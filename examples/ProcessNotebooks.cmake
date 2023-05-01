@@ -5,11 +5,13 @@
 ##===----------------------------------------------------------------------===##
 
 # Copy over the notebooks and strip out the check lines from the notebooks.
-get_filename_component(notebookDir "${OUTPUT_NOTEBOOK}" DIRECTORY)
-file(COPY "${INPUT_NOTEBOOK}" DESTINATION "${notebookDir}")
-
-file(READ "${OUTPUT_NOTEBOOK}" fileContents)
+file(READ "${INPUT_NOTEBOOK}" fileContents)
 string(REGEX REPLACE "\n +\" *#\\|[^\"]*\"," "" fileContents "${fileContents}")
+
+# Write the file without the CHECK lines, but with YAML.
+get_filename_component(notebookDir "${OUTPUT_NOTEBOOK}" DIRECTORY)
+get_filename_component(notebookName "${OUTPUT_NOTEBOOK}" NAME)
+file(WRITE "${notebookDir}/nocheckyesyaml/${notebookName}" "${fileContents}")
 
 # Get the first 'raw' cell. That will be the front matter.
 string(JSON numCells LENGTH "${fileContents}" "cells")
@@ -58,4 +60,5 @@ if (NOT ("${frontMatter}" STREQUAL ""))
   endif()
 endif()
 
+# Write the final output.
 file(WRITE "${OUTPUT_NOTEBOOK}" "${fileContents}")
