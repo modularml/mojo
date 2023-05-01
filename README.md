@@ -9,7 +9,7 @@ We plan to open-source Mojo progressively over time, but it's currently
 changing rapidly. We believe that a small, tight-knit group of 
 engineers with a shared vision can move faster than a community effort, so we will
 continue to incubate it within Modular until it's more complete.  Please see the 
-[Mojo FAQ](https://docs.modular.com/mojo/faq.html) for answers to this and other 
+[Mojo FAQ](https://docs.modular.com/mojo/faq.html) for more information about this and other 
 common questions. 
 
 We've opened this repo now because we want to gather issues and engage in feedback 
