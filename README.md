@@ -5,8 +5,8 @@ and production by combining Python syntax and ecosystem with systems
 programming and metaprogramming features. Mojo is still young, but it is designed
 to become a superset of Python over time.  
 
-We plan to open-source Mojo progressively progressively over time, but for now it's 
-early and changing rapidly. We believe that a small, tight-knit group of 
+We plan to open-source Mojo progressively over time, but it's currently
+changing rapidly. We believe that a small, tight-knit group of 
 engineers with a shared vision can move faster than a community effort, so we will
 continue to incubate it within Modular until it's more complete.  Please see the 
 [Mojo FAQ](https://docs.modular.com/mojo/faq.html) for answers to this and other 
