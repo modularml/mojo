@@ -4,9 +4,13 @@
 #
 ##===----------------------------------------------------------------------===##
 
-# Copy over the notebooks and strip out the check lines from the notebooks.
+# Read the notebook and strip out the CHECK lines first thing.
 file(READ "${INPUT_NOTEBOOK}" fileContents)
-string(REGEX REPLACE "\n +\" *#\\|[^\"]*\"," "" fileContents "${fileContents}")
+string(REGEX REPLACE
+  "\n +\" *#\\| CHECK[^\"]*\","
+  ""
+  fileContents
+  "${fileContents}")
 
 # Write the file without the CHECK lines, but with YAML.
 get_filename_component(notebookDir "${OUTPUT_NOTEBOOK}" DIRECTORY)
