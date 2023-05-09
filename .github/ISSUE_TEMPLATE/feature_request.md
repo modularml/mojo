@@ -2,13 +2,13 @@
 name: Feature request
 about: Suggest an idea for this project
 title: "[Feature Request]"
-labels: ["mojo-external", "enhancement"]
+labels: "enhancement"
 assignees: ''
 
 ---
 
 <!--
-This repository tracks issues and feature requests related to Mojo Programming Language and the Playground. 
+This repository tracks issues and feature requests related to Compiler, Mojo Programming Language and the Playground. While there will be tons of Mojo usecases, we will focus on compiler and language fundamentals and cannot scale the issue tracker to track all possible applications of Mojo.
 -->
 
 ## Request
