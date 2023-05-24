@@ -1,0 +1,37 @@
+name: Documentation issue
+description: Report a problem with the Mojo docs
+title: "[Docs]"
+labels:
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping us improve the Mojo docs!
+        
+        Please add a title above and fill in the following fields so we can understand the problem.
+
+  - type: input
+    attributes:
+      label: Where is the problem?
+      description: Provide a link to the problematic page (with a heading anchor).
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: What can we do better?
+      description: Describe the documentation problem and how you suggest we fix it.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Anything else?
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        Thank you!
