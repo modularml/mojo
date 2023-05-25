@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest an enhancement for Mojo
+title: "[Feature Request]"
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a Mojo enhancement!
+        
+        Please enter a concise title above and fill out the following fields.
+        
+  - type: checkboxes
+    id: Roadmap
+    attributes:
+      label: Review Mojo's priorities
+      description: Please take a look at our roadmap before you file a new feature request. 
+      options:
+        - label: I have read the [roadmap and priorities](https://docs.modular.com/mojo/roadmap.html#overall-priorities) and I believe this request falls within the priorities.
+          required: true
+          
+  - type: textarea
+    id: Request
+    attributes:
+      label: What is your request?
+      description: Describe how you'd like us to improve Mojo.
+      render: shell
+    validations:
+      required: true
+      
+  - type: textarea
+    id: Motivation
+    attributes:
+      label: What is your motivation for this change?
+      description: Describe the problem that your feature seeks to address (what is the value to the product/user?).
+      render: shell
+    validations:
+      required: true
+      
+  - type: textarea
+    id: Description
+    attributes:
+      label: Any other details?
+      description: Perhaps some minimum functional attributes the implementation should include, or other context about your feature.
+      render: shell
+    validations:
+      required: false
