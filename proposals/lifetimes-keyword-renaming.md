@@ -54,7 +54,7 @@ Given this possible direction and layering, I think we should go with something
 like this:
 
 1. `ref`: immutable reference, this is spelled “`borrowed`” today
-2. `mutref`: mutable reference, this is spelled “`inout`” today. I’d love a better keyword suggestion than `mutref` :-)
+2. `mutref`: mutable reference, this is spelled “`inout`” today. I’d love a better keyword suggestion than `mutref`, perhaps just `mut`?
 3. `inout`: abstracted computed mutable reference with getter/setter.
 
 `inout` can decay to `mutref` and `ref` in an argument position with writeback,
@@ -96,3 +96,33 @@ In my opinion, I think we are likely to want to remove `let`’s, but we should
 only do so after the whole lifetime system is up and working.  This will give us
 more information about how things feel in practice and whether they are worth
 the complexity.
+
+## More alternatives to consider:
+
+[@sa- suggests](https://github.com/modularml/mojo/discussions/338#discussioncomment-6104926) the keyword `fix` instead of `let`.
+
+[@mojodojodev suggests](https://github.com/modularml/mojo/discussions/338#discussioncomment-6105688):
+
+`ref[a]` - immutable reference
+`mut[a]` - mutable reference
+`let[a]` - immutable owned
+`var[a]` - mutable owned
+
+Having three letters for all of the keywords will allow the user to understand
+"this is related to ownership and mutability". The problem with the proposed removing let is that code ported from Python to Mojo won't behave the same, keeping let and var is advantageous in that it says this is a Mojo variable so you can add all the weird Python dynamic behavior when the keyword is elided.
+
+[@mzaks suggests](https://github.com/modularml/mojo/discussions/338#discussioncomment-6134220) using numbers to identify lifetimes, e.g.:
+
+```
+fn example['1_life](cond: Bool,
+                    x: borrowed'1 String,
+                    y: borrowed'1 String):
+    # Late initialized local borrow with explicit lifetime
+    borrowed'1 strRef : String
+
+    if cond:
+        strRef = x
+    else:
+      	strRef = y
+    print(strRef)
+```
