@@ -49,19 +49,19 @@ bit different than Rust.
 For example, we expect this to behave like the comments indicate:
 
 ```mojo
-    var someStr = String("hello")
+    var some_str = String("hello")
 
-    # The StringRef contains a reference to the someStr value
-    var someStrRef = StringRef(someStr)
+    # The StringRef contains a reference to the some_str value
+    var some_str_ref = StringRef(some_str)
 
-    # Last use of someStr, but don't destroy it because there is a use of
+    # Last use of some_str, but don't destroy it because there is a use of
     # the reference below!
-    use(someStr)
+    use(some_str)
 
     # References must be propagatable through methods.
-    someStrRef = someStrRef.drop_front().drop_back()
-    print(someStrRef)                                   # Prints "ell"
-    # someStr destroyed here after last reference to it
+    some_str_ref = some_str_ref.drop_front().drop_back()
+    print(some_str_ref)                                   # Prints "ell"
+    # some_str destroyed here after last reference to it
 ```
 
 The major thing that Mojo (and Rust) need from lifetimes is what is called
@@ -186,12 +186,12 @@ fn example(cond: Bool):
     var str2 = String("goodbye")
 
     # Defines an immutable reference with inferred lifetime.
-    borrowed strRef = str1 if cond else str2
-    print(strRef)
+    borrowed str_ref = str1 if cond else str2
+    print(str_ref)
 
     # Defines a mutable reference.
-    inout strRef = str1 if cond else str2
-    strRef = "a new look"
+    inout mut_ref = str1 if cond else str2
+    mut_ref = "a new look"
 
     # One of these will have changed.
     print(str1)
@@ -206,13 +206,13 @@ fn example[life: lifetime](cond: Bool,
                            x: borrowed[life] String,
                            y: borrowed[life] String):
     # Late initialized local borrow with explicit lifetime
-    borrowed[life] strRef : String
+    borrowed[life] str_ref : String
 
     if cond:
-        strRef = x
+        str_ref = x
     else:
-      	strRef = y
-    print(strRef)
+      	str_ref = y
+    print(str_ref)
 ```
 
 ### Keyword (?) for static lifetime
@@ -292,9 +292,9 @@ being more efficient).  We can do this by allowing:
 
 ```mojo
     struct Pointer[type: AnyType, life: lifetime]:
-    	# This getitem returns a reference, so no setitem needed.
-    fn __getitem__(self, offset: Int) -> inout[life] type:
-    		return __get_address_as_lvalue[life](...)
+        # This getitem returns a reference, so no setitem needed.
+        fn __getitem__(self, offset: Int) -> inout[life] type:
+            return __get_address_as_lvalue[life](...)
 ```
 
 We will also need to extend the magic `__get_address_as_lvalue` style functions

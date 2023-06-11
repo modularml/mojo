@@ -14,14 +14,14 @@ the current Mojo keyword paint:
 Instead of reading an argument as “this function takes foo which is a borrowed string”, we would read it as “foo is a borrow/ref of a string”.  This makes it consistent with local borrows on the stack:
 
 ```mojo
-fn doStuff(x: ref(a) String): ...
+fn do_stuff(x: ref(a) String): ...
 
 fn usage():
     var str = String("hello")
     ref r = str   # Defines a local borrow of str.
 
-    doStuff(str)  # Bind a reference to 'str'
-    doStuff(r)    # Pass on existing reference 'str'
+    do_stuff(str)  # Bind a reference to 'str'
+    do_stuff(r)    # Pass on existing reference 'str'
 ```
 
 ## `inout` Keyword => `ref` or `mutref` (??)
@@ -40,7 +40,7 @@ arguments, so the `inout` keyword may return in the future.  For example, we may
 actually want to bind computed values to mutable references:
 
 ```mojo
-	for inout x in someArrayWithGetItemSetItem:
+	for inout x in some_array_with_getitem_and_setitem:
 		x += 1
 ```
 
