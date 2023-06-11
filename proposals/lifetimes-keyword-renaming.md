@@ -118,11 +118,11 @@ fn example['1_life](cond: Bool,
                     x: borrowed'1 String,
                     y: borrowed'1 String):
     # Late initialized local borrow with explicit lifetime
-    borrowed'1 strRef : String
+    borrowed'1 str_ref : String
 
     if cond:
-        strRef = x
+        str_ref = x
     else:
-      	strRef = y
-    print(strRef)
+      	str_ref = y
+    print(str_ref)
 ```
