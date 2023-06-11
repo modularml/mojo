@@ -14,7 +14,7 @@ the current Mojo keyword paint:
 Instead of reading an argument as “this function takes foo which is a borrowed string”, we would read it as “foo is a borrow/ref of a string”.  This makes it consistent with local borrows on the stack:
 
 ```mojo
-fn do_stuff(x: ref(a) String): ...
+fn do_stuff[a: lifetime](x: ref(a) String): ...
 
 fn usage():
     var str = String("hello")
