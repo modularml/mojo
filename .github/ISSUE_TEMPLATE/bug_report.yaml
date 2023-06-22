@@ -16,7 +16,6 @@ body:
     attributes:
       label: Bug description
       description: Describe the bug you encountered and what you expected to happen.
-      render: shell
     validations:
       required: true
       
@@ -30,7 +29,6 @@ body:
         - Include relevant code snippet that did not work as expected.
         - If applicable, add screenshots to help explain the problem.
         - Include anything else that might help us debug the issue.
-      render: shell
     validations:
       required: true
       
