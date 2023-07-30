@@ -132,16 +132,16 @@ fn longest2<'a>(x: &'a mut str, y: &'a mut str) -> &'a mut str {..}
 
 I think we can clean this up in Mojo.  We already have a general set of values
 in our generic signature list: we just need to “parameterize” the `inout` and
-`borrowed` keywords with a parametric lifetime.  Assuming such a `lifetime`  (or
-`Lifetime`?) is defined with a builtin type like `AnyType` we can use:
+`borrowed` keywords with a parametric lifetime.  Assuming such a `Lifetime` is
+defined with a builtin type like `AnyType` we can use:
 
 ```mojo
 # Proposed Mojo syntax, without sugar.
-fn longest[a: lifetime](x: borrowed[a] String,
+fn longest[a: Lifetime](x: borrowed[a] String,
                         y: borrowed[a] String) -> borrowed[a] String:
     return x if len(x) >= len(y) else y
 
-fn longest2[a: lifetime](x: inout[a] String,
+fn longest2[a: Lifetime](x: inout[a] String,
                          y: inout[a] String) -> inout[a] String:
 ```
 
@@ -173,7 +173,7 @@ type name, so parens may be better to make these more syntactically distinct.
 The spelling in structs should flow naturally from this:
 
 ```mojo
-struct StringRef[life: lifetime]:
+struct StringRef[life: Lifetime]:
     var data : Pointer[UInt8, life]
     var len : Int
 ```
@@ -202,7 +202,7 @@ We also want local references to allow late initialization and explicitly
 declared lifetimes as well:
 
 ```mojo
-fn example[life: lifetime](cond: Bool,
+fn example[life: Lifetime](cond: Bool,
                            x: borrowed[life] String,
                            y: borrowed[life] String):
     # Late initialized local borrow with explicit lifetime
@@ -221,7 +221,7 @@ I think we can have a useful feature set without requiring the ability to specif
 
 Similarly, unsafe pointer tricks (e.g. when working with C) may want to use the static lifetime marker to disable all tracking.  We can start with a stub like `__static_lifetime` and then re-syntax it later.
 
-### Syntatic Sugar: Implicitly declared lifetime parameter names
+### Syntatic Sugar(?): Implicitly declared lifetime parameter names
 
 One common use of named lifetime parameters is to tie the lifetime of the result
 of a function back to the lifetime of one of the function arguments.  One
@@ -250,7 +250,7 @@ things like this:
 
 ```mojo
     struct MyExample:
-    	fn method[self_life: lifetime](self: inout[self_life] Self)
+    	fn method[self_life: Lifetime](self: inout[self_life] Self)
     	        -> Pointer[Int, self_life]:
     		...
 
@@ -291,7 +291,7 @@ rather them to expose a reference to the value already in memory (therefore
 being more efficient).  We can do this by allowing:
 
 ```mojo
-    struct Pointer[type: AnyType, life: lifetime]:
+    struct Pointer[type: AnyType, life: Lifetime]:
         # This getitem returns a reference, so no setitem needed.
         fn __getitem__(self, offset: Int) -> inout[life] type:
             return __get_address_as_lvalue[life](...)
@@ -314,7 +314,7 @@ that it needs to work with as well as element type:
 ```mojo
     @value
     @register_passable("trivial")
-    struct MutablePointer[type: AnyType, life: lifetime]:
+    struct MutablePointer[type: AnyType, life: Lifetime]:
         alias pointer_type = __mlir_type[...]
         var address: pointer_type
 
@@ -324,11 +324,10 @@ that it needs to work with as well as element type:
         # Should this be an __init__ to allow implicit conversions?
         @static_method
         fn address_of(inout[life] arg: type) -> Self:
-        	...
+            ...
 
         fn __getitem__(self, offset: Int) -> inout[life] type:
-   		    ...
-
+   	        ...
 
         @staticmethod
         fn alloc(count: Int) -> Self: ...
@@ -337,6 +336,7 @@ that it needs to work with as well as element type:
     fn exercise_pointer():
     	# Allocated untracked data with static/immortal lifetime.
     	let ptr = MutablePointer[Int, __static_lifetime].alloc(42)
+
     	# Use extended getitem through reference to support setter.
     	ptr[4] = 7
 
@@ -371,7 +371,7 @@ We may also want to wire up the prefix star operator into a dunder method.
 ```
     @value
     @register_passable("trivial")
-    struct MutableArraySlice[type: AnyType, life: lifetime]:
+    struct MutableArraySlice[type: AnyType, life: Lifetime]:
         var ptr: MutablePointer[type, life]
         var size: Int
 
@@ -405,7 +405,7 @@ implemented with `std::vector` style eager copying:
         var size: Int
         var capacity: Int
 
-    	fn __getitem__[life: lifetime](self: inout[life], start: Int,
+    	fn __getitem__[life: Lifetime](self: inout[life], start: Int,
                             stop: Int) -> MutableArraySlice[type, life]:
     		return MutableArraySlice(ptr, size)
 ```
