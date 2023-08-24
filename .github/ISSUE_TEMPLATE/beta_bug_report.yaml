@@ -1,5 +1,5 @@
-name: Bug report
-description: Create a bug report to help us improve Mojo
+name: Beta Bug report
+description: Create a bug report for the beta program to help us improve Mojo
 title: "[BETA]: "
 labels:
   - bug
