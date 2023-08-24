@@ -1,0 +1,43 @@
+name: Bug report
+description: Create a bug report to help us improve Mojo
+title: "[BETA]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out a bug report!
+        
+        Please provide a descriptive title above and fill in the following fields.
+        
+  - type: textarea
+    id: Description
+    attributes:
+      label: Bug description
+      description: Describe the bug you encountered and what you expected to happen.
+    validations:
+      required: true
+      
+  - type: textarea
+    id: Steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the specific steps to reproduce the issue. 
+      value: |
+        - Include relevant code snippet that did not work as expected.
+        - If applicable, add screenshots to help explain the problem.
+        - Include anything else that might help us debug the issue.
+    validations:
+      required: true
+      
+  - type: textarea
+    id: Context
+    attributes:
+      label: System information
+      description: Create a new notebook in Mojo Playground, execute the following code, and paste the output back into this text box.
+      value: |
+        - What OS did you do install modular CLI/mojo on ?
+        - Provide version information for Mojo by pasting the output of `mojo -v`
+        - Provide Modular CLI version by pasting the output of `modular -v`
+      render: shell
