@@ -11,11 +11,18 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-# This sample demonstrates some basic Mojo
-# Range and print functions available as builtins
+
+# Simple python program to test interop
+
+import numpy as np
+from timeit import timeit
 
 
-def main():
-    print("Hello Mojo 🔥!")
-    for x in range(9, 0, -3):
-        print(x)
+def test_interop_func():
+    print("Hello from Python!")
+    a = np.array([1, 2, 3])
+    print("I can even print a numpy array: ", a)
+
+
+if __name__ == "__main__":
+    print(timeit(lambda: test_interop_func(), number=1))
