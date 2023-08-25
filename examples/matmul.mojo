@@ -66,16 +66,16 @@ struct Matrix:
 fn run_matmul_python(M: Int, N: Int, K: Int) -> Float64:
     var gflops: Float64 = 0.0
     let python = Python()
-    alias test_dir = "/root/mojo-examples"
     try:
-        Python.add_to_path(test_dir)
+        Python.add_to_path(".")
+        Python.add_to_path("./examples")
         let pymatmul_module: PythonObject = Python.import_module("pymatmul")
         if pymatmul_module:
             gflops = pymatmul_module.benchmark_matmul_python(
                 M, N, K
             ).to_float64()
         else:
-            print("Python matmul module not found")
+            print("pymatmul module not found")
     except e:
         print(e.value)
         pass
