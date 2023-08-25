@@ -26,14 +26,11 @@ def main():
     print("Hello Mojo 🔥!")
     for x in range(9, 0, -3):
         print(x)
-    alias test_dir = "/root/mojo-examples"
     try:
-        Python.add_to_path(test_dir)
-        let test_module: PythonObject = Python.import_module("simple_interop")
-        if test_module:
-            _ = test_module.test_interop_func()
-        else:
-            print("Could not locate module: ", test_module)
+        Python.add_to_path(".")
+        Python.add_to_path("./examples")
+        let test_module = Python.import_module("simple_interop")
+        test_module.test_interop_func()
     except e:
         print(e.value)
-        pass
+        print("could not find module simple_interop")
