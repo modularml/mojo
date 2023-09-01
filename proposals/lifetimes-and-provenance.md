@@ -74,7 +74,7 @@ in the context of `a`.
 
 Because of this, the lifetimes in a function signature are something of a
 "transfer function" that expresses mappings from input lifetimes to returned
-lifetimes, and that allow reasoning about the lifetimes of field references.
+lifetimes, and that allows reasoning about the lifetimes of field references.
 Mojo already has a powerful parameter system that allows it to express these
 sorts of relationships, so this all plugs together.
 
@@ -108,12 +108,12 @@ This change invalidates a basic syntax decision we made earlier: we need to move
 
 ```
 // Mojo today
-fn example(inout a: Int, borrowed b: F32): …
+fn example(inout a: Int, borrowed b: Float32): …
 struct S:
   fn method(inout self): …
 
 // Mojo with lifetimes
-fn example(a: inout Int, b: borrowed F32): …
+fn example(a: inout Int, b: borrowed Float32): …
 struct S:
   fn method(self: inout): …
 ```
