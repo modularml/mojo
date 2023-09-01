@@ -104,8 +104,8 @@ fn vectorized():
             let cy = min_y + (row + iota[float_type, simd_width]()) * scale_y
             let cx = min_x + col * scale_x
             let c = ComplexSIMD[float_type, simd_width](cx, cy)
-            m.simd_store[simd_width](
-                Index(col, row), mandelbrot_kernel_SIMD[simd_width](c)
+            m._ptr.simd_store[simd_width](
+                col * height + row, mandelbrot_kernel_SIMD[simd_width](c)
             )
 
         # Vectorize the call to compute_vector where call gets a chunk of pixels.
@@ -139,8 +139,8 @@ fn parallelized():
             let cy = min_y + (row + iota[float_type, simd_width]()) * scale_y
             let cx = min_x + col * scale_x
             let c = ComplexSIMD[float_type, simd_width](cx, cy)
-            m.simd_store[simd_width](
-                Index(col, row), mandelbrot_kernel_SIMD[simd_width](c)
+            m._ptr.simd_store[simd_width](
+                col * height + row, mandelbrot_kernel_SIMD[simd_width](c)
             )
 
         # Vectorize the call to compute_vector where call gets a chunk of pixels.
@@ -176,8 +176,8 @@ fn compare():
             let cy = min_y + (row + iota[float_type, simd_width]()) * scale_y
             let cx = min_x + col * scale_x
             let c = ComplexSIMD[float_type, simd_width](cx, cy)
-            m.simd_store[simd_width](
-                Index(col, row), mandelbrot_kernel_SIMD[simd_width](c)
+            m._ptr.simd_store[simd_width](
+                col * height + row, mandelbrot_kernel_SIMD[simd_width](c)
             )
 
         # Vectorize the call to compute_vector where call gets a chunk of pixels.
@@ -204,6 +204,8 @@ fn compare():
         let parallelized = Benchmark().run[bench_parallel[simd_width]]() / 1e6
         print("Parallelized:", parallelized, "ms")
         print("Parallel speedup:", vectorized / parallelized)
+
+    _ = m
 
 
 fn main() raises:
