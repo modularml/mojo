@@ -27,6 +27,7 @@ from algorithm import vectorize, parallelize, vectorize_unroll
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from python.object import PythonObject
 from python.python import Python, _destroy_python, _init_python
+from runtime.llcl import Runtime
 
 
 struct Matrix:
@@ -82,7 +83,7 @@ fn run_matmul_python(M: Int, N: Int, K: Int) -> Float64:
     return gflops
 
 
-fn matmul_naive(C: Matrix, A: Matrix, B: Matrix):
+fn matmul_naive(C: Matrix, A: Matrix, B: Matrix, _rt: Runtime):
     for m in range(C.rows):
         for k in range(A.cols):
             for n in range(C.cols):
@@ -93,7 +94,7 @@ fn matmul_naive(C: Matrix, A: Matrix, B: Matrix):
 alias nelts = simdwidthof[DType.float32]()  # The SIMD vector width.
 
 
-fn matmul_vectorized_0(C: Matrix, A: Matrix, B: Matrix):
+fn matmul_vectorized_0(C: Matrix, A: Matrix, B: Matrix, _rt: Runtime):
     for m in range(C.rows):
         for k in range(A.cols):
             for nv in range(0, C.cols, nelts):
@@ -108,7 +109,7 @@ fn matmul_vectorized_0(C: Matrix, A: Matrix, B: Matrix):
 
 # Simplify the code by using the builtin vectorize function
 # from Functional import vectorize
-fn matmul_vectorized_1(C: Matrix, A: Matrix, B: Matrix):
+fn matmul_vectorized_1(C: Matrix, A: Matrix, B: Matrix, _rt: Runtime):
     for m in range(C.rows):
         for k in range(A.cols):
 
@@ -123,7 +124,7 @@ fn matmul_vectorized_1(C: Matrix, A: Matrix, B: Matrix):
 
 # Parallelize the code by using the builtin parallelize function
 # from Functional import parallelize
-fn matmul_parallelized(C: Matrix, A: Matrix, B: Matrix):
+fn matmul_parallelized(C: Matrix, A: Matrix, B: Matrix, rt: Runtime):
     @parameter
     fn calc_row(m: Int):
         for k in range(A.cols):
@@ -136,7 +137,7 @@ fn matmul_parallelized(C: Matrix, A: Matrix, B: Matrix):
 
             vectorize[nelts, dot](C.cols)
 
-    parallelize[calc_row](C.rows)
+    parallelize[calc_row](rt, C.rows)
 
 
 # Perform 2D tiling on the iteration space defined by end_x and end_y.
@@ -148,7 +149,7 @@ fn tile[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
 
 
 # Use the above tile function to perform tiled matmul.
-fn matmul_tiled_parallelized(C: Matrix, A: Matrix, B: Matrix):
+fn matmul_tiled_parallelized(C: Matrix, A: Matrix, B: Matrix, rt: Runtime):
     @parameter
     fn calc_row(m: Int):
         @parameter
@@ -172,12 +173,14 @@ fn matmul_tiled_parallelized(C: Matrix, A: Matrix, B: Matrix):
         alias tile_size = 4
         tile[calc_tile, nelts * tile_size, tile_size](A.cols, C.cols)
 
-    parallelize[calc_row](C.rows)
+    parallelize[calc_row](rt, C.rows)
 
 
 # Unroll the vectorized loop by a constant factor.
 # from Functional import vectorize_unroll
-fn matmul_tiled_unrolled_parallelized(C: Matrix, A: Matrix, B: Matrix):
+fn matmul_tiled_unrolled_parallelized(
+    C: Matrix, A: Matrix, B: Matrix, rt: Runtime
+):
     @parameter
     fn calc_row(m: Int):
         @parameter
@@ -202,31 +205,33 @@ fn matmul_tiled_unrolled_parallelized(C: Matrix, A: Matrix, B: Matrix):
         alias tile_size = 4
         tile[calc_tile, nelts * tile_size, tile_size](A.cols, C.cols)
 
-    parallelize[calc_row](C.rows)
+    parallelize[calc_row](rt, C.rows)
 
 
 @always_inline
 fn benchmark[
-    func: fn (Matrix, Matrix, Matrix) -> None
+    func: fn (Matrix, Matrix, Matrix, Runtime) -> None
 ](M: Int, N: Int, K: Int, base_gflops: Float64, str: String):
     var C = Matrix(M, N)
     C.zero()
     var A = Matrix(M, K)
     var B = Matrix(K, N)
 
-    @always_inline
-    @parameter
-    fn test_fn():
-        _ = func(C, A, B)
+    with Runtime() as rt:
 
-    let secs = Float64(Benchmark().run[test_fn]()) / 1_000_000_000
-    # Prevent the matrices from being freed before the benchmark run
-    _ = (A, B, C)
-    let gflops = ((2 * M * N * K) / secs) / 1e9
-    let speedup: Float64 = gflops / base_gflops
-    # print(gflops, "GFLOP/s", speedup, " speedup")
-    print(str)
-    print(gflops, "GFLOP/s <>", speedup.to_int(), "x speedup over Python")
+        @always_inline
+        @parameter
+        fn test_fn():
+            _ = func(C, A, B, rt)
+
+        let secs = Float64(Benchmark().run[test_fn]()) / 1_000_000_000
+        # Prevent the matrices from being freed before the benchmark run
+        _ = (A, B, C)
+        let gflops = ((2 * M * N * K) / secs) / 1e9
+        let speedup: Float64 = gflops / base_gflops
+        # print(gflops, "GFLOP/s", speedup, " speedup")
+        print(str)
+        print(gflops, "GFLOP/s <>", speedup.to_int(), "x speedup over Python")
 
 
 fn main():
