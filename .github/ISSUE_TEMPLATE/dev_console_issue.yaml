@@ -1,0 +1,31 @@
+name: Develper Console Issue report
+description: Create a issue report to help us improve the Developer Console. 
+title: "[Dev Console]: "
+labels:
+  - dev-console
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out a bug report!
+        
+        Please provide a descriptive title above and fill in the following fields.
+        
+  - type: textarea
+    id: Description
+    attributes:
+      label: Issue description
+      description: Describe the issue you encountered and what you expected to happen.
+    validations:
+      required: true
+      
+  - type: textarea
+    id: Steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the specific steps to reproduce the issue. 
+      value: |
+        - Add screenshots if possible, to help explain the problem.
+        - Include anything that might help us debug the issue.
+    validations:
+      required: true
