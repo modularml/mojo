@@ -1,0 +1,24 @@
+version: "3.8"
+services:
+  spinningup:
+    image: mojosdk:latest
+    container_name: mojosdk
+    tty: true
+    stdin_open: true
+    ports:
+      - 8888:8888
+    volumes:
+      - ../../:/mojo
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    restart: unless-stopped
+    # entrypoint: /bin/bash
+    deploy:
+      resources:
+        # limits:
+        #   cpus: '6'
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
