@@ -38,7 +38,7 @@ body:
       label: System information
       description: What version of Mojo are you using?
       value: |
-        - What OS did you do install mojo on ?
+        - What OS did you do install Mojo on ?
         - Provide version information for Mojo by pasting the output of `mojo -v`
         - Provide Modular CLI version by pasting the output of `modular -v`
       render: shell
