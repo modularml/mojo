@@ -1,7 +1,9 @@
 version: "3.8"
 services:
-  spinningup:
-    image: mojosdk:latest
+  mojosdk:
+    image: mojosdk
+    build:
+      dockerfile: ./Dockerfile.mojosdk
     container_name: mojosdk
     tty: true
     stdin_open: true
