@@ -1,6 +1,6 @@
-name: Beta Bug report
-description: Create a bug report for the beta program to help us improve Mojo
-title: "[BETA]: "
+name: Mojo bug report
+description: Create a bug report to help us improve Mojo
+title: "[BUG]: "
 labels:
   - bug
 body:
@@ -25,8 +25,9 @@ body:
       label: Steps to reproduce
       description: Provide the specific steps to reproduce the issue. 
       value: |
-        - Include relevant code snippet that did not work as expected.
+        - Include relevant code snippet or link to code that did not work as expected.
         - If applicable, add screenshots to help explain the problem.
+        - If using the Playground, name the pre-existing notebook that failed and the steps that led to failure.
         - Include anything else that might help us debug the issue.
     validations:
       required: true
@@ -35,9 +36,9 @@ body:
     id: Context
     attributes:
       label: System information
-      description: Create a new notebook in Mojo Playground, execute the following code, and paste the output back into this text box.
+      description: What version of Mojo are you using?
       value: |
-        - What OS did you do install modular CLI/mojo on ?
+        - What OS did you do install Mojo on ?
         - Provide version information for Mojo by pasting the output of `mojo -v`
         - Provide Modular CLI version by pasting the output of `modular -v`
       render: shell

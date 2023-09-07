@@ -1,4 +1,4 @@
-name: Feature request
+name: Mojo feature request
 description: Suggest an enhancement for Mojo
 title: "[Feature Request]"
 labels:
@@ -19,6 +19,11 @@ body:
       options:
         - label: I have read the [roadmap and priorities](https://docs.modular.com/mojo/roadmap.html#overall-priorities) and I believe this request falls within the priorities.
           required: true
+          
+  - type: markdown
+    attributes:
+      value: |
+        If the request is out of the published roadmap and priorities, please start an [idea](https://github.com/modularml/mojo/discussions/categories/ideas) in GH Discussions to get feedback from the team. 
           
   - type: textarea
     id: Request
