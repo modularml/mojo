@@ -1,4 +1,4 @@
-name: Bug report
+name: Mojo bug report
 description: Create a bug report to help us improve Mojo
 title: "[BUG]: "
 labels:
@@ -25,9 +25,9 @@ body:
       label: Steps to reproduce
       description: Provide the specific steps to reproduce the issue. 
       value: |
-        - Name the pre-existing notebook that failed and the steps that led to failure.
-        - Include relevant code snippet that did not work as expected.
+        - Include relevant code snippet or link to code that did not work as expected.
         - If applicable, add screenshots to help explain the problem.
+        - If using playground, name the pre-existing notebook that failed and the steps that led to failure.
         - Include anything else that might help us debug the issue.
     validations:
       required: true
@@ -36,9 +36,9 @@ body:
     id: Context
     attributes:
       label: System information
-      description: Create a new notebook in Mojo Playground, execute the following code, and paste the output back into this text box.
+      description: What version of Mojo are you using?
       value: |
-        %%python
-        import subprocess
-        subprocess.Popen(["cat", "/proc/self/cgroup"])
+        - What OS did you do install mojo on ?
+        - Provide version information for Mojo by pasting the output of `mojo -v`
+        - Provide Modular CLI version by pasting the output of `modular -v`
       render: shell
