@@ -12,10 +12,28 @@ string(REGEX REPLACE
   fileContents
   "${fileContents}")
 
+
 # Write the file without the CHECK lines, but with YAML.
 get_filename_component(notebookDir "${OUTPUT_NOTEBOOK}" DIRECTORY)
 get_filename_component(notebookName "${OUTPUT_NOTEBOOK}" NAME)
-file(WRITE "${notebookDir}/nocheckyesyaml/${notebookName}" "${fileContents}")
+set(WEBSITE_NOTEBOOK ${notebookDir}/nocheckyesyaml/${notebookName})
+file(WRITE "${WEBSITE_NOTEBOOK}" "${fileContents}")
+# For the version of notebooks going to the docs website,
+# find cells with "REMOVE_FOR_WEBSITE" and strip the entire cell
+file(MAKE_DIRECTORY ${notebookDir}/nocheckyesyaml/stripped/)
+set(STRIPPED_NOTEBOOK ${notebookDir}/nocheckyesyaml/stripped/${notebookName})
+execute_process(
+    COMMAND sh -c "cat ${WEBSITE_NOTEBOOK} | jq '.cells = [.cells[] | select(.source[0] | test(\"REMOVE_FOR_WEBSITE\")? | not)]' > ${STRIPPED_NOTEBOOK}"
+)
+file(REMOVE ${WEBSITE_NOTEBOOK}) # Don't need the "nocheckyesyaml" file anymore
+
+# For the version of notebooks going to GitHub and the Playground,
+# just remove the comment for "REMOVE_FOR_WEBSITE" (leaving the cell intact)
+string(REGEX REPLACE
+  "\n +\" *\\[\\/\\/\\]: # REMOVE_FOR_WEBSITE[^\"]*\","
+  ""
+  fileContents
+  "${fileContents}")
 
 # Get the first 'raw' cell. That will be the front matter.
 string(JSON numCells LENGTH "${fileContents}" "cells")
