@@ -27,7 +27,7 @@ body:
       value: |
         - Include relevant code snippet or link to code that did not work as expected.
         - If applicable, add screenshots to help explain the problem.
-        - If using playground, name the pre-existing notebook that failed and the steps that led to failure.
+        - If using the Playground, name the pre-existing notebook that failed and the steps that led to failure.
         - Include anything else that might help us debug the issue.
     validations:
       required: true
