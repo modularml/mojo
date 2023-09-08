@@ -11,16 +11,9 @@ services:
       - 8888:8888
     volumes:
       - ../../:/mojo
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
     restart: unless-stopped
     # entrypoint: /bin/bash
     deploy:
-      resources:
-        # limits:
-        #   cpus: '6'
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      # resources:
+      #   limits:
+      #     cpus: '6'
