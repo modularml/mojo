@@ -98,7 +98,7 @@ fn benchmark_stdlib_reduce_sum_larger(size: Int) -> Float32:
     # Allocate a Buffer and then use the Mojo stdlib Reduction class
     # TODO: Use globals
     # alias numElem = size
-    alias numElem = 1 << 27
+    alias numElem = 1 << 29
     # Can use either stack allocation or heap
     # see stackalloc
     # var A = Buffer[numElem, DType.float32].stack_allocation()
@@ -146,8 +146,8 @@ fn main():
 
     # larger scale
 
-    print("At a larger scale (2**27 elements)...")
-    size = 1 << 27
+    print("At a larger scale (2**29 elements)...")
+    size = 1 << 29
     eval_begin= now()
     sum = benchmark_naive_reduce_sum(size)
     eval_end= now()
