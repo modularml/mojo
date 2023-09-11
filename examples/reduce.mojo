@@ -66,11 +66,39 @@ fn benchmark_naive_reduce_sum(size: Int) -> Float32:
     return mySum
 
 
-fn benchmark_stdlib_reduce_sum(size: Int) -> Float32:
+fn benchmark_stdlib_reduce_sum_smaller(size: Int) -> Float32:
     # Allocate a Buffer and then use the Mojo stdlib Reduction class
     # TODO: Use globals
     # alias numElem = size
-    alias numElem = 1 << 30
+    alias numElem = 1 << 21
+    # Can use either stack allocation or heap
+    # see stackalloc
+    # var A = Buffer[numElem, DType.float32].stack_allocation()
+    # see heapalloc
+    var B = DTypePointer[DType.float32].alloc(numElem)
+    var A = Buffer[numElem, DType.float32](B)
+
+    # initialize buffer
+    for i in range(numElem):
+        A[i] = Float32(i)
+
+    # Prevent DCE
+    var mySum: Float32 = 0.0
+    print("Computing reduction sum for array num elements: ", size)
+
+    @always_inline
+    @parameter
+    fn test_fn():
+        mySum = sum[numElem, DType.float32](A)
+
+    let bench_time = Float64(Benchmark().run[test_fn]())
+    return mySum
+
+fn benchmark_stdlib_reduce_sum_larger(size: Int) -> Float32:
+    # Allocate a Buffer and then use the Mojo stdlib Reduction class
+    # TODO: Use globals
+    # alias numElem = size
+    alias numElem = 1 << 27
     # Can use either stack allocation or heap
     # see stackalloc
     # var A = Buffer[numElem, DType.float32].stack_allocation()
@@ -111,10 +139,12 @@ fn main():
     print("Completed naive reduction sum: ", sum, " in ", execution_time, "ms")
 
     eval_begin = now()
-    sum = benchmark_stdlib_reduce_sum(size)
+    sum = benchmark_stdlib_reduce_sum_smaller(size)
     eval_end = now()
     execution_time = Float64((eval_end - eval_begin)) / 1e6
     print("Completed stdlib reduction sum: ", sum, " in ", execution_time, "ms")
+
+    # larger scale
 
     print("At a larger scale (2**27 elements)...")
     size = 1 << 27
@@ -125,7 +155,7 @@ fn main():
     print("Completed naive reduction sum: ", sum, " in ", execution_time, "ms")
 
     eval_begin = now()
-    sum = benchmark_stdlib_reduce_sum(size)
+    sum = benchmark_stdlib_reduce_sum_larger(size)
     eval_end = now()
     execution_time = Float64((eval_end - eval_begin)) / 1e6
     print("Completed stdlib reduction sum: ", sum, " in ", execution_time, "ms")
