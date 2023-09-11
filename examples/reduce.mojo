@@ -96,15 +96,32 @@ fn benchmark_stdlib_reduce_sum(size: Int) -> Float32:
 
 
 fn main():
-    # Number of array elements
-    let size = 1 << 21
     print("# Reduction sum across a large array. The naive algorithm's ")
     print("# computation time scales with the size of the array; while Mojo ")
     print("# exhibits significantly better scaling...")
+
+    # Number of array elements
+    var size = 1 << 21
+
+    print("At a smaller scale (2**21 elements)...")
     var eval_begin: Float64 = now()
     var sum = benchmark_naive_reduce_sum(size)
     var eval_end: Float64 = now()
     var execution_time = Float64((eval_end - eval_begin)) / 1e6
+    print("Completed naive reduction sum: ", sum, " in ", execution_time, "ms")
+
+    eval_begin = now()
+    sum = benchmark_stdlib_reduce_sum(size)
+    eval_end = now()
+    execution_time = Float64((eval_end - eval_begin)) / 1e6
+    print("Completed stdlib reduction sum: ", sum, " in ", execution_time, "ms")
+
+    print("At a larger scale (2**27 elements)...")
+    size = 1 << 27
+    eval_begin= now()
+    sum = benchmark_naive_reduce_sum(size)
+    eval_end= now()
+    execution_time = Float64((eval_end - eval_begin)) / 1e6
     print("Completed naive reduction sum: ", sum, " in ", execution_time, "ms")
 
     eval_begin = now()
