@@ -48,7 +48,7 @@ fn main():
 
         @parameter
         fn compute_vector[simd_width: Int](col: Int):
-            """Each time we oeprate on a `simd_width` vector of pixels."""
+            """Each time we operate on a `simd_width` vector of pixels."""
             let cx = min_x + (col + iota[float_type, simd_width]()) * scale_x
             let cy = min_y + row * scale_y
             let c = ComplexSIMD[float_type, simd_width](cx, cy)
