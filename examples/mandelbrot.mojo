@@ -6,6 +6,7 @@ from runtime.llcl import num_cores, Runtime
 from algorithm import parallelize, vectorize
 from tensor import Tensor
 from utils.index import Index
+from python import Python
 
 alias float_type = DType.float64
 alias simd_width = 2 * simdwidthof[float_type]()
