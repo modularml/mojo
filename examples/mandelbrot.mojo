@@ -24,17 +24,22 @@ fn mandelbrot_kernel_SIMD[
     simd_width: Int
 ](c: ComplexSIMD[float_type, simd_width]) -> SIMD[float_type, simd_width]:
     """A vectorized implementation of the inner mandelbrot computation."""
-    var z = ComplexSIMD[float_type, simd_width](0, 0)
+    let cx = c.re
+    let cy = c.im
+    var x = SIMD[float_type, simd_width](0)
+    var y = SIMD[float_type, simd_width](0)
+    var y2 = SIMD[float_type, simd_width](0)
     var iters = SIMD[float_type, simd_width](0)
 
-    var in_set_mask: SIMD[DType.bool, simd_width] = True
+    var t: SIMD[DType.bool, simd_width] = True
     for i in range(MAX_ITERS):
-        if not in_set_mask.reduce_or():
+        if not t.reduce_or():
             break
-        in_set_mask = z.squared_norm() <= 4
-        iters = in_set_mask.select(iters + 1, iters)
-        z = z.squared_add(c)
-
+        y2 = y*y
+        y = x.fma(y + y, cy)
+        t = x.fma(x, y2) <= 4
+        x = x.fma(x, cx - y2)
+        iters = t.select(iters + 1, iters)
     return iters
 
 
