@@ -65,7 +65,7 @@ fn main():
             worker(row)
 
     let vectorized_ms = Benchmark().run[bench[simd_width]]() / 1e6
-    print("Number of hardware cores:", num_cores())
+    print("Number of threads:", num_cores())
     print("Vectorized:", vectorized_ms, "ms")
 
     # Parallelized
