@@ -8,7 +8,7 @@ from tensor import Tensor
 from utils.index import Index
 
 alias float_type = DType.float64
-alias simd_width = simdwidthof[float_type]()
+alias simd_width = 2 * simdwidthof[float_type]()
 
 alias width = 960
 alias height = 960
@@ -73,12 +73,9 @@ fn main():
 
         @parameter
         fn bench_parallel[simd_width: Int]():
-            parallelize[worker](rt, height, 5 * num_cores())
+            parallelize[worker](rt, height, height)
 
-        alias simd_width = simdwidthof[DType.float64]()
-        let parallelized_ms = Benchmark().run[
-            bench_parallel[simd_width]
-        ]() / 1e6
+        let parallelized_ms = Benchmark().run[bench_parallel[simd_width]]() / 1e6
         print("Parallelized:", parallelized_ms, "ms")
         print("Parallel speedup:", vectorized_ms / parallelized_ms)
 
