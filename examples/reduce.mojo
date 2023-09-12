@@ -21,6 +21,9 @@ from algorithm import sum
 from random import rand
 from memory.buffer import Buffer
 
+# Change these numbers to reduce on different sizes
+alias numElemSmall = 1 << 21
+alias numElemLarge = 1 << 29
 
 # Simple array struct
 struct ArrayInput:
@@ -66,61 +69,58 @@ fn benchmark_naive_reduce_sum(size: Int) -> Float32:
     return mySum
 
 
-fn benchmark_stdlib_reduce_sum_smaller(size: Int) -> Float32:
+fn benchmark_stdlib_reduce_sum(size: String) -> Float32:
     # Allocate a Buffer and then use the Mojo stdlib Reduction class
-    # TODO: Use globals
-    # alias numElem = size
-    alias numElem = 1 << 21
-    # Can use either stack allocation or heap
-    # see stackalloc
-    # var A = Buffer[numElem, DType.float32].stack_allocation()
-    # see heapalloc
-    var B = DTypePointer[DType.float32].alloc(numElem)
-    var A = Buffer[numElem, DType.float32](B)
+    if size == 'small':
 
-    # initialize buffer
-    for i in range(numElem):
-        A[i] = Float32(i)
+        alias num_elem_small = numElemSmall
+        # Can use either stack allocation or heap
+        # see stackalloc
+        # var A = Buffer[num_elem_small, DType.float32].stack_allocation()
+        # see heapalloc
+        var B = DTypePointer[DType.float32].alloc(num_elem_small)
+        var A = Buffer[num_elem_small, DType.float32](B)
 
-    # Prevent DCE
-    var mySum: Float32 = 0.0
-    print("Computing reduction sum for array num elements: ", size)
+        # initialize buffer
+        for i in range(num_elem_small):
+            A[i] = Float32(i)
 
-    @always_inline
-    @parameter
-    fn test_fn():
-        mySum = sum[numElem, DType.float32](A)
+        # Prevent DCE
+        var mySum: Float32 = 0.0
+        print("Computing reduction sum for array num elements: ", num_elem_small)
 
-    let bench_time = Float64(Benchmark().run[test_fn]())
-    return mySum
+        @always_inline
+        @parameter
+        fn test_fn():
+            mySum = sum[num_elem_small, DType.float32](A)
 
-fn benchmark_stdlib_reduce_sum_larger(size: Int) -> Float32:
-    # Allocate a Buffer and then use the Mojo stdlib Reduction class
-    # TODO: Use globals
-    # alias numElem = size
-    alias numElem = 1 << 29
-    # Can use either stack allocation or heap
-    # see stackalloc
-    # var A = Buffer[numElem, DType.float32].stack_allocation()
-    # see heapalloc
-    var B = DTypePointer[DType.float32].alloc(numElem)
-    var A = Buffer[numElem, DType.float32](B)
+        let bench_time = Float64(Benchmark().run[test_fn]())
+        return mySum
 
-    # initialize buffer
-    for i in range(numElem):
-        A[i] = Float32(i)
+    else:
+        alias num_elem_large = numElemLarge
+        # Can use either stack allocation or heap
+        # see stackalloc
+        # var A = Buffer[num_elem_large, DType.float32].stack_allocation()
+        # see heapalloc
+        var B = DTypePointer[DType.float32].alloc(num_elem_large)
+        var A = Buffer[num_elem_large, DType.float32](B)
 
-    # Prevent DCE
-    var mySum: Float32 = 0.0
-    print("Computing reduction sum for array num elements: ", size)
+        # initialize buffer
+        for i in range(num_elem_large):
+            A[i] = Float32(i)
 
-    @always_inline
-    @parameter
-    fn test_fn():
-        mySum = sum[numElem, DType.float32](A)
+        # Prevent DCE
+        var mySum: Float32 = 0.0
+        print("Computing reduction sum for array num elements: ", num_elem_large)
 
-    let bench_time = Float64(Benchmark().run[test_fn]())
-    return mySum
+        @always_inline
+        @parameter
+        fn test_fn_large():
+            mySum = sum[num_elem_large, DType.float32](A)
+
+        let bench_time = Float64(Benchmark().run[test_fn_large]())
+        return mySum
 
 
 fn main():
@@ -129,33 +129,35 @@ fn main():
     print("# exhibits significantly better scaling...")
 
     # Number of array elements
-    var size = 1 << 21
+    let size_small: Int = numElemSmall
+    let size_large: Int = numElemLarge
 
-    print("At a smaller scale (2**21 elements)...")
+    # smaller scale
+
+    print("At a smaller scale", size_small, "elements.")
     var eval_begin: Float64 = now()
-    var sum = benchmark_naive_reduce_sum(size)
+    var sum = benchmark_naive_reduce_sum(size_small)
     var eval_end: Float64 = now()
     var execution_time = Float64((eval_end - eval_begin)) / 1e6
     print("Completed naive reduction sum: ", sum, " in ", execution_time, "ms")
 
     eval_begin = now()
-    sum = benchmark_stdlib_reduce_sum_smaller(size)
+    sum = benchmark_stdlib_reduce_sum('small')
     eval_end = now()
     execution_time = Float64((eval_end - eval_begin)) / 1e6
     print("Completed stdlib reduction sum: ", sum, " in ", execution_time, "ms")
 
     # larger scale
 
-    print("At a larger scale (2**29 elements)...")
-    size = 1 << 29
+    print("At a larger scale", size_large, "elements.")
     eval_begin= now()
-    sum = benchmark_naive_reduce_sum(size)
+    sum = benchmark_naive_reduce_sum(size_large)
     eval_end= now()
     execution_time = Float64((eval_end - eval_begin)) / 1e6
     print("Completed naive reduction sum: ", sum, " in ", execution_time, "ms")
 
     eval_begin = now()
-    sum = benchmark_stdlib_reduce_sum_larger(size)
+    sum = benchmark_stdlib_reduce_sum('large')
     eval_end = now()
     execution_time = Float64((eval_end - eval_begin)) / 1e6
     print("Completed stdlib reduction sum: ", sum, " in ", execution_time, "ms")
