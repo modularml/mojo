@@ -14,7 +14,7 @@
 # Example command line:
 # Use no-cache to force docker to rebuild layers of the image by downloading the SDK from the repos
 # docker build --no-cache \
-#    --build-arg AUTH_KEY=<your-modular-auth-key>
+#    --build-arg AUTH_KEY=<your-modular-auth-key> \
 #    --pull -t modular/mojo-v0.2-`date '+%Y%d%m-%H%M'` \
 #    --file Dockerfile.mojosdk .
 
