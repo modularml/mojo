@@ -19,7 +19,7 @@ from benchmark import Benchmark
 from sys.intrinsics import strided_load
 from utils.list import VariadicList
 from math import div_ceil, min
-from memory import memset_zero
+from memory import memset_zero, stack_allocation
 from random import rand, random_float64
 from sys.info import simdwidthof
 from time import now
@@ -43,6 +43,38 @@ struct Matrix:
 
     fn __del__(owned self):
         self.data.free()
+
+    fn zero(inout self):
+        memset_zero(self.data, self.rows * self.cols)
+
+    @always_inline
+    fn __getitem__(self, y: Int, x: Int) -> Float32:
+        return self.load[1](y, x)
+
+    @always_inline
+    fn __setitem__(self, y: Int, x: Int, val: Float32):
+        return self.store[1](y, x, val)
+
+    @always_inline
+    fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[DType.float32, nelts]:
+        return self.data.simd_load[nelts](y * self.cols + x)
+
+    @always_inline
+    fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[DType.float32, nelts]):
+        return self.data.simd_store[nelts](y * self.cols + x, val)
+        
+struct MatrixView:
+    var data: DTypePointer[DType.float32]
+    var rows: Int
+    var cols: Int
+
+    fn __init__(inout self, rows: Int, cols: Int, data: DTypePointer[DType.float32]):
+        self.data = data
+        self.rows = rows
+        self.cols = cols
+
+    fn __del__(owned self):
+        pass
 
     fn zero(inout self):
         memset_zero(self.data, self.rows * self.cols)
@@ -206,7 +238,46 @@ fn matmul_tiled_unrolled_parallelized(
         tile[calc_tile, nelts * tile_size, tile_size](A.cols, C.cols)
 
     parallelize[calc_row](rt, C.rows)
+    
+# Perform 2D tiling on the iteration space defined by end_x and end_y, parallelizing over y.
+fn tile_parallel[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
+    # Note: this assumes that ends are multiples of the tiles.
+    @parameter
+    fn row(yo: Int):
+        let y = tile_y * yo
+        for x in range(0, end_x, tile_x):
+            tiled_fn[tile_x, tile_y](x, y)
+            
+    parallelize[row](end_y // tile_y)
 
+fn matmul_tiled_output(
+    C: Matrix, A: Matrix, B: Matrix, rt: Runtime
+):
+    @parameter
+    fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
+
+        var temp = MatrixView(tile_i, tile_j, stack_allocation[tile_i * tile_j, DType.float32]())
+        temp.zero()
+    
+        for k in range(0, A.cols):
+            @parameter
+            fn calc_tile_row[i: Int]():
+                @parameter
+                fn calc_tile_cols[nelts: Int](j: Int):
+                    temp.store[nelts](i, j, temp.load[nelts](i, j) + A[io + i, k] * B.load[nelts](k, jo + j))
+
+                vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
+
+            unroll[tile_i, calc_tile_row]()
+      
+        # Copy the local tile to the output
+        for i in range(tile_i):
+            for j in range(tile_j):
+                C[io + i, jo + j] = temp[i, j]
+
+    alias tile_i = 4
+    alias tile_j = nelts*4
+    tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
 @always_inline
 fn benchmark[
@@ -298,5 +369,14 @@ fn main():
         (
             "Throughput of a 512x512 {tiled + unrolled + vectorized +"
             " parallelized} matrix multiplication in Mojo: "
+        ),
+    )
+    benchmark[matmul_tiled_output](
+        M,
+        M,
+        M,
+        python_gflops,
+        (
+            "Throughput of a 512x512 {tiled output} matrix multiplication in Mojo: "
         ),
     )
