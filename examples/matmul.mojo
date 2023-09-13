@@ -250,21 +250,23 @@ fn tile_parallel[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end
             
     parallelize[row](end_y // tile_y)
 
+# Tile the output into tiles we can accumulate in registers. This strategy means we can
+# compute tile_i * tile_j values of output for only reading tile_i + tile_j input values.
 fn matmul_tiled_output(
     C: Matrix, A: Matrix, B: Matrix, rt: Runtime
 ):
     @parameter
     fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
-
-        var temp = MatrixView(tile_i, tile_j, stack_allocation[tile_i * tile_j, DType.float32]())
-        temp.zero()
+        # Allocate the tile of accumulators on the stack.
+        var accumulators = MatrixView(tile_i, tile_j, stack_allocation[tile_i * tile_j, DType.float32]())
+        accumulators.zero()
     
         for k in range(0, A.cols):
             @parameter
             fn calc_tile_row[i: Int]():
                 @parameter
                 fn calc_tile_cols[nelts: Int](j: Int):
-                    temp.store[nelts](i, j, temp.load[nelts](i, j) + A[io + i, k] * B.load[nelts](k, jo + j))
+                    accumulators.store[nelts](i, j, accumulators.load[nelts](i, j) + A[io + i, k] * B.load[nelts](k, jo + j))
 
                 vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
 
@@ -273,8 +275,12 @@ fn matmul_tiled_output(
         # Copy the local tile to the output
         for i in range(tile_i):
             for j in range(tile_j):
-                C[io + i, jo + j] = temp[i, j]
+                C[io + i, jo + j] = accumulators[i, j]
 
+    # The goal here is to size this tile such that we use as many registers as possible for accumulators,
+    # without spilling to the stack. On x86 with 32 registers, that should probably be tile_i = 4, tile_j = nelts*3.
+    # However, the tiling mechanism will need work to support tile sizes that don't divide the matrix sizes,
+    # and the accumulators aren't staying in registers currently anyways.
     alias tile_i = 4
     alias tile_j = nelts*4
     tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
