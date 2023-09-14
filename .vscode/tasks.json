@@ -1,0 +1,13 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "runMojo",
+        "type": "shell",
+        "command": "/home/surfer12/.modular/pkg/packages.modular.com_mojo/bin/mojo",
+        "args": ["${file}"],
+        "problemMatcher": []
+      }
+    ]
+  }
+  
