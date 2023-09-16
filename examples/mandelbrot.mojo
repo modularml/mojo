@@ -35,7 +35,7 @@ fn mandelbrot_kernel_SIMD[
     for i in range(MAX_ITERS):
         if not t.reduce_or():
             break
-        y2 = y*y
+        y2 = y * y
         y = x.fma(y + y, cy)
         t = x.fma(x, y2) <= 4
         x = x.fma(x, cx - y2)
@@ -80,7 +80,9 @@ fn main():
         fn bench_parallel[simd_width: Int]():
             parallelize[worker](rt, height, height)
 
-        let parallelized_ms = Benchmark().run[bench_parallel[simd_width]]() / 1e6
+        let parallelized_ms = Benchmark().run[
+            bench_parallel[simd_width]
+        ]() / 1e6
         print("Parallelized:", parallelized_ms, "ms")
         print("Parallel speedup:", vectorized_ms / parallelized_ms)
 
