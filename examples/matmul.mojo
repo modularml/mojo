@@ -203,7 +203,7 @@ fn matmul_tiled_parallelized(C: Matrix, A: Matrix, B: Matrix, rt: Runtime):
 
         # We hardcode the tile factor to be 4.
         alias tile_size = 4
-        tile[calc_tile, nelts * tile_size, tile_size](A.cols, C.cols)
+        tile[calc_tile, nelts * tile_size, tile_size](C.cols, B.rows)
 
     parallelize[calc_row](rt, C.rows)
 
@@ -235,7 +235,7 @@ fn matmul_tiled_unrolled_parallelized(
                 vectorize_unroll[nelts, tile_x // nelts, dot](tile_x)
 
         alias tile_size = 4
-        tile[calc_tile, nelts * tile_size, tile_size](A.cols, C.cols)
+        tile[calc_tile, nelts * tile_size, tile_size](C.cols, B.rows)
 
     parallelize[calc_row](rt, C.rows)
     
@@ -316,11 +316,13 @@ fn main():
     print("Throughput of a 128x128 matrix multiplication in Python: ")
     let python_gflops = run_matmul_python(128, 128, 128)
     alias M = 512
+    alias N = 512
+    alias K = 4096
     # Mojo variants
     benchmark[matmul_naive](
         M,
-        M,
-        M,
+        N,
+        K,
         python_gflops,
         (
             "Throughput of a 512x512 matrix multiplication in Mojo using a"
@@ -329,8 +331,8 @@ fn main():
     )
     benchmark[matmul_vectorized_0](
         M,
-        M,
-        M,
+        N,
+        K,
         python_gflops,
         (
             "Throughput of a 512x512 matrix multiplication in Mojo using"
@@ -339,8 +341,8 @@ fn main():
     )
     benchmark[matmul_vectorized_1](
         M,
-        M,
-        M,
+        N,
+        K,
         python_gflops,
         (
             "Throughput of a 512x512 matrix multiplication in Mojo using the"
@@ -349,8 +351,8 @@ fn main():
     )
     benchmark[matmul_parallelized](
         M,
-        M,
-        M,
+        N,
+        K,
         python_gflops,
         (
             "Throughput of a 512x512 {vectorized + parallelized} matrix"
@@ -359,8 +361,8 @@ fn main():
     )
     benchmark[matmul_tiled_parallelized](
         M,
-        M,
-        M,
+        N,
+        K,
         python_gflops,
         (
             "Throughput of a 512x512 {tiled + vectorized + parallelized} matrix"
@@ -369,8 +371,8 @@ fn main():
     )
     benchmark[matmul_tiled_unrolled_parallelized](
         M,
-        M,
-        M,
+        N,
+        K,
         python_gflops,
         (
             "Throughput of a 512x512 {tiled + unrolled + vectorized +"
@@ -379,8 +381,8 @@ fn main():
     )
     benchmark[matmul_tiled_output](
         M,
-        M,
-        M,
+        N,
+        K,
         python_gflops,
         (
             "Throughput of a 512x512 {tiled output} matrix multiplication in Mojo: "
