@@ -26,7 +26,7 @@ from time import now
 from algorithm import vectorize, parallelize, vectorize_unroll
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from python.object import PythonObject
-from python.python import Python, _destroy_python, _init_python
+from python.python import Python
 from runtime.llcl import Runtime
 
 

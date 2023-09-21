@@ -15,11 +15,7 @@
 # Range and print functions available in the standard library
 # It also demonstrates importing a simple Python program into Mojo
 
-from python.python import (
-    Python,
-    _destroy_python,
-    _init_python,
-)
+from python.python import Python
 
 
 def main():
