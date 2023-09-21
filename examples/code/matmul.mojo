@@ -78,7 +78,7 @@ fn run_matmul_python(M: Int, N: Int, K: Int) -> Float64:
         else:
             print("pymatmul module not found")
     except e:
-        print(e.value)
+        print(e.message())
         pass
     return gflops
 
