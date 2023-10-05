@@ -136,7 +136,7 @@ fn matmul_parallelized(C: Matrix, A: Matrix, B: Matrix):
 
             vectorize[nelts, dot](C.cols)
 
-    parallelize[calc_row](C.rows)
+    parallelize[calc_row](C.rows, C.rows)
 
 
 # Perform 2D tiling on the iteration space defined by end_x and end_y.
@@ -172,7 +172,7 @@ fn matmul_tiled_parallelized(C: Matrix, A: Matrix, B: Matrix):
         alias tile_size = 4
         tile[calc_tile, nelts * tile_size, tile_size](A.cols, C.cols)
 
-    parallelize[calc_row](C.rows)
+    parallelize[calc_row](C.rows, C.rows)
 
 
 # Unroll the vectorized loop by a constant factor.
@@ -202,7 +202,7 @@ fn matmul_tiled_unrolled_parallelized(C: Matrix, A: Matrix, B: Matrix):
         alias tile_size = 4
         tile[calc_tile, nelts * tile_size, tile_size](A.cols, C.cols)
 
-    parallelize[calc_row](C.rows)
+    parallelize[calc_row](C.rows, C.rows)
 
 
 @always_inline
