@@ -15,11 +15,7 @@
 # Range and print functions available in the standard library
 # It also demonstrates importing a simple Python program into Mojo
 
-from python.python import (
-    Python,
-    _destroy_python,
-    _init_python,
-)
+from python.python import Python
 
 
 def main():
@@ -32,5 +28,4 @@ def main():
         let test_module = Python.import_module("simple_interop")
         test_module.test_interop_func()
     except e:
-        print(e.value)
-        print("could not find module simple_interop")
+        print(e, "could not find module simple_interop")
