@@ -17,3 +17,7 @@ fn linear_fill[
     let buf = t._to_buffer()
     for i in range(t.num_elements()):
         buf[i] = elems[i]
+
+
+fn linear_fill[type: DType](t: Tensor[type], *elems: SIMD[type, 1]):
+    linear_fill(t, VariadicList(elems))
