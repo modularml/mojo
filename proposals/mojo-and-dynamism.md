@@ -83,7 +83,7 @@ def foo():
     baz() # throws an 'UnboundLocalError'
 ```
 
-This gets at the heart of how Mojo should treat implicitly declared variables in `def`s. The short answer is: exactly how Python does. `def`s should carry a function-scoped hash table of local variables that is populated and queried at runtime. In other words, lookup of implicitly-declared variables woudl be deferred to runtime. On the other hand, the function does need to have a notion of what variable *could* be available in the function, in order to emit `UnboundLocalError`s as required. Of course, the compiler can optimize the table away and do all the nice stuff compilers do if possible.
+This gets at the heart of how Mojo should treat implicitly declared variables in `def`s. The short answer is: exactly how Python does. `def`s should carry a function-scoped hash table of local variables that is populated and queried at runtime. In other words, lookup of implicitly-declared variables would be deferred to runtime. On the other hand, the function does need to have a notion of what variable *could* be available in the function, in order to emit `UnboundLocalError`s as required. Of course, the compiler can optimize the table away and do all the nice stuff compilers do if possible.
 
 Difficulty arises when discussing `def`s themselves. Although `def`s should internally support full hashtable dynamism, what kind of objects are `def`s themselves? For instance:
 
