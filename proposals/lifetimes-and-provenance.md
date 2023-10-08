@@ -2,7 +2,7 @@
 
 As of mid-May 2023, Mojo has full support for ownership (including move
 semantics, borrows and transfers, mutability, ASAP destruction of values, and
-member synthesis). This provides more expressivity than many languages, but does
+member synthesis). This provides more expressiveness than many languages, but does
 not meet the expectations of Rust and C++ programmers because it is impossible
 to **return references** and **put references in structs**.
 
