@@ -17,7 +17,7 @@ import importlib
 import sys
 import subprocess
 
-if not importlib.find_loader("numpy"):
+if not importlib.util.find_spec("numpy"):
     print("Numpy not found, installing...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy"])
 
