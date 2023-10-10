@@ -15,7 +15,7 @@ services:
       - 8888:8888 
 
     volumes:
-      - ./../examples:/mojo
+      - ./..:/mojo
       
     working_dir: /mojo 
     
