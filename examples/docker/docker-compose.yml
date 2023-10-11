@@ -1,5 +1,5 @@
-## To use docker compose to rebuild the image  
-# docker compose up -d --build
+## To build and run the image run:
+## docker compose up -d
 
 version: "3.8"
 services:

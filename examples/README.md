@@ -35,7 +35,14 @@ extension to develop directly inside the container.
 The Dockerfile also sets up a `conda` environment and by default,  
 starts a `jupyter` server (which you can access via the browser).
 
-To build a Mojo container, use the convenience script provided:
+To build a Mojo container, either use
+[docker-compose](https://docs.docker.com/compose/) in `mojo/examples/docker`:
+
+```bash
+docker compose up -d
+```
+
+Or the convenience script provided:
 
 ```bash
 ./build-image.sh --auth-key <your-modular-auth-key> \
