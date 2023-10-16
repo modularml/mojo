@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
 
 # This sample prints the current host system information using APIs from the
 # sys module.
@@ -66,4 +67,5 @@ def main():
     print("    CPU         : ", cpu)
     print("    Arch        : ", arch)
     print("    Num Cores   : ", num_cores())
+    # CHECK: CPU Features
     print("    CPU Features:", cpu_features)

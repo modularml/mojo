@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
 
 # This sample demonstrates how various systems optimizations can be
 # applied to a naive matmul implementation in Mojo to gain significant
@@ -27,6 +28,7 @@ from algorithm import vectorize, parallelize, vectorize_unroll
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from python.object import PythonObject
 from python.python import Python
+from os.env import getenv
 
 
 struct Matrix:
@@ -65,7 +67,6 @@ struct Matrix:
 
 fn run_matmul_python(M: Int, N: Int, K: Int) -> Float64:
     var gflops: Float64 = 0.0
-    let python = Python()
     try:
         Python.add_to_path(".")
         Python.add_to_path("./examples")
@@ -74,6 +75,7 @@ fn run_matmul_python(M: Int, N: Int, K: Int) -> Float64:
             gflops = pymatmul_module.benchmark_matmul_python(
                 M, N, K
             ).to_float64()
+            print("Throughput in Python:", gflops)
         else:
             print("pymatmul module not found")
     except e:
@@ -224,17 +226,14 @@ fn benchmark[
     _ = (A, B, C)
     let gflops = ((2 * M * N * K) / secs) / 1e9
     let speedup: Float64 = gflops / base_gflops
-    # print(gflops, "GFLOP/s", speedup, " speedup")
     print(str)
     print(gflops, "GFLOP/s <>", speedup.to_int(), "x speedup over Python")
 
 
 fn main():
-    # Python
-    print("Throughput of a 128x128 matrix multiplication in Python: ")
+    # CHECK: Throughput in Python
     let python_gflops = run_matmul_python(128, 128, 128)
     alias M = 512
-    # Mojo variants
     benchmark[matmul_naive](
         M,
         M,
@@ -285,6 +284,7 @@ fn main():
             " multiplication in Mojo: "
         ),
     )
+    # CHECK: Throughput
     benchmark[matmul_tiled_unrolled_parallelized](
         M,
         M,

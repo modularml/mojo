@@ -1,3 +1,17 @@
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2023, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
+
 from benchmark import Benchmark
 from complex import ComplexSIMD, ComplexFloat64
 from math import iota
@@ -74,13 +88,13 @@ fn main():
     print("Vectorized:", vectorized_ms, "ms")
 
     # Parallelized
-
     @parameter
     fn bench_parallel[simd_width: Int]():
         parallelize[worker](height, height)
 
     let parallelized_ms = Benchmark().run[bench_parallel[simd_width]]() / 1e6
     print("Parallelized:", parallelized_ms, "ms")
+    # CHECK: Parallel speedup
     print("Parallel speedup:", vectorized_ms / parallelized_ms)
 
     _ = t  # Make sure tensor isn't destroyed before benchmark is finished

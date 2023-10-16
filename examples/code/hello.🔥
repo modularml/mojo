@@ -10,12 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
 
 # This sample demonstrates some basic Mojo
 # Range and print functions available as builtins
 
 
 def main():
+    # CHECK: Hello Mojo 🔥!
     print("Hello Mojo 🔥!")
     for x in range(9, 0, -3):
         print(x)

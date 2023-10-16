@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
 
 # This sample implements a simple reduction operation on a
 # large array of values to produce a single result.
@@ -111,4 +112,5 @@ fn main():
     sum = benchmark_stdlib_reduce_sum(size)
     eval_end = now()
     execution_time = Float64((eval_end - eval_begin)) / 1e6
+    # CHECK: Completed stdlib
     print("Completed stdlib reduction sum: ", sum, " in ", execution_time, "ms")
