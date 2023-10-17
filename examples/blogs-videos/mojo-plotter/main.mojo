@@ -11,21 +11,21 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-# This sample demonstrates some basic Mojo
-# Range and print functions available in the standard library
-# It also demonstrates importing a simple Python program into Mojo
-
-from python.python import Python
+from python import Python
 
 
-def main():
-    print("Hello Mojo 🔥!")
-    for x in range(9, 0, -3):
-        print(x)
-    try:
-        Python.add_to_path(".")
-        Python.add_to_path("./examples")
-        let test_module = Python.import_module("simple_interop")
-        test_module.test_interop_func()
-    except e:
-        print(e, "could not find module simple_interop")
+fn main() raises:
+    let torch = Python.import_module("torch")
+    let x = torch.linspace(0, 10, 100)
+    let y = torch.sin(x)
+    plot(x, y)
+
+
+def plot(x: PythonObject, y: PythonObject) -> None:
+    let plt = Python.import_module("matplotlib.pyplot")
+    plt.plot(x.numpy(), y.numpy())
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title("Plot of y = sin(x)")
+    plt.grid(True)
+    plt.show()

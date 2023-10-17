@@ -2,7 +2,7 @@
 
 As of mid-May 2023, Mojo has full support for ownership (including move
 semantics, borrows and transfers, mutability, ASAP destruction of values, and
-member synthesis). This provides more expressivity than many languages, but does
+member synthesis). This provides more expressiveness than many languages, but does
 not meet the expectations of Rust and C++ programmers because it is impossible
 to **return references** and **put references in structs**.
 
@@ -100,29 +100,19 @@ parameters, and can be somewhat more complicated.  The framing of “provenance
 tracking” may be more general conceptually than “lifetime tracking” which seems
 specific to the lifetime parameters.
 
-## Mojo Syntax Extensions + Changes
+## Mojo Reference + Lifetime Design
 
-Lifetimes are an additive feature on top of what we already have, but they are also a massive conceptual step forward that will cause us to rethink some previous decisions.  The very end of this document explores a repaint of the keywords we already have (e.g. `inout`, `borrowed`, etc), but there is a bigger issue.  The introduction of lifetimes enables us to generalize `borrowed`/`inout` references in argument conventions to being first class types that can occur in nested positions: You can now have a reference to a reference, you can have an array of references, etc.
-
-This change invalidates a basic syntax decision we made earlier: we need to move the position of the `inout`/`borrowed` keywords to the type position:
-
-```
-// Mojo today
-fn example(inout a: Int, borrowed b: Float32): …
-struct S:
-  fn method(inout self): …
-
-// Mojo with lifetimes
-fn example(a: inout Int, b: borrowed Float32): …
-struct S:
-  fn method(self: inout): …
-```
-
-As a transitional aid, we can continue parsing the old syntax and interpret it according to the new approach, but putting these words in the type position is important for them to compose correctly.  This change will also require introducing these things into the expression grammar because the type grammar is the expression grammar.
+Lifetimes enable us to use references as first class types. This means they
+can occur in nested positions: You can now have a reference to a reference, you
+can have an array of references, etc.  At the machine/execution level, a
+reference is identical to a pointer, but the reference type system enables an
+associated lifetime, tracking of mutability etc.
 
 ### Writing a lifetime bound reference
 
-Rust uses the `'a` syntax which is pretty unconventional and (weirdly but) distinctly Rust.  For example, here are some simple Rust functions:
+The first question is how to spell this.  Rust uses the `'a` syntax which is
+pretty unconventional and (weirdly but) distinctly Rust.  For example, here are
+some simple Rust functions:
 
 ```rust
 // This is Rust
@@ -130,43 +120,36 @@ fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {..}
 fn longest2<'a>(x: &'a mut str, y: &'a mut str) -> &'a mut str {..}
 ```
 
-I think we can clean this up in Mojo.  We already have a general set of values
-in our generic signature list: we just need to “parameterize” the `inout` and
-`borrowed` keywords with a parametric lifetime.  Assuming such a `Lifetime` is
-defined with a builtin type like `AnyType` we can use:
+Mojo already have a general set of values in our generic signature list: we just
+need to "parameterize" references and make them explicit.  For now, we recommend
+using new `ref` and `mutref` keywords parameterized on a lifetime, and a new
+`Lifetime` type.  For example:
 
 ```mojo
-# Proposed Mojo syntax, without sugar.
-fn longest[a: Lifetime](x: borrowed[a] String,
-                        y: borrowed[a] String) -> borrowed[a] String:
+# Proposed Mojo syntax.
+fn longest[a: Lifetime](x: ref[a] String,
+                        y: ref[a] String) -> ref[a] String:
     return x if len(x) >= len(y) else y
 
-fn longest2[a: Lifetime](x: inout[a] String,
-                         y: inout[a] String) -> inout[a] String:
+fn longest2[a: Lifetime](x: mutref[a] String,
+                         y: mutref[a] String) -> mutref[a] String: ...
 ```
 
-This syntax raises several topics right off the bat, including concrete names we
-want for these keywords (this discussion is split out to another document to
-avoid confusing this discussion).  Another question is what syntax to use for
-the explicitly named lifetime, we can make any of these work:
+There are many other options for syntax that we can consider, but this is simple
+and will get us going until we have more experience.  For example, we can make
+any of these work:
 
 ```mojo
-x: borrowed[a] String
-x: borrowed(a) String
-x: borrowed a String
-x: borrowed 'a String
-
-# It would be nice to support eliding 'borrowed' with a lifetime:
-x: [a] String
-x: (a) String
-x: a String
-x: 'a String    # Pay homage to Rust!
+fn f(x: ref[a] String, y: mutref[a] String): ... # Homage to Rust!
+fn f(x: ref(a) String, y: mutref(a) String): ... # Homage to Rust!
+fn f(x: ref a String,  y: mutref a String): ... # Homage to Rust!
+fn f(x: ref 'a String, y: mutref 'a String): ... # Homage to Rust!
+fn f(x: 'a String,     y: mut 'a String): ... # Homage to Rust!
 ```
 
-For now, I’d prefer to keep any use of lifetimes fully explicit as we bring up
-the system; it avoids introducing complexity around ambiguity rules.  The
-argument for square brackets vs parens is if we like the explanation that we’re
-“parameterizing the reference with a lifetime”.  However, remember types can
+The argument for square brackets vs parens is if we like the explanation that
+we’re
+"parameterizing the reference with a lifetime".  However, remember types can
 also be parametric, and those are spelled with square brackets **after** the
 type name, so parens may be better to make these more syntactically distinct.
 
@@ -178,35 +161,15 @@ struct StringRef[life: Lifetime]:
     var len : Int
 ```
 
-We will also want local references:
-
-```mojo
-fn example(cond: Bool):
-    var str1 = String("hello")
-    var str2 = String("goodbye")
-
-    # Defines an immutable reference with inferred lifetime.
-    borrowed str_ref = str1 if cond else str2
-    print(str_ref)
-
-    # Defines a mutable reference.
-    inout mut_ref = str1 if cond else str2
-    mut_ref = "a new look"
-
-    # One of these will have changed.
-    print(str1)
-    print(str2)
-```
-
-We also want local references to allow late initialization and explicitly
-declared lifetimes as well:
+Being first class types, we will naturally allow local references: these should
+also allow late initialization and explicitly declared lifetimes as well:
 
 ```mojo
 fn example[life: Lifetime](cond: Bool,
-                           x: borrowed[life] String,
-                           y: borrowed[life] String):
+                           x: ref[life] String,
+                           y: ref[life] String):
     # Late initialized local borrow with explicit lifetime
-    borrowed[life] str_ref : String
+    let str_ref: ref[life] String
 
     if cond:
         str_ref = x
@@ -215,13 +178,62 @@ fn example[life: Lifetime](cond: Bool,
     print(str_ref)
 ```
 
+### Mojo Argument Conventions vs References
+
+One non-obvious thing is that function argument conventions and references are
+different things: keeping them different allows argument conventions to be a
+convenient sugar that avoids most users from having to know about references and
+lifetimes.  For example, the `borrowed` (which is usually implicit) and `inout`
+argument conventions are sugar that avoids having to explicitly declare
+lifetimes:
+
+```
+// Mojo today
+fn example(inout a: Int, borrowed b: Float32): …
+
+struct S:
+  fn method(inout self): …
+
+// Written long-hand with explicit lifetimes.
+fn example[a_life: Lifetime, b_life: Lifetime]
+          (a: mutref[a_life] Int, b: ref[b_life] Float32): …
+struct S:
+  fn method[self_life: Lifetime](self: mutref[self_life]): …
+```
+
+This is very nice - every memory-only type passed into or returned from a
+function must have a lifetime specified for it, but you really don't want to
+have to deal with this in the normal case.  In the normal case, you can just
+specify that you're taking something by borrow (the default anyway) with an
+implicit lifetime, or taking it `inout` if you want to mutate it but don't care
+about the lifetime.
+
+NOTE: `inout` arguments also have one additional feature: function calls with
+`inout` arguments know how to work with getter/setter pairs.  For example
+something like `mutate(a[i])` will call the getter for the element before
+calling the function, then call the setter afterward.  We cannot support this
+for general mutable reference binding (because we wouldn't know where to perform
+the writeback) so `inout` will have a bit more magic than just providing an
+implicit lifetime.
+
+NOTE: Internally to the compiler, references (which are always pointer sized)
+are treated as a register-passable types.  This means they compose correctly
+with implicit borrow semantics, and you can even pass a reference `inout` if you
+want to.  Such a thing is a "mutable reference to a reference", allowing the
+callee to mutate the callers reference.
+
 ### Keyword (?) for static lifetime
 
-I think we can have a useful feature set without requiring the ability to specify a static lifetime - the uses in Rust appear to be more about constraining input lifetimes than it is about the core propagation of lifetimes, that said, we can definitely dream up a spelling when it is needed.
+I think we can have a useful feature set without requiring the ability to
+specify a static lifetime - the uses in Rust appear to be more about
+constraining input lifetimes than it is about the core propagation of lifetimes,
+that said, we can definitely dream up a spelling when it is needed.
 
-Similarly, unsafe pointer tricks (e.g. when working with C) may want to use the static lifetime marker to disable all tracking.  We can start with a stub like `__static_lifetime` and then re-syntax it later.
+Similarly, unsafe pointer tricks (e.g. when working with C) may want to use the
+static lifetime marker to disable all tracking.  We can start with a stub like
+`__static_lifetime` and then re-syntax it later.
 
-### Syntatic Sugar(?): Implicitly declared lifetime parameter names
+### Implicitly declared lifetime parameter names and other sugar
 
 One common use of named lifetime parameters is to tie the lifetime of the result
 of a function back to the lifetime of one of the function arguments.  One
@@ -229,32 +241,32 @@ refinement over Rust we could permit is for arguments to implicitly declare
 lifetimes on their first use.  For example, we don’t need to require a
 declaration of `life` in this example:
 
-
 ```mojo
-fn longest(x: borrowed[life] String,
-           y: borrowed[life] String) -> borrowed[life] String:
+fn longest(x: ref[life] String,
+           y: ref[life] String) -> ref[life] String:
 
 # Alternatively follow Rust's lead.
 fn longest(x: 'life String, y: 'life String) -> 'life String:
 ```
 
-This is **_really_** not a priority to design though, we can evaluate syntax
-compression after we get the basics up and running.
+Let's **NOT** add this in the near future.  Explicit lifetimes will be much less
+common in Mojo than they are in Rust, and it is better for learnability to not
+have magic like this.
 
 ### Lifetime of `Self`
 
 The `Self` keyword (upper case) produces an elaborated type name for the current
 struct, but that does not include the lifetime of `self` (lower case) which is
-generally a reference. In a method you can name the lifetime of `self` by doing
-things like this:
+generally a reference. In a method you can name the lifetime of `self` by
+declaring it explicitly like this:
 
 ```mojo
     struct MyExample:
-    	fn method[self_life: Lifetime](self: inout[self_life] Self)
+    	fn method[self_life: Lifetime](self: mutref[self_life] Self)
     	        -> Pointer[Int, self_life]:
     		...
 
-    fn callMethod(x: inout[life1] MyExample):
+    fn callMethod(x: mutref[life1] MyExample):
     	use(x.method())
 
     	var y = MyExample()
@@ -268,7 +280,7 @@ lifetime of y in the second example.  This all composes nicely.
 
 One problem though - this won’t work for var definitions inside the struct,
 because they don’t have a self available to them, and may need to reason about
-it.  We’ll have to create some syntax for this:
+it:
 
 ```mojo
     struct IntArray:
@@ -280,20 +292,19 @@ in the pointer/reference instead of the struct type.  An alternative is to not
 allow expressing this and require casts.  We can start with that model and
 explore adding this as the basic design comes up.
 
-
 ### Extended `getitem`/`getattr` Model
 
 Once we have references, we’ll want to add support for them in the property
 reference and subscripting logic.  For example, many types store their enclosed
 values in memory: instead of having `Pointer` and `Array` types implement both
-`__getitem__` and `__setitem__` (therefore being a “computed LValue”) we'd much
+`__getitem__` and `__setitem__` (therefore being a "computed LValue") we'd much
 rather them to expose a reference to the value already in memory (therefore
 being more efficient).  We can do this by allowing:
 
 ```mojo
     struct Pointer[type: AnyType, life: Lifetime]:
-        # This getitem returns a reference, so no setitem needed.
-        fn __getitem__(self, offset: Int) -> inout[life] type:
+        # This __getref__ returns a reference, so no setitem needed.
+        fn __getref__(self, offset: Int) -> mutref[life] type:
             return __get_address_as_lvalue[life](...)
 ```
 
@@ -323,7 +334,7 @@ that it needs to work with as well as element type:
 
         # Should this be an __init__ to allow implicit conversions?
         @static_method
-        fn address_of(inout[life] arg: type) -> Self:
+        fn address_of(arg: mutref[life] type) -> Self:
             ...
 
         fn __getitem__(self, offset: Int) -> inout[life] type:
@@ -353,9 +364,9 @@ It’s not clear to me if we need to have a split between `Pointer` and
 `MutablePointer` like Swift does.  It will depend on details of how the
 CheckLifetimes pass works - I’m hoping/expecting that the borrow checker will
 allow mutable references to overlap with other references iff that reference is
-only loaded and not mutated.  If we decide to eliminate `let` (described later),
-we may be able to eliminate this concept as well, which would be a nice
-simplification.
+only loaded and not mutated. NOTE: We probably won't be able to do this with the
+proposed model, because generics can't be variant over mutability of the
+reference.
 
 Another aspect of the model we should consider is whether we should have an
 `UnsafePointer` that allows unchecked address arithmetic, but have a safe

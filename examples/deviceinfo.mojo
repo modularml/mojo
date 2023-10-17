@@ -43,23 +43,24 @@ def main():
         os = "windows"
     let cpu = String(_current_cpu())
     let arch = String(_triple_attr())
-    var cpu_features = String(" ")
+    var cpu_features = String("")
     if has_sse4():
-        cpu_features = cpu_features.join(" sse4")
+        cpu_features += " sse4"
     if has_avx():
-        cpu_features = cpu_features.join(" avx")
+        cpu_features += " avx"
     if has_avx2():
-        cpu_features = cpu_features.join(" avx2")
+        cpu_features += " avx2"
     if has_avx512f():
-        cpu_features = cpu_features.join(" avx512f")
+        cpu_features += " avx512f"
     if has_avx512_vnni():
-        cpu_features = cpu_features.join(" avx512_vnni")
+        cpu_features += " avx512_vnni"
     if has_intel_amx():
-        cpu_features = cpu_features.join(" intel_amx")
+        cpu_features += " intel_amx"
     if has_neon():
-        cpu_features = cpu_features.join(" neon")
+        cpu_features += " neon"
     if is_apple_m1():
-        cpu_features = cpu_features.join(" Apple M1")
+        cpu_features += " Apple M1"
+
     print("System information: ")
     print("    OS          : ", os)
     print("    CPU         : ", cpu)
