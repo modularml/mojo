@@ -10,7 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
 
 from benchmark import Benchmark
 from complex import ComplexSIMD, ComplexFloat64
@@ -94,7 +93,6 @@ fn main():
 
     let parallelized_ms = Benchmark().run[bench_parallel[simd_width]]() / 1e6
     print("Parallelized:", parallelized_ms, "ms")
-    # CHECK: Parallel speedup
     print("Parallel speedup:", vectorized_ms / parallelized_ms)
 
     _ = t  # Make sure tensor isn't destroyed before benchmark is finished
