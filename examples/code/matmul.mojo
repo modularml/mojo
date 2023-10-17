@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s 
+# RUN: %mojo -debug-level full %s
 
 # This sample demonstrates how various systems optimizations can be
 # applied to a naive matmul implementation in Mojo to gain significant
