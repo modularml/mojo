@@ -51,7 +51,6 @@ def benchmark_matmul_python(M, N, K):
     C = PyMatrix(list(np.zeros((M, N))), M, N)
     secs = timeit(lambda: matmul_python(C, A, B), number=2) / 2
     gflops = ((2 * M * N * K) / secs) / 1e9
-    print(gflops, "GFLOP/s")
     return gflops
 
 
