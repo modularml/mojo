@@ -20,4 +20,4 @@ fn linear_fill[
 
 
 fn linear_fill[type: DType](t: Tensor[type], *elems: SIMD[type, 1]):
-    linear_fill(t, VariadicList(elems))
+    linear_fill(t, elems)
