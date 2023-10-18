@@ -14,7 +14,6 @@
 # This sample implements various memset algorithms and optimizations
 
 from autotune import autotune_fork
-from utils.list import VariadicList
 from math import min, max
 from time import now
 from memory import memset as stdlib_memset
