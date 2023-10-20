@@ -44,12 +44,21 @@ def matmul_python(C, A, B):
             for n in range(C.cols):
                 C[m, n] += A[m, k] * B[k, n]
 
+def matmul_python_numpy(A, B):
+    return np.dot(A, B)
 
 def benchmark_matmul_python(M, N, K):
     A = PyMatrix(list(np.random.rand(M, K)), M, K)
     B = PyMatrix(list(np.random.rand(K, N)), K, N)
     C = PyMatrix(list(np.zeros((M, N))), M, N)
     secs = timeit(lambda: matmul_python(C, A, B), number=2) / 2
+    gflops = ((2 * M * N * K) / secs) / 1e9
+    return gflops
+
+def benchmark_matmul_python_numpy(M, N, K):
+    A = np.random.rand(M, K)
+    B = np.random.rand(K, N)
+    secs = timeit(lambda: matmul_python_numpy(A, B), number=2) / 2
     gflops = ((2 * M * N * K) / secs) / 1e9
     return gflops
 

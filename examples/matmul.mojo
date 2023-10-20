@@ -76,7 +76,11 @@ def run_matmul_python(M: Int, N: Int, K: Int) -> Float64:
     let pymatmul: PythonObject = Python.import_module("pymatmul")
     let gflops = pymatmul.benchmark_matmul_python(M, N, K).to_float64()
     let py = Python.import_module("builtins")
-    py.print(py.str("{:<15} {:>8.3f} GFLOPS").format("Python", gflops))
+    py.print(py.str("{:<15}\t{:>8.3f} GFLOPS").format("Python:", gflops))
+
+    let numpy_gflops = pymatmul.benchmark_matmul_python_numpy(M, N, K).to_float64()
+    py.print(py.str("{:<15}\t{:>8.3f} GFLOPS").format("Python (Numpy):", numpy_gflops))
+
     return gflops
 
 
@@ -263,7 +267,7 @@ fn benchmark[
 
     let py = Python.import_module("builtins")
     _ = py.print(
-        py.str("{:<15} {:>8.3f} GFLOPS {:>15.2f}x faster than Python").format(
+        py.str("{:<15}\t{:>8.3f} GFLOPS {:>15.2f}x faster than Python").format(
             str, gflops, speedup
         )
     )
