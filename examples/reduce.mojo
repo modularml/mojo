@@ -20,7 +20,11 @@ from time import now
 from algorithm import sum
 from random import rand
 from memory.buffer import Buffer
+from python import Python
 
+# Change these numbers to reduce on different sizes
+alias size_small: Int = 1 << 21
+alias size_large: Int = 1 << 29
 
 # Simple array struct
 struct ArrayInput:
@@ -41,21 +45,20 @@ struct ArrayInput:
 # Use the https://en.wikipedia.org/wiki/Kahan_summation_algorithm
 # Simple summation of the array elements
 fn reduce_sum_naive(data: ArrayInput, size: Int) -> Float32:
-    var sum = data[0]
+    var my_sum = data[0]
     var c: Float32 = 0.0
     for i in range(size):
         let y = data[i] - c
-        let t = sum + y
-        c = (t - sum) - y
-        sum = t
-    return sum
+        let t = my_sum + y
+        c = (t - my_sum) - y
+        my_sum = t
+    return my_sum
 
 
-fn benchmark_naive_reduce_sum(size: Int) -> Float32:
-    print("Computing reduction sum for array num elements: ", size)
+fn benchmark_naive_reduce_sum[size: Int]() -> Float32:
     var A = ArrayInput(size)
     # Prevent DCE
-    var mySum: Float32 = 0.0
+    var my_sum: Float32 = 0.0
 
     @always_inline
     @parameter
@@ -63,52 +66,49 @@ fn benchmark_naive_reduce_sum(size: Int) -> Float32:
         _ = reduce_sum_naive(A, size)
 
     let bench_time = Float64(Benchmark().run[test_fn]())
-    return mySum
+    return my_sum
 
 
-fn benchmark_stdlib_reduce_sum(size: Int) -> Float32:
+fn benchmark_stdlib_reduce_sum[size: Int]() -> Float32:
     # Allocate a Buffer and then use the Mojo stdlib Reduction class
-    # TODO: Use globals
-    # alias numElem = size
-    alias numElem = 1 << 29
-    # Can use either stack allocation or heap
-    # see stackalloc
-    # var A = Buffer[numElem, DType.float32].stack_allocation()
-    # see heapalloc
-    var B = DTypePointer[DType.float32].alloc(numElem)
-    var A = Buffer[numElem, DType.float32](B)
+    var B = DTypePointer[DType.float32].alloc(size)
+    var A = Buffer[size, DType.float32](B)
 
     # initialize buffer
-    for i in range(numElem):
+    for i in range(size):
         A[i] = Float32(i)
 
     # Prevent DCE
-    var mySum: Float32 = 0.0
-    print("Computing reduction sum for array num elements: ", size)
+    var my_sum: Float32 = 0.0
 
     @always_inline
     @parameter
     fn test_fn():
-        mySum = sum[numElem, DType.float32](A)
+        my_sum = sum[size, DType.float32](A)
 
     let bench_time = Float64(Benchmark().run[test_fn]())
-    return mySum
+    return my_sum
 
+fn pretty_print(str: StringLiteral, elements: Int, time: Float64) raises:
+    let py = Python.import_module("builtins")
+    _ = py.print(
+        py.str("{:<16} {:>11,} {:>8.2f}ms").format(
+            str, elements, time
+        )
+    )
 
-fn main():
-    # Number of array elements
-    let size = 1 << 29
-    print("# Reduction sum across a large array. The naive algorithm's ")
-    print("# computation time scales with the size of the array; while Mojo ")
-    print("# exhibits significantly better scaling...")
-    var eval_begin: Float64 = now()
-    var sum = benchmark_naive_reduce_sum(size)
-    var eval_end: Float64 = now()
-    var execution_time = Float64((eval_end - eval_begin)) / 1e6
-    print("Completed naive reduction sum: ", sum, " in ", execution_time, "ms")
+fn benchmark[func: fn[size: Int]() -> Float32, size: Int, name: StringLiteral]() raises:
+    let eval_begin: Float64 = now()
+    let sum = func[size]()
+    let eval_end: Float64 = now()
+    let execution_time = Float64((eval_end - eval_begin)) / 1e6
+    pretty_print("naive elements:", size, execution_time)
 
-    eval_begin = now()
-    sum = benchmark_stdlib_reduce_sum(size)
-    eval_end = now()
-    execution_time = Float64((eval_end - eval_begin)) / 1e6
-    print("Completed stdlib reduction sum: ", sum, " in ", execution_time, "ms")
+fn main() raises:
+    print("Reduction sum across a large array, shows better scaling using stdlib\n")
+
+    benchmark[benchmark_naive_reduce_sum, size_small, "naive"]()
+    benchmark[benchmark_naive_reduce_sum, size_large, "naive"]()
+
+    benchmark[benchmark_stdlib_reduce_sum, size_small, "stdlib"]()
+    benchmark[benchmark_stdlib_reduce_sum, size_large, "stdlib"]()
