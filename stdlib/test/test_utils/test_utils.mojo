@@ -9,7 +9,7 @@ from tensor import Tensor
 
 fn linear_fill[
     type: DType
-](t: Tensor[type], elems: VariadicList[SIMD[type, 1]]):
+](inout t: Tensor[type], elems: VariadicList[SIMD[type, 1]]):
     debug_assert(
         t.num_elements() == elems.__len__(), "must fill all elements of tensor"
     )
@@ -19,5 +19,5 @@ fn linear_fill[
         buf[i] = elems[i]
 
 
-fn linear_fill[type: DType](t: Tensor[type], *elems: SIMD[type, 1]):
+fn linear_fill[type: DType](inout t: Tensor[type], *elems: SIMD[type, 1]):
     linear_fill(t, elems)
