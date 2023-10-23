@@ -14,17 +14,10 @@
 
 # Simple python program to test interop
 
-from importlib.util import find_spec
-import sys
-import subprocess
+import check_mod
 
-if not find_spec("numpy"):
-    print("Numpy not found, installing...")
-
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy"])
-
+check_mod.install_if_missing("numpy")
 import numpy as np
-from timeit import timeit
 
 
 def test_interop_func():
@@ -34,4 +27,6 @@ def test_interop_func():
 
 
 if __name__ == "__main__":
+    from timeit import timeit
+
     print(timeit(lambda: test_interop_func(), number=1))

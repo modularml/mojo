@@ -26,6 +26,7 @@ from python import Python
 alias size_small: Int = 1 << 21
 alias size_large: Int = 1 << 29
 
+
 # Simple array struct
 struct ArrayInput:
     var data: DTypePointer[DType.float32]
@@ -84,28 +85,36 @@ fn benchmark_stdlib_reduce_sum[size: Int]() -> Float32:
     @always_inline
     @parameter
     fn test_fn():
-        my_sum = sum[size, DType.float32](A)
+        my_sum = sum(A)
 
     let bench_time = Float64(Benchmark().run[test_fn]())
     return my_sum
 
-fn pretty_print(str: StringLiteral, elements: Int, time: Float64) raises:
+
+fn pretty_print(name: StringLiteral, elements: Int, time: Float64) raises:
     let py = Python.import_module("builtins")
     _ = py.print(
         py.str("{:<16} {:>11,} {:>8.2f}ms").format(
-            str, elements, time
+            String(name) + " elements", elements, time
         )
     )
 
-fn benchmark[func: fn[size: Int]() -> Float32, size: Int, name: StringLiteral]() raises:
+
+fn benchmark[
+    func: fn[size: Int] () -> Float32, size: Int, name: StringLiteral
+]() raises:
     let eval_begin: Float64 = now()
     let sum = func[size]()
     let eval_end: Float64 = now()
     let execution_time = Float64((eval_end - eval_begin)) / 1e6
-    pretty_print("naive elements:", size, execution_time)
+    pretty_print(name, size, execution_time)
+
 
 fn main() raises:
-    print("Reduction sum across a large array, shows better scaling using stdlib\n")
+    print(
+        "Reduction sum across a large array, shows better scaling using"
+        " stdlib\n"
+    )
 
     benchmark[benchmark_naive_reduce_sum, size_small, "naive"]()
     benchmark[benchmark_naive_reduce_sum, size_large, "naive"]()

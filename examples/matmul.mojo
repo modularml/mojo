@@ -44,7 +44,9 @@ struct Matrix:
         self.cols = cols
 
     # Initialize taking a pointer, don't set any elements
-    fn __init__(inout self, rows: Int, cols: Int, data: DTypePointer[DType.float32]):
+    fn __init__(
+        inout self, rows: Int, cols: Int, data: DTypePointer[DType.float32]
+    ):
         self.data = data
         self.rows = rows
         self.cols = cols
@@ -155,7 +157,8 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store[nelts](
                         m,
                         n + x,
-                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x)
+                        + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 vectorize[nelts, dot](tile_x)
@@ -183,7 +186,8 @@ fn matmul_unroll(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store[nelts](
                         m,
                         n + x,
-                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x)
+                        + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 # Vectorize by nelts and unroll by tile_x/nelts
