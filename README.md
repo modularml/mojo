@@ -17,9 +17,9 @@ where you can try coding with an early version of Mojo).
 To get access to the Mojo Playground, [see here to sign up](https://docs.modular.com/mojo/get-started.html).
 Then, when you want to report issues or request features,
 [please create a GitHub issue here](https://github.com/modularml/mojo/issues).
-
-For more general questions or to chat with other Mojo developers,
-check out our [Discord](https://discord.gg/modular). 
+# Join our Community 
+For more general questions or to chat with other Mojo developers
+[![Join our community of Mojo developers](https://img.shields.io/discord/1234567890?color=blue&label=Discord&logo=discord&logoColor=white&style=flat-square)](https://discord.gg/modular)
 
 Otherwise, you can:
 - Read the [inspiration behind Mojo](https://docs.modular.com/mojo/why-mojo.html).
