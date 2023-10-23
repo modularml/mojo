@@ -12,17 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 
 # Simple program demonstrating a naive matrix multiplication in Python
-
-from importlib.util import find_spec
-import sys
-import subprocess
-
-if not find_spec("numpy"):
-    print("Numpy not found, installing...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "numpy"])
-
-import numpy as np
 from timeit import timeit
+import check_mod
+
+check_mod.install_if_missing("numpy")
+import numpy as np
 
 
 class PyMatrix:
@@ -44,6 +38,7 @@ def matmul_python(C, A, B):
             for n in range(C.cols):
                 C[m, n] += A[m, k] * B[k, n]
 
+
 def benchmark_matmul_python(M, N, K):
     A = PyMatrix(list(np.random.rand(M, K)), M, K)
     B = PyMatrix(list(np.random.rand(K, N)), K, N)
@@ -52,10 +47,11 @@ def benchmark_matmul_python(M, N, K):
     gflops = ((2 * M * N * K) / secs) / 1e9
     return gflops
 
+
 def benchmark_matmul_numpy(M, N, K):
     A = np.random.rand(M, K)
     B = np.random.rand(K, N)
-    secs = timeit(lambda: np.dot(A, B), number=2) / 2
+    secs = timeit(lambda: A @ B, number=10) / 10
     gflops = ((2 * M * N * K) / secs) / 1e9
     return gflops
 
