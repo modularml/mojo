@@ -51,7 +51,7 @@ def benchmark_matmul_python(M, N, K):
 def benchmark_matmul_numpy(M, N, K):
     A = np.random.rand(M, K)
     B = np.random.rand(K, N)
-    secs = timeit(lambda: np.dot(A, B), number=2) / 2
+    secs = timeit(lambda: A @ B, number=10) / 10
     gflops = ((2 * M * N * K) / secs) / 1e9
     return gflops
 
