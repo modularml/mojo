@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from benchmark import run
+import benchmark
 from complex import ComplexSIMD, ComplexFloat64
 from math import iota
 from python import Python
@@ -85,7 +85,7 @@ fn main() raises:
         for row in range(height):
             worker(row)
 
-    let vectorized = run[bench[simd_width]]().mean()
+    let vectorized = benchmark.run[bench[simd_width]]().mean()
     print("Number of threads:", num_cores())
     print("Vectorized:", vectorized, "s")
 
@@ -94,7 +94,7 @@ fn main() raises:
     fn bench_parallel[simd_width: Int]():
         parallelize[worker](height, height)
 
-    let parallelized = run[bench_parallel[simd_width]]().mean()
+    let parallelized = benchmark.run[bench_parallel[simd_width]]().mean()
     print("Parallelized:", parallelized, "s")
     print("Parallel speedup:", vectorized / parallelized)
 
