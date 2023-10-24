@@ -15,7 +15,7 @@
 # large array of values to produce a single result.
 # Reductions and scans are common algorithm patterns in parallel computing.
 
-from benchmark import Benchmark
+from benchmark import run, Unit
 from time import now
 from algorithm import sum
 from random import rand
@@ -66,9 +66,6 @@ fn benchmark_naive_reduce_sum[size: Int]() -> Float32:
     fn test_fn():
         _ = reduce_sum_naive(A, size)
 
-    let bench_time = Float64(Benchmark().run[test_fn]())
-    return my_sum
-
 
 fn benchmark_stdlib_reduce_sum[size: Int]() -> Float32:
     # Allocate a Buffer and then use the Mojo stdlib Reduction class
@@ -86,9 +83,6 @@ fn benchmark_stdlib_reduce_sum[size: Int]() -> Float32:
     @parameter
     fn test_fn():
         my_sum = sum(A)
-
-    let bench_time = Float64(Benchmark().run[test_fn]())
-    return my_sum
 
 
 fn pretty_print(name: StringLiteral, elements: Int, time: Float64) raises:

@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from benchmark import Benchmark
+from benchmark import run
 from complex import ComplexSIMD, ComplexFloat64
 from math import iota
 from python import Python
@@ -19,6 +19,7 @@ from runtime.llcl import num_cores
 from algorithm import parallelize, vectorize
 from tensor import Tensor
 from utils.index import Index
+from python import Python
 
 alias float_type = DType.float64
 alias simd_width = 2 * simdwidthof[float_type]()
@@ -56,7 +57,9 @@ fn mandelbrot_kernel_SIMD[
     return iters
 
 
-fn main():
+fn main() raises:
+    let p = Python.import_module("numpy")
+    let b = Python.import_module("numpy")
     let t = Tensor[float_type](height, width)
 
     @parameter
@@ -82,17 +85,17 @@ fn main():
         for row in range(height):
             worker(row)
 
-    let vectorized_ms = Benchmark().run[bench[simd_width]]() / 1e6
+    let vectorized = run[bench[simd_width]]().mean()
     print("Number of threads:", num_cores())
-    print("Vectorized:", vectorized_ms, "ms")
+    print("Vectorized:", vectorized, "s")
 
     # Parallelized
     @parameter
     fn bench_parallel[simd_width: Int]():
         parallelize[worker](height, height)
 
-    let parallelized_ms = Benchmark().run[bench_parallel[simd_width]]() / 1e6
-    print("Parallelized:", parallelized_ms, "ms")
-    print("Parallel speedup:", vectorized_ms / parallelized_ms)
+    let parallelized = run[bench_parallel[simd_width]]().mean()
+    print("Parallelized:", parallelized, "s")
+    print("Parallel speedup:", vectorized / parallelized)
 
     _ = t  # Make sure tensor isn't destroyed before benchmark is finished

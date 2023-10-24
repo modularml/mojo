@@ -15,7 +15,7 @@
 # applied to a naive matmul implementation in Mojo to gain significant
 # performance speedups
 
-from benchmark import Benchmark
+from benchmark import run
 from memory import memset_zero, stack_allocation
 from random import rand
 from algorithm import vectorize, parallelize, vectorize_unroll
@@ -264,8 +264,7 @@ fn benchmark[
     fn test_fn():
         _ = func(C, A, B)
 
-    let secs = Float64(Benchmark().run[test_fn]()) / 1_000_000_000
-
+    let secs = run[test_fn]().mean()
     # Prevent the matrices from being freed before the benchmark run
     A.data.free()
     B.data.free()
