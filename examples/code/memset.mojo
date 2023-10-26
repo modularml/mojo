@@ -91,7 +91,7 @@ fn benchmark(func: memset_fn_type, title: StringRef):
 fn overlapped_store[
     width: Int
 ](ptr: BufferPtrType, value: ValueType, count: Int):
-    let v = SIMD.splat[DType.uint8, width](value)
+    let v = SIMD[DType.uint8, width].splat(value)
     ptr.simd_store[width](v)
     ptr.simd_store[width](count - width, v)
 
