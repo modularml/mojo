@@ -1,8 +1,3 @@
-
-
-
-
-
 # Welcome to Mojo 🔥
 
 - Mojo: Ignite Your Coding Passion!
@@ -10,7 +5,12 @@
   
   - Discover the Future of Programming with Mojo, a groundbreaking language that marries the best of Python's simplicity and ecosystem with the power of systems programming and metaprogramming features. While Mojo is still in its infancy, it's on a mission to evolve into the ultimate Python superset.
 
-  - We plan to open-source Mojo progressively over time, but it's changing very quickly now. We believe that a small, tight-knit group of engineers with a shared vision can move faster than a community effort, so we will continue to incubate it within Modular until it's more complete. Please see the [Mojo FAQ](https://docs.modular.com/mojo/faq.html) for more information about this and other common questions. 
+  - We plan to open-source Mojo progressively over time, but it's changing very quickly now. We believe that a small, tight-knit group of engineers with a shared vision can move faster than a community effort, so we will continue to incubate it within Modular until it's more complete. Please see the [Mojo FAQ](https://docs.modular.com/mojo/faq.html) for more information about this and other common questions.
+ 
+## Table of Contents
+- [Introduction](#introduction)
+- [Getting Started](#getting-started)
+- [Mojo Playground](#mojo-playground)
 
 # 🚀 Why Mojo?
 
