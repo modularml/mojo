@@ -220,7 +220,7 @@ NOTE: Internally to the compiler, references (which are always pointer sized)
 are treated as a register-passable types.  This means they compose correctly
 with implicit borrow semantics, and you can even pass a reference `inout` if you
 want to.  Such a thing is a "mutable reference to a reference", allowing the
-called to mutate the callers reference.
+callee to mutate the callers reference.
 
 ### Keyword (?) for static lifetime
 
