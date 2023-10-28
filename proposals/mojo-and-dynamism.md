@@ -52,7 +52,7 @@ An implementation question here would be "when does the body get executed?" when
 
 A primary goal of Mojo is to [minimize the syntactic differences](https://docs.modular.com/mojo/why-mojo.html#intentional-differences-from-python) with Python. We also have to balance that need with what the right default for Mojo is, and this affects the bias on whether this decorator is "opt-in" or "opt-out".
 
-We find it appealing to follow the Swift approach by making "full dynamic" an opt-in choice for a Mojo class. This choice would add another syntactic divergence between Mojo and Python, but it is one that can be alleviated with an automatic mechanical tranformer from Python code to Mojo code (e.g. to deal with new keywords we take). In this case, all Python classes will be translated by sticking `@dynamic` on them, and they can be removed for incremental boosts to performance.
+We find it appealing to follow the Swift approach by making "full dynamic" an opt-in choice for a Mojo class. This choice would add another syntactic divergence between Mojo and Python, but it is one that can be alleviated with an automatic mechanical transformer from Python code to Mojo code (e.g. to deal with new keywords we take). In this case, all Python classes will be translated by sticking `@dynamic` on them, and they can be removed for incremental boosts to performance.
 
 An alternate design is to require opt-in to "constraint dynamism" by adding a `@strict` (or use another keyword altogether) for vtable dynamism.  We can evaluate tradeoffs as more of the model is implemented.
 
