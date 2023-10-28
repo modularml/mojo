@@ -470,7 +470,7 @@ This allows types to use it like this:
 
 This allows clients to implement a simple `copy()` method, but get the internal machinery for free.
 
-The decorator is a different thing that layers on top of it.  Decorators in Python are functions that use metaprogramming to change the declaration they are attached to.  Python does this with dynamic metaprogramming, but we’ll use the interpreter + builtins operations to also enable static metaprogramming in Mojo.
+The decorator is a different thing that layers on top of it.  Decorators in Python are functions that use metaprogramming to change the declaration they are attached to.  Python does this with dynamic metaprogramming, but we’ll use the interpreter + built-ins operations to also enable static metaprogramming in Mojo.
 
 I'm imagining that this will allow someone to write just:
 
@@ -482,7 +482,7 @@ I'm imagining that this will allow someone to write just:
 
 And the `implicitlyCopyable` function (which implements the decorator) would be implemented to do two things:
 
-1. When it understands all the stored properties of a copy, because they are builtin MLIR types like index, or because they themselves conform to at least `Copyable`, it synthesizes an implementation of a `copy()` method that builds a new instance of the type by invoking the `copy()` member for each element.
+1. When it understands all the stored properties of a copy, because they are built-in MLIR types like index, or because they themselves conform to at least `Copyable`, it synthesizes an implementation of a `copy()` method that builds a new instance of the type by invoking the `copy()` member for each element.
 2. It adds conformance to the `ImplicitlyCopyable` trait, which provides the `__copyinit__` method above.
 
 This is all precedented in languages like Swift and Rust, but they both lack the metaprogramming support to make the decorator synthesis logic implementable in the standard library.  Swift does this for things like the Hashable and `Equatable` protocols.  I believe that Mojo will be able to support much nicer and more extensible designs.

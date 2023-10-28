@@ -8,7 +8,7 @@ If you don't have `conda`, install [miniconda here](https://docs.conda.io/projec
 
 ### Create conda environment
 
-Create and acivate conda enironment:
+Create and activate conda environment:
 
 #### General
 
