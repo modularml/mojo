@@ -16,7 +16,7 @@ from users who have access to the Mojo Playground (our hosted JupyterHub
 where you can try coding with an early version of Mojo). 
 To get access to the Mojo Playground, [see here to sign up](https://docs.modular.com/mojo/get-started.html).
 Then, when you want to report issues or request features,
-[Please create a GitHub issue here](https://github.com/modularml/mojo/issues).
+[please create a GitHub issue here](https://github.com/modularml/mojo/issues).
 
 For more general questions or to chat with other Mojo developers,
 check out our [Discord](https://discord.gg/modular). 
