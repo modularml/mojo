@@ -1,3 +1,5 @@
+# *Copyright 2023 Modular, Inc: Licensed under the Apache License v2.0 with LLVM Exceptions.*
+
 from tensor import Tensor, TensorShape, TensorSpec
 from math import trunc, mod
 fn tensorprint[type: DType](t: Tensor[type])->None:
