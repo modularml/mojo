@@ -15,38 +15,42 @@
 
 from autotune import autotune_fork
 from math import min, max
-from time import now
+from time import time_function
 from memory import memset as stdlib_memset
+from benchmark import keep
 
-alias ValueType = UInt8
-alias BufferPtrType = DTypePointer[DType.uint8]
+alias type = UInt8
+alias ptr_type = DTypePointer[DType.uint8]
+alias fn_type = fn (ptr_type, type, Int) -> None
 
-alias memset_fn_type = fn (BufferPtrType, ValueType, Int) -> None
 
-
-fn measure_time(
-    func: memset_fn_type, size: Int, ITERS: Int, SAMPLES: Int
-) -> Int:
+fn measure_time(func: fn_type, size: Int, iters: Int, samples: Int) -> Int:
     alias alloc_size = 1024 * 1024
-    let ptr = BufferPtrType.alloc(alloc_size)
+    let ptr = ptr_type.alloc(alloc_size)
 
     var best = -1
-    for sample in range(SAMPLES):
-        let tic = now()
-        for iter in range(ITERS):
-            # Offset pointer to shake up cache a bit
-            let offset_ptr = ptr.offset((iter * 128) & 1024)
+    for sample in range(samples):
 
-            # Just in case compiler will try to outsmart us and avoid repeating
-            # memset, change the value we're filling with
-            let v = ValueType(iter&255)
+        @parameter
+        fn runner():
+            for iter in range(iters):
+                # Offset pointer to shake up cache a bit
+                let offset_ptr = ptr.offset((iter * 128) & 1024)
 
-            # Actually call the memset function
-            func(offset_ptr, v.value, size)
+                # memset, change the value we're filling with
+                let v = type(iter&255)
 
-        let toc = now()
-        if best < 0 or toc - tic < best:
-            best = toc - tic
+                # Actually call the memset function
+                func(offset_ptr, v.value, size)
+
+                # Avoid compiler optimizing things away
+                keep(v)
+                keep(size)
+                keep(offset_ptr)
+
+        let ns = time_function[runner]()
+        if best < 0 or ns < best:
+            best = ns
 
     ptr.free()
     return best
@@ -65,7 +69,7 @@ fn visualize_result(size: Int, result: Int):
     print()
 
 
-fn benchmark(func: memset_fn_type, title: StringRef):
+fn benchmark(func: fn_type, title: StringRef):
     print("\n=====================")
     print(title)
     print("---------------------\n")
@@ -88,15 +92,13 @@ fn benchmark(func: memset_fn_type, title: StringRef):
 
 
 @always_inline
-fn overlapped_store[
-    width: Int
-](ptr: BufferPtrType, value: ValueType, count: Int):
+fn overlapped_store[width: Int](ptr: ptr_type, value: type, count: Int):
     let v = SIMD[DType.uint8, width].splat(value)
     ptr.simd_store[width](v)
     ptr.simd_store[width](count - width, v)
 
 
-fn memset_manual(ptr: BufferPtrType, value: ValueType, count: Int):
+fn memset_manual(ptr: ptr_type, value: type, count: Int):
     if count < 32:
         if count < 5:
             if count == 0:
@@ -126,11 +128,11 @@ fn memset_manual(ptr: BufferPtrType, value: ValueType, count: Int):
         memset_system(ptr, value, count)
 
 
-fn memset_system(ptr: BufferPtrType, value: ValueType, count: Int):
+fn memset_system(ptr: ptr_type, value: type, count: Int):
     stdlib_memset(ptr, value.value, count)
 
 
-fn memset_manual_2(ptr: BufferPtrType, value: ValueType, count: Int):
+fn memset_manual_2(ptr: ptr_type, value: type, count: Int):
     if count < 32:
         if count >= 16:
             # 16 <= count < 32
@@ -165,7 +167,7 @@ fn memset_manual_2(ptr: BufferPtrType, value: ValueType, count: Int):
 @always_inline
 fn memset_impl_layer[
     lower: Int, upper: Int
-](ptr: BufferPtrType, value: ValueType, count: Int):
+](ptr: ptr_type, value: type, count: Int):
     @parameter
     if lower == -100 and upper == 0:
         pass
@@ -192,7 +194,7 @@ fn memset_impl_layer[
 @always_inline
 fn memset_impl_layer[
     lower: Int, upper: Int
-](ptr: BufferPtrType, value: ValueType, count: Int):
+](ptr: ptr_type, value: type, count: Int):
     alias cur: Int
     autotune_fork[Int, 0, 4, 8, 16, 32 -> cur]()
 
@@ -209,7 +211,7 @@ fn memset_impl_layer[
 @always_inline
 fn memset_impl_layer[
     lower: Int, upper: Int
-](ptr: BufferPtrType, value: ValueType, count: Int):
+](ptr: ptr_type, value: type, count: Int):
     alias cur: Int
     autotune_fork[Int, 0, 4, 8, 16, 32 -> cur]()
 
@@ -222,7 +224,7 @@ fn memset_impl_layer[
         memset_impl_layer[max(cur, lower), upper](ptr, value, count)
 
 
-fn memset_evaluator(funcs: Pointer[memset_fn_type], size: Int) -> Int:
+fn memset_evaluator(funcs: Pointer[fn_type], size: Int) -> Int:
     # This size is picked at random, in real code we could use a real size
     # distribution here.
     let size_to_optimize_for = 17
