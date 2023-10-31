@@ -26,7 +26,7 @@ Otherwise, you can:
 - Check out the [Mojo programming manual](https://docs.modular.com/mojo/programming-manual.html).
 - Read our other docs on [docs.modular.com/mojo](https://docs.modular.com/mojo).
 
-### All Thanks To Our Contributors:
-<a href="https://github.com/jackos/mojo/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=jackos/mojo" />
+## Thanks To Our Contributors:
+<a href="https://github.com/modularml/mojo/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=modularml/mojo" />
 </a>
