@@ -25,3 +25,8 @@ Otherwise, you can:
 - Read the [inspiration behind Mojo](https://docs.modular.com/mojo/why-mojo.html).
 - Check out the [Mojo programming manual](https://docs.modular.com/mojo/programming-manual.html).
 - Read our other docs on [docs.modular.com/mojo](https://docs.modular.com/mojo).
+
+## Thanks To Our Contributors:
+<a href="https://github.com/modularml/mojo/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=modularml/mojo" />
+</a>
