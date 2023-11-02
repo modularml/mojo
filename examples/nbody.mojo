@@ -16,7 +16,7 @@
 
 from utils.index import StaticTuple
 from math import sqrt
-from benchmark import Benchmark
+from benchmark import run
 
 alias PI = 3.141592653589793
 alias SOLAR_MASS = 4 * PI * PI
@@ -101,7 +101,7 @@ fn energy(bodies: StaticTuple[NUM_BODIES, Planet]) -> Float64:
     return e
 
 
-fn run():
+fn _run():
     let Sun = Planet(
         0,
         0,
@@ -185,12 +185,9 @@ fn run():
 
 
 fn benchmark():
-    fn _bench():
-        run()
-
-    print(Benchmark().run[_bench]() / 1.0e9)
+    print(run[_run]().mean())
 
 
 fn main():
     print("Starting nbody...")
-    run()
+    _run()

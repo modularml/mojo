@@ -23,7 +23,7 @@ from sys.info import (
     has_avx,
     has_avx2,
     has_avx512f,
-    has_avx512_vnni,
+    has_vnni,
     has_neon,
     is_apple_m1,
     has_intel_amx,
@@ -52,8 +52,11 @@ def main():
         cpu_features += " avx2"
     if has_avx512f():
         cpu_features += " avx512f"
-    if has_avx512_vnni():
-        cpu_features += " avx512_vnni"
+    if has_vnni():
+        if has_avx512f():
+            cpu_features += " avx512_vnni"
+        else:
+            cpu_features += " avx_vnni"
     if has_intel_amx():
         cpu_features += " intel_amx"
     if has_neon():
