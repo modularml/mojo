@@ -56,7 +56,7 @@ ENV AUTH_KEY=$AUTH_KEY
 
 RUN curl https://get.modular.com | sh -
 RUN modular auth $AUTH_KEY && \
-    modular install mojo 
+    modular install mojo
 
 ARG MODULAR_HOME="/root/.modular"
 ENV MODULAR_HOME=$MODULAR_HOME

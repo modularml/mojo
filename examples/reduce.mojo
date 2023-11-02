@@ -15,7 +15,7 @@
 # large array of values to produce a single result.
 # Reductions and scans are common algorithm patterns in parallel computing.
 
-from benchmark import Benchmark
+import benchmark
 from time import now
 from algorithm import sum
 from random import rand
@@ -24,70 +24,28 @@ from python import Python
 
 # Change these numbers to reduce on different sizes
 alias size_small: Int = 1 << 21
-alias size_large: Int = 1 << 29
+alias size_large: Int = 1 << 27
 
-
-# Simple array struct
-struct ArrayInput:
-    var data: DTypePointer[DType.float32]
-
-    fn __init__(inout self, size: Int):
-        self.data = DTypePointer[DType.float32].alloc(size)
-        rand(self.data, size)
-
-    fn __del__(owned self):
-        self.data.free()
-
-    @always_inline
-    fn __getitem__(self, x: Int) -> Float32:
-        return self.data.load(x)
+# Datatype for Tensor/Array
+alias type = DType.float32
 
 
 # Use the https://en.wikipedia.org/wiki/Kahan_summation_algorithm
 # Simple summation of the array elements
-fn reduce_sum_naive(data: ArrayInput, size: Int) -> Float32:
-    var my_sum = data[0]
+fn naive_reduce_sum[size: Int](array: Tensor[type]) -> Float32:
+    let A = array
+    var my_sum = array[0]
     var c: Float32 = 0.0
-    for i in range(size):
-        let y = data[i] - c
+    for i in range(array.dim(0)):
+        let y = array[i] - c
         let t = my_sum + y
         c = (t - my_sum) - y
         my_sum = t
     return my_sum
 
 
-fn benchmark_naive_reduce_sum[size: Int]() -> Float32:
-    var A = ArrayInput(size)
-    # Prevent DCE
-    var my_sum: Float32 = 0.0
-
-    @always_inline
-    @parameter
-    fn test_fn():
-        _ = reduce_sum_naive(A, size)
-
-    let bench_time = Float64(Benchmark().run[test_fn]())
-    return my_sum
-
-
-fn benchmark_stdlib_reduce_sum[size: Int]() -> Float32:
-    # Allocate a Buffer and then use the Mojo stdlib Reduction class
-    var B = DTypePointer[DType.float32].alloc(size)
-    var A = Buffer[size, DType.float32](B)
-
-    # initialize buffer
-    for i in range(size):
-        A[i] = Float32(i)
-
-    # Prevent DCE
-    var my_sum: Float32 = 0.0
-
-    @always_inline
-    @parameter
-    fn test_fn():
-        my_sum = sum(A)
-
-    let bench_time = Float64(Benchmark().run[test_fn]())
+fn stdlib_reduce_sum[size: Int](array: Tensor[type]) -> Float32:
+    let my_sum = sum(array._to_buffer())
     return my_sum
 
 
@@ -95,29 +53,36 @@ fn pretty_print(name: StringLiteral, elements: Int, time: Float64) raises:
     let py = Python.import_module("builtins")
     _ = py.print(
         py.str("{:<16} {:>11,} {:>8.2f}ms").format(
-            String(name) + " elements", elements, time
+            String(name) + " elements:", elements, time
         )
     )
 
 
-fn benchmark[
-    func: fn[size: Int] () -> Float32, size: Int, name: StringLiteral
-]() raises:
-    let eval_begin: Float64 = now()
-    let sum = func[size]()
-    let eval_end: Float64 = now()
-    let execution_time = Float64((eval_end - eval_begin)) / 1e6
-    pretty_print(name, size, execution_time)
+fn bench[
+    func: fn[size: Int] (array: Tensor[type]) -> Float32,
+    size: Int,
+    name: StringLiteral,
+](array: Tensor[type]) raises:
+    @parameter
+    fn runner():
+        let result = func[size](array)
+        benchmark.keep(result)
+
+    let ms = benchmark.run[runner]().mean[benchmark.Unit.ms]()
+    pretty_print(name, size, ms)
 
 
 fn main() raises:
     print(
-        "Reduction sum across a large array, shows better scaling using"
-        " stdlib\n"
+        "Sum all values in a small array and large array\n"
+        "Shows algorithm.sum from stdlib with much better scaling\n"
     )
+    # Create two 1-dimensional tensors i.e. arrays
+    let small_array = rand[type](size_small)
+    let large_array = rand[type](size_large)
 
-    benchmark[benchmark_naive_reduce_sum, size_small, "naive"]()
-    benchmark[benchmark_naive_reduce_sum, size_large, "naive"]()
+    bench[naive_reduce_sum, size_small, "naive"](small_array)
+    bench[naive_reduce_sum, size_large, "naive"](large_array)
 
-    benchmark[benchmark_stdlib_reduce_sum, size_small, "stdlib"]()
-    benchmark[benchmark_stdlib_reduce_sum, size_large, "stdlib"]()
+    bench[stdlib_reduce_sum, size_small, "stdlib"](small_array)
+    bench[stdlib_reduce_sum, size_large, "stdlib"](large_array)
