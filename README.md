@@ -12,7 +12,7 @@ it's more complete.  Please see the [Mojo FAQ](https://docs.modular.com/mojo/faq
 for more information about this and other common questions. 
 
 We've opened this repo now because we want to gather issues and engage in feedback 
-from users who have access to the Mojo Playground (our hosted JupyterHub
+from users who have access to the Mojo Playground (our hosted JupyterHub,
 where you can try coding with an early version of Mojo). 
 To get access to the Mojo Playground, [see here to sign up](https://docs.modular.com/mojo/get-started.html).
 Then, when you want to report issues or request features,
@@ -24,7 +24,7 @@ check out our [Discord](https://discord.gg/modular).
 Otherwise, you can:
 - Read the [inspiration behind Mojo](https://docs.modular.com/mojo/why-mojo.html).
 - Check out the [Mojo programming manual](https://docs.modular.com/mojo/programming-manual.html).
-- Read our other docs on [docs.modular.com/mojo](https://docs.modular.com/mojo).
+- Read our other docs at [docs.modular.com/mojo](https://docs.modular.com/mojo).
 
 ## Thanks To Our Contributors:
 <a href="https://github.com/modularml/mojo/graphs/contributors">
