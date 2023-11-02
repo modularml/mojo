@@ -15,7 +15,7 @@
 # applied to a naive matmul implementation in Mojo to gain significant
 # performance speedups
 
-from benchmark import Benchmark
+import benchmark
 from memory import memset_zero, stack_allocation
 from random import rand
 from algorithm import vectorize, parallelize, vectorize_unroll
@@ -252,7 +252,7 @@ fn accumulate_registers(inout C: Matrix, A: Matrix, B: Matrix):
 
 
 @always_inline
-fn benchmark[
+fn bench[
     func: fn (inout Matrix, Matrix, Matrix) -> None, name: StringLiteral
 ](base_gflops: Float64, numpy_gflops: Float64) raises:
     var A = Matrix.rand(M, K)
@@ -264,8 +264,7 @@ fn benchmark[
     fn test_fn():
         _ = func(C, A, B)
 
-    let secs = Float64(Benchmark().run[test_fn]()) / 1_000_000_000
-
+    let secs = benchmark.run[test_fn]().mean()
     # Prevent the matrices from being freed before the benchmark run
     A.data.free()
     B.data.free()
@@ -325,9 +324,9 @@ fn main() raises:
     let python_gflops = run_matmul_python()
     let numpy_gflops = run_matmul_numpy()
 
-    benchmark[matmul_naive, "Naive:"](python_gflops, numpy_gflops)
-    benchmark[matmul_vectorized, "Vectorized: "](python_gflops, numpy_gflops)
-    benchmark[matmul_parallelized, "Parallelized:"](python_gflops, numpy_gflops)
-    benchmark[matmul_tiled, "Tiled:"](python_gflops, numpy_gflops)
-    benchmark[matmul_unroll, "Unrolled:"](python_gflops, numpy_gflops)
-    benchmark[accumulate_registers, "Accumulated:"](python_gflops, numpy_gflops)
+    bench[matmul_naive, "Naive:"](python_gflops, numpy_gflops)
+    bench[matmul_vectorized, "Vectorized: "](python_gflops, numpy_gflops)
+    bench[matmul_parallelized, "Parallelized:"](python_gflops, numpy_gflops)
+    bench[matmul_tiled, "Tiled:"](python_gflops, numpy_gflops)
+    bench[matmul_unroll, "Unrolled:"](python_gflops, numpy_gflops)
+    bench[accumulate_registers, "Accumulated:"](python_gflops, numpy_gflops)

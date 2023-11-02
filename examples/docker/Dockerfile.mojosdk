@@ -54,8 +54,9 @@ RUN pip install \
 ARG AUTH_KEY=5ca1ab1e
 ENV AUTH_KEY=$AUTH_KEY
 
-RUN curl https://get.modular.com | MODULAR_AUTH=$AUTH_KEY sh - \
-    && modular install mojo
+RUN curl https://get.modular.com | sh -
+RUN modular auth $AUTH_KEY && \
+    modular install mojo
 
 ARG MODULAR_HOME="/root/.modular"
 ENV MODULAR_HOME=$MODULAR_HOME
