@@ -251,6 +251,114 @@ fn accumulate_registers(inout C: Matrix, A: Matrix, B: Matrix):
     tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
 
+# Reorder the loops, and do not fully unroll the loop over the reduction dimension
+fn loop_reorder(inout C: Matrix, A: Matrix, B: Matrix):
+    alias tile_k = 8
+    alias tile_k_unroll = 8
+    @parameter
+    fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
+        # Allocate the tile of accumulators on the stack.
+        var accumulators = Matrix(
+            tile_i, tile_j, stack_allocation[tile_i * tile_j, DType.float32]()
+        )
+
+        for ko in range(0, A.cols, tile_k * tile_k_unroll):
+            @parameter
+            fn calc_tile_row[](i: Int):
+                for i in range(0, tile_k):
+                    @parameter
+                    fn calc_tile_inner[k: Int]():
+                        @parameter
+                        fn calc_tile_cols[nelts: Int](j: Int):
+                            accumulators.store[nelts](
+                                i,
+                                j,
+                                accumulators.load[nelts](i, j)
+                                + A[io + i, ko + k] * B.load[nelts](ko + k, jo + j),
+                            )
+
+                        vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
+
+                    unroll[tile_k_unroll, calc_tile_inner]()
+
+            for i in range(0, tile_i):
+                calc_tile_row(i)
+
+        # Copy the local tile to the output
+        for i in range(tile_i):
+            for j in range(tile_j):
+                C[io + i, jo + j] = accumulators[i, j]
+
+    alias tile_i = 32
+    alias tile_j = nelts * 4
+    tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
+
+# Perform 2D tiling on the iteration space defined by end_x and end_y, parallelizing 
+# over x and y, and iterating in an order that has better L3 cache locality
+fn tile_parallel_swizzled[
+    tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int
+](end_x: Int, end_y: Int):
+    # Note: this assumes that ends are multiples of the tiles.
+    alias tile_outer = 8
+    alias group_size = tile_outer * 4
+
+    # L3 cache swizzling
+    @parameter
+    fn row(swizzled: Int):
+        let group_id = swizzled // group_size
+        let group_offset_x = (group_id * tile_outer) % (N // tile_y)
+        let yo = (swizzled % group_size) // tile_outer
+        let xo = group_offset_x + (swizzled % tile_outer)
+        let y = tile_y * yo
+        let x = tile_x * xo
+        tiled_fn[tile_x, tile_y](x, y)
+
+    parallelize[row]((end_y // tile_y * end_x // tile_x), M * 2)
+
+
+# Reorder the loops, and do not fully unroll the loop over the reduction dimension
+# Also utilize tile swizzling for better L3 cache locality.
+fn loop_reorder_swizzled(inout C: Matrix, A: Matrix, B: Matrix):
+    alias tile_k = 8
+    alias tile_k_unroll = 8
+    @parameter
+    fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
+        # Allocate the tile of accumulators on the stack.
+        var accumulators = Matrix(
+            tile_i, tile_j, stack_allocation[tile_i * tile_j, DType.float32]()
+        )
+
+        for ko in range(0, A.cols, tile_k * tile_k_unroll):
+            @parameter
+            fn calc_tile_row[](i: Int):
+                for i in range(0, tile_k):
+                    @parameter
+                    fn calc_tile_inner[k: Int]():
+                        @parameter
+                        fn calc_tile_cols[nelts: Int](j: Int):
+                            accumulators.store[nelts](
+                                i,
+                                j,
+                                accumulators.load[nelts](i, j)
+                                + A[io + i, ko + k] * B.load[nelts](ko + k, jo + j),
+                            )
+
+                        vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
+
+                    unroll[tile_k_unroll, calc_tile_inner]()
+
+            for i in range(0, tile_i):
+                calc_tile_row(i)
+
+        # Copy the local tile to the output
+        for i in range(tile_i):
+            for j in range(tile_j):
+                C[io + i, jo + j] = accumulators[i, j]
+
+    alias tile_i = 32
+    alias tile_j = nelts * 4
+    tile_parallel_swizzled[calc_tile, tile_j, tile_i](C.cols, C.rows)
+
 @always_inline
 fn bench[
     func: fn (inout Matrix, Matrix, Matrix) -> None, name: StringLiteral
@@ -312,6 +420,10 @@ fn test_all() raises:
         raise Error("Unroll output incorrect")
     if test[accumulate_registers](A, B) != result:
         raise Error("Accumulate output incorrect")
+    if test[loop_reorder](A, B) != result:
+        raise Error("Loop reorder output incorrect")
+    if test[loop_reorder_swizzled](A, B) != result:
+        raise Error("Loop reorder swizzled output incorrect")
 
     A.data.free()
     B.data.free()
@@ -319,14 +431,16 @@ fn test_all() raises:
 
 fn main() raises:
     # Uncomment below to test correctness of Matmuls
-    # test_all()
+    test_all()
     print("CPU Results\n")
     let python_gflops = run_matmul_python()
     let numpy_gflops = run_matmul_numpy()
 
     bench[matmul_naive, "Naive:"](python_gflops, numpy_gflops)
-    bench[matmul_vectorized, "Vectorized: "](python_gflops, numpy_gflops)
+    bench[matmul_vectorized, "Vectorized:"](python_gflops, numpy_gflops)
     bench[matmul_parallelized, "Parallelized:"](python_gflops, numpy_gflops)
     bench[matmul_tiled, "Tiled:"](python_gflops, numpy_gflops)
     bench[matmul_unroll, "Unrolled:"](python_gflops, numpy_gflops)
     bench[accumulate_registers, "Accumulated:"](python_gflops, numpy_gflops)
+    bench[loop_reorder, "Loop reordered:"](python_gflops, numpy_gflops)
+    bench[loop_reorder_swizzled, "Loop reordered (swizzled):"](python_gflops, numpy_gflops)
