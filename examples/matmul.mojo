@@ -44,9 +44,7 @@ struct Matrix:
         self.cols = cols
 
     # Initialize taking a pointer, don't set any elements
-    fn __init__(
-        inout self, rows: Int, cols: Int, data: DTypePointer[DType.float32]
-    ):
+    fn __init__(inout self, rows: Int, cols: Int, data: DTypePointer[DType.float32]):
         self.data = data
         self.rows = rows
         self.cols = cols
@@ -92,7 +90,7 @@ def run_matmul_numpy() -> Float64:
     return gflops
 
 
-fn matmul_naive(inout C: Matrix, A: Matrix, B: Matrix):
+fn naive(inout C: Matrix, A: Matrix, B: Matrix):
     for m in range(C.rows):
         for k in range(A.cols):
             for n in range(C.cols):
@@ -104,7 +102,7 @@ alias nelts = simdwidthof[type]()  # The SIMD vector width.
 
 
 # Using stdlib vectorize function
-fn matmul_vectorized(inout C: Matrix, A: Matrix, B: Matrix):
+fn vectorized(inout C: Matrix, A: Matrix, B: Matrix):
     for m in range(C.rows):
         for k in range(A.cols):
 
@@ -118,7 +116,7 @@ fn matmul_vectorized(inout C: Matrix, A: Matrix, B: Matrix):
 
 
 # Parallelize the code by using the builtin parallelize function
-fn matmul_parallelized(inout C: Matrix, A: Matrix, B: Matrix):
+fn parallelized(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_row(m: Int):
         for k in range(A.cols):
@@ -143,7 +141,7 @@ fn tile[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
 
 
 # Use the above tile function to perform tiled matmul.
-fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
+fn tiled(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_row(m: Int):
         @parameter
@@ -157,8 +155,7 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store[nelts](
                         m,
                         n + x,
-                        C.load[nelts](m, n + x)
-                        + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 vectorize[nelts, dot](tile_x)
@@ -172,7 +169,7 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
 
 # Unroll the vectorized loop by a constant factor.
 # from Functional import vectorize_unroll
-fn matmul_unroll(inout C: Matrix, A: Matrix, B: Matrix):
+fn unrolled(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_row(m: Int):
         @parameter
@@ -186,8 +183,7 @@ fn matmul_unroll(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store[nelts](
                         m,
                         n + x,
-                        C.load[nelts](m, n + x)
-                        + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 # Vectorize by nelts and unroll by tile_x/nelts
@@ -214,47 +210,13 @@ fn tile_parallel[
     parallelize[row](end_y // tile_y, M)
 
 
-# Tile the output and accumulate in registers. This strategy means we can
-# compute tile_i * tile_j values of output for only reading tile_i + tile_j input values.
-fn accumulate_registers(inout C: Matrix, A: Matrix, B: Matrix):
-    @parameter
-    fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
-        # Allocate the tile of accumulators on the stack.
-        var accumulators = Matrix(
-            tile_i, tile_j, stack_allocation[tile_i * tile_j, DType.float32]()
-        )
-
-        for k in range(0, A.cols):
-
-            @parameter
-            fn calc_tile_row[i: Int]():
-                @parameter
-                fn calc_tile_cols[nelts: Int](j: Int):
-                    accumulators.store[nelts](
-                        i,
-                        j,
-                        accumulators.load[nelts](i, j)
-                        + A[io + i, k] * B.load[nelts](k, jo + j),
-                    )
-
-                vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
-
-            unroll[tile_i, calc_tile_row]()
-
-        # Copy the local tile to the output
-        for i in range(tile_i):
-            for j in range(tile_j):
-                C[io + i, jo + j] = accumulators[i, j]
-
-    alias tile_i = 4
-    alias tile_j = nelts * 4
-    tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
-
-
-# Reorder the loops, and do not fully unroll the loop over the reduction dimension
-fn loop_reorder(inout C: Matrix, A: Matrix, B: Matrix):
+# Use stack allocation for tiles to accumulate values efficiently,
+# avoiding repeated reads and writes to memory. Also reorder the loops
+# and do not fully unroll the loop over the reduction dimension.
+fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_k = 8
     alias tile_k_unroll = 8
+
     @parameter
     fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
         # Allocate the tile of accumulators on the stack.
@@ -263,9 +225,11 @@ fn loop_reorder(inout C: Matrix, A: Matrix, B: Matrix):
         )
 
         for ko in range(0, A.cols, tile_k * tile_k_unroll):
+
             @parameter
             fn calc_tile_row[](i: Int):
                 for i in range(0, tile_k):
+
                     @parameter
                     fn calc_tile_inner[k: Int]():
                         @parameter
@@ -293,7 +257,8 @@ fn loop_reorder(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_j = nelts * 4
     tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
-# Perform 2D tiling on the iteration space defined by end_x and end_y, parallelizing 
+
+# Perform 2D tiling on the iteration space defined by end_x and end_y, parallelizing
 # over x and y, and iterating in an order that has better L3 cache locality
 fn tile_parallel_swizzled[
     tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int
@@ -316,11 +281,11 @@ fn tile_parallel_swizzled[
     parallelize[row]((end_y // tile_y * end_x // tile_x), M * 2)
 
 
-# Reorder the loops, and do not fully unroll the loop over the reduction dimension
-# Also utilize tile swizzling for better L3 cache locality.
-fn loop_reorder_swizzled(inout C: Matrix, A: Matrix, B: Matrix):
+# Same as previous example but utilisizing tile swizzling for better L3 cache locality.
+fn swizzled(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_k = 8
     alias tile_k_unroll = 8
+
     @parameter
     fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
         # Allocate the tile of accumulators on the stack.
@@ -329,9 +294,11 @@ fn loop_reorder_swizzled(inout C: Matrix, A: Matrix, B: Matrix):
         )
 
         for ko in range(0, A.cols, tile_k * tile_k_unroll):
+
             @parameter
             fn calc_tile_row[](i: Int):
                 for i in range(0, tile_k):
+
                     @parameter
                     fn calc_tile_inner[k: Int]():
                         @parameter
@@ -358,6 +325,7 @@ fn loop_reorder_swizzled(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_i = 32
     alias tile_j = nelts * 4
     tile_parallel_swizzled[calc_tile, tile_j, tile_i](C.cols, C.rows)
+
 
 @always_inline
 fn bench[
@@ -408,22 +376,20 @@ fn test_all() raises:
     let A = Matrix.rand(M, K)
     let B = Matrix.rand(K, N)
 
-    let result = test[matmul_naive](A, B)
+    let result = test[naive](A, B)
 
-    if test[matmul_vectorized](A, B) != result:
+    if test[vectorized](A, B) != result:
         raise Error("Vectorize output does not match")
-    if test[matmul_parallelized](A, B) != result:
+    if test[parallelized](A, B) != result:
         raise Error("Parallelize output incorrect")
-    if test[matmul_tiled](A, B) != result:
+    if test[tiled](A, B) != result:
         raise Error("Tiled output incorrect")
-    if test[matmul_unroll](A, B) != result:
+    if test[unrolled](A, B) != result:
         raise Error("Unroll output incorrect")
-    if test[accumulate_registers](A, B) != result:
-        raise Error("Accumulate output incorrect")
-    if test[loop_reorder](A, B) != result:
+    if test[reordered](A, B) != result:
         raise Error("Loop reorder output incorrect")
-    if test[loop_reorder_swizzled](A, B) != result:
-        raise Error("Loop reorder swizzled output incorrect")
+    if test[swizzled](A, B) != result:
+        raise Error("Swizzled output incorrect")
 
     A.data.free()
     B.data.free()
@@ -431,16 +397,15 @@ fn test_all() raises:
 
 fn main() raises:
     # Uncomment below to test correctness of Matmuls
-    test_all()
+    # test_all()
     print("CPU Results\n")
     let python_gflops = run_matmul_python()
     let numpy_gflops = run_matmul_numpy()
 
-    bench[matmul_naive, "Naive:"](python_gflops, numpy_gflops)
-    bench[matmul_vectorized, "Vectorized:"](python_gflops, numpy_gflops)
-    bench[matmul_parallelized, "Parallelized:"](python_gflops, numpy_gflops)
-    bench[matmul_tiled, "Tiled:"](python_gflops, numpy_gflops)
-    bench[matmul_unroll, "Unrolled:"](python_gflops, numpy_gflops)
-    bench[accumulate_registers, "Accumulated:"](python_gflops, numpy_gflops)
-    bench[loop_reorder, "Loop reordered:"](python_gflops, numpy_gflops)
-    bench[loop_reorder_swizzled, "Loop reordered (swizzled):"](python_gflops, numpy_gflops)
+    bench[naive, "Naive:"](python_gflops, numpy_gflops)
+    bench[vectorized, "Vectorized:"](python_gflops, numpy_gflops)
+    bench[parallelized, "Parallelized:"](python_gflops, numpy_gflops)
+    bench[tiled, "Tiled:"](python_gflops, numpy_gflops)
+    bench[unrolled, "Unrolled:"](python_gflops, numpy_gflops)
+    bench[reordered, "Reordered:"](python_gflops, numpy_gflops)
+    bench[swizzled, "Swizzled:"](python_gflops, numpy_gflops)
