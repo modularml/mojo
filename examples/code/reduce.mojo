@@ -16,6 +16,7 @@
 # Reductions and scans are common algorithm patterns in parallel computing.
 
 import benchmark
+from benchmark import Unit, keep
 from time import now
 from algorithm import sum
 from random import rand
@@ -66,9 +67,9 @@ fn bench[
     @parameter
     fn runner():
         let result = func[size](array)
-        benchmark.keep(result)
+        keep(result)
 
-    let ms = benchmark.run[runner]().mean[benchmark.Unit.ms]()
+    let ms = benchmark.run[runner]().mean(Unit.ms)
     pretty_print(name, size, ms)
 
 
