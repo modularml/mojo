@@ -342,6 +342,7 @@ fn swizzled(inout C: Matrix, A: Matrix, B: Matrix):
         tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
 
+
 @always_inline
 fn bench[
     func: fn (inout Matrix, Matrix, Matrix) -> None, name: StringLiteral
