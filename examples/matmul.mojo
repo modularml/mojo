@@ -15,6 +15,7 @@
 # applied to a naive matmul implementation in Mojo to gain significant
 # performance speedups
 
+import sys
 import benchmark
 from memory import memset_zero, stack_allocation
 from random import rand
@@ -28,8 +29,21 @@ from memory.buffer import NDBuffer
 alias M = 512
 alias N = 512
 alias K = 4096
+
 alias type = DType.float32
 
+alias type_bitwidth = sys.info.bitwidthof[type]()
+
+# Number of elems of type 'type' which would exceed 4MB of storage
+alias l3_cache_threshold_elems = 4 * 1024 * 1024 * 8 // type_bitwidth
+# If the number of elems exceed a certain threshold, we use l3 tile swizzling
+alias use_l3_swizzling = M * K  > l3_cache_threshold_elems or N * K > l3_cache_threshold_elems
+
+# empirically tuned - stay tuned for autotune!
+alias row_iteration = 32 if N * K > 1024 * 1024 else 16 if N * K > 512 * 512 else 8
+
+# Mojo has SIMD vector types, we can vectorize the Matmul code as follows.
+alias nelts = simdwidthof[type]()  # The SIMD vector width.
 
 struct Matrix:
     var data: DTypePointer[type]
@@ -95,10 +109,6 @@ fn naive(inout C: Matrix, A: Matrix, B: Matrix):
         for k in range(A.cols):
             for n in range(C.cols):
                 C[m, n] += A[m, k] * B[k, n]
-
-
-# Mojo has SIMD vector types, we can vectorize the Matmul code as follows.
-alias nelts = simdwidthof[type]()  # The SIMD vector width.
 
 
 # Using stdlib vectorize function
@@ -253,7 +263,7 @@ fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
             for j in range(tile_j):
                 C[io + i, jo + j] = accumulators[i, j]
 
-    alias tile_i = 32
+    alias tile_i = row_iteration
     alias tile_j = nelts * 4
     tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
@@ -322,9 +332,14 @@ fn swizzled(inout C: Matrix, A: Matrix, B: Matrix):
             for j in range(tile_j):
                 C[io + i, jo + j] = accumulators[i, j]
 
-    alias tile_i = 32
+    alias tile_i = row_iteration
     alias tile_j = nelts * 4
-    tile_parallel_swizzled[calc_tile, tile_j, tile_i](C.cols, C.rows)
+
+    @parameter
+    if use_l3_swizzling:
+        tile_parallel_swizzled[calc_tile, tile_j, tile_i](C.cols, C.rows)
+    else:
+        tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
 
 @always_inline
