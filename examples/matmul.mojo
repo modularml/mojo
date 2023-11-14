@@ -40,7 +40,7 @@ alias l3_cache_threshold_elems = 4 * 1024 * 1024 * 8 // type_bitwidth
 alias use_l3_swizzling = M * K  > l3_cache_threshold_elems or N * K > l3_cache_threshold_elems
 
 # empirically tuned - stay tuned for autotune!
-alias row_iteration = 32 if N * K > 1024 * 1024 else 16 if N * K > 512 * 512 else 8
+alias row_iteration = 32 if N * K > 1024 * 1024 else 16
 
 # Mojo has SIMD vector types, we can vectorize the Matmul code as follows.
 alias nelts = simdwidthof[type]()  # The SIMD vector width.
