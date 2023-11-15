@@ -30,20 +30,16 @@ alias M = 512
 alias N = 512
 alias K = 4096
 
-alias type = DType.float32
+alias type = DType.float16
+# We cannot codegen f16 SIMD on x86. Cast to float32 instead.
+alias simd_type = DType.float32 if type == DType.float16 else type
 
-# Number of elems of type 'type' which would exceed 4MB of storage
-alias l3_cache_threshold_elems = 4 * 1024 * 1024 * 8 // sys.info.bitwidthof[type]()
-# If the number of elems exceed a certain threshold, we use l3 tile swizzling
-alias use_l3_swizzling = M * K  > l3_cache_threshold_elems or N * K > l3_cache_threshold_elems
+alias nelts = simdwidthof[type]()  # The SIMD vector width.
 
 # empirically tuned - stay tuned for autotune!
 alias row_iteration = 32 if N * K > 1024 * 1024 else 16
 
-# Mojo has SIMD vector types, we can vectorize the Matmul code as follows.
-alias nelts = simdwidthof[type]()  # The SIMD vector width.
-
-struct Matrix:
+struct Matrix[type: DType = type]:
     var data: DTypePointer[type]
     var rows: Int
     var cols: Int
@@ -68,17 +64,17 @@ struct Matrix:
         rand(data, rows * cols)
         return Self(rows, cols, data)
 
-    fn __getitem__(self, y: Int, x: Int) -> SIMD[type, 1]:
+    fn __getitem__(self, y: Int, x: Int) -> SIMD[simd_type, 1]:
         return self.load[1](y, x)
 
-    fn __setitem__(self, y: Int, x: Int, val: SIMD[type, 1]):
+    fn __setitem__(self, y: Int, x: Int, val: SIMD[simd_type, 1]):
         return self.store[1](y, x, val)
 
-    fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[type, nelts]:
-        return self.data.simd_load[nelts](y * self.cols + x)
+    fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[simd_type, nelts]:
+        return self.data.simd_load[nelts](y * self.cols + x).cast[simd_type]()
 
-    fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[type, nelts]):
-        return self.data.simd_store[nelts](y * self.cols + x, val)
+    fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[simd_type, nelts]):
+        return self.data.simd_store[nelts](y * self.cols + x, val.cast[type]())
 
 
 def run_matmul_python() -> Float64:
@@ -228,8 +224,8 @@ fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
         # Allocate the tile of accumulators on the stack.
-        var accumulators = Matrix(
-            tile_i, tile_j, stack_allocation[tile_i * tile_j, type]()
+        var accumulators = Matrix[simd_type](
+            tile_i, tile_j, stack_allocation[tile_i * tile_j, simd_type]()
         )
 
         for ko in range(0, A.cols, tile_k * tile_k_unroll):
@@ -289,6 +285,11 @@ fn tile_parallel_swizzled[
     parallelize[row]((end_y // tile_y * end_x // tile_x), M * 2)
 
 
+# Number of elems of type 'type' which would exceed 4MB of storage
+alias l3_cache_threshold_elems = 2 * 1024 * 1024 * 8 // sys.info.bitwidthof[type]()
+# If the number of elems exceed a certain threshold, we use l3 tile swizzling
+alias use_l3_swizzling = M * K  > l3_cache_threshold_elems or N * K > l3_cache_threshold_elems
+
 # Same as previous example but utilisizing tile swizzling for better L3 cache locality.
 fn swizzled(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_k = 8
@@ -297,8 +298,8 @@ fn swizzled(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
         # Allocate the tile of accumulators on the stack.
-        var accumulators = Matrix(
-            tile_i, tile_j, stack_allocation[tile_i * tile_j, type]()
+        var accumulators = Matrix[simd_type](
+            tile_i, tile_j, stack_allocation[tile_i * tile_j, simd_type]()
         )
 
         for ko in range(0, A.cols, tile_k * tile_k_unroll):
@@ -380,7 +381,7 @@ fn test[
     var result = SIMD[type, 1]()
     for i in range(C.rows):
         for j in range(C.cols):
-            result += C[i, j]
+            result += C[i, j].cast[type]()
     return result
 
 
