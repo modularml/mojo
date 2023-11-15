@@ -30,7 +30,7 @@ alias M = 512
 alias N = 512
 alias K = 4096
 
-alias type = DType.float16
+alias type = DType.float32
 
 # Number of elems of type 'type' which would exceed 4MB of storage
 alias l3_cache_threshold_elems = 4 * 1024 * 1024 * 8 // sys.info.bitwidthof[type]()
