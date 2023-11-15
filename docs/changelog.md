@@ -139,9 +139,8 @@ modular install mojo
   package now raise an `Error` when the assertion fails instead of returning a
   `Bool` for whether the assertion succeeded or not.
 
-- Parameters of `AnyType` type are no longer (implicitly) assumed to be
-  register-passable. A new `AnyRegType` type is used to represent generic types
-  that are register passable.
+- The `AnyType` builtin type is renamed to `AnyRegType` to reflect that it can
+  only be used as the type of a register-passable type.
 
 - Changing the units in a benchmark report is now an argument instead of a
   parameter:
