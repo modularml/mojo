@@ -262,7 +262,7 @@ fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
                 C[io + i, jo + j] = accumulators[i, j]
 
     alias tile_i = row_iteration
-    alias tile_j = nelts * 8
+    alias tile_j = nelts * 4
     tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
 
