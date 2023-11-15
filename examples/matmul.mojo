@@ -30,7 +30,7 @@ alias M = 512
 alias N = 512
 alias K = 4096
 
-alias type = DType.float16
+alias type = DType.float32
 # We cannot codegen f16 SIMD on x86. Cast to float32 instead.
 alias simd_type = DType.float32 if type == DType.float16 else type
 
