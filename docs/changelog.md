@@ -180,6 +180,9 @@ modular install mojo
 - [#1236](https://github.com/modularml/mojo/issues/1236) - The language server
   doesn't show autocomplete in if statements.
 
+- [#1246](https://github.com/modularml/mojo/issues/1246) - Warning diagnostics
+  are transient in the presence of caching.
+
 ## v0.5.0 (2023-11-2)
 
 ### ⭐️ New
