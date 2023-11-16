@@ -124,6 +124,10 @@ modular install mojo
 - The Mojo REPL now supports indented expressions, making it a bit easier to
   execute expressions copied from an indented block (such as a doc string).
 
+- The Mojo language server now support processing code examples, defined as
+  markdown mojo code blocks, inside of doc strings. This enables IDE features
+  while writing examples in API documentation.
+
 ### 🦋 Changed
 
 - Variadic arguments are now automatically projected into a `VariadicList` or
