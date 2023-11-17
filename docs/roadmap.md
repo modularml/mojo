@@ -549,7 +549,7 @@ fn foo():
 
 Mojo will destruct objects as soon as it thinks it can. That means the lifetime
 of objects to which there are unsafe references must be manually extended. See
-the [lifetime document](https://docs.modular.com/mojo/programming-manual.html#value-lifecycle-birth-life-and-death-of-a-value)
+the [Death of a value](/mojo/manual/lifecycle/death.html)
 for more details. This disables the RAII pattern in Mojo.  Context managers and
 `with` statements are your friends in Mojo.
 

@@ -17,7 +17,7 @@ listing:
     contents:
       - manual/get-started/index.md
       - why-mojo.md
-      - programming-manual.ipynb
+      - manual/basics/index.ipynb
       - lib.md
       - notebooks/index.md
       - changelog.md

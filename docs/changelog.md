@@ -231,7 +231,7 @@ modular install mojo
   ```
 
   For more detail, see the [programming
-  manual](/mojo/programming-manual.html#optional-parameters-and-keyword-parameters).
+  manual](/mojo/manual/parameters/index.html#optional-parameters-and-keyword-parameters).
 
   For the time being, the following notable limitations apply:
 
@@ -814,13 +814,13 @@ Code](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vsco
   The name is intended to connote that the operation takes the conceptual value
   from the source (without destroying it) unlike the first one which "moves" a
   value from one location to another.
+
+  For more information, see the Mojo Manual section on
+  [move constructors](/mojo/manual/lifecycle/life.html#move-constructors).
+
 - The Error type in Mojo has changed. Instead of extracting the error message
   using `error.value` you will now extract the error message using
   `error.message()`.
-
-  For more information, see
-  [Unique "move-only" types](https://docs.modular.com/mojo/programming-manual.html#unique-move-only-types)
-  in the Mojo docs.
 
 ### 🛠️ Fixed
 
@@ -1319,8 +1319,8 @@ possible to write the following:
       pass
   ```
 
-  For details on the overload resolution logic, see the [programming
-  manual](/mojo/programming-manual.html#overloading-on-parameters).
+  For details on the overload resolution logic, see the Mojo Manual section on
+  [parameters](/mojo/manual/parameters/index.html#overloading-on-parameters).
 
 - A new `cost_of()` function has been added to `Autotune`. This meta-function
   must be invoked at compile time, and it returns the number of MLIR operations
@@ -1452,7 +1452,8 @@ only in declared parameter names, e.g. the following now works correctly:
   ```
 
   When `takeValueAsOwned()` takes its argument as an
-  [`owned`](/mojo/programming-manual.html#owned-arguments) value (this is
+  [`owned`](/mojo/manual/values/ownership.html#transfer-arguments-owned-and)
+  value (this is
   common in initializers for example), it is allowed to do whatever it wants
   with the value and destroy it when it is finished. In order to support this,
   the Mojo compiler is forced to make a temporary copy of the `someValue`
@@ -1610,8 +1611,8 @@ you to import Python's print function.
   optimized Matmul implementation is 3x faster.
 
 - Renamed the [`^` postfix
-operator](/mojo/programming-manual.html#owned-arguments) from "consume" to
-"transfer."
+operator](/mojo/manual/values/ownership.html#transfer-arguments-owned-and)
+from "consume" to "transfer."
 
 #### 🛠️ Fixed
 

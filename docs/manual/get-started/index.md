@@ -171,7 +171,7 @@ for access in subsequent Mojo cells.
 - The Mojo environment does not have network access, so you cannot install
 other tools or Python packages. However, we've included a variety of popular
 Python packages, such as `numpy`, `pandas`, and `matplotlib` (see how to
-[import Python modules](/mojo/programming-manual.html#python-integration)).
+[import Python modules](/mojo/manual/python/)).
 
 - Redefining implicit variables is not supported (variables without a `let` or
 `var` in front). If you’d like to redefine a variable across notebook cells,

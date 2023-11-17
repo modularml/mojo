@@ -370,5 +370,5 @@ expedient way to get demos up and running, but we are willing to put in the
 additional effort and work to provide better usability and predictability for
 our use-case.
 
-To see all the features we've built with Mojo so far, see the [Mojo
-programming manual](/mojo/programming-manual.html).
+To learn about what we've built with Mojo so far, see the [Mojo
+Manual](/mojo/manual/).

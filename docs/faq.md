@@ -133,10 +133,8 @@ you to try Mojo and if you find it useful, then that's great too.
 
 ### Where can I learn more about Mojo’s features?
 
-The best place to start is the [Mojo programming
-manual](/mojo/programming-manual.html), which is very
-long, but it covers all the features we support today. And if you want to see
-what features are coming in the future, take a look at [the
+The best place to start is the [Mojo Manual](/mojo/manual). And if you want to
+see what features are coming in the future, take a look at [the
 roadmap](/mojo/roadmap.html).
 
 ### What does it mean that Mojo is designed for MLIR?
@@ -227,8 +225,7 @@ hardware](https://www.modular.com/hardware).
 ### How does Mojo autotuning work?
 
 For details about what autotuning capabilities we support so far, check out
-the [programming
-manual](/mojo/programming-manual.html#autotuning-adaptive-compilation).
+the Mojo Manual section on [metaprogramming](/mojo/manual/parameters/).
 But stay tuned for more details!
 
 ### Who writes the software to add more hardware support for Mojo?
