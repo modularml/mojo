@@ -131,6 +131,9 @@ modular install mojo
 - The Mojo language server now provides semantic token information, providing
   better highlighting for symbols whose semantics are not statically analyzable.
 
+- The Mojo language server now classifies doc strings as folding ranges,
+  making them easier to collapse, reducing vertical space while editing.
+
 ### 🦋 Changed
 
 - Variadic arguments are now automatically projected into a `VariadicList` or
