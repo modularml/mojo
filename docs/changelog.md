@@ -128,6 +128,9 @@ modular install mojo
   markdown mojo code blocks, inside of doc strings. This enables IDE features
   while writing examples in API documentation.
 
+- The Mojo language server now provides semantic token information, providing
+  better highlighting for symbols whose semantics are not statically analyzable.
+
 ### 🦋 Changed
 
 - Variadic arguments are now automatically projected into a `VariadicList` or
