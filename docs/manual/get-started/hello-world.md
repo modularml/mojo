@@ -10,8 +10,8 @@ website:
 ---
 
 After you [install Mojo](/mojo/manual/get-started/setup.html), you can use the
-[Mojo CLI](/mojo/cli/) to build and compile Mojo programs. So let's create the
-classic starter program that prints "Hello, world!"
+[Mojo CLI](/mojo/cli/) to build and run Mojo programs. So let's create the
+classic starter program that prints "Hello, world!", in three different ways.
 
 :::{.callout-note}
 
@@ -38,11 +38,11 @@ issues](/mojo/roadmap.html#mojo-sdk-known-issues).
 
 :::
 
-## Run code in the REPL
+## 1. Run code in the REPL
 
-First, let's try running some code in the Mojo
+First, let's use the Mojo
 [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop),
-which allows you to write and run Mojo code directly in a command prompt:
+which allows you to write and run Mojo code in a command prompt:
 
 1. To start a REPL session, type `mojo` in your terminal and press
    <kbd>Enter</kbd>.
@@ -73,17 +73,10 @@ The REPL is primarily useful for short experiments because the code isn't
 saved. So when you want to write a real program, you need to write the code in
 a `.mojo` source file.
 
-## Build and run Mojo source files
+## 2. Run a Mojo file
 
-Now let's print "Hello, world" with a source file. Mojo source files are
-identified with either the `.mojo` or `.🔥` file extension.
-
-You can quickly execute a Mojo file by passing it to the `mojo` command, or you
-can build a compiled executable with the `mojo build` command. Let's try both.
-
-### Run a Mojo file
-
-First, write the Mojo code and execute it:
+Now let's write the code in a Mojo source file and run it with the
+[`mojo`](/mojo/cli/) command:
 
 1. Create a file named `hello.mojo` (or `hello.🔥`) and add the following code:
 
@@ -110,17 +103,17 @@ If this didn't work for you, double-check your code looks exactly like the code
 in step 1, and make sure you correctly [installed
 Mojo](/mojo/manual/get-started/#install-mojo).
 
-### Build an executable binary
+## 3. Build an executable binary
 
-Now, build and run an executable:
+Finally, let's build and run that same code as an executable:
 
-1. Create a stand-alone executable with the `build` command:
+1. Create an executable file with the [`build`](/mojo/cli/build.html) command:
 
     ```sh
     mojo build hello.mojo
     ```
 
-    It creates the executable with the same name as the `.mojo` file, but
+    The executable file uses the same name as the `.mojo` file, but
     you can change that with the `-o` option.
 
 2. Then run the executable:
@@ -129,49 +122,24 @@ Now, build and run an executable:
     ./hello
     ```
 
-The executable runs on your system like any C or C++ executable.
+This creates a statically compiled binary file, so it contains all the code and
+libraries it needs to run.
 
 ## Next steps
 
-- If you're developing in VS Code, install the [Mojo
-  extension](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo)
-  so you get syntax highlighting, code completion, diagnostics, and more.
+- If you're new to Mojo, we suggest you continue to the next section about
+  [language basics](/mojo/manual/basics/).
 
-- If you're new to Mojo, read the [Mojo language basics](/mojo/manual/basics/).
-
-- If you want to package your code as a library, read about
-  [Mojo modules and packages](/mojo/manual/get-started/packages.html).
-
-- If you want to explore some Mojo code, clone our repo to see some examples:
+- If you want to experiment with some code, clone [the Mojo
+repo](https://github.com/modularml/mojo/) to try our code examples:
 
   ```sh
   git clone https://github.com/modularml/mojo.git
   ```
 
-  Then open the `/examples` directory in your IDE to try our examples:
-
-  - The [code examples](https://github.com/modularml/mojo/tree/main/examples/)
-    offer a variety of demos with the standard library to help you
-    learn Mojo's features and start your own projects.
-
-  - The [Mojo
+  In addition to several `.mojo` examples, the repo includes [Jupyter
   notebooks](https://github.com/modularml/mojo/tree/main/examples/notebooks#readme)
-  are the same Jupyter notebooks we publish in the [Mojo
-  Playground](https://playground.modular.com), which demonstrate a variety of
-  language features. Now with the Mojo SDK, you can also run them in VS Code or in
-  JupyterLab.
-
-- For a deep dive into the language, check out the [Mojo programming
-  manual](/mojo/programming-manual.html).
+  that teach advanced Mojo features.
 
 - To see all the available Mojo APIs, check out the [Mojo standard library
   reference](/mojo/lib.html).
-
-:::{.callout-note}
-
-**Note:** The Mojo SDK is still in early development, but you can expect
-constant improvements to both the language and tools. Please see
-the [known issues](/mojo/roadmap.html#mojo-sdk-known-issues) and [report any
-other issues on GitHub](https://github.com/modularml/mojo/issues/new/choose).
-
-:::
