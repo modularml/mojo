@@ -193,6 +193,8 @@ modular install mojo
   nomnom(Fudge[5, 6, 9]())
   ```
 
+- `file.FileHandle` now has a `seek()` method.
+
 ### 🦋 Changed
 
 - Variadic arguments are now automatically projected into a `VariadicList` or
