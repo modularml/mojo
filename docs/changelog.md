@@ -134,6 +134,65 @@ modular install mojo
 - The Mojo language server now classifies doc strings as folding ranges,
   making them easier to collapse, reducing vertical space while editing.
 
+- Mojo now supports partial autoparameterization: when a function is declared
+  with an argument of a partially bound type, the unbound parameters of that
+  type are implicitly added to the function's input parameters. For example:
+
+  ```mojo
+  @value
+  struct Fudge[a: Int, b: Int, c: Int = 7]: ...
+
+  # These function declarations are roughly equivalent:
+  fn eat(f: Fudge[5]): ...               # (implicitly) autoparameterized
+  fn eat[_b: Int](f: Fudge[5, _b]): ...  # manually parameterized
+
+  # Either signature above can be called like so:
+  eat(Fudge[5, 8]())
+  ```
+
+  The main difference between the two signatures of `eat` above is that
+  `fn eat[_b: Int](f: Fudge[5, _b]): ...` _can_ be called with the `_b`
+  parameter passed explicitly (e.g. `eat[7](Fudge[5, 7]())`), whereas the
+  implicit parameter of `fn eat(f: Fudge[5]): ...` is _always_ inferred from the
+  value passed for the argument `f` (e.g. in `eat(Fudge[5, 8]())` an implicit
+  parameter of `eat` is inferred the value `8` from the value `Fudge[5, 8]()`).
+
+  Moreover, Mojo now allows one to explicitly mark parameters as unbound using
+  the `_` as syntax meaning "placeholder for an unbound parameter", e.g.:
+
+  ```mojo
+  # These function declarations are roughly equivalent:
+  fn eat(f: Fudge[5, _, c=_]): ...                    # autoparameterized
+  fn eat(f: Fudge[c=_, a=5, b=_]): ...                # autoparameterized
+  fn eat[_b: Int, _c: Int](f: Fudge[5, _b, _c]): ...  # manually parameterized
+
+  # Either signature above can be called like so:
+  eat(Fudge[5, 8]())
+  eat(Fudge[5, 8, 9]())
+  ```
+
+  Note that the default parameter values of struct parameters are bound, unless
+  explicitly unbound by the user:
+
+  ```mojo
+  # These are equivalent and concrete (_not_ autoparameterized) function
+  # declarations, because `Fudge.c` is bound:
+  fn eat(f: Fudge[5, 6]): ...    # `Fudge.c = 7` bound from default value.
+  fn eat(f: Fudge[5, 6, 7]): ... # `Fudge.c = 7` bound explicitly
+
+  # Fails for both signatures above:
+  eat(Fudge[5, 6, 9]())  # value has `Fudge.c = 9` bound
+
+  # These function declarations are roughly equivalent:
+  fn nomnom(f: Fudge[5, 6, _]): ...              # autoparameterized
+  fn nomnom(f: Fudge[5, 6, c=_]): ...            # autoparameterized
+  fn nomnom[__c: Int](f: Fudge[5, 6, __c]): ...  # manually parameterized
+
+  # This is valid for all three declarations above because `Fudge.c` is
+  # explicitly unbound for the type of argument `f`:
+  nomnom(Fudge[5, 6, 9]())
+  ```
+
 ### 🦋 Changed
 
 - Variadic arguments are now automatically projected into a `VariadicList` or
