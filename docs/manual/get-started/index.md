@@ -1,6 +1,7 @@
 ---
 title: Get started with Mojo🔥
 sidebar_label: Get Mojo
+sidebar_position: 1
 description: Get the Mojo SDK or try coding in the Mojo Playground.
 css: /static/styles/page-navigation.css
 aliases:

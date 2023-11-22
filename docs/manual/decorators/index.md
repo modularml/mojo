@@ -1,6 +1,7 @@
 ---
 title: Mojo decorators
 sidebar_label: Decorators
+sidebar_position: 1
 description: A reference of Mojo's built-in decorators
 toc: false
 css: /static/styles/page-navigation.css
@@ -12,11 +13,11 @@ website:
 listing:
   - id: docs
     contents:
-      - always_inline.ipynb
+      - always-inline.ipynb
       - noncapturing.ipynb
       - nonmaterializable.ipynb
       - parameter.ipynb
-      - register_passable.ipynb
+      - register-passable.ipynb
       - unroll.ipynb
       - value.ipynb
     type: grid
@@ -31,6 +32,3 @@ as the `@value` decorator) above your code (such as a struct). The Mojo
 compiler then uses the decorator function to modify your code at compile time.
 
 The following pages describe each built-in decorator with examples.
-
-:::{#docs}
-:::

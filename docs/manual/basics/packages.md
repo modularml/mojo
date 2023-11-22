@@ -1,6 +1,7 @@
 ---
 title: Modules and packages
 order: 5
+sidebar_position: 5
 sidebar_label: Modules and packages
 description: Learn how to package Mojo code for distribution and importing.
 css: /static/styles/page-navigation.css

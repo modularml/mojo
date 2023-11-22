@@ -1,5 +1,6 @@
 ---
 title: Hello, world!
+sidebar_position: 2
 description: Learn to run your first Mojo program.
 css: /static/styles/page-navigation.css
 website:

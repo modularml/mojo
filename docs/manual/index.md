@@ -1,5 +1,6 @@
 ---
 title: "Mojo Manual"
+sidebar_label: Introduction
 description: A comprehensive guide to the Mojo programming language.
 css: /static/styles/page-navigation.css
 website:
