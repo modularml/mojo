@@ -298,6 +298,10 @@ You can [get the Mojo SDK here](https://developer.modular.com/download)!
 Yes, you can [get access today](https://www.modular.com/get-started)
 to the Mojo Playground, a hosted set of Mojo-supported Jupyter notebooks.
 
+### What are the license terms for the SDK?
+
+Please read the [Mojo SDK License Terms](https://www.modular.com/legal/mojo).
+
 ### What does the Mojo SDK ship with?
 
 The Mojo SDK includes the Mojo standard library and `mojo` command-line tool,
