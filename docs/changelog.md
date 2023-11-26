@@ -195,6 +195,8 @@ modular install mojo
 
 - `file.FileHandle` now has a `seek()` method.
 
+- `String` now has an `rfind()` method analogous to Python's `str.rfind()`.
+
 ### 🦋 Changed
 
 - Variadic arguments are now automatically projected into a `VariadicList` or
