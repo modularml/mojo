@@ -197,6 +197,9 @@ modular install mojo
 
 - `String` now has an `rfind()` method analogous to Python's `str.rfind()`.
 
+- `Path` now has a `suffix()` method analogous to Python's
+  `pathlib.Path.suffix`.
+
 ### 🦋 Changed
 
 - Variadic arguments are now automatically projected into a `VariadicList` or
