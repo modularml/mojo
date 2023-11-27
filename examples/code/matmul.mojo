@@ -15,7 +15,8 @@
 # applied to a naive matmul implementation in Mojo to gain significant
 # performance speedups
 
-import benchmark
+# RUN: %mojo -debug-level full %s | FileCheck %s
+from benchmark import Unit
 from memory import memset_zero, stack_allocation
 from random import rand
 from algorithm import vectorize, parallelize, vectorize_unroll
@@ -61,8 +62,8 @@ struct Matrix:
     fn __getitem__(self, y: Int, x: Int) -> Float32:
         return self.load[1](y, x)
 
-    fn __setitem__(self, y: Int, x: Int, val: Float32):
-        return self.store[1](y, x, val)
+    fn __setitem__(inout self, y: Int, x: Int, val: Float32):
+        self.store[1](y, x, val)
 
     fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[DType.float32, nelts]:
         return self.data.simd_load[nelts](y * self.cols + x)
@@ -172,7 +173,9 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
 
 # Unroll the vectorized loop by a constant factor.
 # from Functional import vectorize_unroll
-fn matmul_unroll(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
+    alias tile_size = 4
+
     @parameter
     fn calc_row(m: Int):
         @parameter
@@ -214,9 +217,15 @@ fn tile_parallel[
     parallelize[row](end_y // tile_y, M)
 
 
-# Tile the output and accumulate in registers. This strategy means we can
-# compute tile_i * tile_j values of output for only reading tile_i + tile_j input values.
-fn accumulate_registers(inout C: Matrix, A: Matrix, B: Matrix):
+# Use stack allocation for tiles to accumulate values efficiently,
+# avoiding repeated reads and writes to memory. Also reorder the loops
+# and do not fully unroll the loop over the reduction dimension.
+fn matmul_accumulated(inout C: Matrix, A: Matrix, B: Matrix):
+    alias tile_k = 8
+    alias tile_k_unroll = 8
+    alias tile_i = 32
+    alias tile_j = nelts * 4
+
     @parameter
     fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
         # Allocate the tile of accumulators on the stack.
@@ -224,30 +233,32 @@ fn accumulate_registers(inout C: Matrix, A: Matrix, B: Matrix):
             tile_i, tile_j, stack_allocation[tile_i * tile_j, DType.float32]()
         )
 
-        for k in range(0, A.cols):
+        for ko in range(0, A.cols, tile_k * tile_k_unroll):
+            for _ in range(tile_i):
+                for i in range(tile_k):
 
-            @parameter
-            fn calc_tile_row[i: Int]():
-                @parameter
-                fn calc_tile_cols[nelts: Int](j: Int):
-                    accumulators.store[nelts](
-                        i,
-                        j,
-                        accumulators.load[nelts](i, j)
-                        + A[io + i, k] * B.load[nelts](k, jo + j),
-                    )
+                    @unroll
+                    for k in range(tile_k_unroll):
 
-                vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
+                        @parameter
+                        fn calc_tile_cols[nelts: Int](j: Int):
+                            accumulators.store[nelts](
+                                i,
+                                j,
+                                accumulators.load[nelts](i, j)
+                                + A[io + i, ko + k]
+                                * B.load[nelts](ko + k, jo + j),
+                            )
 
-            unroll[tile_i, calc_tile_row]()
+                        vectorize_unroll[
+                            nelts, tile_j // nelts, calc_tile_cols
+                        ](tile_j)
 
         # Copy the local tile to the output
         for i in range(tile_i):
             for j in range(tile_j):
                 C[io + i, jo + j] = accumulators[i, j]
 
-    alias tile_i = 4
-    alias tile_j = nelts * 4
     tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
 
@@ -264,7 +275,7 @@ fn bench[
     fn test_fn():
         _ = func(C, A, B)
 
-    let secs = benchmark.run[test_fn]().mean()
+    let secs = benchmark.run[test_fn](max_runtime_secs=0.5).mean()
     # Prevent the matrices from being freed before the benchmark run
     A.data.free()
     B.data.free()
@@ -308,10 +319,10 @@ fn test_all() raises:
         raise Error("Parallelize output incorrect")
     if test[matmul_tiled](A, B) != result:
         raise Error("Tiled output incorrect")
-    if test[matmul_unroll](A, B) != result:
+    if test[matmul_unrolled](A, B) != result:
         raise Error("Unroll output incorrect")
-    if test[accumulate_registers](A, B) != result:
-        raise Error("Accumulate output incorrect")
+    if test[matmul_accumulated](A, B) != result:
+        raise Error("Loop reorder output incorrect")
 
     A.data.free()
     B.data.free()
@@ -328,5 +339,6 @@ fn main() raises:
     bench[matmul_vectorized, "Vectorized: "](python_gflops, numpy_gflops)
     bench[matmul_parallelized, "Parallelized:"](python_gflops, numpy_gflops)
     bench[matmul_tiled, "Tiled:"](python_gflops, numpy_gflops)
-    bench[matmul_unroll, "Unrolled:"](python_gflops, numpy_gflops)
-    bench[accumulate_registers, "Accumulated:"](python_gflops, numpy_gflops)
+    bench[matmul_unrolled, "Unrolled:"](python_gflops, numpy_gflops)
+    # CHECK: Accumulated
+    bench[matmul_accumulated, "Accumulated:"](python_gflops, numpy_gflops)

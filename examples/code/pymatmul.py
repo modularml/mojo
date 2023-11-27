@@ -13,6 +13,7 @@
 
 # Simple program demonstrating a naive matrix multiplication in Python
 from timeit import timeit
+
 import check_mod
 
 check_mod.install_if_missing("numpy")
@@ -49,8 +50,8 @@ def benchmark_matmul_python(M, N, K):
 
 
 def benchmark_matmul_numpy(M, N, K):
-    A = np.random.rand(M, K)
-    B = np.random.rand(K, N)
+    A = np.random.rand(M, K).astype(np.float32)
+    B = np.random.rand(K, N).astype(np.float32)
     secs = timeit(lambda: A @ B, number=10) / 10
     gflops = ((2 * M * N * K) / secs) / 1e9
     return gflops
@@ -58,4 +59,6 @@ def benchmark_matmul_numpy(M, N, K):
 
 if __name__ == "__main__":
     print("Throughput of a 128x128 matrix multiplication in Python:")
-    benchmark_matmul_python(128, 128, 128)
+    print(benchmark_matmul_python(128, 128, 128))
+    print("Throughput of a 128x128 matrix multiplication in Python numpy:")
+    print(benchmark_matmul_numpy(128, 128, 128))

@@ -10,12 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
 
 # This sample implements a simple reduction operation on a
 # large array of values to produce a single result.
 # Reductions and scans are common algorithm patterns in parallel computing.
 
-import benchmark
 from benchmark import Unit, keep
 from time import now
 from algorithm import sum
@@ -69,14 +69,14 @@ fn bench[
         let result = func[size](array)
         keep(result)
 
-    let ms = benchmark.run[runner]().mean(Unit.ms)
+    let ms = benchmark.run[runner](max_runtime_secs=0.5).mean(Unit.ms)
     pretty_print(name, size, ms)
 
 
 fn main() raises:
     print(
         "Sum all values in a small array and large array\n"
-        "Shows algorithm.sum from stdlib with much better scaling\n"
+        "Shows algorithm.sum from stdlib with much better performance\n"
     )
     # Create two 1-dimensional tensors i.e. arrays
     let small_array = rand[type](size_small)
@@ -86,4 +86,5 @@ fn main() raises:
     bench[naive_reduce_sum, size_large, "naive"](large_array)
 
     bench[stdlib_reduce_sum, size_small, "stdlib"](small_array)
+    # CHECK: stdlib elements
     bench[stdlib_reduce_sum, size_large, "stdlib"](large_array)

@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
 
 # This sample demonstrates some basic Mojo
 # Range and print functions available in the standard library
@@ -25,4 +26,5 @@ def main():
     Python.add_to_path(".")
     Python.add_to_path("./examples")
     let test_module = Python.import_module("simple_interop")
+    # CHECK: I can even print a numpy array:  [1 2 3]
     test_module.test_interop_func()

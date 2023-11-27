@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
 
 # This sample implements the nbody benchmarking in
 # https://benchmarksgame-team.pages.debian.net/benchmarksgame/performance/nbody.html
@@ -101,7 +102,7 @@ fn energy(bodies: StaticTuple[NUM_BODIES, Planet]) -> Float64:
     return e
 
 
-fn _run():
+fn bench():
     let Sun = Planet(
         0,
         0,
@@ -181,13 +182,14 @@ fn _run():
     for i in range(50_000_000):
         advance(system, 0.01)
 
+    # CHECK: Energy of System
     print("Energy of System:", energy(system))
 
 
 fn benchmark():
-    print(run[_run]().mean())
+    print(run[bench](max_runtime_secs=0.5).mean())
 
 
 fn main():
     print("Starting nbody...")
-    _run()
+    bench()
