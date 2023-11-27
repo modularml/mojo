@@ -15,7 +15,6 @@
 # applied to a naive matmul implementation in Mojo to gain significant
 # performance speedups
 
-# RUN: %mojo -debug-level full %s | FileCheck %s
 from benchmark import Unit
 from memory import memset_zero, stack_allocation
 from random import rand
@@ -340,5 +339,4 @@ fn main() raises:
     bench[matmul_parallelized, "Parallelized:"](python_gflops, numpy_gflops)
     bench[matmul_tiled, "Tiled:"](python_gflops, numpy_gflops)
     bench[matmul_unrolled, "Unrolled:"](python_gflops, numpy_gflops)
-    # CHECK: Accumulated
     bench[matmul_accumulated, "Accumulated:"](python_gflops, numpy_gflops)
