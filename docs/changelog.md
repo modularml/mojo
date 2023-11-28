@@ -54,10 +54,122 @@ modular install mojo
   the [traits docs here](https://modul.ar/traits) and a
   [traits blog post here](https://modul.ar/traits-blog).
 
-  We've added some traits to the standard library, you can implement these on
+  You can now define a "trait", which
+  consists of function prototypes that implementing structs must have, which can
+  then be used to write generic functions over the trait. Please see the
+  programming manual for more details!
+
+  Traits are declared with the `trait` keyword. The bodies of traits should
+  contain function prototypes declared with `...` as their bodies. Default
+  function implementations are not supported yet.
+
+  ```mojo
+  trait SomeTrait:
+      fn required_method(self, x: Int): ...
+  ```
+
+  The trait can be implemented on a struct by inheriting from it.
+
+  ```mojo
+  struct SomeStruct(SomeTrait):
+      fn required_method(self, x: Int):
+          print("hello traits", x)
+  ```
+
+  You can then write generic functions over the trait by parameterizing a
+  function with a trait-typed parameter:
+
+  ```mojo
+  fn fun_with_traits[T: SomeTrait](x: T):
+      x.required_method(42)
+  ```
+
+  Which can be invoked with instances of types that implement the trait:
+
+  ```mojo
+  var thing = SomeStruct()
+  # Infer the parameter `T`!
+  fun_with_traits(thing)
+  ```
+
+  Traits can also inherit from other traits, which simply requires that
+  implementors of the child trait also conform to all parent traits.
+
+  ```mojo
+  trait Parent:
+      fn parent_func(self): ...
+
+  trait Child(Parent):
+      fn child_func(self): ...
+  ```
+
+  Then, both child and parent trait functions can be invoked on instances of
+  the trait `Child`. As well, an instance of the child trait can be converted to
+  an instance of the parent trait.
+
+  ```mojo
+  fn the_parents[T: Parent](x: T):
+      x.parent_func()
+
+  fn the_children[T: Child](x: T):
+      x.child_func()
+      x.parent_func()
+      # Upcast `x` from instance of `Child` to `Parent`.
+      the_parents(x)
+  ```
+
+  Traits can specify required static methods as well:
+
+  ```mojo
+  trait HasStaticMethod:
+      @staticmethod
+      fn do_stuff(): ...
+
+  fn fun_with_traits[T: HasStaticMethod]():
+      T.do_stuff()
+  ```
+
+  This includes required constructors, implicit conversions, move constructor,
+  and copy constructors:
+
+  ```mojo
+  trait DefaultConstructible:
+      fn __init__(inout self): ...
+
+  trait Movable:
+      fn __moveinit__(inout self, owned existing: Self): ...
+
+  # TODO: Anonymous trait compositions!
+  trait Composition(DefaultConstructible, Movable):
+      pass
+
+  fn make_default[T: Composition]() -> T:
+      return T()
+  ```
+
+  For `@register_passable` and `@register_passable("trivial")` types, special
+  rules are implemented to ensure that they can conform correctly to traits as
+  well. For example, trivial types are always considered copyable, and you
+  should continue to define constructors in the register-passable form:
+
+  ```mojo
+  @register_passable
+  struct RegisterPassableType(DefaultConstructible):
+      # This is OK: Traits understand different type conventions.
+      fn __init__() -> Self:
+          return Self {}
+  ```
+
+  This also means generic functions (and collections!) can work over both
+  memory-only and register-passable types.
+
+- A fundamental `Destructable` trait has been added to the language. This is a
+  core trait that every type automatically conforms to. This enables destruction
+  of generic types and generic collections.
+
+- We've added some traits to the standard library, you can implement these on
   your own types:
 
-  - [DefaultConstructible](/mojo/stdlib/builtin/value.html#defaultconstructible)
   - [Destructable](/mojo/stdlib/builtin/destructable.html)
   - [Copyable](/mojo/stdlib/builtin/value.html#copyable)
   - [Movable](/mojo/stdlib/builtin/value.html#movable)
@@ -65,6 +177,35 @@ modular install mojo
   - [Intable](/mojo/stdlib/builtin/int.html#intable)
   - [Sized](/mojo/stdlib/builtin/len.html#sized)
   - [CollectionElement](/mojo/stdlib/utils/vector.html#collectionelement):
+
+- We added `len`, `str`, and `int` functions, which work with types that
+  implement `Sized`, `Strinable`, and `Intable`, respectively.
+
+- `DynamicVector` is now a proper generic collection that can use any type that
+  implements `Movable` and `Copyable`. This means you can now write, for
+  example, `DynamicVector[String]`, or even `DynamicVector[DynamicVector[Int]]`.
+  Also, `DynamicVector` now invokes its element destructors upon destruction, so
+  `_del_old` has been deleted.
+
+- Parametric types can now be partially bound in certain contexts. For example,
+  a new `Scalar` type alias has been added defined as:
+
+  ```mojo
+  alias Scalar = SIMD[size=1]
+  ```
+
+  Which creates a parametric type alias `Scalar` with a single parameter of type
+  `DType`. Types can also be partially or fully bound in other contexts. For
+  instance, `alias` declarations of type values inside functions now work
+  properly:
+
+  ```mojo
+  fn type_aliases():
+      alias T = SIMD
+      print(T[DType.float32, 1]())
+      alias Partial = T[type=DType.int32]
+      print(Partial[2]())
+  ```
 
 - The `__mlir_op` feature now supports operations that return multiple results.
   To use them, you write the `_type` field as a `Tuple` of types.  For example:
