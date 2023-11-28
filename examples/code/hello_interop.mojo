@@ -10,9 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+
 # This sample demonstrates some basic Mojo
-# Range and print functions available in the standard library
-# It also demonstrates importing a simple Python program into Mojo
+# range() and print() functions available in the standard library.
+# It also demonstrates Python interop by importing the simple_interop.py file.
 
 from python.python import Python
 
