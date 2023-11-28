@@ -389,6 +389,13 @@ modular install mojo
   report.print(Unit.ms)
   ```
 
+- Default values on `inout` arguments are no longer permitted, i.e. the
+  following will now raise an error:
+
+  ```mojo
+  fn inout_default(inout x: Int = 2): ...
+  ```
+
 ### 🛠️ Fixed
 
 - [#734](https://github.com/modularml/mojo/issues/734) - Consumption of struct
