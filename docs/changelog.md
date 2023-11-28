@@ -170,13 +170,13 @@ modular install mojo
 - We've added some traits to the standard library, you can implement these on
   your own types:
 
-  - [Destructable](/mojo/stdlib/builtin/destructable.html)
-  - [Copyable](/mojo/stdlib/builtin/value.html#copyable)
-  - [Movable](/mojo/stdlib/builtin/value.html#movable)
-  - [Stringable](/mojo/stdlib/builtin/str.html#stringable)
-  - [Intable](/mojo/stdlib/builtin/int.html#intable)
-  - [Sized](/mojo/stdlib/builtin/len.html#sized)
-  - [CollectionElement](/mojo/stdlib/utils/vector.html#collectionelement):
+  - [`Destructable`](/mojo/stdlib/builtin/destructable.html)
+  - [`Copyable`](/mojo/stdlib/builtin/value.html#copyable)
+  - [`Movable`](/mojo/stdlib/builtin/value.html#movable)
+  - [`Stringable`](/mojo/stdlib/builtin/str.html#stringable)
+  - [`Intable`](/mojo/stdlib/builtin/int.html#intable)
+  - [`Sized`](/mojo/stdlib/builtin/len.html#sized)
+  - [`CollectionElement`](/mojo/stdlib/utils/vector.html#collectionelement):
 
 - We added `len`, `str`, and `int` functions, which work with types that
   implement `Sized`, `Strinable`, and `Intable`, respectively.
