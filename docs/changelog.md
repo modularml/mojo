@@ -396,6 +396,10 @@ modular install mojo
   fn inout_default(inout x: Int = 2): ...
   ```
 
+- The `to_string()` function has been removed from `PythonObject` in favor of the
+  new `__str__()` function.  This composes better with traits so it can be used
+  with the generic `str()` function.
+
 ### 🛠️ Fixed
 
 - [#734](https://github.com/modularml/mojo/issues/734) - Consumption of struct
