@@ -50,6 +50,22 @@ modular install mojo
 
 ### ⭐️ New
 
+- Traits have arrived 🔥 make sure to check out
+  the [traits docs here](https://modul.ar/traits) and a
+  [traits blog post here](https://modul.ar/traits-blog).
+
+  We've added some traits to the standard library, you can implement these on
+  your own types:
+
+  - [DefaultConstructible](/mojo/stdlib/builtin/value.html#defaultconstructible)
+  - [Destructable](/mojo/stdlib/builtin/destructable.html)
+  - [Copyable](/mojo/stdlib/builtin/value.html#copyable)
+  - [Movable](/mojo/stdlib/builtin/value.html#movable)
+  - [Stringable](/mojo/stdlib/builtin/str.html#stringable)
+  - [Intable](/mojo/stdlib/builtin/int.html#intable)
+  - [Sized](/mojo/stdlib/builtin/len.html#sized)
+  - [CollectionElement](/mojo/stdlib/utils/vector.html#collectionelement):
+
 - The `__mlir_op` feature now supports operations that return multiple results.
   To use them, you write the `_type` field as a `Tuple` of types.  For example:
 
