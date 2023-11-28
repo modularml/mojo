@@ -271,7 +271,7 @@ matmul implementation and it doesn’t measure up to the state of the art.
 Plus, if you're using the [Mojo Playground](https://playground.modular.com),
 that VM environment is not set up for stable performance evaluation. Modular
 has a separate matmul implementation written in Mojo (and used by the [Modular
-AI Engine](/engine)) that is not available with this release, but you can read
+MAX Engine](/engine)) that is not available with this release, but you can read
 about it in [this blog
 post](https://www.modular.com/blog/the-worlds-fastest-unified-matrix-multiplication).
 
