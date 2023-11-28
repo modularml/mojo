@@ -354,6 +354,8 @@ modular install mojo
 
 - `String` now has an `rfind()` method analogous to Python's `str.rfind()`.
 
+- `String` now has an `split()` method analogous to Python's `str.split()`.
+
 - `Path` now has a `suffix()` method analogous to Python's
   `pathlib.Path.suffix`.
 
