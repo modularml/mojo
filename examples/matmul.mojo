@@ -170,6 +170,8 @@ fn tiled(inout C: Matrix, A: Matrix, B: Matrix):
 # Unroll the vectorized loop by a constant factor.
 # from Functional import vectorize_unroll
 fn unrolled(inout C: Matrix, A: Matrix, B: Matrix):
+    alias tile_size = 4
+
     @parameter
     fn calc_row(m: Int):
         @parameter
@@ -190,7 +192,6 @@ fn unrolled(inout C: Matrix, A: Matrix, B: Matrix):
                 # Here unroll factor is 4
                 vectorize_unroll[nelts, tile_x // nelts, dot](tile_x)
 
-        alias tile_size = 4
         tile[calc_tile, nelts * tile_size, tile_size](C.cols, B.rows)
 
     parallelize[calc_row](C.rows, C.rows)
@@ -216,6 +217,8 @@ fn tile_parallel[
 fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_k = 8
     alias tile_k_unroll = 8
+    alias tile_i = 32
+    alias tile_j = nelts * 4
 
     @parameter
     fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
@@ -225,13 +228,12 @@ fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
         )
 
         for ko in range(0, A.cols, tile_k * tile_k_unroll):
+            for _ in range(tile_i):
+                for i in range(tile_k):
 
-            @parameter
-            fn calc_tile_row[](i: Int):
-                for i in range(0, tile_k):
+                    @unroll
+                    for k in range(tile_k_unroll):
 
-                    @parameter
-                    fn calc_tile_inner[k: Int]():
                         @parameter
                         fn calc_tile_cols[nelts: Int](j: Int):
                             accumulators.store[nelts](
@@ -243,18 +245,11 @@ fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
 
                         vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
 
-                    unroll[tile_k_unroll, calc_tile_inner]()
-
-            for i in range(0, tile_i):
-                calc_tile_row(i)
-
         # Copy the local tile to the output
         for i in range(tile_i):
             for j in range(tile_j):
                 C[io + i, jo + j] = accumulators[i, j]
 
-    alias tile_i = 32
-    alias tile_j = nelts * 4
     tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
 
@@ -285,6 +280,8 @@ fn tile_parallel_swizzled[
 fn swizzled(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_k = 8
     alias tile_k_unroll = 8
+    alias tile_i = 32
+    alias tile_j = nelts * 4
 
     @parameter
     fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
@@ -294,13 +291,12 @@ fn swizzled(inout C: Matrix, A: Matrix, B: Matrix):
         )
 
         for ko in range(0, A.cols, tile_k * tile_k_unroll):
+            for _ in range(tile_i):
+                for i in range(tile_k):
 
-            @parameter
-            fn calc_tile_row[](i: Int):
-                for i in range(0, tile_k):
+                    @unroll
+                    for k in range(tile_k_unroll):
 
-                    @parameter
-                    fn calc_tile_inner[k: Int]():
                         @parameter
                         fn calc_tile_cols[nelts: Int](j: Int):
                             accumulators.store[nelts](
@@ -312,18 +308,11 @@ fn swizzled(inout C: Matrix, A: Matrix, B: Matrix):
 
                         vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
 
-                    unroll[tile_k_unroll, calc_tile_inner]()
-
-            for i in range(0, tile_i):
-                calc_tile_row(i)
-
         # Copy the local tile to the output
         for i in range(tile_i):
             for j in range(tile_j):
                 C[io + i, jo + j] = accumulators[i, j]
 
-    alias tile_i = 32
-    alias tile_j = nelts * 4
     tile_parallel_swizzled[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
 
