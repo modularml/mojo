@@ -187,6 +187,20 @@ modular install mojo
   Also, `DynamicVector` now invokes its element destructors upon destruction, so
   `_del_old` has been deleted.
 
+- `print` now works on any types that implement `Stringable` by invoking their
+  `__str__` method:
+
+  ```mojo
+  @value
+  struct BoxedInt(Stringable):
+      var value: Int
+
+      fn __str__(self) -> String:
+          return self.value
+
+  print(BoxedInt(11), "hello traits!", BoxedInt(42))
+  ```
+
 - Parametric types can now be partially bound in certain contexts. For example,
   a new `Scalar` type alias has been added defined as:
 
