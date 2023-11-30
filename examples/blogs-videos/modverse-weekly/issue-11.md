@@ -10,15 +10,15 @@ Due to overwhelming demand and selling out tickets, we decided to livestream the
 
 ## General 💻
 
-- Jack Released a blog post: [Mojo 🔥 Advent of Code 2023](https://www.modular.com/blog/mojo-advent-of-code-2023)
+- [Jack](https://www.modular.com/team/jack-clayton) Released a blog post: [Mojo 🔥 Advent of Code 2023](https://www.modular.com/blog/mojo-advent-of-code-2023)
 
 ## Community 📡
+
+### ModCon Finalists
 
 Congratulations to the six finalists for our ModCon Contest!
 
 These will all be presented on stage at ModCon, and one winner will be selected, make sure to check them all out.
-
-### Finalists
 
 - Stijn with [dainemo](https://github.com/StijnWoestenborghs/dainemo): A Machine Learning framework from scratch in Mojo 🔥
 - TilleFe with [Infermo](https://github.com/TilliFe/Infermo): Tensors and dynamic Neural Networks in Mojo 🔥
@@ -42,7 +42,7 @@ And congratulations to all the runners-up submissions:
 
 There were some more projects released over the last week that weren't submitted:
 
-- Modular staff Zac with [conway.mojo](https://gist.github.com/zbowling/79a18bcd70f3e82eb4f957687a93e8a1): a Mojo implementation of Conway's Game of Life
+- Modular staff [Zac](https://www.modular.com/team/zac-bowling) with [conway.mojo](https://gist.github.com/zbowling/79a18bcd70f3e82eb4f957687a93e8a1): a Mojo implementation of Conway's Game of Life
 - rd4com with his [tutorial](https://github.com/rd4com/mojo-learning/blob/main/tutorials/parameters-alias-struct-parameter-deduction.md) covering many alias, parameter and compile-time features. Check out his [entire catalog of tutorials](https://github.com/rd4com/mojo-learning/tree/main/tutorials)
 - Leonardo with [simpletools](https://github.com/lleites/simpletools) containing a list and testing module
 - Rama with a [Mojo Udemy course](https://www.udemy.com/course/mojo-programming-basic-to-expert-with-ai-use-cases)
