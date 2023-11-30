@@ -50,14 +50,24 @@ modular install mojo
 
 ### ⭐️ New
 
-- Traits have arrived 🔥 make sure to check out
-  the [traits docs here](https://modul.ar/traits) and a
-  [traits blog post here](https://modul.ar/traits-blog).
+### 🦋 Changed
 
-  You can now define a "trait", which
-  consists of function prototypes that implementing structs must have, which can
-  then be used to write generic functions over the trait. Please see the
-  programming manual for more details!
+### 🛠️ Fixed
+
+## v0.6.0 (2023-12-04)
+
+### 🔥 Legendary
+
+- Traits have arrived!
+
+  You can now define a _trait_, which consists of a required set of method
+  prototypes. A struct can _conform to_ the trait by implementing these methods.
+  This lets you write generic functions that work on any structs that conform to
+  a given trait.
+
+  The following section gives a brief overview of traits—see the
+  [Mojo manual]((/mojo/manual/traits/index.html)) and this
+  [traits blog post](https://modul.ar/traits-blog) for more details!
 
   Traits are declared with the `trait` keyword. The bodies of traits should
   contain function prototypes declared with `...` as their bodies. Default
@@ -118,50 +128,8 @@ modular install mojo
       the_parents(x)
   ```
 
-  Traits can specify required static methods as well:
-
-  ```mojo
-  trait HasStaticMethod:
-      @staticmethod
-      fn do_stuff(): ...
-
-  fn fun_with_traits[T: HasStaticMethod]():
-      T.do_stuff()
-  ```
-
-  This includes required constructors, implicit conversions, move constructor,
-  and copy constructors:
-
-  ```mojo
-  trait DefaultConstructible:
-      fn __init__(inout self): ...
-
-  trait Movable:
-      fn __moveinit__(inout self, owned existing: Self): ...
-
-  # TODO: Anonymous trait compositions!
-  trait Composition(DefaultConstructible, Movable):
-      pass
-
-  fn make_default[T: Composition]() -> T:
-      return T()
-  ```
-
-  For `@register_passable` and `@register_passable("trivial")` types, special
-  rules are implemented to ensure that they can conform correctly to traits as
-  well. For example, trivial types are always considered copyable, and you
-  should continue to define constructors in the register-passable form:
-
-  ```mojo
-  @register_passable
-  struct RegisterPassableType(DefaultConstructible):
-      # This is OK: Traits understand different type conventions.
-      fn __init__() -> Self:
-          return Self {}
-  ```
-
-  This also means generic functions (and collections!) can work over both
-  memory-only and register-passable types.
+  For more information, see the [Traits page](/mojo/manual/traits/index.html)
+  in the Mojo manual.
 
 - A fundamental `Destructable` trait has been added to the language. This is a
   core trait that every type automatically conforms to. This enables destruction
@@ -178,12 +146,15 @@ modular install mojo
   - [`Sized`](/mojo/stdlib/builtin/len.html#sized)
   - [`CollectionElement`](/mojo/stdlib/utils/vector.html#collectionelement):
 
-- We added `len`, `str`, and `int` functions, which work with types that
-  implement `Sized`, `Strinable`, and `Intable`, respectively.
+- We added [`len`](/mojo/stdlib/builtin/len.html#len),
+  [`str`](/mojo/stdlib/builtin/str.html#str), and
+  [`int`](/mojo/stdlib/builtin/int.html#int-1) functions, which work with types
+  that implement `Sized`, `Stringable`, and `Intable`, respectively.
 
-- `DynamicVector` is now a proper generic collection that can use any type that
-  implements `Movable` and `Copyable`. This means you can now write, for
-  example, `DynamicVector[String]`, or even `DynamicVector[DynamicVector[Int]]`.
+- [`DynamicVector`](/mojo/stdlib/utils/vector.html#dynamicvector) is now a
+  proper generic collection that can use any type that implements the `Movable`
+  and `Copyable` traits. This means you can now write, for example,
+  `DynamicVector[String]`, or even `DynamicVector[DynamicVector[Int]]`.
   Also, `DynamicVector` now invokes its element destructors upon destruction, so
   `_del_old` has been deleted.
 
@@ -200,6 +171,72 @@ modular install mojo
 
   print(BoxedInt(11), "hello traits!", BoxedInt(42))
   ```
+
+### ⭐️ New
+
+- Mojo now supports partial autoparameterization: when a function is declared
+  with an argument of a partially bound type, the unbound parameters of that
+  type are implicitly added to the function's input parameters. For example:
+
+  ```mojo
+  @value
+  struct Fudge[a: Int, b: Int, c: Int = 7]: ...
+
+  # These function declarations are roughly equivalent:
+  fn eat(f: Fudge[5]): ...               # (implicitly) autoparameterized
+  fn eat[_b: Int](f: Fudge[5, _b]): ...  # manually parameterized
+  ```
+
+  In the first signature for `eat()`, the `b` parameter isn't bound, so it's
+  _implictly_ added as an input parameter on the function.
+
+  In the second signature for `eat()`, the author has explictly defined an
+  input parameter (`_b`), which is bound to the second parameter on the argument
+  type (which happens to be `b`).
+
+  Both functions can be called like this:
+
+  ```mojo
+  eat(Fudge[5, 8]())
+  ```
+
+  Mojo infers the value of the `b` parameter from the argument (in this case,
+  8).
+
+  With the second signature, you can also pass the `_b` parameter value
+  explicitly:
+
+  ```mojo
+  eat[3](Fudge[5, 3]())
+  ```
+
+  Moreover, Mojo now allows you to explicitly mark parameters as unbound using
+  the `_` as syntax meaning "placeholder for an unbound parameter." For example:
+
+  ```mojo
+  # These function declarations are roughly equivalent:
+  fn eat(f: Fudge[5, _, c=_]): ...                    # autoparameterized
+  fn eat(f: Fudge[c=_, a=5, b=_]): ...                # autoparameterized
+  fn eat[_b: Int, _c: Int](f: Fudge[5, _b, _c]): ...  # manually parameterized
+  ```
+
+  The first two signatures explictly unbind the `b` and `c` parameters.
+
+  The `_b` and `_c` parameters on the last signature are explicitly defined by
+  the author, and bound to the `b` and `c` parameters in the argument type.
+
+  Any of these signatures can be called like this:
+
+  ```mojo
+  eat(Fudge[5, 8]())
+  eat(Fudge[5, 8, 9]())
+  ```
+
+  Note that the default parameter values of struct parameters are bound, unless
+  explicitly unbound by the user.
+
+  For more information, see the
+  [Mojo manual](/mojo/manual/parameters/#partial-autoparameterization).
 
 - Parametric types can now be partially bound in certain contexts. For example,
   a new `Scalar` type alias has been added defined as:
@@ -238,6 +275,18 @@ modular install mojo
       data = f.read_bytes()
   ```
 
+- A size argument was added to the
+  [`read()`](/mojo/stdlib/builtin/file.html#read) and
+  [`read_bytes()`](/mojo/stdlib/builtin/file.html#read_bytes) methods on the
+  builtin `file.FileHandle`. The size argument defaults to -1 and maintains the
+  previous "read to EOF" behaviour when size is negative.
+
+  ```mojo
+  with open("file.binary", "r") as f:
+      data1 = f.read_bytes(1024)
+      data2 = f.read_bytes(256)
+  ```
+
 - [`Path`](/mojo/stdlib/pathlib/path.html#path) now has `read_bytes()` and
   `read_text()` methods to read file contents from a path:
 
@@ -260,30 +309,9 @@ modular install mojo
   let tensor_from_file = Tensor[DType.float32].load(path)
   ```
 
-- The Mojo Language Server now implements the Document Symbols request. IDEs use
-  this to provide support for `Outline View` and `Go to Symbol`. This addresses
-  [Issue #960](https://github.com/modularml/mojo/issues/960).
-
-- The Mojo language server now shows documentation when code completing modules
-  or packages in import statements.
-
-- Command line options for the `mojo` driver that take arguments can now be
-  written in either of two ways: both `--foo FOO` and `--foo=FOO`. Previously,
-  only the former was valid.
-
-- A size argument was added to the
-  [`read()`](/mojo/stdlib/builtin/file.html#read) and
-  [`read_bytes()`](/mojo/stdlib/builtin/file.html#read_bytes) methods on
-  builtin `file.FileHandle`. The size argument defaults to -1 and maintains the
-  previous "read to EOF" behaviour when size is negative.
-
-  ```mojo
-  with open("file.binary", "r") as f:
-      data1 = f.read_bytes(1024)
-      data2 = f.read_bytes(256)
-  ```
-
-  - Subscripting added to `DTypePointer` and `Pointer`:
+  - Subscripting added to
+    [`DTypePointer`](/mojo/stdlib/memory/unsafe.html#dtypepointer) and
+    [`Pointer`](/mojo/stdlib/memory/unsafe.html#pointer):
 
     ```mojo
     let p = DTypePointer[DType.float16].alloc(4)
@@ -292,111 +320,68 @@ modular install mojo
         print(p[i])
     ```
 
+- `file.FileHandle` now has a `seek()` method.
+
+- [`String`](/mojo/stdlib/builtin/string.html#string) now has an
+  [`rfind()`](/mojo/stdlib/builtin/string.html#rfind) method analogous to
+  Python's `str.rfind()`.
+
+- `String` now has an [`split()`](/mojo/stdlib/builtin/string.html#split) method
+  analogous to Python's `str.split()`.
+
+- [`Path`](/stdlib/pathlib/path.html#path) now has a
+  [`suffix()`](/mojo/stdlib/pathlib/path.html#suffix) method analogous to
+  Python's `pathlib.Path.suffix`.
+
 - The Mojo REPL now supports indented expressions, making it a bit easier to
   execute expressions copied from an indented block (such as a doc string).
 
-- The Mojo language server now support processing code examples, defined as
-  markdown mojo code blocks, inside of doc strings. This enables IDE features
+- The Mojo Language Server now implements the Document Symbols request. IDEs use
+  this to provide support for **Outline View** and **Go to Symbol**. This
+  addresses [Issue #960](https://github.com/modularml/mojo/issues/960).
+
+- The Mojo Language Server now shows documentation when code completing modules
+  or packages in `import` statements.
+
+- The Mojo Language Server now supports processing code examples, defined as
+  markdown Mojo code blocks, inside of doc strings. This enables IDE features
   while writing examples in API documentation.
 
-- The Mojo language server now provides semantic token information, providing
+- The Mojo Language Server now provides semantic token information, providing
   better highlighting for symbols whose semantics are not statically analyzable.
 
-- The Mojo language server now classifies doc strings as folding ranges,
+- The Mojo Language Server now classifies doc strings as folding ranges,
   making them easier to collapse, reducing vertical space while editing.
 
-- Mojo now supports partial autoparameterization: when a function is declared
-  with an argument of a partially bound type, the unbound parameters of that
-  type are implicitly added to the function's input parameters. For example:
-
-  ```mojo
-  @value
-  struct Fudge[a: Int, b: Int, c: Int = 7]: ...
-
-  # These function declarations are roughly equivalent:
-  fn eat(f: Fudge[5]): ...               # (implicitly) autoparameterized
-  fn eat[_b: Int](f: Fudge[5, _b]): ...  # manually parameterized
-
-  # Either signature above can be called like so:
-  eat(Fudge[5, 8]())
-  ```
-
-  The main difference between the two signatures of `eat` above is that
-  `fn eat[_b: Int](f: Fudge[5, _b]): ...` _can_ be called with the `_b`
-  parameter passed explicitly (e.g. `eat[7](Fudge[5, 7]())`), whereas the
-  implicit parameter of `fn eat(f: Fudge[5]): ...` is _always_ inferred from the
-  value passed for the argument `f` (e.g. in `eat(Fudge[5, 8]())` an implicit
-  parameter of `eat` is inferred the value `8` from the value `Fudge[5, 8]()`).
-
-  Moreover, Mojo now allows one to explicitly mark parameters as unbound using
-  the `_` as syntax meaning "placeholder for an unbound parameter", e.g.:
-
-  ```mojo
-  # These function declarations are roughly equivalent:
-  fn eat(f: Fudge[5, _, c=_]): ...                    # autoparameterized
-  fn eat(f: Fudge[c=_, a=5, b=_]): ...                # autoparameterized
-  fn eat[_b: Int, _c: Int](f: Fudge[5, _b, _c]): ...  # manually parameterized
-
-  # Either signature above can be called like so:
-  eat(Fudge[5, 8]())
-  eat(Fudge[5, 8, 9]())
-  ```
-
-  Note that the default parameter values of struct parameters are bound, unless
-  explicitly unbound by the user:
-
-  ```mojo
-  # These are equivalent and concrete (_not_ autoparameterized) function
-  # declarations, because `Fudge.c` is bound:
-  fn eat(f: Fudge[5, 6]): ...    # `Fudge.c = 7` bound from default value.
-  fn eat(f: Fudge[5, 6, 7]): ... # `Fudge.c = 7` bound explicitly
-
-  # Fails for both signatures above:
-  eat(Fudge[5, 6, 9]())  # value has `Fudge.c = 9` bound
-
-  # These function declarations are roughly equivalent:
-  fn nomnom(f: Fudge[5, 6, _]): ...              # autoparameterized
-  fn nomnom(f: Fudge[5, 6, c=_]): ...            # autoparameterized
-  fn nomnom[__c: Int](f: Fudge[5, 6, __c]): ...  # manually parameterized
-
-  # This is valid for all three declarations above because `Fudge.c` is
-  # explicitly unbound for the type of argument `f`:
-  nomnom(Fudge[5, 6, 9]())
-  ```
-
-- `file.FileHandle` now has a `seek()` method.
-
-- `String` now has an `rfind()` method analogous to Python's `str.rfind()`.
-
-- `String` now has an `split()` method analogous to Python's `str.split()`.
-
-- `Path` now has a `suffix()` method analogous to Python's
-  `pathlib.Path.suffix`.
+- Command line options for the `mojo` driver that take arguments can now be
+  written in either of two ways: both `--foo FOO` and `--foo=FOO`. Previously,
+  only the former was valid.
 
 ### 🦋 Changed
 
-- Variadic arguments are now automatically projected into a `VariadicList` or
-  `VariadicListMem` inside the function body. This allows for more flexibility
-  in using var args. For example, var args can be iterated now that the variadic
-  list types implement `__iter__`:
+- Variadic list types
+  [`VariadicList`](/mojo/stdlib/builtin/builtin_list.html#variadiclist) and
+  [`VariadicListMem`](/mojo/stdlib/builtin/builtin_list.html#variadiclistmem)
+  are now iterable. Variadic arguments are automatically projected into one of
+  these types inside the function body, so var args can be iterated:
 
   ```mojo
-    fn print_ints(*nums: Int):
-        for num in nums:
-            print(num)
-        print(len(nums))
+  fn print_ints(*nums: Int):
+      for num in nums:
+          print(num)
+      print(len(nums))
   ```
 
 - The assert functions in the [`testing`](/mojo/stdlib/testing/testing.html)
   package now raise an `Error` when the assertion fails instead of returning a
   `Bool` for whether the assertion succeeded or not.
 
-- Parameters of `AnyType` type are no longer (implicitly) assumed to be
-  register-passable. A new `AnyRegType` type is used to represent generic types
-  that are register passable.
+- Parameters of [`AnyType`](/mojo/stdlib/builtin/type_aliases.html) type are no
+  longer (implicitly) assumed to be register-passable. A new `AnyRegType` type
+  is used to represent generic types that are register passable.
 
-- Changing the units in a benchmark report is now an argument instead of a
-  parameter:
+- Changing the units in a [`benchmark`](/mojo/stdlib/benchmark/benchmark.html)
+  report is now an argument instead of a parameter:
 
   ```mojo
   let report = benchmark.run[timer]()
@@ -410,9 +395,10 @@ modular install mojo
   fn inout_default(inout x: Int = 2): ...
   ```
 
-- The `to_string()` function has been removed from `PythonObject` in favor of the
-  new `__str__()` function.  This composes better with traits so it can be used
-  with the generic `str()` function.
+- The `to_string()` function has been removed from
+  [`PythonObject`](/mojo/stdlib/python/object.html#pythonobject) in favor of
+  the new `__str__()` function.  This composes better with traits so it can be
+  used with the generic `str()` function.
 
 ### 🛠️ Fixed
 
