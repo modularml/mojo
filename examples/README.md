@@ -1,101 +1,96 @@
-# Mojo Jupyter notebooks
+# Mojo code examples
 
-Mojo supports programming in [Jupyter notebooks](https://jupyter.org/), just
-like Python.
+A collection of sample programs and Mojo notebooks written in the  
+[Mojo](https://docs.modular.com/mojo/programming-manual.html) programming language.
 
-This page explains how to get started with Mojo notebooks, and this repo
-directory contains notebooks that demonstrate some of Mojo's features
-(most of which we originally published on the [Mojo
-Playground](https://playground.modular.com/)).
+## Getting Started
 
-If you're not familiar with Jupyter notebooks, they're files that allow you to
-create documents with live code, equations, visualizations, and explanatory
-text. They're basically documents with executable code blocks, making them
-great for sharing code experiments and programming tutorials. We actually wrote
-the [Mojo programming
-manual](https://docs.modular.com/mojo/programming-manual.html) as a Jupyter
-notebook, so we can easily test all the code samples.
+Access a Mojo programming environment available from the  
+Mojo product [page](https://www.modular.com/mojo).
 
-And because Mojo allows you to import Python modules, you can use visualization
-libraries in your notebooks to draw graphs and charts, or display images. For
-an example, check out the `Mandelbrot.ipynb` notebook, which uses `matplotlib`
-to draw the Mandelbrot set calculated in Mojo, and the `RayTracing.ipynb`
-notebook, which draws images using `numpy`.
+Git clone the repository of Mojo samples using the command below:
 
-## Get started in VS Code
+```bash
+git clone https://github.com/modularml/mojo.git
+```
 
-Visual Studio Code is a great environment for programming with Jupyter
-notebooks. Especially if you're developing with Mojo on a remote system, using
-VS Code is ideal because it allows you to edit and interact with notebooks on
-the remote machine where you've installed Mojo.
+## Running
 
-All you need is the Mojo SDK and the Jupyter VS Code extension:
+Use the following sample command-line to run the programs:
 
-1. Install the [Mojo SDK](https://developer.modular.com/download).
+```bash
+mojo matmul.mojo
+```
 
-2. Install [Visual Studio Code](https://code.visualstudio.com/) and the
-   [Jupyter
-   extension](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.jupyter).
+You can run the Mojo notebooks using [JupyterLab or Visual Studio  
+Code](notebooks/README.md) with the Mojo extension available on the Marketplace.
 
-3. Then open any `.ipynb` file with Mojo code, click **Select Kernel** in the
-   top-right corner of the document, and then select **Jupyter Kernel > Mojo**.
+### Mojo SDK Container
 
-   The Mojo kernel should have been installed automatically when you installed
-   the Mojo SDK. If the Mojo kernel is not listed, make sure that your
-   `$MODULAR_HOME` environment variable is set on the system where you
-   installed the Mojo SDK (specified in the `~/.profile` or `~/.bashrc` file).
+The repo also contains a Dockerfile that can be used to create a  
+Mojo SDK container for developing and running Mojo programs. Use the  
+container in conjunction with the Visual Studio Code devcontainers  
+extension to develop directly inside the container.
 
-   Now run some Mojo code!
+The Dockerfile also sets up a `conda` environment and by default,  
+starts a `jupyter` server (which you can access via the browser).
 
-## Get started with JupyterLab
+To build a Mojo container, either use
+[docker-compose](https://docs.docker.com/compose/) in `mojo/examples/docker`:
 
-You can also select the Mojo kernel when running notebooks in a local instance
-of JupyterLab. The following is just a quick setup guide for Linux users with
-the Mojo SDK installed locally, and it might not work with your system (these
-instructions don't support remote access to the JupyterLab). For more details
-about using JupyterLab, see the complete [JupyterLab installation
-guide](https://jupyterlab.readthedocs.io/en/latest/getting_started/installation.html).
+```bash
+docker compose up -d
+```
 
-**Note:** You must run this setup on the same machine where you've installed
-the [Mojo SDK](https://developer.modular.com/download). However, syntax
-highlighting for Mojo code is not currently enabled in JupyterLab (coming soon).
+Or the convenience script provided:
 
-1. Install JupyterLab:
+```bash
+./build-image.sh --auth-key <your-modular-auth-key> \
+   --mojo-version 0.3
+```
 
-    ```sh
-    python3 -m pip install jupyterlab
-    ```
+The script also supports building with `podman` instead of `docker`:
 
-2. Make sure the user-level `bin` is in your `$PATH`:
+```bash
+./build-image.sh --auth-key <your-modular-auth-key> \
+   --use-podman \
+   --mojo-version 0.3
+   
+```
 
-    ```sh
-    export PATH="$HOME/.local/bin:$PATH"
-    ```
+You can then run with either `docker` or `podman`. In the example below,  
+we map the ports, bind mount the current directory and open a shell into  
+the container:
 
-3. Launch JupyterLab:
+```bash
+docker run \
+   -it --rm \
+   -p 8888:8888 \
+   --net host \
+   -v ${PWD}:${PWD} \
+   modular/mojo-v0.3-20232109-1205 bash
+```
 
-    ```sh
-    jupyter lab
-    ```
+`podman` requires an additional argument to add the `SYS_PTRACE` capabilities:
 
-4. When you open any of the `.ipynb` notebooks from this repository, JupyterLab
-   should automatically select the Mojo kernel (which was installed with the
-   Mojo SDK).
+```bash
+podman run \
+   --cap-add SYS_PTRACE \
+   -it --rm \
+   -p 8888:8888 \
+   --net host \
+   -v ${PWD}:${PWD} \
+   modular/mojo-v0.3-20232109-1205 bash
+```
 
-   Now run some Mojo code!
+## License
 
-## Notes and tips
+The Mojo examples and notebooks in this repository are licensed  
+under the Apache License v2.0 with LLVM Exceptions  
+(see the LLVM [License](https://llvm.org/LICENSE.txt)).
 
-- Code in a Jupyter notebook cell behaves like code in a Mojo REPL environment:
-  The `main()` function is not required, but there are some caveats:
+## Contributing
 
-  - Top-level variables (variables declared outside a function) are not visible
-    inside functions.
-
-  - Redefining undeclared variables is not supported (variables without a `let`
-    or `var` in front). If you’d like to redefine a variable across notebook
-    cells, you must declare the variable with either `let` or `var`.
-
-- You can use `%%python` at the top of a code cell and write normal Python
-  code. Variables, functions, and imports defined in a Python cell are available
-  from subsequent Mojo code cells.
+Thanks for your interest in contributing to this repository!  
+We are not accepting pull requests at this time, but are actively  
+working on a process to accept contributions. Please stay tuned.
