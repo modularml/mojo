@@ -54,8 +54,6 @@ GitHub issues.
 - A `Signed-off-by` line, as per the [Developer Certificate of
 Origin](#signing-your-work).
 
-Once you send your pull request, our CI workflow should automatically assign a reviewer.
-
 **Note:** Documentation changes might not be visible on the website until the
 next Mojo release.
 
