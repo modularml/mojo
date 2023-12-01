@@ -11,7 +11,7 @@ Before you start your first pull request, please complete this checklist:
 - Read this entire contributor guide.
 - Read the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## 2. Evaluate the change
+## 2. Evaluate and get buy-in on the change
 
 We want to be sure that you spend your time efficiently and prepare changes
 that aren’t controversial and get stuck in long rounds of reviews.
@@ -30,20 +30,19 @@ will happily accept it as quickly as possible:
   - Factual information fix
   - New factual information for an existing page
 
-If your change is regarding anything else, which might be solved in multiple
-ways, please first **create an issue** so we can collaborate on a solution
-before you begin the work.
+Before embarking on any major change, please **create an issue** or **start a
+discussion**, so we can collaborate and agree on a solution.
 
-For example, refactoring an entire code example or adding an entirely new page
-to the documentation is a lot of work and it might conflict with other work
-that’s already in progress. We don’t want you to spend time on something that
-might require difficult reviews and rework.
+For example, refactoring an entire code example or adding an entire new page to
+the documentation is a lot of work and it might conflict with other work that’s
+already in progress. We don’t want you to spend time on something that might
+require difficult reviews and rework, or that might get rejected.
 
 ## 3. Create a pull request
 
 If your change is one of the improvements described above or it has been
-discussed and agreed upon in a **GitHub issue**, please create a pull request
-into the `main` branch and include the following:
+discussed and agreed upon by the project maintainers, please create a pull
+request into the `main` branch and include the following:
 
 - A short commit message.
 
