@@ -70,8 +70,8 @@ modular install mojo
   [traits blog post](https://modul.ar/traits-blog) for more details!
 
   Traits are declared with the `trait` keyword. The bodies of traits should
-  contain function prototypes declared with `...` as their bodies. Default
-  function implementations are not supported yet.
+  contain method prototypes declared with `...` as their bodies. Default
+  method implementations are not supported yet.
 
   ```mojo
   trait SomeTrait:
@@ -86,8 +86,8 @@ modular install mojo
           print("hello traits", x)
   ```
 
-  You can then write generic functions over the trait by parameterizing a
-  function with a trait-typed parameter:
+  You can then write a generic functions over the trait by creating a
+  parameterized function with a trait-typed parameter:
 
   ```mojo
   fn fun_with_traits[T: SomeTrait](x: T):
@@ -113,7 +113,7 @@ modular install mojo
       fn child_func(self): ...
   ```
 
-  Then, both child and parent trait functions can be invoked on instances of
+  Then, both child and parent trait methods can be invoked on instances of
   the trait `Child`. As well, an instance of the child trait can be converted to
   an instance of the parent trait.
 
@@ -132,8 +132,13 @@ modular install mojo
   in the Mojo manual.
 
 - A fundamental `Destructable` trait has been added to the language. This is a
-  core trait that every type automatically conforms to. This enables destruction
-  of generic types and generic collections.
+  core trait that every trait automatically conforms to. This enables
+  destruction of generic types and generic collections.
+
+  **Note:** We're aware that this trait might be better spelled `Destructible`.
+  We're planning on removing it in the future and moving its functionality to
+  `AnyType` so that any type that doesn't provide its own destructor will have
+  a default, no-op destructor.
 
 - We've added some traits to the standard library, you can implement these on
   your own types:
@@ -144,11 +149,11 @@ modular install mojo
   - [`Stringable`](/mojo/stdlib/builtin/str.html#stringable)
   - [`Intable`](/mojo/stdlib/builtin/int.html#intable)
   - [`Sized`](/mojo/stdlib/builtin/len.html#sized)
-  - [`CollectionElement`](/mojo/stdlib/utils/vector.html#collectionelement):
+  - [`CollectionElement`](/mojo/stdlib/utils/vector.html#collectionelement)
 
-- We added [`len`](/mojo/stdlib/builtin/len.html#len),
-  [`str`](/mojo/stdlib/builtin/str.html#str), and
-  [`int`](/mojo/stdlib/builtin/int.html#int-1) functions, which work with types
+- We added built-in [`len()`](/mojo/stdlib/builtin/len.html#len),
+  [`str()`](/mojo/stdlib/builtin/str.html#str), and
+  [`int()`](/mojo/stdlib/builtin/int.html#int-1) functions, which work with types
   that implement `Sized`, `Stringable`, and `Intable`, respectively.
 
 - [`DynamicVector`](/mojo/stdlib/utils/vector.html#dynamicvector) is now a
@@ -174,23 +179,24 @@ modular install mojo
 
 ### ⭐️ New
 
-- Mojo now supports partial autoparameterization: when a function is declared
-  with an argument of a partially bound type, the unbound parameters of that
-  type are implicitly added to the function's input parameters. For example:
+- Mojo now supports partial automatic parameterization: when a function is
+  declared with an argument of a partially bound type, the unbound parameters
+  of that type are implicitly added to the function's input parameters. For
+  example:
 
   ```mojo
   @value
   struct Fudge[a: Int, b: Int, c: Int = 7]: ...
 
   # These function declarations are roughly equivalent:
-  fn eat(f: Fudge[5]): ...               # (implicitly) autoparameterized
-  fn eat[_b: Int](f: Fudge[5, _b]): ...  # manually parameterized
+  fn eat(f: Fudge[5]): ...               # implicitly parameterized
+  fn eat[_b: Int](f: Fudge[5, _b]): ...  # explicitly parameterized
   ```
 
   In the first signature for `eat()`, the `b` parameter isn't bound, so it's
-  _implictly_ added as an input parameter on the function.
+  _implicitly_ added as an input parameter on the function.
 
-  In the second signature for `eat()`, the author has explictly defined an
+  In the second signature for `eat()`, the author has explicitly defined an
   input parameter (`_b`), which is bound to the second parameter on the argument
   type (which happens to be `b`).
 
@@ -215,14 +221,14 @@ modular install mojo
 
   ```mojo
   # These function declarations are roughly equivalent:
-  fn eat(f: Fudge[5, _, c=_]): ...                    # autoparameterized
-  fn eat(f: Fudge[c=_, a=5, b=_]): ...                # autoparameterized
-  fn eat[_b: Int, _c: Int](f: Fudge[5, _b, _c]): ...  # manually parameterized
+  fn eat(f: Fudge[5, _, c=_]): ...                    # implicitly parameterized
+  fn eat(f: Fudge[c=_, a=5, b=_]): ...                # implicitly parameterized
+  fn eat[_b: Int, _c: Int](f: Fudge[5, _b, _c]): ...  # explicitly parameterized
   ```
 
-  The first two signatures explictly unbind the `b` and `c` parameters.
+  The first two signatures explicitly unbind the `b` and `c` parameters.
 
-  The `_b` and `_c` parameters on the last signature are explicitly defined by
+  In the last signature, the `_b` and `_c` parameters are explicitly declared by
   the author, and bound to the `b` and `c` parameters in the argument type.
 
   Any of these signatures can be called like this:
@@ -236,7 +242,7 @@ modular install mojo
   explicitly unbound by the user.
 
   For more information, see the
-  [Mojo manual](/mojo/manual/parameters/#partial-autoparameterization).
+  [Mojo manual](/mojo/manual/parameters/#partial-automatic-parameterization).
 
 - Parametric types can now be partially bound in certain contexts. For example,
   a new `Scalar` type alias has been added defined as:
@@ -279,7 +285,7 @@ modular install mojo
   [`read()`](/mojo/stdlib/builtin/file.html#read) and
   [`read_bytes()`](/mojo/stdlib/builtin/file.html#read_bytes) methods on the
   builtin `file.FileHandle`. The size argument defaults to -1 and maintains the
-  previous "read to EOF" behaviour when size is negative.
+  previous "read to EOF" behavior when size is negative.
 
   ```mojo
   with open("file.binary", "r") as f:
