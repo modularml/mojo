@@ -35,11 +35,11 @@ feedback](/mojo/community.html).
 
 - **Basics**
 
-  - [Language basics](basics/index.html)
-  - [Functions](basics/functions.html)
-  - [Variables](basics/variables.html)
-  - [Structs](basics/structs.html)
-  - [Traits](traits/index.html)
+  - [Language basics](basics.html)
+  - [Functions](functions.html)
+  - [Variables](variables.html)
+  - [Structs](structs.html)
+  - [Traits](traits.html)
 
 - **Value ownership**
 
@@ -73,4 +73,4 @@ feedback](/mojo/community.html).
   - [@unroll](decorators/unroll.html)
   - [@value](decorators/value.html)
 
-- [Modules and packages](basics/packages.html)
+- [Modules and packages](packages.html)

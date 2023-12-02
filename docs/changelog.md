@@ -66,7 +66,7 @@ modular install mojo
   a given trait.
 
   The following section gives a brief overview of traits—see the
-  [Mojo manual]((/mojo/manual/traits/index.html)) and this
+  [Mojo manual]((/mojo/manual/traits.html)) and this
   [traits blog post](https://modul.ar/traits-blog) for more details!
 
   Traits are declared with the `trait` keyword. The bodies of traits should
@@ -128,7 +128,7 @@ modular install mojo
       the_parents(x)
   ```
 
-  For more information, see the [Traits page](/mojo/manual/traits/index.html)
+  For more information, see the [Traits page](/mojo/manual/traits.html)
   in the Mojo manual.
 
 - A fundamental `Destructable` trait has been added to the language. This is a
