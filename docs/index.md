@@ -1,10 +1,9 @@
 ---
 title: Mojo🔥
 sidebar_label: Overview
-description: A new programming language that bridges the gap between
-  research and production by combining the best of Python with systems
-  and metaprogramming.
-image: /static/images/mojo-hero.png
+description: A programming language that bridges the gap between AI research
+  and production, and provides deep integrations into MAX Engine.
+image: /static/images/max-mojo-logo.png
 website:
   open-graph:
     image: /static/images/mojo-social-card.png
@@ -37,7 +36,7 @@ production by combining the best of Python syntax with systems programming and
 metaprogramming. With Mojo, you can write portable code that's faster than C
 and seamlessly inter-op with the Python ecosystem.
 
-Mojo is now available for local development! 🔥
+The Mojo SDK is available for Linux and macOS! 🔥
 
 <p><a class="modLink" href="https://developer.modular.com/download">Get the Mojo
 SDK</a></p>
