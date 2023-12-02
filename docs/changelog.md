@@ -70,7 +70,7 @@ modular install mojo
   [traits blog post](https://modul.ar/traits-blog) for more details!
 
   Traits are declared with the `trait` keyword. The bodies of traits should
-  contain method prototypes declared with `...` as their bodies. Default
+  contain method signatures declared with `...` as their bodies. Default
   method implementations are not supported yet.
 
   ```mojo
@@ -86,15 +86,16 @@ modular install mojo
           print("hello traits", x)
   ```
 
-  You can then write a generic functions over the trait by creating a
-  parameterized function with a trait-typed parameter:
+  You can then write a generic functions that accepts any type that conforms to
+  the trait. You do this by creating a parameterized function with a
+  trait-typed parameter:
 
   ```mojo
   fn fun_with_traits[T: SomeTrait](x: T):
       x.required_method(42)
   ```
 
-  Which can be invoked with instances of types that implement the trait:
+  Which can be invoked with instances of types that conform to the trait:
 
   ```mojo
   var thing = SomeStruct()
@@ -153,8 +154,9 @@ modular install mojo
 
 - We added built-in [`len()`](/mojo/stdlib/builtin/len.html#len),
   [`str()`](/mojo/stdlib/builtin/str.html#str), and
-  [`int()`](/mojo/stdlib/builtin/int.html#int-1) functions, which work with types
-  that implement `Sized`, `Stringable`, and `Intable`, respectively.
+  [`int()`](/mojo/stdlib/builtin/int.html#int-1) functions, which work with
+  types that implement the `Sized`, `Stringable`, and `Intable` traits,
+  respectively.
 
 - [`DynamicVector`](/mojo/stdlib/utils/vector.html#dynamicvector) is now a
   proper generic collection that can use any type that implements the `Movable`
