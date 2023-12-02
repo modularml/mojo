@@ -74,7 +74,7 @@ def run_matmul_python() -> Float64:
     let pymatmul: PythonObject = Python.import_module("pymatmul")
     let py = Python.import_module("builtins")
 
-    let gflops = pymatmul.benchmark_matmul_python(128, 128, 128).to_float64()
+    let gflops = pymatmul.benchmark_matmul_python(M, N, K).to_float64()
     py.print(py.str("{:<13}{:>8.3f} GFLOPS").format("Python:", gflops))
 
     return gflops
