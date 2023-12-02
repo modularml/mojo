@@ -4,9 +4,9 @@ This directory includes most of the documentation at
 [docs.modular.com/mojo](https://docs.modular.com/mojo).
 
 The only things not here are the Jupyter notebooks, which are instead in the
-[`examples/notebooks/`](../examples/notebooks/) directory, and the Mojo
-Standard Library reference. The reference docs are generated from source
-files, which are currently not open-sourced.
+[`examples/notebooks/`](../examples/notebooks/) directory, the `mojo` CLI pages,
+and the Mojo Standard Library reference. The reference docs are generated from
+source files, which are currently not open-sourced.
 
 ## Contributing
 
