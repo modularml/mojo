@@ -39,7 +39,7 @@ feedback](/mojo/community.html).
   - [Functions](basics/functions.html)
   - [Variables](basics/variables.html)
   - [Structs](basics/structs.html)
-  - [Modules and packages](basics/packages.html)
+  - [Traits](traits/index.html)
 
 - **Value ownership**
 
@@ -53,14 +53,14 @@ feedback](/mojo/community.html).
   - [Life of a value](lifecycle/life.html)
   - [Death of a value](lifecycle/death.html)
 
+- **Metaprogramming**
+
+  - [Parameterization: compile-time metaprogramming](parameters/index.html)
+
 - **Python**
 
   - [Python integration](python/index.html)
   - [Python types](python/types.html)
-
-- **Metaprogramming**
-
-  - [Parameterization: compile-time metaprogramming](parameters/index.html)
 
 - **Decorators**
 
@@ -72,3 +72,5 @@ feedback](/mojo/community.html).
   - [@register_passable](decorators/register-passable.html)
   - [@unroll](decorators/unroll.html)
   - [@value](decorators/value.html)
+
+- [Modules and packages](basics/packages.html)
