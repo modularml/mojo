@@ -221,19 +221,32 @@ ability to return references and store references in structures safely.  In the
 immediate future, one can use the unsafe `Pointer` struct to do this like in
 C++.
 
-## Protocols / Traits
+## Traits support
 
-Unlike C++, Mojo does not "instantiate templates" in its parser.  Instead, it
-has a separate phase that works later in the compilation pipeline (the
-"Elaborator") that instantiates parametric code, which is aware of autotuning
-and caching.  This means that the parser has to perform full type checking and
-IR generation without instantiating algorithms.
+As of v0.6.0 Mojo has basic support for
+[traits](/mojo/manual/traits.html#built-in-traits). Traits allow you
+to specify a set of requirements for types to implement. Types can implement
+those requirements to *conform to* the trait. Traits allow you to write
+generic functions and generic containers, which can work with any type that
+conforms to a given trait, instead of being hard-coded to work with a specific
+type.
 
-The planned solution is to implement language support for Protocols - variants
-of this feature exist in many languages (e.g. Swift protocols, Rust traits,
-Haskell typeclasses, C++ concepts) all with different details.  This feature
-allows defining requirements for types that conform to them, and dovetails into
-static and dynamic metaprogramming features.
+Currently, the only kind of requirements supported by traits are required method
+signatures. The trait can't provide a default implementation for its required
+methods, so each conforming type must implement all of the required methods.
+
+A number of [built-in traits](/mojo/manual/traits.html#built-in-traits) are
+already implemented in the standard library.
+
+We plan to expand traits support in future releases. Planned features include:
+
+- More traits built in to the standard library, and expanded use of traits
+  throughout the standard library.
+
+- Support for default implementations of required methods.
+
+- Support for a feature like Swift's extensions, allowing you to add a trait to
+  a preexisting type.
 
 ## Classes
 
@@ -312,14 +325,28 @@ grown a standard list or dictionary type.
 Mojo does not yet support defining anonymous functions with the `lambda`
 keyword.
 
-### No parametric aliases
+### Parametric aliases
 
-Mojo aliases can refer to parametric values but cannot themselves be a
-parameter. We would like this example to work, however:
+Mojo aliases can refer to parametric values but cannot themselves have
+parameter lists. As of v0.6.0, you can create a parametric alias by aliasing
+an unbound or partially-bound type. For example, the new `Scalar` type is
+defined as:
 
 ```mojo
-alias Scalar[dt: DType] = SIMD[dt, 1]
+alias Scalar = SIMD[size=1]
+```
+
+This creates a parametric alias that you can use like this:
+
+```mojo
+var i = Scalar[DType.int8]
+```
+
+Parametric aliases with an explicit parameter list aren't yet supported:
+
+```mojo
 alias mul2[x: Int] = x * 2
+# Error!
 ```
 
 ### `Exception` is actually called `Error`
@@ -490,16 +517,16 @@ def pick_func(cond):
 We hope to sort out these oddities with nested function naming as our model
 of closures in Mojo develops further.
 
-### No polymorphism
+### Limited polymorphism
 
-Mojo will implement static polymorphism through traits/protocols in the near
-future and dynamic polymorphism through classes and MLIR reflection. None of
-those things exist today, which presents several limitations to the language.
+Mojo has implemented static polymorphism through traits, as noted above. We
+plan to implement dynamic polymorphism through classes and MLIR reflection in
+the future.
 
 Python programmers are used to implementing special dunder methods on their
-classes to interface with generic methods like `print` and `len`. For instance,
-one expects that implementing `__repr__` or `__str__` on a class will enable
-that class to be printed via `print`.
+classes to interface with generic methods like `print()` and `len()`. For
+instance, one expects that implementing `__repr__()` or `__str__()` on a class
+will enable that class to be printed using `print()`.
 
 ```python
 class One:
@@ -509,22 +536,26 @@ class One:
 print(One()) # prints '1'
 ```
 
-This is not currently possible in Mojo. Overloads of `print` are provided for
-common types, like `Int` and `SIMD` and `String`, but otherwise the builtin is
-not extensible. Overloads also have the limitation that they must be defined
-within the same module, so you cannot add a new overload of `print` for your
-struct types.
+Mojo currently supports this feature through the
+[`Stringable`](/mojo/stdlib/builtin/str.html#stringable) trait, so that
+`print()` works on all `Stringable` types. Similar support exists for the
+[`int()`](/mojo/stdlib/builtin/int.html#int-1) and
+[`len()`](/mojo/stdlib/builtin/len.html#len) functions. We'll continue to
+add traits support to the standard library to enable common use cases like this.
 
-The same extends to `range`, `len`, and other builtins.
+### Lifetime tracking inside collections
 
-### No lifetime tracking inside collections
+With traits, it is now possible to build collection types like lists, maps, and
+sets that invoke element destructors. However, most standard library collection
+types haven't yet been extended to use traits.
 
-Due to the aforementioned lack of polymorphism, collections like lists, maps,
-and sets are unable to invoke element destructors. For collections of trivial
-types, like `DynamicVector[Int]`, this is no problem, but for collections of
-types with lifetimes, like `DynamicVector[String]`, the elements have to be
+For collections of trivial types, like `Int`, this is no problem, but for
+collections of types with lifetimes, like `String`, the elements have to be
 manually destructed. Doing so requires quite an ugly pattern, shown in the next
 section.
+
+The `DynamicVector` type has been updated to use traits, and invokes destructors
+properly.
 
 ### No safe value references
 
