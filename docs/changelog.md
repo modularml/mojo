@@ -437,6 +437,13 @@ modular install mojo
 - [#1246](https://github.com/modularml/mojo/issues/1246) - Warning diagnostics
   are transient in the presence of caching.
 
+### Known Issue
+
+- There is an issue affecting Jupyter notebooks that use autotuning and traits.
+  This issue only manifests on macOS, and the same code runs without issue
+  outside of the notebooks. This issue affects the _Matrix multiplication in
+  Mojo_ notebook.
+
 ## v0.5.0 (2023-11-2)
 
 ### ⭐️ New
