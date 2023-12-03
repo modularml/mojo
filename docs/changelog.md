@@ -618,6 +618,7 @@ modular install mojo
       fn foo(x: Thing[a]):
           print("🔥", a, b, c)
 
+  fn main():
       _ = CtadStructWithDefault[b=7](Thing[6]())  # prints 'hello 6 7 8'
       CtadStructWithDefault[b=7].foo(Thing[6]())  # prints '🔥 6 7 8'
   ```
