@@ -2,7 +2,7 @@
 title: Mojo🔥
 sidebar_label: Overview
 description: A programming language that bridges the gap between AI research
-  and production, and provides deep integrations into MAX Engine.
+  and production, unlocking speed and usability.
 image: /static/images/max-mojo-logo.png
 website:
   open-graph:
