@@ -66,7 +66,7 @@ modular install mojo
   a given trait.
 
   The following section gives a brief overview of traits—see the
-  [Mojo manual]((/mojo/manual/traits.html)) and this
+  [Mojo Manual](/mojo/manual/traits.html) and this
   [traits blog post](https://modul.ar/traits-blog) for more details!
 
   Traits are declared with the `trait` keyword. The bodies of traits should
@@ -130,7 +130,7 @@ modular install mojo
   ```
 
   For more information, see the [Traits page](/mojo/manual/traits.html)
-  in the Mojo manual.
+  in the Mojo Manual.
 
 - A fundamental `Destructable` trait has been added to the language. This is a
   core trait that every trait automatically conforms to. This enables
@@ -180,6 +180,15 @@ modular install mojo
   ```
 
 ### ⭐️ New
+
+- The [Mojo Manual](/mojo/manual/) is an all-new, complete Mojo user guide.
+  It doesn't include _everything_ about Mojo yet, but it includes a lot,
+  and more than the original [programming
+  manual](/mojo/programming-manual.html) (now deprecated).
+
+  Plus, the entire Mojo Manual and other Mojo docs are now [open-sourced on
+  GitHub](https://github.com/modularml/mojo/tree/main/docs), and we'd love
+  to accept contributions to help us improve them!
 
 - Mojo now supports partial automatic parameterization: when a function is
   declared with an argument of a partially bound type, the unbound parameters
@@ -244,7 +253,7 @@ modular install mojo
   explicitly unbound by the user.
 
   For more information, see the
-  [Mojo manual](/mojo/manual/parameters/#partial-automatic-parameterization).
+  [Mojo Manual](/mojo/manual/parameters/#partial-automatic-parameterization).
 
 - Parametric types can now be partially bound in certain contexts. For example,
   a new `Scalar` type alias has been added defined as:
