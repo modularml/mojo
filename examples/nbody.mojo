@@ -101,7 +101,7 @@ fn energy(bodies: StaticTuple[NUM_BODIES, Planet]) -> Float64:
     return e
 
 
-fn _run():
+fn bench():
     let Sun = Planet(
         0,
         0,
@@ -185,9 +185,9 @@ fn _run():
 
 
 fn benchmark():
-    print(run[_run]().mean())
+    print(run[bench](max_runtime_secs=0.5).mean())
 
 
 fn main():
     print("Starting nbody...")
-    _run()
+    bench()
