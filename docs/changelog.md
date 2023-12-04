@@ -161,9 +161,8 @@ modular install mojo
 - [`DynamicVector`](/mojo/stdlib/utils/vector.html#dynamicvector) is now a
   proper generic collection that can use any type that implements the `Movable`
   and `Copyable` traits. This means you can now write, for example,
-  `DynamicVector[String]`, or even `DynamicVector[DynamicVector[Int]]`.
-  Also, `DynamicVector` now invokes its element destructors upon destruction, so
-  `_del_old` has been deleted.
+  `DynamicVector[String]`. Also, `DynamicVector` now invokes its element
+  destructors upon destruction, so `_del_old` has been deleted.
 
 - `print` now works on any types that implement `Stringable` by invoking their
   `__str__` method:
