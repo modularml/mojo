@@ -2,7 +2,7 @@ import shutil
 import subprocess
 from importlib.util import find_spec
 
-fix = """
+FIX = """
 -------------------------------------------------------------------------
 fix following the steps here:
     https://github.com/modularml/mojo/issues/1085#issuecomment-1771403719
@@ -21,7 +21,8 @@ def install_if_missing(name: str):
         elif shutil.which("python"):
             python = "python"
         else:
-            raise ImportError("python not on path" + fix)
+            raise ImportError("python not on path" + FIX)
         subprocess.check_call([python, "-m", "pip", "install", name])
+        return
     except:
-        raise ImportError(f"{name} not found" + fix)
+        raise ImportError(f"{name} not found" + FIX)

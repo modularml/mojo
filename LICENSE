@@ -1,5 +1,5 @@
 ==============================================================================================
-The Mojo examples repository is licensed under the Apache License v2.0 with LLVM Exceptions:
+The Mojo repository is licensed under the Apache License v2.0 with LLVM Exceptions:
 ==============================================================================================
 
                                  Apache License
@@ -204,7 +204,6 @@ The Mojo examples repository is licensed under the Apache License v2.0 with LLVM
     See the License for the specific language governing permissions and
     limitations under the License.
 
-
 ---- LLVM Exceptions to the Apache 2.0 License ----
 
 As an exception, if, as a result of your compiling your source code, portions
@@ -224,56 +223,13 @@ Software.
 ==============================================================================
 Software from third parties included in the LLVM Project:
 ==============================================================================
+
 The LLVM Project contains third party software which is under different license
 terms. All such code will be identified clearly using at least one of two
 mechanisms:
+
 1) It will be in a separate directory tree with its own `LICENSE.txt` or
    `LICENSE` file at the top containing the specific license and restrictions
    which apply to that software, or
 2) It will contain specific license and restriction terms at the top of every
    file.
-
-==============================================================================
-Legacy LLVM License (https://llvm.org/docs/DeveloperPolicy.html#legacy):
-==============================================================================
-University of Illinois/NCSA
-Open Source License
-
-Copyright (c) 2003-2019 University of Illinois at Urbana-Champaign.
-All rights reserved.
-
-Developed by:
-
-    LLVM Team
-
-    University of Illinois at Urbana-Champaign
-
-    http://llvm.org
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal with
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions:
-
-    * Redistributions of source code must retain the above copyright notice,
-      this list of conditions and the following disclaimers.
-
-    * Redistributions in binary form must reproduce the above copyright notice,
-      this list of conditions and the following disclaimers in the
-      documentation and/or other materials provided with the distribution.
-
-    * Neither the names of the LLVM Team, University of Illinois at
-      Urbana-Champaign, nor the names of its contributors may be used to
-      endorse or promote products derived from this Software without specific
-      prior written permission.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS WITH THE
-SOFTWARE.
-

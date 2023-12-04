@@ -15,7 +15,7 @@
 # large array of values to produce a single result.
 # Reductions and scans are common algorithm patterns in parallel computing.
 
-import benchmark
+from benchmark import Unit, keep
 from time import now
 from algorithm import sum
 from random import rand
@@ -66,16 +66,16 @@ fn bench[
     @parameter
     fn runner():
         let result = func[size](array)
-        benchmark.keep(result)
+        keep(result)
 
-    let ms = benchmark.run[runner]().mean[benchmark.Unit.ms]()
+    let ms = benchmark.run[runner](max_runtime_secs=0.5).mean(Unit.ms)
     pretty_print(name, size, ms)
 
 
 fn main() raises:
     print(
         "Sum all values in a small array and large array\n"
-        "Shows algorithm.sum from stdlib with much better scaling\n"
+        "Shows algorithm.sum from stdlib with much better performance\n"
     )
     # Create two 1-dimensional tensors i.e. arrays
     let small_array = rand[type](size_small)

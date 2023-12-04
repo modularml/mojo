@@ -15,7 +15,7 @@
 # applied to a naive matmul implementation in Mojo to gain significant
 # performance speedups
 
-import benchmark
+from benchmark import Unit
 from memory import memset_zero, stack_allocation
 from random import rand
 from algorithm import vectorize, parallelize, vectorize_unroll
@@ -44,7 +44,9 @@ struct Matrix:
         self.cols = cols
 
     # Initialize taking a pointer, don't set any elements
-    fn __init__(inout self, rows: Int, cols: Int, data: DTypePointer[DType.float32]):
+    fn __init__(
+        inout self, rows: Int, cols: Int, data: DTypePointer[DType.float32]
+    ):
         self.data = data
         self.rows = rows
         self.cols = cols
@@ -59,8 +61,8 @@ struct Matrix:
     fn __getitem__(self, y: Int, x: Int) -> Float32:
         return self.load[1](y, x)
 
-    fn __setitem__(self, y: Int, x: Int, val: Float32):
-        return self.store[1](y, x, val)
+    fn __setitem__(inout self, y: Int, x: Int, val: Float32):
+        self.store[1](y, x, val)
 
     fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[DType.float32, nelts]:
         return self.data.simd_load[nelts](y * self.cols + x)
@@ -90,7 +92,7 @@ def run_matmul_numpy() -> Float64:
     return gflops
 
 
-fn naive(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_naive(inout C: Matrix, A: Matrix, B: Matrix):
     for m in range(C.rows):
         for k in range(A.cols):
             for n in range(C.cols):
@@ -102,7 +104,7 @@ alias nelts = simdwidthof[type]()  # The SIMD vector width.
 
 
 # Using stdlib vectorize function
-fn vectorized(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_vectorized(inout C: Matrix, A: Matrix, B: Matrix):
     for m in range(C.rows):
         for k in range(A.cols):
 
@@ -116,7 +118,7 @@ fn vectorized(inout C: Matrix, A: Matrix, B: Matrix):
 
 
 # Parallelize the code by using the builtin parallelize function
-fn parallelized(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_parallelized(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_row(m: Int):
         for k in range(A.cols):
@@ -141,7 +143,7 @@ fn tile[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
 
 
 # Use the above tile function to perform tiled matmul.
-fn tiled(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_row(m: Int):
         @parameter
@@ -155,7 +157,8 @@ fn tiled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store[nelts](
                         m,
                         n + x,
-                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x)
+                        + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 vectorize[nelts, dot](tile_x)
@@ -169,7 +172,7 @@ fn tiled(inout C: Matrix, A: Matrix, B: Matrix):
 
 # Unroll the vectorized loop by a constant factor.
 # from Functional import vectorize_unroll
-fn unrolled(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_size = 4
 
     @parameter
@@ -185,13 +188,15 @@ fn unrolled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store[nelts](
                         m,
                         n + x,
-                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x)
+                        + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 # Vectorize by nelts and unroll by tile_x/nelts
                 # Here unroll factor is 4
                 vectorize_unroll[nelts, tile_x // nelts, dot](tile_x)
 
+        alias tile_size = 4
         tile[calc_tile, nelts * tile_size, tile_size](C.cols, B.rows)
 
     parallelize[calc_row](C.rows, C.rows)
@@ -214,7 +219,7 @@ fn tile_parallel[
 # Use stack allocation for tiles to accumulate values efficiently,
 # avoiding repeated reads and writes to memory. Also reorder the loops
 # and do not fully unroll the loop over the reduction dimension.
-fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
+fn matmul_accumulated(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_k = 8
     alias tile_k_unroll = 8
     alias tile_i = 32
@@ -240,10 +245,13 @@ fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
                                 i,
                                 j,
                                 accumulators.load[nelts](i, j)
-                                + A[io + i, ko + k] * B.load[nelts](ko + k, jo + j),
+                                + A[io + i, ko + k]
+                                * B.load[nelts](ko + k, jo + j),
                             )
 
-                        vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
+                        vectorize_unroll[
+                            nelts, tile_j // nelts, calc_tile_cols
+                        ](tile_j)
 
         # Copy the local tile to the output
         for i in range(tile_i):
@@ -251,69 +259,6 @@ fn reordered(inout C: Matrix, A: Matrix, B: Matrix):
                 C[io + i, jo + j] = accumulators[i, j]
 
     tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
-
-
-# Perform 2D tiling on the iteration space defined by end_x and end_y, parallelizing
-# over x and y, and iterating in an order that has better L3 cache locality
-fn tile_parallel_swizzled[
-    tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int
-](end_x: Int, end_y: Int):
-    # Note: this assumes that ends are multiples of the tiles.
-    alias tile_outer = 8
-    alias group_size = tile_outer * 4
-
-    # L3 cache swizzling
-    @parameter
-    fn row(swizzled: Int):
-        let group_id = swizzled // group_size
-        let group_offset_x = (group_id * tile_outer) % (N // tile_y)
-        let yo = (swizzled % group_size) // tile_outer
-        let xo = group_offset_x + (swizzled % tile_outer)
-        let y = tile_y * yo
-        let x = tile_x * xo
-        tiled_fn[tile_x, tile_y](x, y)
-
-    parallelize[row]((end_y // tile_y * end_x // tile_x), M * 2)
-
-
-# Same as previous example but utilisizing tile swizzling for better L3 cache locality.
-fn swizzled(inout C: Matrix, A: Matrix, B: Matrix):
-    alias tile_k = 8
-    alias tile_k_unroll = 8
-    alias tile_i = 32
-    alias tile_j = nelts * 4
-
-    @parameter
-    fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
-        # Allocate the tile of accumulators on the stack.
-        var accumulators = Matrix(
-            tile_i, tile_j, stack_allocation[tile_i * tile_j, DType.float32]()
-        )
-
-        for ko in range(0, A.cols, tile_k * tile_k_unroll):
-            for _ in range(tile_i):
-                for i in range(tile_k):
-
-                    @unroll
-                    for k in range(tile_k_unroll):
-
-                        @parameter
-                        fn calc_tile_cols[nelts: Int](j: Int):
-                            accumulators.store[nelts](
-                                i,
-                                j,
-                                accumulators.load[nelts](i, j)
-                                + A[io + i, ko + k] * B.load[nelts](ko + k, jo + j),
-                            )
-
-                        vectorize_unroll[nelts, tile_j // nelts, calc_tile_cols](tile_j)
-
-        # Copy the local tile to the output
-        for i in range(tile_i):
-            for j in range(tile_j):
-                C[io + i, jo + j] = accumulators[i, j]
-
-    tile_parallel_swizzled[calc_tile, tile_j, tile_i](C.cols, C.rows)
 
 
 @always_inline
@@ -329,7 +274,7 @@ fn bench[
     fn test_fn():
         _ = func(C, A, B)
 
-    let secs = benchmark.run[test_fn]().mean()
+    let secs = benchmark.run[test_fn](max_runtime_secs=0.5).mean()
     # Prevent the matrices from being freed before the benchmark run
     A.data.free()
     B.data.free()
@@ -365,20 +310,18 @@ fn test_all() raises:
     let A = Matrix.rand(M, K)
     let B = Matrix.rand(K, N)
 
-    let result = test[naive](A, B)
+    let result = test[matmul_naive](A, B)
 
-    if test[vectorized](A, B) != result:
+    if test[matmul_vectorized](A, B) != result:
         raise Error("Vectorize output does not match")
-    if test[parallelized](A, B) != result:
+    if test[matmul_parallelized](A, B) != result:
         raise Error("Parallelize output incorrect")
-    if test[tiled](A, B) != result:
+    if test[matmul_tiled](A, B) != result:
         raise Error("Tiled output incorrect")
-    if test[unrolled](A, B) != result:
+    if test[matmul_unrolled](A, B) != result:
         raise Error("Unroll output incorrect")
-    if test[reordered](A, B) != result:
+    if test[matmul_accumulated](A, B) != result:
         raise Error("Loop reorder output incorrect")
-    if test[swizzled](A, B) != result:
-        raise Error("Swizzled output incorrect")
 
     A.data.free()
     B.data.free()
@@ -391,10 +334,9 @@ fn main() raises:
     let python_gflops = run_matmul_python()
     let numpy_gflops = run_matmul_numpy()
 
-    bench[naive, "Naive:"](python_gflops, numpy_gflops)
-    bench[vectorized, "Vectorized:"](python_gflops, numpy_gflops)
-    bench[parallelized, "Parallelized:"](python_gflops, numpy_gflops)
-    bench[tiled, "Tiled:"](python_gflops, numpy_gflops)
-    bench[unrolled, "Unrolled:"](python_gflops, numpy_gflops)
-    bench[reordered, "Reordered:"](python_gflops, numpy_gflops)
-    bench[swizzled, "Swizzled:"](python_gflops, numpy_gflops)
+    bench[matmul_naive, "Naive:"](python_gflops, numpy_gflops)
+    bench[matmul_vectorized, "Vectorized: "](python_gflops, numpy_gflops)
+    bench[matmul_parallelized, "Parallelized:"](python_gflops, numpy_gflops)
+    bench[matmul_tiled, "Tiled:"](python_gflops, numpy_gflops)
+    bench[matmul_unrolled, "Unrolled:"](python_gflops, numpy_gflops)
+    bench[matmul_accumulated, "Accumulated:"](python_gflops, numpy_gflops)

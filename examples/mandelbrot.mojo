@@ -58,8 +58,6 @@ fn mandelbrot_kernel_SIMD[
 
 
 fn main() raises:
-    let p = Python.import_module("numpy")
-    let b = Python.import_module("numpy")
     let t = Tensor[float_type](height, width)
 
     @parameter
@@ -85,7 +83,9 @@ fn main() raises:
         for row in range(height):
             worker(row)
 
-    let vectorized = benchmark.run[bench[simd_width]]().mean()
+    let vectorized = benchmark.run[bench[simd_width]](
+        max_runtime_secs=0.5
+    ).mean()
     print("Number of threads:", num_cores())
     print("Vectorized:", vectorized, "s")
 
@@ -94,7 +94,9 @@ fn main() raises:
     fn bench_parallel[simd_width: Int]():
         parallelize[worker](height, height)
 
-    let parallelized = benchmark.run[bench_parallel[simd_width]]().mean()
+    let parallelized = benchmark.run[bench_parallel[simd_width]](
+        max_runtime_secs=0.5
+    ).mean()
     print("Parallelized:", parallelized, "s")
     print("Parallel speedup:", vectorized / parallelized)
 

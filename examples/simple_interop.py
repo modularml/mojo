@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 
 
-# Simple python program to test interop
+# Simple python program to test interop with Mojo.
+# This file is imported from hello_interop.mojo.
 
 import check_mod
 
