@@ -83,7 +83,7 @@ Now let's write the code in a Mojo source file and run it with the
 
    ```mojo
    fn main():
-      print("Hello, world!")
+       print("Hello, world!")
    ```
 
    That's all you need. Save the file and return to your terminal.
