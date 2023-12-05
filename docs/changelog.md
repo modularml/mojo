@@ -52,6 +52,11 @@ modular install mojo
 
 ### 🦋 Changed
 
+- `utils.vector` has been moved to a new `collections` package to make
+  space for new collections. This means that if you had previous code
+  that did `from utils.vector import DynamicVector`, it now needs to
+  be `from collections.vector import DynamicVector` due to the move.
+
 ### 🛠️ Fixed
 
 ## v0.6.0 (2023-12-04)
