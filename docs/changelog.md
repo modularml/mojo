@@ -916,7 +916,7 @@ modular install mojo
 - [#753](https://github.com/modularml/mojo/issues/753) - Direct use of LLVM
   dialect produces strange errors in the compiler.
 - [#926](https://github.com/modularml/mojo/issues/926) - Fixes an issue that
-  occured when a function with a return type of `StringRef` raised an error.
+  occurred when a function with a return type of `StringRef` raised an error.
   When the function raised an error, it incorrectly returned the string value of
   that error.
 - [#536](https://github.com/modularml/mojo/issues/536) - Report More information
