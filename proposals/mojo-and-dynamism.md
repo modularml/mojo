@@ -130,7 +130,7 @@ The fourth category isn't explored here, but will important when/if we support s
 
 The highest level of dynamism and the most faithful compatibility doesn't come from Mojo itself, it comes from Mojo's first class interoperability with CPython.  This in effect will be Mojo's escape hatch for compatibility purposes and is what gives Mojo access to all of Python's vast ecosystem.  Below that, Mojo will provide an emulation of Python's hash-table dynamism that is a faithful but not quite identical replication of Python behaviour (no GIL, for example!).  Building this out will be a huge undertaking, and is something Mojo should do over time.
 
-The most important thing to remember is that Mojo is not a "Python compiler".  The benefit of sharing the same syntax as Python, however, means seemless interop is on the table:
+The most important thing to remember is that Mojo is not a "Python compiler".  The benefit of sharing the same syntax as Python, however, means seamless interop is on the table:
 
 ```python
 @python
