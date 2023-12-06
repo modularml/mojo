@@ -708,7 +708,7 @@ print(1//0) # does not raise and could print anything (undefined behaviour)
 
 This is clearly unacceptable given the strong memory safety goals of Mojo. We
 will circle back to this when more language features and language-level
-optimizations are avaiable.
+optimizations are available.
 
 ### Nested functions cannot be recursive
 
