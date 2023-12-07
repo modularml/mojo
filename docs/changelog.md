@@ -60,14 +60,19 @@ modular install mojo
 ### 🛠️ Fixed
 
 - [`Bool`](/mojo/stdlib/builtins/bool.html#bool)
-  and [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral) now
-  conform to the
-  [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement) trait.
+  and [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral)
+  now conform to the
+  [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
+  trait.
+
 - [#1421](https://github.com/modularml/mojo/issues/1421) - Fixed a crash when
   using Tuples in the REPL.
 
 - [#222](https://github.com/modularml/mojo/issues/222) - [QoI] Generate error
   for obviously self recursive functions
+
+- [#1408](https://github.com/modularml/mojo/issues/1408) - Fix overload
+  resolution when candidates can return generic types.
 
 ## v0.6.0 (2023-12-04)
 
