@@ -64,6 +64,9 @@ modular install mojo
   conform to the
   [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement) trait.
 
+- [#222](https://github.com/modularml/mojo/issues/222) - [QoI] Generate error
+  for obviously self recursive functions
+
 ## v0.6.0 (2023-12-04)
 
 ### 🔥 Legendary
