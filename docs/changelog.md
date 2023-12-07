@@ -63,6 +63,8 @@ modular install mojo
   and [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral) now
   conform to the
   [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement) trait.
+- [#1421](https://github.com/modularml/mojo/issues/1421) - Fixed a crash when
+  using Tuples in the REPL.
 
 - [#222](https://github.com/modularml/mojo/issues/222) - [QoI] Generate error
   for obviously self recursive functions
