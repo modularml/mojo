@@ -390,10 +390,9 @@ persist across sessions.
 
 ### Will Mojo be open-sourced?
 
-Over time we expect to open-source core parts of Mojo, such as the standard
-library. However, Mojo is still young, so we will continue to incubate it within
-Modular until more of its internal architecture is fleshed out. We don’t have an
-established plan for open-sourcing yet.
+We expect to open-source Mojo progressively over time as it continues to mature.
+Mojo is still young, so we will continue to incubate it within Modular until
+more of its internal architecture is fleshed out.
 
 ### Why not develop Mojo in the open from the beginning?
 
