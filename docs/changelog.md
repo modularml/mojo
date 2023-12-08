@@ -56,6 +56,9 @@ modular install mojo
   space for new collections. This means that if you had previous code
   that did `from utils.vector import DynamicVector`, it now needs to
   be `from collections.vector import DynamicVector` due to the move.
+- The special destructor method `__del__` has been changed to enforce
+  that it cannot raise. Raising destructors are not supported properly
+  at the moment.
 
 ### 🛠️ Fixed
 
