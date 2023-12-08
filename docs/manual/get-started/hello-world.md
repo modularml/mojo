@@ -58,7 +58,7 @@ $ mojo
 Welcome to Mojo! 🔥
 
 Expressions are delimited by a blank line.
-Type `:quit` to exit the REPL and `:mojo repl-help` for further assistance.
+Type `:quit` to exit the REPL and `:mojo help repl` for further assistance.
 
 1> print("Hello, world!")
 2.
