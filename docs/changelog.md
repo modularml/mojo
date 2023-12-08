@@ -50,6 +50,14 @@ modular install mojo
 
 ### ⭐️ New
 
+- The Mojo REPL now provides limited support for the `%cd` magic.
+
+  This command automatically maintains an internal stack of directories you
+  visit during the REPL session. Usage:
+
+  - `%cd 'dir'`: change to directory `dir` and push it on the directory stack.
+  - `%cd -`: pop the directory stack and change to the last visited directory.
+
 ### 🦋 Changed
 
 - `utils.vector` has been moved to a new `collections` package to make
