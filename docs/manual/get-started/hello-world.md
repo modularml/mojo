@@ -83,7 +83,7 @@ Now let's write the code in a Mojo source file and run it with the
 
    ```mojo
    fn main():
-      print("Hello, world!")
+       print("Hello, world!")
    ```
 
    That's all you need. Save the file and return to your terminal.
@@ -129,7 +129,7 @@ libraries it needs to run.
 ## Next steps
 
 - If you're new to Mojo, we suggest you continue to the next section about
-  [language basics](/mojo/manual/basics/).
+  [language basics](/mojo/manual/basics.html).
 
 - If you want to experiment with some code, clone [the Mojo
 repo](https://github.com/modularml/mojo/) to try our code examples:

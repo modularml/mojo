@@ -317,7 +317,7 @@ silicon). Support for Windows will follow. Until then, you have several options:
 
 - Windows users can use
   [Windows Subsystem for Linux version 2 (WSL 2)](https://learn.microsoft.com/en-us/windows/wsl/install)
-  running a supported Linix distribution.
+  running a supported Linux distribution.
 - Intel Mac users can use a [Docker](https://www.docker.com/) container running
   a supported Linux distribution.
 - Users on any system can install the SDK on a remote machine running a
