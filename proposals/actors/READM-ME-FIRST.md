@@ -3,7 +3,7 @@
 * _Author_: [Reid Spencer](https://github.com/reid-spencer)
 * _Prior Work_: [Swift Concurrency Manifesto](https://gist.github.com/lattner/31ed37682ef1576b16bca1432ea9f782)
 * _Date_: September-December 2023
-* _Project Working Name_ : Macsy ( Mojo ACtor SYstem, pronounced "moxy")
+* _Project Working Name_ : Moxy
 
 ## Overview
 Mojo gives us the opportunity to re-imagine how an Actor System may 
