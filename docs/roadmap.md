@@ -509,10 +509,18 @@ def pick_func(cond):
         def bar0(): return 42
         result = bar0
     else:
-        def bar1(): return 3 # error: redeclaration of 'bar'
+        def bar1(): return 3 
         result = bar1
     return result
 ```
+In mojo 0.6.0, this yields:
+```
+pick_func.mojo:9:12: error: cannot implicitly convert 'fn() raises capturing -> object' value to 'object' in return value
+    return result
+           ^~~~~~
+mojo: error: failed to parse the provided Mojo
+```
+because a function result was not declared on the function. 
 
 We hope to sort out these oddities with nested function naming as our model
 of closures in Mojo develops further.
