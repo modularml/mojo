@@ -187,3 +187,19 @@ these benefits:
   maintaining a facade of a single scalabe computing entity (a cluster of
   nodes)
 
+### Actor processing is side-effect free
+Since actor state is private and we intend to make it impossible to break
+the encapsulation of it (your program won't compile if you try), message
+processing should be considered free of side-effects from the functional
+programming point of view. While the actor's behavior may change the 
+state of the actor, that is a local effect that has no bearing on anything
+else. In other words, the only way to observe the effect is by sending 
+another message, or implying the effect in a response message. It can't 
+be measured or observable directly. 
+
+A consequence of this is that functional programming enthusiasts can 
+and should consider a message send to be equivalent to an asynchronous,
+non-blocking, function call.  The sender need not wait for a response
+and there may not be a response. If there is a response, it too is sent
+by another asynchronous non-blocking message to the sender of the original
+message.  

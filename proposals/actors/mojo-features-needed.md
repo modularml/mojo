@@ -13,7 +13,14 @@ them.
 While work can begin ahead of the availability of these language
 features, there will likely be additional work without them. 
 
-  
+### Actor Representation
+Mojo must support an efficient object-oriented programming model. This should
+be intrinsic given its intention to be a superset of Python. Actors then can
+be simply objects, classes or structures that can bind functionality (behavior)
+to them.  Inheritance is not necessary but can be used to define an `Actor` base 
+class in the Actor library and require actors to inherit from that class. This should 
+be sufficient notification to the compiler without altering the language.
+
 ### Trait Implementations Not Needed At Usage Level
 Actors should appear to be stateless to users of that actor. There is never a
 a need for the *Actor* to implement any traits since you

@@ -10,9 +10,15 @@ We intend to outline a single coherent design for actors that can be:
 * built in small increments over time
 * scale from very small (processing units) to very large (distributed actor
   systems in multiple computing regions)
-* to incrementally drive Mojo to support
-  a powerful actor system at every level of scale.
-* 
+* based on using existing Mojo language and library features
+* results in a powerful and efficient actor system competitive with other offerings
+
+### Distributed By Design
+Early implementations should not preclude distribution of actors. The intention
+from the outset is to permit actors to efficiently interact across machines
+and networks. Early versions are permitted to not implement distribution
+features but they must not preclude it in the future. 
+
 ### Lower Cognitive Load
 The actor model design should lower cognitive load for the programmer using it.
 It should be easy to learn, easy to reason about
@@ -26,15 +32,32 @@ Preferences:
 * Implemented with the traceability features of OpenTelemetry. 
 
 ### Safety
-Mojo will support some form of ]lifecycle, ownership, and borrow checking
-(ala Rust but easier). It is a design goal to use these features with 
+Mojo will support some form of lifecycle, ownership, and borrow checking
+(ala Rust, but easier). It is a design goal to use these features with the 
 Mojo Actor System to eliminate eliminate race conditions, deadlock, 
 synchronization primitives, and other concurrency problems. 
 
 These features should be used to prevent any kind of back-door access (e.g. 
-an untyped pointer) to the actor's state. Such code generate a compile-time
-error. This should also permit the compiler to generate efficient code since
-only one code region may modify actor data. 
+an untyped pointer) to the actor's state. Such code should generate a 
+compile-time error. This should also permit the compiler to generate
+efficient code since only one code region may modify actor data 
+(the single-threaded illusion). 
+
+### Total Encapsulation
+Actor's states are private. The state can only be modified with the 
+behavior associated the that state, the actor itself. We intend to use 
+Mojo's type system, borrow checker and lifecycle watching to ensure 
+this situation.
+
+### Pause and Resume
+The supervisor of an actor must be able to pause and resume message 
+processing for its supervised actors. The actors state would be either
+maintained in memory, or flushed to persistent storage until it is
+resumed. There may be many reasons for supporting this feature:
+* resource limitations
+* software update
+* load prioritization
+* etc. 
 
 ### Message Scalability
 Actors require a communication pathway to transfer messages between actors.
@@ -50,7 +73,20 @@ The communication medium(s) used by the actor system must scale its support
 for all 8 levels of interaction 
 [as discussed here](about-actors.md#actors-are-asynchronously-message-driven).
 
-### Resilience
+### Elastic Load Scalability
+It should be possible for actors to scale elastically with the load of 
+request of the system. That is, new actors capable of handling a request
+may be created when load is increased, and removed when load decreases.
+Ideally this would happen in a cluster of distributed nodes that can even
+handle adding new nodes to the cluster dynamically without any significant 
+disruption (i.e. downtime) to the work being performed.
+
+### Lightweight
+Individual actors should be considered "lightweight" in both memory size and 
+processing overheads. It should be possible to instantiate millions to 
+billions of actors on a single machine. 
+
+### Resilient
 The actor system should support multiple kinds of resilience:
 - local supervision of parent actors to their child actors
 - Mojo's Error type for error handling
@@ -63,9 +99,10 @@ The actor system should support multiple kinds of resilience:
 ### Performance
 Actor models eliminate the need for concurrent or even atomic access to data
 since only one thread will ever access its private data.  It is a goal to aid
-the compiler in optimizing code construction by knowing that actor data cannot
-cross task (thread, fiber) boundaries.
+the compiler in optimizing machine code generation by knowing that actor 
+data cannot cross task (thread, fiber) boundaries.
 
+ 
 ### Flexibility
 We want to use low-level APIs to provide flexibility in the implementation of 
 the actor model. For example, it should be possible to allow the programmer to
@@ -78,9 +115,7 @@ algorithms by the application programmer without difficulty.
 ### Excellence
 We should look to the existing actor models provided by other
 languages (e.g. Erlang, Swift, Ruby, Dart) and frameworks such as 
-[Akka](https://github.com/akka/akka), [CAF](https://github.com/actor-framework),
-[Pykka](https://pykka.readthedocs.io/), [Akka.NET](https://getakka.net/),
-[Orleans](https://learn.microsoft.com/en-us/dotnet/orleans/overview),
+[Akka](https://github.com/akka/akka), [Pekka](https://pekko.apache.org/), [CAF](https://github.com/actor-framework),[Pykka](https://pykka.readthedocs.io/), [Akka.NET](https://getakka.net/),[Orleans](https://learn.microsoft.com/en-us/dotnet/orleans/overview),
 [Hactors](https://github.com/treep/hactors), and from these draw together the
 best ideas so that Mojo offers a better actor model than all of them.
 
@@ -193,3 +228,4 @@ Recently,
 and we think this is a commendable feature. The brokerless nature of this
 system means significantly less infrastructure and significantly increased
 latency as [Lightbend documented here](https://www.lightbend.com/blog/benchmarking-kafka-vs-akka-brokerless-pub-sub).
+

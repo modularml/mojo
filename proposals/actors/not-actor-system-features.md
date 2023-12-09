@@ -18,6 +18,20 @@ In most of the research, academia assumes the use of a pure actor model
 limited that it is not acceptable for this proposal.  This proposal does
 not require such an all-or-nothing approach.
 
+### No "actor" keyword in Mojo
+Mojo, as a language, should be unaware of actors. The Mojo Actor System should
+be able to be implemented in Mojo as a library without cluttering the semantics
+or syntax of Mojo. Consequently, we don't feel the need to make Mojo have 
+an `actor` keyword or any other facilitation of the concept. A suitable 
+object-orientation based on its origins from Python should be sufficient.
+Actors [combine state and behavior](about-actors.md#what-is-an-actor) much like 
+the original intention for object-orientation<sup>[alan-kay-oop](#alan-kay-oop)</sup>,
+mostly because the encapsulation of state is complete and behavior invocation
+is only provided by message passing. 
+
+However, the language will depend on numerous capabilities of the Mojo
+language, which are [documented here](mojo-features-needed.md). 
+
 ### Non-specialized Language Features
 Actors should be able to participate very efficiently in very
 low-level interactions with things like coprocessors and accelerators (
@@ -64,4 +78,10 @@ changed the actor's state.
 
 This approach accommodates the need for a request/response pattern
 but in a completely asynchronous and non-blocking fashion.
+
+### Footnotes
+#### Alan Kay OOP
+Alan Kay, inventor of SmallTalk, had a conception of
+object-oriented programming in 1967 when he coined the term. Read more about his take
+on OOP[here](https://userpage.fu-berlin.de/~ram/pub/pub_jf47ht81Ht/doc_kay_oop_en)
 
