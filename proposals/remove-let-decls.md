@@ -140,7 +140,7 @@ this:
    eliminate the IR representation and behavior for `let`.  At this phase we
    will keep parsing them for compatibility: parse them into the same IR as a
    `var`, but emit a warning “let has been deprecated and will be removed in
-   the next release” with a fixit hint that renames the `var` to `let`.
+   the next release” with a fixit hint that renames the `let` to `var`.
 3. In a release ~1 month later, change the warning into an error.
 4. In a release ~1 month later, remove the keyword entirely along with the error
    message.
