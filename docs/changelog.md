@@ -58,6 +58,9 @@ modular install mojo
   - `%cd 'dir'`: change to directory `dir` and push it on the directory stack.
   - `%cd -`: pop the directory stack and change to the last visited directory.
 
+- Structs decorated with `@value` now will automatically conform to the Movable
+  and Copyable builtin traits.
+
 ### 🦋 Changed
 
 - `utils.vector` has been moved to a new `collections` package to make
