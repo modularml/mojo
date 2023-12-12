@@ -77,6 +77,7 @@ modular install mojo
   [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
   trait.  These types include [`Bool`](/mojo/stdlib/builtins/bool.html#bool),
   [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral),
+  [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector),
   [`Tensor`](mojo/stdlib/tensor/tensor.html#tensor),
   [`TensorShape`](mojo/stdlib/tensor/tensor_shape.html#tensor_shape),
   and [`TensorSpec`](mojo/stdlib/tensor/tensor_spec.html#tensor_spec).
