@@ -73,12 +73,13 @@ modular install mojo
 
 ### 🛠️ Fixed
 
-- [`Bool`](/mojo/stdlib/builtins/bool.html#bool),
-  [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral),
-  and [`Tensor`](mojo/stdlib/tensor/tensor.html#tensor)
-  now conform to the
+- Several standard library types now conform to the
   [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
-  trait.
+  trait.  These types include [`Bool`](/mojo/stdlib/builtins/bool.html#bool),
+  [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral),
+  [`Tensor`](mojo/stdlib/tensor/tensor.html#tensor),
+  [`TensorShape`](mojo/stdlib/tensor/tensor_shape.html#tensor_shape),
+  and [`TensorSpec`](mojo/stdlib/tensor/tensor_spec.html#tensor_spec).
 
 - [#1421](https://github.com/modularml/mojo/issues/1421) - Fixed a crash when
   using Tuples in the REPL.
