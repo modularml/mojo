@@ -73,8 +73,9 @@ modular install mojo
 
 ### 🛠️ Fixed
 
-- [`Bool`](/mojo/stdlib/builtins/bool.html#bool)
-  and [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral)
+- [`Bool`](/mojo/stdlib/builtins/bool.html#bool),
+  [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral),
+  and [`Tensor`](mojo/stdlib/tensor/tensor.html#tensor)
   now conform to the
   [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
   trait.
