@@ -91,6 +91,10 @@ modular install mojo
 - [#1408](https://github.com/modularml/mojo/issues/1408) - Fix overload
   resolution when candidates can return generic types.
 
+- [#1413](https://github.com/modularml/mojo/issues/1413) and
+  [#1395](https://github.com/modularml/mojo/issues/1395) - Do not crash when
+  redeclaring a builtin declaration.
+
 ## v0.6.0 (2023-12-04)
 
 ### 🔥 Legendary
