@@ -362,16 +362,16 @@ modular install mojo
   let tensor_from_file = Tensor[DType.float32].load(path)
   ```
 
-  - Subscripting added to
-    [`DTypePointer`](/mojo/stdlib/memory/unsafe.html#dtypepointer) and
-    [`Pointer`](/mojo/stdlib/memory/unsafe.html#pointer):
+- Subscripting added to
+  [`DTypePointer`](/mojo/stdlib/memory/unsafe.html#dtypepointer) and
+  [`Pointer`](/mojo/stdlib/memory/unsafe.html#pointer):
 
-    ```mojo
-    let p = DTypePointer[DType.float16].alloc(4)
-    for i in range(4):
-        p[i] = i
-        print(p[i])
-    ```
+  ```mojo
+  let p = DTypePointer[DType.float16].alloc(4)
+  for i in range(4):
+      p[i] = i
+      print(p[i])
+  ```
 
 - `file.FileHandle` now has a `seek()` method.
 
