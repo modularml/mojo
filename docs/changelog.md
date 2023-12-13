@@ -95,6 +95,9 @@ modular install mojo
   [#1395](https://github.com/modularml/mojo/issues/1395) - Do not crash when
   redeclaring a builtin declaration.
 
+- [#1307](https://github.com/modularml/mojo/issues/1307) - Fix compatibility of
+  function signatures that only differ in default argument values.
+
 ## v0.6.0 (2023-12-04)
 
 ### 🔥 Legendary
