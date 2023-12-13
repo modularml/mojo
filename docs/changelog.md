@@ -61,6 +61,11 @@ modular install mojo
 - Structs decorated with `@value` now will automatically conform to the Movable
   and Copyable builtin traits.
 
+- [`String`](/mojo/stdlib/builtin/string.html#string) now has new
+  [`toupper()`](/mojo/stdlib/builtin/string.html#toupper) and
+  [`tolower()`](/mojo/stdlib/builtin/string.html#tolower) methods analogous,
+  respectively, to Python's `str.toupper()` and `str.tolower()`.
+
 ### 🦋 Changed
 
 - `utils.vector` has been moved to a new `collections` package to make
