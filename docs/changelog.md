@@ -68,7 +68,8 @@ modular install mojo
 
 - [`hash`](/mojo/stdlib/builtins/hash.html#hash) builtin function and
   [`Hashable`](/mojo/stdlib/builtins/hash.html#Hashable) trait for types
-  implementing `__hash__`. `String`, `Int`, and `SIMD` implement this now.
+  implementing `__hash__`. The `SIMD` type implements this now. More types
+  in the Standard Library will support this in a future release.
 
 ### 🦋 Changed
 
