@@ -66,6 +66,10 @@ modular install mojo
   [`tolower()`](/mojo/stdlib/builtin/string.html#tolower) methods analogous,
   respectively, to Python's `str.toupper()` and `str.tolower()`.
 
+- [`hash`](/mojo/stdlib/builtins/hash.html#hash) builtin function and
+  [`Hashable`](/mojo/stdlib/builtins/hash.html#Hashable) trait for types
+  implementing `__hash__`. `String`, `Int`, and `SIMD` implement this now.
+
 ### 🦋 Changed
 
 - `utils.vector` has been moved to a new `collections` package to make
