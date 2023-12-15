@@ -15,7 +15,7 @@ website:
 ---
 
 Mojo provides a packaging system that allows you to organize and compile code
-libraries into importables files. This page introduces the necessary concepts
+libraries into importable files. This page introduces the necessary concepts
 about how to organize your code into modules and packages (which is a lot
 like Python), and shows you how to create a packaged binary with the [`mojo
 package`](/mojo/cli/package.html) command.
