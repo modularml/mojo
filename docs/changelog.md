@@ -70,7 +70,7 @@ modular install mojo
   - `%cd -`: pop the directory stack and change to the last visited directory.
 
 - Structs decorated with `@value` now automatically conform to the
-  [`Movable`](/mojo/stdlib/builtin/value.html#movable and )
+  [`Movable`](/mojo/stdlib/builtin/value.html#movable)
   and [`Copyable`](/mojo/stdlib/builtin/value.html#copyable) builtin traits.
 
 - [`String`](/mojo/stdlib/builtin/string.html#string) now has new
