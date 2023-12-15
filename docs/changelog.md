@@ -108,6 +108,9 @@ modular install mojo
 - [#1307](https://github.com/modularml/mojo/issues/1307) - Fix compatibility of
   function signatures that only differ in default argument values.
 
+- [#1399](https://github.com/modularml/mojo/issues/1399) - Fix parser crash when
+  a parameter type in a struct that implements a trait is misspelled.
+
 ## v0.6.0 (2023-12-04)
 
 ### 🔥 Legendary
