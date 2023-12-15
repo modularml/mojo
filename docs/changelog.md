@@ -50,7 +50,18 @@ modular install mojo
 
 ### ⭐️ New
 
-- The Mojo REPL now provides limited support for the `%cd` magic.
+### 🦋 Changed
+
+### 🛠️ Fixed
+
+- [#1399](https://github.com/modularml/mojo/issues/1399) - Fix parser crash when
+  a parameter type in a struct that implements a trait is misspelled.
+
+## v0.6.1 (2023-12-18)
+
+### ⭐️ New
+
+- The Mojo REPL now provides limited support for the `%cd` magic command.
 
   This command automatically maintains an internal stack of directories you
   visit during the REPL session. Usage:
@@ -58,30 +69,20 @@ modular install mojo
   - `%cd 'dir'`: change to directory `dir` and push it on the directory stack.
   - `%cd -`: pop the directory stack and change to the last visited directory.
 
-- Structs decorated with `@value` now will automatically conform to the Movable
-  and Copyable builtin traits.
+- Structs decorated with `@value` now automatically conform to the
+  [`Movable`](/mojo/stdlib/builtin/value.html#movable and )
+  and [`Copyable`](/mojo/stdlib/builtin/value.html#copyable) builtin traits.
 
 - [`String`](/mojo/stdlib/builtin/string.html#string) now has new
   [`toupper()`](/mojo/stdlib/builtin/string.html#toupper) and
   [`tolower()`](/mojo/stdlib/builtin/string.html#tolower) methods analogous,
   respectively, to Python's `str.toupper()` and `str.tolower()`.
 
-- [`hash`](/mojo/stdlib/builtins/hash.html#hash) builtin function and
+- Added a [`hash()`](/mojo/stdlib/builtins/hash.html#hash) builtin function and
   [`Hashable`](/mojo/stdlib/builtins/hash.html#Hashable) trait for types
-  implementing `__hash__`. The `SIMD` type implements this now. More types
-  in the Standard Library will support this in a future release.
-
-### 🦋 Changed
-
-- `utils.vector` has been moved to a new `collections` package to make
-  space for new collections. This means that if you had previous code
-  that did `from utils.vector import DynamicVector`, it now needs to
-  be `from collections.vector import DynamicVector` due to the move.
-- The special destructor method `__del__` has been changed to enforce
-  that it cannot raise. Raising destructors are not supported properly
-  at the moment.
-
-### 🛠️ Fixed
+  implementing the `__hash__()` method. The
+  [`SIMD`](/mojo/stdlib/builtin/simd.html#simd) type implements this now.
+  More types in the Standard Library will support this in a future release.
 
 - Several standard library types now conform to the
   [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
@@ -92,24 +93,34 @@ modular install mojo
   [`TensorShape`](/mojo/stdlib/tensor/tensor_shape.html#tensor_shape),
   and [`TensorSpec`](/mojo/stdlib/tensor/tensor_spec.html#tensor_spec).
 
+### 🦋 Changed
+
+- `utils.vector` has been moved to a new `collections` package to make
+  space for new collections. This means that if you had previous code
+  that did `from utils.vector import DynamicVector`, it now needs to
+  be `from collections.vector import DynamicVector` due to the move.
+
+- The special destructor method `__del__()` has been changed to enforce
+  that it cannot raise an error. Raising destructors are not supported properly
+  at the moment.
+
+### 🛠️ Fixed
+
 - [#1421](https://github.com/modularml/mojo/issues/1421) - Fixed a crash when
   using Tuples in the REPL.
 
-- [#222](https://github.com/modularml/mojo/issues/222) - [QoI] Generate error
-  for obviously self recursive functions
+- [#222](https://github.com/modularml/mojo/issues/222) - Generate an error
+  for obviously self recursive functions.
 
 - [#1408](https://github.com/modularml/mojo/issues/1408) - Fix overload
   resolution when candidates can return generic types.
 
 - [#1413](https://github.com/modularml/mojo/issues/1413) and
   [#1395](https://github.com/modularml/mojo/issues/1395) - Do not crash when
-  redeclaring a builtin declaration.
+  re-declaring a builtin declaration.
 
 - [#1307](https://github.com/modularml/mojo/issues/1307) - Fix compatibility of
   function signatures that only differ in default argument values.
-
-- [#1399](https://github.com/modularml/mojo/issues/1399) - Fix parser crash when
-  a parameter type in a struct that implements a trait is misspelled.
 
 ## v0.6.0 (2023-12-04)
 
