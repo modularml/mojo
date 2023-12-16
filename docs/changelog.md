@@ -50,6 +50,13 @@ modular install mojo
 
 ### ⭐️ New
 
+- Users can opt-in to assertions used in the standard library code by
+  specifying `-D MOJO_ENABLE_ASSERTIONS` when invoking `mojo` to
+  compile your source file(s).  In the case that an assertion is fired,
+  the assertion message will be printed along with the stack trace
+  before the program exits.  By default, assertions are _not enabled_
+  in the standard library right now for performance implications.
+
 ### 🦋 Changed
 
 ### 🛠️ Fixed
