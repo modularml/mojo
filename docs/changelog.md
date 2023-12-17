@@ -63,6 +63,8 @@ modular install mojo
 
 - [#1399](https://github.com/modularml/mojo/issues/1399) - Fix parser crash when
   a parameter type in a struct that implements a trait is misspelled.
+- [#1152](https://github.com/modularml/mojo/issues/1152) - Allow mutable `self`
+  argument when overloading operators using dunder methods.
 
 ## v0.6.1 (2023-12-18)
 
