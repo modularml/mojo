@@ -29,9 +29,7 @@ alias M = 512
 alias N = 512
 alias K = 4096
 alias type = DType.float32
-alias Float = Float32
 # alias type = DType.float64
-# alias Float = Float64
 
 struct Matrix:
     var data: DTypePointer[type]
@@ -60,10 +58,10 @@ struct Matrix:
         rand(data, rows * cols)
         return Self(rows, cols, data)
 
-    fn __getitem__(self, y: Int, x: Int) -> Float:
+    fn __getitem__(self, y: Int, x: Int) -> SIMD[type, 1]:
         return self.load[1](y, x)
 
-    fn __setitem__(inout self, y: Int, x: Int, val: Float):
+    fn __setitem__(inout self, y: Int, x: Int, val: SIMD[type, 1]):
         self.store[1](y, x, val)
 
     fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[type, nelts]:
