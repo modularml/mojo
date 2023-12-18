@@ -57,6 +57,10 @@ modular install mojo
   before the program exits.  By default, assertions are _not enabled_
   in the standard library right now for performance implications.
 
+- A new `__get_bvalue_as_ref(x)` low-level helper was added that allows
+  converting borrowed values in memory to `!lit.ref` types, for use when
+  implementing the internals of low-level types like unsafe pointers.
+
 ### 🦋 Changed
 
 ### 🛠️ Fixed
