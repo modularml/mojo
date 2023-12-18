@@ -73,6 +73,8 @@ modular install mojo
   `DynamicVector` copy constructor in certain situations.
 - [#1316](https://github.com/modularml/mojo/issues/1316) - The `benchmark.keep`
   function now properly handles vector types.
+- [#1505](https://github.com/modularml/mojo/issues/1505) - The `simd.shuffle`
+  operation now works on 64 element permutations.
 
 ## v0.6.1 (2023-12-18)
 
