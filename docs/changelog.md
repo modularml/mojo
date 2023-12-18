@@ -71,6 +71,8 @@ modular install mojo
   argument when overloading operators using dunder methods.
 - [#1493](https://github.com/modularml/mojo/issues/1493) - Fix crash in
   `DynamicVector` copy constructor in certain situations.
+- [#1316](https://github.com/modularml/mojo/issues/1316) - The `benchmark.keep`
+  function now properly handles vector types.
 
 ## v0.6.1 (2023-12-18)
 
