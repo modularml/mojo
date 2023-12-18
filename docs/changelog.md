@@ -69,6 +69,8 @@ modular install mojo
   a parameter type in a struct that implements a trait is misspelled.
 - [#1152](https://github.com/modularml/mojo/issues/1152) - Allow mutable `self`
   argument when overloading operators using dunder methods.
+- [#1493](https://github.com/modularml/mojo/issues/1493) - Fix crash in
+  `DynamicVector` copy constructor in certain situations.
 
 ## v0.6.1 (2023-12-18)
 
