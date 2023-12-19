@@ -75,6 +75,10 @@ modular install mojo
   function now properly handles vector types.
 - [#1505](https://github.com/modularml/mojo/issues/1505) - The `simd.shuffle`
   operation now works on 64 element permutations.
+- [#1355](https://github.com/modularml/mojo/issues/1355) - Fix `String.find()`
+  returning wrong value when starting index is non-zero.
+- [#1367](https://github.com/modularml/mojo/issues/1367) - Fix `String.replace()`
+  returning incorrect results for multi-character search strings.
 
 ## v0.6.1 (2023-12-18)
 
