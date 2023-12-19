@@ -11,6 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+# RUN: %mojo -debug-level full %s | FileCheck %s
 import benchmark
 from complex import ComplexSIMD, ComplexFloat64
 from math import iota
@@ -98,6 +99,7 @@ fn main() raises:
         max_runtime_secs=0.5
     ).mean()
     print("Parallelized:", parallelized, "s")
+    # CHECK: Parallel speedup
     print("Parallel speedup:", vectorized / parallelized)
 
     _ = t  # Make sure tensor isn't destroyed before benchmark is finished

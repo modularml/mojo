@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
 
 # This sample implements a simple reduction operation on a
 # large array of values to produce a single result.
@@ -85,4 +86,5 @@ fn main() raises:
     bench[naive_reduce_sum, size_large, "naive"](large_array)
 
     bench[stdlib_reduce_sum, size_small, "stdlib"](small_array)
+    # CHECK: stdlib elements
     bench[stdlib_reduce_sum, size_large, "stdlib"](large_array)
