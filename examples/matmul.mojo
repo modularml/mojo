@@ -29,7 +29,7 @@ alias M = 512
 alias N = 512
 alias K = 4096
 alias type = DType.float32
-# alias type = DType.float64
+
 
 struct Matrix:
     var data: DTypePointer[type]
