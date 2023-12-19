@@ -40,7 +40,7 @@ Code](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vsco
 to provide a first-class developer experience with features like code
 completion, quick fixes, and hover help for Mojo APIs.
 
-![](/static/images/mojo/mojo-vscode.png)
+![](/mojo/images/mojo-vscode.png)
 
 ### System requirements
 
@@ -135,7 +135,7 @@ running our latest Mojo kernel.
 To get access, just [log in to the Mojo Playground
 here](https://playground.modular.com).
 
-![](/static/images/mojo/mojo-playground.png)
+![](/mojo/images/mojo-playground.png)
 
 ### What to expect
 

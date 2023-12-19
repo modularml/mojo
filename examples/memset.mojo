@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -debug-level full %s | FileCheck %s
 
 # This sample implements various memset algorithms and optimizations
 
@@ -253,10 +254,17 @@ fn memset_evaluator(funcs: Pointer[fn_type], size: Int) -> Int:
 
 
 fn main():
+    # CHECK: Manual memset
     benchmark(memset_manual, "Manual memset")
+    # CHECK: System memset
     benchmark(memset_system, "System memset")
+    # CHECK: Manual memset v2
     benchmark(memset_manual_2, "Manual memset v2")
+    # CHECK: Mojo system memset
     benchmark(memset_system, "Mojo system memset")
+    # CHECK: Mojo manual memset
     benchmark(memset_manual, "Mojo manual memset")
+    # CHECK: Mojo manual memset v2
     benchmark(memset_manual_2, "Mojo manual memset v2")
+    # CHECK: Mojo system memset
     benchmark(memset_system, "Mojo system memset")
