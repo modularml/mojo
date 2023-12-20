@@ -94,18 +94,28 @@ modular install mojo
 
 - Structs decorated with `@value` now automatically conform to the
   [`Movable`](/mojo/stdlib/builtin/value.html#movable)
-  and [`Copyable`](/mojo/stdlib/builtin/value.html#copyable) builtin traits.
+  and [`Copyable`](/mojo/stdlib/builtin/value.html#copyable) built-in traits.
 
 - [`String`](/mojo/stdlib/builtin/string.html#string) now has new
   [`toupper()`](/mojo/stdlib/builtin/string.html#toupper) and
   [`tolower()`](/mojo/stdlib/builtin/string.html#tolower) methods analogous,
   respectively, to Python's `str.toupper()` and `str.tolower()`.
 
-- Added a [`hash()`](/mojo/stdlib/builtin/hash.html#hash) builtin function and
+- Added a [`hash()`](/mojo/stdlib/builtin/hash.html#hash) built-in function and
   [`Hashable`](/mojo/stdlib/builtin/hash.html#Hashable) trait for types
-  implementing the `__hash__()` method. The
-  [`SIMD`](/mojo/stdlib/builtin/simd.html#simd) type implements this now.
-  More types in the Standard Library will support this in a future release.
+  implementing the `__hash__()` method. Future releases will add `Hashable`
+  support to Standard Library types. In the meantime, the `hash` module includes
+  a version of the `hash()` function that works on arbitrary byte strings. To
+  generate hashes for [`SIMD`](/mojo/stdlib/builtin/simd.html#simd) types, you
+  use the internal `_hash_simd()` function:
+
+  ```mojo
+  from builtin.hash import _hash_simd
+
+  fn gen_simd_hash():
+      let vector = SIMD[DType.int64, 4](1, 2, 3, 4)
+      let hash = _hash_simd(vector)
+  ```
 
 - Several standard library types now conform to the
   [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
