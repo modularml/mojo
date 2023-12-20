@@ -101,8 +101,8 @@ modular install mojo
   [`tolower()`](/mojo/stdlib/builtin/string.html#tolower) methods analogous,
   respectively, to Python's `str.toupper()` and `str.tolower()`.
 
-- Added a [`hash()`](/mojo/stdlib/builtins/hash.html#hash) builtin function and
-  [`Hashable`](/mojo/stdlib/builtins/hash.html#Hashable) trait for types
+- Added a [`hash()`](/mojo/stdlib/builtin/hash.html#hash) builtin function and
+  [`Hashable`](/mojo/stdlib/builtin/hash.html#Hashable) trait for types
   implementing the `__hash__()` method. The
   [`SIMD`](/mojo/stdlib/builtin/simd.html#simd) type implements this now.
   More types in the Standard Library will support this in a future release.
