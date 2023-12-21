@@ -79,6 +79,9 @@ modular install mojo
   returning wrong value when starting index is non-zero.
 - [#1367](https://github.com/modularml/mojo/issues/1367) - Fix `String.replace()`
   returning incorrect results for multi-character search strings.
+- [#1535](https://github.com/modularml/mojo/issues/1535) - Invalid error `field
+  'w.x.y' destroyed out of the middle of a value, preventing the overall value
+  from being destroyed`.
 
 ## v0.6.1 (2023-12-18)
 
