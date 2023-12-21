@@ -63,6 +63,13 @@ modular install mojo
 
 ### 🦋 Changed
 
+- The `__takeinit__` special constructor form has been removed from the
+  language.  This "non-destructive move" operation was previously wired into the
+  `x^` transfer operator, but had unpredictable behavior that wasn't consistent.
+  Now that Mojo has traits, it is better to model this as an explicit `.take()`
+  operation on a type, which makes it clear when a lifetime is ended vs when the
+  contents of an LValue are explicitly taken.
+
 ### 🛠️ Fixed
 
 - [#1399](https://github.com/modularml/mojo/issues/1399) - Fix parser crash when
