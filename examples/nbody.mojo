@@ -62,6 +62,10 @@ fn advance(inout bodies: StaticTuple[NUM_BODIES, Planet], dt: Float64):
     @unroll
     for i in range(NUM_BODIES):
         var body_i = bodies[i]
+
+        # @unroll(NUM_BODIES - 1) errors.
+        # Bug reported at https://github.com/modularml/mojo/pull/1534
+        @unroll(4)
         for j in range(NUM_BODIES - i - 1):
             var body_j = bodies[j + i + 1]
             let diff = body_i.pos - body_j.pos
