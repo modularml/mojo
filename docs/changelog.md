@@ -58,8 +58,10 @@ modular install mojo
   in the standard library right now for performance implications.
 
 - A new `__get_ref_from_value(x)` low-level helper was added that allows
-  converting borrowed values in memory to `!lit.ref` types, for use when
-  implementing the internals of low-level types like unsafe pointers.
+  converting values in memory to `!lit.ref` types, for use when implementing the
+  internals of low-level types like unsafe pointers.  A corresponding
+  `__get_value_from_ref(x)` helper converts a reference into a normal value.
+  These will eventually subsume the `address` builtins.
 
 ### 🦋 Changed
 
