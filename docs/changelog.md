@@ -81,6 +81,10 @@ modular install mojo
 
 ### 🛠️ Fixed
 
+- [#1419](https://github.com/modularml/mojo/issues/1419) - Fix assertion failure
+  with uninitialized lattice values.
+- [#1402](https://github.com/modularml/mojo/issues/1402) - Fix movable trait not
+  detected on recursive struct implemented with `AnyPointer`.
 - [#1399](https://github.com/modularml/mojo/issues/1399) - Fix parser crash when
   a parameter type in a struct that implements a trait is misspelled.
 - [#1152](https://github.com/modularml/mojo/issues/1152) - Allow mutable `self`
