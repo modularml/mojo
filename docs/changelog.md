@@ -104,6 +104,8 @@ modular install mojo
   from being destroyed`.
 - [#1475](https://github.com/modularml/mojo/issues/1475) - Assertion failure in
   nested loop.
+- [#1591](https://github.com/modularml/mojo/issues/1591) - Assertion failure
+  when using `AnyType` struct member.
 
 ## v0.6.1 (2023-12-18)
 
