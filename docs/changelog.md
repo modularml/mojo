@@ -75,6 +75,10 @@ modular install mojo
   internally implemented with reference types. When interacting directly with
   it, please use `__get_value_from_ref` instead of `__get_address_as_lvalue`.
 
+- `vectorize` now has an overload to pass `size` as a parameter instead of an
+  argument. This allows the remainder of `size` / `simd_width` to run in a
+  single iteration.
+
 ### 🛠️ Fixed
 
 - [#1399](https://github.com/modularml/mojo/issues/1399) - Fix parser crash when
