@@ -102,6 +102,8 @@ modular install mojo
 - [#1535](https://github.com/modularml/mojo/issues/1535) - Invalid error `field
   'w.x.y' destroyed out of the middle of a value, preventing the overall value
   from being destroyed`.
+- [#1475](https://github.com/modularml/mojo/issues/1475) - Assertion failure in
+  nested loop.
 
 ## v0.6.1 (2023-12-18)
 
