@@ -71,6 +71,9 @@ modular install mojo
   Now that Mojo has traits, it is better to model this as an explicit `.take()`
   operation on a type, which makes it clear when a lifetime is ended vs when the
   contents of an LValue are explicitly taken.
+- The `VariadicListMem` type has an additional `Lifetime` parameter and is
+  internally implemented with reference types. When interacting directly with
+  it, please use `__get_value_from_ref` instead of `__get_address_as_lvalue`.
 
 ### 🛠️ Fixed
 
