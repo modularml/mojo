@@ -278,7 +278,7 @@ modular install mojo
   - [`Stringable`](/mojo/stdlib/builtin/str.html#stringable)
   - [`Intable`](/mojo/stdlib/builtin/int.html#intable)
   - [`Sized`](/mojo/stdlib/builtin/len.html#sized)
-  - [`CollectionElement`](/mojo/stdlib/utils/vector.html#collectionelement)
+  - [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
 
 - We added built-in [`len()`](/mojo/stdlib/builtin/len.html#len),
   [`str()`](/mojo/stdlib/builtin/str.html#str), and
@@ -286,7 +286,7 @@ modular install mojo
   types that implement the `Sized`, `Stringable`, and `Intable` traits,
   respectively.
 
-- [`DynamicVector`](/mojo/stdlib/utils/vector.html#dynamicvector) is now a
+- [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) is now a
   proper generic collection that can use any type that implements the `Movable`
   and `Copyable` traits. This means you can now write, for example,
   `DynamicVector[String]`. Also, `DynamicVector` now invokes its element
@@ -774,7 +774,7 @@ modular install mojo
 
 - [`TensorShape`](/mojo/stdlib/tensor/tensor_shape.html) and
   [`TensorSpec`](/mojo/stdlib/tensor/tensor_shape.html) now have constructors
-  that take [`DynamicVector[Int]`](/mojo/stdlib/utils/vector.html#dynamicvector)
+  that take [`DynamicVector[Int]`](/mojo/stdlib/collections/vector.html#dynamicvector)
   and [`StaticIntTuple`](/mojo/stdlib/utils/index_.html#staticinttuple) to
   initialize shapes.
 
@@ -804,7 +804,7 @@ modular install mojo
   ```
 
 - The parameters for
-  [`InlinedFixedVector`](/mojo/stdlib/utils/vector.html#inlinedfixedvector)
+  [`InlinedFixedVector`](/mojo/stdlib/collections/vector.html#inlinedfixedvector)
   have been switched. The parameters are now `[type, size]` instead of
   `[size, type]`. The `InlinedFixedVector` now has a default size which means
   that one can just use `InlinedFixedVector` as `InlinedFixedVector[Float32]`
