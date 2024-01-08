@@ -63,6 +63,11 @@ modular install mojo
   `__get_value_from_ref(x)` helper converts a reference into a normal value.
   These will eventually subsume the `address` builtins.
 
+- The Mojo Language Server now implements the References request. IDEs use
+  this to provide support for **Go to References** and **Find All References**.
+  A current limitation is that references outside of the current document are
+  not supported, which will be addressed in the future.
+
 ### 🦋 Changed
 
 - The `__takeinit__` special constructor form has been removed from the
