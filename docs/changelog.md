@@ -65,7 +65,7 @@ modular install mojo
 
 - The `llcl` module in addition to `num_cores` now has `num_threads` and
   `num_performance_cores`.
-  
+
 - The Mojo Language Server now implements the References request. IDEs use
   this to provide support for **Go to References** and **Find All References**.
   A current limitation is that references outside of the current document are
@@ -135,6 +135,8 @@ modular install mojo
   nested loop.
 - [#1591](https://github.com/modularml/mojo/issues/1591) - Assertion failure
   when using `AnyType` struct member.
+- [#1503](https://github.com/modularml/mojo/issues/1503) - Rename the mojo build
+  of LLDB to `mojo-lldb`, to prevent name collisions with the system's LLDB.
 
 ## v0.6.1 (2023-12-18)
 
