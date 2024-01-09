@@ -108,6 +108,8 @@ modular install mojo
 
 ### 🛠️ Fixed
 
+- [#1096](https://github.com/modularml/mojo/issues/1096) - Improve warnings
+  messages for dead code in conditionals like `or` expressions.
 - [#1419](https://github.com/modularml/mojo/issues/1419) - Fix assertion failure
   with uninitialized lattice values.
 - [#1402](https://github.com/modularml/mojo/issues/1402) - Fix movable trait not
