@@ -15,7 +15,7 @@
 # This sample prints the current host system information using APIs from the
 # sys module.
 
-from runtime.llcl import num_cores
+from runtime.llcl import num_cores, num_threads
 from sys.info import (
     os_is_linux,
     os_is_windows,
@@ -70,5 +70,6 @@ def main():
     print("    CPU         : ", cpu)
     print("    Arch        : ", arch)
     print("    Num Cores   : ", num_cores())
+    print("    Num Threads : ", num_threads())
     # CHECK: CPU Features
     print("    CPU Features:", cpu_features)
