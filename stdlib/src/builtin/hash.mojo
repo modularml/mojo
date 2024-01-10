@@ -1,0 +1,275 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+"""Implements the `Hashable` trait and `hash()` built-in function.
+
+There are a few main tools in this module:
+
+- `Hashable` trait for types implementing `__hash__(self) -> Int`
+- `hash[T: Hashable](hashable: T) -> Int` built-in function.
+- A `hash()` implementation for abritrary byte strings,
+  `hash(data: DTypePointer[DType.int8], n: Int) -> Int`,
+  is the workhorse function, which implements efficient hashing via SIMD
+  vectors. See the documentation of this function for more details on the hash
+  implementation.
+- `hash(SIMD)` and `hash(Int8)` implementations
+    These are useful helpers to specialize for the general bytes implementation.
+"""
+
+import math
+from memory import memcpy, memset_zero
+import random
+from sys.ffi import _get_global
+
+
+# This hash secret is XOR-ed with the final hash value for common hash functions.
+# Doing so can help prevent DDOS attacks on data structures relying on these
+# hash functions. See `hash(bytes, n)` documentation for more details.
+# TODO(27659): This is always 0 right now
+# let HASH_SECRET = random.random_ui64(
+#     0, math.limit.max_finite[DType.uint64]()
+# ).to_int()
+
+
+fn _HASH_SECRET() -> Int:
+    let ptr = _get_global[
+        "HASH_SECRET", _initialize_hash_secret, _destroy_hash_secret
+    ]()
+    return ptr.bitcast[Int]()[0]
+
+
+fn _initialize_hash_secret(payload: Pointer[NoneType]) -> Pointer[NoneType]:
+    let secret = random.random_ui64(0, math.limit.max_finite[DType.uint64]())
+    let data = Pointer[Int].alloc(1)
+    data.store(secret.to_int())
+    return data.bitcast[NoneType]()
+
+
+fn _destroy_hash_secret(p: Pointer[NoneType]):
+    p.free()
+
+
+trait Hashable:
+    """A trait for types which specify a function to hash their data.
+
+    This hash function will be used for applications like hash maps, and
+    don't need to be cryptographically secure. A good hash function will
+    hash similar / common types to different values, and in particular
+    the _low order bits_ of the hash, which are used in smaller dictionaries,
+    should be sensitive to any changes in the data structure. If your type's
+    hash function doesn't meet this criteria it will get poor performance in
+    common hash map implementations.
+
+    ```mojo
+    @value
+    struct Foo(Hashable):
+        fn __hash__(self) -> Int:
+            return 4  # chosen by fair random dice roll
+
+    let foo = Foo()
+    print(hash(foo))
+    ```
+    """
+
+    fn __hash__(self) -> Int:
+        """Return a 64-bit hash of the type's data."""
+        ...
+
+
+fn hash[T: Hashable](hashable: T) -> Int:
+    """Hash a Hashable type using its underlying hash implementation.
+
+    Parameters:
+        T: Any Hashable type.
+
+    Args:
+        hashable: The input data to hash.
+
+    Returns:
+        A 64-bit integer hash based on the underlying implementation.
+    """
+    return hashable.__hash__()
+
+
+fn _djbx33a_init[type: DType, size: Int]() -> SIMD[type, size]:
+    return SIMD[type, size](5361)
+
+
+fn _djbx33a_hash_update[
+    type: DType, size: Int
+](data: SIMD[type, size], next: SIMD[type, size]) -> SIMD[type, size]:
+    return data * 33 + next
+
+
+alias _HASH_INIT = _djbx33a_init
+alias _HASH_UPDATE = _djbx33a_hash_update
+
+
+fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
+    """Hash a SIMD byte vector using direct DJBX33A hash algorithm.
+
+    See `hash(bytes, n)` documentation for more details.
+
+    Parameters:
+        type: The SIMD dtype of the input data.
+        size: The SIMD width of the input data.
+
+    Args:
+        data: The input data to hash.
+
+    Returns:
+        A 64-bit integer hash. This hash is _not_ suitable for
+        cryptographic purposes, but will have good low-bit
+        hash collision statistical properties for common data structures.
+    """
+    # Some types will have non-integer ratios, eg. DType.bool
+    alias int8_size = math.ceildiv(
+        type.bitwidth(), DType.int8.bitwidth()
+    ) * size
+    # Stack allocate bytes for `data` and load it into that memory.
+    # Then reinterpret as int8 and pass to the specialized int8 hash function.
+    var bytes = StaticTuple[int8_size, Int8]()
+    let raw_ptr = Pointer.address_of(bytes)
+    memset_zero(raw_ptr, int8_size)
+    let ptr = DTypePointer[type](raw_ptr.bitcast[SIMD[type, 1]]())
+    ptr.simd_store[size](data)
+    return _hash_int8(ptr.bitcast[DType.uint8]().simd_load[int8_size]())
+
+
+fn _hash_int8[size: Int](data: SIMD[DType.uint8, size]) -> Int:
+    """Hash a SIMD byte vector using direct DJBX33A hash algorithm.
+
+    This naively implements DJBX33A, with a hash secret appended at the end.
+    The hash secret is computed randomly at compile time, so different executions
+    will use different secrets, and thus have different hash outputs. This is
+    useful in preventing DDOS attacks against hash functions using a
+    non-cryptographic hash function like DJBX33A.
+
+    See `hash(bytes, n)` documentation for more details.
+
+    Parameters:
+        size: The SIMD width of the input data.
+
+    Args:
+        data: The input data to hash.
+
+    Returns:
+        A 64-bit integer hash. This hash is _not_ suitable for
+        cryptographic purposes, but will have good low-bit
+        hash collision statistical properties for common data structures.
+    """
+    var hash_data = _HASH_INIT[DType.int64, 1]()
+    for i in range(size):
+        hash_data = _HASH_UPDATE(hash_data, data[i].cast[DType.int64]())
+    # TODO(27659): 'lit.globalvar.ref' error
+    # return hash_data.to_int() ^ HASH_SECRET
+    return hash_data.to_int() ^ _HASH_SECRET()
+
+
+fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
+    """Hash a byte array using a SIMD-modified DJBX33A hash algorithm.
+
+    The DJBX33A algorithm is commonly used for data structures that rely
+    on well-distributed hashing for performance. The low order bits of the
+    result depend on each byte in the input, meaning that single-byte changes
+    will result in a changed hash even when masking out most bits eg. for small
+    dictionaries.
+
+    _This hash function is not suitable for cryptographic purposes._ The
+    algorithm is easy to reverse and produce deliberate hash collisions.
+    We _do_ however initialize a random hash secret which is mixed into
+    the final hash output. This can help prevent DDOS attacks on applications
+    which make use of this function for dictionary hashing. As a consequence,
+    hash values are deterministic within an individual runtime instance ie.
+    a value will always hash to the same thing, but in between runs this value
+    will change based on the hash secret.
+
+    Standard DJBX33A is:
+
+    - Set _hash_ = 5361
+    - For each byte: _hash_ = 33 * _hash_ + _byte_
+
+    Instead, for all bytes except trailing bytes that don't align
+    to the max SIMD vector width, we:
+
+    - Interpret those bytes as a SIMD vector.
+    - Apply a vectorized hash: _v_ = 33 * _v_ + _bytes_as_simd_value_
+    - Call [`reduce_add()`](/mojo/stdlib/builtin/simd.html#reduce_add) on the
+      final result to get a single hash value.
+    - Use this value in fallback for the remaining suffix bytes
+      with standard DJBX33A.
+
+    Python uses DJBX33A with a hash secret for smaller strings, and
+    then the SipHash algorithm for longer strings. The arguments and tradeoffs
+    are well documented in PEP 456. We should consider this and deeper
+    performance/security tradeoffs as Mojo evolves.
+
+    References:
+
+    - [Wikipedia: Non-cryptographic hash function](https://en.wikipedia.org/wiki/Non-cryptographic_hash_function)
+    - [Python PEP 456](https://peps.python.org/pep-0456/)
+    - [PHP Hash algorithm and collisions](https://www.phpinternalsbook.com/php5/hashtables/hash_algorithm.html)
+
+
+    ```mojo
+    from random import rand
+    let n = 64
+    let rand_bytes = DTypePointer[DType.int8].alloc(n)
+    rand(rand_bytes, n)
+    hash(rand_bytes, n)
+    ```
+
+    Args:
+        bytes: The byte array to hash.
+        n: The length of the byte array.
+
+    Returns:
+        A 64-bit integer hash. This hash is _not_ suitable for
+        cryptographic purposes, but will have good low-bit
+        hash collision statistical properties for common data structures.
+    """
+    alias type = DType.int64
+    alias type_width = type.bitwidth() // DType.int8.bitwidth()
+    alias simd_width = simdwidthof[type]()
+    # stride is the byte length of the whole SIMD vector
+    alias stride = type_width * simd_width
+
+    # Compute our SIMD strides and tail length
+    # n == k * stride + r
+    let k = n // stride
+    let r = n % stride
+    debug_assert(n == k * stride + r, "wrong hash tail math")
+
+    # 1. Reinterpret the underlying data as a larger int type
+    let simd_data = bytes.bitcast[type]()
+
+    # 2. Compute DJBX33A, but strided across the SIMD vector width.
+    #    This is almost the same as DBJX33A, except:
+    #    - The order in which bytes of data update the hash is permuted
+    #    - For larger inputs, a small constant number of bytes from the
+    #      beginning of the string (3/4 of the first vector load)
+    #      have a slightly different power of 33 as a coefficient.
+    var hash_data = _HASH_INIT[type, simd_width]()
+    for i in range(k):
+        let update = simd_data.simd_load[simd_width](i * simd_width)
+        hash_data = _HASH_UPDATE(hash_data, update)
+
+    # 3. Copy the tail data (smaller than the SIMD register) into
+    #    a final hash state update vector that's stack-allocated.
+    if r != 0:
+        var remaining = StaticTuple[stride, Int8]()
+        let ptr = DTypePointer[DType.int8](
+            Pointer.address_of(remaining).bitcast[Int8]()
+        )
+        memcpy(ptr, bytes + k * stride, r)
+        memset_zero(ptr + r, stride - r)  # set the rest to 0
+        let last_value = ptr.bitcast[type]().simd_load[simd_width]()
+        hash_data = _HASH_UPDATE(hash_data, last_value)
+
+    # Now finally, hash the final SIMD vector state. This will also use
+    # DJBX33A to make sure that higher-order bits of the vector will
+    # mix and impact the low-order bits, and is mathematically necessary
+    # for this function to equate to naive DJBX33A.
+    return _hash_simd(hash_data)

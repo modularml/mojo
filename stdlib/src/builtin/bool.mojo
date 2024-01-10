@@ -1,0 +1,225 @@
+# ===----------------------------------------------------------------------=== #
+#
+# This file is Modular Inc proprietary.
+#
+# ===----------------------------------------------------------------------=== #
+"""Implements the Bool class.
+
+These are Mojo built-ins, so you don't need to import them.
+"""
+
+from debug.lldb import lldb_formatter_wrapping_type
+from collections.vector import CollectionElement
+
+
+@lldb_formatter_wrapping_type
+@value
+@register_passable("trivial")
+struct Bool(Stringable, CollectionElement):
+    """The primitive Bool scalar value used in Mojo."""
+
+    var value: __mlir_type.`!pop.scalar<bool>`
+    """The underlying storage of the boolean value."""
+
+    @always_inline("nodebug")
+    fn __init__(value: __mlir_type.i1) -> Bool:
+        """Construct a Bool value given a __mlir_type.i1 value.
+
+        Args:
+            value: The initial __mlir_type.i1 value.
+
+        Returns:
+            The constructed Bool value.
+        """
+        return __mlir_op.`pop.cast_from_builtin`[
+            _type = __mlir_type.`!pop.scalar<bool>`
+        ](value)
+
+    @always_inline("nodebug")
+    fn __init__(value: Bool) -> Bool:
+        """Construct a Bool value given a __mlir_type.i1 value.
+
+        Args:
+            value: The initial __mlir_type.i1 value.
+
+        Returns:
+            The constructed Bool value.
+        """
+        return Self {value: value.value}
+
+    @always_inline("nodebug")
+    fn __init__[width: Int](value: SIMD[DType.bool, width]) -> Bool:
+        """Construct a Bool value given a SIMD value.
+
+        If there is more than a single element in the SIMD value, then value is
+        reduced using the and operator.
+
+        Args:
+            value: The initial SIMD value.
+
+        Returns:
+            The constructed Bool value.
+        """
+        return value.__bool__()
+
+    @always_inline("nodebug")
+    fn __bool__(self) -> Bool:
+        """Convert to Bool.
+
+        Returns:
+            This value.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __mlir_i1__(self) -> __mlir_type.i1:
+        """Convert this Bool to __mlir_type.i1.
+
+        This method is a special hook used by the compiler to test boolean
+        objects in control flow conditions.  It should be implemented by Bool
+        but not other general boolean convertible types (they should implement
+        `__bool__` instead).
+
+        Returns:
+            The underlying value for the Bool.
+        """
+        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i1](
+            self.value
+        )
+
+    fn __str__(self) -> String:
+        """Get the bool as a string.
+
+        Returns:
+            A string representation.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __eq__(self, rhs: Bool) -> Bool:
+        """Compare this Bool to RHS.
+
+        Performs an equality comparison between the Bool value and the argument.
+        This method gets invoked when a user uses the `==` infix operator.
+
+        Args:
+            rhs: The rhs value of the equality statement.
+
+        Returns:
+            True if the two values match and False otherwise.
+        """
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
+            self.value, rhs.value
+        )
+
+    @always_inline("nodebug")
+    fn __ne__(self, rhs: Bool) -> Bool:
+        """Compare this Bool to RHS.
+
+        Performs a non-equality comparison between the Bool value and the
+        argument. This method gets invoked when a user uses the `!=` infix
+        operator.
+
+        Args:
+            rhs: The rhs value of the non-equality statement.
+
+        Returns:
+            False if the two values do match and True otherwise.
+        """
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
+            self.value, rhs.value
+        )
+
+    @always_inline("nodebug")
+    fn __and__(self, rhs: Bool) -> Bool:
+        """Compute `self & rhs`.
+
+        Bitwise and's the Bool value with the argument. This method gets invoked
+        when a user uses the `and` infix operator.
+
+        Args:
+            rhs: The rhs value of the and statement.
+
+        Returns:
+            `self & rhs`.
+        """
+        return __mlir_op.`pop.and`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __or__(self, rhs: Bool) -> Bool:
+        """Compute `self | rhs`.
+
+        Bitwise or's the Bool value with the argument. This method gets invoked
+        when a user uses the `or` infix operator.
+
+        Args:
+            rhs: The rhs value of the or statement.
+
+        Returns:
+            `self | rhs`.
+        """
+        return __mlir_op.`pop.or`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __xor__(self, rhs: Bool) -> Bool:
+        """Compute `self ^ rhs`.
+
+        Bitwise Xor's the Bool value with the argument. This method gets invoked
+        when a user uses the `^` infix operator.
+
+        Args:
+            rhs: The rhs value of the xor statement.
+
+        Returns:
+            `self ^ rhs`.
+        """
+        return __mlir_op.`pop.xor`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __invert__(self) -> Bool:
+        """Inverts the Bool value.
+
+        Returns:
+            True if the object is false and False otherwise.
+        """
+        let true = __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type.`!pop.scalar<bool>`,
+            value = __mlir_attr.`#pop.simd<true> : !pop.scalar<bool>`,
+        ]()
+        return __mlir_op.`pop.xor`(self.value, true)
+
+    @always_inline("nodebug")
+    fn __rand__(self, value: Bool) -> Bool:
+        """Return `value & self`.
+
+        Args:
+            value: The other value.
+
+        Returns:
+            `value & self`.
+        """
+        return value & self
+
+    @always_inline("nodebug")
+    fn __ror__(self, value: Bool) -> Bool:
+        """Return `value | self`.
+
+        Args:
+            value: The other value.
+
+        Returns:
+            `value | self`.
+        """
+        return value | self
+
+    @always_inline("nodebug")
+    fn __rxor__(self, value: Bool) -> Bool:
+        """Return `value ^ self`.
+
+        Args:
+            value: The other value.
+
+        Returns:
+            `value ^ self`.
+        """
+        return value ^ self
