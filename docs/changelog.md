@@ -106,6 +106,9 @@ modular install mojo
         parallelize[foo](rt, C.rows)
   ```
 
+- The `cpython` module in the `python` package has been moved to be an internal
+  module, i.e, `_cpython`.
+
 ### 🛠️ Fixed
 
 - [#1096](https://github.com/modularml/mojo/issues/1096) - Improve warnings
