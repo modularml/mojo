@@ -71,6 +71,9 @@ modular install mojo
   A current limitation is that references outside of the current document are
   not supported, which will be addressed in the future.
 
+- [`Arc`](/mojo/stdlib/memory/arc.html#Arc), a reference-counted smart pointer
+  using atomic reference count updates.
+
 ### 🦋 Changed
 
 - The `__takeinit__` special constructor form has been removed from the
