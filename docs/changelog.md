@@ -116,6 +116,10 @@ modular install mojo
 - `AnyType` and `Destructable` have been unified into a single trait, `AnyType`.
   Every nominal type (i.e. all structs) now automatically conform to `AnyType`.
 
+- The `_OldDynamicVector` type that worked only on register passable element
+  types has been removed.  Please migrate uses to `DynamicVector` which
+  works on both register passable and memory types.
+
 ### 🛠️ Fixed
 
 - [#1096](https://github.com/modularml/mojo/issues/1096) - Improve warnings
