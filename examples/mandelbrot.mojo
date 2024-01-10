@@ -16,7 +16,7 @@ import benchmark
 from complex import ComplexSIMD, ComplexFloat64
 from math import iota
 from python import Python
-from runtime.llcl import num_threads
+from runtime.llcl import num_threads, Runtime
 from algorithm import parallelize, vectorize
 from tensor import Tensor
 from utils.index import Index
@@ -90,16 +90,18 @@ fn main() raises:
     print("Number of threads:", num_threads())
     print("Vectorized:", vectorized, "s")
 
-    # Parallelized
-    @parameter
-    fn bench_parallel[simd_width: Int]():
-        parallelize[worker](height, height)
+    with Runtime(num_threads()) as rt:
+        # Parallelized
+        @parameter
+        fn bench_parallel[simd_width: Int]():
+            parallelize[worker](rt, height, height)
+            # parallelize[worker](height, height)
 
-    let parallelized = benchmark.run[bench_parallel[simd_width]](
-        max_runtime_secs=0.5
-    ).mean()
-    print("Parallelized:", parallelized, "s")
-    # CHECK: Parallel speedup
-    print("Parallel speedup:", vectorized / parallelized)
+        let parallelized = benchmark.run[bench_parallel[simd_width]](
+            max_runtime_secs=0.5
+        ).mean()
+        print("Parallelized:", parallelized, "s")
+        # CHECK: Parallel speedup
+        print("Parallel speedup:", vectorized / parallelized)
 
     _ = t  # Make sure tensor isn't destroyed before benchmark is finished
