@@ -122,6 +122,10 @@ modular install mojo
 
 ### 🛠️ Fixed
 
+- Raising an error from the initializer of a memory-only type now works
+  correctly in the presence of complex control flow.  Previously Mojo could run
+  the destructor on `self`` before it was initialized when exiting with an
+  error.
 - [#1096](https://github.com/modularml/mojo/issues/1096) - Improve warnings
   messages for dead code in conditionals like `or` expressions.
 - [#1419](https://github.com/modularml/mojo/issues/1419) - Fix assertion failure
