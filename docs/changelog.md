@@ -79,6 +79,7 @@ modular install mojo
   Now that Mojo has traits, it is better to model this as an explicit `.take()`
   operation on a type, which makes it clear when a lifetime is ended vs when the
   contents of an LValue are explicitly taken.
+
 - The `VariadicListMem` type has an additional `Lifetime` parameter and is
   internally implemented with reference types. When interacting directly with
   it, please use `__get_value_from_ref` instead of `__get_address_as_lvalue`.
@@ -108,6 +109,9 @@ modular install mojo
 
 - The `cpython` module in the `python` package has been moved to be an internal
   module, i.e, `_cpython`.
+
+- `AnyType` and `Destructable` have been unified into a single trait, `AnyType`.
+  Every nominal type (i.e. all structs) now automatically conform to `AnyType`.
 
 ### 🛠️ Fixed
 
