@@ -120,6 +120,10 @@ modular install mojo
   types has been removed.  Please migrate uses to `DynamicVector` which
   works on both register passable and memory types.
 
+- The current implementation of autotuning has been deprecated, as Mojo's
+  autotuning implementation is undergoing a redesign. Tutorials around the
+  current implementation have also been removed as they are being rewritten.
+
 ### 🛠️ Fixed
 
 - Raising an error from the initializer of a memory-only type now works
