@@ -208,11 +208,11 @@ struct CPython:
         self.total_ref_count = existing.total_ref_count
 
     fn _inc_total_rc(inout self):
-        let v = self.total_ref_count.load(0)
+        let v = self.total_ref_count.load()
         self.total_ref_count.store(0, v + 1)
 
     fn _dec_total_rc(inout self):
-        let v = self.total_ref_count.load(0)
+        let v = self.total_ref_count.load()
         self.total_ref_count.store(0, v - 1)
 
     fn Py_IncRef(inout self, ptr: PyObjectPtr):

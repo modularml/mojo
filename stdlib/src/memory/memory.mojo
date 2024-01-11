@@ -181,12 +181,12 @@ fn memcpy[
     if n < 5:
         if n == 0:
             return
-        dest_data.store(0, src_data.load(0))
-        dest_data.store(n - 1, src_data.load(n - 1))
+        dest_data.store(0, src_data[0])
+        dest_data.store(n - 1, src_data[n - 1])
         if n <= 2:
             return
-        dest_data.store(1, src_data.load(1))
-        dest_data.store(n - 2, src_data.load(n - 2))
+        dest_data.store(1, src_data[1])
+        dest_data.store(n - 2, src_data[n - 2])
         return
 
     if n <= 16:
