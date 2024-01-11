@@ -234,7 +234,7 @@ struct _Function:
     @always_inline
     fn __init__[FnT: AnyRegType](value: FnT) -> Self:
         # FIXME: No "pointer bitcast" for signature function pointers.
-        let f: Pointer[Int16]
+        var f = Pointer[Int16]()
         Pointer(__get_lvalue_as_address(f)).bitcast[FnT]().store(value)
         return Self {value: f}
 
