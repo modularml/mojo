@@ -102,6 +102,9 @@ modular install mojo
   autotuning implementation is undergoing a redesign. Tutorials around the
   current implementation have also been removed as they are being rewritten.
 
+- The `UnsafeFixedVector` in `utils.vector` has been removed in favor of
+  either the use `DynamicVector` or `InlinedFixedVector`.
+
 ### 🛠️ Fixed
 
 - Raising an error from the initializer of a memory-only type now works
