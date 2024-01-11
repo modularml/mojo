@@ -6,7 +6,6 @@
 
 from algorithm import unroll
 from memory.buffer import Buffer, DynamicRankBuffer, NDBuffer
-from runtime.llcl import OutputChainPtr
 
 
 @always_inline
