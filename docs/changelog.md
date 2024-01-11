@@ -63,9 +63,6 @@ modular install mojo
   `__get_value_from_ref(x)` helper converts a reference into a normal value.
   These will eventually subsume the `address` builtins.
 
-- The `llcl` module in addition to `num_cores` now has `num_threads` and
-  `num_performance_cores`.
-
 - The Mojo Language Server now implements the References request. IDEs use
   this to provide support for **Go to References** and **Find All References**.
   A current limitation is that references outside of the current document are
@@ -90,25 +87,6 @@ modular install mojo
 - `vectorize` now has an overload to pass `size` as a parameter instead of an
   argument. This allows the remainder of `size` / `simd_width` to run in a
   single iteration.
-
-- By default the global runtime will now use the total number of threads instead
-  of physical cores. To return to default behaviour you can use:
-
-  ```mojo
-  import llcl
-
-  with llcl.Runtime(llcl.num_cores()) as rt:
-        parallelize[foo](rt, C.rows)
-  ```
-
-  On Apple silicon it will now also use the efficiency cores, instead of just
-  the performance cores as it was previously. To return to previous behaviour
-  you can use:
-
-  ```mojo
-  with llcl.Runtime(llcl.num_performance_cores()) as rt:
-        parallelize[foo](rt, C.rows)
-  ```
 
 - The `cpython` module in the `python` package has been moved to be an internal
   module, i.e, `_cpython`.
