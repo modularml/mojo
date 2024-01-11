@@ -1973,22 +1973,16 @@ fn _pow[
 
 
 @always_inline
-@adaptive
 fn _pow[
     lhs_type: DType, rhs_type: DType, simd_width: Int
 ](lhs: SIMD[lhs_type, simd_width], rhs: SIMD[rhs_type, simd_width]) -> SIMD[
     lhs_type, simd_width
 ]:
-    """Computes elementwise power of a floating point type raised to another
-    floating point type.
+    """Computes elementwise power of a type raised to another type.
 
     An element of the result SIMD vector will be the result of raising the
     corresponding element of lhs to the corresponding element of rhs.
 
-    Constraints:
-      `rhs_type` and `lhs_type` must be the same, and must be floating point
-      types.
-
     Parameters:
       lhs_type: The `dtype` of the lhs SIMD vector.
       rhs_type: The `dtype` of the rhs SIMD vector.
@@ -2001,116 +1995,62 @@ fn _pow[
     Returns:
       A SIMD vector containing elementwise lhs raised to the power of rhs.
     """
-    constrained[rhs_type.is_floating_point()]()
-    constrained[lhs_type == rhs_type]()
-
-    let rhs_quotient = _floor(rhs)
-    if rhs >= 0 and rhs_quotient == rhs:
-        return _pow(lhs, rhs_quotient.cast[_integral_type_of[rhs_type]()]())
-
-    var result = SIMD[lhs_type, simd_width]()
-
-    @unroll
-    for i in range(simd_width):
-        result[i] = llvm_intrinsic["llvm.pow", SIMD[lhs_type, 1]](
-            lhs[i], rhs[i]
-        )
-
-    return result
-
-
-@always_inline
-@adaptive
-fn _pow[
-    lhs_type: DType, rhs_type: DType, simd_width: Int
-](lhs: SIMD[lhs_type, simd_width], rhs: SIMD[rhs_type, simd_width]) -> SIMD[
-    lhs_type, simd_width
-]:
-    """Computes the elementwise power where the exponent is an integer.
-
-    Constraints:
-      `rhs_type` must be an integral type.
-
-    Parameters:
-      lhs_type: The `dtype` of the lhs SIMD vector.
-      rhs_type: The `dtype` of the rhs SIMD vector.
-      simd_width: The width of the input and output SIMD vectors.
-
-    Args:
-      lhs: Base of the power operation.
-      rhs: Exponent of the power operation.
-
-    Returns:
-      A SIMD vector containing elementwise lhs raised to the power of rhs.
-    """
-    constrained[rhs_type.is_integral()]()
-
-    # Common cases
-    if rhs == 2:
-        return lhs * lhs
-    if rhs == 3:
-        return lhs * lhs * lhs
-
-    var result = SIMD[lhs_type, simd_width]()
 
     @parameter
-    if lhs_type.is_floating_point():
+    if rhs_type.is_floating_point() and lhs_type == rhs_type:
+        let rhs_quotient = _floor(rhs)
+        if rhs >= 0 and rhs_quotient == rhs:
+            return _pow(lhs, rhs_quotient.cast[_integral_type_of[rhs_type]()]())
+
+        var result = SIMD[lhs_type, simd_width]()
 
         @unroll
         for i in range(simd_width):
-            result[i] = llvm_intrinsic["llvm.powi", SIMD[lhs_type, 1]](
-                lhs[i], rhs[i].cast[DType.int32]()
+            result[i] = llvm_intrinsic["llvm.pow", SIMD[lhs_type, 1]](
+                lhs[i], rhs[i]
             )
+
+        return result
+    elif rhs_type.is_integral():
+        # Common cases
+        if rhs == 2:
+            return lhs * lhs
+        if rhs == 3:
+            return lhs * lhs * lhs
+
+        var result = SIMD[lhs_type, simd_width]()
+
+        @parameter
+        if lhs_type.is_floating_point():
+
+            @unroll
+            for i in range(simd_width):
+                result[i] = llvm_intrinsic["llvm.powi", SIMD[lhs_type, 1]](
+                    lhs[i], rhs[i].cast[DType.int32]()
+                )
+        else:
+            for i in range(simd_width):
+                if rhs[i] < 0:
+                    # Not defined for Integers, this should raise an
+                    # exception.
+                    debug_assert(
+                        False, "exponent < 0 is undefined for integers"
+                    )
+                    result[i] = 0
+                    break
+                var res: SIMD[lhs_type, 1] = 1
+                var x = lhs[i]
+                var n = rhs[i]
+                while n > 0:
+                    if n&1 != 0:
+                        res *= x
+                    x *= x
+                    n >>= 1
+                result[i] = res
+        return result
     else:
-        for i in range(simd_width):
-            if rhs[i] < 0:
-                # Not defined for Integers, this should raise an
-                # exception.
-                debug_assert(False, "exponent < 0 is undefined for integers")
-                result[i] = 0
-                break
-            var res: SIMD[lhs_type, 1] = 1
-            var x = lhs[i]
-            var n = rhs[i]
-            while n > 0:
-                if n&1 != 0:
-                    res *= x
-                x *= x
-                n >>= 1
-            result[i] = res
-    return result
-
-
-@always_inline
-@adaptive
-fn _pow[
-    lhs_type: DType, rhs_type: DType, simd_width: Int
-](lhs: SIMD[lhs_type, simd_width], rhs: SIMD[rhs_type, simd_width]) -> SIMD[
-    lhs_type, simd_width
-]:
-    """Performs elementwise power of an integer raised to a floating point type.
-    This implementation of pow is unsupported.
-
-    Constraints:
-      `rhs_type` must be a floating point type, while `lhs_type` must be an
-      integral type.
-
-    Parameters:
-      lhs_type: The `dtype` of the lhs SIMD vector.
-      rhs_type: The `dtype` of the rhs SIMD vector.
-      simd_width: The width of the input and output SIMD vectors.
-
-    Args:
-      lhs: Base of the power operation.
-      rhs: Exponent of the power operation.
-
-    Returns:
-      A SIMD vector containing elementwise lhs raised to the power of rhs.
-    """
-    constrained[rhs_type.is_floating_point()]()
-    constrained[lhs_type != rhs_type]()
-
-    return SIMD[lhs_type, simd_width]()
+        # Unsupported.
+        return SIMD[lhs_type, simd_width]()
 
 
 # ===----------------------------------------------------------------------===#
