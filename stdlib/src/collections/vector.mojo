@@ -165,7 +165,7 @@ struct InlinedFixedVector[
         if self.current_size < Self.static_size:
             self.static_data[self.current_size] = value
         else:
-            self.dynamic_data.store(self.current_size - Self.static_size, value)
+            self.dynamic_data[self.current_size - Self.static_size] = value
         self.current_size += 1
 
     @always_inline
@@ -190,7 +190,7 @@ struct InlinedFixedVector[
         debug_assert(i < self.current_size, "index must be within bounds")
         if i < Self.static_size:
             return self.static_data[i]
-        return self.dynamic_data.load(i - Self.static_size)
+        return self.dynamic_data[i - Self.static_size]
 
     @always_inline
     fn __setitem__(inout self, i: Int, value: type):
@@ -204,7 +204,7 @@ struct InlinedFixedVector[
         if i < Self.static_size:
             self.static_data[i] = value
         else:
-            self.dynamic_data.store(i - Self.static_size, value)
+            self.dynamic_data[i - Self.static_size] = value
 
     fn clear(inout self):
         """Clears the elements in the vector."""

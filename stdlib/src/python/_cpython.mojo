@@ -209,11 +209,11 @@ struct CPython:
 
     fn _inc_total_rc(inout self):
         let v = self.total_ref_count.load()
-        self.total_ref_count.store(0, v + 1)
+        self.total_ref_count[0] = v + 1
 
     fn _dec_total_rc(inout self):
         let v = self.total_ref_count.load()
-        self.total_ref_count.store(0, v - 1)
+        self.total_ref_count[0] = v - 1
 
     fn Py_IncRef(inout self, ptr: PyObjectPtr):
         if self.logging_enabled:

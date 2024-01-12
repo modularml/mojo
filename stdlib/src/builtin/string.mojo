@@ -70,8 +70,8 @@ fn chr(c: Int) -> String:
     """
     debug_assert(0 <= c <= 255, "input ordinal must be in range")
     let buf = Pointer[Int8].alloc(2)
-    buf.store(0, c)
-    buf.store(1, 0)
+    buf[0] = c
+    buf[1] = 0
     return String(buf, 2)
 
 

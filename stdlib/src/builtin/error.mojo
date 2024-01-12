@@ -67,7 +67,7 @@ struct Error(Stringable):
         let length = len(src)
         let dest = Pointer[Int8].alloc(length + 1)
         memcpy(dest, src._as_ptr(), length)
-        dest.store(length, 0)
+        dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
     @always_inline("nodebug")
@@ -83,7 +83,7 @@ struct Error(Stringable):
         let length = len(src)
         let dest = DTypePointer[DType.int8].alloc(length + 1)
         memcpy(dest, src.data, length)
-        dest.store(length, 0)
+        dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
     fn __del__(owned self):
@@ -102,7 +102,7 @@ struct Error(Stringable):
             let length = -existing.loaded_length
             let dest = Pointer[Int8].alloc(length + 1)
             memcpy(dest, existing.data, length)
-            dest.store(length, 0)
+            dest[length] = 0
             return Error {data: dest, loaded_length: existing.loaded_length}
         else:
             return Error {

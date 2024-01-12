@@ -115,12 +115,12 @@ fn layer[
     constrained[lower == 0]()
     constrained[upper == 4]()
 
-    ptr.store(0, value)
-    ptr.store(count - 1, value)
+    ptr[0] = value
+    ptr[count - 1] = value
     if count <= 2:
         return
-    ptr.store(1, value)
-    ptr.store(count - 2, value)
+    ptr[1] = value
+    ptr[count - 2] = value
 
 
 # 4 < size <= 8

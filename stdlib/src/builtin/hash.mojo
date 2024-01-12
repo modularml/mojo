@@ -43,7 +43,7 @@ fn _HASH_SECRET() -> Int:
 fn _initialize_hash_secret(payload: Pointer[NoneType]) -> Pointer[NoneType]:
     let secret = random.random_ui64(0, math.limit.max_finite[DType.uint64]())
     let data = Pointer[Int].alloc(1)
-    data.store(secret.to_int())
+    data.store(int(secret))
     return data.bitcast[NoneType]()
 
 
