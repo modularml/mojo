@@ -11,7 +11,7 @@ website:
     image: /static/images/mojo-social-card.png
 listing:
   - id: stdlib
-    contents: "stdlib/**"
+    contents: "stdlib/**/!(index.md)"
     type: grid
     page-size: 99
 ---
