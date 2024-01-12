@@ -22,10 +22,19 @@ struct CoroutineContext:
     """Represents a callback closure (fn_ptr + captures)."""
 
     alias _opaque_handle = Pointer[__mlir_type.i8]
-    alias _resume_fn_type = fn (Self._opaque_handle) -> None
+    alias _resume_fn_type = fn (
+        Self._opaque_handle, Self._opaque_handle
+    ) -> None
 
     var _resume_fn: Self._resume_fn_type
     var _parent_hdl: Self._opaque_handle
+
+
+fn _coro_resume_callback(
+    handle: CoroutineContext._opaque_handle,
+    parent: CoroutineContext._opaque_handle,
+):
+    _coro_resume_fn(parent)
 
 
 @always_inline
@@ -108,7 +117,7 @@ struct Coroutine[type: AnyRegType]:
         let parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
         self.get_ctx[CoroutineContext]().store(
             CoroutineContext {
-                _resume_fn: _coro_resume_fn, _parent_hdl: parent_hdl
+                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
             }
         )
         return self ^
@@ -127,7 +136,10 @@ struct Coroutine[type: AnyRegType]:
         """
 
         @noncapturing
-        fn _coro_noop_fn(handle: CoroutineContext._opaque_handle):
+        fn _coro_noop_fn(
+            handle: CoroutineContext._opaque_handle,
+            null: CoroutineContext._opaque_handle,
+        ):
             return
 
         self.get_ctx[CoroutineContext]().store(
@@ -239,7 +251,7 @@ struct RaisingCoroutine[type: AnyRegType]:
         let parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
         self.get_ctx[CoroutineContext]().store(
             CoroutineContext {
-                _resume_fn: _coro_resume_fn, _parent_hdl: parent_hdl
+                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
             }
         )
         return self ^
@@ -258,7 +270,10 @@ struct RaisingCoroutine[type: AnyRegType]:
         """
 
         @noncapturing
-        fn _coro_noop_fn(handle: CoroutineContext._opaque_handle):
+        fn _coro_noop_fn(
+            handle: CoroutineContext._opaque_handle,
+            null: CoroutineContext._opaque_handle,
+        ):
             return
 
         self.get_ctx[CoroutineContext]().store(
