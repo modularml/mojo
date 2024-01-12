@@ -31,7 +31,7 @@ fn cwd() raises -> Path:
     if res == DTypePointer[DType.int8]():
         raise Error("unable to query the current directory")
 
-    return StringRef(buf)
+    return String(buf)
 
 
 struct Path(Stringable):
@@ -45,14 +45,6 @@ struct Path(Stringable):
         self = cwd()
 
     fn __init__(inout self, path: StringLiteral):
-        """Initializes a path with the provided path.
-
-        Args:
-          path: The file system path.
-        """
-        self.path = path
-
-    fn __init__(inout self, path: StringRef):
         """Initializes a path with the provided path.
 
         Args:
@@ -88,17 +80,6 @@ struct Path(Stringable):
         return self.__truediv__(suffix.path)
 
     fn __truediv__(self, suffix: StringLiteral) -> Self:
-        """Joins two paths using the system-defined path separator.
-
-        Args:
-          suffix: The suffix to append to the path.
-
-        Returns:
-          A new path with the suffix appended to the current path.
-        """
-        return self.__truediv__(String(suffix))
-
-    fn __truediv__(self, suffix: StringRef) -> Self:
         """Joins two paths using the system-defined path separator.
 
         Args:
