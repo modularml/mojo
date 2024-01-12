@@ -180,14 +180,14 @@ struct VariadicListMem[type: AnyRegType, life: Lifetime](Sized):
         life: The reference lifetime of the underlying elements.
     """
 
-    alias MutableRefType = __mlir_type[`!lit.ref<mut `, type, `, `, life, `>`]
-    alias StorageType = __mlir_type[`!kgen.variadic<`, Self.MutableRefType, `>`]
+    alias RefType = __mlir_type[`!lit.ref<`, type, `, `, life, `>`]
+    alias StorageType = __mlir_type[`!kgen.variadic<`, Self.RefType, `>`]
     var value: Self.StorageType
     """The underlying storage, a variadic list of pointers to elements of the
     given type."""
 
     alias IterType = _VariadicListIter[
-        Self.MutableRefType,
+        Self.RefType,
         VariadicListMem[type, life],
         Self.__getitem__,
     ]
@@ -215,7 +215,7 @@ struct VariadicListMem[type: AnyRegType, life: Lifetime](Sized):
         return __mlir_op.`pop.variadic.size`(self.value)
 
     @always_inline
-    fn __getitem__(self, index: Int) -> Self.MutableRefType:
+    fn __getitem__(self, index: Int) -> Self.RefType:
         """Gets a single element on the variadic list.
 
         Args:
