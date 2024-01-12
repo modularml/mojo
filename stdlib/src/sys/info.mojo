@@ -582,3 +582,36 @@ fn simdwidthof[
         The vector size of the dtype on the host system.
     """
     return simdwidthof[__mlir_type[`!pop.scalar<`, type.value, `>`], target]()
+
+
+@always_inline("nodebug")
+fn num_physical_cores() -> Int:
+    """Returns the number of physical cores across all CPU sockets.
+
+
+    Returns:
+        Int: The number of physical cores on the system.
+    """
+    return _external_call_pure["KGEN_CompilerRT_CoreCount", Int]()
+
+
+@always_inline
+fn num_logical_cores() -> Int:
+    """Returns the number of hardware threads, including hyperthreads across all
+    CPU sockets.
+
+    Returns:
+        Int: The number of threads on the system.
+    """
+    return _external_call_pure["KGEN_CompilerRT_ThreadCount", Int]()
+
+
+@always_inline
+fn num_performance_cores() -> Int:
+    """Returns the number of physical performance cores across all CPU sockets.
+    If not known, returns the total number of physical cores.
+
+    Returns:
+        Int: The number of physical performance cores on the system.
+    """
+    return _external_call_pure["KGEN_CompilerRT_PerformanceCoreCount", Int]()

@@ -16,7 +16,8 @@ import benchmark
 from complex import ComplexSIMD, ComplexFloat64
 from math import iota
 from python import Python
-from runtime.llcl import num_threads, Runtime
+from runtime.llcl import Runtime
+from sys.info import num_logical_cores
 from algorithm import parallelize, vectorize
 from tensor import Tensor
 from utils.index import Index
@@ -87,10 +88,10 @@ fn main() raises:
     let vectorized = benchmark.run[bench[simd_width]](
         max_runtime_secs=0.5
     ).mean()
-    print("Number of threads:", num_threads())
+    print("Number of threads:", num_logical_cores())
     print("Vectorized:", vectorized, "s")
 
-    with Runtime(num_threads()) as rt:
+    with Runtime(num_logical_cores()) as rt:
         # Parallelized
         @parameter
         fn bench_parallel[simd_width: Int]():
