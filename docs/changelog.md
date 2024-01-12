@@ -71,6 +71,9 @@ modular install mojo
 - [`Arc`](/mojo/stdlib/memory/arc.html#Arc), a reference-counted smart pointer
   using atomic reference count updates.
 
+- `num_physical_cores`, `num_logical_cores`, and `num_performance_cores` have
+  been added to the `sys.info` module.
+
 ### 🦋 Changed
 
 - The `@unroll(n)` decorator can now take a parameter expression for
