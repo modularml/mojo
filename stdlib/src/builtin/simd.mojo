@@ -515,6 +515,13 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new vector whose element at position `i` is computed as
             `self[i] * rhs[i]`.
         """
+
+        @parameter
+        if type == DType.bool:
+            return (
+                rebind[SIMD[DType.bool, size]](self)
+                & rebind[SIMD[DType.bool, size]](rhs)
+            ).cast[type]()
         return __mlir_op.`pop.mul`(self.value, rhs.value)
 
     @always_inline("nodebug")
