@@ -112,6 +112,35 @@ modular install mojo
 - The `UnsafeFixedVector` in `utils.vector` has been removed in favor of
   either the use `DynamicVector` or `InlinedFixedVector`.
 
+- The `@adaptive` decorator has been removed from the language. Please rewrite
+  any uses of the decorator in a non-search context can be replaced with
+  `@parameter if`. For example:
+
+  ```mojo
+  @adaptive
+  fn foo[a: Bool]():
+    constrained[a]()
+    body1()
+
+  @adaptive
+  fn foo[a: Bool]():
+    constrained[not a]()
+    body2()
+  ```
+
+  Can be rewritten as:
+
+  ```mojo
+  fn foo[a: Bool]():
+      @parameter
+      if a:
+          body1()
+      else:
+          body2()
+  ```
+
+  Consequently, the special `__adaptive_set` attribute has been removed as well.
+
 ### 🛠️ Fixed
 
 - Raising an error from the initializer of a memory-only type now works
