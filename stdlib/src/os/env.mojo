@@ -18,7 +18,7 @@ from sys.info import os_is_linux, os_is_macos
 from memory.unsafe import DTypePointer
 
 
-fn setenv(name: StringRef, value: StringRef, overwrite: Bool = True) -> Bool:
+fn setenv(name: String, value: String, overwrite: Bool = True) -> Bool:
     """Changes or adds an environment variable.
 
     Constraints:
@@ -39,12 +39,12 @@ fn setenv(name: StringRef, value: StringRef, overwrite: Bool = True) -> Bool:
         return False
 
     let status = external_call["setenv", Int32](
-        name.data, value.data, Int32(1 if overwrite else 0)
+        name._as_ptr(), value._as_ptr(), Int32(1 if overwrite else 0)
     )
     return status == 0
 
 
-fn getenv(name: StringRef, default: StringRef) -> StringRef:
+fn getenv(name: String, default: String = "") -> String:
     """Returns the value of the given environment variable.
 
     Constraints:
@@ -64,24 +64,7 @@ fn getenv(name: StringRef, default: StringRef) -> StringRef:
     if not os_is_supported:
         return default
 
-    let ptr = external_call["getenv", DTypePointer[DType.int8]](name.data)
+    let ptr = external_call["getenv", DTypePointer[DType.int8]](name._as_ptr())
     if not ptr:
         return default
-    return StringRef(ptr)
-
-
-fn getenv(name: StringRef) -> StringRef:
-    """Returns the value of the given environment variable. If the
-    environment variable is not found, then an empty string is returned.
-
-    Constraints:
-      The function only works on macOS or Linux and returns an empty string
-      otherwise.
-
-    Args:
-      name: The name of the environment variable.
-
-    Returns:
-      The value of the environment variable.
-    """
-    return getenv(name, "")
+    return String(ptr)

@@ -43,7 +43,7 @@ struct DLHandle:
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn __init__(path: StringRef, flags: Int = DEFAULT_RTLD) -> Self:
+    fn __init__(path: String, flags: Int = DEFAULT_RTLD) -> Self:
         """Initialize a DLHandle object by loading the dynamic library at the
         given path.
 
@@ -59,7 +59,7 @@ struct DLHandle:
         if not os_is_windows():
             return Self {
                 handle: external_call["dlopen", DTypePointer[DType.int8]](
-                    path.data, flags
+                    path._as_ptr(), flags
                 )
             }
         else:
