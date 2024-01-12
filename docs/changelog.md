@@ -73,6 +73,10 @@ modular install mojo
 
 ### 🦋 Changed
 
+- The `@unroll(n)` decorator can now take a parameter expression for
+  the unroll factor, i.e. `n` can be a parameter expression that is
+  of integer type.
+
 - The `__takeinit__` special constructor form has been removed from the
   language.  This "non-destructive move" operation was previously wired into the
   `x^` transfer operator, but had unpredictable behavior that wasn't consistent.
@@ -140,6 +144,8 @@ modular install mojo
   when using `AnyType` struct member.
 - [#1503](https://github.com/modularml/mojo/issues/1503) - Rename the mojo build
   of LLDB to `mojo-lldb`, to prevent name collisions with the system's LLDB.
+- [#1542](https://github.com/modularml/mojo/issues/1542) - `@unroll` does not
+  accept alias as unroll factor.
 
 ## v0.6.1 (2023-12-18)
 
