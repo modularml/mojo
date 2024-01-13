@@ -146,7 +146,7 @@ modular install mojo
 
 - Result parameters have been removed from Mojo. Result parameter declarations
   in function parameter lists are no longer allowed, nor are forward alias
-  declarations.
+  declarations. This includes removing the `param_return` statement.
 
 ### 🛠️ Fixed
 
