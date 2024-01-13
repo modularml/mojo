@@ -779,9 +779,10 @@ fn external_call[
 
 
 @always_inline("nodebug")
-fn _external_call_pure[callee: StringLiteral, type: AnyRegType]() -> type:
-    """Mark the external function call as having read only effects. This allows
-    the compiler to optimize away successive calls to the same function.
+fn _external_call_const[callee: StringLiteral, type: AnyRegType]() -> type:
+    """Mark the external function call as having no observable effects to the
+    program state. This allows the compiler to optimize away successive calls
+    to the same function.
 
     Parameters:
       callee: The name of the external function.
@@ -795,9 +796,9 @@ fn _external_call_pure[callee: StringLiteral, type: AnyRegType]() -> type:
         resAttrs = __mlir_attr.`[{llvm.noundef}]`,
         funcAttrs = __mlir_attr.`["willreturn"]`,
         memory = __mlir_attr[
-            `#llvm.memory_effects<other = read, `,
-            `argMem = read, `,
-            `inaccessibleMem = read>`,
+            `#llvm.memory_effects<other = none, `,
+            `argMem = none, `,
+            `inaccessibleMem = none>`,
         ],
         _type=type,
     ]()

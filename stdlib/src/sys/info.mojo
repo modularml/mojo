@@ -592,7 +592,7 @@ fn num_physical_cores() -> Int:
     Returns:
         Int: The number of physical cores on the system.
     """
-    return _external_call_pure["KGEN_CompilerRT_NumPhysicalCores", Int]()
+    return _external_call_const["KGEN_CompilerRT_NumPhysicalCores", Int]()
 
 
 @always_inline
@@ -603,7 +603,7 @@ fn num_logical_cores() -> Int:
     Returns:
         Int: The number of threads on the system.
     """
-    return _external_call_pure["KGEN_CompilerRT_NumLogicalCores", Int]()
+    return _external_call_const["KGEN_CompilerRT_NumLogicalCores", Int]()
 
 
 @always_inline
@@ -614,4 +614,4 @@ fn num_performance_cores() -> Int:
     Returns:
         Int: The number of physical performance cores on the system.
     """
-    return _external_call_pure["KGEN_CompilerRT_PerformanceCoreCount", Int]()
+    return _external_call_const["KGEN_CompilerRT_PerformanceCoreCount", Int]()
