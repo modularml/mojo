@@ -206,10 +206,6 @@ struct RaisingCoroutine[type: AnyRegType]:
         return promise.bitcast[Self._var_type]()
 
     @always_inline
-    fn _get_err_result(self) -> Self._var_type:
-        return self.get_promise().load()
-
-    @always_inline
     fn get(self) raises -> type:
         """Get the value of the fulfilled coroutine promise.
 
