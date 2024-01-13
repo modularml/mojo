@@ -9,6 +9,7 @@
 from sys.info import os_is_windows
 
 from memory import stack_allocation
+from collections.vector import CollectionElement
 from tensor import Tensor
 
 alias DIR_SEPARATOR = "\\" if os_is_windows() else "/"
@@ -34,7 +35,7 @@ fn cwd() raises -> Path:
     return String(buf)
 
 
-struct Path(Stringable):
+struct Path(Stringable, CollectionElement):
     """The Path object."""
 
     var path: String
@@ -59,6 +60,14 @@ struct Path(Stringable):
           path: The file system path.
         """
         self.path = path
+
+    fn __moveinit__(inout self, owned existing: Self):
+        """Move data of an existing Path into a new one.
+
+        Args:
+            existing: The existing Path.
+        """
+        self.path = existing.path ^
 
     fn __copyinit__(inout self, existing: Self):
         """Copy constructor for the path struct.
