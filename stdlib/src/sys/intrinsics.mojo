@@ -778,6 +778,11 @@ fn external_call[
         )
 
 
+# ===----------------------------------------------------------------------===#
+# _external_call_const
+# ===----------------------------------------------------------------------===#
+
+
 @always_inline("nodebug")
 fn _external_call_const[callee: StringLiteral, type: AnyRegType]() -> type:
     """Mark the external function call as having no observable effects to the
@@ -802,6 +807,72 @@ fn _external_call_const[callee: StringLiteral, type: AnyRegType]() -> type:
         ],
         _type=type,
     ]()
+
+
+@always_inline("nodebug")
+fn _external_call_const[
+    callee: StringLiteral, type: AnyRegType, T0: AnyRegType
+](arg0: T0) -> type:
+    """Mark the external function call as having no observable effects to the
+    program state. This allows the compiler to optimize away successive calls
+    to the same function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+
+    Args:
+      arg0: The first argument.
+
+    Returns:
+      The external call result.
+    """
+    return __mlir_op.`pop.external_call`[
+        func = callee.value,
+        resAttrs = __mlir_attr.`[{llvm.noundef}]`,
+        funcAttrs = __mlir_attr.`["willreturn"]`,
+        memory = __mlir_attr[
+            `#llvm.memory_effects<other = none, `,
+            `argMem = none, `,
+            `inaccessibleMem = none>`,
+        ],
+        _type=type,
+    ](arg0)
+
+
+@always_inline("nodebug")
+fn _external_call_const[
+    callee: StringLiteral, type: AnyRegType, T0: AnyRegType, T1: AnyRegType
+](arg0: T0, arg1: T1) -> type:
+    """Mark the external function call as having no observable effects to the
+    program state. This allows the compiler to optimize away successive calls
+    to the same function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+
+    Returns:
+      The external call result.
+    """
+    return __mlir_op.`pop.external_call`[
+        func = callee.value,
+        resAttrs = __mlir_attr.`[{llvm.noundef}]`,
+        funcAttrs = __mlir_attr.`["willreturn"]`,
+        memory = __mlir_attr[
+            `#llvm.memory_effects<other = none, `,
+            `argMem = none, `,
+            `inaccessibleMem = none>`,
+        ],
+        _type=type,
+    ](arg0, arg1)
 
 
 # ===----------------------------------------------------------------------===#
