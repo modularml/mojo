@@ -181,7 +181,9 @@ struct VariadicListMem[type: AnyRegType, life: Lifetime](Sized):
     """
 
     alias RefType = __mlir_type[`!lit.ref<`, type, `, `, life, `>`]
-    alias StorageType = __mlir_type[`!kgen.variadic<`, Self.RefType, `>`]
+    alias StorageType = __mlir_type[
+        `!kgen.variadic<`, Self.RefType, `, borrow_in_mem>`
+    ]
     var value: Self.StorageType
     """The underlying storage, a variadic list of pointers to elements of the
     given type."""
