@@ -109,6 +109,9 @@ modular install mojo
   autotuning implementation is undergoing a redesign. Tutorials around the
   current implementation have also been removed as they are being rewritten.
 
+  Consequently, the `autotune`, `autotune_fork`, and `search` functions have
+  been removed from the standard library.
+
 - The `UnsafeFixedVector` in `utils.vector` has been removed in favor of
   either the use `DynamicVector` or `InlinedFixedVector`.
 
