@@ -144,6 +144,10 @@ modular install mojo
 
   Consequently, the special `__adaptive_set` attribute has been removed as well.
 
+- Result parameters have been removed from Mojo. Result parameter declarations
+  in function parameter lists are no longer allowed, nor are forward alias
+  declarations.
+
 ### 🛠️ Fixed
 
 - Raising an error from the initializer of a memory-only type now works
