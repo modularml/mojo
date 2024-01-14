@@ -31,15 +31,11 @@ print(to_string(who_knows))
 ```
 """
 
-from math.math import max
+from math.math import max, align_up
 from sys.info import sizeof, alignof
 from algorithm.functional import unroll
 from utils.static_tuple import StaticTuple
 from sys.intrinsics import _mlirtype_is_eq
-
-
-fn _alignto(value: Int, align: Int) -> Int:
-    return (value + align - 1) // align * align
 
 
 # FIXME(#27380): Can't pass *Ts to a function parameter, only type parameter.
@@ -50,7 +46,7 @@ struct _UnionSize[*Ts: CollectionElement]():
 
         @parameter
         fn each[i: Int]():
-            size = max(size, _alignto(sizeof[Ts[i]](), alignof[Ts[i]]()))
+            size = max(size, align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
 
         unroll[len(VariadicList(Ts)), each]()
         return size

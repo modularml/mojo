@@ -14,6 +14,7 @@ from sys.info import bitwidthof, os_is_windows, triple_is_nvidia_cuda
 
 from algorithm.functional import unroll
 from complex import ComplexSIMD as _ComplexSIMD
+from math.math import align_up
 from memory.unsafe import Pointer
 from python.object import PythonObject
 from tensor.tensor import Tensor
@@ -568,10 +569,6 @@ fn print(err: Error):
 # ===----------------------------------------------------------------------=== #
 
 
-fn _alignto(value: Int, align: Int) -> Int:
-    return (value + align - 1) // align * align
-
-
 struct _StringableTuple[*Ts: Stringable]:
     alias _type = __mlir_type[
         `!kgen.pack<:variadic<`, Stringable, `> `, Ts, `>`
@@ -589,9 +586,9 @@ struct _StringableTuple[*Ts: Stringable]:
         if i == 0:
             return 0
         else:
-            return _alignto(
+            return align_up(
                 Self._offset[i - 1]()
-                + _alignto(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
+                + align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
                 alignof[Ts[i]](),
             )
 
