@@ -1276,18 +1276,17 @@ fn prefetch[
 
 @always_inline("nodebug")
 fn masked_load[
-    type: DType, size: Int
+    size: Int
 ](
-    addr: DTypePointer[type],
+    addr: DTypePointer,
     mask: SIMD[DType.bool, size],
-    passthrough: SIMD[type, size],
+    passthrough: SIMD[addr.type, size],
     alignment: Int = 1,
-) -> SIMD[type, size]:
+) -> SIMD[addr.type, size]:
     """Loads data from memory and return it, replacing masked lanes with values
     from the passthrough vector.
 
     Parameters:
-      type: DType of the return SIMD buffer.
       size: Size of the return SIMD buffer.
 
     Args:
@@ -1308,7 +1307,7 @@ fn masked_load[
         return addr.load() if mask else passthrough[0]
 
     let alignment_si32 = SIMD[DType.int32, 1](alignment)
-    return llvm_intrinsic["llvm.masked.load", SIMD[type, size]](
+    return llvm_intrinsic["llvm.masked.load", SIMD[addr.type, size]](
         addr.bitcast[DType.invalid.value]().address,
         alignment_si32.value,
         mask,
