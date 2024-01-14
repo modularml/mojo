@@ -74,11 +74,19 @@ modular install mojo
 - `num_physical_cores`, `num_logical_cores`, and `num_performance_cores` have
   been added to the `sys.info` module.
 
-### 🦋 Changed
+- Mojo's low-level reference system is now parametric over mutability,
+  eliminating the [problems with code duplication due to mutability
+  specifiers](https://duckki.github.io/2024/01/01/inferred-mutability.html) and
+  unifying user-level types like `Reference` across both mutable and immutable
+  values.
 
-- The `@unroll(n)` decorator can now take a parameter expression for
-  the unroll factor, i.e. `n` can be a parameter expression that is
-  of integer type.
+- Mojo now allows types to implement `__refattr__` and `__refitem__` to enable
+  attribute and subscript syntax with computed accessors that return references.
+  For common situations where these address a value in memory this provides a
+  more convenient and significantly more performant alternative to implementing
+  the traditional get/set pairs.
+
+### 🪦 Removed
 
 - The `__takeinit__` special constructor form has been removed from the
   language.  This "non-destructive move" operation was previously wired into the
@@ -87,30 +95,16 @@ modular install mojo
   operation on a type, which makes it clear when a lifetime is ended vs when the
   contents of an LValue are explicitly taken.
 
-- The `VariadicListMem` type has an additional `Lifetime` parameter and is
-  internally implemented with reference types. When interacting directly with
-  it, please use `__get_value_from_ref` instead of `__get_address_as_lvalue`.
-
-- `vectorize` now has an overload to pass `size` as a parameter instead of an
-  argument. This allows the remainder of `size` / `simd_width` to run in a
-  single iteration.
-
-- The `cpython` module in the `python` package has been moved to be an internal
-  module, i.e, `_cpython`.
-
-- `AnyType` and `Destructable` have been unified into a single trait, `AnyType`.
-  Every nominal type (i.e. all structs) now automatically conform to `AnyType`.
-
-- The `_OldDynamicVector` type that worked only on register passable element
-  types has been removed.  Please migrate uses to `DynamicVector` which
-  works on both register passable and memory types.
-
 - The current implementation of autotuning has been deprecated, as Mojo's
   autotuning implementation is undergoing a redesign. Tutorials around the
   current implementation have also been removed as they are being rewritten.
 
   Consequently, the `autotune`, `autotune_fork`, and `search` functions have
   been removed from the standard library.
+
+- The `_OldDynamicVector` type that worked only on register passable element
+  types has been removed.  Please migrate uses to `DynamicVector` which
+  works on both register passable and memory types.
 
 - The `UnsafeFixedVector` in `utils.vector` has been removed in favor of
   either the use `DynamicVector` or `InlinedFixedVector`.
@@ -147,6 +141,26 @@ modular install mojo
 - Result parameters have been removed from Mojo. Result parameter declarations
   in function parameter lists are no longer allowed, nor are forward alias
   declarations. This includes removing the `param_return` statement.
+
+### 🦋 Changed
+
+- The `@unroll(n)` decorator can now take a parameter expression for
+  the unroll factor, i.e. `n` can be a parameter expression that is
+  of integer type.
+
+- The `VariadicListMem` type has an additional `Lifetime` parameter and is
+  internally implemented with reference types. When interacting directly with
+  it, please use `__get_value_from_ref` instead of `__get_address_as_lvalue`.
+
+- `vectorize` now has an overload to pass `size` as a parameter instead of an
+  argument. This allows the remainder of `size` / `simd_width` to run in a
+  single iteration.
+
+- The `cpython` module in the `python` package has been moved to be an internal
+  module, i.e, `_cpython`.
+
+- `AnyType` and `Destructable` have been unified into a single trait, `AnyType`.
+  Every nominal type (i.e. all structs) now automatically conform to `AnyType`.
 
 ### 🛠️ Fixed
 
