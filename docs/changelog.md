@@ -209,6 +209,8 @@ modular install mojo
   of LLDB to `mojo-lldb`, to prevent name collisions with the system's LLDB.
 - [#1542](https://github.com/modularml/mojo/issues/1542) - `@unroll` does not
   accept alias as unroll factor.
+- [#1443](https://github.com/modularml/mojo/issues/1443) - Compiler crash on
+  variadic list of traits.
 
 ## v0.6.1 (2023-12-18)
 

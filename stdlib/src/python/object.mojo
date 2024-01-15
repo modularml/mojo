@@ -380,7 +380,7 @@ struct PythonObject(Intable, Stringable):
         var cpython = _get_global_python_itf().cpython()
         let tuple = cpython.PyTuple_New(size)
         for i in range(size):
-            let arg_value = __get_value_from_ref(args[i]).py_object
+            let arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
             let wasSuccessful = cpython.PyTuple_SetItem(tuple, i, arg_value)
             if wasSuccessful == 1:
@@ -979,7 +979,7 @@ struct PythonObject(Intable, Stringable):
         var cpython = _get_global_python_itf().cpython()
         let tuple = cpython.PyTuple_New(size)
         for i in range(size):
-            let arg_value = __get_value_from_ref(args[i]).py_object
+            let arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
             let wasSuccessful = cpython.PyTuple_SetItem(tuple, i, arg_value)
             if wasSuccessful == 1:

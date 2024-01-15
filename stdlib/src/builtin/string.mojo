@@ -646,9 +646,9 @@ struct String(Sized, CollectionElement, Stringable, Hashable):
         if len(strs) == 0:
             return ""
 
-        var result: String = __get_value_from_ref(strs[0])
+        var result: String = strs[0]
         for i in range(1, len(strs)):
-            result = result + self + __get_value_from_ref(strs[i])
+            result = result + self + strs[i]
         return result
 
     fn _strref_dangerous(self) -> StringRef:

@@ -246,6 +246,69 @@ struct AddressSpace:
 
 
 # ===----------------------------------------------------------------------===#
+# Reference
+# ===----------------------------------------------------------------------===#
+
+
+@value
+@register_passable("trivial")
+struct Reference[
+    type: AnyType,
+    is_mutable: __mlir_type.i1,
+    lifetime: Lifetime,
+]:
+    """Defines a non-nullable safe reference.
+
+    Parameters:
+        type: Type of the underlying data.
+        is_mutable: Whether the referenced data may be mutated through this.
+        lifetime: The lifetime of the reference.
+    """
+
+    alias mlir_ref_type = __mlir_type[
+        `!lit.ref<mut=`,
+        is_mutable,
+        `, :`,
+        AnyType,
+        ` `,
+        type,
+        `, `,
+        lifetime,
+        `>`,
+    ]
+
+    var value: Self.mlir_ref_type
+    """The underlying MLIR reference."""
+
+    fn __init__(value: Self.mlir_ref_type) -> Self:
+        """Constructs a Reference from the MLIR reference.
+
+        Args:
+            value: The MLIR reference.
+
+        Returns:
+            Constructed Reference object.
+        """
+        return Self {value: value}
+
+    fn __refitem__(self) -> Self.mlir_ref_type:
+        """Enable subscript syntax `ref[]` to access the element.
+
+        Returns:
+            The MLIR reference for the Mojo compiler to use.
+        """
+        return self.value
+
+    fn __mlir_ref__(self) -> Self.mlir_ref_type:
+        """Enable the Mojo compiler to see into `Reference`.
+
+        Returns:
+            The MLIR reference for the Mojo compiler to use.
+        """
+        return self.value
+
+
+# ===----------------------------------------------------------------------===#
 # Pointer
 # ===----------------------------------------------------------------------===#
 

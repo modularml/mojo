@@ -8,6 +8,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from memory.unsafe import Reference
+
 # ===----------------------------------------------------------------------===#
 # ListLiteral
 # ===----------------------------------------------------------------------===#
@@ -102,8 +104,8 @@ struct VariadicList[type: AnyRegType](Sized):
         type: The type of the elements in the list.
     """
 
-    alias StorageType = __mlir_type[`!kgen.variadic<`, type, `>`]
-    var value: Self.StorageType
+    alias storage_type = __mlir_type[`!kgen.variadic<`, type, `>`]
+    var value: Self.storage_type
     """The underlying storage for the variadic list."""
 
     alias IterType = _VariadicListIter[type, Self, Self.__getitem__]
@@ -122,7 +124,7 @@ struct VariadicList[type: AnyRegType](Sized):
         return value
 
     @always_inline
-    fn __init__(value: Self.StorageType) -> Self:
+    fn __init__(value: Self.storage_type) -> Self:
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -166,32 +168,32 @@ struct VariadicList[type: AnyRegType](Sized):
 
 
 @register_passable("trivial")
-struct VariadicListMem[type: AnyType, life: Lifetime](Sized):
+struct VariadicListMem[type: AnyType, lifetime: Lifetime](Sized):
     """A utility class to access variadic function arguments of memory-only
     types that may have ownership. It exposes pointers to the elements in a way
-    that can be enumerated.  Each element may be accessed with
-    `__get_value_from_ref`.
+    that can be enumerated.  Each element may be accessed with `elt[]`.
 
     Parameters:
         type: The type of the elements in the list.
-        life: The reference lifetime of the underlying elements.
+        lifetime: The reference lifetime of the underlying elements.
     """
 
-    alias RefType = __mlir_type[
-        `!lit.ref<:`, AnyType, ` `, type, `, `, life, `>`
-    ]
-    alias StorageType = __mlir_type[
-        `!kgen.variadic<`, Self.RefType, `, borrow_in_mem>`
+    alias reference_type = Reference[type, False.__mlir_i1__(), lifetime]
+    alias mlir_ref_type = Self.reference_type.mlir_ref_type
+    alias storage_type = __mlir_type[
+        `!kgen.variadic<`, Self.mlir_ref_type, `, borrow_in_mem>`
     ]
 
-    var value: Self.StorageType
+    var value: Self.storage_type
     """The underlying storage, a variadic list of pointers to elements of the
     given type."""
 
-    alias IterType = _VariadicListIter[Self.RefType, Self, Self.__getitem__]
+    alias IterType = _VariadicListIter[
+        Self.reference_type, Self, Self.__getitem__
+    ]
 
     @always_inline
-    fn __init__(value: Self.StorageType) -> Self:
+    fn __init__(value: Self.storage_type) -> Self:
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -212,8 +214,25 @@ struct VariadicListMem[type: AnyType, life: Lifetime](Sized):
 
         return __mlir_op.`pop.variadic.size`(self.value)
 
+    # TODO: Fix for loops + _VariadicListIter to support a __nextref__ protocol
+    # allowing us to get rid of this and make foreach iteration clean.
     @always_inline
-    fn __getitem__(self, index: Int) -> Self.RefType:
+    fn __getitem__(self, index: Int) -> Self.reference_type:
+        """Gets a single element on the variadic list.
+
+        Args:
+            index: The index of the element to access on the list.
+
+        Returns:
+            A low-level pointer to the element on the list corresponding to the
+            given index.
+        """
+        return Self.reference_type(
+            __mlir_op.`pop.variadic.get`(self.value, index.value)
+        )
+
+    @always_inline
+    fn __refitem__(self, index: Int) -> Self.mlir_ref_type:
         """Gets a single element on the variadic list.
 
         Args:

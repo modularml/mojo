@@ -196,10 +196,9 @@ struct _RefCountedAttrsDictRef:
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            let value = values[i]
             let entry = _AttrsDictEntry {
-                key: __get_value_from_ref(value).key,
-                value: __get_value_from_ref(value).value._value.copy(),
+                key: values[i].key,
+                value: values[i].value._value.copy(),
             }
             __get_address_as_lvalue(ptr.address).impl.push_back(entry)
         return Self {attrs: ptr.bitcast[Int8]()}
@@ -1558,7 +1557,7 @@ struct object(IntableRaising):
         """
         var value = self
         for i in index:
-            value = value[__get_value_from_ref(i)]
+            value = value[i[]]
         return value
 
     @always_inline
