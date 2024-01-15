@@ -280,6 +280,7 @@ struct Reference[
     var value: Self.mlir_ref_type
     """The underlying MLIR reference."""
 
+    @always_inline("nodebug")
     fn __init__(value: Self.mlir_ref_type) -> Self:
         """Constructs a Reference from the MLIR reference.
 
@@ -291,6 +292,7 @@ struct Reference[
         """
         return Self {value: value}
 
+    @always_inline("nodebug")
     fn __refitem__(self) -> Self.mlir_ref_type:
         """Enable subscript syntax `ref[]` to access the element.
 
@@ -299,6 +301,7 @@ struct Reference[
         """
         return self.value
 
+    @always_inline("nodebug")
     fn __mlir_ref__(self) -> Self.mlir_ref_type:
         """Enable the Mojo compiler to see into `Reference`.
 
@@ -307,6 +310,22 @@ struct Reference[
         """
         return self.value
 
+    # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
+    # disagreement.
+    @always_inline("nodebug")
+    fn get_unsafe_pointer(self) -> Pointer[type]:
+        """Constructs a Pointer from a safe reference.
+
+        Returns:
+            Constructed Pointer object.
+        """
+        let ptr_with_trait = __mlir_op.`lit.ref.to_pointer`(self.value)
+        # Work around AnyRefType vs AnyType.
+        return __mlir_op.`pop.pointer.bitcast`[
+            _type = Pointer[type].pointer_type
+        ](ptr_with_trait)
+
+    @always_inline("nodebug")
     fn bitcast_element[
         new_element_type: AnyType
     ](self) -> Reference[new_element_type, is_mutable, lifetime]:

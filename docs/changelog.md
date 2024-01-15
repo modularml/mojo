@@ -178,10 +178,6 @@ modular install mojo
   the package is first `import`-ed. As a result, Mojo packages are smaller and
   more portable.
 
-- A new `__get_ref_from_value(x)` low-level helper was added that allows
-  converting values in memory to `!lit.ref` types.  This is used in the internal
-  implementation of `Reference` and isn't intended for general use.
-
 ### 🛠️ Fixed
 
 - Raising an error from the initializer of a memory-only type now works

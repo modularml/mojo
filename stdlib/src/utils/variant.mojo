@@ -121,8 +121,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         constrained[
             Self._check[T]() != Self._sentinel, "not a union element type"
         ]()
-        let self_ref = __get_ref_from_value(self._impl)
-        let ptr = __mlir_op.`lit.ref.to_pointer`(self_ref)
+        let ptr = Reference(self._impl).get_unsafe_pointer().address
         var result = AnyPointer[T]()
         result.value = __mlir_op.`pop.pointer.bitcast`[
             _type = __mlir_type[
