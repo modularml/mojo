@@ -158,10 +158,6 @@ modular install mojo
   the unroll factor, i.e. `n` can be a parameter expression that is
   of integer type.
 
-- The `VariadicListMem` type has an additional `Lifetime` parameter and is
-  internally implemented with reference types. When interacting directly with
-  it, please use `__get_value_from_ref` instead of `__get_address_as_lvalue`.
-
 - `vectorize` now has an overload to pass `size` as a parameter instead of an
   argument. This allows the remainder of `size` / `simd_width` to run in a
   single iteration.
@@ -182,10 +178,9 @@ modular install mojo
   the package is first `import`-ed. As a result, Mojo packages are smaller and
   more portable.
 
-- A new `__get_ref_from_value(x)` and `__get_value_from_ref` low-level helpers
-  were added that allows converting values in memory to/from `!lit.ref` types.
-  This is used in the internal implementation of `Reference` and isn't intended
-  for general use.
+- A new `__get_ref_from_value(x)` low-level helper was added that allows
+  converting values in memory to `!lit.ref` types.  This is used in the internal
+  implementation of `Reference` and isn't intended for general use.
 
 ### 🛠️ Fixed
 
