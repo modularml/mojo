@@ -162,6 +162,16 @@ modular install mojo
 - `AnyType` and `Destructable` have been unified into a single trait, `AnyType`.
   Every nominal type (i.e. all structs) now automatically conform to `AnyType`.
 
+- Previously, the `mojo package` command would output a Mojo package that
+  included both partly-compiled Mojo code, as well as fully-compiled machine
+  code for a specific computer architecture -- the architecture of the machine
+  being used to invoke the `mojo package` command.
+
+  Now, `mojo package` only includes partly-compiled Mojo code. It is only fully
+  compiled for the specific computer architecture being used at the point that
+  the package is first `import`-ed. As a result, Mojo packages are smaller and
+  more portable.
+
 ### 🛠️ Fixed
 
 - Raising an error from the initializer of a memory-only type now works
