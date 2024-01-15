@@ -168,7 +168,9 @@ struct VariadicList[type: AnyRegType](Sized):
 
 
 @register_passable("trivial")
-struct VariadicListMem[type: AnyType, lifetime: Lifetime](Sized):
+struct VariadicListMem[
+    type: AnyType, lifetime: Lifetime, is_mutable: __mlir_type.i1
+](Sized):
     """A utility class to access variadic function arguments of memory-only
     types that may have ownership. It exposes pointers to the elements in a way
     that can be enumerated.  Each element may be accessed with `elt[]`.
@@ -176,9 +178,11 @@ struct VariadicListMem[type: AnyType, lifetime: Lifetime](Sized):
     Parameters:
         type: The type of the elements in the list.
         lifetime: The reference lifetime of the underlying elements.
+        is_mutable: True if the elements of the list are mutable for an inout
+                    or owned argument.
     """
 
-    alias reference_type = Reference[type, False.__mlir_i1__(), lifetime]
+    alias reference_type = Reference[type, is_mutable, lifetime]
     alias mlir_ref_type = Self.reference_type.mlir_ref_type
     alias storage_type = __mlir_type[
         `!kgen.variadic<`, Self.mlir_ref_type, `, borrow_in_mem>`
@@ -192,6 +196,7 @@ struct VariadicListMem[type: AnyType, lifetime: Lifetime](Sized):
         Self.reference_type, Self, Self.__getitem__
     ]
 
+    # Provide support for borrowed variadic arguments.
     @always_inline
     fn __init__(value: Self.storage_type) -> Self:
         """Constructs a VariadicList from a variadic argument type.
@@ -203,6 +208,30 @@ struct VariadicListMem[type: AnyType, lifetime: Lifetime](Sized):
             The VariadicList constructed.
         """
         return Self {value: value}
+
+    # Provide support for variadics of *inout* arguments.  The reference will
+    # automatically be inferred to be mutable, and the !kgen.variadic will have
+    # convention=byref.
+    alias inout_storage_type = __mlir_type[
+        `!kgen.variadic<`, Self.mlir_ref_type, `, byref>`
+    ]
+
+    @always_inline
+    fn __init__(value: Self.inout_storage_type) -> Self:
+        """Constructs a VariadicList from a variadic argument type.
+
+        Args:
+            value: The variadic argument to construct the list with.
+
+        Returns:
+            The VariadicList constructed.
+        """
+        var tmp = value
+        # We need to bitcast different argument conventions to a consistent
+        # representation.  This is ugly but effective.
+        return Self {
+            value: Pointer.address_of(tmp).bitcast[Self.storage_type]().load()
+        }
 
     @always_inline
     fn __len__(self) -> Int:

@@ -57,12 +57,6 @@ modular install mojo
   before the program exits.  By default, assertions are _not enabled_
   in the standard library right now for performance implications.
 
-- A new `__get_ref_from_value(x)` low-level helper was added that allows
-  converting values in memory to `!lit.ref` types, for use when implementing the
-  internals of low-level types like unsafe pointers.  A corresponding
-  `__get_value_from_ref(x)` helper converts a reference into a normal value.
-  These will eventually subsume the `address` builtins.
-
 - The Mojo Language Server now implements the References request. IDEs use
   this to provide support for **Go to References** and **Find All References**.
   A current limitation is that references outside of the current document are
@@ -74,17 +68,33 @@ modular install mojo
 - `num_physical_cores`, `num_logical_cores`, and `num_performance_cores` have
   been added to the `sys.info` module.
 
+- Mojo now allows types to implement `__refattr__` and `__refitem__` to enable
+  attribute and subscript syntax with computed accessors that return references.
+  For common situations where these address a value in memory this provides a
+  more convenient and significantly more performant alternative to implementing
+  the traditional get/set pairs.
+
 - Mojo's low-level reference system is now parametric over mutability,
   eliminating the [problems with code duplication due to mutability
   specifiers](https://duckki.github.io/2024/01/01/inferred-mutability.html) and
   unifying user-level types like `Reference` across both mutable and immutable
   values.
 
-- Mojo now allows types to implement `__refattr__` and `__refitem__` to enable
-  attribute and subscript syntax with computed accessors that return references.
-  For common situations where these address a value in memory this provides a
-  more convenient and significantly more performant alternative to implementing
-  the traditional get/set pairs.
+- Variadic arguments are more powerful and easier to use. Subscripting into a
+  variadic pack now returns the element instead of an obscure internal type, and
+  we now support `inout` variadics.  Note that direct iteration over variadic
+  pack with a for-in loop produces a reference instead of a value, we intend to
+  fix this in the future.
+
+  ```mojo
+  fn make_worldly(inout *strs: String):
+      # Works as you'd expect.
+      for i in range(len(strs)):
+          strs[i] += " world"
+      # Requires extra [] to dereference the reference.
+      for i in strs):
+          i[] += " world"
+  ```
 
 ### 🪦 Removed
 
@@ -171,6 +181,11 @@ modular install mojo
   compiled for the specific computer architecture being used at the point that
   the package is first `import`-ed. As a result, Mojo packages are smaller and
   more portable.
+
+- A new `__get_ref_from_value(x)` and `__get_value_from_ref` low-level helpers
+  were added that allows converting values in memory to/from `!lit.ref` types.
+  This is used in the internal implementation of `Reference` and isn't intended
+  for general use.
 
 ### 🛠️ Fixed
 

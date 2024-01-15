@@ -307,6 +307,22 @@ struct Reference[
         """
         return self.value
 
+    fn bitcast_element[
+        new_element_type: AnyType
+    ](self) -> Reference[new_element_type, is_mutable, lifetime]:
+        """Cast the reference to one of another element type, but the same
+        lifetime, mutability, and address space.
+
+        Parameters:
+            new_element_type: The result type.
+
+        Returns:
+            The new reference.
+        """
+        return rebind[
+            Reference[new_element_type, is_mutable, lifetime].mlir_ref_type
+        ](self.value)
+
 
 # ===----------------------------------------------------------------------===#
 # Pointer
