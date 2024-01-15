@@ -8,7 +8,6 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-
 # ===----------------------------------------------------------------------===#
 # ListLiteral
 # ===----------------------------------------------------------------------===#
@@ -107,9 +106,7 @@ struct VariadicList[type: AnyRegType](Sized):
     var value: Self.StorageType
     """The underlying storage for the variadic list."""
 
-    alias IterType = _VariadicListIter[
-        type, VariadicList[type], Self.__getitem__
-    ]
+    alias IterType = _VariadicListIter[type, Self, Self.__getitem__]
 
     @always_inline
     fn __init__(*value: type) -> Self:
@@ -169,7 +166,7 @@ struct VariadicList[type: AnyRegType](Sized):
 
 
 @register_passable("trivial")
-struct VariadicListMem[type: AnyRegType, life: Lifetime](Sized):
+struct VariadicListMem[type: AnyType, life: Lifetime](Sized):
     """A utility class to access variadic function arguments of memory-only
     types that may have ownership. It exposes pointers to the elements in a way
     that can be enumerated.  Each element may be accessed with
@@ -180,19 +177,18 @@ struct VariadicListMem[type: AnyRegType, life: Lifetime](Sized):
         life: The reference lifetime of the underlying elements.
     """
 
-    alias RefType = __mlir_type[`!lit.ref<`, type, `, `, life, `>`]
+    alias RefType = __mlir_type[
+        `!lit.ref<:`, AnyType, ` `, type, `, `, life, `>`
+    ]
     alias StorageType = __mlir_type[
         `!kgen.variadic<`, Self.RefType, `, borrow_in_mem>`
     ]
+
     var value: Self.StorageType
     """The underlying storage, a variadic list of pointers to elements of the
     given type."""
 
-    alias IterType = _VariadicListIter[
-        Self.RefType,
-        VariadicListMem[type, life],
-        Self.__getitem__,
-    ]
+    alias IterType = _VariadicListIter[Self.RefType, Self, Self.__getitem__]
 
     @always_inline
     fn __init__(value: Self.StorageType) -> Self:
