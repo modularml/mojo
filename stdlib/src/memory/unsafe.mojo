@@ -342,6 +342,24 @@ struct Reference[
             Reference[new_element_type, is_mutable, lifetime].mlir_ref_type
         ](self.value)
 
+    fn destroy_element_unsafe(self):
+        """This unsafe operation runs the destructor of the element addressed by
+        this reference.  This is equivalent to `x->~Type()` syntax in C++.
+        """
+
+        # This should only work with mutable references.
+        # FIXME: This should be a precondition checked by the Mojo type checker,
+        # not delayed to elaboration!
+        __mlir_op.`kgen.param.assert`[
+            cond=is_mutable,
+            message = "cannot use 'unsafe_destroy_element' on immutable references".value,
+        ]()
+        # Project to an owned raw pointer, allowing the compiler to know it is to
+        # be destroyed.
+        # TODO: Use AnyPointer, but it requires a Movable element.
+        let kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
+        _ = __get_address_as_owned_value(kgen_ptr)
+
 
 # ===----------------------------------------------------------------------===#
 # Pointer

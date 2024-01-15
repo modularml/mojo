@@ -167,7 +167,7 @@ struct VariadicList[type: AnyRegType](Sized):
         return Self.IterType(0, len(self), self)
 
 
-@register_passable("trivial")
+@register_passable
 struct VariadicListMem[
     type: AnyType, lifetime: Lifetime, is_mutable: __mlir_type.i1
 ](Sized):
@@ -192,6 +192,10 @@ struct VariadicListMem[
     """The underlying storage, a variadic list of pointers to elements of the
     given type."""
 
+    # This is true when the elements are 'owned' - these are destroyed when
+    # the VariadicListMem is destroyed.
+    var _is_owned: Bool
+
     alias IterType = _VariadicListIter[
         Self.reference_type, Self, Self.__getitem__
     ]
@@ -207,7 +211,7 @@ struct VariadicListMem[
         Returns:
             The VariadicList constructed.
         """
-        return Self {value: value}
+        return Self {value: value, _is_owned: False}
 
     # Provide support for variadics of *inout* arguments.  The reference will
     # automatically be inferred to be mutable, and the !kgen.variadic will have
@@ -230,8 +234,55 @@ struct VariadicListMem[
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
         return Self {
-            value: Pointer.address_of(tmp).bitcast[Self.storage_type]().load()
+            value: Pointer.address_of(tmp).bitcast[Self.storage_type]().load(),
+            _is_owned: False,
         }
+
+    # Provide support for variadics of *owned* arguments.  The reference will
+    # automatically be inferred to be mutable, and the !kgen.variadic will have
+    # convention=owned_in_mem.
+    alias owned_storage_type = __mlir_type[
+        `!kgen.variadic<`, Self.mlir_ref_type, `, owned_in_mem>`
+    ]
+
+    @always_inline
+    fn __init__(value: Self.owned_storage_type) -> Self:
+        """Constructs a VariadicList from a variadic argument type.
+
+        Args:
+            value: The variadic argument to construct the list with.
+
+        Returns:
+            The VariadicList constructed.
+        """
+        var tmp = value
+        # We need to bitcast different argument conventions to a consistent
+        # representation.  This is ugly but effective.
+        return Self {
+            value: Pointer.address_of(tmp).bitcast[Self.storage_type]().load(),
+            _is_owned: True,
+        }
+
+    @always_inline
+    fn __del__(owned self):
+        """Destructor that releases elements if owned."""
+
+        # Immutable variadics never own the memory underlying them,
+        # microoptimize out a check of _is_owned.
+        @parameter
+        if not Bool(is_mutable):
+            return
+
+        else:
+            # If the elements are unowned, just return.
+            if not self._is_owned:
+                return
+
+            # Otherwise this is a variadic of owned elements, destroy them.  We
+            # destroy in backwards order to match how arguments are normally torn
+            # down when CheckLifetimes is left to its own devices.
+            for i in range(len(self), 0, -1):
+                Reference(self.__refitem__(i - 1)).destroy_element_unsafe()
 
     @always_inline
     fn __len__(self) -> Int:
