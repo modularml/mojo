@@ -936,8 +936,8 @@ struct object(IntableRaising):
     @staticmethod
     @always_inline
     fn _comparison_op[
-        fp_func: fn (Float64, Float64) -> SIMD[DType.bool, 1],
-        int_func: fn (Int64, Int64) -> SIMD[DType.bool, 1],
+        fp_func: fn (Float64, Float64) -> Scalar[DType.bool],
+        int_func: fn (Int64, Int64) -> Scalar[DType.bool],
         bool_func: fn (Bool, Bool) -> Bool,
     ](lhs: object, rhs: object) raises -> object:
         """Dispatches comparison operator depending on the type.

@@ -52,7 +52,7 @@ fn bitcast[
     """
     return __mlir_op.`pop.index_to_pointer`[
         _type = Pointer[type, address_space].pointer_type
-    ](SIMD[DType.index, 1](val).value)
+    ](Scalar[DType.index](val).value)
 
 
 @always_inline("nodebug")
@@ -420,7 +420,7 @@ struct Pointer[
         return Self {address: address}
 
     @always_inline("nodebug")
-    fn __init__(value: SIMD[DType.address, 1]) -> Self:
+    fn __init__(value: Scalar[DType.address]) -> Self:
         """Constructs a Pointer from the value of scalar address.
 
         Args:
@@ -906,7 +906,7 @@ struct DTypePointer[
         return Self {address: value}
 
     @always_inline("nodebug")
-    fn __init__(value: SIMD[DType.address, 1]) -> Self:
+    fn __init__(value: Scalar[DType.address]) -> Self:
         """Constructs a `DTypePointer` from the value of scalar address.
 
         Args:

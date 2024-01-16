@@ -254,7 +254,7 @@ fn _snprintf_kgen_scalar[
 
     @parameter
     if type == DType.bool:
-        if SIMD[DType.bool, 1](rebind[__mlir_type.`!pop.scalar<bool>`](x)):
+        if Scalar[DType.bool](rebind[__mlir_type.`!pop.scalar<bool>`](x)):
             return _snprintf(buffer, size, "True")
         else:
             return _snprintf(buffer, size, "False")
