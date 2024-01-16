@@ -178,6 +178,12 @@ modular install mojo
   the package is first `import`-ed. As a result, Mojo packages are smaller and
   more portable.
 
+- The `simd_width` and `dtype` parameters of `polynomial_evaluate` have been
+  switched. Based on the request in
+  [#1587](https://github.com/modularml/mojo/issues/1587), the
+  `polynomial_evaluate` function has also been extended to take a StaticTuple
+  as input parameters.
+
 ### 🛠️ Fixed
 
 - Raising an error from the initializer of a memory-only type now works
