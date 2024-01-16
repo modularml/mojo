@@ -110,10 +110,10 @@ fn randint[
     @parameter
     if type.is_signed():
         for si in range(size):
-            ptr.store(si, random_si64(low, high).cast[type]())
+            ptr[si] = random_si64(low, high).cast[type]()
     else:
         for ui in range(size):
-            ptr.store(ui, random_ui64(low, high).cast[type]())
+            ptr[ui] = random_ui64(low, high).cast[type]()
 
 
 fn rand[type: DType](ptr: DTypePointer[type], size: Int):
@@ -131,30 +131,27 @@ fn rand[type: DType](ptr: DTypePointer[type], size: Int):
     @parameter
     if type.is_floating_point():
         for i in range(size):
-            ptr.store(i, random_float64().cast[type]())
+            ptr[i] = random_float64().cast[type]()
         return
 
     @parameter
     if type == DType.bool:
         for i in range(size):
-            ptr.store(i, random_ui64(0, 1).cast[type]())
+            ptr[i] = random_ui64(0, 1).cast[type]()
         return
 
     @parameter
     if type.is_signed():
         for i in range(size):
-            ptr.store(
-                i,
-                random_si64(
-                    -(1 << (bitwidth - 1)), (1 << (bitwidth - 1)) - 1
-                ).cast[type](),
-            )
+            ptr[i] = random_si64(
+                -(1 << (bitwidth - 1)), (1 << (bitwidth - 1)) - 1
+            ).cast[type]()
         return
 
     @parameter
     if type.is_unsigned():
         for i in range(size):
-            ptr.store(i, random_ui64(0, (1 << bitwidth) - 1).cast[type]())
+            ptr[i] = random_ui64(0, (1 << bitwidth) - 1).cast[type]()
         return
 
 
@@ -249,7 +246,7 @@ fn randn[
     """
 
     for i in range(size):
-        ptr.store(i, randn_float64(mean, variance).cast[type]())
+        ptr[i] = randn_float64(mean, variance).cast[type]()
     return
 
 

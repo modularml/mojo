@@ -191,14 +191,12 @@ fn memcpy[
 
     if n <= 16:
         if n >= 8:
-            let ui64_size = sizeof[DType.uint64.value]()
-            dest_data.bitcast[DType.uint64.value]().store(
-                src_data.bitcast[DType.uint64.value]().load()
+            let ui64_size = sizeof[DType.uint64]()
+            dest_data.bitcast[DType.uint64]().store(
+                src_data.bitcast[DType.uint64]().load()
             )
-            dest_data.offset(n - ui64_size).bitcast[DType.uint64.value]().store(
-                src_data.offset(n - ui64_size)
-                .bitcast[DType.uint64.value]()
-                .load()
+            dest_data.offset(n - ui64_size).bitcast[DType.uint64]().store(
+                src_data.offset(n - ui64_size).bitcast[DType.uint64]().load()
             )
             return
         let ui32_size = sizeof[DType.uint32]()
