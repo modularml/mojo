@@ -113,7 +113,7 @@ struct Python:
         return PythonObject(result)
 
     @staticmethod
-    fn add_to_path(str: StringRef) raises:
+    fn add_to_path(str: String) raises:
         """Adds a directory to the Python path.
 
         This might be necessary to import a Python module via `import_module()`.
