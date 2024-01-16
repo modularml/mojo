@@ -1033,7 +1033,7 @@ struct PrefetchLocality:
     [LLVM prefetch locality](https://llvm.org/docs/LangRef.html#llvm-prefetch-intrinsic))
     """
 
-    var value: SIMD[DType.int32, 1]
+    var value: Int32
     """The prefetch locality to use. It should be a value in [0, 3]."""
     alias NONE = PrefetchLocality(0)
     """No locality."""
@@ -1062,7 +1062,7 @@ struct PrefetchLocality:
 struct PrefetchRW:
     """Prefetch read or write."""
 
-    var value: SIMD[DType.int32, 1]
+    var value: Int32
     """The read-write prefetch. It should be in [0, 1]."""
     alias READ = PrefetchRW(0)
     """Read prefetch."""
@@ -1088,7 +1088,7 @@ struct PrefetchRW:
 struct PrefetchCache:
     """Prefetch cache type."""
 
-    var value: SIMD[DType.int32, 1]
+    var value: Int32
     """The cache prefetch. It should be in [0, 1]."""
     alias INSTRUCTION = PrefetchCache(0)
     """The instruction prefetching option."""
@@ -1306,10 +1306,9 @@ fn masked_load[
     if size == 1:
         return addr.load() if mask else passthrough[0]
 
-    let alignment_si32 = SIMD[DType.int32, 1](alignment)
     return llvm_intrinsic["llvm.masked.load", SIMD[addr.type, size]](
         addr.bitcast[DType.invalid.value]().address,
-        alignment_si32.value,
+        Int32(alignment),
         mask,
         passthrough,
     )
@@ -1350,11 +1349,10 @@ fn masked_store[
             addr.store(value[0])
         return
 
-    let alignment_si32 = SIMD[DType.int32, 1](alignment)
     llvm_intrinsic["llvm.masked.store", NoneType](
         value,
         addr.bitcast[DType.invalid.value]().address,
-        alignment_si32.value,
+        Int32(alignment),
         mask,
     )
 

@@ -929,4 +929,4 @@ struct Int(
             uses. Its intended usage is for data structures. See the `hash`
             builtin documentation for more details.
         """
-        return _hash_simd(SIMD[DType.int64, 1](self))
+        return _hash_simd(Int64(self))
