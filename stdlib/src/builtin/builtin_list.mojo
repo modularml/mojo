@@ -69,29 +69,22 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
 
 
 @value
-struct _VariadicListIter[
-    type: AnyRegType,
-    list_type: AnyRegType,
-    getitem: fn (list_type, Int) -> type,
-]:
-    """Const Iterator for VariadicList(Mem).
+struct _VariadicListIter[type: AnyRegType]:
+    """Const Iterator for VariadicList.
 
     Parameters:
         type: The type of the elements in the list.
-        list_type: The type of the variadic list (Mem or non-Mem).
-        getitem: The callback for getting an element from the list.
     """
 
     var index: Int
-    var size: Int
-    var src: list_type
+    var src: VariadicList[type]
 
     fn __next__(inout self) -> type:
         self.index += 1
-        return getitem(self.src, self.index - 1)
+        return self.src[self.index - 1]
 
     fn __len__(self) -> Int:
-        return self.size - self.index
+        return len(self.src) - self.index
 
 
 @register_passable("trivial")
@@ -108,7 +101,7 @@ struct VariadicList[type: AnyRegType](Sized):
     var value: Self.storage_type
     """The underlying storage for the variadic list."""
 
-    alias IterType = _VariadicListIter[type, Self, Self.__getitem__]
+    alias IterType = _VariadicListIter[type]
 
     @always_inline
     fn __init__(*value: type) -> Self:
@@ -164,10 +157,64 @@ struct VariadicList[type: AnyRegType](Sized):
         Returns:
             An iterator to the start of the list.
         """
-        return Self.IterType(0, len(self), self)
+        return Self.IterType(0, self)
 
 
-@register_passable
+@value
+struct _VariadicListMemIter[
+    elt_type: AnyType,
+    elt_lifetime: Lifetime,
+    is_mutable: __mlir_type.i1,
+    list_lifetime: Lifetime,
+]:
+    """Iterator for VariadicListMem.
+
+    Parameters:
+        elt_type: The type of the elements in the list.
+        elt_lifetime: The lifetime of the elements.
+        is_mutable: Whether the reference is mutable in VariadicListMem.
+        list_lifetime: The lifetime of the VariadicListMem.
+    """
+
+    alias variadic_list_type = VariadicListMem[
+        elt_type, elt_lifetime, is_mutable
+    ]
+
+    var index: Int
+    var src: Reference[
+        Self.variadic_list_type, False.__mlir_i1__(), list_lifetime
+    ]
+
+    fn __next__(inout self) -> Self.variadic_list_type.reference_type:
+        self.index += 1
+        # TODO: Need to make this return a dereferenced reference, not a
+        # reference that must be deref'd by the user.
+        return self.src[].__getitem__(self.index - 1)
+
+    fn __len__(self) -> Int:
+        return len(self.src[]) - self.index
+
+
+# Helper to build !lit.ref types.
+# TODO: parametric aliases would be nice.
+struct _LITRef[
+    element_type: AnyType,
+    is_mutable: __mlir_type.i1,
+    lifetime: Lifetime,
+]:
+    alias type = __mlir_type[
+        `!lit.ref<mut=`,
+        is_mutable,
+        `, :`,
+        AnyType,
+        ` `,
+        element_type,
+        `, `,
+        lifetime,
+        `>`,
+    ]
+
+
 struct VariadicListMem[
     type: AnyType, lifetime: Lifetime, is_mutable: __mlir_type.i1
 ](Sized):
@@ -196,22 +243,16 @@ struct VariadicListMem[
     # the VariadicListMem is destroyed.
     var _is_owned: Bool
 
-    alias IterType = _VariadicListIter[
-        Self.reference_type, Self, Self.__getitem__
-    ]
-
     # Provide support for borrowed variadic arguments.
     @always_inline
-    fn __init__(value: Self.storage_type) -> Self:
+    fn __init__(inout self, value: Self.storage_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
             value: The variadic argument to construct the list with.
-
-        Returns:
-            The VariadicList constructed.
         """
-        return Self {value: value, _is_owned: False}
+        self.value = value
+        self._is_owned = False
 
     # Provide support for variadics of *inout* arguments.  The reference will
     # automatically be inferred to be mutable, and the !kgen.variadic will have
@@ -221,22 +262,17 @@ struct VariadicListMem[
     ]
 
     @always_inline
-    fn __init__(value: Self.inout_storage_type) -> Self:
+    fn __init__(inout self, value: Self.inout_storage_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
             value: The variadic argument to construct the list with.
-
-        Returns:
-            The VariadicList constructed.
         """
         var tmp = value
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
-        return Self {
-            value: Pointer.address_of(tmp).bitcast[Self.storage_type]().load(),
-            _is_owned: False,
-        }
+        self.value = Pointer.address_of(tmp).bitcast[Self.storage_type]().load()
+        self._is_owned = False
 
     # Provide support for variadics of *owned* arguments.  The reference will
     # automatically be inferred to be mutable, and the !kgen.variadic will have
@@ -246,22 +282,27 @@ struct VariadicListMem[
     ]
 
     @always_inline
-    fn __init__(value: Self.owned_storage_type) -> Self:
+    fn __init__(inout self, value: Self.owned_storage_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
             value: The variadic argument to construct the list with.
-
-        Returns:
-            The VariadicList constructed.
         """
         var tmp = value
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
-        return Self {
-            value: Pointer.address_of(tmp).bitcast[Self.storage_type]().load(),
-            _is_owned: True,
-        }
+        self.value = Pointer.address_of(tmp).bitcast[Self.storage_type]().load()
+        self._is_owned = True
+
+    @always_inline
+    fn __moveinit__(inout self, owned existing: Self):
+        """Moves constructor.
+
+        Args:
+          existing: The existing VariadicListMem.
+        """
+        self.value = existing.value
+        self._is_owned = existing._is_owned
 
     @always_inline
     fn __del__(owned self):
@@ -324,11 +365,19 @@ struct VariadicListMem[
         """
         return __mlir_op.`pop.variadic.get`(self.value, index.value)
 
+    # FIXME: This is horrible syntax to return an iterator whose lifetime is
+    # bound to the VariadicListMem
     @always_inline
-    fn __iter__(self) -> Self.IterType:
+    fn __iter__[
+        self_lifetime: Lifetime, self_mutability: __mlir_type.i1
+    ](
+        self: _LITRef[Self, self_mutability, self_lifetime].type
+    ) -> _VariadicListMemIter[type, lifetime, is_mutable, self_lifetime]:
         """Iterate over the list.
 
         Returns:
             An iterator to the start of the list.
         """
-        return Self.IterType(0, len(self), self)
+        return _VariadicListMemIter[type, lifetime, is_mutable, self_lifetime](
+            0, self
+        )
