@@ -15,7 +15,6 @@ listing:
       - BoolMLIR.ipynb
       - Mandelbrot.ipynb
       - Matmul.ipynb
-      - Memset.ipynb
       - RayTracing.ipynb
     type: grid
     grid-columns: 2
