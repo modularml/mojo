@@ -44,9 +44,7 @@ struct Matrix:
         self.cols = cols
 
     # Initialize taking a pointer, don't set any elements
-    fn __init__(
-        inout self, rows: Int, cols: Int, data: DTypePointer[DType.float32]
-    ):
+    fn __init__(inout self, rows: Int, cols: Int, data: DTypePointer[type]):
         self.data = data
         self.rows = rows
         self.cols = cols
@@ -58,16 +56,16 @@ struct Matrix:
         rand(data, rows * cols)
         return Self(rows, cols, data)
 
-    fn __getitem__(self, y: Int, x: Int) -> Float32:
+    fn __getitem__(self, y: Int, x: Int) -> SIMD[type, 1]:
         return self.load[1](y, x)
 
-    fn __setitem__(inout self, y: Int, x: Int, val: Float32):
+    fn __setitem__(inout self, y: Int, x: Int, val: SIMD[type, 1]):
         self.store[1](y, x, val)
 
-    fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[DType.float32, nelts]:
+    fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[type, nelts]:
         return self.data.simd_load[nelts](y * self.cols + x)
 
-    fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[DType.float32, nelts]):
+    fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[type, nelts]):
         return self.data.simd_store[nelts](y * self.cols + x, val)
 
 
@@ -229,7 +227,7 @@ fn matmul_accumulated(inout C: Matrix, A: Matrix, B: Matrix):
     fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
         # Allocate the tile of accumulators on the stack.
         var accumulators = Matrix(
-            tile_i, tile_j, stack_allocation[tile_i * tile_j, DType.float32]()
+            tile_i, tile_j, stack_allocation[tile_i * tile_j, type]()
         )
 
         for ko in range(0, A.cols, tile_k * tile_k_unroll):
