@@ -1571,10 +1571,10 @@ fn _mlirtype_is_eq[t1: AnyRegType, t2: AnyRegType]() -> Bool:
         `#kgen.param.expr<eq,`,
         `#kgen.parameterizedtype.constant<`,
         t1,
-        `> : !kgen.anyregtype`,
+        `> : !kgen.type`,
         `,`,
         `#kgen.parameterizedtype.constant<`,
         t2,
-        `> : !kgen.anyregtype`,
+        `> : !kgen.type`,
         `> : i1`,
     ]

@@ -441,7 +441,7 @@ fn sizeof[
     return __mlir_attr[
         `#kgen.param.expr<get_sizeof, #kgen.parameterizedtype.constant<`,
         type,
-        `> : !kgen.anyregtype,`,
+        `> : !kgen.type,`,
         target,
         `> : index`,
     ]
@@ -465,7 +465,7 @@ fn sizeof[
         `!pop.scalar<`,
         type.value,
         `>`,
-        `> : !kgen.anyregtype,`,
+        `> : !kgen.type,`,
         target,
         `> : index`,
     ]
@@ -487,7 +487,7 @@ fn alignof[
     return __mlir_attr[
         `#kgen.param.expr<get_alignof, #kgen.parameterizedtype.constant<`,
         type,
-        `> : !kgen.anyregtype,`,
+        `> : !kgen.type,`,
         target,
         `> : index`,
     ]
@@ -511,7 +511,7 @@ fn alignof[
         `!pop.scalar<`,
         type.value,
         `>`,
-        `> : !kgen.anyregtype,`,
+        `> : !kgen.type,`,
         target,
         `> : index`,
     ]
