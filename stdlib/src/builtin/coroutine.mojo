@@ -19,9 +19,14 @@ from memory.unsafe import Pointer
 
 @register_passable("trivial")
 struct CoroutineContext:
-    """Represents a callback closure (fn_ptr + captures)."""
+    """The default context for a Coroutine, capturing the resume function
+    callback and parent Coroutine. The resume function will typically just
+    resume the parent. May be overwritten by other context types with different
+    interpretations of the payload, but which nevertheless be the same size
+    and contain the resume function and a payload pointer."""
 
     alias _opaque_handle = Pointer[__mlir_type.i8]
+    # Passed the coroutine being completed and its context's payload.
     alias _resume_fn_type = fn (
         Self._opaque_handle, Self._opaque_handle
     ) -> None
@@ -34,6 +39,7 @@ fn _coro_resume_callback(
     handle: CoroutineContext._opaque_handle,
     parent: CoroutineContext._opaque_handle,
 ):
+    """Resume the parent Coroutine."""
     _coro_resume_fn(parent)
 
 
@@ -41,6 +47,14 @@ fn _coro_resume_callback(
 fn _coro_resume_fn(handle: CoroutineContext._opaque_handle):
     """This function is a generic coroutine resume function."""
     __mlir_op.`pop.coroutine.resume`(handle.address)
+
+
+fn _coro_resume_noop_callback(
+    handle: CoroutineContext._opaque_handle,
+    null: CoroutineContext._opaque_handle,
+):
+    """Return immediately since nothing to resume."""
+    return
 
 
 # ===----------------------------------------------------------------------=== #
@@ -135,16 +149,9 @@ struct Coroutine[type: AnyRegType]:
             The coroutine promise.
         """
 
-        @noncapturing
-        fn _coro_noop_fn(
-            handle: CoroutineContext._opaque_handle,
-            null: CoroutineContext._opaque_handle,
-        ):
-            return
-
         self.get_ctx[CoroutineContext]().store(
             CoroutineContext {
-                _resume_fn: _coro_noop_fn,
+                _resume_fn: _coro_resume_noop_callback,
                 _parent_hdl: CoroutineContext._opaque_handle.get_null(),
             }
         )
@@ -266,15 +273,12 @@ struct RaisingCoroutine[type: AnyRegType]:
         """
 
         @noncapturing
-        fn _coro_noop_fn(
-            handle: CoroutineContext._opaque_handle,
-            null: CoroutineContext._opaque_handle,
-        ):
+        fn _coro_noop_fn(handle: CoroutineContext._opaque_handle):
             return
 
         self.get_ctx[CoroutineContext]().store(
             CoroutineContext {
-                _resume_fn: _coro_noop_fn,
+                _resume_fn: _coro_resume_noop_callback,
                 _parent_hdl: CoroutineContext._opaque_handle.get_null(),
             }
         )
