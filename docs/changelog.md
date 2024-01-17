@@ -223,6 +223,8 @@ modular install mojo
   accept alias as unroll factor.
 - [#1443](https://github.com/modularml/mojo/issues/1443) - Compiler crash on
   variadic list of traits.
+- [#1604](https://github.com/modularml/mojo/issues/1604) - Variable of trivial
+  type not destroyed by transferring ownership.
 
 ## v0.6.1 (2023-12-18)
 
