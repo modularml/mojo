@@ -261,6 +261,8 @@ modular install mojo
       let hash = _hash_simd(vector)
   ```
 
+- [`Dict`](/mojo/stdlib/collections/Dict.html) Mojo-native dictionary :book:
+
 - Several standard library types now conform to the
   [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
   trait.  These types include [`Bool`](/mojo/stdlib/builtins/bool.html#bool),
