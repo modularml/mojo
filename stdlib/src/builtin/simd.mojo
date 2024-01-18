@@ -414,7 +414,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Casts to the value to an Int. If there is a fractional component,
-        then the value is truncated towards zero.
+        then the fractional part is truncated.
 
         Constraints:
             The size of the SIMD vector must be 1.
@@ -424,7 +424,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[size == 1, "expected a scalar type"]()
         return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-            rebind[SIMD[type, 1]](_floor(self)).value
+            rebind[SIMD[type, 1]](self).value
         )
 
     fn __str__(self) -> String:
