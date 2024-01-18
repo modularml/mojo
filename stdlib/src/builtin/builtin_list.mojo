@@ -215,12 +215,20 @@ struct _LITRef[
     ]
 
 
+# Helper to compute the union of two lifetimes:
+# TODO: parametric aliases would be nice.
+struct _union_lifetimes[a: Lifetime, b: Lifetime]:
+    alias result = __mlir_attr[
+        `#lit.lifetime.union<`, a, `,`, b, `> : !lit.lifetime`
+    ]
+
+
 struct VariadicListMem[
     type: AnyType, lifetime: Lifetime, is_mutable: __mlir_type.i1
 ](Sized):
     """A utility class to access variadic function arguments of memory-only
-    types that may have ownership. It exposes pointers to the elements in a way
-    that can be enumerated.  Each element may be accessed with `elt[]`.
+    types that may have ownership. It exposes references to the elements in a
+    way that can be enumerated.  Each element may be accessed with `elt[]`.
 
     Parameters:
         type: The type of the elements in the list.
@@ -352,8 +360,18 @@ struct VariadicListMem[
             __mlir_op.`pop.variadic.get`(self.value, index.value)
         )
 
+    ## FIXME: This horrible syntax is used to expose and merge in the lifetime
+    # of self.  It would be nice to be able to do:
+    # fn __refitem__(self: Self, index: Int)
+    #      -> Self.reference_type.union_lifetime(lifetimeof(self))
     @always_inline
-    fn __refitem__(self, index: Int) -> Self.mlir_ref_type:
+    fn __refitem__[
+        self_life: Lifetime, self_mutability: __mlir_type.i1
+    ](
+        self: _LITRef[Self, self_mutability, self_life].type, index: Int
+    ) -> _LITRef[
+        type, is_mutable, _union_lifetimes[lifetime, self_life].result
+    ].type:
         """Gets a single element on the variadic list.
 
         Args:
@@ -363,7 +381,9 @@ struct VariadicListMem[
             A low-level pointer to the element on the list corresponding to the
             given index.
         """
-        return __mlir_op.`pop.variadic.get`(self.value, index.value)
+        return __mlir_op.`pop.variadic.get`(
+            Reference(self)[].value, index.value
+        )
 
     # FIXME: This is horrible syntax to return an iterator whose lifetime is
     # bound to the VariadicListMem
