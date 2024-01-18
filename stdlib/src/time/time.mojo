@@ -240,10 +240,7 @@ fn sleep(sec: Float64):
     )
     let req = Pointer[_CTimeSpec].address_of(tv_spec)
     let rem = Pointer[_CTimeSpec].get_null()
-    _ = __mlir_op.`pop.external_call`[
-        func = "nanosleep".value,
-        _type=Int32,
-    ](req, rem)
+    _ = external_call["nanosleep", Int32](req, rem)
 
 
 fn sleep(sec: Int):
@@ -258,7 +255,4 @@ fn sleep(sec: Int):
         # In Windows the argument is in milliseconds.
         external_call["Sleep", NoneType](sec * 1000)
     else:
-        __mlir_op.`pop.external_call`[
-            func = "sleep".value,
-            _type=None,
-        ](sec.value)
+        external_call["sleep", NoneType](sec)
