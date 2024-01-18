@@ -184,6 +184,9 @@ modular install mojo
   `polynomial_evaluate` function has also been extended to take a StaticTuple
   as input parameters.
 
+- As a tiny step towards removing `let` declarations, this release removes the
+  "'var' was never mutated, consider switching to a 'let'" warning.
+
 ### 🛠️ Fixed
 
 - Raising an error from the initializer of a memory-only type now works
