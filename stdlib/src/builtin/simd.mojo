@@ -545,7 +545,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         integer.
 
         Constraints:
-            The element type of the SIMD vector must be integral.
+            The element type of the SIMD vector must be numeric.
 
         Args:
             rhs: The value to divide on.
@@ -553,15 +553,17 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             `floor(self / rhs)` value.
         """
-        constrained[type.is_integral(), "the type must be integral"]()
+        constrained[type.is_numeric(), "the type must be numeric"]()
         if rhs == 0:
             # this should raise an exception.
             return 0
 
-        let div: SIMD[type, size] = __mlir_op.`pop.div`(self.value, rhs.value)
+        let div = self / rhs
 
         @parameter
-        if type.is_unsigned():
+        if type.is_floating_point():
+            return _floor(div)
+        elif type.is_unsigned():
             return div
         else:
             if self > 0 and rhs > 0:
@@ -569,7 +571,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
             let mod = self - div * rhs
             let mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
-            return mod - mask.cast[type]()
+            return div - mask.cast[type]()
 
     @always_inline("nodebug")
     fn __mod__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
@@ -589,18 +591,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if type.is_unsigned():
             return __mlir_op.`pop.rem`(self.value, rhs.value)
         else:
-            var div: SIMD[type, size] = __mlir_op.`pop.div`(
-                self.value, rhs.value
-            )
+            var div = self / rhs
 
             @parameter
             if type.is_floating_point():
-                div = llvm_intrinsic[
-                    "llvm.trunc",
-                    __mlir_type[
-                        `!pop.simd<`, size.value, `, `, type.value, `>`
-                    ],
-                ](div.value)
+                div = llvm_intrinsic["llvm.trunc", Self](div)
 
             let mod = self - div * rhs
             let mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)

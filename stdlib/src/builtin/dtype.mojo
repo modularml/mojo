@@ -392,6 +392,17 @@ struct DType(Stringable):
             or self.is_float64()
         )
 
+    @always_inline("nodebug")
+    fn is_numeric(self) -> Bool:
+        """Returns True if the type parameter is numeric (i.e. you can perform
+        arithmetic operations on).
+
+        Returns:
+            Returns True if the input type parameter is either integral or
+              floating-point.
+        """
+        return self.is_integral() or self.is_floating_point()
+
     @always_inline
     fn sizeof(self) -> Int:
         """Returns the size in bytes of the current DType.
