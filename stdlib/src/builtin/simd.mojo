@@ -363,6 +363,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if type == DType.bool:
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
+        elif target == DType.bool:
+            return rebind[SIMD[target, size]](self != 0)
         elif target == DType.address:
             let index_val = __mlir_op.`pop.cast`[
                 _type = __mlir_type[`!pop.simd<`, size.value, `, index>`]
