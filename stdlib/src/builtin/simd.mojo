@@ -212,7 +212,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # Construct via a variadic type which has the same number of elements as
     # the SIMD value.
     @always_inline("nodebug")
-    fn __init__(*elems: SIMD[type, 1]) -> SIMD[type, size]:
+    fn __init__(*elems: Scalar[type]) -> Self:
         """Constructs a SIMD vector via a variadic list of elements.
 
         If there is just one input value, then it is splatted to all elements
@@ -234,7 +234,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         let num_elements: Int = len(elems)
         if num_elements == 1:
             # Construct by broadcasting a scalar.
-            return SIMD[type, size] {
+            return Self {
                 value: __mlir_op.`pop.simd.splat`[
                     _type = __mlir_type[
                         `!pop.simd<`,
@@ -247,7 +247,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             }
 
         debug_assert(size == num_elements, "mismatch in the number of elements")
-        var result = SIMD[type, size]()
+        var result = Self()
 
         @unroll
         for i in range(size):
@@ -257,7 +257,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     # Initializes from FP literal.
     @always_inline("nodebug")
-    fn __init__(value: FloatLiteral) -> SIMD[type, size]:
+    fn __init__(value: FloatLiteral) -> Self:
         """Initializes the SIMD vector with a FP64 value.
 
         The input value is splatted (broadcast) across all the elements of the
@@ -276,7 +276,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         let vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
-        return SIMD[type, size] {value: vec}
+        return Self {value: vec}
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -304,7 +304,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @staticmethod
     @always_inline("nodebug")
-    fn splat(x: Bool) -> SIMD[type, size]:
+    fn splat(x: Bool) -> Self:
         """Splats (broadcasts) the element onto the vector.
 
         Args:
@@ -326,11 +326,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 ]
             ](x.value)
         }
-        return rebind[SIMD[type, size]](val)
+        return rebind[Self](val)
 
     @staticmethod
     @always_inline("nodebug")
-    fn splat(x: SIMD[type, 1]) -> SIMD[type, size]:
+    fn splat(x: Scalar[type]) -> Self:
         """Splats (broadcasts) the element onto the vector.
 
         Args:
@@ -340,7 +340,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new SIMD vector whose elements are the same as the input value.
         """
         _simd_construction_checks[size]()
-        return SIMD[type, size] {
+        return Self {
             value: __mlir_op.`pop.simd.splat`[
                 _type = __mlir_type[
                     `!pop.simd<`, size.value, `, `, type.value, `>`
@@ -424,7 +424,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[size == 1, "expected a scalar type"]()
         return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-            rebind[SIMD[type, 1]](self).value
+            rebind[Scalar[type]](self).value
         )
 
     fn __str__(self) -> String:
@@ -481,7 +481,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return self.__int__()
 
     @always_inline("nodebug")
-    fn __add__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __add__(self, rhs: Self) -> Self:
         """Computes `self + rhs`.
 
         Args:
@@ -494,7 +494,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.add`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __sub__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __sub__(self, rhs: Self) -> Self:
         """Computes `self - rhs`.
 
         Args:
@@ -507,7 +507,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __mul__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __mul__(self, rhs: Self) -> Self:
         """Computes `self * rhs`.
 
         Args:
@@ -527,7 +527,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.mul`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __truediv__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __truediv__(self, rhs: Self) -> Self:
         """Computes `self / rhs`.
 
         Args:
@@ -540,7 +540,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.div`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __floordiv__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __floordiv__(self, rhs: Self) -> Self:
         """Returns the division of self and rhs rounded down to the nearest
         integer.
 
@@ -574,7 +574,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return div - mask.cast[type]()
 
     @always_inline("nodebug")
-    fn __mod__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __mod__(self, rhs: Self) -> Self:
         """Returns the remainder of self divided by rhs.
 
         Args:
@@ -604,7 +604,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return mod + mask.select(rhs, Self(0))
 
     @always_inline("nodebug")
-    fn __pow__(self, rhs: Int) -> SIMD[type, size]:
+    fn __pow__(self, rhs: Int) -> Self:
         """Computes the vector raised to the power of the input integer value.
 
         Args:
@@ -618,7 +618,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     # TODO(#22771): remove this overload.
     @always_inline("nodebug")
-    fn __pow__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __pow__(self, rhs: Self) -> Self:
         """Computes the vector raised elementwise to the right hand side power.
 
         Args:
@@ -631,9 +631,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return _pow(self, rhs)
 
     @always_inline("nodebug")
-    fn __pow__[
-        rhs_type: DType
-    ](self, rhs: SIMD[rhs_type, size]) -> SIMD[type, size]:
+    fn __pow__[rhs_type: DType](self, rhs: SIMD[rhs_type, size]) -> Self:
         """Computes the vector raised elementwise to the right hand side power.
 
         Parameters:
@@ -649,7 +647,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return _pow(self, rhs)
 
     @always_inline("nodebug")
-    fn __lt__(self, rhs: SIMD[type, size]) -> SIMD[DType.bool, size]:
+    fn __lt__(self, rhs: Self) -> SIMD[DType.bool, size]:
         """Compares two SIMD vectors using less-than comparison.
 
         Args:
@@ -665,7 +663,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __le__(self, rhs: SIMD[type, size]) -> SIMD[DType.bool, size]:
+    fn __le__(self, rhs: Self) -> SIMD[DType.bool, size]:
         """Compares two SIMD vectors using less-than-or-equal comparison.
 
         Args:
@@ -681,7 +679,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __eq__(self, rhs: SIMD[type, size]) -> SIMD[DType.bool, size]:
+    fn __eq__(self, rhs: Self) -> SIMD[DType.bool, size]:
         """Compares two SIMD vectors using equal-to comparison.
 
         Args:
@@ -697,7 +695,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __ne__(self, rhs: SIMD[type, size]) -> SIMD[DType.bool, size]:
+    fn __ne__(self, rhs: Self) -> SIMD[DType.bool, size]:
         """Compares two SIMD vectors using not-equal comparison.
 
         Args:
@@ -713,7 +711,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __gt__(self, rhs: SIMD[type, size]) -> SIMD[DType.bool, size]:
+    fn __gt__(self, rhs: Self) -> SIMD[DType.bool, size]:
         """Compares two SIMD vectors using greater-than comparison.
 
         Args:
@@ -729,7 +727,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __ge__(self, rhs: SIMD[type, size]) -> SIMD[DType.bool, size]:
+    fn __ge__(self, rhs: Self) -> SIMD[DType.bool, size]:
         """Compares two SIMD vectors using greater-than-or-equal comparison.
 
         Args:
@@ -745,7 +743,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __pos__(self) -> SIMD[type, size]:
+    fn __pos__(self) -> Self:
         """Defines the unary `+` operation.
 
         Returns:
@@ -754,7 +752,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return self
 
     @always_inline("nodebug")
-    fn __neg__(self) -> SIMD[type, size]:
+    fn __neg__(self) -> Self:
         """Defines the unary `-` operation.
 
         Returns:
@@ -767,7 +765,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: SIMD[type, size]):
+    fn __iadd__(inout self, rhs: Self):
         """Performs in-place addition.
 
         The vector is mutated where each element at position `i` is computed as
@@ -779,7 +777,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: SIMD[type, size]):
+    fn __isub__(inout self, rhs: Self):
         """Performs in-place subtraction.
 
         The vector is mutated where each element at position `i` is computed as
@@ -791,7 +789,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: SIMD[type, size]):
+    fn __imul__(inout self, rhs: Self):
         """Performs in-place multiplication.
 
         The vector is mutated where each element at position `i` is computed as
@@ -803,7 +801,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self * rhs
 
     @always_inline("nodebug")
-    fn __itruediv__(inout self, rhs: SIMD[type, size]):
+    fn __itruediv__(inout self, rhs: Self):
         """In-place true divide operator.
 
         The vector is mutated where each element at position `i` is computed as
@@ -815,7 +813,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self / rhs
 
     @always_inline("nodebug")
-    fn __ifloordiv__(inout self, rhs: SIMD[type, size]):
+    fn __ifloordiv__(inout self, rhs: Self):
         """In-place flood div operator.
 
         The vector is mutated where each element at position `i` is computed as
@@ -827,7 +825,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self // rhs
 
     @always_inline("nodebug")
-    fn __imod__(inout self, rhs: SIMD[type, size]):
+    fn __imod__(inout self, rhs: Self):
         """In-place mod operator.
 
         The vector is mutated where each element at position `i` is computed as
@@ -855,7 +853,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __radd__(self, value: SIMD[type, size]) -> SIMD[type, size]:
+    fn __radd__(self, value: Self) -> Self:
         """Returns `value + self`.
 
         Args:
@@ -867,7 +865,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return value + self
 
     @always_inline("nodebug")
-    fn __rsub__(self, value: SIMD[type, size]) -> SIMD[type, size]:
+    fn __rsub__(self, value: Self) -> Self:
         """Returns `value - self`.
 
         Args:
@@ -879,7 +877,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return value - self
 
     @always_inline("nodebug")
-    fn __rmul__(self, value: SIMD[type, size]) -> SIMD[type, size]:
+    fn __rmul__(self, value: Self) -> Self:
         """Returns `value * self`.
 
         Args:
@@ -891,7 +889,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return value * self
 
     @always_inline("nodebug")
-    fn __rtruediv__(self, value: SIMD[type, size]) -> SIMD[type, size]:
+    fn __rtruediv__(self, value: Self) -> Self:
         """Returns `value / self`.
 
         Args:
@@ -904,9 +902,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     # TODO: Move to global function.
     @always_inline("nodebug")
-    fn fma(
-        self, multiplier: SIMD[type, size], accumulator: SIMD[type, size]
-    ) -> SIMD[type, size]:
+    fn fma(self, multiplier: Self, accumulator: Self) -> Self:
         """Performs a fused multiply-add operation, i.e.
         `self*multiplier + accumulator`.
 
@@ -927,7 +923,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __and__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __and__(self, rhs: Self) -> Self:
         """Returns `self & rhs`.
 
         Constraints:
@@ -946,7 +942,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.and`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __iand__(inout self, rhs: SIMD[type, size]):
+    fn __iand__(inout self, rhs: Self):
         """Computes `self & rhs` and save the result in `self`.
 
         Constraints:
@@ -962,7 +958,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self & rhs
 
     @always_inline("nodebug")
-    fn __rand__(self, value: SIMD[type, size]) -> SIMD[type, size]:
+    fn __rand__(self, value: Self) -> Self:
         """Returns `value & self`.
 
         Constraints:
@@ -981,7 +977,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return value & self
 
     @always_inline("nodebug")
-    fn __xor__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __xor__(self, rhs: Self) -> Self:
         """Returns `self ^ rhs`.
 
         Constraints:
@@ -1000,7 +996,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.xor`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __ixor__(inout self, rhs: SIMD[type, size]):
+    fn __ixor__(inout self, rhs: Self):
         """Computes `self ^ rhs` and save the result in `self`.
 
         Constraints:
@@ -1016,7 +1012,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self ^ rhs
 
     @always_inline("nodebug")
-    fn __rxor__(self, value: SIMD[type, size]) -> SIMD[type, size]:
+    fn __rxor__(self, value: Self) -> Self:
         """Returns `value ^ self`.
 
         Constraints:
@@ -1035,7 +1031,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return value ^ self
 
     @always_inline("nodebug")
-    fn __or__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __or__(self, rhs: Self) -> Self:
         """Returns `self | rhs`.
 
         Constraints:
@@ -1054,7 +1050,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.or`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __ior__(inout self, rhs: SIMD[type, size]):
+    fn __ior__(inout self, rhs: Self):
         """Computes `self | rhs` and save the result in `self`.
 
         Constraints:
@@ -1070,7 +1066,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self | rhs
 
     @always_inline("nodebug")
-    fn __ror__(self, value: SIMD[type, size]) -> SIMD[type, size]:
+    fn __ror__(self, value: Self) -> Self:
         """Returns `value | self`.
 
         Constraints:
@@ -1089,7 +1085,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return value | self
 
     @always_inline("nodebug")
-    fn __invert__(self) -> SIMD[type, size]:
+    fn __invert__(self) -> Self:
         """Returns `~self`.
 
         Constraints:
@@ -1105,7 +1101,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter
         if type.is_bool():
-            return self.select(SIMD[type, size](False), SIMD[type, size](True))
+            return self.select(Self(False), Self(True))
         else:
             return self ^ -1
 
@@ -1114,7 +1110,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __lshift__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __lshift__(self, rhs: Self) -> Self:
         """Returns `self << rhs`.
 
         Constraints:
@@ -1131,7 +1127,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __rshift__(self, rhs: SIMD[type, size]) -> SIMD[type, size]:
+    fn __rshift__(self, rhs: Self) -> Self:
         """Returns `self >> rhs`.
 
         Constraints:
@@ -1148,7 +1144,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.shr`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __ilshift__(inout self, rhs: SIMD[type, size]):
+    fn __ilshift__(inout self, rhs: Self):
         """Computes `self << rhs` and save the result in `self`.
 
         Constraints:
@@ -1161,7 +1157,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self << rhs
 
     @always_inline("nodebug")
-    fn __irshift__(inout self, rhs: SIMD[type, size]):
+    fn __irshift__(inout self, rhs: Self):
         """Computes `self >> rhs` and save the result in `self`.
 
         Constraints:
@@ -1174,7 +1170,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self >> rhs
 
     @always_inline("nodebug")
-    fn __rlshift__(self, value: SIMD[type, size]) -> SIMD[type, size]:
+    fn __rlshift__(self, value: Self) -> Self:
         """Returns `value << self`.
 
         Constraints:
@@ -1190,7 +1186,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return value << self
 
     @always_inline("nodebug")
-    fn __rrshift__(self, value: SIMD[type, size]) -> SIMD[type, size]:
+    fn __rrshift__(self, value: Self) -> Self:
         """Returns `value >> self`.
 
         Constraints:
@@ -1212,7 +1208,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn _shuffle_list[
         mask: VariadicList[Int], output_size: Int = size
-    ](self, other: SIMD[type, size]) -> SIMD[type, output_size]:
+    ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation).
 
@@ -1240,7 +1236,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](self.value, other.value)
 
     @always_inline("nodebug")
-    fn shuffle[*mask: Int](self) -> SIMD[type, size]:
+    fn shuffle[*mask: Int](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation).
 
@@ -1254,7 +1250,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return self._shuffle_list[mask](self)
 
     @always_inline("nodebug")
-    fn shuffle[*mask: Int](self, other: SIMD[type, size]) -> SIMD[type, size]:
+    fn shuffle[*mask: Int](self, other: Self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation).
 
@@ -1275,7 +1271,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> SIMD[type, 1]:
+    fn __getitem__(self, idx: Int) -> Scalar[type]:
         """Gets an element from the vector.
 
         Args:
@@ -1289,15 +1285,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](self.value, idx.value)
 
     @always_inline("nodebug")
-    fn __setitem__(inout self, idx: Int, val: SIMD[type, 1]):
+    fn __setitem__(inout self, idx: Int, val: Scalar[type]):
         """Sets an element in the vector.
 
         Args:
             idx: The index to set.
             val: The value to set.
         """
-        # This needs to call __setitem__ explicitly to get the overload below.
-        self.__setitem__(idx, val.value)
+        self.value = __mlir_op.`pop.simd.insertelement`(
+            self.value, val.value, idx.value
+        )
 
     @always_inline("nodebug")
     fn __setitem__(
@@ -1363,10 +1360,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 type.value,
                 `>`,
             ],
-        ](self.value, offset.value)
+        ](self, offset)
 
     @always_inline("nodebug")
-    fn join(self, other: SIMD[type, size]) -> SIMD[type, 2 * size]:
+    fn join(self, other: Self) -> SIMD[type, 2 * size]:
         """Concatenates the two vectors together.
 
         Args:
@@ -1441,30 +1438,15 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         var res = SIMD[type, 2 * size]()
 
-        res = llvm_intrinsic[
-            "llvm.vector.insert",
-            __mlir_type[
-                `!pop.simd<`,
-                (2 * size).value,
-                `,`,
-                type.value,
-                `>`,
-            ],
-        ](res.value, self.value, 0)
-
-        return llvm_intrinsic[
-            "llvm.vector.insert",
-            __mlir_type[
-                `!pop.simd<`,
-                (2 * size).value,
-                `,`,
-                type.value,
-                `>`,
-            ],
-        ](res.value, other.value, size.value)
+        res = llvm_intrinsic["llvm.vector.insert", SIMD[type, 2 * size]](
+            res, self, 0
+        )
+        return llvm_intrinsic["llvm.vector.insert", SIMD[type, 2 * size]](
+            res, other, size
+        )
 
     @always_inline("nodebug")
-    fn interleave(self, other: SIMD[type, size]) -> SIMD[type, 2 * size]:
+    fn interleave(self, other: Self) -> SIMD[type, 2 * size]:
         """Constructs a vector by interleaving two input vectors.
 
         Args:
@@ -1511,7 +1493,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn min(self, other: SIMD[type, size]) -> SIMD[type, size]:
+    fn min(self, other: Self) -> Self:
         """Computes the elementwise minimum between the two vectors.
 
         Args:
@@ -1524,7 +1506,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.min`(self.value, other.value)
 
     @always_inline("nodebug")
-    fn max(self, other: SIMD[type, size]) -> SIMD[type, size]:
+    fn max(self, other: Self) -> Self:
         """Computes the elementwise maximum between the two vectors.
 
         Args:
@@ -1606,25 +1588,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if type.is_floating_point():
             return rebind[SIMD[type, size_out]](
-                llvm_intrinsic[
-                    "llvm.vector.reduce.fmax",
-                    __mlir_type[`!pop.simd<1, `, type.value, `>`],
-                ](self.value)
+                llvm_intrinsic["llvm.vector.reduce.fmax", Scalar[type]](self)
             )
 
         @parameter
         if type.is_unsigned():
             return rebind[SIMD[type, size_out]](
-                llvm_intrinsic[
-                    "llvm.vector.reduce.umax",
-                    __mlir_type[`!pop.simd<1, `, type.value, `>`],
-                ](self.value)
+                llvm_intrinsic["llvm.vector.reduce.umax", Scalar[type]](self)
             )
         return rebind[SIMD[type, size_out]](
-            llvm_intrinsic[
-                "llvm.vector.reduce.smax",
-                __mlir_type[`!pop.simd<1, `, type.value, `>`],
-            ](self.value)
+            llvm_intrinsic["llvm.vector.reduce.smax", Scalar[type]](self)
         )
 
     @always_inline("nodebug")
@@ -1661,25 +1634,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if type.is_floating_point():
             return rebind[SIMD[type, size_out]](
-                llvm_intrinsic[
-                    "llvm.vector.reduce.fmin",
-                    __mlir_type[`!pop.simd<1, `, type.value, `>`],
-                ](self.value)
+                llvm_intrinsic["llvm.vector.reduce.fmin", Scalar[type]](self)
             )
 
         @parameter
         if type.is_unsigned():
             return rebind[SIMD[type, size_out]](
-                llvm_intrinsic[
-                    "llvm.vector.reduce.umin",
-                    __mlir_type[`!pop.simd<1, `, type.value, `>`],
-                ](self.value)
+                llvm_intrinsic["llvm.vector.reduce.umin", Scalar[type]](self)
             )
         return rebind[SIMD[type, size_out]](
-            llvm_intrinsic[
-                "llvm.vector.reduce.smin",
-                __mlir_type[`!pop.simd<1, `, type.value, `>`],
-            ](self.value)
+            llvm_intrinsic["llvm.vector.reduce.smin", Scalar[type]](self)
         )
 
     @always_inline
@@ -1738,9 +1702,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if size == 1:
             return self.cast[DType.bool]()[0].value
-        return llvm_intrinsic[
-            "llvm.vector.reduce.and", __mlir_type.`!pop.scalar<bool>`
-        ](self.value)
+        return llvm_intrinsic["llvm.vector.reduce.and", Scalar[DType.bool]](
+            self
+        )
 
     @always_inline
     fn reduce_or(self) -> Bool:
@@ -1756,9 +1720,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if size == 1:
             return self.cast[DType.bool]()[0].value
-        return llvm_intrinsic[
-            "llvm.vector.reduce.or", __mlir_type.`!pop.scalar<bool>`
-        ](self.value)
+        return llvm_intrinsic["llvm.vector.reduce.or", Scalar[DType.bool]](self)
 
     # ===-------------------------------------------------------------------===#
     # select
@@ -1789,9 +1751,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_bool(), "the simd dtype must be bool"]()
         return __mlir_op.`pop.simd.select`(
-            rebind[__mlir_type[`!pop.simd<`, size.value, `, bool>`]](
-                self.value
-            ),
+            rebind[SIMD[DType.bool, size]](self).value,
             true_case.value,
             false_case.value,
         )
@@ -1801,7 +1761,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn rotate_left[shift: Int](self) -> SIMD[type, size]:
+    fn rotate_left[shift: Int](self) -> Self:
         """Shifts the elements of a SIMD vector to the left by `shift`
         elements (with wrap-around).
 
@@ -1821,19 +1781,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             shift >= -size and shift < size,
             "Constraint: -size <= shift < size",
         ]()
-        return llvm_intrinsic[
-            "llvm.experimental.vector.splice",
-            __mlir_type[
-                `!pop.simd<`,
-                size.value,
-                `,`,
-                type.value,
-                `>`,
-            ],
-        ](self.value, self.value, Int32(shift).value)
+        return llvm_intrinsic["llvm.experimental.vector.splice", Self](
+            self, self, Int32(shift)
+        )
 
     @always_inline
-    fn rotate_right[shift: Int](self) -> SIMD[type, size]:
+    fn rotate_right[shift: Int](self) -> Self:
         """Shifts the elements of a SIMD vector to the right by `shift`
         elements (with wrap-around).
 
@@ -1860,7 +1813,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn shift_left[shift: Int](self) -> SIMD[type, size]:
+    fn shift_left[shift: Int](self) -> Self:
         """Shifts the elements of a SIMD vector to the left by `shift`
         elements (no wrap-around, fill with zero).
 
@@ -1876,7 +1829,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             wrap-around, fill with zero).
         """
 
-        let zero_simd = SIMD[type, size]()
+        let zero_simd = Self()
 
         @parameter
         if shift == 0:
@@ -1884,19 +1837,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         elif shift == size:
             return 0
 
-        return llvm_intrinsic[
-            "llvm.experimental.vector.splice",
-            __mlir_type[
-                `!pop.simd<`,
-                size.value,
-                `,`,
-                type.value,
-                `>`,
-            ],
-        ](self.value, zero_simd.value, Int32(shift).value)
+        return llvm_intrinsic["llvm.experimental.vector.splice", Self](
+            self, zero_simd, Int32(shift)
+        )
 
     @always_inline
-    fn shift_right[shift: Int](self) -> SIMD[type, size]:
+    fn shift_right[shift: Int](self) -> Self:
         """Shifts the elements of a SIMD vector to the right by `shift`
         elements (no wrap-around, fill with zero).
 
@@ -1915,7 +1861,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Note the order of the llvm_intrinsic arguments below differ from
         # shift_left(), so we cannot directly reuse it here.
 
-        let zero_simd = SIMD[type, size]()
+        let zero_simd = Self()
 
         @parameter
         if shift == 0:
@@ -1923,16 +1869,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         elif shift == size:
             return 0
 
-        return llvm_intrinsic[
-            "llvm.experimental.vector.splice",
-            __mlir_type[
-                `!pop.simd<`,
-                size.value,
-                `,`,
-                type.value,
-                `>`,
-            ],
-        ](zero_simd.value, self.value, Int32(-shift).value)
+        return llvm_intrinsic["llvm.experimental.vector.splice", Self](
+            zero_simd, self, Int32(-shift)
+        )
 
 
 # ===-------------------------------------------------------------------===#
@@ -1974,7 +1913,6 @@ fn _pow[
     Returns:
       The `pow` of the inputs.
     """
-    let rhs_broadcast = SIMD[DType.index, simd_width](arg1)
     return _pow[type, DType.index, simd_width](arg0, arg1)
 
 
@@ -2012,7 +1950,7 @@ fn _pow[
 
         @unroll
         for i in range(simd_width):
-            result[i] = llvm_intrinsic["llvm.pow", SIMD[lhs_type, 1]](
+            result[i] = llvm_intrinsic["llvm.pow", Scalar[lhs_type]](
                 lhs[i], rhs[i]
             )
 
@@ -2031,7 +1969,7 @@ fn _pow[
 
             @unroll
             for i in range(simd_width):
-                result[i] = llvm_intrinsic["llvm.powi", SIMD[lhs_type, 1]](
+                result[i] = llvm_intrinsic["llvm.powi", Scalar[lhs_type]](
                     lhs[i], rhs[i].cast[DType.int32]()
                 )
         else:
@@ -2044,7 +1982,7 @@ fn _pow[
                     )
                     result[i] = 0
                     break
-                var res: SIMD[lhs_type, 1] = 1
+                var res: Scalar[lhs_type] = 1
                 var x = lhs[i]
                 var n = rhs[i]
                 while n > 0:
@@ -2092,22 +2030,12 @@ fn _floor[
         and (type == DType.float32)
     ):
         return llvm_intrinsic[
-            "llvm.x86.avx512.mask.rndscale.ps.512",
-            __mlir_type[
-                `!pop.simd<`,
-                simd_width.value,
-                `, `,
-                type.value,
-                `>`,
-            ],
+            "llvm.x86.avx512.mask.rndscale.ps.512", SIMD[type, simd_width]
         ](
-            x.value,
+            x,
             __mlir_attr.`1:i32`,
-            x.value,
+            x,
             __mlir_attr.`-1:i16`,
             __mlir_attr.`4:i32`,
         )
-    return llvm_intrinsic[
-        "llvm.floor",
-        __mlir_type[`!pop.simd<`, simd_width.value, `, `, type.value, `>`],
-    ](x.value)
+    return llvm_intrinsic["llvm.floor", SIMD[type, simd_width]](x)
