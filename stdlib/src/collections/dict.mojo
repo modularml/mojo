@@ -119,6 +119,9 @@ struct _DictIndex:
                 data[i] = _EMPTY
             self.data = data.bitcast[DType.invalid]()
 
+    fn __moveinit__(inout self, owned existing: Self):
+        self.data = existing.data
+
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
             let data = self.data.bitcast[DType.int8]()
@@ -256,6 +259,18 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
         self._reserved = 8
         self._index = _DictIndex(self._reserved)
         self._entries = Self._new_entries(self._reserved)
+
+    fn __moveinit__(inout self, owned existing: Self):
+        """Move data of an existing dict into a new one.
+
+        Args:
+            existing: The existing dict.
+        """
+        self.size = existing.size
+        self._n_entries = existing._n_entries
+        self._reserved = existing._reserved
+        self._index = existing._index ^
+        self._entries = existing._entries ^
 
     fn __getitem__(self, key: K) raises -> V:
         """Retrieve a value out of the dictionary.
