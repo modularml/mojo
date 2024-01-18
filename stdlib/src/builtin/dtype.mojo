@@ -513,9 +513,6 @@ struct DType(Stringable):
         #     func[DType.bfloat16]()
         elif self.is_float32():
             func[DType.float32]()
-        # TODO(#15473): Enable after extending LLVM support
-        # elif self.is_tensor_float32():
-        #     func[DType.tensor_float32]()
         elif self.is_float64():
             func[DType.float64]()
         else:
