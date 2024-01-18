@@ -1321,17 +1321,16 @@ fn masked_load[
 
 @always_inline("nodebug")
 fn masked_store[
-    type: DType, size: Int
+    size: Int
 ](
-    value: SIMD[type, size],
-    addr: DTypePointer[type],
+    value: SIMD,
+    addr: DTypePointer[value.type],
     mask: SIMD[DType.bool, size],
     alignment: Int = 1,
 ):
     """Stores a value at a memory location, skipping masked lanes.
 
     Parameters:
-      type: DType of `value`, the data to store.
       size: Size of `value`, the data to store.
 
     Args:
