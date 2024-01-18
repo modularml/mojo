@@ -583,6 +583,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             The remainder of dividing self by rhs.
         """
+        constrained[type.is_numeric(), "the type must be numeric"]()
+
         if rhs == 0:
             # this should raise an exception.
             return 0
@@ -599,7 +601,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
             let mod = self - div * rhs
             let mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
-            return mod + mask.cast[type]() * rhs
+            return mod + mask.select(rhs, Self(0))
 
     @always_inline("nodebug")
     fn __pow__(self, rhs: Int) -> SIMD[type, size]:
