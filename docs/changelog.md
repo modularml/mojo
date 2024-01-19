@@ -189,6 +189,8 @@ modular install mojo
 
 ### 🛠️ Fixed
 
+- [#1595](https://github.com/modularml/mojo/issues/1595) - Improve error message
+  when trying to materialize `IntLiteral` in runtime code.
 - Raising an error from the initializer of a memory-only type now works
   correctly in the presence of complex control flow.  Previously Mojo could run
   the destructor on `self`` before it was initialized when exiting with an
