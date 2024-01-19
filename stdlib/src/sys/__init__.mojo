@@ -6,4 +6,5 @@
 """Implements the sys package."""
 
 from .arg import *
-from .intrinsics import external_call, _external_call_const, llvm_intrinsic
+from .intrinsics import llvm_intrinsic
+from .ffi import external_call

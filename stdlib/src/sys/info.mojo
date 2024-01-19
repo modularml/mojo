@@ -12,6 +12,8 @@ from sys.info import is_x86
 ```
 """
 
+from .ffi import _external_call_const
+
 
 @always_inline("nodebug")
 fn _current_target() -> __mlir_type.`!kgen.target`:
