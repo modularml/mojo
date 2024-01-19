@@ -277,6 +277,13 @@ from "math.h" import cos
 print(cos(0))
 ```
 
+## Calling Mojo from Python
+
+Currently you can call Python code from Mojo, but not the reverse: you can't
+pass a Mojo callback to a Python function, or build a Python extension in Mojo.
+We want to support calling Mojo from Python, but we want to do it right and we
+need the core language to be more mature first.
+
 ## Full MLIR decorator reflection
 
 All decorators in Mojo have hard-coded behavior in the parser. In time, we will
@@ -491,7 +498,7 @@ Currently, this means you cannot declare two nested functions with the same
 name. For instance, the following example does not work in Mojo:
 
 ```mojo
-def pick_func(cond):
+def pick_func(cond) -> def() capturing:
     if cond:
         def bar(): return 42
     else:
@@ -503,13 +510,13 @@ The functions in each conditional must be explicitly materialized as dynamic
 values.
 
 ```mojo
-def pick_func(cond):
+def pick_func(cond)  -> def() capturing:
     let result: def() capturing # Mojo function type
     if cond:
         def bar0(): return 42
         result = bar0
     else:
-        def bar1(): return 3 # error: redeclaration of 'bar'
+        def bar1(): return 3
         result = bar1
     return result
 ```
@@ -668,7 +675,7 @@ fn call_it():
     _ = s^ # discard 's' explicitly
 ```
 
-A quick note on the behaviour of "stateful" closures. One sharp edge here is
+A quick note on the behavior of "stateful" closures. One sharp edge here is
 that stateful closures are *always* capture-by-copy; Mojo lacks syntax for
 move-captures and the lifetime tracking necessary for capture-by-reference.
 Stateful closures are runtime values -- they cannot be passed as parameters,
