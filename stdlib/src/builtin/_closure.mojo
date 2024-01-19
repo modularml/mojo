@@ -14,13 +14,13 @@ struct __ParameterClosureCaptureList[fn_type: AnyRegType, fn_ref: fn_type]:
     @always_inline
     fn __init__() -> Self:
         return Self {
-            value: __mlir_op.`kgen.capture_list.create`[symbiont=fn_ref]()
+            value: __mlir_op.`kgen.capture_list.create`[callee=fn_ref]()
         }
 
     @always_inline
     fn __copyinit__(existing: Self) -> Self:
         return Self {
-            value: __mlir_op.`kgen.capture_list.copy`[symbiont=fn_ref](
+            value: __mlir_op.`kgen.capture_list.copy`[callee=fn_ref](
                 existing.value
             )
         }
