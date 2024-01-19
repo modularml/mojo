@@ -146,7 +146,6 @@ struct slice(Sized):
         """
 
         @always_inline("nodebug")
-        @noncapturing
         fn div_ceil(numerator: Int, denominator: Int) -> Int:
             return (numerator + denominator - 1) // denominator
 

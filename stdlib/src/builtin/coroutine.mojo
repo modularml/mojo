@@ -272,7 +272,6 @@ struct RaisingCoroutine[type: AnyRegType]:
             The coroutine promise.
         """
 
-        @noncapturing
         fn _coro_noop_fn(handle: CoroutineContext._opaque_handle):
             return
 

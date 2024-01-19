@@ -1005,7 +1005,6 @@ struct object(IntableRaising):
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) < 0
 
-        @noncapturing
         @always_inline
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return not lhs and rhs
@@ -1029,7 +1028,6 @@ struct object(IntableRaising):
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) <= 0
 
-        @noncapturing
         @always_inline
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs == rhs or not lhs
@@ -1053,7 +1051,6 @@ struct object(IntableRaising):
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) == 0
 
-        @noncapturing
         @always_inline
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs == rhs
@@ -1077,7 +1074,6 @@ struct object(IntableRaising):
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) != 0
 
-        @noncapturing
         @always_inline
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs != rhs
@@ -1101,7 +1097,6 @@ struct object(IntableRaising):
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) > 0
 
-        @noncapturing
         @always_inline
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs and not rhs
@@ -1126,7 +1121,6 @@ struct object(IntableRaising):
         if self._value.is_list() and rhs._value.is_list():
             return self._list_compare(rhs) >= 0
 
-        @noncapturing
         @always_inline
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs == rhs or lhs

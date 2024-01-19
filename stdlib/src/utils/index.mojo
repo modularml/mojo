@@ -456,7 +456,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Int:
             return a + b
 
@@ -476,7 +475,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Int:
             return a - b
 
@@ -496,7 +494,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Int:
             return a * b
 
@@ -516,7 +513,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Int:
             return a // b
 
@@ -536,7 +532,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Int:
             return a % b
 
@@ -558,7 +553,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Bool:
             return a == b
 
@@ -583,7 +577,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Bool:
             return a < b
 
@@ -608,7 +601,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Bool:
             return a <= b
 
@@ -633,7 +625,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Bool:
             return a > b
 
@@ -658,7 +649,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         """
 
         @always_inline
-        @noncapturing
         fn apply_fn(a: Int, b: Int) -> Bool:
             return a >= b
 

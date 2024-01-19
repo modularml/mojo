@@ -63,8 +63,6 @@ fn __wrap_and_execute_object_raising_main[
     """Define a C-ABI compatible entry point for a raising main function that
     returns an object"""
 
-    @noncapturing
-    @parameter
     fn wrapped_main() raises:
         _ = main_func()
 

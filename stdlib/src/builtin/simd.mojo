@@ -1576,6 +1576,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if is_x86() or size_out > 1:
 
             @always_inline
+            @parameter
             fn max_reduce_body[
                 type: DType, width: Int
             ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
@@ -1622,6 +1623,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if is_x86() or size_out > 1:
 
             @always_inline
+            @parameter
             fn min_reduce_body[
                 type: DType, width: Int
             ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
@@ -1659,6 +1661,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @always_inline
+        @parameter
         fn add_reduce_body[
             type: DType, width: Int
         ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[type, width]:
@@ -1681,6 +1684,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @always_inline
+        @parameter
         fn mul_reduce_body[
             type: DType, width: Int
         ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[type, width]:
