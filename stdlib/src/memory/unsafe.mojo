@@ -256,6 +256,7 @@ struct _LITRef[
     element_type: AnyType,
     is_mutable: __mlir_type.i1,
     lifetime: Lifetime,
+    addr_space: __mlir_type.index = Int(0).__mlir_index__(),
 ]:
     alias type = __mlir_type[
         `!lit.ref<mut=`,
@@ -266,6 +267,8 @@ struct _LITRef[
         element_type,
         `, `,
         lifetime,
+        `, `,
+        addr_space,
         `>`,
     ]
 
