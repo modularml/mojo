@@ -43,4 +43,4 @@ fn __closure_wrapper_noop_dtor(
 fn __closure_wrapper_noop_copy(
     owned other: __mlir_type.`!kgen.pointer<none>`, /
 ) -> __mlir_type.`!kgen.pointer<none>`:
-    return __mlir_attr.`#interp.pointer<0> : !kgen.pointer<none>`
+    return other
