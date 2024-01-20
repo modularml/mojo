@@ -250,6 +250,26 @@ struct AddressSpace:
 # ===----------------------------------------------------------------------===#
 
 
+# Helper to build !lit.ref types.
+# TODO: parametric aliases would be nice.
+struct _LITRef[
+    element_type: AnyType,
+    is_mutable: __mlir_type.i1,
+    lifetime: Lifetime,
+]:
+    alias type = __mlir_type[
+        `!lit.ref<mut=`,
+        is_mutable,
+        `, :`,
+        AnyType,
+        ` `,
+        element_type,
+        `, `,
+        lifetime,
+        `>`,
+    ]
+
+
 @value
 @register_passable("trivial")
 struct Reference[
@@ -265,17 +285,7 @@ struct Reference[
         lifetime: The lifetime of the reference.
     """
 
-    alias mlir_ref_type = __mlir_type[
-        `!lit.ref<mut=`,
-        is_mutable,
-        `, :`,
-        AnyType,
-        ` `,
-        type,
-        `, `,
-        lifetime,
-        `>`,
-    ]
+    alias mlir_ref_type = _LITRef[type, is_mutable, lifetime].type
 
     var value: Self.mlir_ref_type
     """The underlying MLIR reference."""

@@ -8,7 +8,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory.unsafe import Reference
+from memory.unsafe import Reference, _LITRef
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
@@ -195,26 +195,6 @@ struct _VariadicListMemIter[
         return len(self.src[]) - self.index
 
 
-# Helper to build !lit.ref types.
-# TODO: parametric aliases would be nice.
-struct _LITRef[
-    element_type: AnyType,
-    is_mutable: __mlir_type.i1,
-    lifetime: Lifetime,
-]:
-    alias type = __mlir_type[
-        `!lit.ref<mut=`,
-        is_mutable,
-        `, :`,
-        AnyType,
-        ` `,
-        element_type,
-        `, `,
-        lifetime,
-        `>`,
-    ]
-
-
 # Helper to compute the union of two lifetimes:
 # TODO: parametric aliases would be nice.
 struct _union_lifetimes[a: Lifetime, b: Lifetime]:
@@ -366,9 +346,9 @@ struct VariadicListMem[
     #      -> Self.reference_type.union_lifetime(lifetimeof(self))
     @always_inline
     fn __refitem__[
-        self_life: Lifetime, self_mutability: __mlir_type.i1
+        self_life: Lifetime,
     ](
-        self: _LITRef[Self, self_mutability, self_life].type, index: Int
+        self: _LITRef[Self, __mlir_attr.`0: i1`, self_life].type, index: Int
     ) -> _LITRef[
         type, is_mutable, _union_lifetimes[lifetime, self_life].result
     ].type:
@@ -389,9 +369,9 @@ struct VariadicListMem[
     # bound to the VariadicListMem
     @always_inline
     fn __iter__[
-        self_lifetime: Lifetime, self_mutability: __mlir_type.i1
+        self_lifetime: Lifetime
     ](
-        self: _LITRef[Self, self_mutability, self_lifetime].type
+        self: _LITRef[Self, __mlir_attr.`0: i1`, self_lifetime].type
     ) -> _VariadicListMemIter[type, lifetime, is_mutable, self_lifetime]:
         """Iterate over the list.
 
