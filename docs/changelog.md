@@ -152,7 +152,43 @@ modular install mojo
   in function parameter lists are no longer allowed, nor are forward alias
   declarations. This includes removing the `param_return` statement.
 
+- The `@noncapturing` and `@closure` decorators have been removed due to
+  refinements and improvements to the closure model. See below for more details!
+
 ### 🦋 Changed
+
+- The Mojo closure model has been refined to be more straightforward and safe.
+  Mojo has two closure types: parameter closures and runtime closures. Parameter
+  closures can be used in higher-order functions and are the backbone of
+  functions like `vectorize` and `parallelize`. They are always denoted by
+  `@parameter` and have type `fn(...) capturing -> T`.
+
+  On the other hand, runtime closures are always dynamic values, capture values
+  by invoking their copy constructor, and retain ownership of their capture
+  state. You can define a runtiem closure by writing a nested function that
+  captures values:
+
+  ```mojo
+  fn outer(b: Bool, x: String) -> fn() escaping -> None:
+      fn closure()
+          print(x) # 'x' is captured by calling String.__copyinit__
+
+      fn bare_function()
+          print("hello") # nothing is captured
+
+      if b:
+          # closure can be safely returned because it owns its state
+          return closure^
+
+      # function pointers can be converted to runtime closures
+      return bare_function
+  ```
+
+  The type of runtime closures are of the form `fn(...) escaping -> None`. You
+  can pass equivalent function pointers as runtime closures.
+
+  Stay tuned for capture list syntax for move capture and capture by reference,
+  and a more unified closure model!
 
 - The `@unroll(n)` decorator can now take a parameter expression for
   the unroll factor, i.e. `n` can be a parameter expression that is
@@ -230,6 +266,10 @@ modular install mojo
   variadic list of traits.
 - [#1604](https://github.com/modularml/mojo/issues/1604) - Variable of trivial
   type not destroyed by transferring ownership.
+- [#1341](https://github.com/modularml/mojo/issues/1341) - Segmentation fault
+  when passing closures around.
+- [#217](https://github.com/modularml/mojo/issues/217) - Closure state is
+  stack allocated.
 
 ## v0.6.1 (2023-12-18)
 
