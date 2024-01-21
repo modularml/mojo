@@ -163,26 +163,26 @@ struct VariadicList[type: AnyRegType](Sized):
 @value
 struct _VariadicListMemIter[
     elt_type: AnyType,
-    elt_lifetime: Lifetime,
-    is_mutable: __mlir_type.i1,
-    list_lifetime: Lifetime,
+    elt_is_mutable: __mlir_type.i1,
+    elt_lifetime: AnyLifetime[elt_is_mutable].type,
+    list_lifetime: ImmLifetime,
 ]:
     """Iterator for VariadicListMem.
 
     Parameters:
         elt_type: The type of the elements in the list.
+        elt_is_mutable: Whether the elements in the list are mutable.
         elt_lifetime: The lifetime of the elements.
-        is_mutable: Whether the reference is mutable in VariadicListMem.
         list_lifetime: The lifetime of the VariadicListMem.
     """
 
     alias variadic_list_type = VariadicListMem[
-        elt_type, elt_lifetime, is_mutable
+        elt_type, elt_is_mutable, elt_lifetime
     ]
 
     var index: Int
     var src: Reference[
-        Self.variadic_list_type, False.__mlir_i1__(), list_lifetime
+        Self.variadic_list_type, __mlir_attr.`0: i1`, list_lifetime
     ]
 
     fn __next__(inout self) -> Self.variadic_list_type.reference_type:
@@ -197,34 +197,54 @@ struct _VariadicListMemIter[
 
 # Helper to compute the union of two lifetimes:
 # TODO: parametric aliases would be nice.
-struct _union_lifetimes[a: Lifetime, b: Lifetime]:
+struct _lit_lifetime_union[
+    is_mutable: __mlir_type.i1,
+    a: AnyLifetime[is_mutable].type,
+    b: AnyLifetime[is_mutable].type,
+]:
     alias result = __mlir_attr[
-        `#lit.lifetime.union<`, a, `,`, b, `> : !lit.lifetime`
+        `#lit.lifetime.union<`, a, `,`, b, `> : !lit.lifetime<`, is_mutable, `>`
+    ]
+
+
+struct _lit_mut_cast[
+    is_mutable: __mlir_type.i1,
+    operand: AnyLifetime[is_mutable].type,
+    result_mutable: __mlir_type.i1,
+]:
+    alias result = __mlir_attr[
+        `#lit.lifetime.mutcast<`,
+        operand,
+        `> : !lit.lifetime<`,
+        +result_mutable,
+        `>`,
     ]
 
 
 struct VariadicListMem[
-    type: AnyType, lifetime: Lifetime, is_mutable: __mlir_type.i1
+    element_type: AnyType,
+    elt_is_mutable: __mlir_type.i1,
+    lifetime: AnyLifetime[elt_is_mutable].type,
 ](Sized):
     """A utility class to access variadic function arguments of memory-only
     types that may have ownership. It exposes references to the elements in a
     way that can be enumerated.  Each element may be accessed with `elt[]`.
 
     Parameters:
-        type: The type of the elements in the list.
+        element_type: The type of the elements in the list.
+        elt_is_mutable: True if the elements of the list are mutable for an
+                        inout or owned argument.
         lifetime: The reference lifetime of the underlying elements.
-        is_mutable: True if the elements of the list are mutable for an inout
-                    or owned argument.
     """
 
-    alias reference_type = Reference[type, is_mutable, lifetime]
-    alias mlir_ref_type = Self.reference_type.mlir_ref_type
+    alias reference_type = Reference[element_type, elt_is_mutable, lifetime]
+    alias mlir_ref_type = _LITRef[element_type, elt_is_mutable, lifetime].type
     alias storage_type = __mlir_type[
         `!kgen.variadic<`, Self.mlir_ref_type, `, borrow_in_mem>`
     ]
 
     var value: Self.storage_type
-    """The underlying storage, a variadic list of pointers to elements of the
+    """The underlying storage, a variadic list of references to elements of the
     given type."""
 
     # This is true when the elements are 'owned' - these are destroyed when
@@ -299,7 +319,7 @@ struct VariadicListMem[
         # Immutable variadics never own the memory underlying them,
         # microoptimize out a check of _is_owned.
         @parameter
-        if not Bool(is_mutable):
+        if not Bool(elt_is_mutable):
             return
 
         else:
@@ -346,11 +366,20 @@ struct VariadicListMem[
     #      -> Self.reference_type.union_lifetime(lifetimeof(self))
     @always_inline
     fn __refitem__[
-        self_life: Lifetime,
+        self_life: ImmLifetime,
     ](
         self: _LITRef[Self, __mlir_attr.`0: i1`, self_life].type, index: Int
     ) -> _LITRef[
-        type, is_mutable, _union_lifetimes[lifetime, self_life].result
+        element_type,
+        elt_is_mutable,
+        _lit_lifetime_union[
+            elt_is_mutable,
+            lifetime,
+            # cast mutability of self to match the mutability of the element, since that is what we want to use in the ultimate reference and the union overall doesn't matter.
+            _lit_mut_cast[
+                __mlir_attr.`0: i1`, self_life, elt_is_mutable
+            ].result,
+        ].result,
     ].type:
         """Gets a single element on the variadic list.
 
@@ -369,15 +398,17 @@ struct VariadicListMem[
     # bound to the VariadicListMem
     @always_inline
     fn __iter__[
-        self_lifetime: Lifetime
+        self_lifetime: ImmLifetime,
     ](
         self: _LITRef[Self, __mlir_attr.`0: i1`, self_lifetime].type
-    ) -> _VariadicListMemIter[type, lifetime, is_mutable, self_lifetime]:
+    ) -> _VariadicListMemIter[
+        element_type, elt_is_mutable, lifetime, self_lifetime
+    ]:
         """Iterate over the list.
 
         Returns:
             An iterator to the start of the list.
         """
-        return _VariadicListMemIter[type, lifetime, is_mutable, self_lifetime](
-            0, self
-        )
+        return _VariadicListMemIter[
+            element_type, elt_is_mutable, lifetime, self_lifetime
+        ](0, self)

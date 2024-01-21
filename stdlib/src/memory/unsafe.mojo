@@ -8,7 +8,7 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory.unsafe import Pointer
+from memory.unsafe import Pointer, AnyLifetime
 ```
 """
 
@@ -254,14 +254,12 @@ struct AddressSpace:
 # TODO: parametric aliases would be nice.
 struct _LITRef[
     element_type: AnyType,
-    is_mutable: __mlir_type.i1,
-    lifetime: Lifetime,
+    elt_is_mutable: __mlir_type.i1,
+    lifetime: AnyLifetime[elt_is_mutable].type,
     addr_space: __mlir_type.index = Int(0).__mlir_index__(),
 ]:
     alias type = __mlir_type[
-        `!lit.ref<mut=`,
-        is_mutable,
-        `, :`,
+        `!lit.ref<:`,
         AnyType,
         ` `,
         element_type,
@@ -278,7 +276,7 @@ struct _LITRef[
 struct Reference[
     type: AnyType,
     is_mutable: __mlir_type.i1,
-    lifetime: Lifetime,
+    lifetime: AnyLifetime[is_mutable].type,
 ]:
     """Defines a non-nullable safe reference.
 

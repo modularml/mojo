@@ -191,7 +191,10 @@ struct _RefCountedAttrsDictRef:
     """The reference to the dictionary."""
 
     @always_inline
-    fn __init__(values: VariadicListMem[Attr]) -> Self:
+    fn __init__[  # FIXME(#29464): Should use autoparameterization.
+        elt_is_mutable: __mlir_type.i1,
+        lifetime: AnyLifetime[elt_is_mutable].type,
+    ](values: VariadicListMem[Attr, elt_is_mutable, lifetime]) -> Self:
         let ptr = Pointer[_RefCountedAttrsDict].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
