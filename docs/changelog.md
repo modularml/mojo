@@ -44,6 +44,7 @@ modular install mojo
 [//]: ## UNRELEASED
 [//]: ### ⭐️ New
 [//]: ### 🦋 Changed
+[//]: ### ❌ Removed
 [//]: ### 🛠️ Fixed
 
 ## UNRELEASED
@@ -141,7 +142,7 @@ modular install mojo
   references auto-deref - at that point we may switch to just `__getattr__`
   returning a reference.
 
-### 🪦 Removed
+### ❌ Removed
 
 - The `__takeinit__` special constructor form has been removed from the
   language.  This "non-destructive move" operation was previously wired into the
@@ -1032,7 +1033,7 @@ modular install mojo
   machine by default. The prior default behavior was to use all the cores on
   the first socket.
 
-#### ❌ Removed
+### ❌ Removed
 
 - The `math.numerics` module is now private, because its types (`FPUtils` and
   `FlushDenormals`) should not be used externally.
