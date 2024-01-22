@@ -68,33 +68,78 @@ modular install mojo
 - `num_physical_cores`, `num_logical_cores`, and `num_performance_cores` have
   been added to the `sys.info` module.
 
-- Mojo now allows types to implement `__refattr__` and `__refitem__` to enable
-  attribute and subscript syntax with computed accessors that return references.
-  For common situations where these address a value in memory this provides a
-  more convenient and significantly more performant alternative to implementing
-  the traditional get/set pairs.
-
-- Mojo's low-level reference system is now parametric over mutability,
-  eliminating the [problems with code duplication due to mutability
-  specifiers](https://duckki.github.io/2024/01/01/inferred-mutability.html) and
-  unifying user-level types like `Reference` across both mutable and immutable
-  values.
-
 - Variadic arguments are more powerful and easier to use. Subscripting into a
   variadic pack now returns the element instead of an obscure internal type, and
-  we now support `inout` variadics.  Note that direct iteration over variadic
-  pack with a for-in loop produces a reference instead of a value, we intend to
+  we now support `inout` and `owned` variadics:
+
+  ```mojo
+  fn make_worldly(inout *strs: String):
+      # Just works as you'd expect!
+      for i in range(len(strs)):
+          strs[i] += " world"
+  ```
+
+  Note that subscripting the variadic works nicely as above, but for-each
+  iteration over the variadic pack with a for-in loop produces a `Reference`
+  instead of the desired value, so an extra subscript is required: we intend to
   fix this in the future.
 
   ```mojo
   fn make_worldly(inout *strs: String):
-      # Works as you'd expect.
-      for i in range(len(strs)):
-          strs[i] += " world"
-      # Requires extra [] to dereference the reference.
+      # Requires extra [] to dereference the reference for now.
       for i in strs):
           i[] += " world"
   ```
+
+- Mojo now has the prototype of a safe `Reference` type which is reasoned about
+  the lifetime tracking pass to safely extend local variable lifetime, and check
+  indirect access safety.  The `Reference` type has zero syntactic sugar, and is
+  dereferenced with an empty subscript after it: `ref[]` provides access to the
+  underlying value.
+
+  ```mojo
+  fn main():
+      var a : String = "hello"
+      var b : String = " references"
+
+      var aref = Reference(a)
+      aref[] += b
+      print(a)  # prints "hello references"
+
+      aref[] += b
+      # ^last use of b, it is destroyed here.
+
+      print(aref[]) # prints "hello references references"
+      # ^last use of a, it is destroyed here.
+  ```
+
+  While the `Reference` type has the same in-memory representation as a C
+  pointer or the Mojo `Pointer` type, it also tracks a symbolic "lifetime" value
+  so the compiler can reason about the potentially accessed set of values.  This
+  set is part of the static type of the reference, so it propagates through
+  generic algorithms.
+
+  The `Reference` type can form references to both mutable and immutable memory
+  objects, e.g. those on the stack or borrowed/inout/owned function arguments.
+  It is fully parametric over mutability, eliminating the [problems with code
+  duplication due to mutability
+  specifiers](https://duckki.github.io/2024/01/01/inferred-mutability.html) and
+  providing the base for unifed user-level types like `ArraySlice` across both
+  mutable and immutable accesses.
+
+  While this is a major step forward for the lifetimes system in Mojo, it is
+  still very early and awkward to use.  Notably, there is no syntactic sugar
+  for using references (e.g. automatic dereferencing), and several aspects of it
+  need to be more baked.  It is getting exercised by variadic memory arguments,
+  which is why they are starting to behave better now.
+
+- Mojo now allows types to implement `__refattr__` and `__refitem__` to enable
+  attribute and subscript syntax with computed accessors that return references.
+  For common situations where these address a value in memory this provides a
+  more convenient and significantly more performant alternative to implementing
+  the traditional get/set pairs.  Note: this may be changed in the future when
+  references auto-deref - at that point we may switch to just `__getattr__`
+  returning a reference.
 
 ### 🪦 Removed
 
