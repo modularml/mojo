@@ -69,21 +69,29 @@ modular install mojo
 - `num_physical_cores`, `num_logical_cores`, and `num_performance_cores` have
   been added to the `sys.info` module.
 
-- Variadic arguments are more powerful and easier to use. Subscripting into a
-  variadic pack now returns the element instead of an obscure internal type, and
-  we now support `inout` and `owned` variadics:
+- Homogenous variadic arguments are more powerful and easier to use.
+  Subscripting into a variadic now returns the element instead of an obscure
+  internal type, and we now support `inout` and `owned` variadics:
 
   ```mojo
   fn make_worldly(inout *strs: String):
-      # Just works as you'd expect!
+      # This "just works" as you'd expect!
       for i in range(len(strs)):
           strs[i] += " world"
+  fn main():
+      var s1: String = "hello"
+      var s2: String = "konnichiwa"
+      var s3: String = "bonjour"
+      make_worldly(s1, s2, s3)
+      print(s1)  # hello world
+      print(s2)  # konnichiwa world
+      print(s3)  # bonjour world
   ```
 
-  Note that subscripting the variadic works nicely as above, but for-each
-  iteration over the variadic pack with a for-in loop produces a `Reference`
-  instead of the desired value, so an extra subscript is required: we intend to
-  fix this in the future.
+  Note that subscripting the variadic argument works nicely as above, but
+  for-each iteration over the variadic with a for-in loop produces a `Reference`
+  (see below) instead of the desired value, so an extra subscript is required:
+  we intend to fix this in the future.
 
   ```mojo
   fn make_worldly(inout *strs: String):
@@ -92,11 +100,14 @@ modular install mojo
           i[] += " world"
   ```
 
+  Heterogenous variadics have not yet been moved to the new model, but will is
+  future updates.
+
 - Mojo now has the prototype of a safe `Reference` type which is reasoned about
-  the lifetime tracking pass to safely extend local variable lifetime, and check
-  indirect access safety.  The `Reference` type has zero syntactic sugar, and is
-  dereferenced with an empty subscript after it: `ref[]` provides access to the
-  underlying value.
+  by the lifetime tracking pass to safely extend local variable lifetime, and
+  check indirect access safety.  The `Reference` type is brand new (and
+  currently has no syntactic sugar) so it must be explicitly dereferenced with
+  an empty subscript: `ref[]` provides access to the underlying value.
 
   ```mojo
   fn main():
@@ -118,18 +129,18 @@ modular install mojo
   pointer or the Mojo `Pointer` type, it also tracks a symbolic "lifetime" value
   so the compiler can reason about the potentially accessed set of values.  This
   set is part of the static type of the reference, so it propagates through
-  generic algorithms.
+  generic algorithms and composition of abstractions built around it.
 
   The `Reference` type can form references to both mutable and immutable memory
   objects, e.g. those on the stack or borrowed/inout/owned function arguments.
   It is fully parametric over mutability, eliminating the [problems with code
   duplication due to mutability
   specifiers](https://duckki.github.io/2024/01/01/inferred-mutability.html) and
-  providing the base for unifed user-level types like `ArraySlice` across both
+  provides the base for unifed user-level types like `ArraySlice` across both
   mutable and immutable accesses.
 
   While this is a major step forward for the lifetimes system in Mojo, it is
-  still very early and awkward to use.  Notably, there is no syntactic sugar
+  still _very_ early and awkward to use.  Notably, there is no syntactic sugar
   for using references (e.g. automatic dereferencing), and several aspects of it
   need to be more baked.  It is getting exercised by variadic memory arguments,
   which is why they are starting to behave better now.
