@@ -12,10 +12,35 @@ from debug.lldb import lldb_formatter_wrapping_type
 from collections.vector import CollectionElement
 
 
+trait Boolable:
+    """The `Boolable` trait describes a type that can be converted to a bool.
+
+    This trait requires the type to implement the `__bool__()` method. For
+    example:
+
+    ```mojo
+    @value
+    struct Foo(Boolable):
+        var val: Bool
+
+        fn __bool__(self) -> Bool:
+            return self.val
+    ```
+    """
+
+    fn __bool__(self) -> Bool:
+        """Get the boolean representation of the value.
+
+        Returns:
+            The boolean representation of the value.
+        """
+        ...
+
+
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct Bool(Stringable, CollectionElement):
+struct Bool(Stringable, CollectionElement, Boolable):
     """The primitive Bool scalar value used in Mojo."""
 
     var value: __mlir_type.`!pop.scalar<bool>`
@@ -36,16 +61,16 @@ struct Bool(Stringable, CollectionElement):
         ](value)
 
     @always_inline("nodebug")
-    fn __init__(value: Bool) -> Bool:
-        """Construct a Bool value given a __mlir_type.i1 value.
+    fn __init__[type: Boolable](value: type) -> Bool:
+        """Construct a Bool value given a type that is a Boolable.
 
         Args:
-            value: The initial __mlir_type.i1 value.
+            value: The initial value to be coerced to Bool.
 
         Returns:
             The constructed Bool value.
         """
-        return Self {value: value.value}
+        return Self {value: value.__bool__().value}
 
     @always_inline("nodebug")
     fn __init__[width: Int](value: SIMD[DType.bool, width]) -> Bool:
