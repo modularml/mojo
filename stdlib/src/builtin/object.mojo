@@ -654,7 +654,7 @@ struct _ObjectImpl(CollectionElement):
 # ===----------------------------------------------------------------------=== #
 
 
-struct object(IntableRaising):
+struct object(IntableRaising, Boolable):
     """Represents an object without a concrete type.
 
     This is the type of arguments in `def` functions that do not have a type
