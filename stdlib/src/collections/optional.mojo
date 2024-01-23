@@ -139,6 +139,4 @@ struct Optional[T: CollectionElement](CollectionElement):
         Returns:
             A new Optional containing the old value or default.
         """
-        # TODO(27792): we need to bind this to a local for now
-        let result = self or Optional(default)
-        return result
+        return self or Optional(default)

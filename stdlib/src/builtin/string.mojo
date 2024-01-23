@@ -422,8 +422,7 @@ struct String(Sized, CollectionElement, Stringable, Hashable):
         Args:
             existing: The string to move.
         """
-        self._buffer = existing._buffer
-        existing._buffer = Self._buffer_type()
+        self._buffer = existing._buffer ^
 
     @always_inline
     fn __bool__(self) -> Bool:

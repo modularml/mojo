@@ -287,8 +287,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
         let value = self.find(key)
         if value:
             return value.value()
-        else:
-            raise "KeyError"
+        raise "KeyError"
 
     fn __setitem__(inout self, key: K, value: V):
         """Set a value in the dictionary by key.
@@ -325,8 +324,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
         if found:
             let ev = self._entries[index]
             debug_assert(ev.__bool__(), "entry in index must be full")
-            let entry = ev.value()
-            return entry.value
+            return ev.value().value
         return None
 
     fn pop(inout self, key: K, owned default: Optional[V] = None) raises -> V:
@@ -368,7 +366,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
             entries.append(None)
         return entries
 
-    fn _insert(inout self, key: K, value: V):
+    fn _insert(inout self, owned key: K, owned value: V):
         self._insert(DictEntry[K, V](key ^, value ^))
 
     fn _insert(inout self, owned entry: DictEntry[K, V]):
@@ -378,7 +376,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
         let index: Int
         found, slot, index = self._find_index(entry.hash, entry.key)
 
-        self._entries[index] = entry
+        self._entries[index] = entry ^
         if not found:
             self._set_index(slot, index)
             self.size += 1

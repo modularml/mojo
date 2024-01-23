@@ -36,6 +36,7 @@ from sys.info import sizeof, alignof
 from algorithm.functional import unroll
 from utils.static_tuple import StaticTuple
 from sys.intrinsics import _mlirtype_is_eq
+from memory.unsafe import emplace_ref_unsafe
 
 
 # FIXME(#27380): Can't pass *Ts to a function parameter, only type parameter.
@@ -157,20 +158,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._state == i:
                 alias T = Ts[i]
-                # TODO(27657): reinterpret_cast without a copy
-                var _extra_copy_unsafe = other._impl
-                let _extra_impl_ptr = Pointer.address_of(
-                    _extra_copy_unsafe
-                ).address
-                var _extra_ptr = AnyPointer[T]()
-                _extra_ptr.value = __mlir_op.`pop.pointer.bitcast`[
-                    _type = __mlir_type[
-                        `!kgen.pointer<:`, CollectionElement, ` `, T, `>`
-                    ]
-                ](_extra_impl_ptr)
-                # Calls the correct __copyinit__ finally (then __moveinit__)
-                self._get_ptr[T]().emplace_value(
-                    __get_address_as_lvalue(_extra_ptr.value)
+                emplace_ref_unsafe[T](
+                    Reference(self._impl).bitcast_element[T](),
+                    Reference(other._impl).bitcast_element[T]()[],
                 )
 
         unroll[len(VariadicList(Ts)), each]()
@@ -197,14 +187,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     fn __del__(owned self):
         """Destroy the variant."""
-
-        @parameter
-        fn each[i: Int]():
-            if self._state == i:
-                alias q = Ts[i]
-                __get_address_as_owned_value(self._get_ptr[q]().value).__del__()
-
-        unroll[len(VariadicList(Ts)), each]()
+        self._call_correct_deleter()
 
     fn _call_correct_deleter(inout self):
         @parameter

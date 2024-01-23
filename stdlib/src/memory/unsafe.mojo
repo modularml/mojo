@@ -349,9 +349,17 @@ struct Reference[
         Returns:
             The new reference.
         """
-        return rebind[
-            Reference[new_element_type, is_mutable, lifetime].mlir_ref_type
-        ](self.value)
+        # We don't have a generalized lit.ref.cast operation, so convert through
+        # to KGEN pointer.
+        let kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
+        let dest_ptr = __mlir_op.`pop.pointer.bitcast`[
+            _type = __mlir_type[
+                `!kgen.pointer<:`, AnyType, ` `, new_element_type, `>`
+            ]
+        ](kgen_ptr)
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = _LITRef[new_element_type, is_mutable, lifetime].type
+        ](dest_ptr)
 
     fn destroy_element_unsafe(self):
         """This unsafe operation runs the destructor of the element addressed by
@@ -361,15 +369,36 @@ struct Reference[
         # This should only work with mutable references.
         # FIXME: This should be a precondition checked by the Mojo type checker,
         # not delayed to elaboration!
-        __mlir_op.`kgen.param.assert`[
-            cond=is_mutable,
-            message = "cannot use 'unsafe_destroy_element' on immutable references".value,
+        constrained[
+            is_mutable,
+            "cannot use 'unsafe_destroy_element' on immutable references",
         ]()
         # Project to an owned raw pointer, allowing the compiler to know it is to
         # be destroyed.
         # TODO: Use AnyPointer, but it requires a Movable element.
         let kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
         _ = __get_address_as_owned_value(kgen_ptr)
+
+
+# FIXME: This should be a method on Reference, it is placed here because we need
+# it constrained on mutability and copyability of value.
+fn emplace_ref_unsafe[
+    type: Movable, lifetime: MutLifetime
+](dest: Reference[type, __mlir_attr.`1: i1`, lifetime], owned value: type):
+    """This unsafe operation assumes the memory pointed to by the reference
+    is uninitialized and overwrites it with an owned version of the
+    specified value.  This is equivalent to `new(ptr) Type(v)` syntax in C++.
+
+    Parameters:
+        type: Type of the underlying data.
+        lifetime: The lifetime of the reference.
+
+    Args:
+        dest: The reference to uninitialized memory to overwrite.
+        value: The value to write into it.
+    """
+    let kgen_ptr = __mlir_op.`lit.ref.to_pointer`(dest.value)
+    __get_address_as_uninit_lvalue(kgen_ptr) = value ^
 
 
 # ===----------------------------------------------------------------------===#
