@@ -24,6 +24,7 @@ from utils.index import Index
 from python import Python
 
 alias float_type = DType.float64
+alias int_type = DType.int64
 alias simd_width = 2 * simdwidthof[float_type]()
 
 alias width = 960
@@ -38,14 +39,14 @@ alias max_y = 1.5
 
 fn mandelbrot_kernel_SIMD[
     simd_width: Int
-](c: ComplexSIMD[float_type, simd_width]) -> SIMD[float_type, simd_width]:
+](c: ComplexSIMD[float_type, simd_width]) -> SIMD[int_type, simd_width]:
     """A vectorized implementation of the inner mandelbrot computation."""
     let cx = c.re
     let cy = c.im
     var x = SIMD[float_type, simd_width](0)
     var y = SIMD[float_type, simd_width](0)
     var y2 = SIMD[float_type, simd_width](0)
-    var iters = SIMD[float_type, simd_width](0)
+    var iters = SIMD[int_type, simd_width](0)
 
     var t: SIMD[DType.bool, simd_width] = True
     for i in range(MAX_ITERS):
@@ -60,7 +61,7 @@ fn mandelbrot_kernel_SIMD[
 
 
 fn main() raises:
-    let t = Tensor[float_type](height, width)
+    let t = Tensor[int_type](height, width)
 
     @parameter
     fn worker(row: Int):
