@@ -32,7 +32,7 @@ alias DEFAULT_RTLD = RTLD.NOW | RTLD.GLOBAL
 
 @value
 @register_passable
-struct DLHandle:
+struct DLHandle(CollectionElement):
     """Represents a dynamically linked library that can be loaded and unloaded.
 
     The library is loaded on initialization and unloaded on deletion of the object.
