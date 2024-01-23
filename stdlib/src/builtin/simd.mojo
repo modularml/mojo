@@ -56,7 +56,7 @@ alias Float64 = Scalar[DType.float64]
 # ===------------------------------------------------------------------------===#
 
 
-@always_inline
+@always_inline("nodebug")
 fn _simd_construction_checks[size: Int]():
     """Checks if the SIMD size is valid.
 
@@ -66,7 +66,7 @@ fn _simd_construction_checks[size: Int]():
       size: The number of elements in the SIMD vector.
     """
     constrained[size > 0, "simd width must be > 0"]()
-    constrained[_is_power_of_2(size), "simd width must be power of 2"]()
+    constrained[size & (size - 1) == 0, "simd width must be power of 2"]()
 
 
 @lldb_formatter_wrapping_type
@@ -1876,24 +1876,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return llvm_intrinsic["llvm.experimental.vector.splice", Self](
             zero_simd, self, Int32(-shift)
         )
-
-
-# ===-------------------------------------------------------------------===#
-# _is_power_of_2
-# ===-------------------------------------------------------------------===#
-
-
-@always_inline
-fn _is_power_of_2(val: Int) -> Bool:
-    """Checks whether an integer is a power of two.
-
-    Args:
-      val: The integer to check.
-
-    Returns:
-      True if val is a power of two, otherwise False.
-    """
-    return (val & (val - 1) == 0) & (val != 0)
 
 
 # ===-------------------------------------------------------------------===#
