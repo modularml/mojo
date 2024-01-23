@@ -15,5 +15,3 @@ from .memory import (
     Pointer,
     stack_allocation,
 )
-
-from .arc import Arc
