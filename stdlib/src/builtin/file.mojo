@@ -31,12 +31,26 @@ from memory.unsafe import DTypePointer, Pointer, AddressSpace
 from tensor import Tensor
 
 
-fn _empty_stringref() -> StringRef:
-    return StringRef(DTypePointer[DType.int8]().address, 0)
+@register_passable
+struct _OwnedStringRef:
+    var data: DTypePointer[DType.int8]
+    var length: Int
 
+    fn __init__() -> _OwnedStringRef:
+        return Self {data: DTypePointer[DType.int8](), length: 0}
 
-fn _is_empty(str: StringRef) -> Bool:
-    return str.data == DTypePointer[DType.int8]()
+    fn __del__(owned self):
+        if self.data:
+            self.data.free()
+
+    fn consume_as_error(owned self) -> Error:
+        let data = self.data
+        let length = self.length
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_ref_from_value(self))
+        return Error {data: data, loaded_length: -length}
+
+    fn __bool__(self) -> Bool:
+        return self.length != 0
 
 
 struct FileHandle:
@@ -77,14 +91,14 @@ struct FileHandle:
           path: The file path.
           mode: The mode to open the file in (the mode can be "r" or "w").
         """
-        var err_msg = _empty_stringref()
+        var err_msg = _OwnedStringRef()
         let handle = external_call[
             "KGEN_CompilerRT_IO_FileOpen", DTypePointer[DType.invalid]
         ](path, mode, Pointer.address_of(err_msg))
 
-        if not _is_empty(err_msg):
+        if err_msg:
             self.handle = DTypePointer[DType.invalid]()
-            raise Error(err_msg)
+            raise (err_msg ^).consume_as_error()
 
         self.handle = handle
 
@@ -100,13 +114,13 @@ struct FileHandle:
         if self.handle == DTypePointer[DType.invalid]():
             return
 
-        var err_msg = _empty_stringref()
+        var err_msg = _OwnedStringRef()
         external_call["KGEN_CompilerRT_IO_FileClose", NoneType](
             self.handle, Pointer.address_of(err_msg)
         )
 
-        if not _is_empty(err_msg):
-            raise Error(err_msg)
+        if err_msg:
+            raise (err_msg ^).consume_as_error()
 
         self.handle = DTypePointer[DType.invalid]()
 
@@ -132,7 +146,7 @@ struct FileHandle:
             raise Error("invalid file handle")
 
         var size_copy: Int64 = size
-        var err_msg = _empty_stringref()
+        var err_msg = _OwnedStringRef()
 
         let buf = external_call["KGEN_CompilerRT_IO_FileRead", Pointer[Int8]](
             self.handle,
@@ -140,8 +154,8 @@ struct FileHandle:
             Pointer.address_of(err_msg),
         )
 
-        if not _is_empty(err_msg):
-            raise Error(err_msg)
+        if err_msg:
+            raise (err_msg ^).consume_as_error()
 
         return String(buf, int(size_copy) + 1)
 
@@ -159,7 +173,7 @@ struct FileHandle:
             raise Error("invalid file handle")
 
         var size_copy: Int64 = size
-        var err_msg = _empty_stringref()
+        var err_msg = _OwnedStringRef()
 
         let buf = external_call[
             "KGEN_CompilerRT_IO_FileReadBytes", Pointer[Int8]
@@ -169,8 +183,8 @@ struct FileHandle:
             Pointer.address_of(err_msg),
         )
 
-        if not _is_empty(err_msg):
-            raise Error(err_msg)
+        if err_msg:
+            raise (err_msg ^).consume_as_error()
 
         return Tensor(DTypePointer[DType.int8](buf.address), int(size_copy))
 
@@ -190,13 +204,13 @@ struct FileHandle:
         if not self.handle:
             raise "invalid file handle"
 
-        var err_msg = _empty_stringref()
+        var err_msg = _OwnedStringRef()
         let pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
             self.handle, offset, Pointer.address_of(err_msg)
         )
 
-        if not _is_empty(err_msg):
-            raise err_msg
+        if err_msg:
+            raise (err_msg ^).consume_as_error()
 
         return pos
 
@@ -239,7 +253,7 @@ struct FileHandle:
         if self.handle == DTypePointer[DType.invalid]():
             raise Error("invalid file handle")
 
-        var err_msg = _empty_stringref()
+        var err_msg = _OwnedStringRef()
         external_call["KGEN_CompilerRT_IO_FileWrite", NoneType](
             self.handle,
             ptr.address,
@@ -247,8 +261,8 @@ struct FileHandle:
             Pointer.address_of(err_msg),
         )
 
-        if not _is_empty(err_msg):
-            raise Error(err_msg)
+        if err_msg:
+            raise (err_msg ^).consume_as_error()
 
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
