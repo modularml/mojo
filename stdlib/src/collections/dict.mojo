@@ -3,11 +3,15 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-"""Implements `Dict` as a hash map. Dict is an efficient, O(1) amortized
+"""Defines `Dict`, a collection that stores key-value pairs.
+
+Dict provides an efficient, O(1) amortized
 average-time complexity for insert, lookup, and removal of dictionary elements.
 Its implementation closely mirrors Python's `dict` implementation:
+
 - Performance and size are heavily optimized for small dictionaries, but can
   scale to large dictionaries.
+
 - Insertion order is implicitly preserved. Once `__iter__` is implemented
   it will return a deterministic order based on insertion.
 
@@ -155,8 +159,16 @@ struct _DictIndex:
 
 
 struct Dict[K: KeyElement, V: CollectionElement](Sized):
-    """An efficient, O(1) amortized average-time complexity for insert, lookup,
-    and removal of dictionary elements.
+    """A container that stores key-value pairs.
+
+    The key type and value type must be specified statically, unlike a Python
+    dictionary, which can accept arbitrary key and value types.
+
+    The key type must implement the `KeyElement` trait, which encompasses
+    `Movable`, `Hashable`, and `EqualityComparable`. It also includes
+    `CollectionElement` and `Copyable` until we have references.
+
+    The value type must implemnt the `CollectionElement` trait.
 
     Usage:
 
@@ -171,66 +183,31 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
     print(len(d))      # prints 1
     ```
 
-    Its implementation closely mirrors Python's `dict` implementation:
+    Note that until standard library types implement `KeyElement`, you must
+    create custom wrappers to use these as keys. For example, the following
+    `StringKey` type wraps a String value and implements the `KeyElement` trait:
 
-    - Performance and size are heavily optimized for small dictionaries, but can
-        scale to large dictionaries.
-    - Insertion order is implicitly preserved. Once `__iter__` is implemented
-        it will return a deterministic order based on insertion.
-    - To achieve this, elements are stored in a dense array. Inserting a new
-        element will append it to the entry list, and then that index will be stored
-        in the dict's index hash map. Removing an element updates that index to
-        a special `REMOVED` value for correctness of the probing sequence, and
-        the entry in the entry list is marked as removed and the relevant data is freed.
-        The entry can be re-used to insert a new element, but it can't be reset to
-        `EMPTY` without compacting or resizing the dictionary.
-    - The index probe sequence is taken directly from Python's dict implementation:
-      ```
-      var slot = hash(key) % self._reserved
-      var perturb = hash(key)
-      while True:
-        check_slot(slot)
-        alias PERTURB_SHIFT = 5
-        perterb >>= PERTURB_SHIFT
-        slot = ((5 * slot) + perturb + 1) % self._reserved
-      ```
-    - Similarly to Python, we aim for a maximum load of 2/3, after which we resize
-        to a larger dictionary.
-    - In the case where many entries are being added and removed, the dictionary
-        can fill up with `REMOVED` entries without being resized. In this case
-        we will eventually "compact" the dictionary and shift entries towards
-        the beginning to free new space while retaining insertion order.
+    ```mojo
+    from collections.dict import Dict, KeyElement
 
-    Key elements must implement the `KeyElement` trait, which encompasses
-    Movable, Hashable, and EqualityComparable. It also includes CollectionElement
-    and Copyable until we have references.
+    @value
+    struct StringKey(KeyElement):
+        var s: String
 
-    Value elements must be CollectionElements for a similar reason. Both key and
-    value types must always be Movable so we can resize the dictionary as it grows.
+        fn __init__(inout self, owned s: String):
+            self.s = s ^
 
-    Without conditional trait conformance, making a `__str__` representation for
-    Dict is tricky. We'd need to add `Stringable` to the requirements for keys
-    and values. This may be worth it.
+        fn __init__(inout self, s: StringLiteral):
+            self.s = String(s)
 
-    Invariants:
-        size = 2^k for integer k:
-            This is allows for faster entry slot lookups, since modulo can be
-            optimized to a bit shift for powers of 2.
-        size <= 2/3 * _reserved
-            If size exceeds this invariant, we double the size of the dictionary.
-            This is the maximal "load factor" for the dict. Higher load factors
-            trade off higher memory utilization for more frequent worst-case lookup
-            performance. Lookup is O(n) in the worst case and O(1) in average case.
-        _n_entries <= 3/4 * _reserved
-            If _n_entries exceeds this invariant, we compact the dictionary, retaining
-            the insertion order while resetting _n_entries = size.
-            As elements are removed, they retain marker entries for the probe sequence.
-            The average case miss lookup (ie. `contains` check on a key not in the dict)
-            is O(_reserved  / (1 + _reserved - _n_entries)). At `(k-1)/k` this
-            approaches `k` and is therefore O(1) average case. However, we want it to
-            be _larger_ than the load factor: since `compact` is O(n), we don't
-            don't churn and compact on repeated insert/delete, and instead amortize
-            compaction cost to O(1) amortized cost.
+        fn __hash__(self) -> Int:
+            let ptr = self.s._buffer.data.value
+            return hash(DTypePointer[DType.int8](ptr), len(self.s))
+
+        fn __eq__(self, other: Self) -> Bool:
+            return self.s == other.s
+
+    ```
 
     Parameters:
         K: The type of the dictionary key. Must be Hashable and EqualityComparable
@@ -238,6 +215,77 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
         V: The value type of the dictionary. Currently must be CollectionElement
            since we don't have references.
     """
+
+    # Implementation:
+    #
+    # `Dict` provides an efficient, O(1) amortized average-time complexity for
+    # insert, lookup, and removal of dictionary elements.
+    #
+    # Its implementation closely mirrors Python's `dict` implementation:
+    #
+    # - Performance and size are heavily optimized for small dictionaries, but can
+    #     scale to large dictionaries.
+    # - Insertion order is implicitly preserved. Once `__iter__` is implemented
+    #     it will return a deterministic order based on insertion.
+    # - To achieve this, elements are stored in a dense array. Inserting a new
+    #     element will append it to the entry list, and then that index will be stored
+    #     in the dict's index hash map. Removing an element updates that index to
+    #     a special `REMOVED` value for correctness of the probing sequence, and
+    #     the entry in the entry list is marked as removed and the relevant data is freed.
+    #     The entry can be re-used to insert a new element, but it can't be reset to
+    #     `EMPTY` without compacting or resizing the dictionary.
+    # - The index probe sequence is taken directly from Python's dict implementation:
+    #
+    #     ```mojo
+    #     var slot = hash(key) % self._reserved
+    #     var perturb = hash(key)
+    #     while True:
+    #         check_slot(slot)
+    #         alias PERTURB_SHIFT = 5
+    #         perturb >>= PERTURB_SHIFT
+    #         slot = ((5 * slot) + perturb + 1) % self._reserved
+    #     ```
+    #
+    # - Similarly to Python, we aim for a maximum load of 2/3, after which we resize
+    #     to a larger dictionary.
+    # - In the case where many entries are being added and removed, the dictionary
+    #     can fill up with `REMOVED` entries without being resized. In this case
+    #     we will eventually "compact" the dictionary and shift entries towards
+    #     the beginning to free new space while retaining insertion order.
+    #
+    # Key elements must implement the `KeyElement` trait, which encompasses
+    # Movable, Hashable, and EqualityComparable. It also includes CollectionElement
+    # and Copyable until we have references.
+    #
+    # Value elements must be CollectionElements for a similar reason. Both key and
+    # value types must always be Movable so we can resize the dictionary as it grows.
+    #
+    # Without conditional trait conformance, making a `__str__` representation for
+    # Dict is tricky. We'd need to add `Stringable` to the requirements for keys
+    # and values. This may be worth it.
+    #
+    # Invariants:
+    #
+    # - size = 2^k for integer k:
+    #     This allows for faster entry slot lookups, since modulo can be
+    #     optimized to a bit shift for powers of 2.
+    #
+    # - size <= 2/3 * _reserved
+    #     If size exceeds this invariant, we double the size of the dictionary.
+    #     This is the maximal "load factor" for the dict. Higher load factors
+    #     trade off higher memory utilization for more frequent worst-case lookup
+    #     performance. Lookup is O(n) in the worst case and O(1) in average case.
+    #
+    # - _n_entries <= 3/4 * _reserved
+    #     If _n_entries exceeds this invariant, we compact the dictionary, retaining
+    #     the insertion order while resetting _n_entries = size.
+    #     As elements are removed, they retain marker entries for the probe sequence.
+    #     The average case miss lookup (ie. `contains` check on a key not in the dict)
+    #     is O(_reserved  / (1 + _reserved - _n_entries)). At `(k-1)/k` this
+    #     approaches `k` and is therefore O(1) average case. However, we want it to
+    #     be _larger_ than the load factor: since `compact` is O(n), we don't
+    #     don't churn and compact on repeated insert/delete, and instead amortize
+    #     compaction cost to O(1) amortized cost.
 
     alias EMPTY = _EMPTY
     alias REMOVED = _REMOVED
