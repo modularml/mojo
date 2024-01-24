@@ -191,6 +191,24 @@ modular install mojo
   implementing the traditional get/set pairs.  Note: this may be changed in the
   future when references auto-dereference—at that point we may switch to just
   returning a reference from `__getattr__()`.
+- Parametric closures can now capture register passable typed values by copy
+  using the `__copy_capture` decorator. For example, the following code will
+  print `5`, not `2`.
+
+  ```mojo
+  fn foo(x: Int):
+      var z = x
+
+      @__copy_capture(z)
+      @parameter
+      fn formatter() -> Int:
+          return z
+      z = 2
+      print(formatter())
+
+  fn main():
+      foo(5)
+  ```
 
 ### ❌ Removed
 
