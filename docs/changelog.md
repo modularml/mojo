@@ -51,27 +51,43 @@ modular install mojo
 
 ### ⭐️ New
 
+### 🦋 Changed
+
+### ❌ Removed
+
+### 🛠️ Fixed
+
+## v0.7.0 (2024-01-25)
+
+### ⭐️ New
+
 - Users can opt-in to assertions used in the standard library code by
   specifying `-D MOJO_ENABLE_ASSERTIONS` when invoking `mojo` to
   compile your source file(s).  In the case that an assertion is fired,
   the assertion message will be printed along with the stack trace
   before the program exits.  By default, assertions are _not enabled_
-  in the standard library right now for performance implications.
+  in the standard library right now for performance reasons.
 
 - The Mojo Language Server now implements the References request. IDEs use
   this to provide support for **Go to References** and **Find All References**.
   A current limitation is that references outside of the current document are
   not supported, which will be addressed in the future.
 
-- [`Arc`](/mojo/stdlib/memory/arc.html#Arc), a reference-counted smart pointer
-  using atomic reference count updates.
+- The [`sys.info`](/mojo/stdlib/sys/info) module now includes
+  `num_physical_cores()`, `num_logical_cores()`, and `num_performance_cores()`
+  functions.
 
-- `num_physical_cores`, `num_logical_cores`, and `num_performance_cores` have
-  been added to the `sys.info` module.
+- Homogenous variadic arguments consisting of memory-only types, such as
+  `String` are more powerful and easier to use. These arguments are projected
+  into a
+  [`VariadicListMem`](/mojo/stdlib/builtin/builtin_list.html#variadiclistmem).
 
-- Homogenous variadic arguments are more powerful and easier to use.
-  Subscripting into a variadic now returns the element instead of an obscure
-  internal type, and we now support `inout` and `owned` variadics:
+  (Previous releases made it easier to use variadic lists of register-passable
+  types, like `Int`.)
+
+  Subscripting into a `VariadicListMem` now returns the element instead of an
+  obscure internal type. In addition, we now support `inout` and `owned`
+  variadic arguments:
 
   ```mojo
   fn make_worldly(inout *strs: String):
@@ -88,26 +104,44 @@ modular install mojo
       print(s3)  # bonjour world
   ```
 
-  Note that subscripting the variadic argument works nicely as above, but
-  for-each iteration over the variadic with a for-in loop produces a `Reference`
-  (see below) instead of the desired value, so an extra subscript is required:
-  we intend to fix this in the future.
+  (Previous releases made it easier to use variadic lists, but subscripting into
+  a `VariadicListMem` returned a low-level pointer, which required the user to
+  call `__get_address_as_lvalue()` to access the element.)
+
+  Note that subscripting the variadic list works nicely as above, but
+  iterating over the variadic list directly with a `for` loop produces a
+  [`Reference`](/mojo/stdlib/memory/unsafe#reference) (described below) instead
+  of the desired value, so an extra subscript is required; We intend to fix this
+  in the future.
 
   ```mojo
   fn make_worldly(inout *strs: String):
       # Requires extra [] to dereference the reference for now.
-      for i in strs):
+      for i in strs:
           i[] += " world"
   ```
 
-  Heterogenous variadics have not yet been moved to the new model, but will is
-  future updates.
+  Heterogenous variadic arguments have not yet been moved to the new model, but
+  will in future updates.
 
-- Mojo now has the prototype of a safe `Reference` type which is reasoned about
-  by the lifetime tracking pass to safely extend local variable lifetime, and
-  check indirect access safety.  The `Reference` type is brand new (and
-  currently has no syntactic sugar) so it must be explicitly dereferenced with
-  an empty subscript: `ref[]` provides access to the underlying value.
+  Note that for variadic arguments of register-passable types like `Int`, the
+  variadic list contains values, not references, so the dereference operator
+  (`[]`) is not required. This code continues to work as it did previously:
+
+  ```mojo
+  fn print_ints(*nums: Int):
+      for num in nums:
+          print(num)
+      print(len(nums))
+  ```
+
+- Mojo now has a prototype version of a safe
+  [`Reference`](/mojo/stdlib/memory/unsafe#reference) type. The compiler's
+  lifetime tracking pass can reason about references to safely extend local
+  variable lifetime, and check indirect access safety.  The `Reference` type
+  is brand new (and currently has no syntactic sugar) so it must be explicitly
+  dereferenced with an empty subscript: `ref[]` provides access to the
+  underlying value.
 
   ```mojo
   fn main():
@@ -128,30 +162,35 @@ modular install mojo
   While the `Reference` type has the same in-memory representation as a C
   pointer or the Mojo `Pointer` type, it also tracks a symbolic "lifetime" value
   so the compiler can reason about the potentially accessed set of values.  This
-  set is part of the static type of the reference, so it propagates through
-  generic algorithms and composition of abstractions built around it.
+  lifetime is part of the static type of the reference, so it propagates through
+  generic algorithms and abstractions built around it.
 
   The `Reference` type can form references to both mutable and immutable memory
   objects, e.g. those on the stack or borrowed/inout/owned function arguments.
   It is fully parametric over mutability, eliminating the [problems with code
   duplication due to mutability
   specifiers](https://duckki.github.io/2024/01/01/inferred-mutability.html) and
-  provides the base for unifed user-level types like `ArraySlice` across both
-  mutable and immutable accesses.
+  provides the base for unified user-level types. For example, it could be
+  used to implement an array slice object that handles both mutable and immutable
+  array slices.
 
   While this is a major step forward for the lifetimes system in Mojo, it is
   still _very_ early and awkward to use.  Notably, there is no syntactic sugar
-  for using references (e.g. automatic dereferencing), and several aspects of it
-  need to be more baked.  It is getting exercised by variadic memory arguments,
+  for using references, such as automatic dereferencing. Several aspects of it
+  need to be more baked. It is getting exercised by variadic memory arguments,
   which is why they are starting to behave better now.
 
-- Mojo now allows types to implement `__refattr__` and `__refitem__` to enable
-  attribute and subscript syntax with computed accessors that return references.
-  For common situations where these address a value in memory this provides a
-  more convenient and significantly more performant alternative to implementing
-  the traditional get/set pairs.  Note: this may be changed in the future when
-  references auto-deref - at that point we may switch to just `__getattr__`
-  returning a reference.
+  Note: the safe `Reference` type and the unsafe pointer types are defined in
+  the same module, currently named `memory.unsafe`. We expect to restructure
+  this module in a future release.
+
+- Mojo now allows types to implement `__refattr__()` and `__refitem__()` to
+  enable attribute and subscript syntax with computed accessors that return
+  references. For common situations where these address a value in memory this
+  provides a more convenient and significantly more performant alternative to
+  implementing the traditional get/set pairs.  Note: this may be changed in the
+  future when references auto-dereference—at that point we may switch to just
+  returning a reference from `__getattr__()`.
 
 ### ❌ Removed
 
@@ -159,26 +198,34 @@ modular install mojo
   language.  This "non-destructive move" operation was previously wired into the
   `x^` transfer operator, but had unpredictable behavior that wasn't consistent.
   Now that Mojo has traits, it is better to model this as an explicit `.take()`
-  operation on a type, which makes it clear when a lifetime is ended vs when the
+  operation on a type, which would transfer out the contents of the type without
+  ending its lifetime. For example, for a type that holds a pointer, `take()`
+  might return a new instance pointing to the same data, and null out its own
+  internal pointer.
+
+  This change makes it clear when a lifetime is ended versus when the
   contents of an LValue are explicitly taken.
 
 - The current implementation of autotuning has been deprecated, as Mojo's
   autotuning implementation is undergoing a redesign. Tutorials around the
   current implementation have also been removed as they are being rewritten.
 
-  Consequently, the `autotune`, `autotune_fork`, and `search` functions have
-  been removed from the standard library.
+  Consequently, the `autotune()`, `autotune_fork()`, and `search()` functions
+  have been removed from the standard library.
 
 - The `_OldDynamicVector` type that worked only on register passable element
-  types has been removed.  Please migrate uses to `DynamicVector` which
+  types has been removed.  Please migrate uses to
+  [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) which
   works on both register passable and memory types.
 
-- The `UnsafeFixedVector` in `utils.vector` has been removed in favor of
-  either the use `DynamicVector` or `InlinedFixedVector`.
+- The `UnsafeFixedVector` in `utils.vector` has been removed. We recommend using
+  either [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector)
+  or [`InlinedFixedVector`](/mojo/stdlib/collections/vector.html#inlinedfixedvector)
+  instead.
 
-- The `@adaptive` decorator has been removed from the language. Please rewrite
-  any uses of the decorator in a non-search context can be replaced with
-  `@parameter if`. For example:
+- The `@adaptive` decorator has been removed from the language. Any uses of the
+  decorator in a non-search context can be replaced with `@parameter if`. For
+  example:
 
   ```mojo
   @adaptive
@@ -218,19 +265,20 @@ modular install mojo
   Mojo has two closure types: parameter closures and runtime closures. Parameter
   closures can be used in higher-order functions and are the backbone of
   functions like `vectorize` and `parallelize`. They are always denoted by
-  `@parameter` and have type `fn(...) capturing -> T`.
+  `@parameter` and have type `fn() capturing -> T` (where `T` is the return
+  type).
 
   On the other hand, runtime closures are always dynamic values, capture values
   by invoking their copy constructor, and retain ownership of their capture
-  state. You can define a runtiem closure by writing a nested function that
+  state. You can define a runtime closure by writing a nested function that
   captures values:
 
   ```mojo
   fn outer(b: Bool, x: String) -> fn() escaping -> None:
-      fn closure()
+      fn closure():
           print(x) # 'x' is captured by calling String.__copyinit__
 
-      fn bare_function()
+      fn bare_function():
           print("hello") # nothing is captured
 
       if b:
@@ -241,7 +289,7 @@ modular install mojo
       return bare_function
   ```
 
-  The type of runtime closures are of the form `fn(...) escaping -> None`. You
+  The type of runtime closures are of the form `fn() escaping -> T`. You
   can pass equivalent function pointers as runtime closures.
 
   Stay tuned for capture list syntax for move capture and capture by reference,
@@ -274,11 +322,13 @@ modular install mojo
 - The `simd_width` and `dtype` parameters of `polynomial_evaluate` have been
   switched. Based on the request in
   [#1587](https://github.com/modularml/mojo/issues/1587), the
-  `polynomial_evaluate` function has also been extended to take a StaticTuple
-  as input parameters.
+  `polynomial_evaluate` function has also been extended so that the
+  `coefficients` parameter can take either a either a
+  [`StaticTuple`](/mojo/stdlib/utils/static_tuple#statictuple) or a
+  [`VariadicList`](/mojo/stdlib/builtin/builtin_list#variadiclist).
 
 - As a tiny step towards removing `let` declarations, this release removes the
-  "'var' was never mutated, consider switching to a 'let'" warning.
+  warning: `'var' was never mutated, consider switching to a 'let'`.
 
 ### 🛠️ Fixed
 
@@ -286,9 +336,9 @@ modular install mojo
   when trying to materialize `IntLiteral` in runtime code.
 - Raising an error from the initializer of a memory-only type now works
   correctly in the presence of complex control flow.  Previously Mojo could run
-  the destructor on `self`` before it was initialized when exiting with an
+  the destructor on `self` before it was initialized when exiting with an
   error.
-- [#1096](https://github.com/modularml/mojo/issues/1096) - Improve warnings
+- [#1096](https://github.com/modularml/mojo/issues/1096) - Improve warning
   messages for dead code in conditionals like `or` expressions.
 - [#1419](https://github.com/modularml/mojo/issues/1419) - Fix assertion failure
   with uninitialized lattice values.
