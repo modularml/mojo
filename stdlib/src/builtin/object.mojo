@@ -102,7 +102,9 @@ struct _RefCountedListRef:
             return
 
         # Run the destructor on the list elements and then destroy the list.
-        _ = __get_address_as_owned_value(ptr.address).impl
+        var list = __get_address_as_owned_value(ptr.address).impl
+        for i in range(len(list)):
+            list[i].destroy()
         ptr.free()
 
 
@@ -221,7 +223,9 @@ struct _RefCountedAttrsDictRef:
 
         # Run the destructor on the dictionary elements and then destroy the
         # container.
-        _ = __get_address_as_owned_value(ptr.address).impl
+        var list = __get_address_as_owned_value(ptr.address).impl
+        for i in range(len(list)):
+            list[i].value.destroy()
         ptr.free()
 
 
