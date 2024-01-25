@@ -15,7 +15,7 @@
 # applied to a naive matmul implementation in Mojo to gain significant
 # performance speedups
 
-from benchmark import Unit
+import benchmark
 from memory import memset_zero, stack_allocation
 from random import rand
 from algorithm import vectorize, parallelize, vectorize_unroll
@@ -44,9 +44,7 @@ struct Matrix:
         self.cols = cols
 
     # Initialize taking a pointer, don't set any elements
-    fn __init__(
-        inout self, rows: Int, cols: Int, data: DTypePointer[type]
-    ):
+    fn __init__(inout self, rows: Int, cols: Int, data: DTypePointer[type]):
         self.data = data
         self.rows = rows
         self.cols = cols

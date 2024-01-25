@@ -66,10 +66,10 @@ feedback](/mojo/community.html).
 
   - [Mojo decorators](decorators/index.html)
   - [@always_inline](decorators/always-inline.html)
-  - [@noncapturing](decorators/noncapturing.html)
   - [@nonmaterializable](decorators/nonmaterializable.html)
   - [@parameter](decorators/parameter.html)
   - [@register_passable](decorators/register-passable.html)
+  - [@staticmethod](decorators/staticmethod.html)
   - [@unroll](decorators/unroll.html)
   - [@value](decorators/value.html)
 
