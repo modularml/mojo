@@ -607,7 +607,7 @@ modular install mojo
 - We've added some traits to the standard library, you can implement these on
   your own types:
 
-  - [`Destructable`](/mojo/stdlib/builtin/destructable.html)
+  - [`Destructable`](/mojo/stdlib/builtin/anytype.html#anytype)
   - [`Copyable`](/mojo/stdlib/builtin/value.html#copyable)
   - [`Movable`](/mojo/stdlib/builtin/value.html#movable)
   - [`Stringable`](/mojo/stdlib/builtin/str.html#stringable)
