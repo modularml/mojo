@@ -61,6 +61,49 @@ modular install mojo
 
 ### ⭐️ New
 
+- A new Mojo-native dictionary type,
+  [`Dict`](/mojo/stdlib/collections/dict.html) for storing key-value pairs.
+  `Dict` stores values that conform to the
+  [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
+  trait. Keys need to conform to the new
+  [`KeyElement`](/mojo/stdlib/collections/dict.html#keyelement) trait, which is
+  not yet implemented by other standard library types. In the short term, you
+  can create your own wrapper types to use as keys. For example, the following
+  sample defines a `StringKey` type and uses it to create a dictionary that maps
+  strings to `Int` values:
+
+  ```mojo
+  from collections.dict import Dict, KeyElement
+
+  @value
+  struct StringKey(KeyElement):
+      var s: String
+
+      fn __init__(inout self, owned s: String):
+          self.s = s ^
+
+      fn __init__(inout self, s: StringLiteral):
+          self.s = String(s)
+
+      fn __hash__(self) -> Int:
+          return hash(self.s)
+
+      fn __eq__(self, other: Self) -> Bool:
+          return self.s == other.s
+
+  fn main() raises:
+      var d = Dict[StringKey, Int]()
+      d["cats"] = 1
+      d["dogs"] = 2
+      print(len(d))         # prints 2
+      print(d["cats"])      # prints 1
+      print(d.pop("dogs"))  # prints 2
+      print(len(d))         # prints 1
+  ```
+
+  We plan to add `KeyElement` conformance to standard library types in
+  subsequent releases.
+
 - Users can opt-in to assertions used in the standard library code by
   specifying `-D MOJO_ENABLE_ASSERTIONS` when invoking `mojo` to
   compile your source file(s).  In the case that an assertion is fired,
@@ -432,8 +475,6 @@ modular install mojo
       let vector = SIMD[DType.int64, 4](1, 2, 3, 4)
       let hash = _hash_simd(vector)
   ```
-
-- [`Dict`](/mojo/stdlib/collections/Dict.html) Mojo-native dictionary :book:
 
 - Several standard library types now conform to the
   [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
