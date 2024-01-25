@@ -616,4 +616,4 @@ fn num_performance_cores() -> Int:
     Returns:
         Int: The number of physical performance cores on the system.
     """
-    return _external_call_const["KGEN_CompilerRT_PerformanceCoreCount", Int]()
+    return _external_call_const["KGEN_CompilerRT_NumPerformanceCores", Int]()
