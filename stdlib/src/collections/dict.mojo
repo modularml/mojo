@@ -174,7 +174,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
 
     ```mojo
     from collections import Dict
-    var d = Dict[StringKey, Int]()
+    var d = Dict[String, Int]()
     d["a"] = 1
     d["b"] = 2
     print(len(d))      # prints 2

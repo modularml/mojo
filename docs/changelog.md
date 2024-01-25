@@ -253,6 +253,8 @@ modular install mojo
       foo(5)
   ```
 
+- String now implements KeyElement and may be used as a key in Dict.
+
 ### ❌ Removed
 
 - The `__takeinit__` special constructor form has been removed from the

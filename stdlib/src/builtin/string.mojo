@@ -20,7 +20,8 @@ from memory.unsafe import DTypePointer, Pointer
 
 from utils.index import StaticIntTuple
 from utils.static_tuple import StaticTuple
-from collections.vector import CollectionElement, DynamicVector
+from collections.vector import DynamicVector
+from collections.dict import KeyElement
 
 from .io import _snprintf, _snprintf_kgen_scalar
 from .range import _StridedRange
@@ -234,7 +235,7 @@ fn _vec_fmt[
     return _snprintf(rebind[Pointer[Int8]](str), size, fmt, arguments)
 
 
-struct String(Sized, CollectionElement, Stringable, Hashable):
+struct String(Sized, Stringable, KeyElement):
     """Represents a mutable string."""
 
     alias _buffer_type = DynamicVector[Int8]
