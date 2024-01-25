@@ -51,6 +51,12 @@ modular install mojo
 
 ### ⭐️ New
 
+- Modules within packages can now use purely relative `from` imports:
+
+```mojo
+from . import another_module
+```
+
 ### 🦋 Changed
 
 ### ❌ Removed
