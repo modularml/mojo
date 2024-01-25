@@ -15,7 +15,6 @@
 # This sample prints the current host system information using APIs from the
 # sys module.
 
-from runtime.llcl import num_cores
 from sys.info import (
     os_is_linux,
     os_is_windows,
@@ -28,6 +27,8 @@ from sys.info import (
     has_neon,
     is_apple_m1,
     has_intel_amx,
+    num_logical_cores,
+    num_physical_cores,
     _current_target,
     _current_cpu,
     _triple_attr,
@@ -66,9 +67,10 @@ def main():
         cpu_features += " Apple M1"
 
     print("System information: ")
-    print("    OS          : ", os)
-    print("    CPU         : ", cpu)
-    print("    Arch        : ", arch)
-    print("    Num Cores   : ", num_cores())
+    print("    OS             : ", os)
+    print("    CPU            : ", cpu)
+    print("    Arch           : ", arch)
+    print("    Physical Cores : ", num_physical_cores())
+    print("    Logical Cores  : ", num_logical_cores())
     # CHECK: CPU Features
-    print("    CPU Features:", cpu_features)
+    print("    CPU Features   :", cpu_features)

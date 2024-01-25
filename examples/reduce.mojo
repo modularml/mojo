@@ -16,7 +16,7 @@
 # large array of values to produce a single result.
 # Reductions and scans are common algorithm patterns in parallel computing.
 
-from benchmark import Unit, keep
+from benchmark import benchmark, Unit, keep
 from time import now
 from algorithm import sum
 from random import rand
