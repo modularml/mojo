@@ -12,6 +12,7 @@ from builtin.hash import _hash_simd
 from debug.lldb import lldb_formatter_wrapping_type
 from utils.index import StaticIntTuple
 from collections.vector import CollectionElement
+from collections.dict import KeyElement
 
 
 # ===----------------------------------------------------------------------=== #
@@ -159,13 +160,7 @@ fn int[T: IntableRaising](value: T) raises -> Int:
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct Int(
-    Intable,
-    CollectionElement,
-    Stringable,
-    Hashable,
-    KeyElement,
-):
+struct Int(Intable, Stringable, KeyElement):
     """This type represents an integer value."""
 
     var value: __mlir_type.index
