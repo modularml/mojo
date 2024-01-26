@@ -107,7 +107,7 @@ struct StringRef(Sized, CollectionElement, Stringable, Hashable):
         """
 
         var len = 0
-        while not ptr.load(len):
+        while ptr.load(len):
             len += 1
 
         return StringRef(ptr, len)

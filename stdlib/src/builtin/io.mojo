@@ -166,7 +166,7 @@ fn _float_repr(
         p += 1
     while p.load() != 0 and isdigit(p.load()):
         p += 1
-    if not p.load():
+    if p.load():
         return n
     p.store(dot)
     p += 1

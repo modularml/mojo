@@ -300,7 +300,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if Self.element_type == DType.bool:
             return self.reduce_and()
-        return (self == 0).reduce_and()
+        return (self != 0).reduce_and()
 
     @staticmethod
     @always_inline("nodebug")
