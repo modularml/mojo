@@ -33,6 +33,11 @@ struct assert_raises:
             return True
 
 
+def test_dict_construction():
+    _ = Dict[Int, Int]()
+    _ = Dict[String, Int]()
+
+
 def test_basic():
     var dict = Dict[String, Int]()
     dict["a"] = 1
@@ -97,6 +102,7 @@ fn test[name: String, test_fn: fn () raises -> object]() raises:
 
 
 def main():
+    test_dict_construction()
     test["test_basic", test_basic]()
     test["test_multiple_resizes", test_multiple_resizes]()
     test["test_big_dict", test_big_dict]()

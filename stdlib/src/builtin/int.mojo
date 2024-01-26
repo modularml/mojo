@@ -164,6 +164,7 @@ struct Int(
     CollectionElement,
     Stringable,
     Hashable,
+    KeyElement,
 ):
     """This type represents an integer value."""
 
