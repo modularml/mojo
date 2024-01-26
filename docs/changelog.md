@@ -63,6 +63,11 @@ from . import another_module
 
 ### 🛠️ Fixed
 
+- [#435](https://github.com/modularml/mojo/issues/435)
+  Structs with Self type don't always work.
+- [#1540](https://github.com/modularml/mojo/issues/1540)
+  Crash in register_passable self referencing struct.
+
 ## v0.7.0 (2024-01-25)
 
 ### ⭐️ New
@@ -260,6 +265,27 @@ from . import another_module
   ```
 
 - String now implements KeyElement and may be used as a key in Dict.
+- More robust support for structs with fields of self referencing types.
+  For example, the following code will work and print `0`:
+
+  ```mojo
+  struct Foo(CollectionElement):
+    var vec: DynamicVector[Self]
+
+    fn __init__(inout self: Self):
+        self.vec = DynamicVector[Self]()
+
+    fn __moveinit__(inout self: Self, owned existing: Self):
+        self.vec = existing.vec ^
+
+    fn __copyinit__(inout self: Self, existing: Self):
+        self.vec = existing.vec
+
+  
+  fn main():
+    var foo = Foo()
+    print(len(foo.vec))
+  ```
 
 ### ❌ Removed
 
