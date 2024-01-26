@@ -260,9 +260,14 @@ fn _snprintf_kgen_scalar[
             return _snprintf(buffer, size, "False")
     elif type.is_integral():
         return _snprintf(buffer, size, format, x)
-    elif (
-        type == DType.float16 or type == DType.bfloat16 or type == DType.float32
-    ):
+    elif type == DType.float16:
+        # We need to cast the value to float64 to print it.
+        return _float_repr(
+            buffer,
+            size,
+            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<f64>`](x),
+        )
+    elif type == DType.float32:
         # We need to cast the value to float64 to print it.
         return _float_repr(
             buffer,
