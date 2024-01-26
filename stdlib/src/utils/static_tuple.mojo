@@ -182,8 +182,11 @@ struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
         _set_array_elem[index, size, Self.element_type](val, self.array)
 
     @always_inline("nodebug")
-    fn __getitem__(self, index: Int) -> Self.element_type:
+    fn __getitem__[intable: Intable](self, index: intable) -> Self.element_type:
         """Returns the value of the tuple at the given dynamic index.
+
+        Parameters:
+            intable: The intable type.
 
         Args:
             index: The index into the tuple.
@@ -191,26 +194,33 @@ struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
         Returns:
             The value at the specified position.
         """
-        debug_assert(index < size, "index must be within bounds")
+        let offset = int(index)
+        debug_assert(offset < size, "index must be within bounds")
         # Copy the array so we can get its address, because we can't take the
         # address of 'self' in a non-mutating method.
         # TODO(Ownership): we should be able to get const references.
         var arrayCopy = self.array
         let ptr = __mlir_op.`pop.array.gep`(
-            Pointer.address_of(arrayCopy).address, index.value
+            Pointer.address_of(arrayCopy).address, offset.value
         )
         return Pointer(ptr).load()
 
     @always_inline("nodebug")
-    fn __setitem__(inout self, index: Int, val: Self.element_type):
+    fn __setitem__[
+        intable: Intable
+    ](inout self, index: intable, val: Self.element_type):
         """Stores a single value into the tuple at the specified dynamic index.
+
+        Parameters:
+            intable: The intable type.
 
         Args:
             index: The index into the tuple.
             val: The value to store.
         """
-        debug_assert(index < size, "index must be within bounds")
+        let offset = int(index)
+        debug_assert(offset < size, "index must be within bounds")
         let ptr = __mlir_op.`pop.array.gep`(
-            Pointer.address_of(self.array).address, index.value
+            Pointer.address_of(self.array).address, offset.value
         )
         Pointer(ptr).store(val)
