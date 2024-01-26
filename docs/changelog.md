@@ -57,6 +57,26 @@ modular install mojo
 from . import another_module
 ```
 
+- Mojo now has limited support to declare keyword-only arguments and parameters.
+  For example:
+
+  ```mojo
+  fn my_product(a: Int, b: Int = 1, *, c: Int, d: Int = 2):
+      print(a * b * c * d)
+
+  my_product(3, c=5)     # prints '30'
+  my_product(3, 5, d=7)  # error: missing 1 required keyword-only argument: 'c'
+  ```
+
+  Keyword-only parameters cannot be specified in a signature with variadics yet,
+  i.e. the following are not supported yet:
+
+  ```mojo
+  fn variadic_kw_only(x: Int, *args: Int, y: Int): ...
+
+  fn variadic_kw_only_params[*args: Int, p: Int]: ...
+  ```
+
 ### 🦋 Changed
 
 ### ❌ Removed
