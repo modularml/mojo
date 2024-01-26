@@ -761,6 +761,17 @@ struct String(Sized, Stringable, KeyElement):
 
         return res
 
+    fn __contains__(self, substr: String) -> Bool:
+        """Returns True if the substring is contained within the current string.
+
+        Args:
+          substr: The substring to check.
+
+        Returns:
+          True if the string contains the substring.
+        """
+        return self.find(substr) != -1
+
     fn find(self, substr: String, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
