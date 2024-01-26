@@ -134,6 +134,13 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[size]()
+
+        @parameter
+        if type == DType.address:
+            return rebind[Self](
+                SIMD[DType.index, size](value).cast[DType.address]()
+            )
+
         let t0 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<index>`
         ](value.value)
@@ -159,6 +166,13 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[size]()
+
+        @parameter
+        if type == DType.address:
+            return rebind[Self](
+                SIMD[DType.index, size](value).cast[DType.address]()
+            )
+
         let tn1 = __mlir_op.`kgen.int_literal.convert`[
             _type = __mlir_type.si128
         ](value.value)
@@ -186,6 +200,13 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[size]()
+
+        @parameter
+        if type == DType.address:
+            return rebind[Self](
+                SIMD[DType.index, size](value).cast[DType.address]()
+            )
+
         let casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
         ](value.value)
@@ -491,6 +512,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new vector whose element at position `i` is computed as
             `self[i] + rhs[i]`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.add`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -504,6 +526,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new vector whose element at position `i` is computed as
             `self[i] - rhs[i]`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -524,6 +547,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 rebind[SIMD[DType.bool, size]](self)
                 & rebind[SIMD[DType.bool, size]](rhs)
             ).cast[type]()
+
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.mul`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -537,6 +562,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new vector whose element at position `i` is computed as
             `self[i] / rhs[i]`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.div`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -554,6 +580,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `floor(self / rhs)` value.
         """
         constrained[type.is_numeric(), "the type must be numeric"]()
+
         if rhs == 0:
             # this should raise an exception.
             return 0
@@ -614,6 +641,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A SIMD vector where each element is raised to the power of the
             specified exponential value.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return _pow(self, rhs)
 
     # TODO(#22771): remove this overload.
@@ -628,6 +656,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A SIMD vector where each element is raised to the power of the
             specified exponential value.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return _pow(self, rhs)
 
     @always_inline("nodebug")
@@ -644,6 +673,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A SIMD vector where each element is raised to the power of the
             specified exponential value.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return _pow(self, rhs)
 
     @always_inline("nodebug")
@@ -658,6 +688,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] < rhs[i]`.
         """
+
+        @parameter
+        if type == DType.address:
+            return self.cast[DType.index]() < rhs.cast[DType.index]()
+
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred lt>`](
             self.value, rhs.value
         )
@@ -674,6 +709,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] <= rhs[i]`.
         """
+
+        @parameter
+        if type == DType.address:
+            return self.cast[DType.index]() <= rhs.cast[DType.index]()
+
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred le>`](
             self.value, rhs.value
         )
@@ -690,6 +730,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] == rhs[i]`.
         """
+
+        @parameter
+        if type == DType.address:
+            return self.cast[DType.index]() == rhs.cast[DType.index]()
+
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
             self.value, rhs.value
         )
@@ -706,6 +751,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] != rhs[i]`.
         """
+
+        @parameter
+        if type == DType.address:
+            return self.cast[DType.index]() != rhs.cast[DType.index]()
+
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
             self.value, rhs.value
         )
@@ -722,6 +772,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] > rhs[i]`.
         """
+
+        @parameter
+        if type == DType.address:
+            return self.cast[DType.index]() > rhs.cast[DType.index]()
+
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred gt>`](
             self.value, rhs.value
         )
@@ -738,6 +793,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] >= rhs[i]`.
         """
+
+        @parameter
+        if type == DType.address:
+            return self.cast[DType.index]() >= rhs.cast[DType.index]()
+
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ge>`](
             self.value, rhs.value
         )
@@ -749,6 +809,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             This SIMD vector.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return self
 
     @always_inline("nodebug")
@@ -758,6 +819,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             The negation of this SIMD vector.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.neg`(self.value)
 
     # ===-------------------------------------------------------------------===#
@@ -774,6 +836,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Args:
             rhs: The rhs of the addition operation.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         self = self + rhs
 
     @always_inline("nodebug")
@@ -786,6 +849,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Args:
             rhs: The rhs of the operation.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         self = self - rhs
 
     @always_inline("nodebug")
@@ -798,6 +862,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Args:
             rhs: The rhs of the operation.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         self = self * rhs
 
     @always_inline("nodebug")
@@ -810,6 +875,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Args:
             rhs: The rhs of the operation.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         self = self / rhs
 
     @always_inline("nodebug")
@@ -822,6 +888,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Args:
             rhs: The rhs of the operation.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         self = self // rhs
 
     @always_inline("nodebug")
@@ -834,6 +901,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Args:
             rhs: The rhs of the operation.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         self = self.__mod__(rhs)
 
     @always_inline("nodebug")
@@ -846,6 +914,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Args:
             rhs: The rhs of the operation.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         self = self.__pow__(rhs)
 
     # ===-------------------------------------------------------------------===#
@@ -862,6 +931,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             `value + self`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return value + self
 
     @always_inline("nodebug")
@@ -874,6 +944,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             `value - self`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return value - self
 
     @always_inline("nodebug")
@@ -886,6 +957,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             `value * self`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return value * self
 
     @always_inline("nodebug")
@@ -898,6 +970,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             `value / self`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return value / self
 
     # TODO: Move to global function.
@@ -914,6 +987,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new vector whose element at position `i` is computed as
             `self[i]*multiplier[i] + accumulator[i]`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.fma`(
             self.value, multiplier.value, accumulator.value
         )
@@ -1503,6 +1577,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new SIMD vector where each element at position `i` is
             `min(self[i], other[i])`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.min`(self.value, other.value)
 
     @always_inline("nodebug")
@@ -1516,6 +1591,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new SIMD vector where each element at position `i` is
             `max(self[i], other[i])`.
         """
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.max`(self.value, other.value)
 
     # ===-------------------------------------------------------------------===#
