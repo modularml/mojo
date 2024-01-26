@@ -44,6 +44,8 @@ alias Int64 = Scalar[DType.int64]
 alias UInt64 = Scalar[DType.uint64]
 """Represents a 64-bit unsigned scalar integer."""
 
+alias BFloat16 = Scalar[DType.bfloat16]
+"""Represents a 16-bit brain floating point value."""
 alias Float16 = Scalar[DType.float16]
 """Represents a 16-bit floating point value."""
 alias Float32 = Scalar[DType.float32]
