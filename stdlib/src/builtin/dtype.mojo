@@ -610,11 +610,7 @@ fn _integral_type_of[type: DType]() -> DType:
         return type
 
     @parameter
-    if type == DType.bfloat16:
-        return DType.int16
-
-    @parameter
-    if type == DType.float16:
+    if type == DType.bfloat16 or type == DType.float16:
         return DType.int16
 
     @parameter
