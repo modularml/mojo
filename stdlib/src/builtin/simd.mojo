@@ -58,14 +58,16 @@ alias Float64 = Scalar[DType.float64]
 
 
 @always_inline("nodebug")
-fn _simd_construction_checks[size: Int]():
+fn _simd_construction_checks[type: DType, size: Int]():
     """Checks if the SIMD size is valid.
 
     The SIMD size is valid if it is a power of two and is positive.
 
     Parameters:
+      type: The data type of SIMD vector elements.
       size: The number of elements in the SIMD vector.
     """
+    constrained[type != DType.invalid, "simd type cannot be DType.invalid"]()
     constrained[size > 0, "simd width must be > 0"]()
     constrained[size & (size - 1) == 0, "simd width must be power of 2"]()
 
@@ -104,7 +106,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             SIMD vector whose elements are 0.
         """
-        _simd_construction_checks[size]()
+        _simd_construction_checks[type, size]()
         let zero = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
         ](
@@ -134,7 +136,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             SIMD vector whose elements have the specified value.
         """
-        _simd_construction_checks[size]()
+        _simd_construction_checks[type, size]()
 
         @parameter
         if type == DType.address:
@@ -166,7 +168,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             SIMD vector whose elements have the specified value.
         """
-        _simd_construction_checks[size]()
+        _simd_construction_checks[type, size]()
 
         @parameter
         if type == DType.address:
@@ -200,7 +202,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             SIMD vector whose elements have the specified value.
         """
-        _simd_construction_checks[size]()
+        _simd_construction_checks[type, size]()
 
         @parameter
         if type == DType.address:
@@ -228,7 +230,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             SIMD vector using the specified value.
         """
-        _simd_construction_checks[size]()
+        _simd_construction_checks[type, size]()
         return Self {value: value}
 
     # Construct via a variadic type which has the same number of elements as
@@ -252,7 +254,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             The constructed SIMD vector.
         """
-        _simd_construction_checks[size]()
+        _simd_construction_checks[type, size]()
         let num_elements: Int = len(elems)
         if num_elements == 1:
             # Construct by broadcasting a scalar.
@@ -291,7 +293,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             A SIMD vector whose elements have the specified value.
         """
-        _simd_construction_checks[size]()
+        _simd_construction_checks[type, size]()
         let casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
         ](value.value)
@@ -335,7 +337,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             A new SIMD vector whose elements are the same as the input value.
         """
-        _simd_construction_checks[size]()
+        _simd_construction_checks[type, size]()
         constrained[type == DType.bool, "input type must be boolean"]()
         let val = SIMD[DType.bool, size] {
             value: __mlir_op.`pop.simd.splat`[
@@ -361,7 +363,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             A new SIMD vector whose elements are the same as the input value.
         """
-        _simd_construction_checks[size]()
+        _simd_construction_checks[type, size]()
         return Self {
             value: __mlir_op.`pop.simd.splat`[
                 _type = __mlir_type[
