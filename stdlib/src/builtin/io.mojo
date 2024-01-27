@@ -320,6 +320,10 @@ fn _put_simd_scalar[type: DType](x: SIMD[type, 1]):
             _printf(format, x.cast[DType.float64]())
         else:
             _put(String(x))
+    elif type == DType.address:
+        _printf(format, x)
+    else:
+        constrained[False, "invalid dtype"]()
 
 
 @no_inline
