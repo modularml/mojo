@@ -138,12 +138,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
 
-        @parameter
-        if type == DType.address:
-            return rebind[Self](
-                SIMD[DType.index, size](value).cast[DType.address]()
-            )
-
         let t0 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<index>`
         ](value.value)
@@ -169,12 +163,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[type, size]()
-
-        @parameter
-        if type == DType.address:
-            return rebind[Self](
-                SIMD[DType.index, size](value).cast[DType.address]()
-            )
 
         let tn1 = __mlir_op.`kgen.int_literal.convert`[
             _type = __mlir_type.si128
@@ -203,12 +191,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[type, size]()
-
-        @parameter
-        if type == DType.address:
-            return rebind[Self](
-                SIMD[DType.index, size](value).cast[DType.address]()
-            )
 
         let casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
@@ -692,10 +674,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self[i] < rhs[i]`.
         """
 
-        @parameter
-        if type == DType.address:
-            return self.cast[DType.index]() < rhs.cast[DType.index]()
-
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred lt>`](
             self.value, rhs.value
         )
@@ -712,10 +690,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] <= rhs[i]`.
         """
-
-        @parameter
-        if type == DType.address:
-            return self.cast[DType.index]() <= rhs.cast[DType.index]()
 
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred le>`](
             self.value, rhs.value
@@ -734,10 +708,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self[i] == rhs[i]`.
         """
 
-        @parameter
-        if type == DType.address:
-            return self.cast[DType.index]() == rhs.cast[DType.index]()
-
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
             self.value, rhs.value
         )
@@ -754,10 +724,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] != rhs[i]`.
         """
-
-        @parameter
-        if type == DType.address:
-            return self.cast[DType.index]() != rhs.cast[DType.index]()
 
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
             self.value, rhs.value
@@ -776,10 +742,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self[i] > rhs[i]`.
         """
 
-        @parameter
-        if type == DType.address:
-            return self.cast[DType.index]() > rhs.cast[DType.index]()
-
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred gt>`](
             self.value, rhs.value
         )
@@ -796,10 +758,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] >= rhs[i]`.
         """
-
-        @parameter
-        if type == DType.address:
-            return self.cast[DType.index]() >= rhs.cast[DType.index]()
 
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ge>`](
             self.value, rhs.value
