@@ -360,24 +360,20 @@ struct VariadicListMem[
             __mlir_op.`pop.variadic.get`(self.value, index.value)
         )
 
-    ## FIXME: This horrible syntax is used to expose and merge in the lifetime
-    # of self.  It would be nice to be able to do:
-    # fn __refitem__(self: Self, index: Int)
-    #      -> Self.reference_type.union_lifetime(lifetimeof(self))
     @always_inline
-    fn __refitem__[
-        self_life: ImmLifetime,
-    ](
-        self: _LITRef[Self, __mlir_attr.`0: i1`, self_life].type, index: Int
+    fn __refitem__(
+        self, index: Int
     ) -> _LITRef[
         element_type,
         elt_is_mutable,
         _lit_lifetime_union[
             elt_is_mutable,
             lifetime,
-            # cast mutability of self to match the mutability of the element, since that is what we want to use in the ultimate reference and the union overall doesn't matter.
+            # cast mutability of self to match the mutability of the element,
+            # since that is what we want to use in the ultimate reference and
+            # the union overall doesn't matter.
             _lit_mut_cast[
-                __mlir_attr.`0: i1`, self_life, elt_is_mutable
+                __mlir_attr.`0: i1`, __lifetime_of(self), elt_is_mutable
             ].result,
         ].result,
     ].type:
@@ -390,9 +386,7 @@ struct VariadicListMem[
             A low-level pointer to the element on the list corresponding to the
             given index.
         """
-        return __mlir_op.`pop.variadic.get`(
-            Reference(self)[].value, index.value
-        )
+        return __mlir_op.`pop.variadic.get`(self.value, index.value)
 
     # FIXME: This is horrible syntax to return an iterator whose lifetime is
     # bound to the VariadicListMem
