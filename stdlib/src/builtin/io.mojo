@@ -146,13 +146,11 @@ fn _snprintf[
 
 
 @no_inline
-fn _float_repr(
-    buffer: Pointer[Int8], size: Int, x: __mlir_type.`!pop.scalar<f64>`
-) -> Int:
+fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
-    let n = _snprintf(buffer, size, "%.17g", x)
+    let n = _snprintf(buffer, size, "%.17g", x.value)
     # If the buffer isn't big enough to add anything, then just return.
     if n + 2 >= size:
         return n
@@ -243,41 +241,24 @@ fn _snprintf_int(
 
 
 @no_inline
-fn _snprintf_kgen_scalar[
+fn _snprintf_scalar[
     type: DType
-](
-    buffer: Pointer[Int8],
-    size: Int,
-    x: __mlir_type[`!pop.scalar<`, type.value, `>`],
-) -> Int:
+](buffer: Pointer[Int8], size: Int, x: Scalar[type],) -> Int:
     alias format = _get_dtype_printf_format[type]()
 
     @parameter
     if type == DType.bool:
-        if Scalar[DType.bool](rebind[__mlir_type.`!pop.scalar<bool>`](x)):
+        if x:
             return _snprintf(buffer, size, "True")
         else:
             return _snprintf(buffer, size, "False")
     elif type.is_integral():
         return _snprintf(buffer, size, format, x)
-    elif type == DType.float16:
+    elif type == DType.float16 or type == DType.float32:
         # We need to cast the value to float64 to print it.
-        return _float_repr(
-            buffer,
-            size,
-            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<f64>`](x),
-        )
-    elif type == DType.float32:
-        # We need to cast the value to float64 to print it.
-        return _float_repr(
-            buffer,
-            size,
-            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<f64>`](x),
-        )
+        return _float_repr(buffer, size, x.cast[DType.float64]())
     elif type == DType.float64:
-        return _float_repr(
-            buffer, size, rebind[__mlir_type.`!pop.scalar<f64>`](x)
-        )
+        return _float_repr(buffer, size, rebind[Float64](x))
     return 0
 
 

@@ -12,7 +12,7 @@ from sys import llvm_intrinsic
 from sys.info import has_avx512f, is_x86, simdwidthof
 
 from .dtype import _integral_type_of
-from .io import _snprintf_kgen_scalar
+from .io import _snprintf_scalar
 from .string import _calc_initial_buffer_size, _vec_fmt
 
 from builtin.hash import _hash_simd
@@ -459,10 +459,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             if i != 0:
                 buf.size += _vec_fmt(buf.data + buf.size, 3, ", ")
 
-            buf.size += _snprintf_kgen_scalar[type](
+            buf.size += _snprintf_scalar[type](
                 rebind[Pointer[Int8]](buf.data + buf.size),
                 _calc_initial_buffer_size(element),
-                element.value,
+                element,
             )
 
         # Print a closing `]`.

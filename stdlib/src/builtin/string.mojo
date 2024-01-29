@@ -23,7 +23,7 @@ from utils.static_tuple import StaticTuple
 from collections.vector import DynamicVector
 from collections.dict import KeyElement
 
-from .io import _snprintf, _snprintf_kgen_scalar
+from .io import _snprintf, _snprintf_scalar
 from .range import _StridedRange
 
 # ===----------------------------------------------------------------------===#
@@ -269,11 +269,7 @@ struct String(Sized, Stringable, KeyElement):
         let length = len(str)
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
-        memcpy(
-            rebind[DTypePointer[DType.int8]](buffer.data),
-            str.data,
-            length,
-        )
+        memcpy(rebind[DTypePointer[DType.int8]](buffer.data), str.data, length)
         buffer[length] = 0
         self._buffer = buffer ^
 
