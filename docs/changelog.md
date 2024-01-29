@@ -77,6 +77,11 @@ from . import another_module
   fn variadic_kw_only_params[*args: Int, p: Int]: ...
   ```
 
+- A new magic `__lifetime_of(expr)` call will yield the lifetime of a memory
+  value.  We hope and expect that this will eventually be replaced by
+  `Reference(expr).lifetime` as the parameter system evolves, but this is
+  important in the meantime for use in function signatures.
+
 ### 🦋 Changed
 
 ### ❌ Removed
@@ -301,7 +306,7 @@ from . import another_module
     fn __copyinit__(inout self: Self, existing: Self):
         self.vec = existing.vec
 
-  
+
   fn main():
     var foo = Foo()
     print(len(foo.vec))
