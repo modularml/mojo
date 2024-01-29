@@ -9,7 +9,6 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
-from sys import llvm_intrinsic
 from sys._build import is_kernels_debug_build
 from sys.param_env import is_defined
 
@@ -31,6 +30,33 @@ fn debug_assert(cond: Bool, msg: StringLiteral):
         cond: The bool value to assert.
         msg: The message to display on failure.
     """
+    _debug_assert_impl(cond, msg)
+
+
+@always_inline
+fn debug_assert[boolable: Boolable](cond: boolable, msg: StringLiteral):
+    """Asserts that the condition is true.
+
+    The `debug_assert` is similar to `assert` in C++. It is a no-op in release
+    builds unless MOJO_ENABLE_ASSERTIONS is defined.
+
+    Right now, users of the mojo-sdk must explicitly specify `-D MOJO_ENABLE_ASSERTIONS`
+    to enable assertions.  It is not sufficient to compile programs with `-debug-level full`
+    for enabling assertions in the library.
+
+    Parameters:
+        boolable: The trait of the conditional.
+
+    Args:
+        cond: The bool value to assert.
+        msg: The message to display on failure.
+    """
+    _debug_assert_impl(cond, msg)
+
+
+@always_inline
+fn _debug_assert_impl[boolable: Boolable](cond: boolable, msg: StringLiteral):
+    """Asserts that the condition is true."""
 
     # Print an error and fail.
     alias err = is_kernels_debug_build() or is_defined[
@@ -42,7 +68,7 @@ fn debug_assert(cond: Bool, msg: StringLiteral):
 
     @parameter
     if err or warn:
-        if cond:
+        if cond.__bool__():
             return
 
         @parameter
