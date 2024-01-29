@@ -388,15 +388,10 @@ struct VariadicListMem[
         """
         return __mlir_op.`pop.variadic.get`(self.value, index.value)
 
-    # FIXME: This is horrible syntax to return an iterator whose lifetime is
-    # bound to the VariadicListMem
-    @always_inline
-    fn __iter__[
-        self_lifetime: ImmLifetime,
-    ](
-        self: _LITRef[Self, __mlir_attr.`0: i1`, self_lifetime].type
+    fn __iter__(
+        self,
     ) -> _VariadicListMemIter[
-        element_type, elt_is_mutable, lifetime, self_lifetime
+        element_type, elt_is_mutable, lifetime, __lifetime_of(self)
     ]:
         """Iterate over the list.
 
@@ -404,5 +399,5 @@ struct VariadicListMem[
             An iterator to the start of the list.
         """
         return _VariadicListMemIter[
-            element_type, elt_is_mutable, lifetime, self_lifetime
+            element_type, elt_is_mutable, lifetime, __lifetime_of(self)
         ](0, self)
