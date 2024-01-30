@@ -15,24 +15,12 @@ from testing import assert_true
 from math import abs, isclose
 
 
-fn assert_true(val: object, msg: String = "") raises:
+fn assert_true[T: Boolable](val: T, msg: String = "") raises:
     """Asserts that the input value is True. If it is not then an
     Error is raised.
 
-    Args:
-        val: The value to assert to be True.
-        msg: The message to be printed if the assertion fails.
-
-    Raises:
-        An Error with the provided message if assert fails and `None` otherwise.
-    """
-    if not val:
-        raise Error("AssertionError: " + msg)
-
-
-fn assert_true(val: Bool, msg: String = "") raises:
-    """Asserts that the input value is True. If it is not then an Error
-    is raised.
+    Parameters:
+        T: A Boolable type.
 
     Args:
         val: The value to assert to be True.
@@ -45,24 +33,12 @@ fn assert_true(val: Bool, msg: String = "") raises:
         raise Error("AssertionError: " + msg)
 
 
-fn assert_false(val: object, msg: String = "") raises:
+fn assert_false[T: Boolable](val: T, msg: String = "") raises:
     """Asserts that the input value is False. If it is not then an Error is
     raised.
 
-    Args:
-        val: The value to assert to be False.
-        msg: The message to be printed if the assertion fails.
-
-    Raises:
-        An Error with the provided message if assert fails and `None` otherwise.
-    """
-    if val:
-        raise Error("AssertionError: " + msg)
-
-
-fn assert_false(val: Bool, msg: String = "") raises:
-    """Asserts that the input value is False. If it is not then an Error is
-    raised.
+    Parameters:
+        T: A Boolable type.
 
     Args:
         val: The value to assert to be False.

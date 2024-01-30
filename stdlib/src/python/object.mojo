@@ -164,14 +164,13 @@ struct PythonObject(Intable, Stringable):
         var cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.toPython(value)
 
-    fn __init__(inout self, str: StringLiteral):
+    fn __init__(inout self, value: StringLiteral):
         """Initialize the object from a string literal.
 
         Args:
-            str: The string value.
+            value: The string value.
         """
-        var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(str)
+        self = PythonObject(str(value))
 
     fn __init__(inout self, str: StringRef):
         """Initialize the object from a string reference.

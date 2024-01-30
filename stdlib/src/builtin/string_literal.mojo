@@ -20,7 +20,7 @@ from collections.vector import CollectionElement
 
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
-struct StringLiteral(Sized, Stringable, CollectionElement, Hashable):
+struct StringLiteral(Sized, Stringable, CollectionElement, Hashable, Boolable):
     """This type represents a string literal.
 
     String literals are all null-terminated for compatibility with C APIs, but
