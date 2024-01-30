@@ -71,3 +71,17 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
             The tuple element at the requested index.
         """
         return __mlir_op.`kgen.pack.get`[_type=T, index = i.value](self.storage)
+
+    @staticmethod
+    fn _offset[i: Int]() -> Int:
+        constrained[i >= 0, "index must be positive"]()
+
+        @parameter
+        if i == 0:
+            return 0
+        else:
+            return align_up(
+                Self._offset[i - 1]()
+                + align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
+                alignof[Ts[i]](),
+            )
