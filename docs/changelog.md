@@ -82,6 +82,9 @@ from . import another_module
   `Reference(expr).lifetime` as the parameter system evolves, but this is
   important in the meantime for use in function signatures.
 
+- The `__refitem__` accessor method may now return a `Reference` instead of
+  having to return an MLIR internal reference type.
+
 ### 🦋 Changed
 
 ### ❌ Removed

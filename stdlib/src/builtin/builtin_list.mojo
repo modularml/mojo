@@ -331,7 +331,7 @@ struct VariadicListMem[
             # destroy in backwards order to match how arguments are normally torn
             # down when CheckLifetimes is left to its own devices.
             for i in range(len(self), 0, -1):
-                Reference(self.__refitem__(i - 1)).destroy_element_unsafe()
+                self.__refitem__(i - 1).destroy_element_unsafe()
 
     @always_inline
     fn __len__(self) -> Int:
@@ -340,7 +340,6 @@ struct VariadicListMem[
         Returns:
             The number of elements on the variadic list.
         """
-
         return __mlir_op.`pop.variadic.size`(self.value)
 
     # TODO: Fix for loops + _VariadicListIter to support a __nextref__ protocol
@@ -363,7 +362,7 @@ struct VariadicListMem[
     @always_inline
     fn __refitem__(
         self, index: Int
-    ) -> _LITRef[
+    ) -> Reference[
         element_type,
         elt_is_mutable,
         _lit_lifetime_union[
@@ -376,7 +375,7 @@ struct VariadicListMem[
                 __mlir_attr.`0: i1`, __lifetime_of(self), elt_is_mutable
             ].result,
         ].result,
-    ].type:
+    ]:
         """Gets a single element on the variadic list.
 
         Args:
