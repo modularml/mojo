@@ -90,6 +90,17 @@ fn _create_array[
 # ===----------------------------------------------------------------------===#
 
 
+fn _static_tuple_construction_checks[size: Int]():
+    """Checks if the properties in `StaticTuple` are valid.
+
+    Validity right now is just ensuring the number of elements is >= 0.
+
+    Parameters:
+      size: The number of elements.
+    """
+    constrained[size >= 0, "number of elements in `StaticTuple` must be >= 0"]()
+
+
 @value
 @register_passable("trivial")
 struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
@@ -114,6 +125,7 @@ struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
         Returns:
             The tuple.
         """
+        _static_tuple_construction_checks[size]()
         return Self {array: __mlir_op.`kgen.undef`[_type = Self.type]()}
 
     @always_inline
@@ -126,6 +138,7 @@ struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
         Returns:
             The tuple.
         """
+        _static_tuple_construction_checks[size]()
         return Self {array: _create_array[size](elems)}
 
     @always_inline
@@ -138,8 +151,7 @@ struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
         Returns:
             A tuple with the values filled in.
         """
-        constrained[size > 0]()
-
+        _static_tuple_construction_checks[size]()
         return Self {array: _create_array[size, Self.element_type](values)}
 
     @always_inline("nodebug")

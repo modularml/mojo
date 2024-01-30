@@ -95,6 +95,9 @@ from . import another_module
   Structs with Self type don't always work.
 - [#1540](https://github.com/modularml/mojo/issues/1540)
   Crash in register_passable self referencing struct.
+- [1664](https://github.com/modularml/mojo/issues/1664) - Improve error
+  message when `StaticTuple` is constructed with a negative size for
+  the number of elements.
 
 ## v0.7.0 (2024-01-25)
 
