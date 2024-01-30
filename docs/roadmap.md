@@ -717,3 +717,25 @@ at the moment.
 The upstream dialects available in the Playground are the
 [`index`](https://mlir.llvm.org/docs/Dialects/IndexOps/) dialect and the
 [`LLVM`](https://mlir.llvm.org/docs/Dialects/LLVM/) dialect.
+
+### `@value` is limited with trait conformance check
+
+Structs with `@value` decorator still need to explicitly provide dundner
+methods such as `__init__`, `__copyinit__`, and `__moveinit__` when
+both of the following are true:
+
+- The struct has one or more fields that are self referencing
+  (such as `Pointer[Self]`).
+- The struct declares conformance to a trait that requires these dundner
+  methods.
+
+```mojo
+# test.mojo
+@value
+struct A(CollectionElement):
+    # error: 'DynamicVector' parameter #0 has 'CollectionElement' type, but value has type 'A'
+    var a: DynamicVector[Self] 
+```
+
+In the example above, adding the `__moveinit__()` and `__copyinit__()` methods
+required by `CollectionElement` resolves this error.
