@@ -1158,7 +1158,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self << rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert((rhs >= 0).__bool__(), "unhandled negative value")
+        debug_assert(rhs >= 0, "unhandled negative value")
         return __mlir_op.`pop.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -1175,7 +1175,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self >> rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert((rhs >= 0).__bool__(), "unhandled negative value")
+        debug_assert(rhs >= 0, "unhandled negative value")
         return __mlir_op.`pop.shr`(self.value, rhs.value)
 
     @always_inline("nodebug")
