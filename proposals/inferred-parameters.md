@@ -42,22 +42,13 @@ This has been requested multiple times in various forms, especially given the ne
 
 # Proposal
 
-We can enable parameter inference from other parameters using keyword arguments, for example. This allows specifying function (and type) parameters out-of-order, where we can infer parameters left-to-right:
+In the above example, we want to be able to infer `dt` instead of explicitly specifying it:
 
 ```python
-scalar_param[x=Int32()]() # 'dt' is inferred from 'x'
-```
-
-We should enable this in the language, since this does not work today. However, in many cases this still provides more verbose than one would like, especially if the parameter name is long:
-
-```python
-scalar_param[infer_stuff_from_me=Int32()]()
-
-# One would like to write:
 scalar_param[Int32()]()
 ```
 
-Laszlo Kindrat and I proposed several options to remedy this and members of the “Mojo Language Committee” (key stakeholders across Modular) met to discuss these ideas, summarized below.
+Laszlo Kindrat and I proposed several options to remedy this and members of the “Mojo Language Committee”  met to discuss these ideas, summarized below.
 
 We decided to move forward with the following option. Mojo will introduce a new keyword, `inferred`, as a specifier for parameters only. `inferred` parameters must precede all non-inferred parameters in the parameter list, and they **cannot** be specified by a caller — they can **only** be inferred from other parameters. This allows us to express:
 
@@ -67,18 +58,26 @@ fn scalar_param[inferred dt: DType, x: Scalar[dt]](): pass
 scalar_param[Int32()]() # 'dt' is skipped and 'Int32()' is bound to 'x'
 ```
 
-Where `dt` is inferred from `x`. The decision to choose a keyword instead of introducing a new sigil like `%` à la Python is because the Python syntax is confusing to begin with, a keyword clearly indicates the intent of the syntax, and it’s easy to explain in documentation and find via internet search.
+Where `dt` is inferred from `x`. The decision to choose a keyword instead of introducing a new punctuation character [like Python does for keyword-only arguments](https://docs.python.org/3/tutorial/controlflow.html#special-parameters) is because a keyword clearly indicates the intent of the syntax, and it’s easy to explain in documentation and find via internet search.
 
-By moving inferred parameters to the beginning of the parameter list, this allows us to extend autoparameterization to parameter types as well, enabling:
+# Aside: Inferring from Keyword Parameters
+
+Related but separate to the proposal, we can enable parameter inference from other parameters using keyword arguments. This allows specifying function (and type) parameters out-of-order, where we can infer parameters left-to-right:
 
 ```python
-fn scalar_param[x: Scalar[_]](): pass
-
-# This is equivalent to
-fn scalar_param[inferred dt: DType, x: Scalar[dt]](): pas
+scalar_param[x=Int32()]() # 'dt' is inferred from 'x'
 ```
 
-As the next logical step beyond this core capability. This will enable simplifying many heavily parametric code throughout the codebase today, including the GPU package, the kernel library, lifetimes support, etc.
+We should absolutely enable this in the language, since this does not work today. However, with respect to the above proposal, in many cases this still ends up being more verbose than one would like, especially if the parameter name is long:
+
+```python
+scalar_param[infer_stuff_from_me=Int32()]()
+
+# One would like to write:
+scalar_param[Int32()]()
+```
+
+So this feature is orthogonal to the `inferred` parameter proposal.
 
 # Alternatives Considered
 
@@ -99,7 +98,7 @@ This alternative was rejected because:
 1. Non-lexical parameters are potentially confusing to users, who normally expect named declarations to be lexical. Relatedly, we are moving towards removing non-lexical parameters in general from the language.
 2. This would incur a huge implementation burden on the compiler, because the type system needs to track the topological order of the parameters.
 
-## Separator Sigil
+## New Special Separator Parameter
 
 This solution is fundamentally the same as the accepted proposal, but differs only in syntax. Instead of annotating each parameter as `inferred`, they are separated from the rest using a new undecided sigil (`%%%` is a placeholder):
 
@@ -107,16 +106,16 @@ This solution is fundamentally the same as the accepted proposal, but differs on
 fn scalar_param[dt: DType, %%%, x: Scalar[dt]](): pass
 ```
 
-The benefit of this approach is this matches the Python syntax for separating position-only and keyword-only parameters. It also structurally guarantees that all infer-only parameters appear at the beginning of the list.
+The benefit of this approach is this matches the [Python syntax](https://docs.python.org/3/tutorial/controlflow.html#special-parameters) for separating position-only and keyword-only parameters. It also structurally guarantees that all infer-only parameters appear at the beginning of the list.
 
 This alternative was rejected because:
 
-1. There was no agreement over the sigil, and any selected sigil would introduce additional noise into the language.
+1. There was no agreement over the syntax, and any selected sigil would introduce additional noise into the language.
 2. `inferred` clearly indicates the intent of the syntax, and can be found via internet search, and is overall easier to explain syntax than introducing a new argument separator.
 
-## Separator Sigil at the End
+## Special Separator Parameter at the End
 
-This is a variation on the above, where the infer-only parameters would appear at the end of the parameter list be allowed to be non-lexical:
+This is a variation on the above, where the infer-only parameters would appear at the end of the parameter list, and subsequent parameters would be allowed to be non-lexical:
 
 ```python
 fn scalar_param[x: Scalar[dt], %%%, dt: DType](): pass
