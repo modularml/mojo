@@ -10,6 +10,9 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import llvm_intrinsic
 from sys.info import has_avx512f, is_x86, simdwidthof
+from math.math import nan, _simd_apply
+from math._numerics import FPUtils, _isnan
+from math.limit import neginf, inf
 
 from .dtype import _integral_type_of
 from .io import _snprintf_scalar
@@ -45,6 +48,8 @@ alias Int64 = Scalar[DType.int64]
 alias UInt64 = Scalar[DType.uint64]
 """Represents a 64-bit unsigned scalar integer."""
 
+alias BFloat16 = Scalar[DType.bfloat16]
+"""Represents a 16-bit brain floating point value."""
 alias Float16 = Scalar[DType.float16]
 """Represents a 16-bit floating point value."""
 alias Float32 = Scalar[DType.float32]
@@ -2062,3 +2067,70 @@ fn _floor[
             __mlir_attr.`4:i32`,
         )
     return llvm_intrinsic["llvm.floor", SIMD[type, simd_width]](x)
+
+
+# ===----------------------------------------------------------------------===#
+# bfloat16
+# ===----------------------------------------------------------------------===#
+
+alias _fp32_bf16_mantissa_diff = FPUtils[
+    DType.float32
+].mantissa_width() - FPUtils[DType.bfloat16].mantissa_width()
+
+
+fn _bfloat16_to_f32_scalar(
+    val: Scalar[DType.bfloat16],
+) -> Scalar[DType.float32]:
+    let bfloat_bits = FPUtils[DType.bfloat16].bitcast_to_integer(val)
+    return FPUtils[DType.float32].bitcast_from_integer(
+        bfloat_bits << _fp32_bf16_mantissa_diff
+    )
+
+
+fn _bfloat16_to_f32[
+    size: Int
+](val: SIMD[DType.bfloat16, size]) -> SIMD[DType.float32, size]:
+    return _simd_apply[
+        size,
+        DType.bfloat16,
+        DType.float32,
+        rebind[
+            fn[
+                input_type: DType, result_type: DType
+            ] (SIMD[input_type, 1]) capturing -> SIMD[result_type, 1]
+        ](_bfloat16_to_f32),
+    ](val)
+
+
+fn _f32_to_bfloat16_scalar(
+    val: Scalar[DType.float32],
+) -> Scalar[DType.bfloat16]:
+    if _isnan(val):
+        return -nan[DType.bfloat16]() if FPUtils[DType.float32].get_sign(
+            val
+        ) else nan[DType.bfloat16]()
+
+    var float_bits = FPUtils[DType.float32].bitcast_to_integer(val)
+
+    let lsb = (float_bits >> _fp32_bf16_mantissa_diff) & 1
+    let rounding_bias = 0x7FFF + lsb
+    float_bits += rounding_bias
+
+    let bfloat_bits = float_bits >> _fp32_bf16_mantissa_diff
+
+    return FPUtils[DType.bfloat16].bitcast_from_integer(bfloat_bits)
+
+
+fn _f32_to_bfloat16[
+    size: Int
+](val: SIMD[DType.float32, size]) -> SIMD[DType.bfloat16, size]:
+    return _simd_apply[
+        size,
+        DType.float32,
+        DType.bfloat16,
+        rebind[
+            fn[
+                input_type: DType, result_type: DType
+            ] (SIMD[input_type, 1]) capturing -> SIMD[result_type, 1]
+        ](_f32_to_bfloat16_scalar),
+    ](val)

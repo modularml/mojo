@@ -254,7 +254,9 @@ fn _snprintf_scalar[
             return _snprintf(buffer, size, "False")
     elif type.is_integral():
         return _snprintf(buffer, size, format, x)
-    elif type == DType.float16 or type == DType.float32:
+    elif (
+        type == DType.float16 or type == DType.bfloat16 or type == DType.float32
+    ):
         # We need to cast the value to float64 to print it.
         return _float_repr(buffer, size, x.cast[DType.float64]())
     elif type == DType.float64:
