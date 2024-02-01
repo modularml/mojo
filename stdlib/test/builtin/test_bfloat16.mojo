@@ -3,7 +3,7 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: !aarch64
+# REQUIRES: !arm
 # RUN: %mojo -debug-level full %s | FileCheck %s
 from math import *
 from testing import *
