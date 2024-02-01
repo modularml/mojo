@@ -3,10 +3,10 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: !arm
 # RUN: %mojo -debug-level full %s | FileCheck %s
 from math import *
 from testing import *
+from sys.info import has_neon
 
 
 def test_methods():
@@ -17,15 +17,17 @@ def test_methods():
     assert_equal(int(BFloat16(3.0)), 3)
     assert_equal(int(BFloat16(3.5)), 3)
 
+    assert_almost_equal(BFloat16(4.4).cast[DType.float32](), 4.40625)
+    assert_almost_equal(Float32(4.4).cast[DType.bfloat16](), 4.4)
+
+
+def test_math():
     assert_equal(floor(BFloat16(3.0)), 3)
     assert_equal(ceil(BFloat16(3.5)), 4)
 
     assert_almost_equal(exp(BFloat16(2.0)), 7.375)
 
     assert_almost_equal(cos(BFloat16(2.0)), -0.416015625)
-
-    assert_almost_equal(BFloat16(4.4).cast[DType.float32](), 4.40625)
-    assert_almost_equal(Float32(4.4).cast[DType.bfloat16](), 4.4)
 
 
 def main():
@@ -50,3 +52,8 @@ def main():
     )
 
     test_methods()
+
+    # TODO(30525): Currently disabled because LLVM gets an error during isel.
+    @parameter
+    if not has_neon():
+        test_math()
