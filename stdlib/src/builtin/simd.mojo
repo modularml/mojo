@@ -11,8 +11,8 @@ These are Mojo built-ins, so you don't need to import them.
 from sys import llvm_intrinsic
 from sys.info import has_avx512f, is_x86, simdwidthof
 from math.math import nan, _simd_apply
-from math._numerics import FPUtils, _isnan
-from math.limit import neginf, inf
+from math._numerics import FPUtils
+from math.limit import neginf, inf, isnan
 
 from .dtype import _integral_type_of
 from .io import _snprintf_scalar
@@ -2105,7 +2105,7 @@ fn _bfloat16_to_f32[
 fn _f32_to_bfloat16_scalar(
     val: Scalar[DType.float32],
 ) -> Scalar[DType.bfloat16]:
-    if _isnan(val):
+    if isnan(val):
         return -nan[DType.bfloat16]() if FPUtils.get_sign(val) else nan[
             DType.bfloat16
         ]()
