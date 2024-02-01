@@ -35,7 +35,7 @@ fn _default_or[T: AnyRegType](value: T, default: Int) -> Int:
 
 
 @register_passable("trivial")
-struct slice(Sized):
+struct Slice(Sized):
     """Represents a slice expression.
 
     Objects of this type are generated when slice syntax is used within square
@@ -46,7 +46,7 @@ struct slice(Sized):
 
     # Both are equivalent and print "Mojo".
     print(msg[6:])
-    print(msg.__getitem__(slice(6, len(msg))))
+    print(msg.__getitem__(Slice(6, len(msg))))
     ```
     """
 
@@ -169,3 +169,53 @@ struct slice(Sized):
     @always_inline("nodebug")
     fn _has_end(self) -> Bool:
         return self.end != _int_max_value()
+
+
+@always_inline("nodebug")
+fn slice(end: Int) -> Slice:
+    """Construct slice given the end value.
+
+    Args:
+        end: The end value.
+
+    Returns:
+        The constructed slice.
+    """
+    return Slice(end)
+
+
+@always_inline("nodebug")
+fn slice(start: Int, end: Int) -> Slice:
+    """Construct slice given the start and end values.
+
+    Args:
+        start: The start value.
+        end: The end value.
+
+    Returns:
+        The constructed slice.
+    """
+    return Slice(start, end)
+
+
+# TODO(30496): Modernize the slice type
+@always_inline("nodebug")
+fn slice[
+    T0: AnyRegType, T1: AnyRegType, T2: AnyRegType
+](start: T0, end: T1, step: T2) -> Slice:
+    """Construct a Slice given the start, end and step values.
+
+    Parameters:
+        T0: Type of the start value.
+        T1: Type of the end value.
+        T2: Type of the step value.
+
+    Args:
+        start: The start value.
+        end: The end value.
+        step: The step value.
+
+    Returns:
+        The constructed slice.
+    """
+    return Slice(start, end, step)

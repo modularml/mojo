@@ -447,7 +447,7 @@ struct String(Sized, Stringable, KeyElement):
         return String(buf ^)
 
     @always_inline
-    fn _adjust_span(self, span: slice) -> slice:
+    fn _adjust_span(self, span: Slice) -> Slice:
         """Adjusts the span based on the string length."""
         var adjusted_span = span
 
@@ -462,7 +462,7 @@ struct String(Sized, Stringable, KeyElement):
         return adjusted_span
 
     @always_inline
-    fn __getitem__(self, span: slice) -> String:
+    fn __getitem__(self, span: Slice) -> String:
         """Gets the sequence of characters at the specified positions.
 
         Args:
