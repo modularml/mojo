@@ -2081,7 +2081,7 @@ alias _fp32_bf16_mantissa_diff = FPUtils[
 fn _bfloat16_to_f32_scalar(
     val: Scalar[DType.bfloat16],
 ) -> Scalar[DType.float32]:
-    let bfloat_bits = FPUtils[DType.bfloat16].bitcast_to_integer(val)
+    let bfloat_bits = FPUtils.bitcast_to_integer(val)
     return FPUtils[DType.float32].bitcast_from_integer(
         bfloat_bits << _fp32_bf16_mantissa_diff
     )
@@ -2097,7 +2097,7 @@ fn _bfloat16_to_f32[
         rebind[
             fn[
                 input_type: DType, result_type: DType
-            ] (SIMD[input_type, 1]) capturing -> SIMD[result_type, 1]
+            ] (Scalar[input_type]) capturing -> Scalar[result_type]
         ](_bfloat16_to_f32),
     ](val)
 
@@ -2106,11 +2106,11 @@ fn _f32_to_bfloat16_scalar(
     val: Scalar[DType.float32],
 ) -> Scalar[DType.bfloat16]:
     if _isnan(val):
-        return -nan[DType.bfloat16]() if FPUtils[DType.float32].get_sign(
-            val
-        ) else nan[DType.bfloat16]()
+        return -nan[DType.bfloat16]() if FPUtils.get_sign(val) else nan[
+            DType.bfloat16
+        ]()
 
-    var float_bits = FPUtils[DType.float32].bitcast_to_integer(val)
+    var float_bits = FPUtils.bitcast_to_integer(val)
 
     let lsb = (float_bits >> _fp32_bf16_mantissa_diff) & 1
     let rounding_bias = 0x7FFF + lsb
@@ -2131,6 +2131,6 @@ fn _f32_to_bfloat16[
         rebind[
             fn[
                 input_type: DType, result_type: DType
-            ] (SIMD[input_type, 1]) capturing -> SIMD[result_type, 1]
+            ] (Scalar[input_type]) capturing -> Scalar[result_type]
         ](_f32_to_bfloat16_scalar),
     ](val)
