@@ -9,10 +9,11 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from sys import llvm_intrinsic
-from sys.info import has_avx512f, is_x86, simdwidthof
+from sys.info import has_avx512f, is_x86, simdwidthof, has_neon
 from math.math import nan, _simd_apply
 from math._numerics import FPUtils
 from math.limit import neginf, inf, isnan
+from memory.unsafe import bitcast
 
 from .dtype import _integral_type_of
 from .io import _snprintf_scalar
@@ -713,6 +714,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self[i] == rhs[i]`.
         """
 
+        @parameter  # Because of #30525, we roll our own implementation for eq.
+        if has_neon() and type == DType.bfloat16:
+            let int_self = bitcast[_integral_type_of[type](), size](self)
+            let int_rhs = bitcast[_integral_type_of[type](), size](rhs)
+            return int_self == int_rhs
+
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
             self.value, rhs.value
         )
@@ -729,6 +736,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] != rhs[i]`.
         """
+
+        @parameter  # Because of #30525, we roll our own implementation for ne.
+        if has_neon() and type == DType.bfloat16:
+            let int_self = bitcast[_integral_type_of[type](), size](self)
+            let int_rhs = bitcast[_integral_type_of[type](), size](rhs)
+            return int_self != int_rhs
 
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
             self.value, rhs.value

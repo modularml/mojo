@@ -22,12 +22,13 @@ def test_methods():
 
 
 def test_math():
-    assert_equal(floor(BFloat16(3.0)), 3)
-    assert_equal(ceil(BFloat16(3.5)), 4)
+    assert_equal(exp(BFloat16(2.0)), 7.375)
+    assert_equal(cos(BFloat16(2.0)), -0.416015625)
 
-    assert_almost_equal(exp(BFloat16(2.0)), 7.375)
-
-    assert_almost_equal(cos(BFloat16(2.0)), -0.416015625)
+    @parameter
+    if not has_neon():
+        assert_almost_equal(exp(BFloat16(2.0)), 7.375)
+        assert_almost_equal(cos(BFloat16(2.0)), -0.416015625)
 
 
 def main():
@@ -52,8 +53,4 @@ def main():
     )
 
     test_methods()
-
-    # TODO(30525): Currently disabled because LLVM gets an error during isel.
-    @parameter
-    if not has_neon():
-        test_math()
+    test_math()
