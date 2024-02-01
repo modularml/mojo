@@ -381,6 +381,20 @@ fn test_string_conversions() -> None:
     test_string()
 
 
+def test_len():
+    let empty_list = Python.evaluate("[]")
+    # CHECK: 0
+    print(len(empty_list))
+
+    let l1 = Python.evaluate("[1,2,3]")
+    # CHECK: 3
+    print(len(l1))
+
+    let l2 = Python.evaluate("[42,42.0]")
+    # CHECK: 2
+    print(len(l2))
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -388,6 +402,7 @@ def main():
     test_dunder_methods(python)
     test_bool_conversion()
     test_string_conversions()
+    test_len()
     # CHECK: I like to eat apple
     # CHECK: I like to eat orange
     # CHECK: I like to eat banana

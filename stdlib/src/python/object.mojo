@@ -94,7 +94,7 @@ struct _PyIter(Sized):
 
 
 @value
-struct PythonObject(Intable, Stringable):
+struct PythonObject(Intable, Stringable, Sized):
     """A Python object."""
 
     var py_object: PyObjectPtr
@@ -365,6 +365,15 @@ struct PythonObject(Intable, Stringable):
         """
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyObject_IsTrue(self.py_object) == 1
+
+    fn __len__(self) -> Int:
+        """Returns the length of the object.
+
+        Returns:
+            The length of the object.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        return cpython.PyObject_Length(self.py_object)
 
     fn __getitem__(self, *args: PythonObject) raises -> PythonObject:
         """Return the value for the given key or keys.

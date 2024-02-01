@@ -413,6 +413,16 @@ struct CPython:
             )
         )
 
+    fn PyObject_Length(
+        inout self,
+        obj: PyObjectPtr,
+    ) -> Int:
+        return int(
+            self.lib.get_function[fn (PyObjectPtr) -> Int]("PyObject_Length")(
+                obj
+            )
+        )
+
     fn PyTuple_New(inout self, count: Int) -> PyObjectPtr:
         let r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             StringRef("PyTuple_New")
