@@ -234,7 +234,7 @@ struct AddressSpace:
 
     @always_inline("nodebug")
     fn __eq__(self, other: AddressSpace) -> Bool:
-        """The True if the two address spaces are equal and False otherwise.
+        """True if the two address spaces are equal and False otherwise.
 
         Args:
           other: The other address space value.
