@@ -51,6 +51,10 @@ modular install mojo
 
 ### ⭐️ New
 
+- Trivial types, like MLIR types and function types, can now be bound implicitly
+  to traits that require copy constructors or move constructors, such as
+  `Movable`, `Copyable`, and `CollectionElement`.
+
 - Modules within packages can now use purely relative `from` imports:
 
 ```mojo
