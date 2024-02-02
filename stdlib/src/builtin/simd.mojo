@@ -2065,6 +2065,10 @@ fn _floor[
         return x
 
     @parameter
+    if has_neon() and type == DType.bfloat16:
+        return _floor(x.cast[DType.float32]()).cast[type]()
+
+    @parameter
     if (
         has_avx512f()
         and (simdwidthof[type]() == simd_width)
@@ -2079,6 +2083,7 @@ fn _floor[
             __mlir_attr.`-1:i16`,
             __mlir_attr.`4:i32`,
         )
+
     return llvm_intrinsic["llvm.floor", SIMD[type, simd_width]](x)
 
 

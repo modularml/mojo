@@ -26,10 +26,8 @@ def test_math():
     assert_equal(exp(BFloat16(2.0)), 7.375)
     assert_equal(cos(BFloat16(2.0)), -0.416015625)
 
-    @parameter
-    if not has_neon():
-        assert_equal(floor(BFloat16(2.0)), 2.0)
-        assert_equal(ceil(BFloat16(2.0)), 2.0)
+    assert_equal(floor(BFloat16(2.0)), 2.0)
+    assert_equal(ceil(BFloat16(2.0)), 2.0)
 
 
 def main():
