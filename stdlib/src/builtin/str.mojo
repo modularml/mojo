@@ -133,6 +133,19 @@ fn str[T: Stringable](value: T) -> String:
 
 
 @always_inline
+fn str(value: None) -> String:
+    """Get the string representation of the `None` type.
+
+    Args:
+        value: The object to get the string representation of.
+
+    Returns:
+        The string representation of the object.
+    """
+    return "None"
+
+
+@always_inline
 fn str[T: StringableRaising](value: T) raises -> String:
     """Get the string representation of a value.
 
