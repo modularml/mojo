@@ -192,10 +192,6 @@ fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _SequentialRange:
     """
     let s = int(start)
     let e = int(end)
-    debug_assert(
-        e >= s,
-        "end must be greater than or equal to start when step is 1",
-    )
     return _SequentialRange(s, e)
 
 
@@ -218,10 +214,6 @@ fn range[
     """
     let s = int(start)
     let e = int(end)
-    debug_assert(
-        e >= s,
-        "end must be greater than or equal to start when step is 1",
-    )
     return _SequentialRange(s, e)
 
 
