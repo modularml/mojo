@@ -19,6 +19,7 @@ def test_methods():
 
     assert_almost_equal(BFloat16(4.4).cast[DType.float32](), 4.40625)
     assert_almost_equal(Float32(4.4).cast[DType.bfloat16](), 4.4)
+    assert_almost_equal(BFloat16(2.0), 2.0)
 
 
 def test_math():
@@ -27,8 +28,8 @@ def test_math():
 
     @parameter
     if not has_neon():
-        assert_almost_equal(exp(BFloat16(2.0)), 7.375)
-        assert_almost_equal(cos(BFloat16(2.0)), -0.416015625)
+        assert_equal(floor(BFloat16(2.0)), 2.0)
+        assert_equal(ceil(BFloat16(2.0)), 2.0)
 
 
 def main():

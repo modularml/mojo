@@ -163,6 +163,7 @@ fn assert_not_equal[
         )
 
 
+@always_inline
 fn assert_almost_equal[
     type: DType, size: Int
 ](
