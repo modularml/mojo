@@ -13,12 +13,12 @@ from sys.info import sizeof
 from memory.unsafe import Pointer
 
 # ===----------------------------------------------------------------------=== #
-# CoroutineContext
+# _CoroutineContext
 # ===----------------------------------------------------------------------=== #
 
 
 @register_passable("trivial")
-struct CoroutineContext:
+struct _CoroutineContext:
     """The default context for a Coroutine, capturing the resume function
     callback and parent Coroutine. The resume function will typically just
     resume the parent. May be overwritten by other context types with different
@@ -36,22 +36,22 @@ struct CoroutineContext:
 
 
 fn _coro_resume_callback(
-    handle: CoroutineContext._opaque_handle,
-    parent: CoroutineContext._opaque_handle,
+    handle: _CoroutineContext._opaque_handle,
+    parent: _CoroutineContext._opaque_handle,
 ):
     """Resume the parent Coroutine."""
     _coro_resume_fn(parent)
 
 
 @always_inline
-fn _coro_resume_fn(handle: CoroutineContext._opaque_handle):
+fn _coro_resume_fn(handle: _CoroutineContext._opaque_handle):
     """This function is a generic coroutine resume function."""
     __mlir_op.`pop.coroutine.resume`(handle.address)
 
 
 fn _coro_resume_noop_callback(
-    handle: CoroutineContext._opaque_handle,
-    null: CoroutineContext._opaque_handle,
+    handle: _CoroutineContext._opaque_handle,
+    null: _CoroutineContext._opaque_handle,
 ):
     """Return immediately since nothing to resume."""
     return
@@ -80,7 +80,7 @@ struct Coroutine[type: AnyRegType]:
     var _handle: Self._handle_type
 
     @always_inline
-    fn get_promise(self) -> Pointer[type]:
+    fn _get_promise(self) -> Pointer[type]:
         """Return the pointer to the beginning of the memory where the async
         function results are stored.
 
@@ -99,10 +99,10 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The value of the fulfilled promise.
         """
-        return self.get_promise().load()
+        return self._get_promise().load()
 
     @always_inline
-    fn get_ctx[ctx_type: AnyRegType](self) -> Pointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyRegType](self) -> Pointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:
@@ -112,10 +112,10 @@ struct Coroutine[type: AnyRegType]:
             The coroutine context.
         """
         constrained[
-            sizeof[CoroutineContext]() == sizeof[ctx_type](),
+            sizeof[_CoroutineContext]() == sizeof[ctx_type](),
             "context size must be 16 bytes",
         ]()
-        return self.get_promise().bitcast[ctx_type]() - 1
+        return self._get_promise().bitcast[ctx_type]() - 1
 
     @always_inline
     fn __init__(handle: Self._handle_type) -> Coroutine[type]:
@@ -129,8 +129,8 @@ struct Coroutine[type: AnyRegType]:
         """
         let self = Coroutine[type] {_handle: handle}
         let parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
-        self.get_ctx[CoroutineContext]().store(
-            CoroutineContext {
+        self._get_ctx[_CoroutineContext]().store(
+            _CoroutineContext {
                 _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
             }
         )
@@ -149,10 +149,10 @@ struct Coroutine[type: AnyRegType]:
             The coroutine promise.
         """
 
-        self.get_ctx[CoroutineContext]().store(
-            CoroutineContext {
+        self._get_ctx[_CoroutineContext]().store(
+            _CoroutineContext {
                 _resume_fn: _coro_resume_noop_callback,
-                _parent_hdl: CoroutineContext._opaque_handle.get_null(),
+                _parent_hdl: _CoroutineContext._opaque_handle.get_null(),
             }
         )
         __mlir_op.`pop.coroutine.resume`(self._handle)
@@ -200,7 +200,7 @@ struct RaisingCoroutine[type: AnyRegType]:
     var _handle: Self._handle_type
 
     @always_inline
-    fn get_promise(self) -> Pointer[Self._var_type]:
+    fn _get_promise(self) -> Pointer[Self._var_type]:
         """Return the pointer to the beginning of the memory where the async
         function results are stored.
 
@@ -219,13 +219,13 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The value of the fulfilled promise.
         """
-        let variant = self.get_promise().load()
+        let variant = self._get_promise().load()
         if __mlir_op.`kgen.variant.is`[index = Int(0).value](variant):
             raise __mlir_op.`kgen.variant.take`[index = Int(0).value](variant)
         return __mlir_op.`kgen.variant.take`[index = Int(1).value](variant)
 
     @always_inline
-    fn get_ctx[ctx_type: AnyRegType](self) -> Pointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyRegType](self) -> Pointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:
@@ -235,10 +235,10 @@ struct RaisingCoroutine[type: AnyRegType]:
             The coroutine context.
         """
         constrained[
-            sizeof[CoroutineContext]() == sizeof[ctx_type](),
+            sizeof[_CoroutineContext]() == sizeof[ctx_type](),
             "context size must be 16 bytes",
         ]()
-        return self.get_promise().bitcast[ctx_type]() - 1
+        return self._get_promise().bitcast[ctx_type]() - 1
 
     @always_inline
     fn __init__(handle: Self._handle_type) -> Self:
@@ -252,8 +252,8 @@ struct RaisingCoroutine[type: AnyRegType]:
         """
         let self = Self {_handle: handle}
         let parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
-        self.get_ctx[CoroutineContext]().store(
-            CoroutineContext {
+        self._get_ctx[_CoroutineContext]().store(
+            _CoroutineContext {
                 _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
             }
         )
@@ -272,13 +272,13 @@ struct RaisingCoroutine[type: AnyRegType]:
             The coroutine promise.
         """
 
-        fn _coro_noop_fn(handle: CoroutineContext._opaque_handle):
+        fn _coro_noop_fn(handle: _CoroutineContext._opaque_handle):
             return
 
-        self.get_ctx[CoroutineContext]().store(
-            CoroutineContext {
+        self._get_ctx[_CoroutineContext]().store(
+            _CoroutineContext {
                 _resume_fn: _coro_resume_noop_callback,
-                _parent_hdl: CoroutineContext._opaque_handle.get_null(),
+                _parent_hdl: _CoroutineContext._opaque_handle.get_null(),
             }
         )
         __mlir_op.`pop.coroutine.resume`(self._handle)
