@@ -377,6 +377,15 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
         elif target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
+        elif type == DType.bfloat16:
+            let cast_result = _bfloat16_to_f32(
+                rebind[SIMD[DType.bfloat16, size]](self)
+            ).cast[target]()
+            return rebind[SIMD[target, size]](cast_result)
+        elif target == DType.bfloat16:
+            return rebind[SIMD[target, size]](
+                _f32_to_bfloat16(self.cast[DType.float32]())
+            )
         elif target == DType.address:
             let index_val = __mlir_op.`pop.cast`[
                 _type = __mlir_type[`!pop.simd<`, size.value, `, index>`]
@@ -2108,15 +2117,20 @@ fn _bfloat16_to_f32_scalar(
 fn _bfloat16_to_f32[
     size: Int
 ](val: SIMD[DType.bfloat16, size]) -> SIMD[DType.float32, size]:
+    @always_inline
+    @parameter
+    fn wrapper_fn[
+        input_type: DType, result_type: DType
+    ](val: SIMD[input_type, 1]) capturing -> SIMD[result_type, 1]:
+        return rebind[Scalar[result_type]](
+            _bfloat16_to_f32_scalar(rebind[Scalar[DType.bfloat16]](val))
+        )
+
     return _simd_apply[
         size,
         DType.bfloat16,
         DType.float32,
-        rebind[
-            fn[
-                input_type: DType, result_type: DType
-            ] (Scalar[input_type]) capturing -> Scalar[result_type]
-        ](_bfloat16_to_f32),
+        wrapper_fn,
     ](val)
 
 
@@ -2142,13 +2156,18 @@ fn _f32_to_bfloat16_scalar(
 fn _f32_to_bfloat16[
     size: Int
 ](val: SIMD[DType.float32, size]) -> SIMD[DType.bfloat16, size]:
+    @always_inline
+    @parameter
+    fn wrapper_fn[
+        input_type: DType, result_type: DType
+    ](val: SIMD[input_type, 1]) capturing -> SIMD[result_type, 1]:
+        return rebind[Scalar[result_type]](
+            _f32_to_bfloat16_scalar(rebind[Scalar[DType.float32]](val))
+        )
+
     return _simd_apply[
         size,
         DType.float32,
         DType.bfloat16,
-        rebind[
-            fn[
-                input_type: DType, result_type: DType
-            ] (Scalar[input_type]) capturing -> Scalar[result_type]
-        ](_f32_to_bfloat16_scalar),
+        wrapper_fn,
     ](val)
