@@ -11,6 +11,7 @@ You can import these APIs from the `testing` package. For example:
 from testing import assert_true
 ```
 """
+from collections import Optional
 
 from math import abs, isclose
 
@@ -200,3 +201,69 @@ fn assert_almost_equal[
             + " with a diff of "
             + abs(lhs - rhs)
         )
+
+
+struct assert_raises:
+    """Context manager that asserts that the block raises an exception.
+
+    You can use this to test expected error cases, and to test that the correct
+    errors are raised. For instance:
+
+    ```mojo
+    from testing import assert_raises
+
+    # Good! Caught the raised error, test passes
+    with assert_raises():
+        raise "SomeError"
+
+    # Also good!
+    with assert_raises(contains="Some"):
+        raise "SomeError"
+
+    # This will assert, we didn't raise
+    with assert_raises():
+        pass
+
+    # This will let the underlying error propagate, failing the test
+    with assert_raises(contains="Some"):
+        raise "OtherError"
+    ```
+    """
+
+    var message_contains: Optional[String]
+    """If present, check that the error message contains this literal string."""
+
+    fn __init__(inout self):
+        """Construct a context manager with no message pattern."""
+        self.message_contains = None
+
+    fn __init__(inout self, *, contains: String):
+        """Construct a context manager matching specific errors.
+
+        Args:
+            contains: The test will only pass if the error message
+                includes the literal text passed.
+        """
+        self.message_contains = contains
+
+    fn __enter__(self):
+        """Enter the context manager."""
+        pass
+
+    fn __exit__(self) raises:
+        """Exit the context manager with no error.
+
+        Raises:
+            AssertionError: Always. The block must raise to pass the test.
+        """
+        raise Error("AssertionError: Didn't raise")
+
+    fn __exit__(self, error: Error) raises -> Bool:
+        """Exit the context manager with an error.
+
+        Raises:
+            Error: If the error raised doesn't match the expected error to raise.
+        """
+        if self.message_contains:
+            return str(error).__contains__(self.message_contains.value())
+        return True
