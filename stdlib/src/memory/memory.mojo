@@ -228,7 +228,7 @@ fn memcpy[
         )
 
     # Copy in 32-bit chunks
-    vectorize[32, _copy](n)
+    vectorize[_copy, 32](n)
 
 
 # ===----------------------------------------------------------------------===#
@@ -247,7 +247,7 @@ fn _memset_simd[
         ptr.simd_store[simd_width](idx, splat_val)
 
     # Copy in 32-bit chunks
-    vectorize[32, _set](count)
+    vectorize[_set, 32](count)
 
 
 @always_inline("nodebug")

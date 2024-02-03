@@ -18,7 +18,7 @@
 import benchmark
 from memory import memset_zero, stack_allocation
 from random import rand
-from algorithm import vectorize, parallelize, vectorize_unroll
+from algorithm import vectorize, parallelize
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from python import Python
 from tensor import Tensor
@@ -112,7 +112,7 @@ fn matmul_vectorized(inout C: Matrix, A: Matrix, B: Matrix):
                     m, n, C.load[nelts](m, n) + A[m, k] * B.load[nelts](k, n)
                 )
 
-            vectorize[nelts, dot](C.cols)
+            vectorize[dot, nelts](C.cols)
 
 
 # Parallelize the code by using the builtin parallelize function
@@ -127,7 +127,7 @@ fn matmul_parallelized(inout C: Matrix, A: Matrix, B: Matrix):
                     m, n, C.load[nelts](m, n) + A[m, k] * B.load[nelts](k, n)
                 )
 
-            vectorize[nelts, dot](C.cols)
+            vectorize[dot, nelts](C.cols)
 
     parallelize[calc_row](C.rows, C.rows)
 
@@ -159,7 +159,7 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
                         + A[m, k] * B.load[nelts](k, n + x),
                     )
 
-                vectorize[nelts, dot](tile_x)
+                vectorize[dot, nelts](tile_x)
 
         # We hardcode the tile factor to be 4.
         alias tile_size = 4
@@ -169,7 +169,6 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
 
 
 # Unroll the vectorized loop by a constant factor.
-# from Functional import vectorize_unroll
 fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
     alias tile_size = 4
 
@@ -190,11 +189,9 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
                         + A[m, k] * B.load[nelts](k, n + x),
                     )
 
-                # Vectorize by nelts and unroll by tile_x/nelts
-                # Here unroll factor is 4
-                vectorize_unroll[nelts, tile_x // nelts, dot](tile_x)
+                alias unroll_factor = tile_x // nelts
+                vectorize[dot, nelts, tile_x, unroll_factor]()
 
-        alias tile_size = 4
         tile[calc_tile, nelts * tile_size, tile_size](C.cols, B.rows)
 
     parallelize[calc_row](C.rows, C.rows)
@@ -247,9 +244,8 @@ fn matmul_accumulated(inout C: Matrix, A: Matrix, B: Matrix):
                                 * B.load[nelts](ko + k, jo + j),
                             )
 
-                        vectorize_unroll[
-                            nelts, tile_j // nelts, calc_tile_cols
-                        ](tile_j)
+                        alias unroll_factor = tile_j // nelts
+                        vectorize[calc_tile_cols, nelts, unroll_factor](tile_j)
 
         # Copy the local tile to the output
         for i in range(tile_i):

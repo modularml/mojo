@@ -79,7 +79,7 @@ fn main() raises:
             )
 
         # Vectorize the call to compute_vector where call gets a chunk of pixels.
-        vectorize[simd_width, compute_vector](width)
+        vectorize[compute_vector, simd_width, width]()
 
     @parameter
     fn bench[simd_width: Int]():
