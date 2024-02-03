@@ -149,9 +149,15 @@ from . import another_module
   Structs with Self type don't always work.
 - [#1540](https://github.com/modularml/mojo/issues/1540)
   Crash in register_passable self referencing struct.
-- [1664](https://github.com/modularml/mojo/issues/1664) - Improve error
+- [#1664](https://github.com/modularml/mojo/issues/1664) - Improve error
   message when `StaticTuple` is constructed with a negative size for
   the number of elements.
+- [#1679](https://github.com/modularml/mojo/issues/1679) - crash on SIMD of zero
+  elements.
+- Various crashes on invalid code:
+  [#1230](https://github.com/modularml/mojo/issues/1230),
+  [#1699](https://github.com/modularml/mojo/issues/1699),
+  [#1708](https://github.com/modularml/mojo/issues/1708)
 
 ## v0.7.0 (2024-01-25)
 
