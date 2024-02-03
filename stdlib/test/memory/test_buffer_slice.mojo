@@ -17,9 +17,7 @@ from utils.index import Index, StaticIntTuple
 from utils.list import Dim, DimList
 
 
-fn print_elements[
-    type: DType, in_rank: Int
-](tensor: NDBuffer[type, in_rank, DimList.create_unknown[in_rank]()]):
+fn print_elements[type: DType, in_rank: Int](tensor: NDBuffer[type, in_rank]):
     print("New shape:", tensor.dynamic_shape)
     print("New strides:", tensor.dynamic_stride)
 
@@ -61,25 +59,19 @@ fn test_slice[
     print("In strides:", in_tensor.dynamic_stride)
 
     let start_tensor_mem = stack_allocation[outer_rank, DType.index, 1]()
-    let start_tensor = NDBuffer[
-        DType.index,
-        1,
-        DimList.create_unknown[1](),
-    ](start_tensor_mem.address, StaticIntTuple[1](outer_rank))
+    let start_tensor = NDBuffer[DType.index, 1](
+        start_tensor_mem.address, StaticIntTuple[1](outer_rank)
+    )
 
     let end_tensor_mem = stack_allocation[outer_rank, DType.index, 1]()
-    let end_tensor = NDBuffer[
-        DType.index,
-        1,
-        DimList.create_unknown[1](),
-    ](end_tensor_mem.address, StaticIntTuple[1](outer_rank))
+    let end_tensor = NDBuffer[DType.index, 1](
+        end_tensor_mem.address, StaticIntTuple[1](outer_rank)
+    )
 
     let step_tensor_mem = stack_allocation[outer_rank, DType.index, 1]()
-    let step_tensor = NDBuffer[
-        DType.index,
-        1,
-        DimList.create_unknown[1](),
-    ](step_tensor_mem.address, StaticIntTuple[1](outer_rank))
+    let step_tensor = NDBuffer[DType.index, 1](
+        step_tensor_mem.address, StaticIntTuple[1](outer_rank)
+    )
 
     for dim in range(outer_rank):
         start_tensor[dim] = starts[dim]
@@ -91,9 +83,7 @@ fn test_slice[
 
     # Perform the slice even if we are testing the copy so we get the target size.
     let sliced = slice_as_view(
-        rebind[
-            NDBuffer[dtype, outer_rank, DimList.create_unknown[outer_rank]()]
-        ](in_tensor),
+        rebind[NDBuffer[dtype, outer_rank]](in_tensor),
         start_tensor,
         end_tensor,
         step_tensor,

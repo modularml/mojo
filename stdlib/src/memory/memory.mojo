@@ -116,7 +116,7 @@ fn memcpy[
         count: The number of elements to copy.
     """
     let byte_count = count * sizeof[type]()
-    memcpy[DType.uint8, Dim()](
+    memcpy[DType.uint8](
         Buffer[DType.uint8, Dim(), address_space=address_space](
             dest.bitcast[UInt8](), byte_count
         ),
