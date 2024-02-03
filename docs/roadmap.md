@@ -57,7 +57,7 @@ There are three major reasons for this:
 - First, Mojo is still young: we are still "building a house" by laying down
 major bricks in the type system and adding system programming features that
 Python lacks. We know we need to implement support for many existing Python
-features (compatibility a massive and important goal of Mojo) and this work
+features (compatibility is a massive and important goal of Mojo) and this work
 is not done yet. We have limited engineering bandwidth and want focus on
 building essential functionality, and we will not debate whether certain
 syntactic sugar is important or not.
