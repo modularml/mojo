@@ -117,6 +117,27 @@ from . import another_module
   The doc string has been updated with examples demonstrating the difference
   between the two signatures.
 
+- The signature of the `NDBuffer` and `Buffer` types have changed. Now, both
+  take the type as the first parameter and no longer require the shape
+  parameter. This allows one to use these types and have sensible default.
+  For example:
+
+  ```mojo
+  NDBuffer[DType.float32, 3]
+  ```
+
+  is equivalent to
+
+  ```mojo
+  NDBuffer[DType.float32, 3, DimList.create_unknown[3]()]
+  ```
+
+  Users can still specify the static shape (if known) to the type:
+
+  ```mojo
+  NDBuffer[DType.float32, 3, DimList(128, 128, 3)]
+  ```
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
