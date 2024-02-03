@@ -100,6 +100,23 @@ from . import another_module
 
 ### 🦋 Changed
 
+- `vectorize_unroll` has been removed, and `vectorize` now has a parameter named
+  `unroll_factor` with a default value of 1. Increasing `unroll_factor` may
+  improve performance at the cost of binary size. See the
+  [loop unrolling blog here](https://www.modular.com/blog/what-is-loop-unrolling-how-you-can-speed-up-mojo)
+  for more details.
+
+- The `vectorize` signatures have changed with the closure `func` moved to the
+  first parameter:
+
+  ```mojo
+  vectorize[func, width, unroll_factor = 1](size)
+  vectorize[func, width, size, unroll_factor = 1]()
+  ```
+
+  The doc string has been updated with examples demonstrating the difference
+  between the two signatures.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
@@ -437,10 +454,6 @@ from . import another_module
 - The `@unroll(n)` decorator can now take a parameter expression for
   the unroll factor, i.e. `n` can be a parameter expression that is
   of integer type.
-
-- `vectorize` now has an overload to pass `size` as a parameter instead of an
-  argument. This allows the remainder of `size` / `simd_width` to run in a
-  single iteration.
 
 - The `cpython` module in the `python` package has been moved to be an internal
   module, i.e, `_cpython`.
