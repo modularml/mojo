@@ -236,11 +236,12 @@ fn test_contains() raises:
 
     assert_true(str.__contains__(""))
     assert_true(str.__contains__("He"))
-    assert_true(str.__contains__("lo"))
+    assert_true("lo" in str)
     assert_true(str.__contains__(" "))
     assert_true(str.__contains__("ld"))
 
     assert_false(str.__contains__("bellow"))
+    assert_true("bellow" not in str)
 
 
 fn test_find() raises:

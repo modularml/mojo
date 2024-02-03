@@ -81,6 +81,9 @@ from . import another_module
   fn variadic_kw_only_params[*args: Int, p: Int]: ...
   ```
 
+- Mojo now supports the `x in y` expression as syntax sugar for
+  `y.__contains__(x)` as well as `x not in y`.
+
 - A new magic `__lifetime_of(expr)` call will yield the lifetime of a memory
   value.  We hope and expect that this will eventually be replaced by
   `Reference(expr).lifetime` as the parameter system evolves, but this is

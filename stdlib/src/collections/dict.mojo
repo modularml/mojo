@@ -347,7 +347,14 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
         self._insert(key, value)
 
     fn __contains__(self, key: K) -> Bool:
-        """Check if a given value is in the dictionary or not."""
+        """Check if a given value is in the dictionary or not.
+
+        Args:
+            key: The key to check.
+
+        Returns:
+            True if there key exists in the dictionary, False otherwise.
+        """
         return self.find(key).__bool__()
 
     fn __len__(self) -> Int:
