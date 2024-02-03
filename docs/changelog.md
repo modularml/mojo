@@ -86,6 +86,15 @@ from . import another_module
   `Reference(expr).lifetime` as the parameter system evolves, but this is
   important in the meantime for use in function signatures.
 
+- A new magic `__type_of(expr)` call will yield the type of a value. This allows
+  one to refer type types of other variables. For example:
+
+  ```mojo
+  fn my_function(x: Int, y: __type_of(x)) -> Int:
+    let z : __type_of(x) = y
+    return z
+  ```
+
 - The `__refitem__` accessor method may now return a `Reference` instead of
   having to return an MLIR internal reference type.
 
