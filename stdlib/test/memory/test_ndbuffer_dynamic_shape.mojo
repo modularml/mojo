@@ -18,7 +18,7 @@ fn test_ndbuffer_dynamic_shape():
     # Create a buffer of size 16
     var buffer = stack_allocation[16, DType.index, 1]()
 
-    var matrix = NDBuffer[2, DimList.create_unknown[2](), DType.index](
+    var matrix = NDBuffer[DType.index, 2, DimList.create_unknown[2]()](
         buffer.address, DimList(4, 4)
     )
 
@@ -32,9 +32,9 @@ fn test_ndbuffer_dynamic_shape():
 
     # Mix static and dynamic shape.
     var matrix2 = NDBuffer[
+        DType.index,
         2,
         DimList(42, Dim()),
-        DType.index,
     ](buffer.address, DimList(42, 1))
 
     matrix2.dynamic_shape[1] = 43

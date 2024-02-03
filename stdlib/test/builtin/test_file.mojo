@@ -176,14 +176,14 @@ def test_file_write_again():
 # CHECK-LABEL: test_buffer
 def test_buffer():
     print("== test_buffer")
-    let buf = Buffer[4, DType.float32].stack_allocation()
+    let buf = Buffer[DType.float32, 4].stack_allocation()
     buf.fill(2.0)
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_buffer"
     buf.tofile(TEMP_FILE)
 
     with open(TEMP_FILE, "r") as f:
         let str = f.read()
-        let buf_read = Buffer[4, DType.float32](
+        let buf_read = Buffer[DType.float32, 4](
             str._as_ptr().bitcast[DType.float32]()
         )
         for i in range(4):
@@ -197,14 +197,14 @@ def test_buffer():
 # CHECK-LABEL: test_ndbuffer
 def test_ndbuffer():
     print("== test_ndbuffer")
-    let buf = NDBuffer[2, DimList(2, 2), DType.float32].stack_allocation()
+    let buf = NDBuffer[DType.float32, 2, DimList(2, 2)].stack_allocation()
     buf.fill(2.0)
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_ndbuffer"
     buf.tofile(TEMP_FILE)
 
     with open(TEMP_FILE, "r") as f:
         let str = f.read()
-        let buf_read = NDBuffer[2, DimList(2, 2), DType.float32](
+        let buf_read = NDBuffer[DType.float32, 2, DimList(2, 2)](
             str._as_ptr().bitcast[DType.float32]()
         )
         for i in range(2):

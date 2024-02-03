@@ -92,7 +92,7 @@ fn test_print():
 # CHECK-LABEL: test_issue_20421
 fn test_issue_20421():
     print("== test_issue_20421")
-    let a = Buffer[16 * 64, DType.uint8].aligned_stack_allocation[64]()
+    let a = Buffer[DType.uint8, 16 * 64].aligned_stack_allocation[64]()
     for i in range(16 * 64):
         a[i] = i & 255
     let av16 = a.data.offset(128 + 64 + 4).bitcast[DType.int32]().simd_load[4]()

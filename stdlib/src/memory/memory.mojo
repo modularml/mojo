@@ -117,10 +117,10 @@ fn memcpy[
     """
     let byte_count = count * sizeof[type]()
     memcpy[DType.uint8, Dim()](
-        Buffer[Dim(), DType.uint8, address_space=address_space](
+        Buffer[DType.uint8, Dim(), address_space=address_space](
             dest.bitcast[UInt8](), byte_count
         ),
-        Buffer[Dim(), DType.uint8, address_space=address_space](
+        Buffer[DType.uint8, Dim(), address_space=address_space](
             src.bitcast[UInt8](), byte_count
         ),
     )
@@ -145,11 +145,11 @@ fn memcpy[
         count: The number of elements to copy (not bytes!).
     """
     memcpy[DType.uint8, Dim(), address_space=address_space](
-        Buffer[Dim(), DType.uint8, address_space](
+        Buffer[DType.uint8, Dim(), address_space](
             dest.bitcast[DType.uint8](),
             count * sizeof[type](),
         ),
-        Buffer[Dim(), DType.uint8, address_space](
+        Buffer[DType.uint8, Dim(), address_space](
             src.bitcast[DType.uint8](),
             count * sizeof[type](),
         ),
@@ -159,8 +159,8 @@ fn memcpy[
 fn memcpy[
     type: DType, size: Dim, address_space: AddressSpace
 ](
-    dest: Buffer[size, type, address_space],
-    src: Buffer[size, type, address_space],
+    dest: Buffer[type, size, address_space],
+    src: Buffer[type, size, address_space],
 ):
     """Copies a memory buffer from `src` to `dest`.
 

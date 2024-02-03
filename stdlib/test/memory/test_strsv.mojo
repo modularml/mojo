@@ -15,13 +15,13 @@ alias simd_width = 8
 
 fn strsv[
     size: Int
-](L: Buffer[size * size, DType.float32], x: Buffer[size, DType.float32]):
+](L: Buffer[DType.float32, size * size], x: Buffer[DType.float32, size]):
     # assuming size is a multiple of simd_width
     var x_ptr = DTypePointer[DType.float32](x.data.address)
     var L_ptr = DTypePointer[DType.float32](L.data.address)
     var n: Int = size
     let x_solved = Buffer[
-        simd_width * simd_width, DType.float32
+        DType.float32, simd_width * simd_width
     ].aligned_stack_allocation[64]()
 
     while True:
@@ -63,7 +63,7 @@ fn strsv[
 
 
 # Fill the lower triangle matrix.
-fn fill_L[size: Int](L: Buffer[size * size, DType.float32]):
+fn fill_L[size: Int](L: Buffer[DType.float32, size * size]):
     for j in range(size):
         for i in range(size):
             if i == j:
@@ -73,14 +73,14 @@ fn fill_L[size: Int](L: Buffer[size * size, DType.float32]):
 
 
 # Fill the rhs, which is also used to save the solution vector.
-fn fill_x[size: Int](x: Buffer[size, DType.float32]):
+fn fill_x[size: Int](x: Buffer[DType.float32, size]):
     for i in range(size):
         x[i] = 1.0
 
 
 fn naive_strsv[
     size: Int
-](L: Buffer[size * size, DType.float32], x: Buffer[size, DType.float32]):
+](L: Buffer[DType.float32, size * size], x: Buffer[DType.float32, size]):
     for j in range(size):
         let x_j = x[j]
         for i in range(j + 1, size):
@@ -92,9 +92,9 @@ fn test_strsv():
     print("== test_strsv")
 
     alias size: Int = 64
-    let L = Buffer[size * size, DType.float32].stack_allocation()
-    let x0 = Buffer[size, DType.float32].stack_allocation()
-    let x1 = Buffer[size, DType.float32].stack_allocation()
+    let L = Buffer[DType.float32, size * size].stack_allocation()
+    let x0 = Buffer[DType.float32, size].stack_allocation()
+    let x1 = Buffer[DType.float32, size].stack_allocation()
 
     fill_L[size](L)
     fill_x[size](x0)

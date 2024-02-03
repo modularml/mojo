@@ -52,12 +52,12 @@ fn test_memcpy():
 
     @parameter
     fn _test_memcpy_buf[size: Int]():
-        let buf = Buffer[size * 2, DType.uint8.value].stack_allocation()
+        let buf = Buffer[DType.uint8.value, size * 2].stack_allocation()
         buf.fill(2)
         memset_zero(buf.data + size, size)
-        let src = Buffer[size * 2, DType.uint8.value].stack_allocation()
+        let src = Buffer[DType.uint8.value, size * 2].stack_allocation()
         src.fill(2)
-        let dst = Buffer[size * 2, DType.uint8.value].stack_allocation()
+        let dst = Buffer[DType.uint8.value, size * 2].stack_allocation()
         dst.fill(0)
 
         memcpy(dst.data, src.data, size)

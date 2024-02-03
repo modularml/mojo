@@ -28,11 +28,11 @@ fn test_non_temporal_store(m: Int):
     alias alignment = 64  # Bytes
     alias simd_width = simdwidthof[DType.float32]()
 
-    let b1 = Buffer[buffer_size, DType.float32].stack_allocation()
+    let b1 = Buffer[DType.float32, buffer_size].stack_allocation()
     for i in range(buffer_size):
         b1[i] = Float32(i)
 
-    let b2 = Buffer[buffer_size, DType.float32].aligned_stack_allocation[
+    let b2 = Buffer[DType.float32, buffer_size].aligned_stack_allocation[
         alignment
     ]()
 
@@ -40,14 +40,14 @@ fn test_non_temporal_store(m: Int):
         b2.simd_nt_store[simd_width](i, b1.simd_load[simd_width](i))
 
     let b3 = NDBuffer[
+        DType.float32,
         2,
         DimList(buffer_size // simd_width, simd_width),
-        DType.float32,
     ](b1.data)
     let b4 = NDBuffer[
+        DType.float32,
         2,
         DimList(buffer_size // simd_width, simd_width),
-        DType.float32,
     ](b2.data)
 
     for j in range(buffer_size // simd_width):

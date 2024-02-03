@@ -21,7 +21,7 @@ from memory.buffer import Buffer
 fn test_masked_load():
     print("== test_masked_load")
 
-    let vector = Buffer[5, DType.float32].stack_allocation()
+    let vector = Buffer[DType.float32, 5].stack_allocation()
     vector.fill(1)
 
     # CHECK: [1.0, 1.0, 1.0, 1.0]
@@ -53,7 +53,7 @@ fn test_masked_load():
 fn test_masked_store():
     print("== test_masked_store")
 
-    let vector = Buffer[5, DType.float32].stack_allocation()
+    let vector = Buffer[DType.float32, 5].stack_allocation()
     vector.fill(0)
 
     # CHECK: [0.0, 1.0, 2.0, 3.0]
@@ -73,7 +73,7 @@ fn test_masked_store():
 fn test_compressed_store():
     print("== test_compressed_store")
 
-    let vector = Buffer[4, DType.float32].stack_allocation()
+    let vector = Buffer[DType.float32, 4].stack_allocation()
     vector.fill(0)
 
     # CHECK: [2.0, 3.0, 0.0, 0.0]
@@ -96,7 +96,7 @@ fn test_strided_load():
     print("== test_strided_load")
 
     alias size = 16
-    let vector = Buffer[size, DType.float32].stack_allocation()
+    let vector = Buffer[DType.float32, size].stack_allocation()
 
     for i in range(size):
         vector[i] = i
@@ -111,7 +111,7 @@ fn test_strided_store():
     print("== test_strided_store")
 
     alias size = 8
-    let vector = Buffer[size, DType.float32].stack_allocation()
+    let vector = Buffer[DType.float32, size].stack_allocation()
     vector.fill(0)
 
     strided_store(SIMD[DType.float32, 4](99, 12, 23, 56), vector.data, 2)

@@ -69,9 +69,9 @@ from utils.list import DimList
 fn test_my_naive_matmul[
     shape: DimList, type: DType
 ](
-    c: NDBuffer[2, shape, type],
-    a: NDBuffer[2, shape, type],
-    b: NDBuffer[2, shape, type],
+    c: NDBuffer[type, 2, shape],
+    a: NDBuffer[type, 2, shape],
+    b: NDBuffer[type, 2, shape],
 ):
     """Computes matrix multiplication with a naive algorithm.
 
@@ -88,7 +88,7 @@ fn test_my_naive_matmul[
             c[StaticIntTuple[2](m, n)] = c_val
 
 
-fn fill_a[size: Int](buf: NDBuffer[2, DimList(size, size), DType.float32]):
+fn fill_a[size: Int](buf: NDBuffer[DType.float32, 2, DimList(size, size)]):
     """Fills the matrix with the values `row + 2*col`."""
 
     for i in range(size):
@@ -97,7 +97,7 @@ fn fill_a[size: Int](buf: NDBuffer[2, DimList(size, size), DType.float32]):
             buf[StaticIntTuple[2](i, j)] = val.value
 
 
-fn fill_b[size: Int](buf: NDBuffer[2, DimList(size, size), DType.float32]):
+fn fill_b[size: Int](buf: NDBuffer[DType.float32, 2, DimList(size, size)]):
     """Fills the matrix with the values `row/(col + 1) + col`."""
 
     for i in range(size):
@@ -108,7 +108,7 @@ fn fill_b[size: Int](buf: NDBuffer[2, DimList(size, size), DType.float32]):
 
 fn print_matrix[
     size: Int
-](buf: NDBuffer[2, DimList(size, size), DType.float32,]):
+](buf: NDBuffer[DType.float32, 2, DimList(size, size),]):
     """Prints each element of the input matrix, element-wise."""
     for i in range(size):
         for j in range(size):
@@ -119,23 +119,23 @@ fn print_matrix[
 fn test_naive_matmul[size: Int]():
     print("== test_naive_matmul")
     let c = NDBuffer[
+        DType.float32,
         2,
         DimList(size, size),
-        DType.float32,
     ].stack_allocation()
     c.fill(0)
 
     let b = NDBuffer[
+        DType.float32,
         2,
         DimList(size, size),
-        DType.float32,
     ].stack_allocation()
     fill_b[size](b)
 
     let a = NDBuffer[
+        DType.float32,
         2,
         DimList(size, size),
-        DType.float32,
     ].stack_allocation()
     fill_a[size](a)
 

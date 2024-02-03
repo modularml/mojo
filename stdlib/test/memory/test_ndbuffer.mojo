@@ -25,9 +25,9 @@ fn test_ndbuffer():
     # ...
     #  [12, 13, 14, 15]]
     var matrix = NDBuffer[
+        DType.index,
         2,
         DimList(4, 4),
-        DType.index,
     ].stack_allocation()
 
     matrix[StaticIntTuple[2](0, 0)] = 0
@@ -50,27 +50,27 @@ fn test_ndbuffer():
     # CHECK: 11
     print(
         _compute_ndbuffer_offset[
+            DType.index,
             2,
             DimList(4, 4),
-            DType.index,
         ](matrix, StaticIntTuple[2](2, 3))
     )
 
     # CHECK: 14
     print(
         _compute_ndbuffer_offset[
+            DType.index,
             2,
             DimList(4, 4),
-            DType.index,
         ](matrix, StaticIntTuple[2](3, 2))
     )
 
     # CHECK: 15
     print(
         _compute_ndbuffer_offset[
+            DType.index,
             2,
             DimList(4, 4),
-            DType.index,
         ](matrix, StaticIntTuple[2](3, 3))
     )
 
@@ -134,9 +134,9 @@ fn test_fill():
     print("== test_fill")
 
     var buf = NDBuffer[
+        DType.index,
         2,
         DimList(3, 3),
-        DType.index,
     ].stack_allocation()
     buf[StaticIntTuple[2](0, 0)] = 1
     buf[StaticIntTuple[2](0, 1)] = 1
@@ -149,9 +149,9 @@ fn test_fill():
     buf[StaticIntTuple[2](2, 2)] = 1
 
     var filled = NDBuffer[
+        DType.index,
         2,
         DimList(3, 3),
-        DType.index,
     ].stack_allocation()
     filled.fill(1)
 
@@ -179,9 +179,9 @@ fn test_ndbuffer_prefetch():
     # [[0, 1, 2],
     #  [3, 4, 5]]
     var matrix = NDBuffer[
+        DType.index,
         2,
         DimList(2, 3),
-        DType.index,
     ].stack_allocation()
 
     # Prefetch for write
@@ -226,9 +226,9 @@ fn test_ndbuffer_prefetch():
 fn test_aligned_load_store():
     print("== test_aligned_load_store")
     var matrix = NDBuffer[
+        DType.index,
         2,
         DimList(4, 4),
-        DType.index,
     ].aligned_stack_allocation[128]()
 
     # Set values
@@ -250,15 +250,15 @@ fn test_aligned_load_store():
 fn test_get_nd_index():
     print("== test_get_nd_index\n")
     var matrix0 = NDBuffer[
+        DType.index,
         2,
         DimList(2, 3),
-        DType.index,
     ].stack_allocation()
 
     var matrix1 = NDBuffer[
+        DType.index,
         3,
         DimList(3, 5, 7),
-        DType.index,
     ].stack_allocation()
 
     # CHECK: (0, 0)
@@ -290,7 +290,7 @@ fn test_print():
     let tensor = Tensor[DType.index](2, 2, 3)
     iota(tensor.data(), tensor.num_elements())
 
-    let buffer = NDBuffer[3, DimList(2, 2, 3), DType.index](tensor.data())
+    let buffer = NDBuffer[DType.index, 3, DimList(2, 2, 3)](tensor.data())
 
     print(str(buffer))
     _ = tensor ^

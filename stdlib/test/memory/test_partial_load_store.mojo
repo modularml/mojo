@@ -38,13 +38,13 @@ fn test_partial_load_store():
     ]()
 
     var read_buffer = Buffer[
-        total_buffer_size,
         DType.index,
+        total_buffer_size,
     ](read_data)
 
     var write_buffer = Buffer[
-        total_buffer_size,
         DType.index,
+        total_buffer_size,
     ](write_data)
 
     for idx in range(total_buffer_size):
@@ -76,15 +76,15 @@ fn test_partial_load_store():
 
     # Test NDBuffer partial load store
     let read_nd_buffer = NDBuffer[
+        DType.index,
         2,
         DimList(8, 4),
-        DType.index,
     ](read_data)
 
     let write_nd_buffer = NDBuffer[
+        DType.index,
         2,
         DimList(8, 4),
-        DType.index,
     ](write_data)
 
     # Test partial load:

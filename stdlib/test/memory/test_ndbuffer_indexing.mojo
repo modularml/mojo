@@ -28,8 +28,8 @@ fn test_ndbuffer_indexing():
     # Fill data with increasing order, so that the value of each element in
     #  the test buffer is equal to it's linear index.:
     var fillBufferView = Buffer[
-        total_buffer_size,
         DType.index,
+        total_buffer_size,
     ](_data)
 
     for fillIdx in range(total_buffer_size):
@@ -40,9 +40,9 @@ fn test_ndbuffer_indexing():
     # ===------------------------------------------------------------------=== #
 
     var bufferView1D = NDBuffer[
+        DType.index,
         1,
         DimList(6),
-        DType.index,
     ](_data)
 
     # Try to access element[5]
@@ -54,9 +54,9 @@ fn test_ndbuffer_indexing():
     # ===------------------------------------------------------------------=== #
 
     var bufferView2D = NDBuffer[
+        DType.index,
         2,
         DimList(5, 6),
-        DType.index,
     ](_data)
 
     # Try to access element[4,5]
@@ -69,9 +69,9 @@ fn test_ndbuffer_indexing():
     # ===------------------------------------------------------------------=== #
 
     var bufferView3D = NDBuffer[
+        DType.index,
         3,
         DimList(4, 5, 6),
-        DType.index,
     ](_data)
 
     # Try to access element[3,4,5]
@@ -84,9 +84,9 @@ fn test_ndbuffer_indexing():
     # ===------------------------------------------------------------------=== #
 
     var bufferView4D = NDBuffer[
+        DType.index,
         4,
         DimList(3, 4, 5, 6),
-        DType.index,
     ](_data)
 
     # Try to access element[2,3,4,5]
@@ -99,9 +99,9 @@ fn test_ndbuffer_indexing():
     # ===------------------------------------------------------------------=== #
 
     var bufferView5D = NDBuffer[
+        DType.index,
         5,
         DimList(2, 3, 4, 5, 6),
-        DType.index,
     ](_data)
 
     # Try to access element[1,2,3,4,5]
