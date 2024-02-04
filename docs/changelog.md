@@ -141,6 +141,28 @@ from . import another_module
   NDBuffer[DType.float32, 3, DimList(128, 128, 3)]
   ```
 
+- The standard library `slice` type has been renamed to `Slice`, and a `slice`
+  function has been introduced.  This makes Mojo closer to Python and makes the
+  `Slice` type follow the naming conventions of other types like `Int`.
+
+- "Slice" syntax in subscripts is no longer hard coded to the builtin `slice`
+  type: it now works with any type that getitem implements, e.g. consider:
+
+  ```mojo
+  @value
+  struct UnusualSlice:
+    var a: Int
+    var b: Float64
+    var c: String
+
+  struct YourContainer:
+    fn __getitem__(self, slice: UnusualSlice) -> T: ...
+  ```
+
+  Given this implementation, you can subscript into an instance of
+  `YourContainer` like `yc[42:3.14:"🔥"]` and the three values are passed to the
+  `UnusualSlice` constructor.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
