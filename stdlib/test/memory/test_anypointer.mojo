@@ -7,6 +7,8 @@
 
 from memory.anypointer import AnyPointer
 
+from testing import *
+
 
 struct MoveOnlyType(Movable):
     var value: Int
@@ -22,7 +24,7 @@ struct MoveOnlyType(Movable):
         print("deleted", self.value)
 
 
-fn main():
+fn test_basic():
     # CHECK-LABEL: === test_anypointer
     print("=== test_anypointer")
 
@@ -36,3 +38,24 @@ fn main():
     # CHECK: value 42
     print("value", value.value)
     ptr.free()
+
+
+def test_refitem():
+    let ptr = AnyPointer[Int].alloc(1)
+    ptr[0] = 0
+    ptr[] += 1
+    assert_equal(ptr[], 1)
+
+
+def test_refitem_offset():
+    let ptr = AnyPointer[Int].alloc(5)
+    for i in range(5):
+        ptr[i] = i
+    for i in range(5):
+        assert_equal(ptr[i], i)
+
+
+def main():
+    test_basic()
+    test_refitem()
+    test_refitem_offset()

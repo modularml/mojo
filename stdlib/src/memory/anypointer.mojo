@@ -115,3 +115,35 @@ struct AnyPointer[T: Movable]:
             An offset pointer.
         """
         return Self.__from_index(self.__as_index() + offset * sizeof[T]())
+
+    # We're unsafe, so we can have unsafe things. References we make have
+    # an immortal mutable lifetime, since we can't come up with a meaningful
+    # lifetime for them anyway.
+    alias mlir_ref_type = Reference[
+        T, __mlir_attr.`1: i1`, __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`
+    ].mlir_ref_type
+
+    @always_inline
+    fn __refitem__(
+        self,
+    ) -> Self.mlir_ref_type:
+        """Return a reference to the underlying data, offset by the offset index.
+
+        Returns:
+            A reference to the value.
+        """
+        return __mlir_op.`lit.ref.from_pointer`[_type = Self.mlir_ref_type](
+            self.value
+        )
+
+    @always_inline
+    fn __refitem__(self, offset: Int) -> Self.mlir_ref_type:
+        """Return a reference to the underlying data, offset by the offset index.
+
+        Args:
+            offset: The offset index.
+
+        Returns:
+            An offset reference.
+        """
+        return (self + offset).__refitem__()
