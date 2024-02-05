@@ -101,6 +101,9 @@ from . import another_module
 - The `__refitem__` accessor method may now return a `Reference` instead of
   having to return an MLIR internal reference type.
 
+- `PythonObject` now implements `__is__` and `__isnot__` so that expressions
+  of the form `x is y` and `x is not y` are well-formed.
+
 ### 🦋 Changed
 
 - `vectorize_unroll` has been removed, and `vectorize` now has a parameter named

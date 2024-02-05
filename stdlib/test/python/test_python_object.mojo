@@ -11,6 +11,8 @@ from python._cpython import CPython, PyObjectPtr
 from python.object import PythonObject
 from python.python import Python
 
+from testing import assert_true, assert_false
+
 
 # CHECK-LABEL: test_dunder_methods
 fn test_dunder_methods(inout python: Python):
@@ -395,6 +397,26 @@ def test_len():
     print(len(l2))
 
 
+def test_is():
+    var x = PythonObject(500)
+    var y = PythonObject(500)
+    assert_false(x is y)
+    assert_true(x is not y)
+
+    # Assign to a new variable but this still holds
+    # the same object and same memory location
+    var z = x
+    assert_true(z is x)
+    assert_false(z is not x)
+
+    # Two separate lists/objects, and therefore are not the "same".
+    # as told by the `__is__` function. They point to different addresses.
+    let l1 = Python.evaluate("[1,2,3]")
+    let l2 = Python.evaluate("[1,2,3]")
+    assert_false(l1 is l2)
+    assert_true(l1 is not l2)
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -403,6 +425,7 @@ def main():
     test_bool_conversion()
     test_string_conversions()
     test_len()
+    test_is()
     # CHECK: I like to eat apple
     # CHECK: I like to eat orange
     # CHECK: I like to eat banana

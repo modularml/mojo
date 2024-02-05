@@ -366,6 +366,31 @@ struct PythonObject(Intable, Stringable, Sized):
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyObject_IsTrue(self.py_object) == 1
 
+    fn __is__(self, other: PythonObject) -> Bool:
+        """Test if the PythonObject is the `other` PythonObject, the same as `x is y` in
+        Python.
+
+        Args:
+            other: The right-hand-side value in the comparison.
+
+        Returns:
+            True if they are the same object and False otherwise.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        return cpython.Py_Is(self.py_object, other.py_object)
+
+    fn __isnot__(self, other: PythonObject) -> Bool:
+        """Test if the PythonObject is not the `other` PythonObject, the same as `x is not y` in
+        Python.
+
+        Args:
+            other: The right-hand-side value in the comparison.
+
+        Returns:
+            True if they are not the same object and False otherwise.
+        """
+        return not (self is other)
+
     fn __len__(self) -> Int:
         """Returns the length of the object.
 
