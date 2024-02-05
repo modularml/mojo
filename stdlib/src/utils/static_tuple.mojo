@@ -81,7 +81,7 @@ fn _create_array[
         fn fill[idx: Int]():
             _set_array_elem[idx, size, type](lst[idx], array)
 
-        unroll[size, fill]()
+        unroll[fill, size]()
         return array
 
 

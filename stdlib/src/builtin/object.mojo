@@ -811,7 +811,7 @@ struct object(IntableRaising, Boolable):
                     False, "cannot convert nested list element to object"
                 ]()
 
-        unroll[len(types), append]()
+        unroll[append, len(types)]()
 
     @always_inline
     fn __init__(inout self, func: Self.nullary_function):

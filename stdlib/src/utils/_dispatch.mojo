@@ -24,7 +24,7 @@ fn rank_axis_dispatch[
             if axis == axis_static:
                 func[rank, axis_static]()
 
-        unroll[rank, _func_axis]()  # ensure that 0 <= axis < rank
+        unroll[_func_axis, rank]()  # ensure that 0 <= axis < rank
 
     range_dispatch[_func_rank, 0, max_rank, 1](rank)
 

@@ -83,7 +83,7 @@ fn _int_tuple_binary_apply[
         let b_elem: Int = b.__getitem__[idx]()
         c.__setitem__[idx](binary_fn(a_elem, b_elem))
 
-    unroll[size, do_apply]()
+    unroll[do_apply, size]()
 
     return c
 
@@ -124,7 +124,7 @@ fn _int_tuple_compare[
         let b_elem: Int = b.__getitem__[idx]()
         c.__setitem__[idx](comp_fn(a_elem, b_elem).value)
 
-    unroll[size, do_compare]()
+    unroll[do_compare, size]()
 
     return c
 
@@ -160,7 +160,7 @@ fn _bool_tuple_reduce[
     fn do_reduce[idx: Int]():
         c = reduce_fn(c, a.__getitem__[idx]())
 
-    unroll[size, do_reduce]()
+    unroll[do_reduce, size]()
 
     return c
 
@@ -228,7 +228,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         fn fill[idx: Int]():
             tup[idx] = elems.get[idx, Int]()
 
-        unroll[2, fill]()
+        unroll[fill, 2]()
 
         return tup
 
@@ -256,7 +256,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         fn fill[idx: Int]():
             tup[idx] = elems.get[idx, Int]()
 
-        unroll[3, fill]()
+        unroll[fill, 3]()
 
         return tup
 
@@ -284,7 +284,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         fn fill[idx: Int]():
             tup[idx] = elems.get[idx, Int]()
 
-        unroll[4, fill]()
+        unroll[fill, 4]()
 
         return tup
 
@@ -366,7 +366,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
                 index = idx.value,
             ](values.at[idx]().get(), array)
 
-        unroll[size, fill]()
+        unroll[fill, size]()
         return Self {data: StaticTuple[size, Int](array)}
 
     fn __str__(self) -> String:

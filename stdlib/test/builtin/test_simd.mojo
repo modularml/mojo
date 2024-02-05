@@ -243,7 +243,7 @@ def test_truthy():
         assert_equal(False, SIMD[type, 2](True, False).__bool__())
         assert_equal(False, SIMD[type, 2](False, False).__bool__())
 
-    unroll[dtypes.__len__(), test_dtype]()
+    unroll[test_dtype, dtypes.__len__()]()
 
 
 # CHECK-LABEL: test_floordiv

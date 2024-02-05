@@ -525,7 +525,7 @@ fn print[length: Int](shape: DimList):
         _put(value.get().value)
 
     _put("[")
-    unroll[length, _print_elem]()
+    unroll[_print_elem, length]()
     _put("]")
     put_new_line()
 
@@ -599,7 +599,7 @@ fn _print_elements[
     fn each[i: Int]():
         rest._print[i]()
 
-    unroll[len(VariadicList(Ts)), each]()
+    unroll[each, len(VariadicList(Ts))]()
 
 
 @no_inline

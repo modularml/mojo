@@ -438,7 +438,7 @@ struct DType(Stringable):
                 size = _sizeof[type_list[idx]]()
                 return
 
-        unroll[len(type_list), func]()
+        unroll[func, len(type_list)]()
 
         return size
 
@@ -567,7 +567,7 @@ struct DType(Stringable):
                 matched = True
                 return func[dtype]()
 
-        unroll[len(dtype_var), _func]()
+        unroll[_func, len(dtype_var)]()
 
         if not matched:
             raise Error(

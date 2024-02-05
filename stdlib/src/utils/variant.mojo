@@ -49,7 +49,7 @@ struct _UnionSize[*Ts: CollectionElement]():
         fn each[i: Int]():
             size = max(size, align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
 
-        unroll[len(VariadicList(Ts)), each]()
+        unroll[each, len(VariadicList(Ts))]()
         return size
 
 
@@ -67,7 +67,7 @@ struct _UnionTypeIndex[T: CollectionElement, *Ts: CollectionElement]:
             if _mlirtype_is_eq[q, T]():
                 result = i
 
-        unroll[len(VariadicList(Ts)), each]()
+        unroll[each, len(VariadicList(Ts))]()
         return result
 
 
@@ -163,7 +163,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
                     Reference(other._impl).bitcast_element[T]()[],
                 )
 
-        unroll[len(VariadicList(Ts)), each]()
+        unroll[each, len(VariadicList(Ts))]()
 
     fn __moveinit__(inout self, owned other: Self):
         """Move initializer for the variant.
@@ -183,7 +183,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
                     other._get_ptr[T]().take_value()
                 )
 
-        unroll[len(VariadicList(Ts)), each]()
+        unroll[each, len(VariadicList(Ts))]()
 
     fn __del__(owned self):
         """Destroy the variant."""
@@ -196,7 +196,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
                 alias q = Ts[i]
                 __get_address_as_owned_value(self._get_ptr[q]().value).__del__()
 
-        unroll[len(VariadicList(Ts)), each]()
+        unroll[each, len(VariadicList(Ts))]()
 
     fn take[T: CollectionElement](owned self) -> T:
         """Take the current value of the variant as the provided type.

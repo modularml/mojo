@@ -120,6 +120,13 @@ from . import another_module
   The doc string has been updated with examples demonstrating the difference
   between the two signatures.
 
+- The `unroll` signatures have changed with the closure `func` moved to the
+  first parameter:
+
+  ```mojo
+  unroll[func, unroll_count]()
+  ```
+
 - The signature of the `NDBuffer` and `Buffer` types have changed. Now, both
   take the type as the first parameter and no longer require the shape
   parameter. This allows one to use these types and have sensible default.

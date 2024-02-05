@@ -232,7 +232,7 @@ struct PythonObject(Intable, Stringable, Sized):
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
-        unroll[len(types), fill]()
+        unroll[fill, len(types)]()
 
     fn __init__[*Ts: AnyRegType](inout self, value: Tuple[Ts]):
         """Initialize the object from a tuple literal.
@@ -275,7 +275,7 @@ struct PythonObject(Intable, Stringable, Sized):
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
-        unroll[len(types), fill]()
+        unroll[fill, len(types)]()
 
     fn __copyinit__(inout self, existing: Self):
         """Copy the object.
