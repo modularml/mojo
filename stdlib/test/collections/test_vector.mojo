@@ -185,6 +185,38 @@ def test_vector_copy_constructor():
     _ = vec ^  # To ensure previous one doesn't invoke move constuctor
 
 
+def test_vector_iter():
+    var vs = DynamicVector[Int]()
+    vs.append(1)
+    vs.append(2)
+    vs.append(3)
+
+    # Borrow immutably
+    fn sum(vs: DynamicVector[Int]) -> Int:
+        var sum = 0
+        for v in vs:
+            sum += v[]
+        return sum
+
+    assert_equal(6, sum(vs))
+
+
+def test_vector_iter_mutable():
+    var vs = DynamicVector[Int]()
+    vs.append(1)
+    vs.append(2)
+    vs.append(3)
+
+    for v in vs:
+        v[] += 1
+
+    var sum = 0
+    for v in vs:
+        sum += v[]
+
+    assert_equal(9, sum)
+
+
 def main():
     test_inlined_fixed_vector()
     test_inlined_fixed_vector_with_default()
@@ -192,3 +224,5 @@ def main():
     test_vector()
     test_vector_copy_constructor()
     test_2d_dynamic_vector()
+    test_vector_iter()
+    test_vector_iter_mutable()

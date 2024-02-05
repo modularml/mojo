@@ -61,6 +61,20 @@ modular install mojo
 from . import another_module
 ```
 
+- `DynamicVector` now supports iteration. Iteration values
+  are references and require dereferencing.
+
+```mojo
+var v: DynamicVector[String]()
+v.append("Alice")
+v.append("Bob")
+v.append("Charlie")
+for x in v:
+  x[] = str("Hello, ") + x[]
+for x in v:
+  print(x[])
+```
+
 - Mojo now has limited support to declare keyword-only arguments and parameters.
   For example:
 

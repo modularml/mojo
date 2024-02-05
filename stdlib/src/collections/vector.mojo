@@ -15,7 +15,7 @@ from collections.vector import InlinedFixedVector
 from math import max
 
 from memory.anypointer import AnyPointer
-from memory.unsafe import Pointer
+from memory.unsafe import bitcast, Pointer, Reference, _LITRef
 
 from utils.static_tuple import StaticTuple
 
@@ -239,6 +239,37 @@ trait CollectionElement(Movable, Copyable):
     pass
 
 
+@value
+struct _DynamicVectorIter[
+    T: CollectionElement,
+    vector_mutability: __mlir_type.`i1`,
+    vector_lifetime: AnyLifetime[vector_mutability].type,
+]:
+    """Iterator for DynamicVector.
+
+    Parameters:
+        T: The type of the elements in the list.
+        vector_mutability: Whether the reference to the vector is mutable.
+        vector_lifetime: The lifetime of the DynamicVector
+    """
+
+    alias vector_type = DynamicVector[T]
+
+    var index: Int
+    var src: Reference[Self.vector_type, vector_mutability, vector_lifetime]
+
+    fn __next__(
+        inout self,
+    ) -> Reference[T, vector_mutability, vector_lifetime]:
+        self.index += 1
+        return self.src[].__get_ref[vector_mutability, vector_lifetime](
+            self.index - 1
+        )
+
+    fn __len__(self) -> Int:
+        return len(self.src[]) - self.index
+
+
 struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
     """The `DynamicVector` type is a dynamically-allocated vector.
 
@@ -421,3 +452,40 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
             A copy of the element at the given index.
         """
         return __get_address_as_lvalue((self.data + i).value)
+
+    # TODO(30737): Replace __getitem__ with this as __refitem__, but lots of places use it
+    fn __get_ref[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        i: Int,
+    ) -> Reference[T, mutability, self_life]:
+        """Gets a reference to the vector element at the given index.
+
+        Args:
+            i: The index of the element.
+
+        Returns:
+            An immutable reference to the element at the given index.
+        """
+        # Mutability gets set to the local mutability of this
+        # pointer value, ie. because we defined it with `let` it's now an
+        # "immutable" reference regardless of the mutability of `self`.
+        # This means we can't just use `AnyPointer.__refitem__` here
+        # because the mutability won't match.
+        let base_ptr = Reference(self)[].data
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Reference[T, mutability, self_life].mlir_ref_type
+        ]((base_ptr + i).value)
+
+    fn __iter__[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life].mlir_ref_type,
+    ) -> _DynamicVectorIter[T, mutability, self_life]:
+        """Iterate over elements of the vector, returning immutable references.
+
+        Returns:
+            An iterator of immutable references to the vector elements.
+        """
+        return _DynamicVectorIter[T, mutability, self_life](0, Reference(self))
