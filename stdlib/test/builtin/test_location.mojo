@@ -6,12 +6,8 @@
 # RUN: mojo --debug-level full %s
 
 from testing import *
-from debug._location import _SourceRange
+from builtin._location import _SourceLocation
 
 
 def main():
-    assert_equal(str(_SourceRange("foo.txt", 12)), "foo.txt:12")
-
-    assert_equal(str(_SourceRange("foo.txt", 12, 4)), "foo.txt:12:4")
-
-    assert_equal(str(_SourceRange("foo.txt", 12, 4, 6)), "foo.txt:12:4:6")
+    assert_equal(str(_SourceLocation("foo.txt", "bar", 4)), "foo.txt:bar:4")
