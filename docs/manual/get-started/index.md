@@ -14,14 +14,6 @@ website:
     image: /static/images/mojo-social-card.png
 ---
 
-
-Mojo is now available for local development!
-
-<a href="https://developer.modular.com/download"
-class="button-purple download">
-  Download Now
-</a>
-
 The Mojo SDK is currently available for Ubuntu Linux systems and macOS
 systems running on Apple silicon. Support for Windows is
 coming soon. You can also develop from Windows or Intel macOS using a container
@@ -29,6 +21,16 @@ or remote Linux system. Alternatively, you can also experiment with Mojo using
 our web-based [Mojo Playground](#develop-in-the-mojo-playground).
 
 ## Get the Mojo SDK
+
+:::note Deprecation Notice
+
+The Mojo SDK is now included in the [MAX Developer
+Edition](/engine/get-started/). To provide a complete toolkit with simple
+dependencies, **the standalone Mojo SDK is now deprecated**. For now, you
+can still download Mojo as a standalone package, but you will soon need to
+instead install the `max` package to get the Mojo SDK.
+
+:::
 
 The Mojo SDK includes everything you need for local Mojo development, including
 the Mojo standard library and the [Mojo command-line interface](/mojo/cli/)
@@ -66,17 +68,25 @@ Support for Windows will be added in a future release.
 
 ### Install Mojo
 
-The Mojo SDK is available through the [Modular CLI tool](/cli/), which works
-like a package manager to install and update Mojo. Use the following link to
-log into the Modular developer console, where you can get the Modular CLI
-and then install Mojo:
+1. Open a terminal and install the [`modular`](/cli/) command line tool:
 
-<a href="https://developer.modular.com/download"
-class="button-purple download">
-  Download Now
-</a>
+    ```sh
+    curl https://get.modular.com | sh -
+    ```
 
-Then get started with **[Hello, world!](hello-world.html)**
+2. Then sign in to your Modular account with this command:
+
+    ```sh
+    modular auth
+    ```
+
+3. Now you can install the Mojo SDK:
+
+    ```sh
+    modular install mojo
+    ```
+
+Next, get started with **[Hello, world!](hello-world.html)**
 
 :::{.callout-note}
 
