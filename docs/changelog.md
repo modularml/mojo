@@ -234,6 +234,8 @@ for x in v:
   [#1230](https://github.com/modularml/mojo/issues/1230),
   [#1699](https://github.com/modularml/mojo/issues/1699),
   [#1708](https://github.com/modularml/mojo/issues/1708)
+- [#1223](https://github.com/modularml/mojo/issues/1223) - Crash when parametric
+  function is passed as (runtime) argument. The parser now errors out instead.
 
 ## v0.7.0 (2024-01-25)
 
