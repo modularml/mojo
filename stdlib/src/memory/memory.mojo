@@ -221,6 +221,7 @@ fn memcpy[
     #    return
 
     @always_inline
+    @__copy_capture(dest_data, src_data)
     @parameter
     fn _copy[simd_width: Int](idx: Int):
         dest_data.simd_store[simd_width](
