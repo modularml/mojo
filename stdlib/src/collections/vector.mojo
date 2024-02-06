@@ -360,6 +360,46 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         (self.data + self.size).emplace_value(value ^)
         self.size += 1
 
+    fn extend(inout self, owned other: DynamicVector[T]):
+        """Extends this vector by consuming the elements of `other`.
+
+        Args:
+            other: Vector whose elements will be added in order at the end of this vector.
+        """
+
+        let final_size = len(self) + len(other)
+        let other_original_size = len(other)
+
+        self.reserve(final_size)
+
+        # Defensively mark `other` as logically being empty, as we will be doing
+        # consuming moves out of `other`, and so we want to avoid leaving `other`
+        # in a partially valid state where some elements have been consumed
+        # but are still part of the valid `size` of the vector.
+        #
+        # That invalid intermediate state of `other` could potentially be
+        # visible outside this function if a `__moveinit__()` constructor were
+        # to throw (not currently possible AFAIK though) part way through the
+        # logic below.
+        other.size = 0
+
+        var dest_ptr = self.data + len(self)
+
+        for i in range(other_original_size):
+            let src_ptr = other.data + i
+
+            # This (TODO: optimistically) moves an element directly from the
+            # `other` vector into this vector using a single `T.__moveinit()__`
+            # call, without moving into an intermediate temporary value
+            # (avoiding an extra redundant move constructor call).
+            src_ptr.move_into(dest_ptr)
+
+            dest_ptr = dest_ptr + 1
+
+        # Update the size now that all new elements have been moved into this
+        # vector.
+        self.size = final_size
+
     fn push_back(inout self, owned value: T):
         """Appends a value to this vector.
 
@@ -411,6 +451,43 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         for i in range(self.size, new_size):
             (self.data + i).emplace_value(value)
         self.size = new_size
+
+    fn reverse(inout self):
+        """Reverses the elements of the vector."""
+
+        self._reverse()
+
+    # This method is private to avoid exposing the non-Pythonic `start` argument.
+    fn _reverse(inout self, start: Int = 0):
+        """Reverses the elements of the vector at positions after `start`.
+
+        Args:
+            start: A non-negative integer indicating the position after which to reverse elements.
+        """
+
+        # TODO(polish): Support a negative slice-like start position here that
+        #               counts from the end.
+        debug_assert(
+            start >= 0,
+            "DynamicVector reverse start position must be non-negative",
+        )
+
+        var earlier_idx = start
+        var later_idx = len(self) - 1
+
+        let effective_len = len(self) - start
+        let half_len = effective_len // 2
+
+        for _ in range(half_len):
+            let earlier_ptr = self.data + earlier_idx
+            let later_ptr = self.data + later_idx
+
+            let tmp = earlier_ptr.take_value()
+            later_ptr.move_into(earlier_ptr)
+            later_ptr.emplace_value(tmp ^)
+
+            earlier_idx += 1
+            later_idx -= 1
 
     fn clear(inout self):
         """Clears the elements in the vector."""

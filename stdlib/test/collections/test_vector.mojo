@@ -9,6 +9,7 @@ from collections.vector import DynamicVector
 from collections.vector import InlinedFixedVector
 
 from testing import *
+from testing.testing import _MoveCounter
 
 
 def test_inlined_fixed_vector():
@@ -145,6 +146,243 @@ def test_vector():
     assert_equal(2, vector.capacity)
 
 
+def test_vector_reverse():
+    #
+    # Test reversing the vector []
+    #
+
+    var vec = DynamicVector[Int]()
+
+    assert_equal(len(vec), 0)
+
+    vec.reverse()
+
+    assert_equal(len(vec), 0)
+
+    #
+    # Test reversing the vector [123]
+    #
+
+    vec = DynamicVector[Int]()
+
+    vec.push_back(123)
+
+    assert_equal(len(vec), 1)
+    assert_equal(vec[0], 123)
+
+    vec.reverse()
+
+    assert_equal(len(vec), 1)
+    assert_equal(vec[0], 123)
+
+    #
+    # Test reversing the vector ["one", "two", "three"]
+    #
+
+    vec2 = DynamicVector[String]()
+    vec2.push_back("one")
+    vec2.push_back("two")
+    vec2.push_back("three")
+
+    assert_equal(len(vec2), 3)
+    assert_equal(vec2[0], "one")
+    assert_equal(vec2[1], "two")
+    assert_equal(vec2[2], "three")
+
+    vec2.reverse()
+
+    assert_equal(len(vec2), 3)
+    assert_equal(vec2[0], "three")
+    assert_equal(vec2[1], "two")
+    assert_equal(vec2[2], "one")
+
+    #
+    # Test reversing the vector [5, 10]
+    #
+
+    vec = DynamicVector[Int]()
+    vec.push_back(5)
+    vec.push_back(10)
+
+    assert_equal(len(vec), 2)
+    assert_equal(vec[0], 5)
+    assert_equal(vec[1], 10)
+
+    vec.reverse()
+
+    assert_equal(len(vec), 2)
+    assert_equal(vec[0], 10)
+    assert_equal(vec[1], 5)
+
+    #
+    # Test reversing the vector [1, 2, 3, 4, 5] starting at the 3rd position
+    # to produce [1, 2, 5, 4, 3]
+    #
+
+    vec = DynamicVector[Int]()
+    vec.push_back(1)
+    vec.push_back(2)
+    vec.push_back(3)
+    vec.push_back(4)
+    vec.push_back(5)
+
+    assert_equal(len(vec), 5)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 2)
+    assert_equal(vec[2], 3)
+    assert_equal(vec[3], 4)
+    assert_equal(vec[4], 5)
+
+    vec._reverse(start=2)
+
+    assert_equal(len(vec), 5)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 2)
+    assert_equal(vec[2], 5)
+    assert_equal(vec[3], 4)
+    assert_equal(vec[4], 3)
+
+    #
+    # Test edge case of reversing the vector [1, 2, 3] but starting after the
+    # last element.
+    #
+
+    vec = DynamicVector[Int]()
+    vec.push_back(1)
+    vec.push_back(2)
+    vec.push_back(3)
+
+    vec._reverse(start=len(vec))
+
+    assert_equal(len(vec), 3)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 2)
+    assert_equal(vec[2], 3)
+
+
+def test_vector_reverse_move_count():
+    # Create this vec with enough capacity to avoid moves due to resizing.
+    var vec = DynamicVector[_MoveCounter[Int]](5)
+    vec.push_back(_MoveCounter(1))
+    vec.push_back(_MoveCounter(2))
+    vec.push_back(_MoveCounter(3))
+    vec.push_back(_MoveCounter(4))
+    vec.push_back(_MoveCounter(5))
+
+    assert_equal(len(vec), 5)
+    assert_equal(__get_address_as_lvalue((vec.data + 0).value).value, 1)
+    assert_equal(__get_address_as_lvalue((vec.data + 1).value).value, 2)
+    assert_equal(__get_address_as_lvalue((vec.data + 2).value).value, 3)
+    assert_equal(__get_address_as_lvalue((vec.data + 3).value).value, 4)
+    assert_equal(__get_address_as_lvalue((vec.data + 4).value).value, 5)
+
+    assert_equal(__get_address_as_lvalue((vec.data + 0).value).move_count, 1)
+    assert_equal(__get_address_as_lvalue((vec.data + 1).value).move_count, 1)
+    assert_equal(__get_address_as_lvalue((vec.data + 2).value).move_count, 1)
+    assert_equal(__get_address_as_lvalue((vec.data + 3).value).move_count, 1)
+    assert_equal(__get_address_as_lvalue((vec.data + 4).value).move_count, 1)
+
+    vec.reverse()
+
+    assert_equal(len(vec), 5)
+    assert_equal(__get_address_as_lvalue((vec.data + 0).value).value, 5)
+    assert_equal(__get_address_as_lvalue((vec.data + 1).value).value, 4)
+    assert_equal(__get_address_as_lvalue((vec.data + 2).value).value, 3)
+    assert_equal(__get_address_as_lvalue((vec.data + 3).value).value, 2)
+    assert_equal(__get_address_as_lvalue((vec.data + 4).value).value, 1)
+
+    # NOTE:
+    # Earlier elements went through 2 moves and later elements went through 3
+    # moves because the implementation of DynamicVector.reverse arbitrarily
+    # chooses to perform the swap of earlier and later elements by moving the
+    # earlier element to a temporary (+1 move), directly move the later element
+    # into the position the earlier element was in, and then move from the
+    # temporary into the later position (+1 move).
+    assert_equal(__get_address_as_lvalue((vec.data + 0).value).move_count, 2)
+    assert_equal(__get_address_as_lvalue((vec.data + 1).value).move_count, 2)
+    assert_equal(__get_address_as_lvalue((vec.data + 2).value).move_count, 1)
+    assert_equal(__get_address_as_lvalue((vec.data + 3).value).move_count, 3)
+    assert_equal(__get_address_as_lvalue((vec.data + 4).value).move_count, 3)
+
+    # Keep vec alive until after we've done the last `vec.data + N` read.
+    _ = vec ^
+
+
+def test_vector_extend():
+    #
+    # Test extending the vector [1, 2, 3] with itself
+    #
+
+    vec = DynamicVector[Int]()
+    vec.push_back(1)
+    vec.push_back(2)
+    vec.push_back(3)
+
+    assert_equal(len(vec), 3)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 2)
+    assert_equal(vec[2], 3)
+
+    let copy = vec
+    vec.extend(copy)
+
+    # vec == [1, 2, 3, 1, 2, 3]
+    assert_equal(len(vec), 6)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 2)
+    assert_equal(vec[2], 3)
+    assert_equal(vec[3], 1)
+    assert_equal(vec[4], 2)
+    assert_equal(vec[5], 3)
+
+    vec._reverse(start=3)
+
+    # vec == [1, 2, 3, 3, 2, 1]
+    assert_equal(len(vec), 6)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 2)
+    assert_equal(vec[2], 3)
+    assert_equal(vec[3], 3)
+    assert_equal(vec[4], 2)
+    assert_equal(vec[5], 1)
+
+
+def test_vector_extend_non_trivial():
+    # Tests three things:
+    #   - extend() for non-plain-old-data types
+    #   - extend() with mixed-length self and other vectors
+    #   - extend() using optimal number of __moveinit__() calls
+
+    # Preallocate with enough capacity to avoid reallocation making the
+    # move count checks below flaky.
+    var v1 = DynamicVector[_MoveCounter[String]](5)
+    v1.push_back(_MoveCounter[String]("Hello"))
+    v1.push_back(_MoveCounter[String]("World"))
+
+    var v2 = DynamicVector[_MoveCounter[String]](3)
+    v2.push_back(_MoveCounter[String]("Foo"))
+    v2.push_back(_MoveCounter[String]("Bar"))
+    v2.push_back(_MoveCounter[String]("Baz"))
+
+    v1.extend(v2)
+
+    assert_equal(len(v1), 5)
+    assert_equal(v1[0].value, "Hello")
+    assert_equal(v1[1].value, "World")
+    assert_equal(v1[2].value, "Foo")
+    assert_equal(v1[3].value, "Bar")
+    assert_equal(v1[4].value, "Baz")
+
+    assert_equal(__get_address_as_lvalue((v1.data + 0).value).move_count, 1)
+    assert_equal(__get_address_as_lvalue((v1.data + 1).value).move_count, 1)
+    assert_equal(__get_address_as_lvalue((v1.data + 2).value).move_count, 2)
+    assert_equal(__get_address_as_lvalue((v1.data + 3).value).move_count, 2)
+    assert_equal(__get_address_as_lvalue((v1.data + 4).value).move_count, 2)
+
+    # Keep v1 alive until after we've done the last `vec.data + N` read.
+    _ = v1 ^
+
+
 def test_2d_dynamic_vector():
     var vector = DynamicVector[DynamicVector[Int]]()
 
@@ -222,6 +460,10 @@ def main():
     test_inlined_fixed_vector_with_default()
     test_mojo_issue_698()
     test_vector()
+    test_vector_reverse()
+    test_vector_reverse_move_count()
+    test_vector_extend()
+    test_vector_extend_non_trivial()
     test_vector_copy_constructor()
     test_2d_dynamic_vector()
     test_vector_iter()

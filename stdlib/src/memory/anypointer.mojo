@@ -66,6 +66,14 @@ struct AnyPointer[T: Movable]:
     fn take_value(self) -> T:
         """Move the value at the pointer out.
 
+        The pointer must not be null, and the pointer memory location is assumed
+        to contain a valid initialized instance of `T`.
+
+        This performs a _consuming_ move, ending the lifetime of the value stored
+        in this pointer memory location. Subsequent reads of this pointer are
+        not valid. If a new valid value is stored using `emplace_value()`, then
+        reading from this pointer becomes valid again.
+
         Returns:
             The value at the pointer.
         """
@@ -75,10 +83,43 @@ struct AnyPointer[T: Movable]:
     fn emplace_value(self, owned value: T):
         """Emplace a new value into the pointer location.
 
+        The pointer memory location is assumed to contain uninitialized data,
+        and consequently the current contents of this pointer are not destructed
+        before writing `value`. Similarly, ownership of `value` is logically
+        transfered into the pointer location.
+
         Args:
             value: The value to emplace.
         """
         __get_address_as_uninit_lvalue(self.value) = value ^
+
+    @always_inline
+    fn move_into(self, dest: AnyPointer[T]):
+        """Moves the value contained in this pointer into the memory location
+        pointed to by `dest`.
+
+        This performs a consuming move (using `__moveinit__()`) out of the
+        memory location pointed to by this pointer. Subsequent reads of this
+        pointer are not valid unless and until a new, valid value has been
+        moved into this pointer's memory location using `emplace_value()`.
+
+        This transfers the value out of `self` and into `dest` using at most one
+        `__moveinit__()` call.
+
+        Safety:
+            * `self` must not be null
+            * `self` must contain a valid, initialized instance of `T`
+            * `dest` must not be null
+            * The contents of `dest` should be uninitialized. If `dest` was
+              previously written with a valid value, that value will be be
+              overwritten and its destructor will NOT be run.
+
+        Args:
+            dest: Destination pointer that the value will be moved into.
+        """
+        __get_address_as_uninit_lvalue(
+            dest.value
+        ) = __get_address_as_owned_value(self.value)
 
     @always_inline
     fn __as_index(self) -> Int:

@@ -118,6 +118,15 @@ for x in v:
 - `PythonObject` now implements `__is__` and `__isnot__` so that expressions
   of the form `x is y` and `x is not y` are well-formed.
 
+- Added [`AnyPointer.move_into()`](/mojo/stdlib/memory/anypointer.html#move_into)
+  method, for moving a value from one pointer memory location to another.
+
+- Added new [`DynamicVector.reverse()`](/mojo/stdlib/collections/vector.html#reverse)
+  method, which reverses the elements of the vector in place.
+
+- Added [`DynamicVector.extend`](/mojo/stdlib/collections/vector.html#extend)
+  method, which extends a vector by consuming the elements of another vector.
+
 ### 🦋 Changed
 
 - `vectorize_unroll` has been removed, and `vectorize` now has a parameter named
