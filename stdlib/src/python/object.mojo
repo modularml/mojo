@@ -1071,7 +1071,7 @@ struct PythonObject(Intable, Stringable, Sized):
         """
         var cpython = _get_global_python_itf().cpython()
         try:
-            let python_str: PythonObject = self.__getattr__("__str__")()
+            let python_str: PythonObject = cpython.PyObject_Str(self.py_object)
             # copy the string
             let str = String(
                 cpython.PyUnicode_AsUTF8AndSize(python_str.py_object)

@@ -378,9 +378,17 @@ fn test_string_conversions() -> None:
         except e:
             print("Error occurred")
 
+    fn test_type_object() -> None:
+        let py = Python()
+        let py_float = PythonObject(3.14)
+        let type_obj = py.type(py_float)
+        # CHECK: <class 'float'>
+        print(type_obj)
+
     test_string_literal()
     test_string_ref()
     test_string()
+    test_type_object()
 
 
 def test_len():

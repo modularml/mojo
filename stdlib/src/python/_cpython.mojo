@@ -672,6 +672,13 @@ struct CPython:
         self._inc_total_rc()
         return f(obj)
 
+    fn PyObject_Str(inout self, obj: PyObjectPtr) -> PyObjectPtr:
+        let f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+            "PyObject_Str"
+        )
+        self._inc_total_rc()
+        return f(obj)
+
     fn PyObject_GetIter(
         inout self, traversablePyObject: PyObjectPtr
     ) -> PyObjectPtr:
