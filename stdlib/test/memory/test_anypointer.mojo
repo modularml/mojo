@@ -45,6 +45,7 @@ def test_refitem():
     ptr[0] = 0
     ptr[] += 1
     assert_equal(ptr[], 1)
+    ptr.free()
 
 
 def test_refitem_offset():
@@ -53,6 +54,7 @@ def test_refitem_offset():
         ptr[i] = i
     for i in range(5):
         assert_equal(ptr[i], i)
+    ptr.free()
 
 
 def main():
