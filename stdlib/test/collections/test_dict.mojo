@@ -11,28 +11,6 @@ from collections import Optional
 from testing import *
 
 
-@value
-struct assert_raises:
-    var message: Optional[StringLiteral]
-
-    fn __enter__(self) -> Self:
-        return self
-
-    fn __exit__(self) raises:
-        var message = String("Test didn't raise!")
-        if self.message:
-            message += " Expected: " + str(self.message.value())
-        assert_true(False, message)
-
-    fn __exit__(self, error: Error) raises -> Bool:
-        let message = str(error)
-        if self.message:
-            let expected = String(self.message.value())
-            return expected == message
-        else:
-            return True
-
-
 def test_dict_construction():
     _ = Dict[Int, Int]()
     _ = Dict[String, Int]()
@@ -84,10 +62,74 @@ def test_pop_default():
 def test_key_error():
     var dict = Dict[String, Int]()
 
-    with assert_raises("KeyError"):
+    with assert_raises(contains="KeyError"):
         _ = dict["a"]
-    with assert_raises("KeyError"):
+    with assert_raises(contains="KeyError"):
         _ = dict.pop("a")
+
+
+def test_iter():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    var keys = String("")
+    for key in dict:
+        keys += key[]
+
+    assert_equal(keys, "ab")
+
+
+def test_iter_keys():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    var keys = String("")
+    for key in dict.keys():
+        keys += key[]
+
+    assert_equal(keys, "ab")
+
+
+def test_iter_values():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    var sum = 0
+    for value in dict.values():
+        sum += value[]
+
+    assert_equal(sum, 3)
+
+
+def test_iter_values_mut():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    for value in dict.values():
+        value[] += 1
+
+    assert_equal(2, dict["a"])
+    assert_equal(3, dict["b"])
+    assert_equal(2, len(dict))
+
+
+def test_iter_items():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    var keys = String("")
+    var sum = 0
+    for entry in dict.items():
+        keys += entry[].key
+        sum += entry[].value
+
+    assert_equal(keys, "ab")
+    assert_equal(sum, 3)
 
 
 fn test[name: String, test_fn: fn () raises -> object]() raises:
@@ -109,3 +151,8 @@ def main():
     test["test_compact", test_compact]()
     test["test_pop_default", test_pop_default]()
     test["test_key_error", test_key_error]()
+    test["test_iter", test_iter]()
+    test["test_iter_keys", test_iter_keys]()
+    test["test_iter_values", test_iter_values]()
+    test["test_iter_values_mut", test_iter_values_mut]()
+    test["test_iter_items", test_iter_items]()

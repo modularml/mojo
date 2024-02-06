@@ -56,6 +56,141 @@ trait KeyElement(CollectionElement, Hashable, EqualityComparable):
 
 
 @value
+struct _DictEntryIter[
+    K: KeyElement,
+    V: CollectionElement,
+    dict_mutability: __mlir_type.`i1`,
+    dict_lifetime: AnyLifetime[dict_mutability].type,
+]:
+    """Iterator over immutable DictEntry references.
+
+    Parameters:
+        K: The key type of the elements in the dictionary.
+        V: The value type of the elements in the dictionary.
+        dict_mutability: Whether the reference to the dictionary is mutable.
+        dict_lifetime: The lifetime of the DynamicVector
+    """
+
+    alias imm_dict_lifetime = __mlir_attr[
+        `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
+    ]
+    alias ref_type = Reference[
+        DictEntry[K, V], __mlir_attr.`0: i1`, Self.imm_dict_lifetime
+    ]
+
+    var index: Int
+    var seen: Int
+    var src: Reference[Dict[K, V], dict_mutability, dict_lifetime]
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> Self.ref_type:
+        while True:
+            debug_assert(self.index < self.src[]._reserved, "dict iter bounds")
+            if self.src[]._entries[self.index]:
+                let opt_entry_ref = self.src[]._entries.__get_ref[
+                    __mlir_attr.`0: i1`,
+                    Self.imm_dict_lifetime,
+                ](self.index)
+                self.index += 1
+                self.seen += 1
+                # Super unsafe, but otherwise we have to do a bunch of super
+                # unsafe reference lifetime casting.
+                return opt_entry_ref.bitcast_element[DictEntry[K, V]]()
+            self.index += 1
+
+    fn __len__(self) -> Int:
+        return len(self.src[]) - self.seen
+
+
+@value
+struct _DictKeyIter[
+    K: KeyElement,
+    V: CollectionElement,
+    dict_mutability: __mlir_type.`i1`,
+    dict_lifetime: AnyLifetime[dict_mutability].type,
+]:
+    """Iterator over immutable Dict key references.
+
+    Parameters:
+        K: The key type of the elements in the dictionary.
+        V: The value type of the elements in the dictionary.
+        dict_mutability: Whether the reference to the vector is mutable.
+        dict_lifetime: The lifetime of the DynamicVector
+    """
+
+    alias imm_dict_lifetime = __mlir_attr[
+        `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
+    ]
+    alias ref_type = Reference[K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime]
+
+    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> Self.ref_type:
+        let entry_ref = self.iter.__next__()
+        let mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
+            Reference(entry_ref[].key).value
+        )
+        let key_ptr = AnyPointer[K] {
+            value: __mlir_op.`pop.pointer.bitcast`[
+                _type = AnyPointer[K].pointer_type
+            ](mlir_ptr)
+        }
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Self.ref_type.mlir_ref_type
+        ](key_ptr.value)
+
+    fn __len__(self) -> Int:
+        return self.iter.__len__()
+
+
+@value
+struct _DictValueIter[
+    K: KeyElement,
+    V: CollectionElement,
+    dict_mutability: __mlir_type.`i1`,
+    dict_lifetime: AnyLifetime[dict_mutability].type,
+]:
+    """Iterator over Dict value references. These are mutable if the dict
+    is mutable.
+
+    Parameters:
+        K: The key type of the elements in the dictionary.
+        V: The value type of the elements in the dictionary.
+        dict_mutability: Whether the reference to the vector is mutable.
+        dict_lifetime: The lifetime of the DynamicVector
+    """
+
+    alias ref_type = Reference[V, dict_mutability, dict_lifetime]
+
+    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> Self.ref_type:
+        let entry_ref = self.iter.__next__()
+        let mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
+            Reference(entry_ref[].value).value
+        )
+        let value_ptr = AnyPointer[V] {
+            value: __mlir_op.`pop.pointer.bitcast`[
+                _type = AnyPointer[V].pointer_type
+            ](mlir_ptr)
+        }
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Self.ref_type.mlir_ref_type
+        ](value_ptr.value)
+
+    fn __len__(self) -> Int:
+        return self.iter.__len__()
+
+
+@value
 struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
     """Store a key-value pair entry inside a dictionary.
 
@@ -413,6 +548,84 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
         elif default:
             return default.value()
         raise "KeyError"
+
+    fn __iter__[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life].mlir_ref_type,
+    ) -> _DictKeyIter[K, V, mutability, self_life]:
+        """Iterate over the dict's keys as immutable references.
+
+        Parameters:
+            mutability: Whether the dict is mutable.
+            self_life: The dict's lifetime.
+
+        Returns:
+            An iterator of immutable references to the dictionary keys.
+        """
+        return _DictKeyIter(
+            _DictEntryIter[K, V, mutability, self_life](0, 0, Reference(self))
+        )
+
+    fn keys[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life].mlir_ref_type,
+    ) -> _DictKeyIter[K, V, mutability, self_life]:
+        """Iterate over the dict's keys as immutable references.
+
+        Parameters:
+            mutability: Whether the dict is mutable.
+            self_life: The dict's lifetime.
+
+        Returns:
+            An iterator of immutable references to the dictionary keys.
+        """
+        return Self.__iter__(self)
+
+    fn values[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life].mlir_ref_type,
+    ) -> _DictValueIter[K, V, mutability, self_life]:
+        """Iterate over the dict's values as references.
+
+        Parameters:
+            mutability: Whether the dict is mutable.
+            self_life: The dict's lifetime.
+
+        Returns:
+            An iterator of references to the dictionary values.
+        """
+        return _DictValueIter(
+            _DictEntryIter[K, V, mutability, self_life](0, 0, Reference(self))
+        )
+
+    fn items[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life].mlir_ref_type,
+    ) -> _DictEntryIter[K, V, mutability, self_life]:
+        """Iterate over the dict's entries as immutable references.
+
+        These can't yet be unpacked like Python dict items, but you can
+        access the key and value as attributes ie.
+
+        ```mojo
+        for e in dict.items():
+            print(e[].key, e[].value)
+        ```
+
+        Parameters:
+            mutability: Whether the dict is mutable.
+            self_life: The dict's lifetime.
+
+        Returns:
+            An iterator of immutable references to the dictionary entries.
+        """
+        return _DictEntryIter[K, V, mutability, self_life](
+            0, 0, Reference(self)
+        )
 
     @staticmethod
     fn _new_entries(reserved: Int) -> DynamicVector[Optional[DictEntry[K, V]]]:
