@@ -8,14 +8,14 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.info import sizeof as _sizeof
-
 from algorithm.functional import unroll
+from collections.dict import KeyElement
+from sys.info import sizeof as _sizeof
 
 
 @value
 @register_passable("trivial")
-struct DType(Stringable):
+struct DType(Stringable, KeyElement):
     """Represents DType and provides methods for working with it."""
 
     alias type = __mlir_type.`!kgen.dtype`
@@ -169,6 +169,9 @@ struct DType(Stringable):
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
             self._as_i8(), rhs._as_i8()
         )
+
+    fn __hash__(self) -> Int:
+        return hash(UInt8(self._as_i8()))
 
     @always_inline("nodebug")
     fn isa[other: DType](self) -> Bool:
