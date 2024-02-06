@@ -1070,14 +1070,9 @@ struct PythonObject(Intable, Stringable, Sized):
             A string that represents this object.
         """
         var cpython = _get_global_python_itf().cpython()
-        try:
-            let python_str: PythonObject = cpython.PyObject_Str(self.py_object)
-            # copy the string
-            let str = String(
-                cpython.PyUnicode_AsUTF8AndSize(python_str.py_object)
-            )
-            # keep python object alive so the copy can occur
-            _ = python_str
-            return str
-        except:
-            return "No string method found on the python object."
+        let python_str: PythonObject = cpython.PyObject_Str(self.py_object)
+        # copy the string
+        let str = String(cpython.PyUnicode_AsUTF8AndSize(python_str.py_object))
+        # keep python object alive so the copy can occur
+        _ = python_str
+        return str
