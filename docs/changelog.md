@@ -75,6 +75,27 @@ for x in v:
   print(x[])
 ```
 
+- We now have a `Set` type in our collections! `Set` is backed by a `Dict`,
+  so it has fast add, remove, and `in` checks, and requires member elements
+  to be `KeyElement`s.
+
+  ```mojo
+  from collections import Set
+
+  var set = Set[Int](1, 2, 3)
+  print(len(set))  # 3
+  set.add(4)
+
+  for element in set:
+      print(element[])
+
+  set -= Set[Int](3, 4, 5)
+  print(set == Set[Int](1, 2))  # True
+  print(set | Set[Int](0, 1) == Set[Int](0, 1, 2))  # True
+  let element = set.pop()
+  print(len(set))  # 1
+  ```
+
 - Mojo now has limited support to declare keyword-only arguments and parameters.
   For example:
 
