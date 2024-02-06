@@ -13,7 +13,6 @@ from python.object import PythonObject
 """
 
 from algorithm import unroll
-from memory.unsafe import Pointer
 from sys.intrinsics import _mlirtype_is_eq
 
 from ._cpython import CPython, PyObjectPtr
