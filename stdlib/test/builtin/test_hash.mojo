@@ -4,6 +4,9 @@
 #
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
+# RUN: %mojo -debug-level full -O0 %s
+
+# Issue #31111 -- run this test with -O0 also.
 
 # These tests aren't _great_. They're platform specific, and implementation
 # specific. But for now they test behavior and reproducibility.
@@ -103,6 +106,11 @@ def test_hash_simd():
     )
 
 
+fn test_issue_31111():
+    _ = hash(Int(1))
+
+
 def main():
     test_hash_byte_array()
     test_hash_simd()
+    test_issue_31111()

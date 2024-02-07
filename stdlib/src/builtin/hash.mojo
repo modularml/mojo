@@ -19,7 +19,7 @@ There are a few main tools in this module:
 """
 
 import math
-from memory import memcpy, memset_zero
+from memory import memcpy, memset_zero, stack_allocation
 import random
 from sys.ffi import _get_global
 
@@ -126,16 +126,22 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     """
     # Some types will have non-integer ratios, eg. DType.bool
     alias int8_size = math.ceildiv(
-        type.bitwidth(), DType.int8.bitwidth()
+        type.bitwidth(), DType.uint8.bitwidth()
     ) * size
     # Stack allocate bytes for `data` and load it into that memory.
     # Then reinterpret as int8 and pass to the specialized int8 hash function.
-    var bytes = StaticTuple[int8_size, Int8]()
-    let raw_ptr = Pointer.address_of(bytes)
-    memset_zero(raw_ptr, int8_size)
-    let ptr = DTypePointer[type](raw_ptr.bitcast[SIMD[type, 1]]())
-    ptr.simd_store[size](data)
-    return _hash_int8(ptr.bitcast[DType.uint8]().simd_load[int8_size]())
+    # - Ensure that the alignment matches both types, otherwise
+    #   an aligned load or store will be offset and cause
+    #   nondeterminism (read) or memory corruption (write)
+    # TODO(#31160): use math.lcm
+    # Technically this is LCM, but alignments should always be multiples of 2.
+    alias alignment = math.max(
+        alignof[SIMD[type, size]](), alignof[SIMD[DType.uint8, int8_size]]()
+    )
+    var bytes = stack_allocation[int8_size, DType.uint8, alignment=alignment]()
+    memset_zero(bytes, int8_size)
+    bytes.bitcast[type]().simd_store[size](data)
+    return _hash_int8(bytes.simd_load[int8_size]())
 
 
 fn _hash_int8[size: Int](data: SIMD[DType.uint8, size]) -> Int:
