@@ -507,6 +507,30 @@ Pink: No! Darkness! (Pink is floating in the air)"""
     )
 
 
+fn test_startswith() raises:
+    let str = String("Hello world")
+
+    assert_true(str.startswith("Hello"))
+    assert_false(str.startswith("Bye"))
+
+    assert_true(str.startswith("llo", 2))
+    assert_true(str.startswith("llo", 2, -1))
+    assert_false(str.startswith("llo", 2, 3))
+
+
+fn test_endswith() raises:
+    let str = String("Hello world")
+
+    assert_true(str.endswith(""))
+    assert_true(str.endswith("world"))
+    assert_true(str.endswith("ld"))
+    assert_false(str.endswith("universe"))
+
+    assert_true(str.endswith("ld", 2))
+    assert_true(str.endswith("llo", 2, 5))
+    assert_false(str.endswith("llo", 2, 3))
+
+
 fn main() raises:
     test_constructors()
     test_equality_operators()
@@ -537,3 +561,5 @@ fn main() raises:
     test_lstrip()
     test_strip()
     test_hash()
+    test_startswith()
+    test_endswith()

@@ -1019,6 +1019,41 @@ struct String(Sized, Stringable, KeyElement):
 
         return copy
 
+    fn startswith(self, prefix: String, start: Int = 0, end: Int = -1) -> Bool:
+        """Checks if the string starts with the specified prefix between start
+        and end positions. Returns True if found and False otherwise.
+
+        Args:
+          prefix: The prefix to check.
+          start: The start offset from which to check.
+          end: The end offset from which to check.
+
+        Returns:
+          True if the self[start:end] is prefixed by the input prefix.
+        """
+        if end == -1:
+            return self.find(prefix, start) == start
+        return self[start:end].startswith(prefix)
+
+    fn endswith(self, suffix: String, start: Int = 0, end: Int = -1) -> Bool:
+        """Checks if the string end with the specified suffix between start
+        and end positions. Returns True if found and False otherwise.
+
+        Args:
+          suffix: The prefix to check.
+          start: The start offset from which to check.
+          end: The end offset from which to check.
+
+        Returns:
+          True if the self[start:end] is suffixed by the input suffix.
+        """
+        if end == -1:
+            return self._endswith_impl(suffix, start)
+        return self[start:end]._endswith_impl(suffix)
+
+    fn _endswith_impl(self, suffix: String, start: Int = 0) -> Bool:
+        return self.rfind(suffix, start) + len(suffix) == len(self)
+
 
 # ===----------------------------------------------------------------------===#
 # Utilities
