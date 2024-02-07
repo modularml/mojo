@@ -81,7 +81,14 @@ def test_refitem_offset():
     ptr.free()
 
 
+def test_address_of():
+    let local = 1
+    assert_not_equal(0, AnyPointer[Int].address_of(local).__as_index())
+
+
 def main():
+    test_address_of()
+
     test_refitem()
     test_refitem_offset()
 

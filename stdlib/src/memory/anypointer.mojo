@@ -57,6 +57,23 @@ struct AnyPointer[T: Movable]:
             )
         }
 
+    @staticmethod
+    @always_inline("nodebug")
+    fn address_of(arg: T) -> Self:
+        """Gets the address of the argument.
+
+        Args:
+            arg: The value to get the address of.
+
+        Returns:
+            An AnyPointer which contains the address of the argument.
+        """
+        return Self {
+            value: __mlir_op.`pop.pointer.bitcast`[_type = Self.pointer_type](
+                __mlir_op.`lit.ref.to_pointer`(__get_ref_from_value(arg))
+            )
+        }
+
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
