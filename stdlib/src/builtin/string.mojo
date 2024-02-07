@@ -1167,7 +1167,7 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
     )
     let n = UInt32(n0)
-    let log2 = bitwidthof[DType.uint32]() - ctlz(n | 1) - 1
+    let log2 = int((bitwidthof[DType.uint32]() - 1) ^ ctlz(n | 1))
     return (n0 + lookup_table[int(log2)]) >> 32
 
 
