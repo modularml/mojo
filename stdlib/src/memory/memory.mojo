@@ -53,8 +53,8 @@ fn memcmp[
         buffer.
     """
     for i in range(count):
-        let s1i = s1.load(i)
-        let s2i = s2.load(i)
+        let s1i = s1[i]
+        let s2i = s2[i]
         if s1i == s2i:
             continue
         if s1i > s2i:

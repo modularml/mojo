@@ -788,7 +788,7 @@ struct String(Sized, Stringable, KeyElement):
 
         let loc = _memmem(
             haystack_str._as_ptr(),
-            haystack_str.length,
+            len(haystack_str),
             substr._as_ptr(),
             len(substr),
         )
@@ -1081,12 +1081,31 @@ fn _memmem[
         return haystack
     if needle_len > haystack_len:
         return DTypePointer[type]()
+    if needle_len == 1:
+        return _memchr[type, range_fn](haystack, needle[0], haystack_len)
     for i in range_fn(haystack_len, needle_len):
-        var j = 0
-        while j < needle_len and haystack[i + j] == needle[j]:
-            j += 1
-        if j == needle_len:
+        if haystack[i] != needle[0]:
+            continue
+
+        if memcmp(haystack + i, needle, needle_len) == 0:
             return haystack + i
+    return DTypePointer[type]()
+
+
+fn _memchr[
+    type: DType, range_fn: fn (Int, Int) -> _StridedRange
+](
+    source: DTypePointer[type],
+    char: Scalar[type],
+    len: Int,
+) -> DTypePointer[
+    type
+]:
+    if not len:
+        return DTypePointer[type]()
+    for i in range_fn(len, 1):
+        if source[i] == char:
+            return source + i
     return DTypePointer[type]()
 
 
