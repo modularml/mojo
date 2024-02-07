@@ -86,6 +86,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     CollectionElement,
     Stringable,
     Hashable,
+    Boolable,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
