@@ -1040,7 +1040,7 @@ struct String(Sized, Stringable, KeyElement):
         and end positions. Returns True if found and False otherwise.
 
         Args:
-          suffix: The prefix to check.
+          suffix: The suffix to check.
           start: The start offset from which to check.
           end: The end offset from which to check.
 

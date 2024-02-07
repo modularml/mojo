@@ -108,6 +108,8 @@ struct Path(Stringable, CollectionElement):
         Returns:
           A new path with the suffix appended to the current path.
         """
+        if self.path.endswith(DIR_SEPARATOR):
+            return self.path + suffix
         return self.path + DIR_SEPARATOR + suffix
 
     fn __str__(self) -> String:

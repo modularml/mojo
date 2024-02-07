@@ -31,6 +31,9 @@ fn test_path() raises:
     # CHECK: /foo/bar/jar
     print(str(Path("/foo") / "bar" / "jar"))
 
+    # CHECK: /foo/bar/jar
+    print(str(Path("/foo" + DIR_SEPARATOR) / "bar" / "jar"))
+
 
 # CHECK-LABEL: test_path
 fn test_path_exists():
