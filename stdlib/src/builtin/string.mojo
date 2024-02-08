@@ -782,6 +782,9 @@ struct String(Sized, Stringable, KeyElement):
         if not substr:
             return 0
 
+        if len(self) < len(substr) + start:
+            return -1
+
         # The substring to search within, offset from the beginning if `start`
         # is positive, and offset from the end if `start` is negative.
         let haystack_str = self._strref_from_start(start)
@@ -789,6 +792,39 @@ struct String(Sized, Stringable, KeyElement):
         let loc = _memmem(
             haystack_str._as_ptr(),
             len(haystack_str),
+            substr._as_ptr(),
+            len(substr),
+        )
+
+        if not loc:
+            return -1
+
+        return loc.__as_index() - self._as_ptr().__as_index()
+
+    fn rfind(self, substr: String, start: Int = 0) -> Int:
+        """Finds the offset of the last occurrence of `substr` starting at
+        `start`. If not found, returns -1.
+
+        Args:
+          substr: The substring to find.
+          start: The offset from which to find.
+
+        Returns:
+          The offset of `substr` relative to the beginning of the string.
+        """
+        if not substr:
+            return len(self)
+
+        if len(self) < len(substr) + start:
+            return -1
+
+        # The substring to search within, offset from the beginning if `start`
+        # is positive, and offset from the end if `start` is negative.
+        let haystack_str = self._strref_from_start(start)
+
+        let loc = _memrmem(
+            haystack_str._as_ptr(),
+            haystack_str.length,
             substr._as_ptr(),
             len(substr),
         )
@@ -830,36 +866,6 @@ struct String(Sized, Stringable, KeyElement):
             current_offset = loc + len(delimiter)
 
         return output
-
-    fn rfind(self, substr: String, start: Int = 0) -> Int:
-        """Finds the offset of the last occurrence of `substr` starting at
-        `start`. If not found, returns -1.
-
-        Args:
-          substr: The substring to find.
-          start: The offset from which to find.
-
-        Returns:
-          The offset of `substr` relative to the beginning of the string.
-        """
-        if not substr:
-            return len(self)
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        let haystack_str = self._strref_from_start(start)
-
-        let loc = _memrmem(
-            haystack_str._as_ptr(),
-            haystack_str.length,
-            substr._as_ptr(),
-            len(substr),
-        )
-
-        if not loc:
-            return -1
-
-        return loc.__as_index() - self._as_ptr().__as_index()
 
     fn replace(self, old: String, new: String) -> String:
         """Return a copy of the string with all occurrences of substring `old`

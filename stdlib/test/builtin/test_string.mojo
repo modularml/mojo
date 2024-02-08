@@ -264,6 +264,8 @@ fn test_find() raises:
     assert_equal(4, str.find("o", -10))
     assert_equal(7, str.find("o", -5))
 
+    assert_equal(-1, String("abc").find("abcd"))
+
 
 fn test_count() raises:
     let str = String("Hello world")
@@ -317,6 +319,8 @@ fn test_rfind() raises:
     assert_equal(String("hello world").rfind("l", -5), 9)
     assert_equal(String("hello world").rfind("w", -3), -1)
     assert_equal(String("hello world").rfind("w", -5), 6)
+
+    assert_equal(-1, String("abc").rfind("abcd"))
 
     # Special characters.
     # TODO(#26444): Support unicode strings.
