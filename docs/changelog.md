@@ -247,6 +247,8 @@ for x in v:
   https://github.com/modularml/mojo/issues/1607) - Crash when returning type
   value instead of instance of expected type. This is a common mistake and the
   error now includes a hint to point users to the problem.
+- [#1613](https://github.com/modularml/mojo/issues/1613) - Wrong type name in
+  error for incorrect `self` argument type in trait method declaration.
 
 ## v0.7.0 (2024-01-25)
 
