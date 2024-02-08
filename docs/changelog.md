@@ -249,6 +249,8 @@ for x in v:
   error now includes a hint to point users to the problem.
 - [#1613](https://github.com/modularml/mojo/issues/1613) - Wrong type name in
   error for incorrect `self` argument type in trait method declaration.
+- [#1670](https://github.com/modularml/mojo/issues/1670) - Crash on implicit
+  conversion in a global variable declaration.
 
 ## v0.7.0 (2024-01-25)
 
