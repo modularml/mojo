@@ -217,6 +217,11 @@ for x in v:
   `YourContainer` like `yc[42:3.14:"🔥"]` and the three values are passed to the
   `UnusualSlice` constructor.
 
+- The error message for missing function arguments is improved: instead of
+  describing the number of arguments (e.g. `callee expects at least 3 arguments,
+  but 1 was specified`) the missing arguments are now described by
+  name (e.g. `missing 2 required positional arguments: 'b', 'c'`).
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
@@ -236,6 +241,8 @@ for x in v:
   [#1708](https://github.com/modularml/mojo/issues/1708)
 - [#1223](https://github.com/modularml/mojo/issues/1223) - Crash when parametric
   function is passed as (runtime) argument. The parser now errors out instead.
+- [#1530](https://github.com/modularml/mojo/issues/1530) - Crash during
+  diagnostic emission for parameter deduction failure.
 
 ## v0.7.0 (2024-01-25)
 
