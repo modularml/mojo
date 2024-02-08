@@ -148,6 +148,9 @@ for x in v:
 - Added [`DynamicVector.extend`](/mojo/stdlib/collections/vector.html#extend)
   method, which extends a vector by consuming the elements of another vector.
 
+- Added built-in `hex()` function, which can be used to format any value whose
+  type implements the `Intable` trait as a hexadecimal string.
+
 ### 🦋 Changed
 
 - `vectorize_unroll` has been removed, and `vectorize` now has a parameter named

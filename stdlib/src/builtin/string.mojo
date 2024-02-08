@@ -421,6 +421,22 @@ struct String(Sized, Stringable, KeyElement):
         """
         self._buffer = existing._buffer ^
 
+    @staticmethod
+    fn _unchecked_from_bytes(owned impl: Self._buffer_type) -> String:
+        """Construct a string from a sequence of bytes.
+
+        This does no validation that the given bytes are valid in any specific
+        String encoding.
+
+        Args:
+            impl: The buffer. This should not have an existing NUL terminator.
+        """
+
+        # Add the NUL terminator.
+        impl.push_back(0)
+
+        return String(impl ^)
+
     @always_inline
     fn __bool__(self) -> Bool:
         """Checks if the string is empty.
@@ -671,6 +687,26 @@ struct String(Sized, Stringable, KeyElement):
             The pointer to the underlying memory.
         """
         return rebind[DTypePointer[DType.int8]](self._buffer.data)
+
+    fn as_bytes(self) -> DynamicVector[Int8]:
+        """Retrieves the underlying byte sequence encoding the characters in
+        this string.
+
+        This does not include the trailing null terminator.
+
+        Returns:
+            A sequence containing the encoded characters stored in this string.
+        """
+
+        # TODO(lifetimes): Return a reference rather than a copy
+        var copy = self._buffer
+        let last = copy.pop_back()
+        debug_assert(
+            last == 0,
+            "expected last element of String buffer to be null terminator",
+        )
+
+        return copy
 
     fn _strref_from_start(self, start: Int) -> StringRef:
         """Gets the StringRef pointing to the substring after the specified slice start position.
