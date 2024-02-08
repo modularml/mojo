@@ -7,6 +7,7 @@
 from math import *
 from testing import *
 from sys.info import has_neon
+from random import randn_float64
 
 
 def test_methods():
@@ -41,6 +42,23 @@ def test_math():
     assert_true(BFloat16(2.0) == BFloat16(2.0))
 
 
+fn test_bf_primitives():
+    # we have to use dynamic values, otherwise these get evaled at compile time.
+    let a = randn_float64().cast[DType.bfloat16]()
+    let b = randn_float64().cast[DType.bfloat16]()
+
+    print(a + b)
+    print(a - b)
+    print(a / b)
+    print(a * b)
+    print(a == b)
+    print(a != b)
+    print(a <= b)
+    print(a >= b)
+
+    print("DONE!")
+
+
 def main():
     # CHECK: 33.0
     print(
@@ -62,5 +80,11 @@ def main():
         )
     )
 
-    test_methods()
-    test_math()
+    # TODO re-enable this test when we sort out BF16 support for graviton3 #30525
+    @parameter
+    if not has_neon():
+        test_methods()
+        test_math()
+
+        # CHECK: DONE!
+        test_bf_primitives()
