@@ -20,7 +20,6 @@ from math import abs, isclose
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
 fn assert_true[T: Boolable](val: T, msg: String = "") raises:
     """Asserts that the input value is True. If it is not then an
     Error is raised.
@@ -39,7 +38,6 @@ fn assert_true[T: Boolable](val: T, msg: String = "") raises:
         raise Error("AssertionError: " + msg)
 
 
-@always_inline
 fn assert_false[T: Boolable](val: T, msg: String = "") raises:
     """Asserts that the input value is False. If it is not then an Error is
     raised.
@@ -60,7 +58,6 @@ fn assert_false[T: Boolable](val: T, msg: String = "") raises:
 
 # TODO: Collapse these two overloads for generic T that has the
 # Equality Comparable trait.
-@always_inline
 fn assert_equal(lhs: Int, rhs: Int) raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
@@ -78,7 +75,6 @@ fn assert_equal(lhs: Int, rhs: Int) raises:
         )
 
 
-@always_inline
 fn assert_equal(lhs: String, rhs: String) raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
@@ -94,7 +90,6 @@ fn assert_equal(lhs: String, rhs: String) raises:
         raise Error("AssertionError: " + lhs + " is not equal to " + rhs)
 
 
-@always_inline
 fn assert_equal[
     type: DType, size: Int
 ](lhs: SIMD[type, size], rhs: SIMD[type, size]) raises:
@@ -118,7 +113,6 @@ fn assert_equal[
         )
 
 
-@always_inline
 fn assert_not_equal(lhs: Int, rhs: Int) raises:
     """Asserts that the input values are not equal. If it is not then an
     Error is raised.
@@ -136,7 +130,6 @@ fn assert_not_equal(lhs: Int, rhs: Int) raises:
         )
 
 
-@always_inline
 fn assert_not_equal(lhs: String, rhs: String) raises:
     """Asserts that the input values are not equal. If it is not then an
     an Error is raised.
@@ -152,7 +145,6 @@ fn assert_not_equal(lhs: String, rhs: String) raises:
         raise Error("AssertionError: " + lhs + " is not equal to " + rhs)
 
 
-@always_inline
 fn assert_not_equal[
     type: DType, size: Int
 ](lhs: SIMD[type, size], rhs: SIMD[type, size]) raises:
@@ -176,7 +168,6 @@ fn assert_not_equal[
         )
 
 
-@always_inline
 fn assert_almost_equal[
     type: DType, size: Int
 ](
