@@ -243,6 +243,10 @@ for x in v:
   function is passed as (runtime) argument. The parser now errors out instead.
 - [#1530](https://github.com/modularml/mojo/issues/1530) - Crash during
   diagnostic emission for parameter deduction failure.
+- [#1538](https://github.com/modularml/mojo/issues/1538) and [#1607](
+  https://github.com/modularml/mojo/issues/1607) - Crash when returning type
+  value instead of instance of expected type. This is a common mistake and the
+  error now includes a hint to point users to the problem.
 
 ## v0.7.0 (2024-01-25)
 
