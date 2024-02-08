@@ -12,7 +12,7 @@ fn trap():
     """Calls a target dependent trap instruction. If the target does not have a
     trap instruction, this intrinsic will be lowered to a call of the abort()
     function."""
-    trap("")
+    llvm_intrinsic["llvm.trap", NoneType]()
 
 
 @always_inline("nodebug")
