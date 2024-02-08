@@ -724,6 +724,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self[i] == rhs[i]`.
         """
 
+        @parameter  # Because of #30525, we roll our own implementation for eq.
+        if has_neon() and type == DType.bfloat16:
+            let int_self = bitcast[_integral_type_of[type](), size](self)
+            let int_rhs = bitcast[_integral_type_of[type](), size](rhs)
+            return int_self == int_rhs
+
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
             self.value, rhs.value
         )
@@ -740,6 +746,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `i` is True or False depending on the expression
             `self[i] != rhs[i]`.
         """
+
+        @parameter  # Because of #30525, we roll our own implementation for ne.
+        if has_neon() and type == DType.bfloat16:
+            let int_self = bitcast[_integral_type_of[type](), size](self)
+            let int_rhs = bitcast[_integral_type_of[type](), size](rhs)
+            return int_self != int_rhs
 
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
             self.value, rhs.value

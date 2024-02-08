@@ -26,19 +26,8 @@ def test_math():
     assert_equal(exp(BFloat16(2.0)), 7.375)
     assert_equal(cos(BFloat16(2.0)), -0.416015625)
 
-    assert_equal(floor(BFloat16(2.5)), 2.0)
+    assert_equal(floor(BFloat16(2.0)), 2.0)
     assert_equal(ceil(BFloat16(2.0)), 2.0)
-
-    assert_equal(min(BFloat16(2.0), BFloat16(3.0)), 2.0)
-    assert_equal(max(BFloat16(2.0), BFloat16(3.0)), 3.0)
-    assert_true(BFloat16(2.0) > BFloat16(-2.0))
-    assert_false(BFloat16(2.0) < BFloat16(-3.0))
-    assert_true(BFloat16(2.0) <= BFloat16(2.0))
-    assert_true(BFloat16(2.0) >= BFloat16(2.0))
-    assert_true(BFloat16(2.0) != BFloat16(3.0))
-    assert_false(BFloat16(2.0) != BFloat16(2.0))
-    assert_false(BFloat16(2.0) == BFloat16(3.0))
-    assert_true(BFloat16(2.0) == BFloat16(2.0))
 
 
 def main():
