@@ -118,7 +118,7 @@ struct Bool(Stringable, CollectionElement, Boolable):
         Returns:
             A string representation.
         """
-        return self
+        return "True" if self else "False"
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Bool) -> Bool:

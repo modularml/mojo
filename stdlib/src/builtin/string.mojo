@@ -226,15 +226,6 @@ fn isspace(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline
-fn _vec_fmt[
-    *types: AnyRegType
-](
-    str: AnyPointer[Int8], size: Int, fmt: StringLiteral, *arguments: *types
-) -> Int:
-    return _snprintf(rebind[Pointer[Int8]](str), size, fmt, arguments)
-
-
 struct String(Sized, Stringable, KeyElement):
     """Represents a mutable string."""
 
@@ -283,91 +274,17 @@ struct String(Sized, Stringable, KeyElement):
 
         self = String(StringRef(str))
 
-    @always_inline
-    fn __init__(inout self, str: String):
-        """Constructs a String value given a constant string.
-
-        Args:
-            str: The input string.
-        """
-
-        self._buffer = str._buffer
-
-    @always_inline
-    fn __init__(inout self, val: Bool):
-        """Constructs a string representing an bool value.
-
-        Args:
-            val: The boolean value.
-        """
-        self = Self("True" if val else "False")
-
-    @always_inline
-    fn __init__(inout self, num: Int):
-        """Constructs a string representing an integer value.
-
-        Args:
-            num: The integer value.
-        """
-        var buf = Self._buffer_type()
-        let initial_buffer_size = _calc_initial_buffer_size(num)
-        buf.reserve(initial_buffer_size)
-        buf.size += _vec_fmt(buf.data, initial_buffer_size, "%li", num.value)
-        buf.size += 1  # for the null terminator.
-        self._buffer = buf ^
-
-    @always_inline
-    fn __init__(inout self, num: FloatLiteral):
-        """Constructs a string representing a float value.
-
-        Args:
-            num: The float value.
-        """
-        var buf = Self._buffer_type()
-        let initial_buffer_size = _calc_initial_buffer_size(num)
-        buf.reserve(initial_buffer_size)
-        buf.size += _vec_fmt(buf.data, initial_buffer_size, "%f", num.value)
-        buf.size += 1  # for the null terminator.
-        self._buffer = buf ^
-
-    @always_inline
-    fn __init__[size: Int](inout self, tuple: StaticIntTuple[size]):
-        """Constructs a string from a given StaticIntTuple.
+    fn __init__[stringable: Stringable](inout self, value: stringable):
+        """Creates a string from a value that conforms to Stringable trait.
 
         Parameters:
-            size: The size of the tuple.
+            stringable: The Stringable type.
 
         Args:
-            tuple: The input tuple.
+            value: The value that conforms to Stringable.
         """
-        # Reserve space for opening and closing parentheses, plus each element
-        # and its trailing commas.
-        var buf = Self._buffer_type()
-        var initial_buffer_size = 2
-        for i in range(size):
-            initial_buffer_size += _calc_initial_buffer_size(tuple[i]) + 2
-        buf.reserve(initial_buffer_size)
 
-        # Print an opening `(`.
-        buf.size += _vec_fmt(buf.data, 2, "(")
-        for i in range(size):
-            # Print separators between each element.
-            if i != 0:
-                buf.size += _vec_fmt(buf.data + buf.size, 3, ", ")
-            buf.size += _vec_fmt(
-                buf.data + buf.size,
-                _calc_initial_buffer_size(tuple[i]),
-                "%d",
-                tuple[i],
-            )
-        # Single element tuples should be printed with a trailing comma.
-        if size == 1:
-            buf.size += _vec_fmt(buf.data + buf.size, 2, ",")
-        # Print a closing `)`.
-        buf.size += _vec_fmt(buf.data + buf.size, 2, ")")
-
-        buf.size += 1  # for the null terminator.
-        self._buffer = buf ^
+        self = str(value)
 
     @always_inline
     fn __init__(inout self, ptr: Pointer[Int8], len: Int):
@@ -392,16 +309,6 @@ struct String(Sized, Stringable, KeyElement):
             len: The length of the buffer.
         """
         self = String(ptr.address, len)
-
-    @always_inline
-    fn __init__[T: Stringable](inout self, value: T):
-        """Creates a string from a value of T that conforms to Stringable trait.
-
-        Args:
-            value: The value that conforms to Stringable.
-
-        """
-        self = str(value)
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
@@ -589,17 +496,6 @@ struct String(Sized, Stringable, KeyElement):
             The new constructed string.
         """
         return other + self
-
-    fn __radd__(self, other: StringLiteral) -> String:
-        """Creates a string by prepending another string to the start.
-
-        Args:
-            other: The string to prepend.
-
-        Returns:
-            The new constructed string.
-        """
-        return String(other) + self
 
     fn __iadd__(inout self, other: String):
         """Appends another string to this string.
@@ -1100,6 +996,15 @@ struct String(Sized, Stringable, KeyElement):
 # ===----------------------------------------------------------------------===#
 # Utilities
 # ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _vec_fmt[
+    *types: AnyRegType
+](
+    str: AnyPointer[Int8], size: Int, fmt: StringLiteral, *arguments: *types
+) -> Int:
+    return _snprintf(rebind[Pointer[Int8]](str), size, fmt, arguments)
 
 
 fn _toggle_ascii_case(char: Int8) -> Int8:

@@ -13,6 +13,7 @@ from debug.lldb import lldb_formatter_wrapping_type
 from utils.index import StaticIntTuple
 from collections.vector import CollectionElement
 from collections.dict import KeyElement
+from builtin.string import _calc_initial_buffer_size, _vec_fmt
 
 
 # ===----------------------------------------------------------------------=== #
@@ -292,14 +293,20 @@ struct Int(Intable, Stringable, KeyElement):
         Returns:
             A string representation.
         """
-        return self
+        var buf = String._buffer_type()
+        let initial_buffer_size = _calc_initial_buffer_size(self)
+        buf.reserve(initial_buffer_size)
+        buf.size += _vec_fmt(buf.data, initial_buffer_size, "%li", self.value)
+        buf.size += 1  # for the null terminator.
+        return buf ^
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
         """Convert to index.
 
         Returns:
-            The corresponding __mlir_type.index value."""
+            The corresponding __mlir_type.index value.
+        """
         return self.value
 
     @always_inline("nodebug")

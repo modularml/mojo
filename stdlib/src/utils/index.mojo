@@ -14,6 +14,8 @@ from utils.index import StaticIntTuple
 """
 
 from algorithm import unroll
+from builtin.string import _calc_initial_buffer_size, _vec_fmt
+from builtin.io import _get_dtype_printf_format
 
 from utils.list import DimList
 
@@ -369,14 +371,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         unroll[fill, size]()
         return Self {data: StaticTuple[size, Int](array)}
 
-    fn __str__(self) -> String:
-        """Get the tuple as a string.
-
-        Returns:
-            A string representation.
-        """
-        return self
-
     @always_inline("nodebug")
     fn __len__(self) -> Int:
         """Returns the size of the tuple.
@@ -675,6 +669,41 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
             The comparison result.
         """
         return not (self == rhs)
+
+    fn __str__(self) -> String:
+        """Get the tuple as a string.
+
+        Returns:
+            A string representation.
+        """
+        # Reserve space for opening and closing parentheses, plus each element
+        # and its trailing commas.
+        var buf = String._buffer_type()
+        var initial_buffer_size = 2
+        for i in range(size):
+            initial_buffer_size += _calc_initial_buffer_size(self[i]) + 2
+        buf.reserve(initial_buffer_size)
+
+        # Print an opening `(`.
+        buf.size += _vec_fmt(buf.data, 2, "(")
+        for i in range(size):
+            # Print separators between each element.
+            if i != 0:
+                buf.size += _vec_fmt(buf.data + buf.size, 3, ", ")
+            buf.size += _vec_fmt(
+                buf.data + buf.size,
+                _calc_initial_buffer_size(self[i]),
+                _get_dtype_printf_format[DType.index](),
+                self[i],
+            )
+        # Single element tuples should be printed with a trailing comma.
+        if size == 1:
+            buf.size += _vec_fmt(buf.data + buf.size, 2, ",")
+        # Print a closing `)`.
+        buf.size += _vec_fmt(buf.data + buf.size, 2, ")")
+
+        buf.size += 1  # for the null terminator.
+        return buf ^
 
 
 # ===----------------------------------------------------------------------===#
