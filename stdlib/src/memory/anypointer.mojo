@@ -16,7 +16,7 @@ from sys.info import alignof, sizeof
 
 
 @register_passable("trivial")
-struct AnyPointer[T: Movable]:
+struct AnyPointer[T: Movable](Boolable):
     """This is a pointer type that can point to any generic value that is
     movable.
 

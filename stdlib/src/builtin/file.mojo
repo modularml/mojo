@@ -32,7 +32,7 @@ from tensor import Tensor
 
 
 @register_passable
-struct _OwnedStringRef:
+struct _OwnedStringRef(Boolable):
     var data: DTypePointer[DType.int8]
     var length: Int
 

@@ -161,7 +161,7 @@ fn int[T: IntableRaising](value: T) raises -> Int:
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct Int(Intable, Stringable, KeyElement):
+struct Int(Intable, Stringable, KeyElement, Boolable):
     """This type represents an integer value."""
 
     var value: __mlir_type.index

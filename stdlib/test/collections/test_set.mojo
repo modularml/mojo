@@ -58,10 +58,10 @@ def test_equal():
 
 
 def test_bool():
-    assert_false(Bool(Set[Int]()))
-    assert_false(Bool(Set[Int](DynamicVector[Int]())))
-    assert_true(Bool(Set[Int](1)))
-    assert_true(Bool(Set[Int](1, 2, 3)))
+    assert_false(Set[Int]())
+    assert_false(Set[Int](DynamicVector[Int]()))
+    assert_true(Set[Int](1))
+    assert_true(Set[Int](1, 2, 3))
 
 
 def test_intersection():

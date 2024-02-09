@@ -19,7 +19,7 @@ from memory.unsafe import DTypePointer
 
 
 @register_passable
-struct Error(Stringable):
+struct Error(Stringable, Boolable):
     """This type represents an Error."""
 
     var data: DTypePointer[DType.int8]

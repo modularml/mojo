@@ -410,7 +410,7 @@ fn emplace_ref_unsafe[
 @register_passable("trivial")
 struct Pointer[
     type: AnyRegType, address_space: AddressSpace = AddressSpace.GENERIC
-]:
+](Boolable):
     """Defines a Pointer struct that contains the address of a register passable
     type.
 
@@ -887,7 +887,7 @@ struct Pointer[
 @register_passable("trivial")
 struct DTypePointer[
     type: DType, address_space: AddressSpace = AddressSpace.GENERIC
-]:
+](Boolable):
     """Defines a `DTypePointer` struct that contains an address of the given
     dtype.
 

@@ -93,7 +93,7 @@ struct _PyIter(Sized):
 
 
 @value
-struct PythonObject(Intable, Stringable, Sized):
+struct PythonObject(Intable, Stringable, Sized, Boolable):
     """A Python object."""
 
     var py_object: PyObjectPtr

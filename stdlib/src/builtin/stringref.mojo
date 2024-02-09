@@ -17,7 +17,7 @@ from memory.unsafe import DTypePointer, Pointer
 
 @value
 @register_passable("trivial")
-struct StringRef(Sized, CollectionElement, Stringable, Hashable):
+struct StringRef(Sized, CollectionElement, Stringable, Hashable, Boolable):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
     and a length, which need not be null terminated.

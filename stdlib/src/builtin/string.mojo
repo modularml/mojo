@@ -224,9 +224,7 @@ fn isspace(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 # String
 # ===----------------------------------------------------------------------===#
-
-
-struct String(Sized, Stringable, KeyElement):
+struct String(Sized, Stringable, KeyElement, Boolable):
     """Represents a mutable string."""
 
     alias _buffer_type = DynamicVector[Int8]

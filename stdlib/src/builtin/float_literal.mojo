@@ -15,7 +15,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 @value
 @register_passable("trivial")
-struct FloatLiteral(Intable, Stringable):
+struct FloatLiteral(Intable, Stringable, Boolable):
     """Mojo floating point literal type."""
 
     alias fp_type = __mlir_type.`!pop.scalar<f64>`

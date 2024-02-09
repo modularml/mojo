@@ -20,8 +20,8 @@ def main():
 
     assert_equal(val.value(), 15)
 
-    assert_true(val or Bool(False))
-    assert_true(val and Bool(True))
+    assert_true(val or False)
+    assert_true(val and True)
 
-    assert_true(Bool(False) or val)
-    assert_true(Bool(True) and val)
+    assert_true(False or val)
+    assert_true(True and val)

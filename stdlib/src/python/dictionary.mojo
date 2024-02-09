@@ -77,7 +77,7 @@ struct _PyIter(Sized):
             return 0
 
 
-struct Dictionary:
+struct Dictionary(Boolable):
     """A Python dictionary."""
 
     var py_object: PyObjectPtr

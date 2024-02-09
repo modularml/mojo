@@ -61,18 +61,6 @@ struct Bool(Stringable, CollectionElement, Boolable):
         ](value)
 
     @always_inline("nodebug")
-    fn __init__[type: Boolable](value: type) -> Bool:
-        """Construct a Bool value given a type that is a Boolable.
-
-        Args:
-            value: The initial value to be coerced to Bool.
-
-        Returns:
-            The constructed Bool value.
-        """
-        return Self {value: value.__bool__().value}
-
-    @always_inline("nodebug")
     fn __init__[width: Int](value: SIMD[DType.bool, width]) -> Bool:
         """Construct a Bool value given a SIMD value.
 
