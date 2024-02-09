@@ -11,19 +11,14 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-# This sample demonstrates how various systems optimizations can be
-# applied to a naive matmul implementation in Mojo to gain significant
-# performance speedups
+# This sample demonstrates how various systems optimizations can be applied to a
+# naive matmul implementation in Mojo to gain significant performance speedups
 
 import benchmark
-from memory import memset_zero, stack_allocation
 from random import rand
-from algorithm import vectorize, parallelize
-from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from python import Python
-from tensor import Tensor
-from utils.index import Index
-from memory.buffer import NDBuffer
+from memory import memset_zero
+from algorithm import vectorize, parallelize, Static2DTileUnitFunc as Tile2DFunc
 
 alias M = 512  # rows of A and C
 alias N = 4096  # cols of B and C
@@ -128,14 +123,14 @@ fn matmul_parallelized(inout C: Matrix, A: Matrix, B: Matrix):
     parallelize[calc_row](C.rows, C.rows)
 
 
-# Perform 2D tiling on the iteration space defined by end_x and end_y.
+# Perform 2D tiling on the iteration space defined by end_x and end_y
 fn tile[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
     for y in range(0, end_y, tile_y):
         for x in range(0, end_x, tile_x):
             tiled_fn[tile_x, tile_y](x, y)
 
 
-# Use the above tile function to perform tiled matmul.
+# Use the above tile function to perform tiled matmul
 fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_row(m: Int):
@@ -144,10 +139,8 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
             for k in range(y, y + tile_y):
 
                 @parameter
-                fn dot[
-                    nelts: Int,
-                ](n: Int):
-                    C.store[nelts](
+                fn dot[nelts: Int](n: Int):
+                    C.store(
                         m,
                         n + x,
                         C.load[nelts](m, n + x)
@@ -161,7 +154,7 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
     parallelize[calc_row](C.rows, C.rows)
 
 
-# Unroll the vectorized loop by a constant factor.
+# Unroll the vectorized loop by a constant factor
 fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
     @parameter
     fn calc_row(m: Int):
@@ -171,10 +164,8 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
             for k in range(y, y + tile_y):
 
                 @parameter
-                fn dot[
-                    nelts: Int,
-                ](n: Int):
-                    C.store[nelts](
+                fn dot[nelts: Int](n: Int):
+                    C.store(
                         m,
                         n + x,
                         C.load[nelts](m, n + x)
@@ -203,10 +194,11 @@ fn bench[
         _ = func(C, A, B)
 
     let secs = benchmark.run[test_fn](max_runtime_secs=0.5).mean()
-    # Prevent the matrices from being freed before the benchmark run
+
     A.data.free()
     B.data.free()
     C.data.free()
+
     let gflops = ((2 * M * N * K) / secs) / 1e9
     let speedup: Float64 = gflops / base_gflops
     let numpy_speedup: Float64 = gflops / numpy_gflops
