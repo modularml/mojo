@@ -25,10 +25,16 @@ from tensor import Tensor
 from utils.index import Index
 from memory.buffer import NDBuffer
 
-alias M = 512
-alias N = 512
-alias K = 4096
+alias M = 512  # rows of A and C
+alias N = 4096  # cols of B and C
+alias K = 512  # cols of A and rows of B
 alias type = DType.float32
+
+# simdwidth of = amount of `type` elements that fit into a single SIMD register
+# 2x multiplier will use multiple SIMD registers in parallel where possible
+alias nelts = simdwidthof[type]() * 2
+alias tile_n = 64  # N must be a multiple of this
+alias tile_k = 4  # K must be a multiple of this
 
 
 struct Matrix[rows: Int, cols: Int]:
@@ -91,10 +97,6 @@ fn matmul_naive(inout C: Matrix, A: Matrix, B: Matrix):
                 C[m, n] += A[m, k] * B[k, n]
 
 
-# Mojo has SIMD vector types, we can vectorize the Matmul code as follows.
-alias nelts = simdwidthof[type]() * 2  # The SIMD vector width.
-
-
 # Using stdlib vectorize function
 fn matmul_vectorized(inout C: Matrix, A: Matrix, B: Matrix):
     for m in range(C.rows):
@@ -128,7 +130,6 @@ fn matmul_parallelized(inout C: Matrix, A: Matrix, B: Matrix):
 
 # Perform 2D tiling on the iteration space defined by end_x and end_y.
 fn tile[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
-    # Note: this assumes that ends are multiples of the tiles.
     for y in range(0, end_y, tile_y):
         for x in range(0, end_x, tile_x):
             tiled_fn[tile_x, tile_y](x, y)
@@ -155,21 +156,18 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
 
                 vectorize[dot, nelts, size=tile_x]()
 
-        # We hardcode the tile factor to be 4.
-        alias tile_size = 4
-        tile[calc_tile, nelts * tile_size, tile_size](C.cols, B.rows)
+        tile[calc_tile, tile_n, tile_k](C.cols, B.rows)
 
     parallelize[calc_row](C.rows, C.rows)
 
 
 # Unroll the vectorized loop by a constant factor.
 fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
-    alias tile_size = 4
-
     @parameter
     fn calc_row(m: Int):
         @parameter
         fn calc_tile[tile_x: Int, tile_y: Int](x: Int, y: Int):
+            @unroll(tile_y)
             for k in range(y, y + tile_y):
 
                 @parameter
@@ -186,7 +184,7 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
                 alias unroll_factor = tile_x // nelts
                 vectorize[dot, nelts, tile_x, unroll_factor]()
 
-        tile[calc_tile, nelts * tile_size, tile_size](C.cols, B.rows)
+        tile[calc_tile, tile_n, tile_k](C.cols, B.rows)
 
     parallelize[calc_row](C.rows, C.rows)
 
@@ -238,8 +236,6 @@ fn test_matrix_equal[
 
 
 fn test_all() raises:
-    constrained[M == N, "M and N must be equal for matrix multiplication"]()
-
     let A = Matrix[M, K].rand()
     let B = Matrix[K, N].rand()
     var C = Matrix[M, N]()
@@ -261,6 +257,9 @@ fn test_all() raises:
 
 
 fn main() raises:
+    constrained[N % tile_n == 0, "N must be a multiple of tile_n"]()
+    constrained[K % tile_k == 0, "K must be a multiple of tile_k"]()
+
     test_all()
     print("CPU Results\n")
     let python_gflops = run_matmul_python()
