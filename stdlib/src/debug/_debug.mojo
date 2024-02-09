@@ -12,7 +12,7 @@ fn trap():
     """Calls a target dependent trap instruction. If the target does not have a
     trap instruction, this intrinsic will be lowered to a call of the abort()
     function."""
-    llvm_intrinsic["llvm.trap", NoneType]()
+    __mlir_op.`llvm.intr.trap`()
 
 
 @always_inline("nodebug")
@@ -21,11 +21,11 @@ fn trap[T: Stringable](message: T):
     If the target does not have a trap instruction, this intrinsic will be
     lowered to a call of the abort() function."""
     print(message)
-    llvm_intrinsic["llvm.trap", NoneType]()
+    __mlir_op.`llvm.intr.trap`()
 
 
 @always_inline("nodebug")
 fn debug_trap():
     """Cause an execution trap with the intention of requesting the attention
     of a debugger."""
-    llvm_intrinsic["llvm.debugtrap", NoneType]()
+    __mlir_op.`llvm.intr.debugtrap`()
