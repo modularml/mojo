@@ -197,64 +197,6 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
     parallelize[calc_row](C.rows, C.rows)
 
 
-# Perform 2D tiling on the iteration space defined by end_x and end_y, parallelizing over y.
-fn tile_parallel[
-    tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int
-](end_x: Int, end_y: Int):
-    # Note: this assumes that ends are multiples of the tiles.
-    @parameter
-    fn row(yo: Int):
-        let y = tile_y * yo
-        for x in range(0, end_x, tile_x):
-            tiled_fn[tile_x, tile_y](x, y)
-
-    parallelize[row](end_y // tile_y, M)
-
-
-# Use stack allocation for tiles to accumulate values efficiently,
-# avoiding repeated reads and writes to memory. Also reorder the loops
-# and do not fully unroll the loop over the reduction dimension.
-fn matmul_accumulated(inout C: Matrix, A: Matrix, B: Matrix):
-    alias tile_k = 8
-    alias tile_k_unroll = 8
-    alias tile_i = 32
-    alias tile_j = nelts * 4
-
-    @parameter
-    fn calc_tile[tile_j: Int, tile_i: Int](jo: Int, io: Int):
-        # Allocate the tile of accumulators on the stack.
-        var accumulators = Matrix(
-            tile_i, tile_j, stack_allocation[tile_i * tile_j, type]()
-        )
-
-        for ko in range(0, A.cols, tile_k * tile_k_unroll):
-            for _ in range(tile_i):
-                for i in range(tile_k):
-
-                    @unroll
-                    for k in range(tile_k_unroll):
-
-                        @parameter
-                        fn calc_tile_cols[nelts: Int](j: Int):
-                            accumulators.store[nelts](
-                                i,
-                                j,
-                                accumulators.load[nelts](i, j)
-                                + A[io + i, ko + k]
-                                * B.load[nelts](ko + k, jo + j),
-                            )
-
-                        alias unroll_factor = tile_j // nelts
-                        vectorize[calc_tile_cols, nelts, unroll_factor](tile_j)
-
-        # Copy the local tile to the output
-        for i in range(tile_i):
-            for j in range(tile_j):
-                C[io + i, jo + j] = accumulators[i, j]
-
-    tile_parallel[calc_tile, tile_j, tile_i](C.cols, C.rows)
-
-
 @always_inline
 fn bench[
     func: fn (inout Matrix, Matrix, Matrix) -> None, name: StringLiteral
@@ -314,8 +256,6 @@ fn test_all() raises:
         raise Error("Tiled output incorrect")
     if test[matmul_unrolled](A, B) != result:
         raise Error("Unroll output incorrect")
-    if test[matmul_accumulated](A, B) != result:
-        raise Error("Loop reorder output incorrect")
 
     A.data.free()
     B.data.free()
@@ -333,4 +273,3 @@ fn main() raises:
     bench[matmul_parallelized, "Parallelized:"](python_gflops, numpy_gflops)
     bench[matmul_tiled, "Tiled:"](python_gflops, numpy_gflops)
     bench[matmul_unrolled, "Unrolled:"](python_gflops, numpy_gflops)
-    bench[matmul_accumulated, "Accumulated:"](python_gflops, numpy_gflops)
