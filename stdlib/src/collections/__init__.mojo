@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the collections package."""
 
-from .dict import Dict, EqualityComparable, KeyElement
+from .dict import Dict, KeyElement
 from .optional import Optional
 from .set import Set
 from .vector import DynamicVector, CollectionElement

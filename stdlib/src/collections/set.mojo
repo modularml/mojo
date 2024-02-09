@@ -10,7 +10,6 @@ from .dict import (
     KeyElement,
     _DictKeyIter,
     _DictEntryIter,
-    EqualityComparable,
 )
 
 

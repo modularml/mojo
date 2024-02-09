@@ -6,7 +6,6 @@
 # RUN: %mojo -debug-level full %s
 
 from collections.set import Set
-from collections.dict import EqualityComparable
 
 from testing import *
 
