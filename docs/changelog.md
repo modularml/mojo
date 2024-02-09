@@ -225,6 +225,10 @@ for x in v:
   but 1 was specified`) the missing arguments are now described by
   name (e.g. `missing 2 required positional arguments: 'b', 'c'`).
 
+- The `mojo package` command now produces compilation agnostic packages.
+  Compilation options such as O0, or --debug-level, are no longer needed or
+  accepted. As a result, packages are now extremely portable and smaller.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
