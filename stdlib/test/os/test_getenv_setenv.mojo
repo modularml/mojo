@@ -4,7 +4,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: linux || darwin
-# RUN: TEST_MYVAR=MyValue mojo %s | FileCheck %s
+# RUN: TEST_MYVAR=MyValue %mojo -debug-level full %s | FileCheck %s
 
 from os import getenv, setenv
 
