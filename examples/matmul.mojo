@@ -31,30 +31,24 @@ alias K = 4096
 alias type = DType.float32
 
 
-struct Matrix:
+struct Matrix[rows: Int, cols: Int]:
     var data: DTypePointer[type]
-    var rows: Int
-    var cols: Int
 
     # Initialize zeroeing all values
-    fn __init__(inout self, rows: Int, cols: Int):
+    fn __init__(inout self):
         self.data = DTypePointer[type].alloc(rows * cols)
         memset_zero(self.data, rows * cols)
-        self.rows = rows
-        self.cols = cols
 
     # Initialize taking a pointer, don't set any elements
-    fn __init__(inout self, rows: Int, cols: Int, data: DTypePointer[type]):
+    fn __init__(inout self, data: DTypePointer[type]):
         self.data = data
-        self.rows = rows
-        self.cols = cols
 
     ## Initialize with random values
     @staticmethod
-    fn rand(rows: Int, cols: Int) -> Self:
+    fn rand() -> Self:
         let data = DTypePointer[type].alloc(rows * cols)
         rand(data, rows * cols)
-        return Self(rows, cols, data)
+        return Self(data)
 
     fn __getitem__(self, y: Int, x: Int) -> SIMD[type, 1]:
         return self.load[1](y, x)
@@ -98,7 +92,7 @@ fn matmul_naive(inout C: Matrix, A: Matrix, B: Matrix):
 
 
 # Mojo has SIMD vector types, we can vectorize the Matmul code as follows.
-alias nelts = simdwidthof[type]()  # The SIMD vector width.
+alias nelts = simdwidthof[type]() * 2  # The SIMD vector width.
 
 
 # Using stdlib vectorize function
@@ -112,7 +106,7 @@ fn matmul_vectorized(inout C: Matrix, A: Matrix, B: Matrix):
                     m, n, C.load[nelts](m, n) + A[m, k] * B.load[nelts](k, n)
                 )
 
-            vectorize[dot, nelts](C.cols)
+            vectorize[dot, nelts, size = C.cols]()
 
 
 # Parallelize the code by using the builtin parallelize function
@@ -127,7 +121,7 @@ fn matmul_parallelized(inout C: Matrix, A: Matrix, B: Matrix):
                     m, n, C.load[nelts](m, n) + A[m, k] * B.load[nelts](k, n)
                 )
 
-            vectorize[dot, nelts](C.cols)
+            vectorize[dot, nelts, size = C.cols]()
 
     parallelize[calc_row](C.rows, C.rows)
 
@@ -159,7 +153,7 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
                         + A[m, k] * B.load[nelts](k, n + x),
                     )
 
-                vectorize[dot, nelts](tile_x)
+                vectorize[dot, nelts, size=tile_x]()
 
         # We hardcode the tile factor to be 4.
         alias tile_size = 4
@@ -201,9 +195,9 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
 fn bench[
     func: fn (inout Matrix, Matrix, Matrix) -> None, name: StringLiteral
 ](base_gflops: Float64, numpy_gflops: Float64) raises:
-    var A = Matrix.rand(M, K)
-    var B = Matrix.rand(K, N)
-    var C = Matrix(M, N)
+    var A = Matrix[M, K].rand()
+    var B = Matrix[K, N].rand()
+    var C = Matrix[M, N]()
 
     @always_inline
     @parameter
@@ -234,7 +228,7 @@ fn test_matrix_equal[
     """Runs a matmul function on A and B and tests the result for equality with
     C on every element.
     """
-    var result = Matrix(M, N)
+    var result = Matrix[M, N]()
     _ = func(result, A, B)
     for i in range(C.rows):
         for j in range(C.cols):
@@ -246,9 +240,9 @@ fn test_matrix_equal[
 fn test_all() raises:
     constrained[M == N, "M and N must be equal for matrix multiplication"]()
 
-    let A = Matrix.rand(M, K)
-    let B = Matrix.rand(K, N)
-    var C = Matrix(M, N)
+    let A = Matrix[M, K].rand()
+    let B = Matrix[K, N].rand()
+    var C = Matrix[M, N]()
 
     matmul_naive(C, A, B)
 
