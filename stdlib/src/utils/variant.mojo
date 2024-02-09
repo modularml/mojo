@@ -43,7 +43,7 @@ from memory.unsafe import emplace_ref_unsafe
 struct _UnionSize[*Ts: CollectionElement]():
     @staticmethod
     fn compute() -> Int:
-        var size = 0
+        var size = 1
 
         @parameter
         fn each[i: Int]():

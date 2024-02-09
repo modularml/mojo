@@ -93,12 +93,12 @@ fn _create_array[
 fn _static_tuple_construction_checks[size: Int]():
     """Checks if the properties in `StaticTuple` are valid.
 
-    Validity right now is just ensuring the number of elements is >= 0.
+    Validity right now is just ensuring the number of elements is > 0.
 
     Parameters:
       size: The number of elements.
     """
-    constrained[size >= 0, "number of elements in `StaticTuple` must be >= 0"]()
+    constrained[size > 0, "number of elements in `StaticTuple` must be > 0"]()
 
 
 @value
