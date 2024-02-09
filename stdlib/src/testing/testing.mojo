@@ -73,9 +73,7 @@ fn assert_equal(lhs: Int, rhs: Int) raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise Error(
-            "AssertionError: " + String(lhs) + " is not equal to " + String(rhs)
-        )
+        raise _assert_equal_error(String(lhs), String(rhs))
 
 
 @always_inline
@@ -91,7 +89,7 @@ fn assert_equal(lhs: String, rhs: String) raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise Error("AssertionError: " + lhs + " is not equal to " + rhs)
+        raise _assert_equal_error(lhs, rhs)
 
 
 @always_inline
@@ -113,9 +111,7 @@ fn assert_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise Error(
-            "AssertionError: " + String(lhs) + " is not equal to " + String(rhs)
-        )
+        raise _assert_equal_error(String(lhs), String(rhs))
 
 
 @always_inline
@@ -213,6 +209,15 @@ fn assert_almost_equal[
             + " with a diff of "
             + abs(lhs - rhs)
         )
+
+
+fn _assert_equal_error(lhs: String, rhs: String) raises -> Error:
+    raise Error(
+        "AssertionError: `left == right` comparison failed:\n   left: "
+        + lhs
+        + "\n  right: "
+        + rhs
+    )
 
 
 struct assert_raises:
