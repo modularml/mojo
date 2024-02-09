@@ -9,7 +9,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from builtin.hash import _hash_simd
-from debug.lldb import lldb_formatter_wrapping_type
+from debug.visualizers import lldb_formatter_wrapping_type
 from utils.index import StaticIntTuple
 from collections.vector import CollectionElement
 from collections.dict import KeyElement

@@ -6,4 +6,4 @@
 """Implements the debug package."""
 
 from ._debug import debug_trap, trap
-from .lldb import lldb_formatter_wrapping_type
+from .visualizers import lldb_formatter_wrapping_type
