@@ -73,7 +73,7 @@ fn assert_equal(lhs: Int, rhs: Int) raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(String(lhs), String(rhs))
+        raise _assert_equal_error(str(lhs), str(rhs))
 
 
 @always_inline
@@ -111,7 +111,7 @@ fn assert_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(String(lhs), String(rhs))
+        raise _assert_equal_error(str(lhs), str(rhs))
 
 
 @always_inline
@@ -128,7 +128,7 @@ fn assert_not_equal(lhs: Int, rhs: Int) raises:
     """
     if lhs == rhs:
         raise Error(
-            "AssertionError: " + String(lhs) + " is not equal to " + String(rhs)
+            "AssertionError: " + str(lhs) + " is not equal to " + str(rhs)
         )
 
 
@@ -168,7 +168,7 @@ fn assert_not_equal[
     """
     if lhs == rhs:
         raise Error(
-            "AssertionError: " + String(lhs) + " is not equal to " + String(rhs)
+            "AssertionError: " + str(lhs) + " is not equal to " + str(rhs)
         )
 
 
@@ -203,9 +203,9 @@ fn assert_almost_equal[
     if not almost_equal:
         raise Error(
             "AssertionError: "
-            + String(lhs)
+            + str(lhs)
             + " is not close to "
-            + String(rhs)
+            + str(rhs)
             + " with a diff of "
             + abs(lhs - rhs)
         )
