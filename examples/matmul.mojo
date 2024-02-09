@@ -228,16 +228,19 @@ fn bench[
 
 
 @always_inline
-fn test[
+fn test_matrix_equal[
     func: fn (inout Matrix, Matrix, Matrix) -> None
-](A: Matrix, B: Matrix) raises -> SIMD[type, 1]:
-    var C = Matrix(M, N)
-    _ = func(C, A, B)
-    var result = SIMD[type, 1]()
+](inout C: Matrix, A: Matrix, B: Matrix) raises -> SIMD[type, 1]:
+    """Runs a matmul function on A and B and tests the result for equality with
+    C on every element.
+    """
+    var result = Matrix(M, N)
+    _ = func(result, A, B)
     for i in range(C.rows):
         for j in range(C.cols):
-            result += C[i, j]
-    return result
+            if C[i, j] != result[i, j]:
+                return False
+    return True
 
 
 fn test_all() raises:
@@ -245,25 +248,26 @@ fn test_all() raises:
 
     let A = Matrix.rand(M, K)
     let B = Matrix.rand(K, N)
+    var C = Matrix(M, N)
 
-    let result = test[matmul_naive](A, B)
+    matmul_naive(C, A, B)
 
-    if test[matmul_vectorized](A, B) != result:
-        raise Error("Vectorize output does not match")
-    if test[matmul_parallelized](A, B) != result:
-        raise Error("Parallelize output incorrect")
-    if test[matmul_tiled](A, B) != result:
-        raise Error("Tiled output incorrect")
-    if test[matmul_unrolled](A, B) != result:
-        raise Error("Unroll output incorrect")
+    if not test_matrix_equal[matmul_vectorized](C, A, B):
+        raise Error("Vectorize output does not match naive implementation")
+    if not test_matrix_equal[matmul_parallelized](C, A, B):
+        raise Error("Parallelize output does not match naive implementation")
+    if not test_matrix_equal[matmul_tiled](C, A, B):
+        raise Error("Tiled output does not match naive implementation")
+    if not test_matrix_equal[matmul_unrolled](C, A, B):
+        raise Error("Unroll output does not match naive implementation")
 
     A.data.free()
     B.data.free()
+    C.data.free()
 
 
 fn main() raises:
-    # Uncomment below to test correctness of Matmuls
-    # test_all()
+    test_all()
     print("CPU Results\n")
     let python_gflops = run_matmul_python()
     let numpy_gflops = run_matmul_numpy()
