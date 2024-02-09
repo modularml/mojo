@@ -88,6 +88,9 @@ fn test_print():
     # CHECK: [-943274556, -875902520, -808530484, -741158448]
     print(SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448))
 
+    # CHECK: bad
+    print(Error("bad"))
+
 
 # CHECK-LABEL: test_issue_20421
 fn test_issue_20421():

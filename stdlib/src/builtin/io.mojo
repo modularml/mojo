@@ -378,6 +378,11 @@ fn print():
     put_new_line()
 
 
+# These specific overloads are defined for twofold:
+# 1. Reduce binary size
+# 2. The `Stringable` path in variadic print doesn't work on GPUs.
+
+
 @no_inline
 fn print(t: DType):
     """Prints a DType.
