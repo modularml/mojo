@@ -23,7 +23,7 @@ from utils.static_tuple import StaticTuple
 from collections.vector import DynamicVector
 from collections.dict import KeyElement
 
-from .io import _snprintf, _snprintf_scalar
+from .io import _snprintf, _snprintf_scalar, _StringableTuple
 from .range import _StridedRange
 
 # ===----------------------------------------------------------------------===#
@@ -517,14 +517,17 @@ struct String(Sized, Stringable, KeyElement, Boolable):
             The joined string.
         """
         if len(elems) == 0:
-            return String("")
+            return ""
         var curr = String(elems[0])
         for i in range(1, len(elems)):
             curr += self + String(elems[i])
         return curr
 
-    fn join(self, *elems: Int) -> String:
-        """Joins integer elements using the current string as a delimiter.
+    fn join[*Stringables: Stringable](self, *elems: *Stringables) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            Stringables: The Stringable types.
 
         Args:
             elems: The input values.
@@ -532,29 +535,21 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         Returns:
             The joined string.
         """
-        if len(elems) == 0:
+        alias types = VariadicList(Stringables)
+        alias count = len(types)
+
+        var args = _StringableTuple(elems)
+
+        if count == 0:
             return ""
 
-        var result = String(elems[0])
-        for i in range(1, len(elems)):
-            result += self + String(elems[i])
-        return result
+        var result = str(args._at[0]())
 
-    fn join(self, *strs: String) -> String:
-        """Joins string elements using the current string as a delimiter.
+        @parameter
+        fn each[i: Int]():
+            result = result + self + str(args._at[i + 1]())
 
-        Args:
-            strs: The input values.
-
-        Returns:
-            The joined string.
-        """
-        if len(strs) == 0:
-            return ""
-
-        var result: String = strs[0]
-        for i in range(1, len(strs)):
-            result = result + self + strs[i]
+        unroll[each, count - 1]()
         return result
 
     fn _strref_dangerous(self) -> StringRef:

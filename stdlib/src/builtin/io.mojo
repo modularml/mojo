@@ -561,7 +561,7 @@ fn print(err: Error):
 # ===----------------------------------------------------------------------=== #
 
 
-struct _StringableTuple[*Ts: Stringable]:
+struct _StringableTuple[*Ts: Stringable](Sized):
     alias _type = __mlir_type[
         `!kgen.pack<:variadic<`, Stringable, `> `, Ts, `>`
     ]
@@ -585,14 +585,20 @@ struct _StringableTuple[*Ts: Stringable]:
             )
 
     fn _print[i: Int](inout self):
+        _put(" ")
+        _put(self._at[i]())
+
+    fn _at[i: Int](inout self) -> String:
         alias offset = Self._offset[i]()
         let addr = Pointer.address_of(self).bitcast[Int8]().offset(offset)
         let ptr = __mlir_op.`pop.pointer.bitcast`[
             _type = __mlir_type[`!kgen.pointer<:`, Stringable, ` `, Ts[i], `>`]
         ](addr.address)
 
-        _put(" ")
-        _put(__get_address_as_lvalue(ptr).__str__())
+        return str(__get_address_as_lvalue(ptr))
+
+    fn __len__(self) -> Int:
+        return len(VariadicList(Ts))
 
 
 fn _print_elements[

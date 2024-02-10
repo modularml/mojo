@@ -96,6 +96,10 @@ fn test_string_join() raises:
     let s1 = sep.join(s0, s0, s0, s0)
     assert_equal("abc,abc,abc,abc", s1)
 
+    assert_equal(sep.join(1, 2, 3), "1,2,3")
+
+    assert_equal(sep.join(1, "abc", 3), "1,abc,3")
+
 
 fn test_stringref() raises:
     let a = StringRef("AAA")
