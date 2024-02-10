@@ -10,7 +10,6 @@ from math import mul
 from algorithm import elementwise
 from memory import stack_allocation
 from memory.buffer import Buffer, NDBuffer
-from runtime.llcl import Runtime
 from NN.Slice import slice_as_copy, slice_as_view
 
 from utils.index import Index, StaticIntTuple
@@ -29,10 +28,9 @@ fn print_elements[type: DType, in_rank: Int](tensor: NDBuffer[type, in_rank]):
         let index = rebind[StaticIntTuple[in_rank]](idx)
         print(tensor[index])
 
-    with Runtime(1) as runtime:
-        elementwise[in_rank, 1, print_elements_lambda](
-            rebind[StaticIntTuple[in_rank]](tensor.dynamic_shape),
-        )
+    elementwise[in_rank, 1, print_elements_lambda](
+        rebind[StaticIntTuple[in_rank]](tensor.dynamic_shape),
+    )
 
 
 # slice_dim
@@ -103,30 +101,29 @@ fn test_slice[
             rebind[StaticIntTuple[outer_rank]](sliced.dynamic_shape),
         )
 
-        with Runtime(1) as runtime:
-            slice_as_copy[dtype, DType.index, outer_rank](
-                rebind[
-                    NDBuffer[
-                        dtype, outer_rank, DimList.create_unknown[outer_rank]()
-                    ]
-                ](output_buffer),
-                rebind[
-                    NDBuffer[
-                        dtype, outer_rank, DimList.create_unknown[outer_rank]()
-                    ]
-                ](in_tensor),
-                start_tensor,
-                end_tensor,
-                step_tensor,
-            )
+        slice_as_copy[dtype, DType.index, outer_rank](
+            rebind[
+                NDBuffer[
+                    dtype, outer_rank, DimList.create_unknown[outer_rank]()
+                ]
+            ](output_buffer),
+            rebind[
+                NDBuffer[
+                    dtype, outer_rank, DimList.create_unknown[outer_rank]()
+                ]
+            ](in_tensor),
+            start_tensor,
+            end_tensor,
+            step_tensor,
+        )
 
-            print_elements[dtype, outer_rank](
-                rebind[
-                    NDBuffer[
-                        dtype, outer_rank, DimList.create_unknown[outer_rank]()
-                    ]
-                ](output_buffer)
-            )
+        print_elements[dtype, outer_rank](
+            rebind[
+                NDBuffer[
+                    dtype, outer_rank, DimList.create_unknown[outer_rank]()
+                ]
+            ](output_buffer)
+        )
 
 
 # CHECK-LABEL: == test_slice_basic
