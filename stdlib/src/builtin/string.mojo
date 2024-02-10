@@ -453,6 +453,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         return not (self == other)
 
     # "str1"+"str2" -> "str1str2"
+    @always_inline
     fn __add__(self, other: String) -> String:
         """Creates a string by appending another string at the end.
 
@@ -484,6 +485,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         buffer[total_len] = 0
         return Self(buffer ^)
 
+    @always_inline
     fn __radd__(self, other: String) -> String:
         """Creates a string by prepending another string to the start.
 
@@ -495,6 +497,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         """
         return other + self
 
+    @always_inline
     fn __iadd__(inout self, other: String):
         """Appends another string to this string.
 
