@@ -27,7 +27,7 @@ struct Atomic[type: DType]:
         type: DType of the value.
     """
 
-    var value: SIMD[type, 1]
+    var value: Scalar[type]
     """The atomic value.
 
     This is the underlying value of the atomic. Access to the value can only
@@ -35,7 +35,7 @@ struct Atomic[type: DType]:
     """
 
     @always_inline
-    fn __init__(inout self, value: SIMD[type, 1]):
+    fn __init__(inout self, value: Scalar[type]):
         """Constructs a new atomic value.
 
         Args:
@@ -50,13 +50,13 @@ struct Atomic[type: DType]:
         Args:
             value: Initial value represented as `mlir.index` type.
         """
-        self.__init__(SIMD[type, 1](value))
+        self.__init__(Scalar[type](value))
 
     @staticmethod
     @always_inline
     fn _fetch_add(
-        ptr: Pointer[SIMD[type, 1]], rhs: SIMD[type, 1]
-    ) -> SIMD[type, 1]:
+        ptr: Pointer[Scalar[type]], rhs: Scalar[type]
+    ) -> Scalar[type]:
         """Performs atomic in-place add.
 
         Atomically replaces the current value with the result of arithmetic
@@ -82,7 +82,7 @@ struct Atomic[type: DType]:
         )
 
     @always_inline
-    fn fetch_add(inout self, rhs: SIMD[type, 1]) -> SIMD[type, 1]:
+    fn fetch_add(inout self, rhs: Scalar[type]) -> Scalar[type]:
         """Performs atomic in-place add.
 
         Atomically replaces the current value with the result of arithmetic
@@ -101,7 +101,7 @@ struct Atomic[type: DType]:
         return Self._fetch_add(value_addr, rhs)
 
     @always_inline
-    fn __iadd__(inout self, rhs: SIMD[type, 1]):
+    fn __iadd__(inout self, rhs: Scalar[type]):
         """Performs atomic in-place add.
 
         Atomically replaces the current value with the result of arithmetic
@@ -116,7 +116,7 @@ struct Atomic[type: DType]:
         _ = self.fetch_add(rhs)
 
     @always_inline
-    fn fetch_sub(inout self, rhs: SIMD[type, 1]) -> SIMD[type, 1]:
+    fn fetch_sub(inout self, rhs: Scalar[type]) -> Scalar[type]:
         """Performs atomic in-place sub.
 
         Atomically replaces the current value with the result of arithmetic
@@ -139,7 +139,7 @@ struct Atomic[type: DType]:
         ](value_addr.address, rhs.value)
 
     @always_inline
-    fn __isub__(inout self, rhs: SIMD[type, 1]):
+    fn __isub__(inout self, rhs: Scalar[type]):
         """Performs atomic in-place sub.
 
         Atomically replaces the current value with the result of arithmetic
@@ -155,7 +155,7 @@ struct Atomic[type: DType]:
 
     @always_inline
     fn _compare_exchange_weak(
-        inout self, expected: SIMD[type, 1], desired: SIMD[type, 1]
+        inout self, expected: Scalar[type], desired: Scalar[type]
     ) -> Bool:
         constrained[
             type.is_integral() or type.is_floating_point(),
@@ -203,7 +203,7 @@ struct Atomic[type: DType]:
         )
 
     @always_inline
-    fn max(inout self, rhs: SIMD[type, 1]):
+    fn max(inout self, rhs: Scalar[type]):
         """Performs atomic in-place max.
 
         Atomically replaces the current value with the result of max of the
@@ -230,7 +230,7 @@ struct Atomic[type: DType]:
         ](value_addr.address, rhs.value)
 
     @always_inline
-    fn min(inout self, rhs: SIMD[type, 1]):
+    fn min(inout self, rhs: Scalar[type]):
         """Performs atomic in-place min.
 
         Atomically replaces the current value with the result of min of the
