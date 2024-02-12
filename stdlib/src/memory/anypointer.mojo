@@ -13,6 +13,7 @@ from memory.anypointer import AnyPointer
 """
 
 from sys.info import alignof, sizeof
+from sys.intrinsics import _mlirtype_is_eq
 
 
 @register_passable("trivial")
@@ -39,6 +40,18 @@ struct AnyPointer[T: Movable](Boolable):
         return Self {
             value: __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
         }
+
+    @always_inline
+    fn __init__(value: Self.pointer_type) -> Self:
+        """Create a pointer with the input value.
+
+        Args:
+            value: The input pointer to construct with.
+
+        Returns:
+            A null pointer.
+        """
+        return Self {value: value}
 
     @staticmethod
     @always_inline
@@ -68,16 +81,34 @@ struct AnyPointer[T: Movable](Boolable):
         Returns:
             An AnyPointer which contains the address of the argument.
         """
-        return Self {
-            value: __mlir_op.`pop.pointer.bitcast`[_type = Self.pointer_type](
-                __mlir_op.`lit.ref.to_pointer`(__get_ref_from_value(arg))
-            )
-        }
+        return __mlir_op.`pop.pointer.bitcast`[_type = Self.pointer_type](
+            __mlir_op.`lit.ref.to_pointer`(__get_ref_from_value(arg))
+        )
 
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
         __mlir_op.`pop.aligned_free`(self.value)
+
+    @always_inline
+    fn bitcast[new_type: Movable](self) -> AnyPointer[new_type]:
+        """Bitcasts the pointer to a different type.
+
+        Parameters:
+            new_type: The target type.
+
+        Returns:
+            A new pointer with the specified type and the same address, as
+            the original pointer.
+        """
+
+        @parameter
+        if _mlirtype_is_eq[T, new_type]():
+            return rebind[AnyPointer[new_type]](self)
+
+        return __mlir_op.`pop.pointer.bitcast`[
+            _type = AnyPointer[new_type].pointer_type
+        ](self.value)
 
     @always_inline
     fn take_value(self) -> T:

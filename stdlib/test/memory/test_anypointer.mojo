@@ -86,6 +86,16 @@ def test_address_of():
     assert_not_equal(0, AnyPointer[Int].address_of(local).__as_index())
 
 
+def test_bitcast():
+    let local = 1
+    let ptr = AnyPointer[Int].address_of(local)
+    let aliased_ptr = ptr.bitcast[SIMD[DType.uint8, 4]]()
+
+    assert_equal(ptr.__as_index(), ptr.bitcast[Int]().__as_index())
+
+    assert_equal(ptr.__as_index(), aliased_ptr.__as_index())
+
+
 def main():
     test_address_of()
 
@@ -94,3 +104,5 @@ def main():
 
     test_anypointer_of_move_only_type()
     test_anypointer_move_into_move_count()
+
+    test_bitcast()

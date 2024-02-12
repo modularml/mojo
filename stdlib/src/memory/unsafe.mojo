@@ -76,6 +76,26 @@ fn bitcast[
 
 @always_inline("nodebug")
 fn bitcast[
+    new_type: Movable, src_type: Movable
+](ptr: AnyPointer[src_type]) -> AnyPointer[new_type]:
+    """Bitcasts an AnyPointer to a different type.
+
+    Parameters:
+        new_type: The target type.
+        src_type: The source type.
+
+    Args:
+        ptr: The source pointer.
+
+    Returns:
+        A new Pointer with the specified type and the same address, as the
+        original Pointer.
+    """
+    return ptr.bitcast[new_type]()
+
+
+@always_inline("nodebug")
+fn bitcast[
     new_type: AnyRegType, src_type: AnyRegType, address_space: AddressSpace
 ](ptr: Pointer[src_type, address_space]) -> Pointer[new_type, address_space]:
     """Bitcasts a Pointer to a different type.
