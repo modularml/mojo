@@ -27,10 +27,8 @@ alias _SERIALIZATION_HEADER = StaticTuple[6, Int8](
 
 
 fn _serialize_elements_compact[
-    type: DType,
-    address_space: AddressSpace,
     serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
-](ptr: DTypePointer[type, address_space], len: Int):
+](ptr: DTypePointer, len: Int):
     serialize_fn(_kStartTensorMarker)
     if len < _kCompactMaxElemsToPrint:
         _serialize_elements_complete[serialize_fn=serialize_fn](ptr, len)
@@ -49,10 +47,8 @@ fn _serialize_elements_compact[
 
 
 fn _serialize_elements_complete[
-    type: DType,
-    address_space: AddressSpace,
     serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
-](ptr: DTypePointer[type, address_space], len: Int):
+](ptr: DTypePointer, len: Int):
     if len == 0:
         return
     serialize_fn(ptr.load())
@@ -62,11 +58,9 @@ fn _serialize_elements_complete[
 
 
 fn _serialize_elements[
-    type: DType,
-    address_space: AddressSpace,
-    compact: Bool,
     serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
-](ptr: DTypePointer[type, address_space], len: Int):
+    compact: Bool = False,
+](ptr: DTypePointer, len: Int):
     @parameter
     if compact:
         _serialize_elements_compact[serialize_fn=serialize_fn](ptr, len)
@@ -75,13 +69,11 @@ fn _serialize_elements[
 
 
 fn _serialize[
-    type: DType,
-    address_space: AddressSpace,
     serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
     serialize_dtype: Bool = True,
     serialize_shape: Bool = True,
     serialize_end_line: Bool = True,
-](ptr: DTypePointer[type, address_space], shape: TensorShape):
+](ptr: DTypePointer, shape: TensorShape):
     let rank = shape.rank()
     if rank == 0:
         if serialize_end_line:
@@ -129,7 +121,7 @@ fn _serialize[
             if row_idx > 0:
                 serialize_fn("\n")
 
-            _serialize_elements[compact=True, serialize_fn=serialize_fn](
+            _serialize_elements[serialize_fn=serialize_fn, compact=True](
                 ptr
                 + matrix_idx * matrix_elem_count
                 + row_idx * column_elem_count,
@@ -170,7 +162,7 @@ fn _serialize[
 
     if serialize_dtype:
         serialize_fn(", dtype=")
-        serialize_fn(type)
+        serialize_fn(ptr.type)
     if serialize_shape:
         serialize_fn(", shape=")
         serialize_fn(shape.__str__())
