@@ -10,6 +10,7 @@ from .memory import (
     DTypePointer,
     memcmp,
     memcpy,
+    parallel_memcpy,
     memset_zero,
     memset,
     Pointer,

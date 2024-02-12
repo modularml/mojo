@@ -16,7 +16,9 @@ from memory import memcmp
 from sys import llvm_intrinsic
 from sys.info import sizeof, triple_is_nvidia_cuda
 
-from algorithm import vectorize
+from algorithm import vectorize, sync_parallelize
+from math import min, div_ceil
+from runtime.llcl import Runtime
 
 from utils.list import Dim
 
@@ -230,6 +232,84 @@ fn memcpy[
 
     # Copy in 32-bit chunks
     vectorize[_copy, 32](n)
+
+
+fn parallel_memcpy[
+    type: DType
+](
+    dest: DTypePointer[type],
+    src: DTypePointer[type],
+    count: Int,
+    count_per_task: Int,
+    num_tasks: Int,
+):
+    """Copies `count` elements from a memory buffer `src` to `dest` in parallel
+    by spawning `num_tasks` tasks each copying `count_per_task` elements.
+
+    Parameters:
+        type: The element dtype.
+
+    Args:
+        dest: The destination buffer.
+        src: The source buffer.
+        count: Number of elements in the buffer.
+        count_per_task: Task size.
+        num_tasks: Number of tasks to run in parallel.
+    """
+
+    @parameter
+    @always_inline
+    fn _parallel_copy(thread_id: Int):
+        let begin = count_per_task * thread_id
+        let end = min(
+            count_per_task * (thread_id + 1),
+            count,
+        )
+        if begin >= count:
+            return
+        let to_copy = end - begin
+        if to_copy <= 0:
+            return
+
+        memcpy(dest.offset(begin), src.offset(begin), to_copy)
+
+    sync_parallelize[_parallel_copy](num_tasks)
+
+
+fn parallel_memcpy[
+    type: DType,
+](dest: DTypePointer[type], src: DTypePointer[type], count: Int):
+    """Copies `count` elements from a memory buffer `src` to `dest` in parallel.
+
+    Parameters:
+        type: The element type.
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+        count: The number of elements to copy.
+    """
+
+    # TODO: Find a heuristic to replace the magic number.
+    alias min_work_per_task = 1024
+    alias min_work_for_parallel = 4 * min_work_per_task
+
+    # If number of elements to be copied is less than minimum preset (4048),
+    # then use default memcpy.
+    if count < min_work_for_parallel:
+        memcpy(dest, src, count)
+    else:
+        let work_units = div_ceil(count, min_work_per_task)
+        let num_tasks = min(work_units, Runtime().parallelism_level())
+        let work_block_size = div_ceil(work_units, num_tasks)
+
+        parallel_memcpy[type](
+            dest,
+            src,
+            count,
+            work_block_size * min_work_per_task,
+            num_tasks,
+        )
 
 
 # ===----------------------------------------------------------------------===#
