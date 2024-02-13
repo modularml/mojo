@@ -351,7 +351,6 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         """
         return len(self) > 0
 
-    @always_inline
     fn __getitem__(self, idx: Int) -> String:
         """Gets the character at the specified position.
 
@@ -361,6 +360,9 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         Returns:
             A new string containing the character at the specified position.
         """
+        if idx < 0:
+            return self.__getitem__(len(self) + idx)
+
         debug_assert(0 <= idx < len(self), "index must be in range")
         var buf = Self._buffer_type(1)
         buf.append(self._buffer[idx])

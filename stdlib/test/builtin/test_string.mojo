@@ -155,6 +155,8 @@ fn test_string_indexing() raises:
     let str = String("Hello Mojo!!")
 
     assert_equal("H", str[0])
+    assert_equal("!", str[-1])
+    assert_equal("H", str[-len(str)])
     assert_equal("llo Mojo!!", str[2:])
     assert_equal("lo Mojo!", str[3:-1:1])
     assert_equal("lo Moj", str[3:-3])
