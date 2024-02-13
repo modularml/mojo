@@ -40,7 +40,7 @@ struct _ArcInner[T: CollectionElement]:
         return self.refcount.fetch_sub(1) - 1
 
 
-@value
+@register_passable
 struct Arc[T: CollectionElement](CollectionElement):
     """Atomic reference-counted pointer inspired by Rust Arc.
 
@@ -75,29 +75,26 @@ struct Arc[T: CollectionElement](CollectionElement):
     alias _type = _ArcInner[T]
     var _inner: Pointer[Self._type]
 
-    fn __init__(inout self, owned value: T):
+    fn __init__(owned value: T) -> Self:
         """Construct a new thread-safe, reference-counted smart pointer,
         and move the value into heap memory managed by the new pointer.
 
         Args:
             value: The value to manage.
         """
-        self._inner = Pointer[Self._type].alloc(1)
+        let self = Self {_inner: Pointer[Self._type].alloc(1)}
         __get_address_as_uninit_lvalue(self._inner.address) = Self._type(
             value ^
         )
         _ = __get_address_as_lvalue(self._inner.address).increment()
+        return self ^
 
-    fn __copyinit__(inout self, other: Self):
-        """Copy an existing reference. Increment the refcount to the object.
-
-        Args:
-            other: The existing reference to copy.
-        """
+    fn __copyinit__(other: Self) -> Self:
+        """Copy an existing reference. Increment the refcount to the object."""
         # Order here does not matter since `other` is borrowed, and can't
         # be destroyed until our copy completes.
         _ = __get_address_as_lvalue(other._inner.address).increment()
-        self._inner = other._inner
+        return Self {_inner: other._inner}
 
     fn __del__(owned self):
         """Delete the smart pointer reference.
