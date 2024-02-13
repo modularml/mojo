@@ -214,7 +214,7 @@ fn bench[
 @always_inline
 fn test_matrix_equal[
     func: fn (inout Matrix, Matrix, Matrix) -> None
-](inout C: Matrix, A: Matrix, B: Matrix) raises -> SIMD[type, 1]:
+](inout C: Matrix, A: Matrix, B: Matrix) raises -> Bool:
     """Runs a matmul function on A and B and tests the result for equality with
     C on every element.
     """
