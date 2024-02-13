@@ -63,8 +63,14 @@ fn test_suffix() raises:
     assert_equal(Path("résumé.doc").suffix(), ".doc")
 
 
+fn test_joinpath() raises:
+    assert_equal(Path(), Path().joinpath())
+    assert_equal(Path() / "some" / "dir", Path().joinpath("some", "dir"))
+
+
 def main():
     test_cwd()
     test_path()
     test_path_exists()
     test_suffix()
+    test_joinpath()

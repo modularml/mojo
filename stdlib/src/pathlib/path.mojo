@@ -108,9 +108,20 @@ struct Path(Stringable, CollectionElement):
         Returns:
           A new path with the suffix appended to the current path.
         """
+        var res = self
+        res /= suffix
+        return res
+
+    fn __itruediv__(inout self, suffix: String):
+        """Joins two paths using the system-defined path separator.
+
+        Args:
+          suffix: The suffix to append to the path.
+        """
         if self.path.endswith(DIR_SEPARATOR):
-            return self.path + suffix
-        return self.path + DIR_SEPARATOR + suffix
+            self.path += suffix
+        else:
+            self.path += DIR_SEPARATOR + suffix
 
     fn __str__(self) -> String:
         """Returns a string representation of the path.
@@ -202,3 +213,23 @@ struct Path(Stringable, CollectionElement):
             return self.path[i:]
 
         return ""
+
+    fn joinpath(self, *pathsegments: String) -> Path:
+        """Joins the Path using the pathsegments.
+
+        Args:
+            pathsegments: The path segments.
+
+        Returns:
+            The path concatination with the pathsegments using the
+            directory separator.
+        """
+        if len(pathsegments) == 0:
+            return self
+
+        var result = self
+
+        for i in range(len(pathsegments)):
+            result /= pathsegments[i]
+
+        return result
