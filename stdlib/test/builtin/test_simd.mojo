@@ -7,7 +7,7 @@
 
 from math import iota, pow
 from testing import *
-from sys.info import simdwidthof
+from sys.info import simdwidthof, has_neon
 
 
 # CHECK-LABEL: test_simd
@@ -209,6 +209,7 @@ fn test_simd_bool():
 # CHECK-LABEL: test_truthy
 def test_truthy():
     print("== test_truthy")
+
     alias dtypes = (
         DType.bool,
         DType.int8,
@@ -222,15 +223,12 @@ def test_truthy():
         DType.float16,
         DType.float32,
         DType.float64,
-        DType.bfloat16,
         DType.index,
         # DType.address  # TODO(29920)
     )
 
     @parameter
-    fn test_dtype[i: Int]() raises:
-        alias type = dtypes.get[i, DType]()
-
+    fn test_dtype[type: DType]() raises:
         # # Scalars of 0-values are false-y, 1-values are truth-y
         assert_equal(False, Scalar[type](False).__bool__())
         assert_equal(True, Scalar[type](True).__bool__())
@@ -243,7 +241,17 @@ def test_truthy():
         assert_equal(False, SIMD[type, 2](True, False).__bool__())
         assert_equal(False, SIMD[type, 2](False, False).__bool__())
 
-    unroll[test_dtype, dtypes.__len__()]()
+    @parameter
+    fn test_dtype_unrolled[i: Int]() raises:
+        alias type = dtypes.get[i, DType]()
+        test_dtype[type]()
+
+    unroll[test_dtype_unrolled, dtypes.__len__()]()
+
+    @parameter
+    if not has_neon():
+        # TODO bfloat16 is not supported on neon #30525
+        test_dtype[DType.bfloat16]()
 
 
 # CHECK-LABEL: test_floordiv
