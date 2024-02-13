@@ -76,6 +76,10 @@ fn _simd_construction_checks[type: DType, size: Int]():
     constrained[type != DType.invalid, "simd type cannot be DType.invalid"]()
     constrained[size > 0, "simd width must be > 0"]()
     constrained[size & (size - 1) == 0, "simd width must be power of 2"]()
+    constrained[
+        type != DType.bfloat16 or not has_neon(),
+        "bf16 is not supported for ARM architectures",
+    ]()
 
 
 @lldb_formatter_wrapping_type
@@ -378,15 +382,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
         elif target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
-        elif type == DType.bfloat16:
-            let cast_result = _bfloat16_to_f32(
-                rebind[SIMD[DType.bfloat16, size]](self)
-            ).cast[target]()
-            return rebind[SIMD[target, size]](cast_result)
-        elif target == DType.bfloat16:
-            return rebind[SIMD[target, size]](
-                _f32_to_bfloat16(self.cast[DType.float32]())
-            )
         elif target == DType.address:
             let index_val = __mlir_op.`pop.cast`[
                 _type = __mlir_type[`!pop.simd<`, size.value, `, index>`]
@@ -2095,80 +2090,3 @@ fn _floor[
         )
 
     return llvm_intrinsic["llvm.floor", SIMD[type, simd_width]](x)
-
-
-# ===----------------------------------------------------------------------===#
-# bfloat16
-# ===----------------------------------------------------------------------===#
-
-alias _fp32_bf16_mantissa_diff = FPUtils[
-    DType.float32
-].mantissa_width() - FPUtils[DType.bfloat16].mantissa_width()
-
-
-fn _bfloat16_to_f32_scalar(
-    val: Scalar[DType.bfloat16],
-) -> Scalar[DType.float32]:
-    let bfloat_bits = FPUtils.bitcast_to_integer(val)
-    return FPUtils[DType.float32].bitcast_from_integer(
-        bfloat_bits << _fp32_bf16_mantissa_diff
-    )
-
-
-fn _bfloat16_to_f32[
-    size: Int
-](val: SIMD[DType.bfloat16, size]) -> SIMD[DType.float32, size]:
-    @always_inline
-    @parameter
-    fn wrapper_fn[
-        input_type: DType, result_type: DType
-    ](val: SIMD[input_type, 1]) capturing -> SIMD[result_type, 1]:
-        return rebind[Scalar[result_type]](
-            _bfloat16_to_f32_scalar(rebind[Scalar[DType.bfloat16]](val))
-        )
-
-    return _simd_apply[
-        size,
-        DType.bfloat16,
-        DType.float32,
-        wrapper_fn,
-    ](val)
-
-
-fn _f32_to_bfloat16_scalar(
-    val: Scalar[DType.float32],
-) -> Scalar[DType.bfloat16]:
-    if isnan(val):
-        return -nan[DType.bfloat16]() if FPUtils.get_sign(val) else nan[
-            DType.bfloat16
-        ]()
-
-    var float_bits = FPUtils.bitcast_to_integer(val)
-
-    let lsb = (float_bits >> _fp32_bf16_mantissa_diff) & 1
-    let rounding_bias = 0x7FFF + lsb
-    float_bits += rounding_bias
-
-    let bfloat_bits = float_bits >> _fp32_bf16_mantissa_diff
-
-    return FPUtils[DType.bfloat16].bitcast_from_integer(bfloat_bits)
-
-
-fn _f32_to_bfloat16[
-    size: Int
-](val: SIMD[DType.float32, size]) -> SIMD[DType.bfloat16, size]:
-    @always_inline
-    @parameter
-    fn wrapper_fn[
-        input_type: DType, result_type: DType
-    ](val: SIMD[input_type, 1]) capturing -> SIMD[result_type, 1]:
-        return rebind[Scalar[result_type]](
-            _f32_to_bfloat16_scalar(rebind[Scalar[DType.float32]](val))
-        )
-
-    return _simd_apply[
-        size,
-        DType.float32,
-        DType.bfloat16,
-        wrapper_fn,
-    ](val)
