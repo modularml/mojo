@@ -907,7 +907,7 @@ struct Pointer[
 @register_passable("trivial")
 struct DTypePointer[
     type: DType, address_space: AddressSpace = AddressSpace.GENERIC
-](Boolable):
+](Boolable, CollectionElement):
     """Defines a `DTypePointer` struct that contains an address of the given
     dtype.
 
