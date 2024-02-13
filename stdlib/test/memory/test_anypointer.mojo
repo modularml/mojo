@@ -96,6 +96,16 @@ def test_bitcast():
     assert_equal(ptr.__as_index(), aliased_ptr.__as_index())
 
 
+def test_anypointer_string():
+    let nullptr = AnyPointer[Int]()
+    assert_equal(str(nullptr), "0x0")
+
+    let ptr = AnyPointer[Int].alloc(1)
+    assert_true(str(ptr).startswith("0x"))
+    assert_not_equal(str(ptr), "0x0")
+    ptr.free()
+
+
 def main():
     test_address_of()
 
@@ -106,3 +116,4 @@ def main():
     test_anypointer_move_into_move_count()
 
     test_bitcast()
+    test_anypointer_string()

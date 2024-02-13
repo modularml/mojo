@@ -17,7 +17,7 @@ from sys.intrinsics import _mlirtype_is_eq
 
 
 @register_passable("trivial")
-struct AnyPointer[T: Movable](Boolable):
+struct AnyPointer[T: Movable](Boolable, Stringable):
     """This is a pointer type that can point to any generic value that is
     movable.
 
@@ -183,6 +183,9 @@ struct AnyPointer[T: Movable](Boolable):
                 Scalar[DType.index](value).value
             )
         }
+
+    fn __str__(self) -> String:
+        return hex(self.__as_index())
 
     @always_inline
     fn __bool__(self) -> Bool:

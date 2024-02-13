@@ -16,7 +16,7 @@ from collections.vector import DynamicVector
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
-fn hex[T: Intable](value: T) raises -> String:
+fn hex[T: Intable](value: T) -> String:
     """Returns the hex string represention of the given integer.
 
     The hexadecimal representation is a base-16 encoding of the integer value.
@@ -32,13 +32,16 @@ fn hex[T: Intable](value: T) raises -> String:
 
     Returns:
         A string containing the hex representation of the given integer.
-
-    Raises:
-        Raises an error if there are not enough `digit_chars` to represent the
-        given integer in base 16.
     """
 
-    return _format_int(int(value), 16, prefix="0x")
+    try:
+        return _format_int(int(value), 16, prefix="0x")
+    except e:
+        # This should not be reachable as _format_int only throws if we pass
+        # incompatible radix and custom digit chars, which we aren't doing
+        # above.
+        trap("unexpected exception formatting value as hexadecimal: " + str(e))
+        return ""
 
 
 # ===----------------------------------------------------------------------===#
