@@ -61,13 +61,14 @@ fn mandelbrot_kernel_SIMD[
 
 
 fn main() raises:
-    let t = Tensor[int_type](height, width)
+    var t = Tensor[int_type](height, width)
 
     @parameter
     fn worker(row: Int):
         let scale_x = (max_x - min_x) / width
         let scale_y = (max_y - min_y) / height
 
+        @__copy_capture(scale_x, scale_y)
         @parameter
         fn compute_vector[simd_width: Int](col: Int):
             """Each time we operate on a `simd_width` vector of pixels."""
