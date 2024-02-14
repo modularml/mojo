@@ -132,6 +132,21 @@ def test_iter_items():
     assert_equal(sum, 3)
 
 
+def test_dict_copy():
+    var orig = Dict[String, Int]()
+    orig["a"] = 1
+
+    # test values copied to new Dict
+    var copy = Dict(orig)
+    assert_equal(1, copy["a"])
+
+    # test there are two copies of dict and
+    # they don't share underlying memory
+    copy["a"] = 2
+    assert_equal(2, copy["a"])
+    assert_equal(1, orig["a"])
+
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print_no_newline("Test", name_val, "...")

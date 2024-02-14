@@ -241,6 +241,9 @@ struct _DictIndex:
                 data[i] = _EMPTY
             self.data = data.bitcast[DType.invalid]()
 
+    fn __copyinit__(inout self, existing: Self):
+        self.data = existing.data
+
     fn __moveinit__(inout self, owned existing: Self):
         self.data = existing.data
 
@@ -276,7 +279,7 @@ struct _DictIndex:
         self.data.free()
 
 
-struct Dict[K: KeyElement, V: CollectionElement](Sized):
+struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     """A container that stores key-value pairs.
 
     The key type and value type must be specified statically, unlike a Python
@@ -286,7 +289,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
     `Movable`, `Hashable`, and `EqualityComparable`. It also includes
     `CollectionElement` and `Copyable` until we have references.
 
-    The value type must implemnt the `CollectionElement` trait.
+    The value type must implement the `CollectionElement` trait.
 
     Usage:
 
@@ -425,6 +428,30 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized):
         self._reserved = 8
         self._index = _DictIndex(self._reserved)
         self._entries = Self._new_entries(self._reserved)
+
+    fn __init__(inout self, existing: Self):
+        """Copy an existing dictiontary.
+
+        Args:
+            existing: The existing dict.
+        """
+        self.size = existing.size
+        self._n_entries = existing._n_entries
+        self._reserved = existing._reserved
+        self._index = existing._index
+        self._entries = existing._entries
+
+    fn __copyinit__(inout self, existing: Self):
+        """Copy an existing dictiontary.
+
+        Args:
+            existing: The existing dict.
+        """
+        self.size = existing.size
+        self._n_entries = existing._n_entries
+        self._reserved = existing._reserved
+        self._index = existing._index
+        self._entries = existing._entries
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing dict into a new one.
