@@ -93,7 +93,7 @@ struct _PyIter(Sized):
 
 
 @value
-struct PythonObject(Intable, Stringable, Sized, Boolable):
+struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
     """A Python object."""
 
     var py_object: PyObjectPtr
@@ -390,14 +390,19 @@ struct PythonObject(Intable, Stringable, Sized, Boolable):
         """
         return not (self is other)
 
-    fn __len__(self) -> Int:
+    fn __len__(self) raises -> Int:
         """Returns the length of the object.
 
         Returns:
             The length of the object.
         """
         var cpython = _get_global_python_itf().cpython()
-        return cpython.PyObject_Length(self.py_object)
+        var result = cpython.PyObject_Length(self.py_object)
+        if result == -1:
+            # TODO: Improve error message so we say
+            # "object of type 'int' has no len()" function to match Python
+            raise Error("object has no len()")
+        return result
 
     fn __getitem__(self, *args: PythonObject) raises -> PythonObject:
         """Return the value for the given key or keys.
