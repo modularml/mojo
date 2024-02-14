@@ -26,7 +26,6 @@ See the `Dict` docs for more details.
 """
 from memory.anypointer import AnyPointer
 from .optional import Optional
-from .vector import CollectionElement
 
 
 trait KeyElement(CollectionElement, Hashable, EqualityComparable):

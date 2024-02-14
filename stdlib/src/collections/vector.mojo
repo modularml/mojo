@@ -232,13 +232,6 @@ struct InlinedFixedVector[
 # ===----------------------------------------------------------------------===#
 
 
-trait CollectionElement(Movable, Copyable):
-    """A collection element is a value type that can be moved, copied, and
-    default-constructed in a collection."""
-
-    pass
-
-
 @value
 struct _DynamicVectorIter[
     T: CollectionElement,

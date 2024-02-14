@@ -9,7 +9,6 @@
 from sys.info import os_is_windows
 
 from memory import stack_allocation
-from collections.vector import CollectionElement
 from tensor import Tensor
 
 alias DIR_SEPARATOR = "\\" if os_is_windows() else "/"

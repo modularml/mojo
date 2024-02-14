@@ -6,7 +6,6 @@
 # RUN: %mojo -debug-level full %s
 
 from memory.unsafe import Pointer
-from collections.vector import CollectionElement
 from utils.variant import Variant
 from testing import *
 

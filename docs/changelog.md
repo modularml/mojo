@@ -229,6 +229,9 @@ for x in v:
   Compilation options such as O0, or --debug-level, are no longer needed or
   accepted. As a result, packages are now extremely portable and smaller.
 
+- The `CollectionElement` trait is now a built-in trait and has been
+  removed from `collections.vector`.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed

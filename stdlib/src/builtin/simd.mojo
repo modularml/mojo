@@ -22,7 +22,6 @@ from .string import _calc_initial_buffer_size, _vec_fmt
 from builtin.hash import _hash_simd
 from utils.static_tuple import StaticTuple
 from debug.visualizers import lldb_formatter_wrapping_type
-from collections.vector import CollectionElement
 
 
 # ===------------------------------------------------------------------------===#
