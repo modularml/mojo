@@ -430,7 +430,7 @@ fn emplace_ref_unsafe[
 @register_passable("trivial")
 struct Pointer[
     type: AnyRegType, address_space: AddressSpace = AddressSpace.GENERIC
-](Boolable):
+](Boolable, Stringable):
     """Defines a Pointer struct that contains the address of a register passable
     type.
 
@@ -503,6 +503,15 @@ struct Pointer[
             Constructed nullptr Pointer object.
         """
         return __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
+
+    fn __str__(self) -> String:
+        """Format this pointer as a hexadecimal string.
+
+        Returns:
+            A String containing the hexadecimal representation of the memory location
+            destination of this pointer.
+        """
+        return hex(self.__as_index())
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:

@@ -3,7 +3,7 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo -debug-level full %s
 
 from sys.info import sizeof
 
@@ -12,6 +12,8 @@ from memory.buffer import Buffer
 from memory.unsafe import DTypePointer, Pointer
 
 from utils.index import Index
+
+from testing import assert_equal, assert_not_equal, assert_true
 
 alias void = __mlir_attr.`#kgen.dtype.constant<invalid> : !kgen.dtype`
 alias int8_pop = __mlir_type.`!pop.scalar<si8>`
@@ -23,7 +25,7 @@ struct Pair:
     var hi: Int
 
 
-fn test_memcpy():
+def test_memcpy():
     print("== test_memcpy")
     var pair1 = Pair(1, 2)
     var pair2 = Pair(0, 0)
@@ -36,22 +38,20 @@ fn test_memcpy():
 
     # DTypePointer test
     memcpy(ddest, dsrc, sizeof[Pair]())
-    # CHECK: 1
-    print(pair2.lo)
-    # CHECK: 2
-    print(pair2.hi)
+
+    assert_equal(pair2.lo, 1)
+    assert_equal(pair2.hi, 2)
 
     # Pointer test
     pair2.lo = 0
     pair2.hi = 0
     memcpy(dest, src, 1)
-    # CHECK: 1
-    print(pair2.lo)
-    # CHECK: 2
-    print(pair2.hi)
+
+    assert_equal(pair2.lo, 1)
+    assert_equal(pair2.hi, 2)
 
     @parameter
-    fn _test_memcpy_buf[size: Int]():
+    def _test_memcpy_buf[size: Int]():
         let buf = Buffer[DType.uint8.value, size * 2].stack_allocation()
         buf.fill(2)
         memset_zero(buf.data + size, size)
@@ -62,8 +62,8 @@ fn test_memcpy():
 
         memcpy(dst.data, src.data, size)
         let err = memcmp(dst.data, buf.data, len(dst))
-        # CHECK: 0
-        print(err)
+
+        assert_equal(err, 0)
 
     _test_memcpy_buf[1]()
     _test_memcpy_buf[4]()
@@ -75,7 +75,7 @@ fn test_memcpy():
     _test_memcpy_buf[19]()
 
 
-fn test_memcpy_dtype():
+def test_memcpy_dtype():
     print("== test_memcpy_dtype")
     let a = DTypePointer[DType.int32].alloc(4)
     let b = DTypePointer[DType.int32].alloc(4)
@@ -83,16 +83,23 @@ fn test_memcpy_dtype():
         a[i] = i
         b[i] = -1
 
-    # CHECK: -1 -1 -1 -1
-    print(b[0], b[1], b[2], b[3])
+    assert_equal(b[0], -1)
+    assert_equal(b[1], -1)
+    assert_equal(b[2], -1)
+    assert_equal(b[3], -1)
+
     memcpy(b, a, 4)
-    # CHECK: 0 1 2 3
-    print(b[0], b[1], b[2], b[3])
+
+    assert_equal(b[0], 0)
+    assert_equal(b[1], 1)
+    assert_equal(b[2], 2)
+    assert_equal(b[3], 3)
+
     a.free()
     b.free()
 
 
-fn test_memcmp():
+def test_memcmp():
     print("== test_memcmp")
     var pair1 = Pair(1, 2)
     var pair2 = Pair(1, 2)
@@ -104,35 +111,46 @@ fn test_memcmp():
     let dptr2 = DTypePointer[DType.int8](ptr2.bitcast[int8_pop]().address)
 
     let errors1 = memcmp(dptr1, dptr2, 1)
-    # CHECK: 0
-    print(errors1)
+
+    assert_equal(errors1, 0)
+
     let errors2 = memcmp(ptr1, ptr2, 1)
-    # CHECK: 0
-    print(errors2)
+
+    assert_equal(errors2, 0)
 
 
-fn test_memset():
+def test_memset():
     print("== test_memset")
     var pair = Pair(1, 2)
 
     let ptr = Pointer.address_of(pair)
     memset_zero(ptr, 1)
-    # CHECK: 0
-    print(pair.lo)
-    # CHECK: 0
-    print(pair.hi)
+
+    assert_equal(pair.lo, 0)
+    assert_equal(pair.hi, 0)
 
     pair.lo = 1
     pair.hi = 2
     memset_zero(ptr, 1)
-    # CHECK: 0
-    print(pair.lo)
-    # CHECK: 0
-    print(pair.hi)
+
+    assert_equal(pair.lo, 0)
+    assert_equal(pair.hi, 0)
 
 
-fn main():
+def test_pointer_string():
+    let nullptr = Pointer[Int]()
+    assert_equal(str(nullptr), "0x0")
+
+    let ptr = Pointer[Int].alloc(1)
+    assert_true(str(ptr).startswith("0x"))
+    assert_not_equal(str(ptr), "0x0")
+    ptr.free()
+
+
+def main():
     test_memcpy()
     test_memcpy_dtype()
     test_memcmp()
     test_memset()
+
+    test_pointer_string()
