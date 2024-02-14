@@ -136,7 +136,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         Parameters:
             T: The type to initialize the variant to. Generally this should
-                be able to be inferred from the call type, eg. `Variant[Int, String](4)`
+                be able to be inferred from the call type, eg. `Variant[Int, String](4)`.
 
         Args:
             value: The value to initialize the variant with.

@@ -66,6 +66,9 @@ struct Bool(Stringable, CollectionElement, Boolable):
         If there is more than a single element in the SIMD value, then value is
         reduced using the and operator.
 
+        Parameters:
+            width: SIMD width.
+
         Args:
             value: The initial SIMD value.
 

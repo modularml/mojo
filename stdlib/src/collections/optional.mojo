@@ -153,6 +153,12 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         """Return true if self has a value and the other value is coercible to
         True.
 
+        Parameters:
+            type: Type coercible to Bool.
+
+        Args:
+            other: Value to compare to.
+
         Returns:
             True if both inputs are True after boolean coercion.
         """
@@ -161,6 +167,12 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     fn __rand__[type: Boolable](self, other: type) -> Bool:
         """Return true if self has a value and the other value is coercible to
         True.
+
+        Parameters:
+            type: Type coercible to Bool.
+
+        Args:
+            other: Value to compare to.
 
         Returns:
             True if both inputs are True after boolean coercion.
@@ -171,6 +183,12 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         """Return true if self has a value or the other value is coercible to
         True.
 
+        Parameters:
+            type: Type coercible to Bool.
+
+        Args:
+            other: Value to compare to.
+
         Returns:
             True if either inputs is True after boolean coercion.
         """
@@ -179,6 +197,12 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     fn __ror__[type: Boolable](self, other: type) -> Bool:
         """Return true if self has a value or the other value is coercible to
         True.
+
+        Parameters:
+            type: Type coercible to Bool.
+
+        Args:
+            other: Value to compare to.
 
         Returns:
             True if either inputs is True after boolean coercion.

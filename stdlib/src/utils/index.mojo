@@ -410,6 +410,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
     @always_inline("nodebug")
     fn __setitem__[intable: Intable](inout self, index: intable, val: Int):
         """Sets an element in the tuple at the given index.
+
         Parameters:
             intable: The intable type.
 
