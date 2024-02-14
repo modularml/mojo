@@ -87,14 +87,6 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         """
         self = Self()
 
-    fn __bool__(self) -> Bool:
-        """Whether or not the Optional contains a value.
-
-        Returns:
-            True if the Optional contains a value, False otherwise.
-        """
-        return not self._value.isa[_NoneType]()
-
     fn value(self) -> T:
         """Unsafely retrieve the value out of the Optional.
 
@@ -140,3 +132,55 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             A new Optional containing the old value or default.
         """
         return self or Optional(default)
+
+    fn __bool__(self) -> Bool:
+        """Return true if the Optional has a value.
+
+        Returns:
+            True if the optional has a valu and False otherwise.
+        """
+        return not self._value.isa[_NoneType]()
+
+    fn __invert__(self) -> Bool:
+        """Return False if the optional has a value.
+
+        Returns:
+            False if the optional has a value and True otherwise.
+        """
+        return not self
+
+    fn __and__[type: Boolable](self, other: type) -> Bool:
+        """Return true if self has a value and the other value is coercible to
+        True.
+
+        Returns:
+            True if both inputs are True after boolean coercion.
+        """
+        return self.__bool__() and other.__bool__()
+
+    fn __rand__[type: Boolable](self, other: type) -> Bool:
+        """Return true if self has a value and the other value is coercible to
+        True.
+
+        Returns:
+            True if both inputs are True after boolean coercion.
+        """
+        return self.__bool__() and other.__bool__()
+
+    fn __or__[type: Boolable](self, other: type) -> Bool:
+        """Return true if self has a value or the other value is coercible to
+        True.
+
+        Returns:
+            True if either inputs is True after boolean coercion.
+        """
+        return self.__bool__() or other.__bool__()
+
+    fn __ror__[type: Boolable](self, other: type) -> Bool:
+        """Return true if self has a value or the other value is coercible to
+        True.
+
+        Returns:
+            True if either inputs is True after boolean coercion.
+        """
+        return self.__bool__() or other.__bool__()
