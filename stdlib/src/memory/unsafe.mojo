@@ -916,7 +916,7 @@ struct Pointer[
 @register_passable("trivial")
 struct DTypePointer[
     type: DType, address_space: AddressSpace = AddressSpace.GENERIC
-](Boolable, CollectionElement):
+](Boolable, CollectionElement, Stringable):
     """Defines a `DTypePointer` struct that contains an address of the given
     dtype.
 
@@ -998,6 +998,15 @@ struct DTypePointer[
             Constructed *nullptr* `DTypePointer` object.
         """
         return Self.pointer_type()
+
+    fn __str__(self) -> String:
+        """Format this pointer as a hexadecimal string.
+
+        Returns:
+            A String containing the hexadecimal representation of the memory location
+            destination of this pointer.
+        """
+        return str(self.address)
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:

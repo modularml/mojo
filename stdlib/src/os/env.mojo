@@ -67,4 +67,4 @@ fn getenv(name: String, default: String = "") -> String:
     let ptr = external_call["getenv", DTypePointer[DType.int8]](name._as_ptr())
     if not ptr:
         return default
-    return String(ptr)
+    return String(StringRef(ptr))

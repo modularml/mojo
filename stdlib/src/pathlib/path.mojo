@@ -31,7 +31,7 @@ fn cwd() raises -> Path:
     if res == DTypePointer[DType.int8]():
         raise Error("unable to query the current directory")
 
-    return String(buf)
+    return String(StringRef(buf))
 
 
 struct Path(Stringable, CollectionElement):

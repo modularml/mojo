@@ -3,7 +3,7 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo -debug-level full %s | FileCheck %s --dump-input=always
 
 from memory.anypointer import AnyPointer
 from testing.testing import _MoveCounter

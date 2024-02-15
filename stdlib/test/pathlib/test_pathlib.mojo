@@ -4,46 +4,44 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: !windows
-# RUN: %mojo -D CURRENT_DIR=%S -debug-level full %s | FileCheck %s
+# RUN: %mojo -D CURRENT_DIR=%S -debug-level full %s
 
 from pathlib import *
 from sys.param_env import env_get_string
-from testing import assert_equal
+from testing import assert_equal, assert_true, assert_false
 
 alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
 
 
-# CHECK-LABEL: test_cwd
 fn test_cwd() raises:
     print("== test_cwd")
 
     # CHECK-NOT: unable to query the current directory
-    print(str(cwd()))
+    assert_true(str(cwd()).startswith("/"))
 
 
-# CHECK-LABEL: test_path
 fn test_path() raises:
     print("== test_path")
 
-    # CHECK: /some/dir
-    print(str(Path() / "some" / "dir"))
+    assert_true(str(Path() / "some" / "dir").endswith("/some/dir"))
 
-    # CHECK: /foo/bar/jar
-    print(str(Path("/foo") / "bar" / "jar"))
+    assert_equal(str(Path("/foo") / "bar" / "jar"), "/foo/bar/jar")
 
-    # CHECK: /foo/bar/jar
-    print(str(Path("/foo" + DIR_SEPARATOR) / "bar" / "jar"))
+    assert_equal(
+        str(Path("/foo" + DIR_SEPARATOR) / "bar" / "jar"), "/foo/bar/jar"
+    )
 
 
-# CHECK-LABEL: test_path
-fn test_path_exists():
+fn test_path_exists() raises:
     print("== test_path")
 
-    # CHECK: True
-    print((Path(CURRENT_DIR) / "test_pathlib.mojo").exists())
+    assert_true(
+        (Path(CURRENT_DIR) / "test_pathlib.mojo").exists(), "does not exist"
+    )
 
-    # CHECK: False
-    print((Path(CURRENT_DIR) / "this_path_does_not_exist.mojo").exists())
+    assert_false(
+        (Path(CURRENT_DIR) / "this_path_does_not_exist.mojo").exists(), "exists"
+    )
 
 
 fn test_suffix() raises:

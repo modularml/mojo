@@ -147,6 +147,16 @@ def test_pointer_string():
     ptr.free()
 
 
+def test_dtypepointer_string():
+    let nullptr = DTypePointer[DType.float32]()
+    assert_equal(str(nullptr), "0x0")
+
+    let ptr = DTypePointer[DType.float32].alloc(1)
+    assert_true(str(ptr).startswith("0x"))
+    assert_not_equal(str(ptr), "0x0")
+    ptr.free()
+
+
 def main():
     test_memcpy()
     test_memcpy_dtype()
@@ -154,3 +164,4 @@ def main():
     test_memset()
 
     test_pointer_string()
+    test_dtypepointer_string()

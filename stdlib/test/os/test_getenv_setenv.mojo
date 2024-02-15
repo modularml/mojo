@@ -4,48 +4,39 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: linux || darwin
-# RUN: TEST_MYVAR=MyValue %mojo -debug-level full %s | FileCheck %s
+# RUN: TEST_MYVAR=MyValue %mojo -debug-level full %s
 
 from os import getenv, setenv
 
+from testing import assert_equal
 
-# CHECK-OK-LABEL: test_getenv
-fn test_getenv():
+
+def test_getenv():
     print("== test_getenv")
 
-    # CHECK: MyValue
-    print(getenv("TEST_MYVAR"))
+    assert_equal(getenv("TEST_MYVAR"), "MyValue")
 
-    # CHECK: MyValue
-    print(getenv("TEST_MYVAR", "DefaultValue"))
+    assert_equal(getenv("TEST_MYVAR", "DefaultValue"), "MyValue")
 
-    # CHECK: DefaultValue
-    print(getenv("NON_EXISTENT_VAR", "DefaultValue"))
+    assert_equal(getenv("NON_EXISTENT_VAR", "DefaultValue"), "DefaultValue")
 
 
 # CHECK-OK-LABEL: test_setenv
-fn test_setenv():
+def test_setenv():
     print("== test_setenv")
 
-    # CHECK: True
-    print(setenv("NEW_VAR", "FOO", True))
-    # CHECK: FOO
-    print(getenv("NEW_VAR"))
+    assert_equal(setenv("NEW_VAR", "FOO", True), True)
+    assert_equal(getenv("NEW_VAR"), "FOO")
 
-    # CHECK: True
-    print(setenv("NEW_VAR", "BAR", False))
-    # CHECK: FOO
-    print(getenv("NEW_VAR"))
+    assert_equal(setenv("NEW_VAR", "BAR", False), True)
+    assert_equal(getenv("NEW_VAR"), "FOO")
 
-    # CHECK: True
-    print(setenv("NEW_VAR", "BAR", True))
-    # CHECK: BAR
-    print(getenv("NEW_VAR", "BAR"))
+    assert_equal(setenv("NEW_VAR", "BAR", True), True)
+    assert_equal(getenv("NEW_VAR", "BAR"), "BAR")
 
-    # CHECK: False
-    print(setenv("=", "INVALID", True))
+    assert_equal(setenv("=", "INVALID", True), False)
 
 
-fn main():
+def main():
     test_getenv()
     test_setenv()
