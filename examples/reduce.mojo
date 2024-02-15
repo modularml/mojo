@@ -66,7 +66,7 @@ fn bench[
 ](array: Tensor[type]) raises:
     @parameter
     fn runner():
-        let result = func[size](array)
+        var result = func[size](array)
         keep(result)
 
     let ms = benchmark.run[runner](max_runtime_secs=0.5).mean(Unit.ms)

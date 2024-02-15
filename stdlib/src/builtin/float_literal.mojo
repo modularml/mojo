@@ -60,10 +60,12 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         Returns:
             The integer value as a double.
         """
-        let v0 = __mlir_op.`pop.cast_from_builtin`[
-            _type = __mlir_type.`!pop.scalar<index>`
-        ](value.value)
-        return __mlir_op.`pop.cast`[_type = Self.fp_type](v0)
+        # FIXME(#29493): Unfurl this into a var decl to unnest.
+        return __mlir_op.`pop.cast`[_type = Self.fp_type](
+            __mlir_op.`pop.cast_from_builtin`[
+                _type = __mlir_type.`!pop.scalar<index>`
+            ](value.value)
+        )
 
     @always_inline("nodebug")
     fn __init__(value: IntLiteral) -> Self:
