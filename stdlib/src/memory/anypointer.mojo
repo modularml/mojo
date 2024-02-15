@@ -17,7 +17,7 @@ from sys.intrinsics import _mlirtype_is_eq
 
 
 @register_passable("trivial")
-struct AnyPointer[T: Movable](Boolable, Stringable):
+struct AnyPointer[T: Movable](Boolable, Stringable, EqualityComparable):
     """This is a pointer type that can point to any generic value that is
     movable.
 
@@ -207,6 +207,92 @@ struct AnyPointer[T: Movable](Boolable, Stringable):
             An offset pointer.
         """
         return Self.__from_index(self.__as_index() + offset * sizeof[T]())
+
+    @always_inline
+    fn __sub__(self, offset: Int) -> Self:
+        """Return a pointer at an offset from the current one.
+
+        Args:
+            offset: The offset index.
+
+        Returns:
+            An offset pointer.
+        """
+        return self + (-offset)
+
+    @always_inline("nodebug")
+    fn __eq__(self, rhs: Self) -> Bool:
+        """Returns True if the two pointers are equal.
+
+        Args:
+            rhs: The value of the other pointer.
+
+        Returns:
+            True if the two pointers are equal and False otherwise.
+        """
+        return self.__as_index() == rhs.__as_index()
+
+    @always_inline("nodebug")
+    fn __ne__(self, rhs: Self) -> Bool:
+        """Returns True if the two pointers are not equal.
+
+        Args:
+            rhs: The value of the other pointer.
+
+        Returns:
+            True if the two pointers are not equal and False otherwise.
+        """
+        return not (self == rhs)
+
+    @always_inline("nodebug")
+    fn __lt__(self, rhs: Self) -> Bool:
+        """Returns True if this pointer represents a lower address than rhs.
+
+        Args:
+            rhs: The value of the other pointer.
+
+        Returns:
+            True if this pointer represents a lower address and False otherwise.
+        """
+        return self.__as_index() < rhs.__as_index()
+
+    @always_inline("nodebug")
+    fn __le__(self, rhs: Self) -> Bool:
+        """Returns True if this pointer represents a lower than or equal
+           address than rhs.
+
+        Args:
+            rhs: The value of the other pointer.
+
+        Returns:
+            True if this pointer represents a lower address and False otherwise.
+        """
+        return self.__as_index() <= rhs.__as_index()
+
+    @always_inline("nodebug")
+    fn __gt__(self, rhs: Self) -> Bool:
+        """Returns True if this pointer represents a higher address than rhs.
+
+        Args:
+            rhs: The value of the other pointer.
+
+        Returns:
+            True if this pointer represents a higher than or equal address and False otherwise.
+        """
+        return self.__as_index() > rhs.__as_index()
+
+    @always_inline("nodebug")
+    fn __ge__(self, rhs: Self) -> Bool:
+        """Returns True if this pointer represents a higher than or equal
+           address than rhs.
+
+        Args:
+            rhs: The value of the other pointer.
+
+        Returns:
+            True if this pointer represents a higher than or equal address and False otherwise.
+        """
+        return self.__as_index() >= rhs.__as_index()
 
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful
