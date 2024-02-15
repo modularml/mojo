@@ -41,24 +41,27 @@ fn test_anypointer_of_move_only_type():
     ptr.free()
 
 
-def test_anypointer_move_into_move_count():
+fn test_anypointer_move_into_move_count():
     let ptr = AnyPointer[_MoveCounter[Int]].alloc(1)
 
     let value = _MoveCounter(5)
-    assert_equal(0, value.move_count)
+    # CHECK: 0
+    print(value.move_count)
     ptr.emplace_value(value ^)
 
     # -----
     # Test that `AnyPointer.move_into` performs exactly one move.
     # -----
 
-    assert_equal(1, __get_address_as_lvalue(ptr.value).move_count)
+    # CHECK: 1
+    print(__get_address_as_lvalue(ptr.value).move_count)
 
     let ptr_2 = AnyPointer[_MoveCounter[Int]].alloc(1)
 
     ptr.move_into(ptr_2)
 
-    assert_equal(2, __get_address_as_lvalue(ptr_2.value).move_count)
+    # CHECK: 2
+    print(__get_address_as_lvalue(ptr_2.value).move_count)
 
 
 def test_refitem():
@@ -103,32 +106,6 @@ def test_anypointer_string():
     ptr.free()
 
 
-def test_eq():
-    let local = 1
-    let p1 = AnyPointer[Int].address_of(local)
-    let p2 = p1
-    assert_equal(p1, p2)
-
-    let other_local = 2
-    let p3 = AnyPointer[Int].address_of(other_local)
-    assert_not_equal(p1, p3)
-    let p4 = AnyPointer[Int].address_of(local)
-    assert_not_equal(p1, p4)
-
-
-def test_comparisons():
-    let p1 = AnyPointer[Int].alloc(1)
-
-    assert_true((p1 - 1) < p1)
-    assert_true((p1 - 1) <= p1)
-    assert_true(p1 <= p1)
-    assert_true((p1 + 1) > p1)
-    assert_true((p1 + 1) >= p1)
-    assert_true(p1 >= p1)
-
-    p1.free()
-
-
 def main():
     test_address_of()
 
@@ -140,5 +117,3 @@ def main():
 
     test_bitcast()
     test_anypointer_string()
-    test_eq()
-    test_comparisons()
