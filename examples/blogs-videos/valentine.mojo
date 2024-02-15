@@ -64,22 +64,22 @@ struct MojoArray[dtype: DType = DType.float64](Stringable):
 
     @staticmethod
     fn from_numpy(np_array: PythonObject) raises->Self:
-        let npArrayPtr = DTypePointer[dtype](
+        var npArrayPtr = DTypePointer[dtype](
         __mlir_op.`pop.index_to_pointer`[
             _type = __mlir_type[`!kgen.pointer<scalar<`, dtype.value, `>>`]
         ](
             SIMD[DType.index,1](np_array.__array_interface__['data'][0].__index__()).value
         )
     )
-        let numel = int(np_array.shape[0])
-        let _ptr = DTypePointer[dtype].alloc(numel)
+        var numel = int(np_array.shape[0])
+        var _ptr = DTypePointer[dtype].alloc(numel)
         memcpy(_ptr, npArrayPtr, numel)
         return Self(numel,_ptr)
 
     fn to_numpy(self) raises->PythonObject:
-        let np = Python.import_module("numpy")
+        var np = Python.import_module("numpy")
         var np_arr = np.zeros(self.numel)
-        let npArrayPtr = DTypePointer[dtype](
+        var npArrayPtr = DTypePointer[dtype](
         __mlir_op.`pop.index_to_pointer`[
             _type = __mlir_type[`!kgen.pointer<scalar<`, dtype.value, `>>`]
         ](
@@ -116,7 +116,7 @@ struct MojoArray[dtype: DType = DType.float64](Stringable):
 
     fn _elemwise_pow(self, p: Scalar[dtype]) -> Self:
         alias simd_width: Int = simdwidthof[dtype]()
-        let new_array = Self(self.numel)
+        var new_array = Self(self.numel)
         @parameter
         fn tensor_scalar_vectorize[simd_width: Int](idx: Int) -> None:
             new_array._ptr.simd_store[simd_width](idx, math.pow[dtype,dtype,simd_width](self._ptr.simd_load[simd_width](idx), SIMD[dtype,simd_width].splat(p)))
@@ -125,7 +125,7 @@ struct MojoArray[dtype: DType = DType.float64](Stringable):
 
     fn _elemwise_transform[func: fn[dtype: DType, width: Int](SIMD[dtype, width])->SIMD[dtype, width]](self) -> Self:
         alias simd_width: Int = simdwidthof[dtype]()
-        let new_array = Self(self.numel)
+        var new_array = Self(self.numel)
         @parameter
         fn elemwise_vectorize[simd_width: Int](idx: Int) -> None:
             new_array._ptr.simd_store[simd_width](idx, func[dtype, simd_width](self._ptr.simd_load[simd_width](idx)))
@@ -134,7 +134,7 @@ struct MojoArray[dtype: DType = DType.float64](Stringable):
 
     fn _elemwise_array_math[func: fn[dtype: DType, width: Int](SIMD[dtype, width],SIMD[dtype, width])->SIMD[dtype, width]](self, other: Self) -> Self:
         alias simd_width: Int = simdwidthof[dtype]()
-        let new_array = Self(self.numel)
+        var new_array = Self(self.numel)
         @parameter
         fn elemwise_vectorize[simd_width: Int](idx: Int) -> None:
             new_array._ptr.simd_store[simd_width](idx, func[dtype, simd_width](self._ptr.simd_load[simd_width](idx), other._ptr.simd_load[simd_width](idx)))
@@ -143,32 +143,32 @@ struct MojoArray[dtype: DType = DType.float64](Stringable):
 
     fn _elemwise_scalar_math[func: fn[dtype: DType, width: Int](SIMD[dtype, width],SIMD[dtype, width])->SIMD[dtype, width]](self, s: Scalar[dtype]) -> Self:
         alias simd_width: Int = simdwidthof[dtype]()
-        let new_array = Self(self.numel)
+        var new_array = Self(self.numel)
         @parameter
         fn elemwise_vectorize[simd_width: Int](idx: Int) -> None:
             new_array._ptr.simd_store[simd_width](idx, func[dtype, simd_width](self._ptr.simd_load[simd_width](idx), SIMD[dtype, simd_width](s)))
         vectorize[simd_width, elemwise_vectorize](self.numel)
         return new_array
 
-fn main() raises:
-    let np = Python.import_module("numpy")
-    let plt = Python.import_module("matplotlib.pyplot")
+def main():
+    np = Python.import_module("numpy")
+    plt = Python.import_module("matplotlib.pyplot")
 
-    let np_arr = np.arange(-2,2,0.01)
-    let x = MojoArray.from_numpy(np_arr)
+    np_arr = np.arange(-2,2,0.01)
+    x = MojoArray.from_numpy(np_arr)
 
-    let fig = plt.figure()
-    let ax = fig.add_subplot()
-    _ = ax.set_xlim([-3,3])
-    _ = ax.set_ylim([-3,3])   
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    ax.set_xlim([-3,3])
+    ax.set_ylim([-3,3])   
 
-    let a = MojoArray.from_numpy(np.linspace(0,20,100))
+    a = MojoArray.from_numpy(np.linspace(0,20,100))
     for i in range(a.numel):
-        let y = (x**2)**(1/3.) - 0.9*((3.3-(x*x)).sqrt())*(a[i]*3.14*x).sin()
-        _ = ax.cla()
-        let title = ax.set_title("Mojo ❤️ Python")
-        _ = title.set_fontsize(20)
-        _ = ax.set_axis_off()
-        _ = ax.plot(x.to_numpy(),y.to_numpy(),'r')
-        _ = plt.pause(0.1)
-        _ = plt.draw()
+        y = (x**2)**(1/3.) - 0.9*((3.3-(x*x)).sqrt())*(a[i]*3.14*x).sin()
+        ax.cla()
+        title = ax.set_title("Mojo ❤️ Python")
+        title.set_fontsize(20)
+        ax.set_axis_off()
+        ax.plot(x.to_numpy(),y.to_numpy(),'r')
+        plt.pause(0.1)
+        plt.draw()
