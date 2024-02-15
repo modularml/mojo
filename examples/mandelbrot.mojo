@@ -97,8 +97,7 @@ fn main() raises:
         # Parallelized
         @parameter
         fn bench_parallel[simd_width: Int]():
-            parallelize[worker](rt, height, height)
-            # parallelize[worker](height, height)
+            parallelize[worker](height, height)
 
         let parallelized = benchmark.run[bench_parallel[simd_width]](
             max_runtime_secs=0.5
