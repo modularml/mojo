@@ -708,30 +708,14 @@ struct Pointer[
 
     @staticmethod
     @always_inline
-    fn alloc(count: Int) -> Self:
-        """Heap-allocates a number of element of the specified type.
-
-        Args:
-            count: The number of elements to allocate (note that this is not
-              the bytecount).
-
-        Returns:
-            A new Pointer object which has been allocated on the heap.
-        """
-        return Self.aligned_alloc(alignof[type](), count)
-
-    @staticmethod
-    @always_inline
-    fn aligned_alloc(
-        alignment: Int, count: Int
-    ) -> Pointer[type, address_space]:
+    fn alloc(count: Int, /, *, alignment: Int = alignof[type]()) -> Self:
         """Heap-allocates a number of element of the specified type using
         the specified alignment.
 
         Args:
-            alignment: The alignment used for the allocation.
             count: The number of elements to allocate (note that this is not
               the bytecount).
+            alignment: The alignment used for the allocation.
 
         Returns:
             A new Pointer object which has been allocated on the heap.
@@ -1105,28 +1089,14 @@ struct DTypePointer[
 
     @staticmethod
     @always_inline
-    fn alloc(count: Int) -> Self:
-        """Heap-allocates a number of element of the specified type.
-
-        Args:
-            count: The number of elements to allocate (note that this is not
-              the bytecount).
-
-        Returns:
-            A new `DTypePointer` object which has been allocated on the heap.
-        """
-        return Self.pointer_type.aligned_alloc(alignof[type](), count)
-
-    @staticmethod
-    @always_inline
-    fn aligned_alloc(alignment: Int, count: Int) -> Self:
+    fn alloc(count: Int, /, *, alignment: Int = alignof[type]()) -> Self:
         """Heap-allocates a number of element of the specified type using
         the specified alignment.
 
         Args:
-            alignment: The alignment used for the allocation.
             count: The number of elements to allocate (note that this is not
               the bytecount).
+            alignment: The alignment used for the allocation.
 
         Returns:
             A new `DTypePointer` object which has been allocated on the heap.
