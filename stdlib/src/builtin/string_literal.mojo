@@ -130,7 +130,7 @@ struct StringLiteral(Sized, Stringable, CollectionElement, Hashable, Boolable):
         return self
 
 
-# A local memcmp that avoids #31139 and #25100
+# Use a local memcmp rather than memory.memcpy to avoid #31139 and #25100.
 @always_inline("nodebug")
 fn _memcmp(
     s1: DTypePointer[DType.int8], s2: DTypePointer[DType.int8], count: Int

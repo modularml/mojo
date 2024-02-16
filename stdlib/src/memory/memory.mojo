@@ -17,7 +17,7 @@ from sys import llvm_intrinsic
 from sys.info import sizeof, triple_is_nvidia_cuda
 
 from algorithm import vectorize, sync_parallelize
-from math import min, div_ceil
+from math import min, div_ceil, align_down
 from runtime.llcl import Runtime
 
 from utils.list import Dim
@@ -31,18 +31,8 @@ from gpu.memory import AddressSpace as GPUAddressSpace
 # ===----------------------------------------------------------------------===#
 
 
-fn memcmp[
-    type: DType, address_space: AddressSpace
-](
-    s1: DTypePointer[type, address_space],
-    s2: DTypePointer[type, address_space],
-    count: Int,
-) -> Int:
+fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
     """Compares two buffers. Both strings are assumed to be of the same length.
-
-    Parameters:
-        type: The element dtype.
-        address_space: The address space of the pointer.
 
     Args:
         s1: The first buffer address.
@@ -54,11 +44,26 @@ fn memcmp[
         s1 < s2. The comparison is performed by the first different byte in the
         buffer.
     """
-    for i in range(count):
+    alias simd_width = simdwidthof[s1.type]()
+    let vector_end_simd = align_down(count, simd_width)
+    for i in range(0, vector_end_simd, simd_width):
+        let s1i = s1.simd_load[simd_width](i)
+        let s2i = s2.simd_load[simd_width](i)
+        if s1i == s2i:
+            continue
+
+        let diff = s1i - s2i
+        for j in range(simd_width):
+            if diff[j] > 0:
+                return 1
+            return -1
+
+    for i in range(vector_end_simd, count):
         let s1i = s1[i]
         let s2i = s2[i]
         if s1i == s2i:
             continue
+
         if s1i > s2i:
             return 1
         return -1
