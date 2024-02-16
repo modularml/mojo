@@ -151,6 +151,34 @@ for x in v:
 - Added built-in `hex()` function, which can be used to format any value whose
   type implements the `Intable` trait as a hexadecimal string.
 
+- Mojo now has syntax for unbound packs that allow users to unbind any number of
+  positional parameters explicitly. For example
+
+  ```mojo
+  struct StructWithDefault[a: Int, b: Int, c: Int = 8, d: Int = 9]: pass
+
+  alias all_unbound = StructWithDefault[*_]
+  # equivalent to
+  alias all_unbound = StructWithDefault[_, _, _, _]
+
+  alias first_bound = StructWithDefault[5, *_]
+  # equivalent to
+  alias first_bound = StructWithDefault[5, _, _, _]
+
+  alias last_bound = StructWithDefault[*_, 6]
+  # equivalent to
+  alias last_bound = StructWithDefault[_, _, _, 6]
+
+  alias mid_unbound = StructWithDefault[3, *_, 4]
+  # equivalent to
+  alias mid_unbound = StructWithDefault[3, _, _, 4]
+  ```
+
+  As demonstrated above, this syntax can be used to explicitly unbind an
+  arbitrary number of parameters, at the beginning, at the end, or in the middle
+  of the operand list. Note that the `*_` syntax will also mark optional
+  parameters as unbound (i.e. defaults are not applied).
+
 ### 🦋 Changed
 
 - `vectorize_unroll` has been removed, and `vectorize` now has a parameter named
