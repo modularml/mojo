@@ -6,6 +6,7 @@
 """Implements `Path` and related functions.
 """
 
+import os
 from sys.info import os_is_windows
 from os import PathLike
 
@@ -175,16 +176,25 @@ struct Path(Stringable, CollectionElement, PathLike):
         Returns:
           True if the path exists on disk and False otherwise.
         """
-        alias mode = "r"
-        let handle = external_call["fopen", Pointer[NoneType]](
-            self.path._as_ptr(), mode.data()
-        )
+        return os.path.exists(self)
 
-        if not handle:
-            return False
+    fn is_dir(self) -> Bool:
+        """Returns True if the path is a directory and False otherwise.
 
-        _ = external_call["fclose", Int32](handle)
-        return True
+        Returns:
+          Return True if the path points to a directory (or a link pointing to
+          a directory).
+        """
+        return os.path.isdir(self)
+
+    fn is_file(self) -> Bool:
+        """Returns True if the path is a file and False otherwise.
+
+        Returns:
+          Return True if the path points to a file (or a link pointing to
+          a file).
+        """
+        return os.path.isfile(self)
 
     fn read_text(self) raises -> String:
         """Returns content of the file.

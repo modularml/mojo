@@ -71,7 +71,9 @@ fn isdir(path: String) -> Bool:
     _constrain_unix()
     try:
         let st_mode = _get_stat_st_mode(path)
-        return _S_ISDIR(st_mode) or _S_ISLNK(st_mode)
+        if _S_ISDIR(st_mode):
+            return True
+        return _S_ISLNK(st_mode) and _S_ISDIR(_get_lstat_st_mode(path))
     except:
         return False
 
@@ -91,6 +93,45 @@ fn isdir[pathlike: os.PathLike](path: pathlike) -> Bool:
       False otherwise.
     """
     return isdir(path.__fspath__())
+
+
+# ===----------------------------------------------------------------------=== #
+# isfile
+# ===----------------------------------------------------------------------=== #
+
+
+fn isfile(path: String) -> Bool:
+    """Test whether a path is a regular file.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      Returns True if the path is a regular file.
+    """
+    _constrain_unix()
+    try:
+        let st_mode = _get_stat_st_mode(path)
+        if _S_ISREG(st_mode):
+            return True
+        return _S_ISLNK(st_mode) and _S_ISREG(_get_lstat_st_mode(path))
+    except:
+        return False
+
+
+fn isfile[pathlike: os.PathLike](path: pathlike) -> Bool:
+    """Test whether a path is a regular file.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      Returns True if the path is a regular file.
+    """
+    return isfile(path.__fspath__())
 
 
 # ===----------------------------------------------------------------------=== #
@@ -127,42 +168,6 @@ fn islink[pathlike: os.PathLike](path: pathlike) -> Bool:
       True if the path is a link to a directory and False otherwise.
     """
     return islink(path.__fspath__())
-
-
-# ===----------------------------------------------------------------------=== #
-# isfile
-# ===----------------------------------------------------------------------=== #
-
-
-fn isfile(path: String) -> Bool:
-    """Test whether a path is a regular file.
-
-    Args:
-      path: The path to the directory.
-
-    Returns:
-      Returns True if the path is a regular file.
-    """
-    _constrain_unix()
-    try:
-        return _S_ISREG(_get_stat_st_mode(path))
-    except:
-        return False
-
-
-fn isfile[pathlike: os.PathLike](path: pathlike) -> Bool:
-    """Test whether a path is a regular file.
-
-    Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
-
-    Args:
-      path: The path to the directory.
-
-    Returns:
-      Returns True if the path is a regular file.
-    """
-    return isfile(path.__fspath__())
 
 
 # ===----------------------------------------------------------------------=== #

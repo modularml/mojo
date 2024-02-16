@@ -4,23 +4,21 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: !windows
-# RUN: %mojo -D CURRENT_DIR=%S -debug-level full %s
+# RUN: %mojo -debug-level full %s
 
 from pathlib import *
 from sys.param_env import env_get_string
 from testing import assert_equal, assert_true, assert_false
 
-alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
 
-
-fn test_cwd() raises:
+def test_cwd():
     print("== test_cwd")
 
     # CHECK-NOT: unable to query the current directory
     assert_true(str(cwd()).startswith("/"))
 
 
-fn test_path() raises:
+def test_path():
     print("== test_path")
 
     assert_true(str(Path() / "some" / "dir").endswith("/some/dir"))
@@ -32,19 +30,27 @@ fn test_path() raises:
     )
 
 
-fn test_path_exists() raises:
-    print("== test_path")
+def test_path_exists():
+    print("== test_path_exists")
 
-    assert_true(
-        (Path(CURRENT_DIR) / "test_pathlib.mojo").exists(), "does not exist"
-    )
+    assert_true(Path(__source_location().file_name).exists(), "does not exist")
 
-    assert_false(
-        (Path(CURRENT_DIR) / "this_path_does_not_exist.mojo").exists(), "exists"
-    )
+    assert_false((Path() / "this_path_does_not_exist.mojo").exists(), "exists")
 
 
-fn test_suffix() raises:
+def test_path_isdir():
+    print("== test_path_isdir")
+    assert_true(Path().is_dir())
+    assert_false((Path() / "this_path_does_not_exist").is_dir())
+
+
+def test_path_isfile():
+    print("== test_path_isfile")
+    assert_true(Path(__source_location().file_name).is_file())
+    assert_false(Path("this/file/does/not/exist").is_file())
+
+
+def test_suffix():
     # Common filenames.
     assert_equal(Path("/file.txt").suffix(), ".txt")
     assert_equal(Path("file.txt").suffix(), ".txt")
@@ -61,7 +67,7 @@ fn test_suffix() raises:
     assert_equal(Path("résumé.doc").suffix(), ".doc")
 
 
-fn test_joinpath() raises:
+def test_joinpath():
     assert_equal(Path(), Path().joinpath())
     assert_equal(Path() / "some" / "dir", Path().joinpath("some", "dir"))
 
@@ -70,5 +76,7 @@ def main():
     test_cwd()
     test_path()
     test_path_exists()
+    test_path_isdir()
+    test_path_isfile()
     test_suffix()
     test_joinpath()
