@@ -286,7 +286,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         self.size = 0
         self.capacity = 0
 
-    fn __init__(inout self, capacity: Int):
+    fn __init__(inout self, *, capacity: Int):
         """Constructs a vector with the given capacity.
 
         Args:
@@ -312,7 +312,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         Args:
             existing: The vector to copy.
         """
-        self = Self(existing.capacity)
+        self = Self(capacity=existing.capacity)
         for i in range(len(existing)):
             self.append(existing[i])
 

@@ -638,7 +638,9 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
 
     @staticmethod
     fn _new_entries(reserved: Int) -> DynamicVector[Optional[DictEntry[K, V]]]:
-        var entries = DynamicVector[Optional[DictEntry[K, V]]](reserved)
+        var entries = DynamicVector[Optional[DictEntry[K, V]]](
+            capacity=reserved
+        )
         for i in range(reserved):
             entries.append(None)
         return entries

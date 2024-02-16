@@ -683,7 +683,7 @@ out-of-bounds access (it will crash), and `Int` does not throw on divide by
 zero. In other words, most standard library types are considered "unsafe".
 
 ```mojo
-let v = DynamicVector[Int](0)
+let v = DynamicVector[Int](capacity=0)
 print(v[1]) # could crash or print garbage values (undefined behaviour)
 
 print(1//0) # does not raise and could print anything (undefined behaviour)
@@ -734,7 +734,7 @@ both of the following are true:
 @value
 struct A(CollectionElement):
     # error: 'DynamicVector' parameter #0 has 'CollectionElement' type, but value has type 'A'
-    var a: DynamicVector[Self] 
+    var a: DynamicVector[Self]
 ```
 
 In the example above, adding the `__moveinit__()` and `__copyinit__()` methods

@@ -34,7 +34,7 @@ fn b64encode(str: String) -> String:
     let b64chars = lookup.data()
 
     let length = len(str)
-    var out = DynamicVector[Int8](length + 1)
+    var out = DynamicVector[Int8](capacity=length + 1)
 
     @parameter
     @always_inline

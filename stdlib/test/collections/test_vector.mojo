@@ -262,7 +262,7 @@ def test_vector_reverse():
 
 def test_vector_reverse_move_count():
     # Create this vec with enough capacity to avoid moves due to resizing.
-    var vec = DynamicVector[_MoveCounter[Int]](5)
+    var vec = DynamicVector[_MoveCounter[Int]](capacity=5)
     vec.push_back(_MoveCounter(1))
     vec.push_back(_MoveCounter(2))
     vec.push_back(_MoveCounter(3))
@@ -355,11 +355,11 @@ def test_vector_extend_non_trivial():
 
     # Preallocate with enough capacity to avoid reallocation making the
     # move count checks below flaky.
-    var v1 = DynamicVector[_MoveCounter[String]](5)
+    var v1 = DynamicVector[_MoveCounter[String]](capacity=5)
     v1.push_back(_MoveCounter[String]("Hello"))
     v1.push_back(_MoveCounter[String]("World"))
 
-    var v2 = DynamicVector[_MoveCounter[String]](3)
+    var v2 = DynamicVector[_MoveCounter[String]](capacity=3)
     v2.push_back(_MoveCounter[String]("Foo"))
     v2.push_back(_MoveCounter[String]("Bar"))
     v2.push_back(_MoveCounter[String]("Baz"))
@@ -417,7 +417,7 @@ def test_2d_dynamic_vector():
 # as reported in GH issue 27875 internally and
 # https://github.com/modularml/mojo/issues/1493
 def test_vector_copy_constructor():
-    let vec = DynamicVector[Int](1)
+    let vec = DynamicVector[Int](capacity=1)
     var vec_copy = vec
     vec_copy.push_back(1)  # Ensure copy constructor doesn't crash
     _ = vec ^  # To ensure previous one doesn't invoke move constuctor

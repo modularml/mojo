@@ -232,6 +232,9 @@ for x in v:
 - The `CollectionElement` trait is now a built-in trait and has been
   removed from `collections.vector`.
 
+- The `DynamicVector(capacity: Int)` constructor has been changed to take
+  `capacity` as a keyword-only argument to prevent implicit conversion from Int.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
