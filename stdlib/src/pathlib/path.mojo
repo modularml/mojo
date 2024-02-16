@@ -7,6 +7,7 @@
 """
 
 from sys.info import os_is_windows
+from os import PathLike
 
 from memory import stack_allocation
 from tensor import Tensor
@@ -34,7 +35,7 @@ fn cwd() raises -> Path:
     return String(StringRef(buf))
 
 
-struct Path(Stringable, CollectionElement):
+struct Path(Stringable, CollectionElement, PathLike):
     """The Path object."""
 
     var path: String
@@ -130,13 +131,21 @@ struct Path(Stringable, CollectionElement):
         """
         return self.path
 
+    fn __fspath__(self) -> String:
+        """Returns a string representation of the path.
+
+        Returns:
+          A string represntation of the path.
+        """
+        return str(self)
+
     fn __repr__(self) -> String:
         """Returns a printable representation of the path.
 
         Returns:
           A printable represntation of the path.
         """
-        return self.__str__()
+        return str(self)
 
     fn __eq__(self, other: Self) -> Bool:
         """Returns True if the two paths are equal.

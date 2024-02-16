@@ -7,7 +7,7 @@
 # RUN: %mojo -debug-level full %s
 
 
-from pathlib import cwd
+from pathlib import cwd, Path
 from os.path import exists, lexists
 from testing import *
 
@@ -21,3 +21,6 @@ def main():
 
     assert_true(exists(cwd()))
     assert_true(lexists(cwd()))
+
+    assert_true(exists(Path()))
+    assert_true(lexists(Path()))

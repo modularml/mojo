@@ -6,3 +6,4 @@
 """Implements the os package."""
 
 from .env import *
+from .pathlike import PathLike

@@ -15,6 +15,7 @@ from os.path import isdir
 from .._macos import _stat as _stat_macos, _lstat as _lstat_macos
 from .._linux import _stat as _stat_linux, _lstat as _lstat_linux
 from ..stat import _S_ISDIR, _S_ISLNK, _S_ISREG
+from .. import PathLike
 from sys.info import os_is_windows, os_is_linux, os_is_macos
 
 
@@ -67,6 +68,23 @@ fn isdir(path: String) -> Bool:
         return False
 
 
+fn isdir[pathlike: os.PathLike](path: pathlike) -> Bool:
+    """Return True if path is an existing directory. This follows
+    symbolic links, so both islink() and isdir() can be true for the same path.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      True if the path is a directory or a link to a directory and
+      False otherwise.
+    """
+    return isdir(path.__fspath__())
+
+
 # ===----------------------------------------------------------------------=== #
 # islink
 # ===----------------------------------------------------------------------=== #
@@ -85,6 +103,22 @@ fn islink(path: String) -> Bool:
         return _S_ISLNK(_get_lstat_st_mode(path))
     except:
         return False
+
+
+fn islink[pathlike: os.PathLike](path: pathlike) -> Bool:
+    """Return True if path refers to an existing directory entry that is a
+    symbolic link.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      True if the path is a link to a directory and False otherwise.
+    """
+    return islink(path.__fspath__())
 
 
 # ===----------------------------------------------------------------------=== #
@@ -106,6 +140,21 @@ fn isfile(path: String) -> Bool:
         return _S_ISREG(_get_stat_st_mode(path))
     except:
         return False
+
+
+fn isfile[pathlike: os.PathLike](path: pathlike) -> Bool:
+    """Test whether a path is a regular file.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      Returns True if the path is a regular file.
+    """
+    return isfile(path.__fspath__())
 
 
 # ===----------------------------------------------------------------------=== #
@@ -130,6 +179,21 @@ fn exists(path: String) -> Bool:
         return False
 
 
+fn exists[pathlike: os.PathLike](path: pathlike) -> Bool:
+    """Return True if path exists.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      Returns True if the path exists and is not a broken symbolic link.
+    """
+    return exists(path.__fspath__())
+
+
 # ===----------------------------------------------------------------------=== #
 # lexists
 # ===----------------------------------------------------------------------=== #
@@ -150,3 +214,18 @@ fn lexists(path: String) -> Bool:
         return True
     except:
         return False
+
+
+fn lexists[pathlike: os.PathLike](path: pathlike) -> Bool:
+    """Return True if path exists or is a broken symlink.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      Returns True if the path exists or is a broken symbolic link.
+    """
+    return exists(path.__fspath__())
