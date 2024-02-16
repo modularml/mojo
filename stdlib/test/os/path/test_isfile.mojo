@@ -5,12 +5,11 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from pathlib import cwd
-from os.path import isdir
+
+from os.path import isfile
 from testing import *
 
 
 def main():
-    assert_true(isdir(str(cwd())))
-    assert_false(isdir(str(cwd() / "nonexistant")))
-    assert_false(isdir(__source_location().file_name))
+    assert_true(isfile(__source_location().file_name))
+    assert_false(isfile("this/file/does/not/exist"))

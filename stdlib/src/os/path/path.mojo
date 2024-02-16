@@ -14,7 +14,7 @@ from os.path import isdir
 
 from .._macos import _stat as _stat_macos, _lstat as _lstat_macos
 from .._linux import _stat as _stat_linux, _lstat as _lstat_linux
-from ..stat import _S_ISDIR, _S_ISLNK
+from ..stat import _S_ISDIR, _S_ISLNK, _S_ISREG
 from sys.info import os_is_windows, os_is_linux, os_is_macos
 
 
@@ -83,5 +83,70 @@ fn islink(path: String) -> Bool:
     _constrain_unix()
     try:
         return _S_ISLNK(_get_lstat_st_mode(path))
+    except:
+        return False
+
+
+# ===----------------------------------------------------------------------=== #
+# isfile
+# ===----------------------------------------------------------------------=== #
+
+
+fn isfile(path: String) -> Bool:
+    """Test whether a path is a regular file.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      Returns True if the path is a regular file.
+    """
+    _constrain_unix()
+    try:
+        return _S_ISREG(_get_stat_st_mode(path))
+    except:
+        return False
+
+
+# ===----------------------------------------------------------------------=== #
+# exists
+# ===----------------------------------------------------------------------=== #
+
+
+fn exists(path: String) -> Bool:
+    """Return True if path exists.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      Returns True if the path exists and is not a broken symbolic link.
+    """
+    _constrain_unix()
+    try:
+        _ = _get_stat_st_mode(path)
+        return True
+    except:
+        return False
+
+
+# ===----------------------------------------------------------------------=== #
+# lexists
+# ===----------------------------------------------------------------------=== #
+
+
+fn lexists(path: String) -> Bool:
+    """Return True if path exists or is a broken symlink.
+
+    Args:
+      path: The path to the directory.
+
+    Returns:
+      Returns True if the path exists or is a broken symbolic link.
+    """
+    _constrain_unix()
+    try:
+        _ = _get_lstat_st_mode(path)
+        return True
     except:
         return False
