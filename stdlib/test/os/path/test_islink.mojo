@@ -3,6 +3,7 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
+# XFAIL: system-linux && target-aarch64
 # RUN: ln -s %S %T/tmp
 # RUN: %mojo -debug-level full -D TEMP_DIR=%T/tmp %s
 

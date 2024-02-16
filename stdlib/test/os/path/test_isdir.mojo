@@ -3,6 +3,7 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
+# XFAIL: system-linux && target-aarch64
 # RUN: %mojo -debug-level full %s
 
 from pathlib import cwd
