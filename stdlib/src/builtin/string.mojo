@@ -548,11 +548,11 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         if count == 0:
             return ""
 
-        var result = str(args._at[0]())
+        var result = args._at[0]()
 
         @parameter
         fn each[i: Int]():
-            result = result + self + str(args._at[i + 1]())
+            result += self + args._at[i + 1]()
 
         unroll[each, count - 1]()
         return result

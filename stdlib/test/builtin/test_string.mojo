@@ -3,7 +3,6 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# XFAIL: asan
 # RUN: %mojo -debug-level full %s
 
 from builtin.string import (
