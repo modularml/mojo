@@ -97,7 +97,7 @@ struct StringLiteral(Sized, Stringable, CollectionElement, Hashable, Boolable):
         if length != len(rhs):
             return False
 
-        return memcmp(self.data(), rhs.data(), length) == 0
+        return _memcmp(self.data(), rhs.data(), length) == 0
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: StringLiteral) -> Bool:
@@ -128,3 +128,19 @@ struct StringLiteral(Sized, Stringable, CollectionElement, Hashable, Boolable):
             A new string.
         """
         return self
+
+
+# A local memcmp that avoids #31139 and #25100
+@always_inline("nodebug")
+fn _memcmp(
+    s1: DTypePointer[DType.int8], s2: DTypePointer[DType.int8], count: Int
+) -> Int:
+    for i in range(count):
+        let s1i = s1[i]
+        let s2i = s2[i]
+        if s1i == s2i:
+            continue
+        if s1i > s2i:
+            return 1
+        return -1
+    return 0
