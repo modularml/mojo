@@ -45,7 +45,7 @@ alias _WINDOWS_LARGE_INTEGER = Int64
 
 @value
 @register_passable("trivial")
-struct _CTimeSpec:
+struct _CTimeSpec(Stringable):
     var tv_sec: Int  # Seconds
     var tv_subsec: Int  # subsecond (nanoseconds on linux and usec on mac)
 
@@ -58,6 +58,9 @@ struct _CTimeSpec:
             return self.tv_sec * _NSEC_PER_SEC + self.tv_subsec
         else:
             return self.tv_sec * _NSEC_PER_SEC + self.tv_subsec * _NSEC_PER_USEC
+
+    fn __str__(self) -> String:
+        return str(self.as_nanoseconds()) + "ns"
 
 
 @value
