@@ -161,13 +161,13 @@ fn test_fill():
 
     memset_zero(filled.data, filled.num_elements())
     filled.fill(1)
-    err = memcmp[DType.index](buf.data, filled.data, filled.num_elements())
+    err = memcmp(buf.data, filled.data, filled.num_elements())
     # CHECK: 0
     print(err)
 
     memset_zero(buf.data, buf.num_elements())
     filled.simd_fill[4](0)
-    err = memcmp[DType.index](buf.data, filled.data, filled.num_elements())
+    err = memcmp(buf.data, filled.data, filled.num_elements())
     # CHECK: 0
     print(err)
 

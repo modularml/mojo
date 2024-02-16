@@ -181,6 +181,17 @@ for x in v:
 
 ### 🦋 Changed
 
+- It is no longer possible to explicitly specify implicit argument parameters in
+  autoparameterized functions. This ability was an oversight and this is now an
+  error:
+
+```mojo
+fn autoparameterized(x: SIMD):
+    pass
+
+autoparameterized[DType.int32, 1](3) # error: too many parameters
+```
+
 - `vectorize_unroll` has been removed, and `vectorize` now has a parameter named
   `unroll_factor` with a default value of 1. Increasing `unroll_factor` may
   improve performance at the cost of binary size. See the
