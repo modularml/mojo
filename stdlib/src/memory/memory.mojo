@@ -31,6 +31,7 @@ from gpu.memory import AddressSpace as GPUAddressSpace
 # ===----------------------------------------------------------------------===#
 
 
+@always_inline
 fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
     """Compares two buffers. Both strings are assumed to be of the same length.
 
@@ -70,6 +71,7 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
     return 0
 
 
+@always_inline
 fn memcmp[
     type: AnyRegType, address_space: AddressSpace
 ](
