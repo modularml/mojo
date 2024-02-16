@@ -6,7 +6,6 @@
 
 from time.time import _CTimeSpec
 from utils.index import StaticIntTuple
-from sys.ffi import _get_dylib_function, DLHandle
 
 
 alias dev_t = Int64

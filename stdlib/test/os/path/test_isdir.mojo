@@ -3,7 +3,6 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# UNSUPPORTED: target=aarch64{{.*linux.*}}
 # RUN: %mojo -debug-level full %s
 
 from pathlib import cwd, Path

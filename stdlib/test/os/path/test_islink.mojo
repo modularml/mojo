@@ -3,7 +3,6 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# UNSUPPORTED: target=aarch64{{.*linux.*}}
 # RUN: ln -s %S %T/tmp
 # RUN: %mojo -debug-level full -D TEMP_DIR=%T/tmp %s
 

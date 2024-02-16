@@ -13,10 +13,14 @@ from os.path import isdir
 """
 
 from .._macos import _stat as _stat_macos, _lstat as _lstat_macos
-from .._linux import _stat as _stat_linux, _lstat as _lstat_linux
+from .._linux_x86 import _stat as _stat_linux_x86, _lstat as _lstat_linux_x86
+from .._linux_aarch64 import (
+    _stat as _stat_linux_arm,
+    _lstat as _lstat_linux_arm,
+)
 from ..stat import _S_ISDIR, _S_ISLNK, _S_ISREG
 from .. import PathLike
-from sys.info import os_is_windows, os_is_linux, os_is_macos
+from sys.info import os_is_windows, os_is_linux, os_is_macos, has_neon
 
 
 # ===----------------------------------------------------------------------=== #
@@ -33,8 +37,10 @@ fn _get_stat_st_mode(path: String) raises -> Int:
     @parameter
     if os_is_macos():
         return int(_stat_macos(path).st_mode)
+    elif has_neon():
+        return int(_stat_linux_arm(path).st_mode)
     else:
-        return int(_stat_linux(path).st_mode)
+        return int(_stat_linux_x86(path).st_mode)
 
 
 @always_inline
@@ -42,8 +48,10 @@ fn _get_lstat_st_mode(path: String) raises -> Int:
     @parameter
     if os_is_macos():
         return int(_lstat_macos(path).st_mode)
+    elif has_neon():
+        return int(_lstat_linux_arm(path).st_mode)
     else:
-        return int(_lstat_linux(path).st_mode)
+        return int(_lstat_linux_x86(path).st_mode)
 
 
 # ===----------------------------------------------------------------------=== #
