@@ -3,8 +3,9 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: ln -s %S %T/tmp
-# RUN: %mojo -debug-level full -D TEMP_DIR=%T/tmp %s
+# RUN: rm -rf %t && mkdir -p %t
+# RUN: ln -s %S %t/tmp
+# RUN: %mojo -debug-level full -D TEMP_DIR=%t/tmp %s
 
 from pathlib import Path
 from os.path import isdir, islink
