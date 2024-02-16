@@ -3,7 +3,7 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# XFAIL: system-linux && target-aarch64
+# UNSUPPORTED: target=aarch64{{.*linux.*}}
 # RUN: %mojo -debug-level full %s
 
 from pathlib import Path
