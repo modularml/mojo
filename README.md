@@ -5,7 +5,7 @@ and production by combining Python syntax and ecosystem with systems
 programming and metaprogramming features. Mojo is still young, but it is designed
 to become a superset of Python over time.  
 
-[See here to get started with Mojo](https://docs.modular.com/mojo/manual/get-started/).
+[You can install Mojo here](https://developer.modular.com).
 Then, when you want to report issues or request features,
 [please create a GitHub issue here](https://github.com/modularml/mojo/issues).
 
