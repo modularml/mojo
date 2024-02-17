@@ -39,7 +39,7 @@ trait Stringable:
     `String`:
 
     ```mojo
-    var foo = Foo("test")
+    let foo = Foo("test")
     print(str(foo) == "test")
     ```
 
@@ -90,7 +90,7 @@ trait StringableRaising:
 
     ```mojo
     fn main() raises:
-        var foo = Foo("test")
+        let foo = Foo("test")
         print(str(foo) == "test")
     ```
 

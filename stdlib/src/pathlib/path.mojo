@@ -23,9 +23,9 @@ fn cwd() raises -> Path:
       The current directory.
     """
     alias MAX_CWD_BUFFER_SIZE = 1024
-    var buf = stack_allocation[MAX_CWD_BUFFER_SIZE, DType.int8]()
+    let buf = stack_allocation[MAX_CWD_BUFFER_SIZE, DType.int8]()
 
-    var res = external_call["getcwd", DTypePointer[DType.int8]](
+    let res = external_call["getcwd", DTypePointer[DType.int8]](
         buf, MAX_CWD_BUFFER_SIZE
     )
 
@@ -225,8 +225,8 @@ struct Path(Stringable, CollectionElement, PathLike):
         """
         # +2 to skip both `DIR_SEPARATOR` and the first ".".
         # For example /a/.foo's suffix is "" but /a/b.foo's suffix is .foo.
-        var start = self.path.rfind(DIR_SEPARATOR) + 2
-        var i = self.path.rfind(".", start)
+        let start = self.path.rfind(DIR_SEPARATOR) + 2
+        let i = self.path.rfind(".", start)
         if 0 < i < (len(self.path) - 1):
             return self.path[i:]
 

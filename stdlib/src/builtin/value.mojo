@@ -31,8 +31,8 @@ trait Movable:
     fn return_foo[T: Movable](owned foo: T) -> T:
         return foo^
 
-    var foo = Foo()
-    var res = return_foo(foo^)
+    let foo = Foo()
+    let res = return_foo(foo^)
     ```
 
     ```plaintext
@@ -71,11 +71,11 @@ trait Copyable:
 
     ```mojo
     fn copy_return[T: Copyable](foo: T) -> T:
-        var copy = foo
+        let copy = foo
         return copy
 
-    var foo = Foo("test")
-    var res = copy_return(foo)
+    let foo = Foo("test")
+    let res = copy_return(foo)
     ```
 
     ```plaintext

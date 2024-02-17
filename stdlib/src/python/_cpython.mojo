@@ -35,7 +35,7 @@ struct PyObjectPtr:
 
     @staticmethod
     fn null_ptr() -> PyObjectPtr:
-        var null_pointer = DTypePointer[DType.int8].get_null()
+        let null_pointer = DTypePointer[DType.int8].get_null()
         return PyObjectPtr {value: null_pointer}
 
     fn is_null(self) -> Bool:
@@ -59,7 +59,7 @@ struct PythonVersion:
     var patch: Int
 
     fn __init__(version: StringRef) -> PythonVersion:
-        var version_string = String(version)
+        let version_string = String(version)
         var components = StaticIntTuple[3]()
         var start = 0
         var next = 0
@@ -68,7 +68,7 @@ struct PythonVersion:
             if version_string[next] == "." or (
                 version_string[next] == " " and i == 2
             ):
-                var c = version_string[start:next]
+                let c = version_string[start:next]
                 try:
                     components[i] = atol(c)
                 except:
@@ -93,7 +93,7 @@ fn _py_initialize(inout cpython: CPython):
     # setting explicitly every library search path, as well as needing to
     # specify a `PYTHONHOME`. This is much more complicated and restrictive
     # to be considered a better solution.
-    var error_message: StringRef = external_call[
+    let error_message: StringRef = external_call[
         "KGEN_CompilerRT_Python_SetPythonPath",
         DTypePointer[DType.int8],
     ]()
@@ -106,7 +106,7 @@ fn _py_initialize(inout cpython: CPython):
 
 
 fn _py_get_version(lib: DLHandle) -> StringRef:
-    var version_string = lib.get_function[fn () -> DTypePointer[DType.int8]](
+    let version_string = lib.get_function[fn () -> DTypePointer[DType.int8]](
         "Py_GetVersion"
     )()
     return StringRef(version_string)
@@ -126,7 +126,7 @@ fn _py_initialize(lib: DLHandle):
     # setting explicitly every library search path, as well as needing to
     # specify a `PYTHONHOME`. This is much more complicated and restrictive
     # to be considered a better solution.
-    var error_message: StringRef = external_call[
+    let error_message: StringRef = external_call[
         "KGEN_CompilerRT_Python_SetPythonPath",
         DTypePointer[DType.int8],
     ]()
@@ -151,17 +151,17 @@ struct CPython:
     var total_ref_count: Pointer[Int]
 
     fn __init__(inout self: CPython):
-        var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
+        let logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
         if logging_enabled:
             print("CPython init")
-        var python_lib = getenv("MOJO_PYTHON_LIBRARY")
+        let python_lib = getenv("MOJO_PYTHON_LIBRARY")
         if python_lib == "":
             print(
                 "Mojo/Python interoperability error: Unable to locate a"
                 " suitable libpython, please set `MOJO_PYTHON_LIBRARY`"
             )
 
-        var null_pointer = DTypePointer[DType.int8].get_null()
+        let null_pointer = DTypePointer[DType.int8].get_null()
 
         self.lib = DLHandle(python_lib)
         self.total_ref_count = Pointer[Int].alloc(1)
@@ -186,9 +186,9 @@ struct CPython:
 
     fn Py_NoneType(inout self) -> PyObjectPtr:
         if self.noneType.is_null():
-            var list = self.PyList_New(0)
-            var tuple = self.PyTuple_New(0)
-            var callable = self.PyObject_GetAttrString(list, "reverse")
+            let list = self.PyList_New(0)
+            let tuple = self.PyTuple_New(0)
+            let callable = self.PyObject_GetAttrString(list, "reverse")
             self.noneType = self.PyObject_CallObject(callable, tuple)
             self.Py_DecRef(tuple)
             self.Py_DecRef(callable)
@@ -208,11 +208,11 @@ struct CPython:
         self.total_ref_count = existing.total_ref_count
 
     fn _inc_total_rc(inout self):
-        var v = self.total_ref_count.load()
+        let v = self.total_ref_count.load()
         self.total_ref_count[0] = v + 1
 
     fn _dec_total_rc(inout self):
-        var v = self.total_ref_count.load()
+        let v = self.total_ref_count.load()
         self.total_ref_count[0] = v - 1
 
     fn Py_IncRef(inout self, ptr: PyObjectPtr):
@@ -242,7 +242,7 @@ struct CPython:
         return int(ptr.value.load())
 
     fn PyDict_New(inout self) -> PyObjectPtr:
-        var r = self.lib.get_function[fn () -> PyObjectPtr]("PyDict_New")()
+        let r = self.lib.get_function[fn () -> PyObjectPtr]("PyDict_New")()
         if self.logging_enabled:
             print(
                 r._get_ptr_as_int(),
@@ -255,7 +255,7 @@ struct CPython:
     fn PyDict_SetItem(
         inout self, dict: PyObjectPtr, key: PyObjectPtr, value: PyObjectPtr
     ) -> Int:
-        var r = self.lib.get_function[
+        let r = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> Int32
         ](StringRef("PyDict_SetItem"))(dict, key, value)
         if self.logging_enabled:
@@ -270,7 +270,7 @@ struct CPython:
     fn PyDict_GetItemWithError(
         inout self, dict: PyObjectPtr, key: PyObjectPtr
     ) -> PyObjectPtr:
-        var result = self.lib.get_function[
+        let result = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
         ](StringRef("PyDict_GetItemWithError"))(dict, key)
         if self.logging_enabled:
@@ -286,7 +286,7 @@ struct CPython:
         inout self,
         name: StringRef,
     ) -> PyObjectPtr:
-        var r = self.lib.get_function[
+        let r = self.lib.get_function[
             fn (DTypePointer[DType.int8]) -> PyObjectPtr
         ]("PyImport_ImportModule")(name.data)
         if self.logging_enabled:
@@ -310,7 +310,7 @@ struct CPython:
             `True` if the code executed successfully or `False` if the code
             raised an exception.
         """
-        var status = self.lib.get_function[
+        let status = self.lib.get_function[
             fn (DTypePointer[DType.int8]) -> Int
         ](StringRef("PyRun_SimpleString"))(str.data)
         # PyRun_SimpleString returns 0 on success and -1 if an exception was
@@ -324,7 +324,7 @@ struct CPython:
         locals: PyObjectPtr,
         run_mode: Int,
     ) -> PyObjectPtr:
-        var result = PyObjectPtr(
+        let result = PyObjectPtr(
             self.lib.get_function[
                 fn (
                     DTypePointer[DType.int8], Int32, PyObjectPtr, PyObjectPtr
@@ -349,7 +349,7 @@ struct CPython:
         obj: PyObjectPtr,
         name: StringRef,
     ) -> PyObjectPtr:
-        var r = self.lib.get_function[
+        let r = self.lib.get_function[
             fn (PyObjectPtr, DTypePointer[DType.int8]) -> PyObjectPtr
         ]("PyObject_GetAttrString")(obj, name.data)
         if self.logging_enabled:
@@ -368,7 +368,7 @@ struct CPython:
     fn PyObject_SetAttrString(
         inout self, obj: PyObjectPtr, name: StringRef, new_value: PyObjectPtr
     ) -> Int:
-        var r = self.lib.get_function[
+        let r = self.lib.get_function[
             fn (PyObjectPtr, DTypePointer[DType.int8], PyObjectPtr) -> Int
         ]("PyObject_SetAttrString")(obj, name.data, new_value)
         if self.logging_enabled:
@@ -389,7 +389,7 @@ struct CPython:
         callable: PyObjectPtr,
         args: PyObjectPtr,
     ) -> PyObjectPtr:
-        var r = self.lib.get_function[
+        let r = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
         ]("PyObject_CallObject")(callable, args)
         if self.logging_enabled:
@@ -424,7 +424,7 @@ struct CPython:
         )
 
     fn PyTuple_New(inout self, count: Int) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
+        let r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             StringRef("PyTuple_New")
         )(count)
         if self.logging_enabled:
@@ -452,7 +452,7 @@ struct CPython:
         )(tuple, index, element)
 
     fn PyString_FromStringAndSize(inout self, str: StringRef) -> PyObjectPtr:
-        var r = self.lib.get_function[
+        let r = self.lib.get_function[
             fn (
                 DTypePointer[DType.int8], Int, DTypePointer[DType.int8]
             ) -> PyObjectPtr
@@ -471,7 +471,7 @@ struct CPython:
         return r
 
     fn PyLong_FromLong(inout self, value: Int) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
+        let r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             "PyLong_FromLong"
         )(value)
         if self.logging_enabled:
@@ -486,19 +486,19 @@ struct CPython:
         return r
 
     fn PyModule_GetDict(inout self, name: PyObjectPtr) -> PyObjectPtr:
-        var value = self.lib.get_function[
+        let value = self.lib.get_function[
             fn (PyObjectPtr) -> DTypePointer[DType.int8]
         ]("PyModule_GetDict")(name.value)
         return PyObjectPtr {value: value}
 
     fn PyImport_AddModule(inout self, name: StringRef) -> PyObjectPtr:
-        var value = self.lib.get_function[
+        let value = self.lib.get_function[
             fn (DTypePointer[DType.int8]) -> DTypePointer[DType.int8]
         ]("PyImport_AddModule")(name.data)
         return PyObjectPtr {value: value}
 
     fn PyBool_FromLong(inout self, value: Int) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
+        let r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             "PyBool_FromLong"
         )(value)
         if self.logging_enabled:
@@ -513,7 +513,7 @@ struct CPython:
         return r
 
     fn PyList_New(inout self, len: Int) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Int) -> PyObjectPtr]("PyList_New")(
+        let r = self.lib.get_function[fn (Int) -> PyObjectPtr]("PyList_New")(
             len
         )
         if self.logging_enabled:
@@ -562,7 +562,7 @@ struct CPython:
         )(py_object)
 
     fn PyFloat_FromDouble(inout self, value: Float64) -> PyObjectPtr:
-        var r = self.lib.get_function[fn (Float64) -> PyObjectPtr](
+        let r = self.lib.get_function[fn (Float64) -> PyObjectPtr](
             "PyFloat_FromDouble"
         )(value)
         if self.logging_enabled:
@@ -583,7 +583,7 @@ struct CPython:
         var long = 0
         if value:
             long = 1
-        var r = self.lib.get_function[fn (Int8) -> PyObjectPtr](
+        let r = self.lib.get_function[fn (Int8) -> PyObjectPtr](
             "PyBool_FromLong"
         )(Int8(long))
         if self.logging_enabled:
@@ -598,7 +598,7 @@ struct CPython:
         return r
 
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
-        var result = self.lib.get_function[
+        let result = self.lib.get_function[
             fn (PyObjectPtr, Pointer[Int]) -> DTypePointer[DType.int8]
         ]("PyUnicode_AsUTF8AndSize")(py_object, Pointer[Int]())
         return StringRef(result)
@@ -607,7 +607,7 @@ struct CPython:
         self.lib.get_function[fn () -> None]("PyErr_Clear")()
 
     fn PyErr_Occurred(inout self) -> Bool:
-        var value = self.lib.get_function[fn () -> PyObjectPtr](
+        let value = self.lib.get_function[fn () -> PyObjectPtr](
             "PyErr_Occurred"
         )()
         return not value.is_null()
@@ -617,19 +617,19 @@ struct CPython:
         var value = DTypePointer[DType.int8]()
         var traceback = DTypePointer[DType.int8]()
 
-        var type_ptr = Pointer[DTypePointer[DType.int8]].address_of(type)
-        var value_ptr = Pointer[DTypePointer[DType.int8]].address_of(value)
-        var traceback_ptr = Pointer[DTypePointer[DType.int8]].address_of(
+        let type_ptr = Pointer[DTypePointer[DType.int8]].address_of(type)
+        let value_ptr = Pointer[DTypePointer[DType.int8]].address_of(value)
+        let traceback_ptr = Pointer[DTypePointer[DType.int8]].address_of(
             traceback
         )
-        var func = self.lib.get_function[
+        let func = self.lib.get_function[
             fn (
                 Pointer[DTypePointer[DType.int8]],
                 Pointer[DTypePointer[DType.int8]],
                 Pointer[DTypePointer[DType.int8]],
             ) -> None
         ]("PyErr_Fetch")(type_ptr, value_ptr, traceback_ptr)
-        var r = PyObjectPtr {value: value}
+        let r = PyObjectPtr {value: value}
         if self.logging_enabled:
             print(
                 r._get_ptr_as_int(),
@@ -645,7 +645,7 @@ struct CPython:
         lhs: PyObjectPtr,
     ) -> Bool:
         if self.version.minor >= 10:
-            var r = self.lib.get_function[fn (PyObjectPtr, PyObjectPtr) -> Int](
+            let r = self.lib.get_function[fn (PyObjectPtr, PyObjectPtr) -> Int](
                 "Py_Is"
             )(rhs, lhs)
             return r > 0
@@ -653,10 +653,10 @@ struct CPython:
             return rhs == lhs
 
     fn PyDict_Check(inout self, maybe_dict: PyObjectPtr) -> Bool:
-        var my_type = self.PyObject_Type(maybe_dict)
-        var my_type_as_int = my_type._get_ptr_as_int()
-        var dict_type = self.PyDict_Type()
-        var result = my_type_as_int == dict_type._get_ptr_as_int()
+        let my_type = self.PyObject_Type(maybe_dict)
+        let my_type_as_int = my_type._get_ptr_as_int()
+        let dict_type = self.PyDict_Type()
+        let result = my_type_as_int == dict_type._get_ptr_as_int()
         self.Py_DecRef(my_type)
         return result
 
@@ -666,14 +666,14 @@ struct CPython:
         return self.dictType
 
     fn PyObject_Type(inout self, obj: PyObjectPtr) -> PyObjectPtr:
-        var f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+        let f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyObject_Type"
         )
         self._inc_total_rc()
         return f(obj)
 
     fn PyObject_Str(inout self, obj: PyObjectPtr) -> PyObjectPtr:
-        var f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+        let f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyObject_Str"
         )
         self._inc_total_rc()
@@ -682,7 +682,7 @@ struct CPython:
     fn PyObject_GetIter(
         inout self, traversablePyObject: PyObjectPtr
     ) -> PyObjectPtr:
-        var iter = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+        let iter = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyObject_GetIter"
         )(traversablePyObject)
         if self.logging_enabled:
@@ -699,7 +699,7 @@ struct CPython:
         return iter
 
     fn PyIter_Next(inout self, iterator: PyObjectPtr) -> PyObjectPtr:
-        var next = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+        let next = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyIter_Next"
         )(iterator)
         if self.logging_enabled:
@@ -717,13 +717,13 @@ struct CPython:
         return next
 
     fn PyIter_Check(inout self, obj: PyObjectPtr) -> Bool:
-        var follows_iter_protocol = self.lib.get_function[
+        let follows_iter_protocol = self.lib.get_function[
             fn (PyObjectPtr) -> Int
         ]("PyIter_Check")(obj)
         return follows_iter_protocol != 0
 
     fn PySequence_Check(inout self, obj: PyObjectPtr) -> Bool:
-        var follows_seq_protocol = self.lib.get_function[
+        let follows_seq_protocol = self.lib.get_function[
             fn (PyObjectPtr) -> Int
         ]("PySequence_Check")(obj)
         return follows_seq_protocol != 0
@@ -734,10 +734,10 @@ struct CPython:
         var key = DTypePointer[DType.int8].get_null()
         var value = DTypePointer[DType.int8].get_null()
         var v = p
-        var position = Pointer[Int].address_of(v)
-        var value_ptr = Pointer[DTypePointer[DType.int8]].address_of(value)
-        var key_ptr = Pointer[DTypePointer[DType.int8]].address_of(key)
-        var result = self.lib.get_function[
+        let position = Pointer[Int].address_of(v)
+        let value_ptr = Pointer[DTypePointer[DType.int8]].address_of(value)
+        let key_ptr = Pointer[DTypePointer[DType.int8]].address_of(key)
+        let result = self.lib.get_function[
             fn (
                 PyObjectPtr,
                 Pointer[Int],

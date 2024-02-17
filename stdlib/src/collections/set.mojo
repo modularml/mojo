@@ -26,7 +26,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
     set -= Set[Int](3, 4, 5)
     print(set == Set[Int](1, 2))  # True
     print(set | Set[Int](0, 1) == Set[Int](0, 1, 2))  # True
-    var element = set.pop()
+    let element = set.pop()
     print(len(set))  # 1
     ```
 
@@ -264,7 +264,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         if not self:
             raise "Pop on empty set"
         var iter = self.__iter__()
-        var first = iter.__next__()[]
+        let first = iter.__next__()[]
         self.remove(first)
         return first
 

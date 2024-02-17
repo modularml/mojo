@@ -35,7 +35,7 @@ alias DEFAULT_RTLD = RTLD.NOW | RTLD.GLOBAL
 struct DLHandle(CollectionElement):
     """Represents a dynamically linked library that can be loaded and unloaded.
 
-    The library is loaded on initialization and unloaded on devarion of the object.
+    The library is loaded on initialization and unloaded on deletion of the object.
     """
 
     var handle: DTypePointer[DType.int8]
@@ -68,7 +68,7 @@ struct DLHandle(CollectionElement):
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
     fn _del_old(inout self):
-        """Devare the DLHandle object unloading the associated dynamic library.
+        """Delete the DLHandle object unloading the associated dynamic library.
         """
 
         @parameter
@@ -137,7 +137,7 @@ fn _get_dylib[
     init_fn: fn (Pointer[NoneType]) -> Pointer[NoneType],
     destroy_fn: fn (Pointer[NoneType]) -> None,
 ](payload: Pointer[NoneType] = Pointer[NoneType]()) -> DLHandle:
-    var ptr = _get_global[name, init_fn, destroy_fn](payload).bitcast[
+    let ptr = _get_global[name, init_fn, destroy_fn](payload).bitcast[
         DLHandle
     ]()
     return __get_address_as_lvalue(ptr.address)

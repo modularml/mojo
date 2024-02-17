@@ -38,7 +38,7 @@ fn setenv(name: String, value: String, overwrite: Bool = True) -> Bool:
     if not os_is_supported:
         return False
 
-    var status = external_call["setenv", Int32](
+    let status = external_call["setenv", Int32](
         name._as_ptr(), value._as_ptr(), Int32(1 if overwrite else 0)
     )
     return status == 0
@@ -64,7 +64,7 @@ fn getenv(name: String, default: String = "") -> String:
     if not os_is_supported:
         return default
 
-    var ptr = external_call["getenv", DTypePointer[DType.int8]](name._as_ptr())
+    let ptr = external_call["getenv", DTypePointer[DType.int8]](name._as_ptr())
     if not ptr:
         return default
     return String(StringRef(ptr))

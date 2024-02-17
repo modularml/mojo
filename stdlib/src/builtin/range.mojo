@@ -48,7 +48,7 @@ struct _ZeroStartingRange(Sized):
 
     @always_inline
     fn __next__(inout self) -> Int:
-        var curr = self.curr
+        let curr = self.curr
         self.curr -= 1
         return self.end - curr
 
@@ -73,7 +73,7 @@ struct _SequentialRange(Sized):
 
     @always_inline
     fn __next__(inout self) -> Int:
-        var start = self.start
+        let start = self.start
         self.start += 1
         return start
 
@@ -104,7 +104,7 @@ struct _StridedRangeIterator(Sized):
 
     @always_inline
     fn __next__(inout self) -> Int:
-        var result = self.start
+        let result = self.start
         self.start += self.step
         return result
 
@@ -130,7 +130,7 @@ struct _StridedRange(Sized):
 
     @always_inline
     fn __next__(inout self) -> Int:
-        var result = self.start
+        let result = self.start
         self.start += self.step
         return result
 
@@ -190,8 +190,8 @@ fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _SequentialRange:
     Returns:
         The constructed range.
     """
-    var s = int(start)
-    var e = int(end)
+    let s = int(start)
+    let e = int(end)
     return _SequentialRange(s, e)
 
 
@@ -212,8 +212,8 @@ fn range[
     Returns:
         The constructed range.
     """
-    var s = int(start)
-    var e = int(end)
+    let s = int(start)
+    let e = int(end)
     return _SequentialRange(s, e)
 
 

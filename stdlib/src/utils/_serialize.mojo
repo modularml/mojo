@@ -30,22 +30,22 @@ fn _serialize_elements_compact[
 ](ptr: DTypePointer, len: Int):
     serialize_fn(_kStartTensorMarker)
     if len < _kCompactMaxElemsToPrint:
-        _serialize_elements_compvare[serialize_fn=serialize_fn](ptr, len)
+        _serialize_elements_complete[serialize_fn=serialize_fn](ptr, len)
         serialize_fn(_kEndTensorMarker)
         return
 
-    _serialize_elements_compvare[serialize_fn=serialize_fn](
+    _serialize_elements_complete[serialize_fn=serialize_fn](
         ptr, _kCompactElemPerSide
     )
     serialize_fn(", ")
     serialize_fn(_kTensorFiller)
-    _serialize_elements_compvare[serialize_fn=serialize_fn](
+    _serialize_elements_complete[serialize_fn=serialize_fn](
         ptr + len - _kCompactElemPerSide, _kCompactElemPerSide
     )
     serialize_fn(_kEndTensorMarker)
 
 
-fn _serialize_elements_compvare[
+fn _serialize_elements_complete[
     serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
 ](ptr: DTypePointer, len: Int):
     if len == 0:
@@ -64,7 +64,7 @@ fn _serialize_elements[
     if compact:
         _serialize_elements_compact[serialize_fn=serialize_fn](ptr, len)
     else:
-        _serialize_elements_compvare[serialize_fn=serialize_fn](ptr, len)
+        _serialize_elements_complete[serialize_fn=serialize_fn](ptr, len)
 
 
 fn _serialize[
@@ -73,7 +73,7 @@ fn _serialize[
     serialize_shape: Bool = True,
     serialize_end_line: Bool = True,
 ](ptr: DTypePointer, shape: TensorShape):
-    var rank = shape.rank()
+    let rank = shape.rank()
     if rank == 0:
         if serialize_end_line:
             serialize_fn("\n")
@@ -87,11 +87,11 @@ fn _serialize[
     # first and last 3 columns. The intermediaries are filled with '...'
     # to indicate something is here but we are not displaying it.
 
-    var column_elem_count = 1 if rank < 1 else shape[-1]
+    let column_elem_count = 1 if rank < 1 else shape[-1]
     # If the tensor is a rank-1 vector, then the number of rows is 1.
-    var row_elem_count = 1 if rank < 2 else shape[-2]
+    let row_elem_count = 1 if rank < 2 else shape[-2]
 
-    var matrix_elem_count = column_elem_count * row_elem_count
+    let matrix_elem_count = column_elem_count * row_elem_count
 
     # Open parens for every other dimension other than row_elem_count &
     # column_elem_count
@@ -180,9 +180,9 @@ fn _serialize_as_tensor[
     Returns:
       Tensor containing the bytes of object.
     """
-    var self_ptr = bitcast[Int8](Pointer.address_of(object))
+    let self_ptr = bitcast[Int8](Pointer.address_of(object))
     alias size = sizeof[type]()
-    var bytes = Tensor[DType.int8](size)
+    let bytes = Tensor[DType.int8](size)
     memcpy(bytes.data(), DTypePointer[DType.int8](self_ptr.address), size)
     return bytes ^
 
@@ -195,20 +195,20 @@ fn _serialize_to_file[type: DType](tensor: Tensor[type], path: Path) raises:
       tensor: Tensor to serialize.
       path: Path of file.
     """
-    var header_size = len(_SERIALIZATION_HEADER)
+    let header_size = len(_SERIALIZATION_HEADER)
     var header_bytes = Tensor[DType.int8](header_size)
 
     for i in range(header_size):
         header_bytes.simd_store(i, _SERIALIZATION_HEADER[i])
 
     var major_format: UInt32 = _SERIALIZATION_MAJOR_FORMAT
-    var major_format_bytes = _serialize_as_tensor(major_format)
+    let major_format_bytes = _serialize_as_tensor(major_format)
     var minor_format: UInt32 = _SERIALIZATION_MINOR_FORMAT
-    var minor_format_bytes = _serialize_as_tensor(minor_format)
+    let minor_format_bytes = _serialize_as_tensor(minor_format)
     var spec_size: UInt32 = sizeof[TensorSpec]()
-    var spec_size_bytes = _serialize_as_tensor(spec_size)
+    let spec_size_bytes = _serialize_as_tensor(spec_size)
     var spec = tensor.spec()
-    var spec_bytes = _serialize_as_tensor[TensorSpec](spec)
+    let spec_bytes = _serialize_as_tensor[TensorSpec](spec)
 
     var bytes = Tensor[DType.int8](
         header_bytes.num_elements()
@@ -224,7 +224,7 @@ fn _serialize_to_file[type: DType](tensor: Tensor[type], path: Path) raises:
     fn _copy_bytes(
         inout dest: Tensor[DType.int8], offset: Int, src: Tensor[DType.int8]
     ) -> Int:
-        var size = src.num_elements()
+        let size = src.num_elements()
         memcpy(
             dest.data() + offset,
             src.data(),

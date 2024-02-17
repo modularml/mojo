@@ -46,22 +46,22 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         buffer.
     """
     alias simd_width = simdwidthof[s1.type]()
-    var vector_end_simd = align_down(count, simd_width)
+    let vector_end_simd = align_down(count, simd_width)
     for i in range(0, vector_end_simd, simd_width):
-        var s1i = s1.simd_load[simd_width](i)
-        var s2i = s2.simd_load[simd_width](i)
+        let s1i = s1.simd_load[simd_width](i)
+        let s2i = s2.simd_load[simd_width](i)
         if s1i == s2i:
             continue
 
-        var diff = s1i - s2i
+        let diff = s1i - s2i
         for j in range(simd_width):
             if diff[j] > 0:
                 return 1
             return -1
 
     for i in range(vector_end_simd, count):
-        var s1i = s1[i]
-        var s2i = s2[i]
+        let s1i = s1[i]
+        let s2i = s2[i]
         if s1i == s2i:
             continue
 
@@ -95,9 +95,9 @@ fn memcmp[
         s1 < s2. The comparison is performed by the first different byte in the
         byte strings.
     """
-    var ds1 = DTypePointer[DType.uint8, address_space](s1.bitcast[UInt8]())
-    var ds2 = DTypePointer[DType.uint8, address_space](s2.bitcast[UInt8]())
-    var byte_count = count * sizeof[type]()
+    let ds1 = DTypePointer[DType.uint8, address_space](s1.bitcast[UInt8]())
+    let ds2 = DTypePointer[DType.uint8, address_space](s2.bitcast[UInt8]())
+    let byte_count = count * sizeof[type]()
     return memcmp(ds1, ds2, byte_count)
 
 
@@ -124,7 +124,7 @@ fn memcpy[
         src: The source pointer.
         count: The number of elements to copy.
     """
-    var byte_count = count * sizeof[type]()
+    let byte_count = count * sizeof[type]()
     memcpy[DType.uint8](
         Buffer[DType.uint8, Dim(), address_space=address_space](
             dest.bitcast[UInt8](), byte_count
@@ -182,10 +182,10 @@ fn memcpy[
         dest: The destination buffer.
         src: The source buffer.
     """
-    var n = len(dest) * sizeof[type]()
+    let n = len(dest) * sizeof[type]()
 
-    var dest_data = dest.data.bitcast[DType.uint8]()
-    var src_data = src.data.bitcast[DType.uint8]()
+    let dest_data = dest.data.bitcast[DType.uint8]()
+    let src_data = src.data.bitcast[DType.uint8]()
 
     if n < 5:
         if n == 0:
@@ -200,7 +200,7 @@ fn memcpy[
 
     if n <= 16:
         if n >= 8:
-            var ui64_size = sizeof[DType.uint64]()
+            let ui64_size = sizeof[DType.uint64]()
             dest_data.bitcast[DType.uint64]().store(
                 src_data.bitcast[DType.uint64]().load()
             )
@@ -208,7 +208,7 @@ fn memcpy[
                 src_data.offset(n - ui64_size).bitcast[DType.uint64]().load()
             )
             return
-        var ui32_size = sizeof[DType.uint32]()
+        let ui32_size = sizeof[DType.uint32]()
         dest_data.bitcast[DType.uint32]().store(
             src_data.bitcast[DType.uint32]().load()
         )
@@ -267,14 +267,14 @@ fn parallel_memcpy[
     @parameter
     @always_inline
     fn _parallel_copy(thread_id: Int):
-        var begin = count_per_task * thread_id
-        var end = min(
+        let begin = count_per_task * thread_id
+        let end = min(
             count_per_task * (thread_id + 1),
             count,
         )
         if begin >= count:
             return
-        var to_copy = end - begin
+        let to_copy = end - begin
         if to_copy <= 0:
             return
 
@@ -306,9 +306,9 @@ fn parallel_memcpy[
     if count < min_work_for_parallel:
         memcpy(dest, src, count)
     else:
-        var work_units = div_ceil(count, min_work_per_task)
-        var num_tasks = min(work_units, Runtime().parallelism_level())
-        var work_block_size = div_ceil(work_units, num_tasks)
+        let work_units = div_ceil(count, min_work_per_task)
+        let num_tasks = min(work_units, Runtime().parallelism_level())
+        let work_block_size = div_ceil(work_units, num_tasks)
 
         parallel_memcpy[type](
             dest,
@@ -331,7 +331,7 @@ fn _memset_simd[
     @always_inline
     @parameter
     fn _set[simd_width: Int](idx: Int):
-        var splat_val = SIMD[DType.uint8, simd_width].splat(value)
+        let splat_val = SIMD[DType.uint8, simd_width].splat(value)
         ptr.simd_store[simd_width](idx, splat_val)
 
     # Copy in 32-bit chunks

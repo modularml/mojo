@@ -104,7 +104,7 @@ struct _c_stat(Stringable):
 @always_inline
 fn _stat(path: String) raises -> _c_stat:
     var stat = _c_stat()
-    var err = external_call["__xstat", Int32](
+    let err = external_call["__xstat", Int32](
         Int32(0), path._as_ptr(), Pointer.address_of(stat)
     )
     if err == -1:
@@ -115,7 +115,7 @@ fn _stat(path: String) raises -> _c_stat:
 @always_inline
 fn _lstat(path: String) raises -> _c_stat:
     var stat = _c_stat()
-    var err = external_call["__lxstat", Int32](
+    let err = external_call["__lxstat", Int32](
         Int32(0), path._as_ptr(), Pointer.address_of(stat)
     )
     if err == -1:

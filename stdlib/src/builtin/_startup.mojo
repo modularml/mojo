@@ -20,7 +20,7 @@ fn _get_global[
 
 
 fn _init_global_runtime(ignored: Pointer[NoneType]) -> Pointer[NoneType]:
-    """Intialize the global runtime. This is a singvaron that handle the common
+    """Intialize the global runtime. This is a singleton that handle the common
     case where the runtime has the same number of threads as the number of cores.
     """
     return external_call[
@@ -35,15 +35,15 @@ fn _destroy_global_runtime(ptr: Pointer[NoneType]):
 
 @always_inline
 fn _get_current_or_global_runtime() -> Pointer[NoneType]:
-    """Returns the current runtime, or returns the Mojo singvaron global
+    """Returns the current runtime, or returns the Mojo singleton global
     runtime, creating it if it does not already exist. When Mojo is used within
     the Modular Execution Engine the current runtime will be that already
     constructed by the execution engine. If the user has already manually
     constructed a runtime and added tasks to it, the current runtime for those
-    tasks will be that runtime. Otherwise, the singvaron runtime is used, which
+    tasks will be that runtime. Otherwise, the singleton runtime is used, which
     is created with number of threads equal to the number of cores.
     """
-    var current_runtime = external_call[
+    let current_runtime = external_call[
         "KGEN_CompilerRT_LLCL_GetCurrentRuntime", Pointer[NoneType]
     ]()
     if current_runtime:
@@ -70,7 +70,7 @@ fn __wrap_and_execute_main[
     # Call into the user main function.
     main_func()
 
-    # Devare any globals we have allocated.
+    # Delete any globals we have allocated.
     external_call["KGEN_CompilerRT_DestroyGlobals", NoneType]()
 
     # Return OK.
@@ -98,7 +98,7 @@ fn __wrap_and_execute_raising_main[
         print("Unhandled exception caught during execution:", e)
         return 1
 
-    # Devare any globals we have allocated.
+    # Delete any globals we have allocated.
     external_call["KGEN_CompilerRT_DestroyGlobals", NoneType]()
 
     # Return OK.

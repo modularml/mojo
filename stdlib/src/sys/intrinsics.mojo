@@ -703,7 +703,7 @@ fn scatter[
     @parameter
     if size == 1:
         if mask:
-            var ptr = DTypePointer[type](base[0])
+            let ptr = DTypePointer[type](base[0])
             ptr.store(value[0])
         return
     llvm_intrinsic["llvm.masked.scatter", NoneType](
@@ -1128,11 +1128,11 @@ fn strided_load[
     if simd_width == 1:
         return addr.load() if mask else SIMD[type, 1]()
 
-    var offset = (
+    let offset = (
         addr.__as_index()
         + stride * iota[DType.index, simd_width]() * sizeof[type]()
     )
-    var passthrough = SIMD[type, simd_width]()
+    let passthrough = SIMD[type, simd_width]()
     return gather[type, simd_width](
         offset.cast[DType.address](), mask, passthrough
     )
@@ -1207,7 +1207,7 @@ fn strided_store[
             addr.store(value[0])
         return
 
-    var offset = (
+    let offset = (
         addr.__as_index()
         + stride * iota[DType.index, simd_width]() * sizeof[type]()
     )

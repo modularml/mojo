@@ -49,7 +49,7 @@ struct _PyIter(Sized):
         """
         var cpython = _get_global_python_itf().cpython()
         self.iterator = iter
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
+        let maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
         if maybeNextItem.is_null():
             self.isDone = True
             self.preparedNextItem = 0
@@ -73,8 +73,8 @@ struct _PyIter(Sized):
         if not self.iterator:
             return self.iterator
         var cpython = _get_global_python_itf().cpython()
-        var current = self.preparedNextItem
-        var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
+        let current = self.preparedNextItem
+        let maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
         if maybeNextItem.is_null():
             self.isDone = True
         else:
@@ -85,7 +85,7 @@ struct _PyIter(Sized):
         """Return zero to halt iteration.
 
         Returns:
-            0 if the traversal is compvare and 1 otherwise.
+            0 if the traversal is complete and 1 otherwise.
         """
         if self.isDone:
             return 0
@@ -149,10 +149,10 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         if dt == DType.bool:
             self.py_object = cpython.toPython(value.__bool__())
         elif dt.is_integral():
-            var int_val = value.cast[DType.index]().value
+            let int_val = value.cast[DType.index]().value
             self.py_object = cpython.toPython(int_val)
         else:
-            var fp_val = value.cast[DType.float64]()
+            let fp_val = value.cast[DType.float64]()
             self.py_object = cpython.PyFloat_FromDouble(fp_val.value)
 
     fn __init__(inout self, value: Bool):
@@ -211,7 +211,7 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
             # FIXME: This doesn't handle implicit conversions or nested lists.
             alias T = types[i]
 
-            var obj: PythonObject
+            let obj: PythonObject
 
             @parameter
             if _mlirtype_is_eq[T, Int]():
@@ -254,7 +254,7 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
             # FIXME: This doesn't handle implicit conversions or nested lists.
             alias T = types[i]
 
-            var obj: PythonObject
+            let obj: PythonObject
 
             @parameter
             if _mlirtype_is_eq[T, Int]():
@@ -299,7 +299,7 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         if cpython.PySequence_Check(self.py_object) or cpython.PyIter_Check(
             self.py_object
         ):
-            var iter = cpython.PyObject_GetIter(self.py_object)
+            let iter = cpython.PyObject_GetIter(self.py_object)
             return _PyIter(iter)
         else:
             return _PyIter()
@@ -324,7 +324,7 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
             The value of the object attribute with the given name.
         """
         var cpython = _get_global_python_itf().cpython()
-        var result = cpython.PyObject_GetAttrString(self.py_object, name)
+        let result = cpython.PyObject_GetAttrString(self.py_object, name)
         Python.throw_python_exception_if_error_state(cpython)
         if result.is_null():
             raise Error("Attribute is not found.")
@@ -350,7 +350,7 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
 
     fn _setattr(self, name: StringLiteral, newValue: PyObjectPtr) raises:
         var cpython = _get_global_python_itf().cpython()
-        var result = cpython.PyObject_SetAttrString(
+        let result = cpython.PyObject_SetAttrString(
             self.py_object, name, newValue
         )
         Python.throw_python_exception_if_error_state(cpython)
@@ -414,20 +414,20 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         Returns:
             The value corresponding to the given key for this object.
         """
-        var size = len(args)
+        let size = len(args)
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(size)
+        let tuple = cpython.PyTuple_New(size)
         for i in range(size):
-            var arg_value = args[i].py_object
+            let arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
-            var wasSuccessful = cpython.PyTuple_SetItem(tuple, i, arg_value)
+            let wasSuccessful = cpython.PyTuple_SetItem(tuple, i, arg_value)
             if wasSuccessful == 1:
                 raise Error()
 
-        var callable = cpython.PyObject_GetAttrString(
+        let callable = cpython.PyObject_GetAttrString(
             self.py_object, "__getitem__"
         )
-        var result = cpython.PyObject_CallObject(callable, tuple)
+        let result = cpython.PyObject_CallObject(callable, tuple)
         cpython.Py_DecRef(callable)
         cpython.Py_DecRef(tuple)
         Python.throw_python_exception_if_error_state(cpython)
@@ -437,13 +437,13 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         self, method_name: StringRef
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(0)
-        var callable = cpython.PyObject_GetAttrString(
+        let tuple = cpython.PyTuple_New(0)
+        let callable = cpython.PyObject_GetAttrString(
             self.py_object, method_name
         )
         if callable.is_null():
             raise Error()
-        var result = cpython.PyObject_CallObject(callable, tuple)
+        let result = cpython.PyObject_CallObject(callable, tuple)
         cpython.Py_DecRef(tuple)
         cpython.Py_DecRef(callable)
         return PythonObject(result)
@@ -452,18 +452,18 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         self, method_name: StringRef, rhs: PythonObject
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(1)
-        var wasSuccessful = cpython.PyTuple_SetItem(tuple, 0, rhs.py_object)
+        let tuple = cpython.PyTuple_New(1)
+        let wasSuccessful = cpython.PyTuple_SetItem(tuple, 0, rhs.py_object)
         cpython.Py_IncRef(rhs.py_object)
 
         if wasSuccessful == 1:
             raise Error()
-        var callable = cpython.PyObject_GetAttrString(
+        let callable = cpython.PyObject_GetAttrString(
             self.py_object, method_name
         )
         if callable.is_null():
             raise Error()
-        var result = cpython.PyObject_CallObject(callable, tuple)
+        let result = cpython.PyObject_CallObject(callable, tuple)
         cpython.Py_DecRef(tuple)
         cpython.Py_DecRef(callable)
         return PythonObject(result)
@@ -472,13 +472,13 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         inout self, method_name: StringRef, rhs: PythonObject
     ) raises:
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(1)
-        var wasSuccessful = cpython.PyTuple_SetItem(tuple, 0, rhs.py_object)
+        let tuple = cpython.PyTuple_New(1)
+        let wasSuccessful = cpython.PyTuple_SetItem(tuple, 0, rhs.py_object)
         cpython.Py_IncRef(rhs.py_object)
 
         if wasSuccessful == 1:
             raise Error()
-        var callable = cpython.PyObject_GetAttrString(
+        let callable = cpython.PyObject_GetAttrString(
             self.py_object, method_name
         )
         if callable.is_null():
@@ -1013,24 +1013,24 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         Returns:
             The return value from the called object.
         """
-        var size = len(args)
+        let size = len(args)
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(size)
+        let tuple = cpython.PyTuple_New(size)
         for i in range(size):
-            var arg_value = args[i].py_object
+            let arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
-            var wasSuccessful = cpython.PyTuple_SetItem(tuple, i, arg_value)
+            let wasSuccessful = cpython.PyTuple_SetItem(tuple, i, arg_value)
             if wasSuccessful == 1:
                 raise Error()
 
-        var callable = self.py_object
+        let callable = self.py_object
         cpython.Py_IncRef(callable)
-        var result = cpython.PyObject_CallObject(callable, tuple)
+        let result = cpython.PyObject_CallObject(callable, tuple)
         cpython.Py_DecRef(callable)
         cpython.Py_DecRef(tuple)
         Python.throw_python_exception_if_error_state(cpython)
         # Python always returns non null on success.
-        # A void function returns the singvaron None.
+        # A void function returns the singleton None.
         # If the result is null, something went awry;
         # an exception should have been thrown above.
         if result.is_null():
@@ -1075,9 +1075,9 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
             A string that represents this object.
         """
         var cpython = _get_global_python_itf().cpython()
-        var python_str: PythonObject = cpython.PyObject_Str(self.py_object)
+        let python_str: PythonObject = cpython.PyObject_Str(self.py_object)
         # copy the string
-        var str = String(cpython.PyUnicode_AsUTF8AndSize(python_str.py_object))
+        let str = String(cpython.PyUnicode_AsUTF8AndSize(python_str.py_object))
         # keep python object alive so the copy can occur
         _ = python_str
         return str

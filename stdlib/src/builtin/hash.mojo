@@ -28,21 +28,21 @@ from memory import memcpy, memset_zero, stack_allocation
 # Doing so can help prevent DDOS attacks on data structures relying on these
 # hash functions. See `hash(bytes, n)` documentation for more details.
 # TODO(27659): This is always 0 right now
-# var HASH_SECRET = random.random_ui64(
+# let HASH_SECRET = random.random_ui64(
 #     0, math.limit.max_finite[DType.uint64]()
 # ).to_int()
 
 
 fn _HASH_SECRET() -> Int:
-    var ptr = _get_global[
+    let ptr = _get_global[
         "HASH_SECRET", _initialize_hash_secret, _destroy_hash_secret
     ]()
     return ptr.bitcast[Int]()[0]
 
 
 fn _initialize_hash_secret(payload: Pointer[NoneType]) -> Pointer[NoneType]:
-    var secret = random.random_ui64(0, math.limit.max_finite[DType.uint64]())
-    var data = Pointer[Int].alloc(1)
+    let secret = random.random_ui64(0, math.limit.max_finite[DType.uint64]())
+    let data = Pointer[Int].alloc(1)
     data.store(int(secret))
     return data.bitcast[NoneType]()
 
@@ -68,7 +68,7 @@ trait Hashable:
         fn __hash__(self) -> Int:
             return 4  # chosen by fair random dice roll
 
-    var foo = Foo()
+    let foo = Foo()
     print(hash(foo))
     ```
     """
@@ -221,8 +221,8 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
 
     ```mojo
     from random import rand
-    var n = 64
-    var rand_bytes = DTypePointer[DType.int8].alloc(n)
+    let n = 64
+    let rand_bytes = DTypePointer[DType.int8].alloc(n)
     rand(rand_bytes, n)
     hash(rand_bytes, n)
     ```
@@ -244,12 +244,12 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
 
     # Compute our SIMD strides and tail length
     # n == k * stride + r
-    var k = n // stride
-    var r = n % stride
+    let k = n // stride
+    let r = n % stride
     debug_assert(n == k * stride + r, "wrong hash tail math")
 
     # 1. Reinterpret the underlying data as a larger int type
-    var simd_data = bytes.bitcast[type]()
+    let simd_data = bytes.bitcast[type]()
 
     # 2. Compute DJBX33A, but strided across the SIMD vector width.
     #    This is almost the same as DBJX33A, except:
@@ -259,19 +259,19 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     #      have a slightly different power of 33 as a coefficient.
     var hash_data = _HASH_INIT[type, simd_width]()
     for i in range(k):
-        var update = simd_data.simd_load[simd_width](i * simd_width)
+        let update = simd_data.simd_load[simd_width](i * simd_width)
         hash_data = _HASH_UPDATE(hash_data, update)
 
     # 3. Copy the tail data (smaller than the SIMD register) into
     #    a final hash state update vector that's stack-allocated.
     if r != 0:
         var remaining = StaticTuple[stride, Int8]()
-        var ptr = DTypePointer[DType.int8](
+        let ptr = DTypePointer[DType.int8](
             Pointer.address_of(remaining).bitcast[Int8]()
         )
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
-        var last_value = ptr.bitcast[type]().simd_load[simd_width]()
+        let last_value = ptr.bitcast[type]().simd_load[simd_width]()
         hash_data = _HASH_UPDATE(hash_data, last_value)
 
     # Now finally, hash the final SIMD vector state. This will also use
