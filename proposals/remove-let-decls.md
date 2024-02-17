@@ -1,6 +1,6 @@
 # Simplifying Mojo🔥 - let's get rid of `let`!
 
-Chris Lattner / Dec 5, 2023
+Chris Lattner, Dec 5, 2023, Status: **Accepted**, [discussion thread](https://github.com/modularml/mojo/discussions/1456#discussioncomment-8358722)
 
 Mojo is still a new language, and is rapidly evolving.  We’re learning a lot
 from other languages, but Mojo poses its own set of tradeoffs that indicate a
