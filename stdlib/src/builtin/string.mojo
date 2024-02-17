@@ -70,7 +70,7 @@ fn chr(c: Int) -> String:
         A string containing a single character based on the given code point.
     """
     debug_assert(0 <= c <= 255, "input ordinal must be in range")
-    let buf = Pointer[Int8].alloc(2)
+    var buf = Pointer[Int8].alloc(2)
     buf[0] = c
     buf[1] = 0
     return String(buf, 2)
@@ -98,8 +98,8 @@ fn atol(str: String) raises -> Int:
     if not str:
         raise Error("Empty String cannot be converted to integer.")
     var result = 0
-    let is_negative: Bool
-    let start: Int
+    var is_negative: Bool
+    var start: Int
     if str[0] == "-":
         is_negative = True
         start = 1
@@ -110,13 +110,13 @@ fn atol(str: String) raises -> Int:
     alias ord_0 = ord("0")
     alias ord_9 = ord("9")
     for pos in range(start, len(str)):
-        let digit = int(str._buffer[pos])
+        var digit = int(str._buffer[pos])
         if ord_0 <= digit <= ord_9:
             result += digit - ord_0
         else:
             raise Error("String is not convertible to integer.")
         if pos + 1 < len(str):
-            let nextresult = result * 10
+            var nextresult = result * 10
             if nextresult < result:
                 raise Error(
                     "String expresses an integer too large to store in Int."
@@ -265,7 +265,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         Args:
             str: The StringRef from which to construct this string object.
         """
-        let length = len(str)
+        var length = len(str)
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
         memcpy(rebind[DTypePointer[DType.int8]](buffer.data), str.data, length)
@@ -409,7 +409,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
             A new string containing the string at the specified positions.
         """
 
-        let adjusted_span = self._adjust_span(span)
+        var adjusted_span = self._adjust_span(span)
         if adjusted_span.step == 1:
             return StringRef(
                 (self._buffer.data + span.start).value,
@@ -417,7 +417,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
             )
 
         var buffer = Self._buffer_type()
-        let adjusted_span_len = len(adjusted_span)
+        var adjusted_span_len = len(adjusted_span)
         buffer.resize(adjusted_span_len + 1, 0)
         for i in range(adjusted_span_len):
             buffer[i] = self._as_ptr().offset(adjusted_span[i]).load()
@@ -483,9 +483,9 @@ struct String(Sized, Stringable, KeyElement, Boolable):
             return other
         if not other:
             return self
-        let self_len = len(self)
-        let other_len = len(other)
-        let total_len = self_len + other_len
+        var self_len = len(self)
+        var other_len = len(other)
+        var total_len = self_len + other_len
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
         memcpy(
@@ -608,7 +608,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
 
         # TODO(lifetimes): Return a reference rather than a copy
         var copy = self._buffer
-        let last = copy.pop_back()
+        var last = copy.pop_back()
         debug_assert(
             last == 0,
             "expected last element of String buffer to be null terminator",
@@ -632,9 +632,9 @@ struct String(Sized, Stringable, KeyElement, Boolable):
             characters of the slice starting at start.
         """
 
-        let self_len = len(self)
+        var self_len = len(self)
 
-        let abs_start: Int
+        var abs_start: Int
         if start < 0:
             # Avoid out of bounds earlier than the start
             # len = 5, start = -3,  then abs_start == 2, i.e. a partial string
@@ -654,8 +654,8 @@ struct String(Sized, Stringable, KeyElement, Boolable):
             "strref absolute start must be less than source String len",
         )
 
-        let data = self._as_ptr() + abs_start
-        let length = self_len - abs_start
+        var data = self._as_ptr() + abs_start
+        var length = self_len - abs_start
 
         return StringRef(data, length)
 
@@ -666,7 +666,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         Returns:
             The pointer to the underlying memory.
         """
-        let ptr = self._as_ptr()
+        var ptr = self._as_ptr()
         self._buffer.data = AnyPointer[Int8]()
         self._buffer.size = 0
         self._buffer.capacity = 0
@@ -692,7 +692,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         var offset = 0
 
         while True:
-            let pos = self.find(substr, offset)
+            var pos = self.find(substr, offset)
             if pos == -1:
                 break
             res += 1
@@ -731,9 +731,9 @@ struct String(Sized, Stringable, KeyElement, Boolable):
 
         # The substring to search within, offset from the beginning if `start`
         # is positive, and offset from the end if `start` is negative.
-        let haystack_str = self._strref_from_start(start)
+        var haystack_str = self._strref_from_start(start)
 
-        let loc = _memmem(
+        var loc = _memmem(
             haystack_str._as_ptr(),
             len(haystack_str),
             substr._as_ptr(),
@@ -764,9 +764,9 @@ struct String(Sized, Stringable, KeyElement, Boolable):
 
         # The substring to search within, offset from the beginning if `start`
         # is positive, and offset from the end if `start` is negative.
-        let haystack_str = self._strref_from_start(start)
+        var haystack_str = self._strref_from_start(start)
 
-        let loc = _memrmem(
+        var loc = _memrmem(
             haystack_str._as_ptr(),
             haystack_str.length,
             substr._as_ptr(),
@@ -797,7 +797,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
 
         var current_offset = 0
         while True:
-            let loc = self.find(delimiter, current_offset)
+            var loc = self.find(delimiter, current_offset)
             # delimiter not found, so add the search slice from where we're currently at
             if loc == -1:
                 output.push_back(self[current_offset:])
@@ -825,25 +825,25 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         if not old:
             return self._interleave(new)
 
-        let occurrences = self.count(old)
+        var occurrences = self.count(old)
         if occurrences == -1:
             return self
 
-        let self_start = self._as_ptr()
+        var self_start = self._as_ptr()
         var self_ptr = self._as_ptr()
-        let new_ptr = new._as_ptr()
+        var new_ptr = new._as_ptr()
 
-        let self_len = len(self)
-        let old_len = len(old)
-        let new_len = len(new)
+        var self_len = len(self)
+        var old_len = len(old)
+        var new_len = len(new)
 
         var res = DynamicVector[Int8]()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
 
         for _ in range(occurrences):
-            let curr_offset = self_ptr.__as_index() - self_start.__as_index()
+            var curr_offset = self_ptr.__as_index() - self_start.__as_index()
 
-            let idx = self.find(old, curr_offset)
+            var idx = self.find(old, curr_offset)
 
             debug_assert(idx >= 0, "expected to find occurrence during find")
 
@@ -859,7 +859,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
             self_ptr += old_len
 
         while True:
-            let val = self_ptr.load()
+            var val = self_ptr.load()
             if val == 0:
                 break
             res.push_back(self_ptr.load())
@@ -917,13 +917,13 @@ struct String(Sized, Stringable, KeyElement, Boolable):
             uses. Its intended usage is for data structures. See the `hash`
             builtin documentation for more details.
         """
-        let data = DTypePointer[DType.int8](self._buffer.data.value)
+        var data = DTypePointer[DType.int8](self._buffer.data.value)
         return hash(data, len(self))
 
     fn _interleave(self, val: String) -> String:
         var res = DynamicVector[Int8]()
-        let val_ptr = val._as_ptr()
-        let self_ptr = self._as_ptr()
+        var val_ptr = val._as_ptr()
+        var self_ptr = self._as_ptr()
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
@@ -936,35 +936,35 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         """Returns a copy of the string with all ASCII cased characters converted to lowercase.
 
         Returns:
-            A new string where cased letters have been convered to lowercase.
+            A new string where cased varters have been convered to lowercase.
         """
 
         # TODO(#26444):
-        # Support the Unicode standard casing behavior to handle cased letters
-        # outside of the standard ASCII letters.
+        # Support the Unicode standard casing behavior to handle cased varters
+        # outside of the standard ASCII varters.
         return self._toggle_ascii_case[_is_ascii_uppercase]()
 
     fn toupper(self) -> String:
         """Returns a copy of the string with all ASCII cased characters converted to uppercase.
 
         Returns:
-            A new string where cased letters have been converted to uppercase.
+            A new string where cased varters have been converted to uppercase.
         """
 
         # TODO(#26444):
-        # Support the Unicode standard casing behavior to handle cased letters
-        # outside of the standard ASCII letters.
+        # Support the Unicode standard casing behavior to handle cased varters
+        # outside of the standard ASCII varters.
         return self._toggle_ascii_case[_is_ascii_lowercase]()
 
     fn _toggle_ascii_case[check_case: fn (Int8) -> Bool](self) -> String:
-        let copy: String = self
+        var copy: String = self
 
-        let char_ptr = copy._as_ptr()
+        var char_ptr = copy._as_ptr()
 
         for i in range(len(self)):
-            let char: Int8 = char_ptr[i]
+            var char: Int8 = char_ptr[i]
             if check_case(char):
-                let lower = _toggle_ascii_case(char)
+                var lower = _toggle_ascii_case(char)
                 char_ptr[i] = lower
 
         return copy
@@ -1020,7 +1020,7 @@ fn _vec_fmt[
 
 
 fn _toggle_ascii_case(char: Int8) -> Int8:
-    """Assuming char is a cased ASCII character, this function will return the opposite-cased letter
+    """Assuming char is a cased ASCII character, this function will return the opposite-cased varter
     """
 
     # ASCII defines A-Z and a-z as differing only in their 6th bit,
@@ -1144,8 +1144,8 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
         42949672960,
     )
-    let n = UInt32(n0)
-    let log2 = int((bitwidthof[DType.uint32]() - 1) ^ ctlz(n | 1))
+    var n = UInt32(n0)
+    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ ctlz(n | 1))
     return (n0 + lookup_table[int(log2)]) >> 32
 
 
@@ -1166,8 +1166,8 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
 
 
 fn _calc_initial_buffer_size(n0: Int) -> Int:
-    let n = _abs(n0)
-    let sign = 0 if n0 > 0 else 1
+    var n = _abs(n0)
+    var sign = 0 if n0 > 0 else 1
     alias is_32bit_system = bitwidthof[DType.index]() == 32
 
     # Add 1 for the terminator
@@ -1188,8 +1188,8 @@ fn _calc_initial_buffer_size(n: FloatLiteral) -> Int:
 fn _calc_initial_buffer_size[type: DType](n0: SIMD[type, 1]) -> Int:
     @parameter
     if type.is_integral():
-        let n = _abs(n0)
-        let sign = 0 if n0 > 0 else 1
+        var n = _abs(n0)
+        var sign = 0 if n0 > 0 else 1
         alias is_32bit_system = bitwidthof[DType.index]() == 32
 
         @parameter

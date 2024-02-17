@@ -350,7 +350,7 @@ struct Reference[
         Returns:
             Constructed Pointer object.
         """
-        let ptr_with_trait = __mlir_op.`lit.ref.to_pointer`(self.value)
+        var ptr_with_trait = __mlir_op.`lit.ref.to_pointer`(self.value)
         # Work around AnyRefType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[
             _type = Pointer[type].pointer_type
@@ -371,8 +371,8 @@ struct Reference[
         """
         # We don't have a generalized lit.ref.cast operation, so convert through
         # to KGEN pointer.
-        let kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
-        let dest_ptr = __mlir_op.`pop.pointer.bitcast`[
+        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
+        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
             _type = __mlir_type[
                 `!kgen.pointer<:`, AnyType, ` `, new_element_type, `>`
             ]
@@ -396,7 +396,7 @@ struct Reference[
         # Project to an owned raw pointer, allowing the compiler to know it is to
         # be destroyed.
         # TODO: Use AnyPointer, but it requires a Movable element.
-        let kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
+        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
         _ = __get_address_as_owned_value(kgen_ptr)
 
 
@@ -417,7 +417,7 @@ fn emplace_ref_unsafe[
         dest: The reference to uninitialized memory to overwrite.
         value: The value to write into it.
     """
-    let kgen_ptr = __mlir_op.`lit.ref.to_pointer`(dest.value)
+    var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(dest.value)
     __get_address_as_uninit_lvalue(kgen_ptr) = value ^
 
 
@@ -489,7 +489,7 @@ struct Pointer[
         Returns:
             Constructed Pointer object.
         """
-        let address = __mlir_op.`pop.index_to_pointer`[
+        var address = __mlir_op.`pop.index_to_pointer`[
             _type = Self.pointer_type
         ](value.cast[DType.index]().value)
         return Self {address: address}
@@ -968,7 +968,7 @@ struct DTypePointer[
         Returns:
             Constructed `DTypePointer` object.
         """
-        let address = __mlir_op.`pop.index_to_pointer`[
+        var address = __mlir_op.`pop.index_to_pointer`[
             _type = Self.pointer_type.pointer_type
         ](value.cast[DType.index]().value)
         return Self {address: address}

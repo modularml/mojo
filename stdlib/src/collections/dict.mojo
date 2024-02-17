@@ -71,7 +71,7 @@ struct _DictEntryIter[
         while True:
             debug_assert(self.index < self.src[]._reserved, "dict iter bounds")
             if self.src[]._entries[self.index]:
-                let opt_entry_ref = self.src[]._entries.__get_ref[
+                var opt_entry_ref = self.src[]._entries.__get_ref[
                     __mlir_attr.`0: i1`,
                     Self.imm_dict_lifetime,
                 ](self.index)
@@ -113,11 +113,11 @@ struct _DictKeyIter[
         return self
 
     fn __next__(inout self) -> Self.ref_type:
-        let entry_ref = self.iter.__next__()
-        let mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
+        var entry_ref = self.iter.__next__()
+        var mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
             Reference(entry_ref[].key).value
         )
-        let key_ptr = AnyPointer[K] {
+        var key_ptr = AnyPointer[K] {
             value: __mlir_op.`pop.pointer.bitcast`[
                 _type = AnyPointer[K].pointer_type
             ](mlir_ptr)
@@ -155,11 +155,11 @@ struct _DictValueIter[
         return self
 
     fn __next__(inout self) -> Self.ref_type:
-        let entry_ref = self.iter.__next__()
-        let mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
+        var entry_ref = self.iter.__next__()
+        var mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
             Reference(entry_ref[].value).value
         )
-        let value_ptr = AnyPointer[V] {
+        var value_ptr = AnyPointer[V] {
             value: __mlir_op.`pop.pointer.bitcast`[
                 _type = AnyPointer[V].pointer_type
             ](mlir_ptr)
@@ -220,22 +220,22 @@ struct _DictIndex:
 
     fn __init__(inout self, reserved: Int):
         if reserved <= 128:
-            let data = DTypePointer[DType.int8].alloc(reserved)
+            var data = DTypePointer[DType.int8].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
             self.data = data.bitcast[DType.invalid]()
         elif reserved <= 2**16 - 2:
-            let data = DTypePointer[DType.int16].alloc(reserved)
+            var data = DTypePointer[DType.int16].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
             self.data = data.bitcast[DType.invalid]()
         elif reserved <= 2**32 - 2:
-            let data = DTypePointer[DType.int32].alloc(reserved)
+            var data = DTypePointer[DType.int32].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
             self.data = data.bitcast[DType.invalid]()
         else:
-            let data = DTypePointer[DType.int64].alloc(reserved)
+            var data = DTypePointer[DType.int64].alloc(reserved)
             for i in range(reserved):
                 data[i] = _EMPTY
             self.data = data.bitcast[DType.invalid]()
@@ -248,30 +248,30 @@ struct _DictIndex:
 
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
-            let data = self.data.bitcast[DType.int8]()
+            var data = self.data.bitcast[DType.int8]()
             return data.load(slot % reserved).to_int()
         elif reserved <= 2**16 - 2:
-            let data = self.data.bitcast[DType.int16]()
+            var data = self.data.bitcast[DType.int16]()
             return data.load(slot % reserved).to_int()
         elif reserved <= 2**32 - 2:
-            let data = self.data.bitcast[DType.int32]()
+            var data = self.data.bitcast[DType.int32]()
             return data.load(slot % reserved).to_int()
         else:
-            let data = self.data.bitcast[DType.int64]()
+            var data = self.data.bitcast[DType.int64]()
             return data.load(slot % reserved).to_int()
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
-            let data = self.data.bitcast[DType.int8]()
+            var data = self.data.bitcast[DType.int8]()
             return data.store(slot % reserved, value)
         elif reserved <= 2**16 - 2:
-            let data = self.data.bitcast[DType.int16]()
+            var data = self.data.bitcast[DType.int16]()
             return data.store(slot % reserved, value)
         elif reserved <= 2**32 - 2:
-            let data = self.data.bitcast[DType.int32]()
+            var data = self.data.bitcast[DType.int32]()
             return data.store(slot % reserved, value)
         else:
-            let data = self.data.bitcast[DType.int64]()
+            var data = self.data.bitcast[DType.int64]()
             return data.store(slot % reserved, value)
 
     fn __del__(owned self):
@@ -321,7 +321,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
             self.s = String(s)
 
         fn __hash__(self) -> Int:
-            let ptr = self.s._buffer.data.value
+            var ptr = self.s._buffer.data.value
             return hash(DTypePointer[DType.int8](ptr), len(self.s))
 
         fn __eq__(self, other: Self) -> Bool:
@@ -404,7 +404,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     #     is O(_reserved  / (1 + _reserved - _n_entries)). At `(k-1)/k` this
     #     approaches `k` and is therefore O(1) average case. However, we want it to
     #     be _larger_ than the load factor: since `compact` is O(n), we don't
-    #     don't churn and compact on repeated insert/delete, and instead amortize
+    #     don't churn and compact on repeated insert/devare, and instead amortize
     #     compaction cost to O(1) amortized cost.
 
     alias EMPTY = _EMPTY
@@ -476,7 +476,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         Raises:
             "KeyError" if the key isn't present.
         """
-        let value = self.find(key)
+        var value = self.find(key)
         if value:
             return value.value()
         raise "KeyError"
@@ -515,13 +515,13 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
             An optional value containing a copy of the value if it was present,
             otherwise an empty Optional.
         """
-        let hash = hash(key)
-        let found: Bool
-        let slot: Int
-        let index: Int
+        var hash = hash(key)
+        var found: Bool
+        var slot: Int
+        var index: Int
         found, slot, index = self._find_index(hash, key)
         if found:
-            let ev = self._entries[index]
+            var ev = self._entries[index]
             debug_assert(ev.__bool__(), "entry in index must be full")
             return ev.value().value
         return None
@@ -542,14 +542,14 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
             "KeyError" if the key was not present in the dictionary and no
             default value was provided.
         """
-        let hash = hash(key)
-        let found: Bool
-        let slot: Int
-        let index: Int
+        var hash = hash(key)
+        var found: Bool
+        var slot: Int
+        var index: Int
         found, slot, index = self._find_index(hash, key)
         if found:
             self._set_index(slot, Self.REMOVED)
-            let entry = self._entries[index]
+            var entry = self._entries[index]
             self._entries[index] = None
             self.size -= 1
             debug_assert(entry.__bool__(), "entry in index must be full")
@@ -650,9 +650,9 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
 
     fn _insert(inout self, owned entry: DictEntry[K, V]):
         self._maybe_resize()
-        let found: Bool
-        let slot: Int
-        let index: Int
+        var found: Bool
+        var slot: Int
+        var index: Int
         found, slot, index = self._find_index(entry.hash, entry.key)
 
         self._entries[index] = entry ^
@@ -676,7 +676,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         var slot = hash % self._reserved
         var perturb = hash
         for _ in range(self._reserved):
-            let index = self._get_index(slot)
+            var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return slot
             self._next_index_slot(slot, perturb)
@@ -690,7 +690,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         var slot = hash % self._reserved
         var perturb = hash
         for _ in range(self._reserved):
-            let index = self._get_index(slot)
+            var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return (False, slot, self._n_entries)
             elif index == Self.REMOVED:
@@ -698,9 +698,9 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
                     insert_slot = slot
                     insert_index = self._n_entries
             else:
-                let ev = self._entries[index]
+                var ev = self._entries[index]
                 debug_assert(ev.__bool__(), "entry in index must be full")
-                let entry = ev.value()
+                var entry = ev.value()
                 if hash == entry.hash and key == entry.key:
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
@@ -724,11 +724,11 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         self.size = 0
         self._n_entries = 0
         self._index = _DictIndex(self._reserved)
-        let old_entries = self._entries ^
+        var old_entries = self._entries ^
         self._entries = self._new_entries(self._reserved)
 
         for i in range(len(old_entries)):
-            let entry = old_entries[i]
+            var entry = old_entries[i]
             if entry:
                 self._insert(entry.value())
 
@@ -739,9 +739,9 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
             while not self._entries[right]:
                 right += 1
                 debug_assert(right < self._reserved, "Invalid dict state")
-            let entry = self._entries[right]
+            var entry = self._entries[right]
             debug_assert(entry.__bool__(), "Logic error")
-            let slot = self._find_empty_index(entry.value().hash)
+            var slot = self._find_empty_index(entry.value().hash)
             self._set_index(slot, left)
             if left != right:
                 self._entries[left] = entry

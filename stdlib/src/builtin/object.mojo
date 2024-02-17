@@ -51,7 +51,7 @@ struct _ImmutableString:
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
-        let res = memcmp(self.data, rhs.data, _min(self.length, rhs.length))
+        var res = memcmp(self.data, rhs.data, _min(self.length, rhs.length))
         if res != 0:
             return -1 if res < 0 else 1
         if self.length == rhs.length:
@@ -84,7 +84,7 @@ struct _RefCountedListRef:
 
     @always_inline
     fn __init__() -> Self:
-        let ptr = Pointer[_RefCountedList].alloc(1)
+        var ptr = Pointer[_RefCountedList].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         return Self {lst: ptr.bitcast[NoneType]()}
 
@@ -96,8 +96,8 @@ struct _RefCountedListRef:
         return Self {lst: self.lst}
 
     fn release(self):
-        let ptr = self.lst.bitcast[_RefCountedList]()
-        let prev = __get_address_as_lvalue(ptr.address).refcount.fetch_sub(1)
+        var ptr = self.lst.bitcast[_RefCountedList]()
+        var prev = __get_address_as_lvalue(ptr.address).refcount.fetch_sub(1)
         if prev != 1:
             return
 
@@ -122,7 +122,7 @@ struct _AttrsDictEntry(CollectionElement):
 struct _RefCountedAttrsDict:
     """This type contains the attribute dictionary for a dynamic object. The
     attribute dictionary is constructed once with a fixed number of elements.
-    Those elements can be modified, but elements cannot be added or deleted
+    Those elements can be modified, but elements cannot be added or devared
     after the dictionary is implemented. Because attribute are accessed
     directly with `x.attr`, the key will always be a `StringLiteral`. Mojo
     string literals are uniqued by the compiler, so we can compare pointers for
@@ -142,7 +142,7 @@ struct _RefCountedAttrsDict:
     @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
         for i in range(len(self.impl)):
-            let cur = self.impl[i]
+            var cur = self.impl[i]
             if cur.key.data() == key.data():
                 self.impl[i].value.destroy()
                 self.impl[i] = _AttrsDictEntry {key: key, value: value}
@@ -154,7 +154,7 @@ struct _RefCountedAttrsDict:
     @always_inline
     fn get(self, key: StringLiteral) raises -> _ObjectImpl:
         for i in range(len(self.impl)):
-            let cur = self.impl[i]
+            var cur = self.impl[i]
             if cur.key.data() == key.data():
                 return cur.value
         raise Error(
@@ -197,11 +197,11 @@ struct _RefCountedAttrsDictRef:
         elt_is_mutable: __mlir_type.i1,
         lifetime: AnyLifetime[elt_is_mutable].type,
     ](values: VariadicListMem[Attr, elt_is_mutable, lifetime]) -> Self:
-        let ptr = Pointer[_RefCountedAttrsDict].alloc(1)
+        var ptr = Pointer[_RefCountedAttrsDict].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            let entry = _AttrsDictEntry {
+            var entry = _AttrsDictEntry {
                 key: values[i].key,
                 value: values[i].value._value.copy(),
             }
@@ -216,8 +216,8 @@ struct _RefCountedAttrsDictRef:
         return Self {attrs: self.attrs}
 
     fn release(self):
-        let ptr = self.attrs.bitcast[_RefCountedAttrsDict]()
-        let prev = __get_address_as_lvalue(ptr.address).refcount.fetch_sub(1)
+        var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()
+        var prev = __get_address_as_lvalue(ptr.address).refcount.fetch_sub(1)
         if prev != 1:
             return
 
@@ -404,8 +404,8 @@ struct _ObjectImpl(CollectionElement):
     @always_inline
     fn copy(self) -> Self:
         if self.is_str():
-            let str = self.get_as_string()
-            let impl = _ImmutableString(
+            var str = self.get_as_string()
+            var impl = _ImmutableString(
                 Pointer[Int8].alloc(str.length), str.length
             )
             memcpy(impl.data, DTypePointer[DType.int8](str.data), str.length)
@@ -564,8 +564,8 @@ struct _ObjectImpl(CollectionElement):
         lowest-common denominator type for performing comparisons, in order of
         increasing priority: bool, int, and then float.
         """
-        let lhsId = lhs.get_type_id()
-        let rhsId = rhs.get_type_id()
+        var lhsId = lhs.get_type_id()
+        var rhsId = rhs.get_type_id()
         if lhsId == rhsId:
             return
 
@@ -769,7 +769,7 @@ struct object(IntableRaising, Boolable):
         Args:
             value: The string value.
         """
-        let impl = _ImmutableString(
+        var impl = _ImmutableString(
             Pointer[Int8].alloc(value.length), value.length
         )
         memcpy(impl.data, value.data, value.length)
@@ -880,7 +880,7 @@ struct object(IntableRaising, Boolable):
 
     @always_inline
     fn __del__(owned self):
-        """Delete the object and release any owned memory."""
+        """Devare the object and release any owned memory."""
         self._value.destroy()
 
     # ===------------------------------------------------------------------=== #
@@ -981,12 +981,12 @@ struct object(IntableRaising, Boolable):
 
     @always_inline
     fn _list_compare(self, rhs: object) raises -> Int:
-        let llen = self._value.get_list_length()
-        let rlen = self._value.get_list_length()
-        let cmp_len = _min(llen, rlen)
+        var llen = self._value.get_list_length()
+        var rlen = self._value.get_list_length()
+        var cmp_len = _min(llen, rlen)
         for i in range(cmp_len):
-            let lelt: object = self._value.get_list_element(i)
-            let relt: object = rhs._value.get_list_element(i)
+            var lelt: object = self._value.get_list_element(i)
+            var relt: object = rhs._value.get_list_element(i)
             if lelt < relt:
                 return -1
             if lelt > relt:
@@ -1218,17 +1218,17 @@ struct object(IntableRaising, Boolable):
             The sum or concatenated values.
         """
         if self._value.is_str() and rhs._value.is_str():
-            let lhsStr = self._value.get_as_string()
-            let rhsStr = rhs._value.get_as_string()
-            let length = lhsStr.length + rhsStr.length
-            let impl = _ImmutableString(Pointer[Int8].alloc(length), length)
+            var lhsStr = self._value.get_as_string()
+            var rhsStr = rhs._value.get_as_string()
+            var length = lhsStr.length + rhsStr.length
+            var impl = _ImmutableString(Pointer[Int8].alloc(length), length)
             memcpy(impl.data, lhsStr.data, lhsStr.length)
             memcpy(impl.data.offset(lhsStr.length), rhsStr.data, rhsStr.length)
             var result = object()
             result._value = impl
             return result
         if self._value.is_list() and rhs._value.is_list():
-            let result2 = object([])
+            var result2 = object([])
             for i in range(self.__len__()):
                 result2.append(self[i])
             for j in range(rhs.__len__()):
@@ -1537,9 +1537,9 @@ struct object(IntableRaising, Boolable):
             return object(self._value.get_obj_attr("__getitem__"))(self, i)
         if not self._value.is_str() and not self._value.is_list():
             raise Error("TypeError: can only index into lists and strings")
-        let index = Self._convert_index_to_int(i)
+        var index = Self._convert_index_to_int(i)
         if self._value.is_str():
-            let impl = _ImmutableString(Pointer[Int8].alloc(1), 1)
+            var impl = _ImmutableString(Pointer[Int8].alloc(1), 1)
             impl.data.store(
                 self._value.get_as_string().data.offset(index).load()
             )
@@ -1579,7 +1579,7 @@ struct object(IntableRaising, Boolable):
             )
         if not self._value.is_list():
             raise Error("TypeError: can only assign items in lists")
-        let index = Self._convert_index_to_int(i)
+        var index = Self._convert_index_to_int(i)
         self._value.set_list_element(index.value, value._value.copy())
 
     @always_inline
@@ -1665,7 +1665,7 @@ struct object(IntableRaising, Boolable):
         elif self._value.is_float():
             _put(self._value.get_as_float())
         elif self._value.is_str():
-            let str = self._value.get_as_string()
+            var str = self._value.get_as_string()
             _printf("'%.*s'", str.length, str.data)
         elif self._value.is_list():
             _put("[")
@@ -1678,9 +1678,9 @@ struct object(IntableRaising, Boolable):
             _printf("function at %p", self._value.get_as_func().value.address)
         else:
             _put("{")
-            let ptr = self._value.get_obj_attrs_ptr().address
+            var ptr = self._value.get_obj_attrs_ptr().address
             for k in range(len(__get_address_as_lvalue(ptr).impl)):
-                let value = __get_address_as_lvalue(ptr).impl[k]
+                var value = __get_address_as_lvalue(ptr).impl[k]
                 if k != 0:
                     _put(", ")
                 _printf("'%s' = ", value.key.data())

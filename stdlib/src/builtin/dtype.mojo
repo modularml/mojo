@@ -137,7 +137,7 @@ struct DType(Stringable, KeyElement):
     fn _as_i8(
         self,
     ) -> __mlir_type.`!pop.scalar<ui8>`:
-        let val = __mlir_op.`pop.dtype.to_ui8`(self.value)
+        var val = __mlir_op.`pop.dtype.to_ui8`(self.value)
         return __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<ui8>`
         ](val)
@@ -453,7 +453,7 @@ struct DType(Stringable, KeyElement):
             Returns the size in bits of the current DType and -1 if the size is
             unknown.
         """
-        let size_in_bytes = self.sizeof()
+        var size_in_bytes = self.sizeof()
         return 8 * size_in_bytes if size_in_bytes > 0 else -1
 
     # ===----------------------------------------------------------------------===#
@@ -532,7 +532,7 @@ struct DType(Stringable, KeyElement):
         Parameters:
             func: A parametrized on dtype function to dispatch.
         """
-        let bitwidth = self.bitwidth()
+        var bitwidth = self.bitwidth()
         if bitwidth == 8:
             func[DType.uint8]()
         elif bitwidth == 16:

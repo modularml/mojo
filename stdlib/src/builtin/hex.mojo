@@ -105,10 +105,10 @@ fn _write_int[
     # NOTE:
     #   Use Int64 instead of Int here so that the % and / operators use C-like
     #   behavior of returning remainder and doing truncating division.
-    let value: Int64 = Int64(int(value0))
+    var value: Int64 = Int64(int(value0))
 
     # TODO(#26444, Unicode support): Get an array of Character, not bytes.
-    let digit_chars_array: DynamicVector[Int8] = digit_chars.as_bytes()
+    var digit_chars_array: DynamicVector[Int8] = digit_chars.as_bytes()
 
     # Prefix a '-' if the original int was negative.
     if value < 0:
@@ -123,15 +123,15 @@ fn _write_int[
         fmt.push_back(digit_chars_array[0])
         return
 
-    let first_digit_pos = len(fmt)
+    var first_digit_pos = len(fmt)
 
     var remaining_int: Int64 = value
     if remaining_int >= 0:
         while remaining_int != 0:
-            let digit_value = int(remaining_int % radix)
+            var digit_value = int(remaining_int % radix)
 
             # Push the char representing the value of the least significant digit
-            let digit_char: Int8 = digit_chars_array[digit_value]
+            var digit_char: Int8 = digit_chars_array[digit_value]
             fmt.push_back(digit_char)
 
             # Drop the least significant digit
@@ -139,10 +139,10 @@ fn _write_int[
     else:
         while remaining_int != 0:
             # `%` works differently for negative numbers in Mojo than in C
-            let digit_value = int(_abs(remaining_int % -radix))
+            var digit_value = int(_abs(remaining_int % -radix))
 
             # Push the char representing the value of the least significant digit
-            let digit_char: Int8 = digit_chars_array[digit_value]
+            var digit_char: Int8 = digit_chars_array[digit_value]
             fmt.push_back(digit_char)
 
             # Drop the least significant digit

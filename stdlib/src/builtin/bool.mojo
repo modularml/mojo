@@ -197,7 +197,7 @@ struct Bool(Stringable, CollectionElement, Boolable):
         Returns:
             True if the object is false and False otherwise.
         """
-        let true = __mlir_op.`kgen.param.constant`[
+        var true = __mlir_op.`kgen.param.constant`[
             _type = __mlir_type.`!pop.scalar<bool>`,
             value = __mlir_attr.`#pop.simd<true> : !pop.scalar<bool>`,
         ]()

@@ -332,7 +332,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         return self.size
 
     fn _realloc(inout self, new_capacity: Int):
-        let new_data = AnyPointer[T].alloc(new_capacity)
+        var new_data = AnyPointer[T].alloc(new_capacity)
 
         for i in range(self.size):
             (new_data + i).emplace_value((self.data + i).take_value())
@@ -360,8 +360,8 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
             other: Vector whose elements will be added in order at the end of this vector.
         """
 
-        let final_size = len(self) + len(other)
-        let other_original_size = len(other)
+        var final_size = len(self) + len(other)
+        var other_original_size = len(other)
 
         self.reserve(final_size)
 
@@ -379,7 +379,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         var dest_ptr = self.data + len(self)
 
         for i in range(other_original_size):
-            let src_ptr = other.data + i
+            var src_ptr = other.data + i
 
             # This (TODO: optimistically) moves an element directly from the
             # `other` vector into this vector using a single `T.__moveinit()__`
@@ -407,7 +407,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         Returns:
             The popped value.
         """
-        let ret_val = (self.data + (self.size - 1)).take_value()
+        var ret_val = (self.data + (self.size - 1)).take_value()
         self.size -= 1
         if self.size * 4 < self.capacity:
             if self.capacity > 1:
@@ -468,14 +468,14 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         var earlier_idx = start
         var later_idx = len(self) - 1
 
-        let effective_len = len(self) - start
-        let half_len = effective_len // 2
+        var effective_len = len(self) - start
+        var half_len = effective_len // 2
 
         for _ in range(half_len):
-            let earlier_ptr = self.data + earlier_idx
-            let later_ptr = self.data + later_idx
+            var earlier_ptr = self.data + earlier_idx
+            var later_ptr = self.data + later_idx
 
-            let tmp = earlier_ptr.take_value()
+            var tmp = earlier_ptr.take_value()
             later_ptr.move_into(earlier_ptr)
             later_ptr.emplace_value(tmp ^)
 
@@ -494,7 +494,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         Returns:
             The underlying data.
         """
-        let ptr = self.data
+        var ptr = self.data
         self.data = AnyPointer[T]()
         self.size = 0
         self.capacity = 0
@@ -539,11 +539,11 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
             An immutable reference to the element at the given index.
         """
         # Mutability gets set to the local mutability of this
-        # pointer value, ie. because we defined it with `let` it's now an
+        # pointer value, ie. because we defined it with `var` it's now an
         # "immutable" reference regardless of the mutability of `self`.
         # This means we can't just use `AnyPointer.__refitem__` here
         # because the mutability won't match.
-        let base_ptr = Reference(self)[].data
+        var base_ptr = Reference(self)[].data
         return __mlir_op.`lit.ref.from_pointer`[
             _type = Reference[T, mutability, self_life].mlir_ref_type
         ]((base_ptr + i).value)

@@ -26,7 +26,7 @@ struct _CoroutineContext:
     and contain the resume function and a payload pointer."""
 
     alias _opaque_handle = Pointer[__mlir_type.i8]
-    # Passed the coroutine being completed and its context's payload.
+    # Passed the coroutine being compvared and its context's payload.
     alias _resume_fn_type = fn (
         Self._opaque_handle, Self._opaque_handle
     ) -> None
@@ -72,7 +72,7 @@ struct Coroutine[type: AnyRegType]:
     left off, with the saved state restored.
 
     Parameters:
-        type: Type of value returned upon completion of the coroutine.
+        type: Type of value returned upon compvarion of the coroutine.
     """
 
     alias _handle_type = __mlir_type[`!pop.coroutine<() -> `, type, `>`]
@@ -87,7 +87,7 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
-        let promise: Pointer[
+        var promise: Pointer[
             Self._promise_type
         ] = __mlir_op.`pop.coroutine.promise`(self._handle)
         return promise.bitcast[type]()
@@ -127,8 +127,8 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The constructed coroutine object.
         """
-        let self = Coroutine[type] {_handle: handle}
-        let parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
+        var self = Coroutine[type] {_handle: handle}
+        var parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
         self._get_ctx[_CoroutineContext]().store(
             _CoroutineContext {
                 _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
@@ -160,7 +160,7 @@ struct Coroutine[type: AnyRegType]:
 
     @always_inline
     fn __await__(self) -> type:
-        """Suspends the current coroutine until the coroutine is complete.
+        """Suspends the current coroutine until the coroutine is compvare.
 
         Returns:
             The coroutine promise.
@@ -189,7 +189,7 @@ struct RaisingCoroutine[type: AnyRegType]:
     left off, with the saved state restored.
 
     Parameters:
-        type: Type of value returned upon completion of the coroutine.
+        type: Type of value returned upon compvarion of the coroutine.
     """
 
     alias _var_type = __mlir_type[`!kgen.variant<`, Error, `, `, type, `>`]
@@ -207,7 +207,7 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
-        let promise: Pointer[
+        var promise: Pointer[
             Self._promise_type
         ] = __mlir_op.`pop.coroutine.promise`(self._handle)
         return promise.bitcast[Self._var_type]()
@@ -219,7 +219,7 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The value of the fulfilled promise.
         """
-        let variant = self._get_promise().load()
+        var variant = self._get_promise().load()
         if __mlir_op.`kgen.variant.is`[index = Int(0).value](variant):
             raise __mlir_op.`kgen.variant.take`[index = Int(0).value](variant)
         return __mlir_op.`kgen.variant.take`[index = Int(1).value](variant)
@@ -250,8 +250,8 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The constructed coroutine object.
         """
-        let self = Self {_handle: handle}
-        let parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
+        var self = Self {_handle: handle}
+        var parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
         self._get_ctx[_CoroutineContext]().store(
             _CoroutineContext {
                 _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
@@ -286,7 +286,7 @@ struct RaisingCoroutine[type: AnyRegType]:
 
     @always_inline
     fn __await__(self) raises -> type:
-        """Suspends the current coroutine until the coroutine is complete.
+        """Suspends the current coroutine until the coroutine is compvare.
 
         Returns:
             The coroutine promise.

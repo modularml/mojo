@@ -117,7 +117,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             SIMD vector whose elements are 0.
         """
         _simd_construction_checks[type, size]()
-        let zero = __mlir_op.`pop.cast`[
+        var zero = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
         ](
             __mlir_op.`kgen.param.constant`[
@@ -148,13 +148,13 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
 
-        let t0 = __mlir_op.`pop.cast_from_builtin`[
+        var t0 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<index>`
         ](value.value)
-        let casted = __mlir_op.`pop.cast`[
+        var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
         ](t0)
-        let vec = __mlir_op.`pop.simd.splat`[
+        var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
         return Self {value: vec}
@@ -174,16 +174,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
 
-        let tn1 = __mlir_op.`kgen.int_literal.convert`[
+        var tn1 = __mlir_op.`kgen.int_literal.convert`[
             _type = __mlir_type.si128
         ](value.value)
-        let t0 = __mlir_op.`pop.cast_from_builtin`[
+        var t0 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<si128>`
         ](tn1)
-        let casted = __mlir_op.`pop.cast`[
+        var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
         ](t0)
-        let vec = __mlir_op.`pop.simd.splat`[
+        var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
         return Self {value: vec}
@@ -202,10 +202,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
 
-        let casted = __mlir_op.`pop.cast`[
+        var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
         ](value.value)
-        let vec = __mlir_op.`pop.simd.splat`[
+        var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
         return Self {value: vec}
@@ -247,7 +247,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             The constructed SIMD vector.
         """
         _simd_construction_checks[type, size]()
-        let num_elements: Int = len(elems)
+        var num_elements: Int = len(elems)
         if num_elements == 1:
             # Construct by broadcasting a scalar.
             return Self {
@@ -286,10 +286,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[type, size]()
-        let casted = __mlir_op.`pop.cast`[
+        var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
         ](value.value)
-        let vec = __mlir_op.`pop.simd.splat`[
+        var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
         return Self {value: vec}
@@ -331,7 +331,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
         constrained[type == DType.bool, "input type must be boolean"]()
-        let val = SIMD[DType.bool, size] {
+        var val = SIMD[DType.bool, size] {
             value: __mlir_op.`pop.simd.splat`[
                 _type = __mlir_type[
                     `!pop.simd<`,
@@ -382,10 +382,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         elif target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
         elif target == DType.address:
-            let index_val = __mlir_op.`pop.cast`[
+            var index_val = __mlir_op.`pop.cast`[
                 _type = __mlir_type[`!pop.simd<`, size.value, `, index>`]
             ](self.value)
-            let tmp = SIMD[DType.address, size](
+            var tmp = SIMD[DType.address, size](
                 __mlir_op.`pop.index_to_pointer`[
                     _type = __mlir_type[
                         `!pop.simd<`,
@@ -396,7 +396,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             )
             return rebind[SIMD[target, size]](tmp)
         elif (type == DType.address) and target.is_integral():
-            let index_tmp = SIMD[DType.index, size](
+            var index_tmp = SIMD[DType.index, size](
                 __mlir_op.`pop.pointer_to_index`[
                     _type = __mlir_type[
                         `!pop.simd<`,
@@ -464,7 +464,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             buf.size += _vec_fmt(buf.data, 2, "[")
         # Print each element.
         for i in range(size):
-            let element = self[i]
+            var element = self[i]
             # Print separators between each element.
             if i != 0:
                 buf.size += _vec_fmt(buf.data + buf.size, 3, ", ")
@@ -580,7 +580,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             # this should raise an exception.
             return 0
 
-        let div = self / rhs
+        var div = self / rhs
 
         @parameter
         if type.is_floating_point():
@@ -591,8 +591,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             if self > 0 and rhs > 0:
                 return div
 
-            let mod = self - div * rhs
-            let mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
+            var mod = self - div * rhs
+            var mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
             return div - mask.cast[type]()
 
     @always_inline("nodebug")
@@ -621,8 +621,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             if type.is_floating_point():
                 div = llvm_intrinsic["llvm.trunc", Self](div)
 
-            let mod = self - div * rhs
-            let mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
+            var mod = self - div * rhs
+            var mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
             return mod + mask.select(rhs, Self(0))
 
     @always_inline("nodebug")
@@ -720,8 +720,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter  # Because of #30525, we roll our own implementation for eq.
         if has_neon() and type == DType.bfloat16:
-            let int_self = bitcast[_integral_type_of[type](), size](self)
-            let int_rhs = bitcast[_integral_type_of[type](), size](rhs)
+            var int_self = bitcast[_integral_type_of[type](), size](self)
+            var int_rhs = bitcast[_integral_type_of[type](), size](rhs)
             return int_self == int_rhs
 
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
@@ -743,8 +743,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter  # Because of #30525, we roll our own implementation for ne.
         if has_neon() and type == DType.bfloat16:
-            let int_self = bitcast[_integral_type_of[type](), size](self)
-            let int_rhs = bitcast[_integral_type_of[type](), size](rhs)
+            var int_self = bitcast[_integral_type_of[type](), size](self)
+            var int_rhs = bitcast[_integral_type_of[type](), size](rhs)
             return int_self != int_rhs
 
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
@@ -1536,7 +1536,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         constrained[size > 1, "the vector size must be greater than 1."]()
 
-        let res = llvm_intrinsic[
+        var res = llvm_intrinsic[
             "llvm.experimental.vector.deinterleave2",
             (SIMD[type, size // 2], SIMD[type, size // 2]),
         ](self)
@@ -1605,8 +1605,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return func[type, 1](self[0], self[1])
         else:
             alias half_size: Int = size // 2
-            let lhs = self.slice[half_size](0)
-            let rhs = self.slice[half_size](half_size)
+            var lhs = self.slice[half_size](0)
+            var rhs = self.slice[half_size](half_size)
 
             @parameter
             if half_size != size_out:
@@ -1892,7 +1892,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             wrap-around, fill with zero).
         """
 
-        let zero_simd = Self()
+        var zero_simd = Self()
 
         @parameter
         if shift == 0:
@@ -1924,7 +1924,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Note the order of the llvm_intrinsic arguments below differ from
         # shift_left(), so we cannot directly reuse it here.
 
-        let zero_simd = Self()
+        var zero_simd = Self()
 
         @parameter
         if shift == 0:
@@ -1987,7 +1987,7 @@ fn _pow[
 
     @parameter
     if rhs_type.is_floating_point() and lhs_type == rhs_type:
-        let rhs_quotient = _floor(rhs)
+        var rhs_quotient = _floor(rhs)
         if rhs >= 0 and rhs_quotient == rhs:
             return _pow(lhs, rhs_quotient.cast[_integral_type_of[rhs_type]()]())
 

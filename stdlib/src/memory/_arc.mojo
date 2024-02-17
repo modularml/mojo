@@ -9,8 +9,8 @@ Example usage:
 
 ```mojo
 from memory import Arc
-let p = Arc(4)
-let p2 = p
+var p = Arc(4)
+var p2 = p
 p2.set(3)
 print(3 == p.get())
 ```
@@ -65,8 +65,8 @@ struct Arc[T: CollectionElement](CollectionElement):
         that will be mutated should manage synchronization somehow.
     - Copies use atomic reference counting for memory management.
         - Copying the Arc object will increment the reference count in a thread-safe way.
-        - Deleting the Arc object will decrement the reference count in a thread-safe way,
-            and then call the custom deleter.
+        - Devaring the Arc object will decrement the reference count in a thread-safe way,
+            and then call the custom devarer.
 
     Parameters:
         T: The type of the stored value.
@@ -82,7 +82,7 @@ struct Arc[T: CollectionElement](CollectionElement):
         Args:
             value: The value to manage.
         """
-        let self = Self {_inner: Pointer[Self._type].alloc(1)}
+        var self = Self {_inner: Pointer[Self._type].alloc(1)}
         __get_address_as_uninit_lvalue(self._inner.address) = Self._type(
             value ^
         )
@@ -92,27 +92,27 @@ struct Arc[T: CollectionElement](CollectionElement):
     fn __copyinit__(other: Self) -> Self:
         """Copy an existing reference. Increment the refcount to the object."""
         # Order here does not matter since `other` is borrowed, and can't
-        # be destroyed until our copy completes.
+        # be destroyed until our copy compvares.
         _ = __get_address_as_lvalue(other._inner.address).increment()
         return Self {_inner: other._inner}
 
     fn __del__(owned self):
-        """Delete the smart pointer reference.
+        """Devare the smart pointer reference.
 
         Decrement the ref count for the reference. If there are no more
-        references, delete the object and free its memory."""
+        references, devare the object and free its memory."""
         # Reference docs from Rust Arc: https://doc.rust-lang.org/src/alloc/sync.rs.html#2367-2402
-        let rc = __get_address_as_lvalue(self._inner.address).decrement()
+        var rc = __get_address_as_lvalue(self._inner.address).decrement()
         if rc < 1:
             # Call inner destructor, then free the memory
             _ = __get_address_as_owned_value(self._inner.address)
             self._inner.free()
 
     fn set(self, owned new_value: T):
-        """Replace the existing value with a new value. The old value is deleted.
+        """Replace the existing value with a new value. The old value is devared.
 
         Thread safety: This method is currently not thread-safe. The old value's
-        deleter is called and the new value's __moveinit__ is called. If either of
+        devarer is called and the new value's __moveinit__ is called. If either of
         these occur while another thread is also trying to perform a `get` or `set`
         operation, then functions may run or copy improperly initialized memory.
 

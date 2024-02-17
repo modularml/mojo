@@ -62,7 +62,7 @@ fn _int_tuple_binary_apply[
     Example Usage:
         var a: StaticTuple[size, Int]
         var b: StaticTuple[size, Int]
-        let c = _int_tuple_binary_apply[size, Int.add](a, b)
+        var c = _int_tuple_binary_apply[size, Int.add](a, b)
 
     Parameters:
         size: Static size of the operand and result tuples.
@@ -81,8 +81,8 @@ fn _int_tuple_binary_apply[
     @always_inline
     @parameter
     fn do_apply[idx: Int]():
-        let a_elem: Int = a.__getitem__[idx]()
-        let b_elem: Int = b.__getitem__[idx]()
+        var a_elem: Int = a.__getitem__[idx]()
+        var b_elem: Int = b.__getitem__[idx]()
         c.__setitem__[idx](binary_fn(a_elem, b_elem))
 
     unroll[do_apply, size]()
@@ -103,7 +103,7 @@ fn _int_tuple_compare[
     Example Usage:
         var a: StaticTuple[size, Int]
         var b: StaticTuple[size, Int]
-        let c = _int_tuple_compare[size, Int.less_than](a, b)
+        var c = _int_tuple_compare[size, Int.less_than](a, b)
 
     Parameters:
         size: Static size of the operand and result tuples.
@@ -122,8 +122,8 @@ fn _int_tuple_compare[
     @always_inline
     @parameter
     fn do_compare[idx: Int]():
-        let a_elem: Int = a.__getitem__[idx]()
-        let b_elem: Int = b.__getitem__[idx]()
+        var a_elem: Int = a.__getitem__[idx]()
+        var b_elem: Int = b.__getitem__[idx]()
         c.__setitem__[idx](comp_fn(a_elem, b_elem).value)
 
     unroll[do_compare, size]()
@@ -141,7 +141,7 @@ fn _bool_tuple_reduce[
 
     Example Usage:
         var a: StaticTuple[size, mlir_bool]
-        let c = _bool_tuple_reduce[size, _reduce_and_fn](a, True)
+        var c = _bool_tuple_reduce[size, _reduce_and_fn](a, True)
 
     Parameters:
         size: Static size of the operand and result tuples.
@@ -217,7 +217,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
             The constructed tuple.
         """
 
-        let num_elements = len(elems)
+        var num_elements = len(elems)
 
         debug_assert(
             size == num_elements,
@@ -245,7 +245,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
             The constructed tuple.
         """
 
-        let num_elements = len(elems)
+        var num_elements = len(elems)
 
         debug_assert(
             size == num_elements,
@@ -273,7 +273,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
             The constructed tuple.
         """
 
-        let num_elements = len(elems)
+        var num_elements = len(elems)
 
         debug_assert(
             size == num_elements,
@@ -301,7 +301,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
             The constructed tuple.
         """
 
-        let num_elements = len(elems)
+        var num_elements = len(elems)
 
         debug_assert(
             size == num_elements,

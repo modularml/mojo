@@ -122,7 +122,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         constrained[
             Self._check[T]() != Self._sentinel, "not a union element type"
         ]()
-        let ptr = Reference(self._impl).get_unsafe_pointer().address
+        var ptr = Reference(self._impl).get_unsafe_pointer().address
         var result = AnyPointer[T]()
         result.value = __mlir_op.`pop.pointer.bitcast`[
             _type = __mlir_type[
@@ -187,9 +187,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     fn __del__(owned self):
         """Destroy the variant."""
-        self._call_correct_deleter()
+        self._call_correct_devarer()
 
-    fn _call_correct_deleter(inout self):
+    fn _call_correct_devarer(inout self):
         @parameter
         fn each[i: Int]():
             if self._state == i:
@@ -202,7 +202,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """Take the current value of the variant as the provided type.
 
         The caller takes ownership of the underlying value. The variant
-        type is consumed without calling any deleters.
+        type is consumed without calling any devarers.
 
         This doesn't explicitly check that your value is of that type!
         If you haven't verified the type correctness at runtime, you'll get
@@ -216,7 +216,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             The undelying data as an owned value.
         """
         debug_assert(Self._check[T]() == self._state, "taking wrong type")
-        self._state = Self._sentinel  # don't call the variant's deleter later
+        self._state = Self._sentinel  # don't call the variant's devarer later
         return self._get_ptr[T]().take_value()
 
     fn set[T: CollectionElement](inout self, owned value: T):
@@ -231,7 +231,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             value: The new value to set the variant to.
         """
-        self._call_correct_deleter()
+        self._call_correct_devarer()
         self._state = Self._check[T]()
         self._get_ptr[T]().emplace_value(value ^)
 

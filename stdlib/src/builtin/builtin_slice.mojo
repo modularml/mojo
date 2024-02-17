@@ -42,7 +42,7 @@ struct Slice(Sized):
     brackets, e.g.:
 
     ```mojo
-    let msg: String = "Hello Mojo"
+    var msg: String = "Hello Mojo"
 
     # Both are equivalent and print "Mojo".
     print(msg[6:])

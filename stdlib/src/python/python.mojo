@@ -25,20 +25,20 @@ from sys.ffi import _get_global
 
 
 fn _init_global(ignored: Pointer[NoneType]) -> Pointer[NoneType]:
-    let ptr = Pointer[CPython].alloc(1)
+    var ptr = Pointer[CPython].alloc(1)
     __get_address_as_lvalue(ptr.address) = CPython()
     return ptr.bitcast[NoneType]()
 
 
 fn _destroy_global(python: Pointer[NoneType]):
-    let p = python.bitcast[CPython]()
+    var p = python.bitcast[CPython]()
     CPython.destroy(__get_address_as_lvalue(p.address))
     python.free()
 
 
 @always_inline
 fn _get_global_python_itf() -> _PythonInterfaceImpl:
-    let ptr = _get_global["Python", _init_global, _destroy_global]()
+    var ptr = _get_global["Python", _init_global, _destroy_global]()
     return ptr.bitcast[CPython]()
 
 
@@ -97,15 +97,15 @@ struct Python:
             `PythonObject` containing the result of the evaluation.
         """
         var cpython = _get_global_python_itf().cpython()
-        let module = PythonObject(cpython.PyImport_AddModule("__main__"))
+        var module = PythonObject(cpython.PyImport_AddModule("__main__"))
         # PyImport_AddModule returns a borrowed reference - IncRef it to keep it alive.
         cpython.Py_IncRef(module.py_object)
-        let dictionary = PythonObject(
+        var dictionary = PythonObject(
             cpython.PyModule_GetDict(module.py_object)
         )
         # PyModule_GetDict returns a borrowed reference - IncRef it to keep it alive.
         cpython.Py_IncRef(dictionary.py_object)
-        let result = cpython.PyRun_String(
+        var result = cpython.PyRun_String(
             str, dictionary.py_object, dictionary.py_object, Py_eval_input
         )
         # We no longer need module and dictionary, release them.
@@ -124,17 +124,17 @@ struct Python:
 
         # Specify path to `mypython.py` module
         Python.add_to_path("path/to/module")
-        let mypython = Python.import_module("mypython")
+        var mypython = Python.import_module("mypython")
 
-        let c = mypython.my_algorithm(2, 3)
+        var c = mypython.my_algorithm(2, 3)
         ```
 
         Args:
             str: The path to a Python module you want to import.
         """
-        let cpython = _get_global_python_itf().cpython()
-        let sys = Python.import_module("sys")
-        let directory: PythonObject = str
+        var cpython = _get_global_python_itf().cpython()
+        var sys = Python.import_module("sys")
+        var directory: PythonObject = str
         _ = sys.path.append(directory)
 
     @staticmethod
@@ -148,7 +148,7 @@ struct Python:
         from python import Python
 
         # This is equivalent to Python's `import numpy as np`
-        let np = Python.import_module("numpy")
+        var np = Python.import_module("numpy")
         a = np.array([1, 2, 3])
         ```
 
@@ -161,7 +161,7 @@ struct Python:
             The Python module.
         """
         var cpython = _get_global_python_itf().cpython()
-        let module_maybe = cpython.PyImport_ImportModule(str)
+        var module_maybe = cpython.PyImport_ImportModule(str)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(module_maybe)
 
@@ -194,10 +194,10 @@ struct Python:
             cpython: The cpython instance we wish to error check.
         """
         if cpython.PyErr_Occurred():
-            let error = PythonObject(cpython.PyErr_Fetch()).__getattr__(
+            var error = PythonObject(cpython.PyErr_Fetch()).__getattr__(
                 "__str__"
             )()
-            let err: Error = cpython.PyUnicode_AsUTF8AndSize(error.py_object)
+            var err: Error = cpython.PyUnicode_AsUTF8AndSize(error.py_object)
             cpython.PyErr_Clear()
             raise err
 
@@ -237,6 +237,6 @@ struct Python:
             `PythonObject` representing `None`.
         """
         var cpython = _get_global_python_itf().cpython()
-        let nonetype = cpython.Py_NoneType()
+        var nonetype = cpython.Py_NoneType()
         cpython.Py_IncRef(nonetype)
         return PythonObject(nonetype)

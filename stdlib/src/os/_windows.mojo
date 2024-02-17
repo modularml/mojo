@@ -27,7 +27,7 @@ fn get_last_error_code() -> Int:
     Returns the error code from last operation.
 
     Returns:
-      The error code from last completed operation. Returns 0
+      The error code from last compvared operation. Returns 0
       if operation was success.
     """
     _assert_windows()
@@ -37,7 +37,7 @@ fn get_last_error_code() -> Int:
 @always_inline
 fn last_operation_succeeded() -> Bool:
     """
-    Returns if the last completed operation was a success or not.
+    Returns if the last compvared operation was a success or not.
 
     Returns:
       Returns True on success, else returns False.

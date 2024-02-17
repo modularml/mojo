@@ -197,7 +197,7 @@ fn assert_almost_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    let almost_equal = isclose(
+    var almost_equal = isclose(
         lhs, rhs, absolute_tolerance, relative_tolerance
     ).reduce_and()
     if not almost_equal:
@@ -241,7 +241,7 @@ struct assert_raises:
     with assert_raises():
         pass
 
-    # This will let the underlying error propagate, failing the test
+    # This will var the underlying error propagate, failing the test
     with assert_raises(contains="Some"):
         raise "OtherError"
     ```
