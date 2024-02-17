@@ -236,7 +236,17 @@ struct String(Sized, Stringable, KeyElement, Boolable):
 
     @always_inline
     fn __init__(inout self, owned impl: Self._buffer_type):
-        """Construct a string from its underlying buffer.
+        """Construct a string from a buffer of bytes.
+
+        The buffer must be terminated with a null byte:
+
+        ```mojo
+        var buf = DynamicVector[Int8]()
+        buf.append(ord('H'))
+        buf.append(ord('i'))
+        buf.append(0)
+        var hi = String(buf)
+        ```
 
         Args:
             impl: The buffer.
@@ -289,9 +299,11 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
+        The buffer must be terminated with a null byte.
+
         Args:
             ptr: The pointer to the buffer.
-            len: The length of the buffer.
+            len: The length of the buffer, including the null terminator.
         """
         self._buffer = Self._buffer_type()
         self._buffer.data = rebind[AnyPointer[Int8]](ptr)
@@ -302,9 +314,11 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
+        The buffer must be terminated with a null byte.
+
         Args:
             ptr: The pointer to the buffer.
-            len: The length of the buffer.
+            len: The length of the buffer, including the null terminator.
         """
         self = String(ptr.address, len)
 
@@ -344,10 +358,10 @@ struct String(Sized, Stringable, KeyElement, Boolable):
 
     @always_inline
     fn __bool__(self) -> Bool:
-        """Checks if the string is empty.
+        """Checks if the string is not empty.
 
         Returns:
-            True if the string is empty and False otherwise.
+            True if the string length is greater than zero, and False otherwise.
         """
         return len(self) > 0
 
