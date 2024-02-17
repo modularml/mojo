@@ -24,7 +24,7 @@ with open("my_file.txt", "r") as f:
 
 """
 
-from pathlib.path import Path
+from os import PathLike
 from sys import external_call
 
 from memory.unsafe import AddressSpace, DTypePointer, Pointer
@@ -62,15 +62,6 @@ struct FileHandle:
     fn __init__(inout self):
         """Default constructor."""
         self.handle = DTypePointer[DType.invalid]()
-
-    fn __init__(inout self, path: StringLiteral, mode: StringLiteral) raises:
-        """Construct the FileHandle using the file path and mode.
-
-        Args:
-          path: The file path.
-          mode: The mode to open the file in (the mode can be "r" or "w").
-        """
-        self.__init__(StringRef(path), StringRef(mode))
 
     fn __init__(inout self, path: String, mode: String) raises:
         """Construct the FileHandle using the file path and mode.
@@ -269,34 +260,6 @@ struct FileHandle:
         return self ^
 
 
-fn open(path: StringLiteral, mode: StringLiteral) raises -> FileHandle:
-    """Opens the file specified by path using the mode provided, returning a
-    FileHandle.
-
-    Args:
-      path: The path to the file to open.
-      mode: The mode to open the file in (the mode can be "r" or "w").
-
-    Returns:
-      A file handle.
-    """
-    return FileHandle(StringRef(path), StringRef(mode))
-
-
-fn open(path: StringRef, mode: StringRef) raises -> FileHandle:
-    """Opens the file specified by path using the mode provided, returning a
-    FileHandle.
-
-    Args:
-      path: The path to the file to open.
-      mode: The mode to open the file in (the mode can be "r" or "w").
-
-    Returns:
-      A file handle.
-    """
-    return FileHandle(path, mode)
-
-
 fn open(path: String, mode: String) raises -> FileHandle:
     """Opens the file specified by path using the mode provided, returning a
     FileHandle.
@@ -311,9 +274,14 @@ fn open(path: String, mode: String) raises -> FileHandle:
     return FileHandle(path, mode)
 
 
-fn open(path: Path, mode: String) raises -> FileHandle:
+fn open[
+    pathlike: os.PathLike
+](path: pathlike, mode: String) raises -> FileHandle:
     """Opens the file specified by path using the mode provided, returning a
     FileHandle.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file to open.
@@ -322,4 +290,4 @@ fn open(path: Path, mode: String) raises -> FileHandle:
     Returns:
       A file handle.
     """
-    return FileHandle(str(path), mode)
+    return FileHandle(path.__fspath__(), mode)
