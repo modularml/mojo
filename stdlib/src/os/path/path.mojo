@@ -21,7 +21,7 @@ from .._linux_x86 import _lstat as _lstat_linux_x86
 from .._linux_x86 import _stat as _stat_linux_x86
 from .._macos import _lstat as _lstat_macos
 from .._macos import _stat as _stat_macos
-from ..stat import _S_ISDIR, _S_ISLNK, _S_ISREG
+from ..fstat import _S_ISDIR, _S_ISLNK, _S_ISREG
 
 
 # ===----------------------------------------------------------------------=== #

@@ -7,3 +7,4 @@
 
 from .env import *
 from .pathlike import PathLike
+from .fstat import stat, stat_result

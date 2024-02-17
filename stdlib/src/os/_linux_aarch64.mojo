@@ -5,6 +5,8 @@
 # ===----------------------------------------------------------------------=== #
 
 from time.time import _CTimeSpec
+from utils.index import StaticIntTuple
+from .fstat import stat_result
 
 from utils.index import StaticIntTuple
 
@@ -78,6 +80,25 @@ struct _c_stat(Stringable):
         res += "st_ctimespec: " + str(self.st_ctimespec) + ",\n"
         res += "st_birthtimespec: " + str(self.st_birthtimespec) + "\n"
         return res + "}"
+
+    fn _to_stat_result(self) -> stat_result:
+        return stat_result(
+            st_dev=int(self.st_dev),
+            st_mode=int(self.st_mode),
+            st_nlink=int(self.st_nlink),
+            st_ino=int(self.st_ino),
+            st_uid=int(self.st_uid),
+            st_gid=int(self.st_gid),
+            st_rdev=int(self.st_rdev),
+            st_atimespec=self.st_atimespec,
+            st_ctimespec=self.st_ctimespec,
+            st_mtimespec=self.st_mtimespec,
+            st_birthtimespec=self.st_birthtimespec,
+            st_size=int(self.st_size),
+            st_blocks=int(self.st_blocks),
+            st_blksize=int(self.st_blksize),
+            st_flags=0,
+        )
 
 
 @always_inline
