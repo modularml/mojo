@@ -14,6 +14,11 @@ from sys.info import sizeof as _sizeof
 from algorithm.functional import unroll
 
 
+alias _mIsSigned = UInt8(1)
+alias _mIsInteger = UInt8(1 << 7)
+alias _mIsFloat = UInt8(1 << 6)
+
+
 @value
 @register_passable("trivial")
 struct DType(Stringable, KeyElement):
@@ -344,17 +349,10 @@ struct DType(Stringable, KeyElement):
         let ui8 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<ui8>`
         ](val)
-        var _mIsSigned = __mlir_op.`kgen.param.constant`[
-            _type = __mlir_type[`!pop.scalar<ui8>`],
-            value = __mlir_attr[`#pop.simd<1> : !pop.scalar<ui8>`],
-        ]()
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
-                __mlir_op.`pop.and`(ui8, _mIsSigned),
-                __mlir_op.`kgen.param.constant`[
-                    _type = __mlir_type[`!pop.scalar<ui8>`],
-                    value = __mlir_attr[`#pop.simd<0> : !pop.scalar<ui8>`],
-                ](),
+                __mlir_op.`pop.and`(ui8, _mIsSigned.value),
+                UInt8(0).value,
             )
         )
 
@@ -373,17 +371,10 @@ struct DType(Stringable, KeyElement):
         let ui8 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<ui8>`
         ](val)
-        var _mIsSigned = __mlir_op.`kgen.param.constant`[
-            _type = __mlir_type[`!pop.scalar<ui8>`],
-            value = __mlir_attr[`#pop.simd<1> : !pop.scalar<ui8>`],
-        ]()
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(ui8, _mIsSigned),
-                __mlir_op.`kgen.param.constant`[
-                    _type = __mlir_type[`!pop.scalar<ui8>`],
-                    value = __mlir_attr[`#pop.simd<0> : !pop.scalar<ui8>`],
-                ](),
+                __mlir_op.`pop.and`(ui8, _mIsSigned.value),
+                UInt8(0).value,
             )
         )
 
@@ -400,17 +391,10 @@ struct DType(Stringable, KeyElement):
         let ui8 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<ui8>`
         ](val)
-        var _mIsInteger = __mlir_op.`kgen.param.constant`[
-            _type = __mlir_type[`!pop.scalar<ui8>`],
-            value = __mlir_attr[`#pop.simd<128> : !pop.scalar<ui8>`],
-        ]()
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(ui8, _mIsInteger),
-                __mlir_op.`kgen.param.constant`[
-                    _type = __mlir_type[`!pop.scalar<ui8>`],
-                    value = __mlir_attr[`#pop.simd<0> : !pop.scalar<ui8>`],
-                ](),
+                __mlir_op.`pop.and`(ui8, _mIsInteger.value),
+                UInt8(0).value,
             )
         )
 
@@ -428,17 +412,10 @@ struct DType(Stringable, KeyElement):
         let ui8 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<ui8>`
         ](val)
-        var _mIsFloat = __mlir_op.`kgen.param.constant`[
-            _type = __mlir_type[`!pop.scalar<ui8>`],
-            value = __mlir_attr[`#pop.simd<64> : !pop.scalar<ui8>`],
-        ]()
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(ui8, _mIsFloat),
-                __mlir_op.`kgen.param.constant`[
-                    _type = __mlir_type[`!pop.scalar<ui8>`],
-                    value = __mlir_attr[`#pop.simd<0> : !pop.scalar<ui8>`],
-                ](),
+                __mlir_op.`pop.and`(ui8, _mIsFloat.value),
+                UInt8(0).value,
             )
         )
 
