@@ -338,11 +338,24 @@ struct DType(Stringable, KeyElement):
         Returns:
             Returns True if the input type parameter is unsigned.
         """
-        return (
-            self.is_uint8()
-            or self.is_uint16()
-            or self.is_uint32()
-            or self.is_uint64()
+        if not self.is_integral():
+            return False
+        let val = __mlir_op.`pop.dtype.to_ui8`(self.value)
+        let ui8 = __mlir_op.`pop.cast_from_builtin`[
+            _type = __mlir_type.`!pop.scalar<ui8>`
+        ](val)
+        var _mIsSigned = __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type[`!pop.scalar<ui8>`],
+            value = __mlir_attr[`#pop.simd<1> : !pop.scalar<ui8>`],
+        ]()
+        return Bool(
+            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
+                __mlir_op.`pop.and`(ui8, _mIsSigned),
+                __mlir_op.`kgen.param.constant`[
+                    _type = __mlir_type[`!pop.scalar<ui8>`],
+                    value = __mlir_attr[`#pop.simd<0> : !pop.scalar<ui8>`],
+                ](),
+            )
         )
 
     @always_inline("nodebug")
@@ -352,13 +365,26 @@ struct DType(Stringable, KeyElement):
         Returns:
             Returns True if the input type parameter is signed.
         """
-        return (
-            self.is_int8()
-            or self.is_int16()
-            or self.is_int32()
-            or self.is_int64()
-            or self.is_index()
-            or self.is_floating_point()
+        if self.is_index() or self.is_floating_point():
+            return True
+        if not self.is_integral():
+            return False
+        let val = __mlir_op.`pop.dtype.to_ui8`(self.value)
+        let ui8 = __mlir_op.`pop.cast_from_builtin`[
+            _type = __mlir_type.`!pop.scalar<ui8>`
+        ](val)
+        var _mIsSigned = __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type[`!pop.scalar<ui8>`],
+            value = __mlir_attr[`#pop.simd<1> : !pop.scalar<ui8>`],
+        ]()
+        return Bool(
+            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
+                __mlir_op.`pop.and`(ui8, _mIsSigned),
+                __mlir_op.`kgen.param.constant`[
+                    _type = __mlir_type[`!pop.scalar<ui8>`],
+                    value = __mlir_attr[`#pop.simd<0> : !pop.scalar<ui8>`],
+                ](),
+            )
         )
 
     @always_inline("nodebug")
@@ -368,16 +394,24 @@ struct DType(Stringable, KeyElement):
         Returns:
             Returns True if the input type parameter is an integer.
         """
-        return (
-            self.is_uint8()
-            or self.is_int8()
-            or self.is_uint16()
-            or self.is_int16()
-            or self.is_uint32()
-            or self.is_int32()
-            or self.is_uint64()
-            or self.is_int64()
-            or self.is_index()
+        if self.is_index():
+            return True
+        let val = __mlir_op.`pop.dtype.to_ui8`(self.value)
+        let ui8 = __mlir_op.`pop.cast_from_builtin`[
+            _type = __mlir_type.`!pop.scalar<ui8>`
+        ](val)
+        var _mIsInteger = __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type[`!pop.scalar<ui8>`],
+            value = __mlir_attr[`#pop.simd<128> : !pop.scalar<ui8>`],
+        ]()
+        return Bool(
+            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
+                __mlir_op.`pop.and`(ui8, _mIsInteger),
+                __mlir_op.`kgen.param.constant`[
+                    _type = __mlir_type[`!pop.scalar<ui8>`],
+                    value = __mlir_attr[`#pop.simd<0> : !pop.scalar<ui8>`],
+                ](),
+            )
         )
 
     @always_inline("nodebug")
@@ -388,12 +422,24 @@ struct DType(Stringable, KeyElement):
         Returns:
             Returns True if the input type parameter is a floating-point.
         """
-        return (
-            self.is_bfloat16()
-            or self.is_float16()
-            or self.is_float32()
-            or self.is_tensor_float32()
-            or self.is_float64()
+        if self.is_integral():
+            return False
+        let val = __mlir_op.`pop.dtype.to_ui8`(self.value)
+        let ui8 = __mlir_op.`pop.cast_from_builtin`[
+            _type = __mlir_type.`!pop.scalar<ui8>`
+        ](val)
+        var _mIsFloat = __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type[`!pop.scalar<ui8>`],
+            value = __mlir_attr[`#pop.simd<64> : !pop.scalar<ui8>`],
+        ]()
+        return Bool(
+            __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
+                __mlir_op.`pop.and`(ui8, _mIsFloat),
+                __mlir_op.`kgen.param.constant`[
+                    _type = __mlir_type[`!pop.scalar<ui8>`],
+                    value = __mlir_attr[`#pop.simd<0> : !pop.scalar<ui8>`],
+                ](),
+            )
         )
 
     @always_inline("nodebug")
