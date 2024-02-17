@@ -345,13 +345,9 @@ struct DType(Stringable, KeyElement):
         """
         if not self.is_integral():
             return False
-        let val = __mlir_op.`pop.dtype.to_ui8`(self.value)
-        let ui8 = __mlir_op.`pop.cast_from_builtin`[
-            _type = __mlir_type.`!pop.scalar<ui8>`
-        ](val)
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
-                __mlir_op.`pop.and`(ui8, _mIsSigned.value),
+                __mlir_op.`pop.and`(self._as_i8(), _mIsSigned.value),
                 UInt8(0).value,
             )
         )
@@ -367,13 +363,9 @@ struct DType(Stringable, KeyElement):
             return True
         if not self.is_integral():
             return False
-        let val = __mlir_op.`pop.dtype.to_ui8`(self.value)
-        let ui8 = __mlir_op.`pop.cast_from_builtin`[
-            _type = __mlir_type.`!pop.scalar<ui8>`
-        ](val)
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(ui8, _mIsSigned.value),
+                __mlir_op.`pop.and`(self._as_i8(), _mIsSigned.value),
                 UInt8(0).value,
             )
         )
@@ -387,13 +379,9 @@ struct DType(Stringable, KeyElement):
         """
         if self.is_index():
             return True
-        let val = __mlir_op.`pop.dtype.to_ui8`(self.value)
-        let ui8 = __mlir_op.`pop.cast_from_builtin`[
-            _type = __mlir_type.`!pop.scalar<ui8>`
-        ](val)
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(ui8, _mIsInteger.value),
+                __mlir_op.`pop.and`(self._as_i8(), _mIsInteger.value),
                 UInt8(0).value,
             )
         )
@@ -408,13 +396,9 @@ struct DType(Stringable, KeyElement):
         """
         if self.is_integral():
             return False
-        let val = __mlir_op.`pop.dtype.to_ui8`(self.value)
-        let ui8 = __mlir_op.`pop.cast_from_builtin`[
-            _type = __mlir_type.`!pop.scalar<ui8>`
-        ](val)
         return Bool(
             __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-                __mlir_op.`pop.and`(ui8, _mIsFloat.value),
+                __mlir_op.`pop.and`(self._as_i8(), _mIsFloat.value),
                 UInt8(0).value,
             )
         )
