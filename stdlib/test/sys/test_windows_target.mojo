@@ -11,15 +11,15 @@
 # RUN: mojo.exe %s | FileCheck %s
 
 
-from sys import external_call
-from sys.info import os_is_linux, os_is_macos, os_is_windows
-
-from memory.unsafe import Pointer
 from os._windows import (
     get_last_error_code,
     last_operation_succeeded,
     reset_last_error,
 )
+from sys import external_call
+from sys.info import os_is_linux, os_is_macos, os_is_windows
+
+from memory.unsafe import Pointer
 
 
 # CHECK-LABEL: test_os_query

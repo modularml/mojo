@@ -7,8 +7,8 @@
 """
 
 import os
-from sys.info import os_is_windows
 from os import PathLike
+from sys.info import os_is_windows
 
 from memory import stack_allocation
 from tensor import Tensor

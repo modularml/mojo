@@ -5,10 +5,11 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
+from testing import *
+
+from utils._optional_param import OptionalParamInt, OptionalParamInts
 from utils.index import StaticIntTuple
 from utils.list import Dim, DimList
-from utils._optional_param import OptionalParamInt, OptionalParamInts
-from testing import *
 
 
 # CHECK-LABEL: test_dim_list

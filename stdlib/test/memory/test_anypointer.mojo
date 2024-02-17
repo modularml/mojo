@@ -6,9 +6,8 @@
 # RUN: %mojo -debug-level full %s | FileCheck %s --dump-input=always
 
 from memory.anypointer import AnyPointer
-from testing.testing import _MoveCounter
-
 from testing import *
+from testing.testing import _MoveCounter
 
 
 struct MoveOnlyType(Movable):

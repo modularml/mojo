@@ -8,4 +8,4 @@
 from .dict import Dict, KeyElement
 from .optional import Optional
 from .set import Set
-from .vector import DynamicVector, CollectionElement
+from .vector import CollectionElement, DynamicVector

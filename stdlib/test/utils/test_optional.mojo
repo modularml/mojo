@@ -5,8 +5,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from utils._optional import Optional
 from testing import *
+
+from utils._optional import Optional
 
 
 def main():

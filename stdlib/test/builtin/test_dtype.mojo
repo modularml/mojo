@@ -6,6 +6,7 @@
 # RUN: %mojo -debug-level full %s
 
 from collections import Set
+
 from testing import *
 
 

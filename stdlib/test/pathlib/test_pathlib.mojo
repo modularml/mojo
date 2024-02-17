@@ -8,7 +8,8 @@
 
 from pathlib import *
 from sys.param_env import env_get_string
-from testing import assert_equal, assert_true, assert_false
+
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_cwd():

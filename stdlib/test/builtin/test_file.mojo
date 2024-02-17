@@ -9,12 +9,11 @@
 from pathlib import Path
 from sys.info import os_is_windows
 from sys.param_env import env_get_string
-from testing import assert_equal
 
 from memory.buffer import Buffer, NDBuffer
-
-from test_utils import linear_fill
 from tensor import Tensor
+from test_utils import linear_fill
+from testing import assert_equal
 
 alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
 alias TEMP_FILE_DIR = env_get_string["TEMP_FILE_DIR"]()

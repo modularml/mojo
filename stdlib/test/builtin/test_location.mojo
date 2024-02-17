@@ -5,8 +5,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: mojo --debug-level full %s
 
-from testing import *
 from builtin._location import _SourceLocation
+from testing import *
 
 
 def main():

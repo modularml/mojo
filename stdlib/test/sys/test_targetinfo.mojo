@@ -6,14 +6,15 @@
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
 from sys.info import (
-    simdwidthof,
-    simdbitwidth,
     alignof,
-    sizeof,
     num_logical_cores,
     num_performance_cores,
     num_physical_cores,
+    simdbitwidth,
+    simdwidthof,
+    sizeof,
 )
+
 from gpu.host._compile import _get_nvptx_target
 
 

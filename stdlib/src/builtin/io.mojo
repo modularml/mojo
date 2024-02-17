@@ -8,13 +8,13 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from math.math import align_up
 from os.atomic import Atomic
 from sys import external_call
 from sys.info import bitwidthof, os_is_windows, triple_is_nvidia_cuda
 
 from algorithm.functional import unroll
 from complex import ComplexSIMD as _ComplexSIMD
-from math.math import align_up
 from memory.unsafe import Pointer
 from python.object import PythonObject
 from tensor.tensor import Tensor

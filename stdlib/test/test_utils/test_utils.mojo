@@ -4,9 +4,9 @@
 #
 # ===----------------------------------------------------------------------=== #
 
-from tensor import Tensor
 from math.math import _simd_apply, abs, max
 from sys import external_call, llvm_intrinsic
+
 from tensor import Tensor, TensorShape
 
 

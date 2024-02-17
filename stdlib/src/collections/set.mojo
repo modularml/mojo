@@ -5,12 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the  Set datatype."""
 
-from .dict import (
-    Dict,
-    KeyElement,
-    _DictKeyIter,
-    _DictEntryIter,
-)
+from .dict import Dict, KeyElement, _DictEntryIter, _DictKeyIter
 
 
 struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):

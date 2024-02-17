@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from math import max, min, divmod
+from math import divmod, max, min
 
 
 # CHECK-LABEL: test_int

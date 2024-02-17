@@ -6,8 +6,9 @@
 # RUN: %mojo -debug-level full %s
 
 
-from pathlib import cwd, Path
 from os.path import exists, lexists
+from pathlib import Path, cwd
+
 from testing import *
 
 

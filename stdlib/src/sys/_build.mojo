@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 """Provides functions to examine build configuration."""
 
-from .param_env import is_defined, env_get_string
+from .param_env import env_get_string, is_defined
 
 
 @always_inline("nodebug")

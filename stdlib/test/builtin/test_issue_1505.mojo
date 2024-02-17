@@ -7,8 +7,9 @@
 # RUN: %mojo -debug-level full %s
 # Test for https://github.com/modularml/mojo/issues/1505
 
-from testing import *
 from random import random_ui64
+
+from testing import *
 
 
 fn gen_perm() -> StaticIntTuple[64]:

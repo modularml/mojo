@@ -8,8 +8,11 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from collections.dict import KeyElement
+from collections.vector import DynamicVector
 from math import abs as _abs
-from math import min as _min, max as _max
+from math import max as _max
+from math import min as _min
 from math.bit import ctlz
 from sys.info import bitwidthof
 
@@ -20,8 +23,6 @@ from memory.unsafe import DTypePointer, Pointer
 
 from utils.index import StaticIntTuple
 from utils.static_tuple import StaticTuple
-from collections.vector import DynamicVector
-from collections.dict import KeyElement
 
 from .io import _snprintf, _snprintf_scalar, _StringableTuple
 from .range import _StridedRange

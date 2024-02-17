@@ -8,11 +8,11 @@
 from .memory import (
     AddressSpace,
     DTypePointer,
+    Pointer,
     memcmp,
     memcpy,
-    parallel_memcpy,
-    memset_zero,
     memset,
-    Pointer,
+    memset_zero,
+    parallel_memcpy,
     stack_allocation,
 )

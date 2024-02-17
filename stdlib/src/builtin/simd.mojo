@@ -8,21 +8,21 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import llvm_intrinsic
-from sys.info import has_avx512f, is_x86, simdwidthof, has_neon
-from math.math import nan, _simd_apply
 from math._numerics import FPUtils
-from math.limit import neginf, inf, isnan
+from math.limit import inf, isnan, neginf
+from math.math import _simd_apply, nan
+from sys import llvm_intrinsic
+from sys.info import has_avx512f, has_neon, is_x86, simdwidthof
+
+from builtin.hash import _hash_simd
+from debug.visualizers import lldb_formatter_wrapping_type
 from memory.unsafe import bitcast
+
+from utils.static_tuple import StaticTuple
 
 from .dtype import _integral_type_of
 from .io import _snprintf_scalar
 from .string import _calc_initial_buffer_size, _vec_fmt
-
-from builtin.hash import _hash_simd
-from utils.static_tuple import StaticTuple
-from debug.visualizers import lldb_formatter_wrapping_type
-
 
 # ===------------------------------------------------------------------------===#
 # Type Aliases

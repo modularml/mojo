@@ -8,9 +8,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from algorithm.functional import unroll
 from collections.dict import KeyElement
 from sys.info import sizeof as _sizeof
+
+from algorithm.functional import unroll
 
 
 @value

@@ -5,11 +5,12 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
+from sys.ffi import _get_global
+
 from memory.unsafe import Pointer
-from utils.variant import Variant
 from testing import *
 
-from sys.ffi import _get_global
+from utils.variant import Variant
 
 
 struct TestCounter(CollectionElement):

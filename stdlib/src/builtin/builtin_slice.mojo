@@ -9,7 +9,6 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from math import limit
-
 from sys.intrinsics import _mlirtype_is_eq
 
 

@@ -8,12 +8,13 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin.hash import _hash_simd
-from debug.visualizers import lldb_formatter_wrapping_type
-from utils.index import StaticIntTuple
 from collections.dict import KeyElement
-from builtin.string import _calc_initial_buffer_size, _vec_fmt
 
+from builtin.hash import _hash_simd
+from builtin.string import _calc_initial_buffer_size, _vec_fmt
+from debug.visualizers import lldb_formatter_wrapping_type
+
+from utils.index import StaticIntTuple
 
 # ===----------------------------------------------------------------------=== #
 #  Intable

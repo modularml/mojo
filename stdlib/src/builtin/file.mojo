@@ -27,7 +27,7 @@ with open("my_file.txt", "r") as f:
 from pathlib.path import Path
 from sys import external_call
 
-from memory.unsafe import DTypePointer, Pointer, AddressSpace
+from memory.unsafe import AddressSpace, DTypePointer, Pointer
 from tensor import Tensor
 
 

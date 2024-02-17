@@ -5,10 +5,10 @@
 # ===----------------------------------------------------------------------=== #
 """Implements a foreign functions interface (FFI)."""
 
+from memory.unsafe import DTypePointer, Pointer
+
 from .info import os_is_linux, os_is_windows
 from .intrinsics import _mlirtype_is_eq
-
-from memory.unsafe import DTypePointer, Pointer
 
 
 struct RTLD:

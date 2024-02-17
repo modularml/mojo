@@ -10,8 +10,7 @@ from memory.unsafe import Pointer
 from python._cpython import CPython, PyObjectPtr
 from python.object import PythonObject
 from python.python import Python
-
-from testing import assert_true, assert_false
+from testing import assert_false, assert_true
 
 
 # CHECK-LABEL: test_dunder_methods

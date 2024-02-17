@@ -5,8 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from collections.vector import DynamicVector
-from collections.vector import InlinedFixedVector
+from collections.vector import DynamicVector, InlinedFixedVector
 
 from testing import *
 from testing.testing import _MoveCounter

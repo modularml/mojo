@@ -12,8 +12,9 @@ from python.object import PythonObject
 ```
 """
 
-from algorithm import unroll
 from sys.intrinsics import _mlirtype_is_eq
+
+from algorithm import unroll
 
 from ._cpython import CPython, PyObjectPtr
 from .dictionary import Dictionary

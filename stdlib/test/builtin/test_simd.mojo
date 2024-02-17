@@ -6,8 +6,9 @@
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
 from math import iota, pow
+from sys.info import has_neon, simdwidthof
+
 from testing import *
-from sys.info import simdwidthof, has_neon
 
 
 # CHECK-LABEL: test_simd

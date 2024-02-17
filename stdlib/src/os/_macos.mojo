@@ -4,9 +4,9 @@
 #
 # ===----------------------------------------------------------------------=== #
 
-from utils.index import StaticIntTuple
 from time.time import _CTimeSpec
 
+from utils.index import StaticIntTuple
 
 alias dev_t = Int32
 alias mode_t = Int16

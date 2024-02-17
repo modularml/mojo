@@ -8,7 +8,6 @@
 
 from python.object import PythonObject
 from python.python import Python
-
 from testing import assert_raises
 
 

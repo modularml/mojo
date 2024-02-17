@@ -5,8 +5,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from collections.dict import Dict, KeyElement
 from collections import Optional
+from collections.dict import Dict, KeyElement
 
 from testing import *
 

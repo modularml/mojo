@@ -6,7 +6,8 @@
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
 from random import random_float64
-from testing import assert_true, assert_false, assert_equal
+
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_object_ctors():

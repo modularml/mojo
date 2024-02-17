@@ -5,8 +5,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo --debug-level full %s
 
-from memory._arc import Arc
 from collections.vector import DynamicVector
+
+from memory._arc import Arc
 from testing import *
 
 

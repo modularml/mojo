@@ -4,4 +4,4 @@
 #
 # ===----------------------------------------------------------------------=== #
 
-from .path import isdir, islink, isfile, exists, lexists
+from .path import exists, isdir, isfile, islink, lexists

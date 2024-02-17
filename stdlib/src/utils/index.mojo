@@ -14,8 +14,8 @@ from utils.index import StaticIntTuple
 """
 
 from algorithm import unroll
-from builtin.string import _calc_initial_buffer_size, _vec_fmt
 from builtin.io import _get_dtype_printf_format
+from builtin.string import _calc_initial_buffer_size, _vec_fmt
 
 from utils.list import DimList
 

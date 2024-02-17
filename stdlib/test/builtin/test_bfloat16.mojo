@@ -5,9 +5,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 from math import *
-from testing import *
-from sys.info import has_neon
 from random import randn_float64
+from sys.info import has_neon
+
+from testing import *
 
 
 def test_methods():

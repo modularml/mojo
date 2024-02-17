@@ -5,11 +5,10 @@
 # ===----------------------------------------------------------------------=== #
 
 from math import max
-
-from memory.unsafe import DTypePointer, AddressSpace, bitcast
-from tensor import TensorShape
-from tensor import Tensor, TensorSpec
 from pathlib import Path
+
+from memory.unsafe import AddressSpace, DTypePointer, bitcast
+from tensor import Tensor, TensorShape, TensorSpec
 
 alias _kStartTensorMarker = "["
 alias _kEndTensorMarker = "]"

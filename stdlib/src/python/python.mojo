@@ -13,6 +13,7 @@ from python import Python
 """
 
 from sys import external_call
+from sys.ffi import _get_global
 from sys.info import sizeof
 
 from memory.unsafe import Pointer
@@ -20,8 +21,6 @@ from memory.unsafe import Pointer
 from ._cpython import CPython, Py_eval_input
 from .dictionary import Dictionary
 from .object import PythonObject
-
-from sys.ffi import _get_global
 
 
 fn _init_global(ignored: Pointer[NoneType]) -> Pointer[NoneType]:

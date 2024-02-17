@@ -5,8 +5,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from pathlib import cwd, Path
 from os.path import isdir
+from pathlib import Path, cwd
+
 from testing import *
 
 

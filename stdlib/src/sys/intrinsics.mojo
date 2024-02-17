@@ -15,7 +15,7 @@ from sys.intrinsics import PrefetchLocality
 from math import iota
 from sys.info import sizeof
 
-from memory.unsafe import DTypePointer, AddressSpace
+from memory.unsafe import AddressSpace, DTypePointer
 
 # ===----------------------------------------------------------------------===#
 # llvm_intrinsic

@@ -10,10 +10,9 @@ from sys.info import sizeof
 from memory import memcmp, memcpy, memset_zero
 from memory.buffer import Buffer
 from memory.unsafe import DTypePointer, Pointer
+from testing import assert_equal, assert_not_equal, assert_true
 
 from utils.index import Index
-
-from testing import assert_equal, assert_not_equal, assert_true
 
 alias void = __mlir_attr.`#kgen.dtype.constant<invalid> : !kgen.dtype`
 alias int8_pop = __mlir_type.`!pop.scalar<si8>`

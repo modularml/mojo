@@ -15,7 +15,7 @@ from collections.vector import InlinedFixedVector
 from math import max
 
 from memory.anypointer import AnyPointer
-from memory.unsafe import bitcast, Pointer, Reference, _LITRef
+from memory.unsafe import Pointer, Reference, _LITRef, bitcast
 
 from utils.static_tuple import StaticTuple
 

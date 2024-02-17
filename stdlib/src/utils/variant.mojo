@@ -31,12 +31,14 @@ print(to_string(who_knows))
 ```
 """
 
-from math.math import max, align_up
-from sys.info import sizeof, alignof
-from algorithm.functional import unroll
-from utils.static_tuple import StaticTuple
+from math.math import align_up, max
+from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
+
+from algorithm.functional import unroll
 from memory.unsafe import emplace_ref_unsafe
+
+from utils.static_tuple import StaticTuple
 
 
 # FIXME(#27380): Can't pass *Ts to a function parameter, only type parameter.

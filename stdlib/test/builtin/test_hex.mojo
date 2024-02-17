@@ -5,10 +5,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from testing import assert_equal
 from math.limit import max_finite, min_finite
 
 from builtin.hex import _format_int
+from testing import assert_equal
 
 
 fn test_format_int() raises:

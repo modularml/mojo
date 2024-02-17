@@ -21,10 +21,10 @@ from sys.info import (
     sizeof,
     triple_is_nvidia_cuda,
 )
-from sys.intrinsics import PrefetchOptions
+from sys.intrinsics import PrefetchOptions, _mlirtype_is_eq
 from sys.intrinsics import prefetch as _prefetch
 from sys.intrinsics import strided_load, strided_store
-from sys.intrinsics import _mlirtype_is_eq
+
 from gpu.memory import AddressSpace as GPUAddressSpace
 
 from .memory import _aligned_alloc, _aligned_free

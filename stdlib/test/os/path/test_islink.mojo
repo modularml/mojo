@@ -7,9 +7,10 @@
 # RUN: ln -s %S %t/tmp
 # RUN: %mojo -debug-level full -D TEMP_DIR=%t/tmp %s
 
-from pathlib import Path
 from os.path import isdir, islink
+from pathlib import Path
 from sys.param_env import env_get_string
+
 from testing import *
 
 alias TEMP_DIR = env_get_string["TEMP_DIR"]()

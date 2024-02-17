@@ -5,8 +5,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from utils.static_tuple import StaticTuple
 from utils.index import StaticIntTuple
+from utils.static_tuple import StaticTuple
 
 
 # CHECK-LABEL: test_static_tuple

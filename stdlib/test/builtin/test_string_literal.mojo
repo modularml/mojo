@@ -5,12 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from testing import (
-    assert_equal,
-    assert_not_equal,
-    assert_false,
-    assert_true,
-)
+from testing import assert_equal, assert_false, assert_not_equal, assert_true
 
 
 def test_hash():

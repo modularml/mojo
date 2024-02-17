@@ -13,18 +13,18 @@ from memory import memcmp
 """
 
 
+from math import align_down, div_ceil, min
 from sys import llvm_intrinsic
 from sys.info import sizeof, triple_is_nvidia_cuda
 
-from algorithm import vectorize, sync_parallelize
-from math import min, div_ceil, align_down
+from algorithm import sync_parallelize, vectorize
+from gpu.memory import AddressSpace as GPUAddressSpace
 from runtime.llcl import Runtime
 
 from utils.list import Dim
 
 from .buffer import Buffer
-from .unsafe import DTypePointer, Pointer, AddressSpace
-from gpu.memory import AddressSpace as GPUAddressSpace
+from .unsafe import AddressSpace, DTypePointer, Pointer
 
 # ===----------------------------------------------------------------------===#
 # memcmp

@@ -12,9 +12,10 @@ from base64 import b64encode
 ```
 """
 
-from sys.info import simdwidthof
-from memory.unsafe import DTypePointer
 from collections.vector import DynamicVector
+from sys.info import simdwidthof
+
+from memory.unsafe import DTypePointer
 
 # ===----------------------------------------------------------------------===#
 # b64encode

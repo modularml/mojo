@@ -12,7 +12,6 @@ from testing import assert_true
 ```
 """
 from collections import Optional
-
 from math import abs, isclose
 
 # ===----------------------------------------------------------------------=== #

@@ -19,10 +19,10 @@ There are a few main tools in this module:
 """
 
 import math
-from memory import memcpy, memset_zero, stack_allocation
 import random
 from sys.ffi import _get_global
 
+from memory import memcpy, memset_zero, stack_allocation
 
 # This hash secret is XOR-ed with the final hash value for common hash functions.
 # Doing so can help prevent DDOS attacks on data structures relying on these
