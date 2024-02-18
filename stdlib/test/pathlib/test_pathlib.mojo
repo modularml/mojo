@@ -9,7 +9,7 @@
 from pathlib import *
 from sys.param_env import env_get_string
 
-from testing import assert_equal, assert_false, assert_true
+from testing import *
 
 
 def test_cwd():
@@ -29,6 +29,8 @@ def test_path():
     assert_equal(
         str(Path("/foo" + DIR_SEPARATOR) / "bar" / "jar"), "/foo/bar/jar"
     )
+
+    assert_not_equal(Path().stat().st_mode, 0)
 
 
 def test_path_exists():

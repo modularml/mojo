@@ -7,7 +7,7 @@
 """
 
 import os
-from os import PathLike
+from os import PathLike, stat, stat_result
 from sys.info import os_is_windows
 
 from memory import stack_allocation
@@ -169,6 +169,14 @@ struct Path(Stringable, CollectionElement, PathLike):
           True if the paths are not equal and False otherwise.
         """
         return not self == other
+
+    fn stat(self) raises -> stat_result:
+        """Returns the stat information on the path.
+
+        Returns:
+          A stat_result object containing information about the path.
+        """
+        return os.stat(self)
 
     fn exists(self) -> Bool:
         """Returns True if the path exists and False otherwise.
