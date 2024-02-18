@@ -21,7 +21,7 @@ from .._linux_x86 import _lstat as _lstat_linux_x86
 from .._linux_x86 import _stat as _stat_linux_x86
 from .._macos import _lstat as _lstat_macos
 from .._macos import _stat as _stat_macos
-from ..fstat import _S_ISDIR, _S_ISLNK, _S_ISREG
+from stat import S_ISDIR, S_ISLNK, S_ISREG
 
 
 # ===----------------------------------------------------------------------=== #
@@ -72,9 +72,9 @@ fn isdir(path: String) -> Bool:
     _constrain_unix()
     try:
         let st_mode = _get_stat_st_mode(path)
-        if _S_ISDIR(st_mode):
+        if S_ISDIR(st_mode):
             return True
-        return _S_ISLNK(st_mode) and _S_ISDIR(_get_lstat_st_mode(path))
+        return S_ISLNK(st_mode) and S_ISDIR(_get_lstat_st_mode(path))
     except:
         return False
 
@@ -113,9 +113,9 @@ fn isfile(path: String) -> Bool:
     _constrain_unix()
     try:
         let st_mode = _get_stat_st_mode(path)
-        if _S_ISREG(st_mode):
+        if S_ISREG(st_mode):
             return True
-        return _S_ISLNK(st_mode) and _S_ISREG(_get_lstat_st_mode(path))
+        return S_ISLNK(st_mode) and S_ISREG(_get_lstat_st_mode(path))
     except:
         return False
 
@@ -150,7 +150,7 @@ fn islink(path: String) -> Bool:
     """
     _constrain_unix()
     try:
-        return _S_ISLNK(_get_lstat_st_mode(path))
+        return S_ISLNK(_get_lstat_st_mode(path))
     except:
         return False
 
