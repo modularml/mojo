@@ -78,9 +78,26 @@ struct DLHandle(CollectionElement):
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn get_function[
+    fn get_function[result_type: AnyRegType](self, name: String) -> result_type:
+        """Returns a handle to the function with the given name in the dynamic
+        library.
+
+        Parameters:
+            result_type: The type of the function pointer to return.
+
+        Args:
+            name: The name of the function to get the handle for.
+
+        Returns:
+            A handle to the function.
+        """
+
+        return self._get_function[result_type](name._as_ptr())
+
+    @always_inline
+    fn _get_function[
         result_type: AnyRegType
-    ](self, name: StringRef) -> result_type:
+    ](self, name: DTypePointer[DType.int8]) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -98,7 +115,7 @@ struct DLHandle(CollectionElement):
         if not os_is_windows():
             var opaque_function_ptr = external_call[
                 "dlsym", DTypePointer[DType.int8]
-            ](self.handle.address, name.data)
+            ](self.handle.address, name)
             return (
                 Pointer(__get_lvalue_as_address(opaque_function_ptr))
                 .bitcast[result_type]()
@@ -106,6 +123,23 @@ struct DLHandle(CollectionElement):
             )
         else:
             return Pointer[result_type].get_null().load()
+
+    @always_inline
+    fn _get_function[
+        func_name: StringLiteral, result_type: AnyRegType
+    ](self) -> result_type:
+        """Returns a handle to the function with the given name in the dynamic
+        library.
+
+        Parameters:
+            func_name:The name of the function to get the handle for.
+            result_type: The type of the function pointer to return.
+
+        Returns:
+            A handle to the function.
+        """
+
+        return self._get_function[result_type](func_name.data())
 
 
 # ===----------------------------------------------------------------------===#
@@ -146,22 +180,21 @@ fn _get_dylib[
 @always_inline
 fn _get_dylib_function[
     name: StringLiteral,
+    func_name: StringLiteral,
     init_fn: fn (Pointer[NoneType]) -> Pointer[NoneType],
     destroy_fn: fn (Pointer[NoneType]) -> None,
     result_type: AnyRegType,
-](
-    fn_name: StringRef, payload: Pointer[NoneType] = Pointer[NoneType]()
-) -> result_type:
-    return _get_dylib_function[result_type](
-        _get_dylib[name, init_fn, destroy_fn](payload), fn_name
+](payload: Pointer[NoneType] = Pointer[NoneType]()) -> result_type:
+    return _get_dylib_function[func_name, result_type](
+        _get_dylib[name, init_fn, destroy_fn](payload)
     )
 
 
 @always_inline
 fn _get_dylib_function[
-    result_type: AnyRegType
-](dylib: DLHandle, name: StringRef) -> result_type:
-    return dylib.get_function[result_type](name)
+    func_name: StringLiteral, result_type: AnyRegType
+](dylib: DLHandle) -> result_type:
+    return dylib._get_function[func_name, result_type]()
 
 
 # ===----------------------------------------------------------------------===#
