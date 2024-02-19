@@ -7,7 +7,7 @@
 """
 
 import os
-from os import PathLike, stat, stat_result
+from os import PathLike, stat_result
 from sys.info import os_is_windows
 
 from memory import stack_allocation
@@ -177,6 +177,16 @@ struct Path(Stringable, CollectionElement, PathLike):
           A stat_result object containing information about the path.
         """
         return os.stat(self)
+
+    fn lstat(self) raises -> stat_result:
+        """Returns the lstat information on the path. This is similar to stat,
+        but if the file is a symlink then it gives you information about the
+        symlink rather than the target.
+
+        Returns:
+          A stat_result object containing information about the path.
+        """
+        return os.lstat(self)
 
     fn exists(self) -> Bool:
         """Returns True if the path exists and False otherwise.
