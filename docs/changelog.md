@@ -145,6 +145,36 @@ for x in v:
 - The `os` package now has a `PathLike` trait. A struct conforms to the
   `PathLike` trait by implementing the `__fspath__` function.
 
+- The `listdir` method now exists on `pathlib.Path` and also exists in the `os`
+  module to work on `PathLike` structs. For example, to list all the directories
+  in the `/tmp` directory, one can write
+
+  ```mojo
+  from pathlib import Path
+
+  fn walktree(top: Path, inout files: DynamicVector[Path]):
+      try:
+          var ls = top.listdir()
+          for i in range(len(ls)):
+              var child = top / ls[i]
+              if child.is_dir():
+                  walktree(child, files)
+              elif child.is_file():
+                  files.append(child)
+              else:
+                  print("Skipping '" + str(child) + "'")
+      except:
+          return
+
+  fn main():
+      var files = DynamicVector[Path]()
+
+      walktree(Path("/tmp"), files)
+
+      for i in range(len(files)):
+          print(files[i])
+  ```
+
 - `PythonObject` now implements `__is__` and `__isnot__` so that expressions
   of the form `x is y` and `x is not y` are well-formed.
 
