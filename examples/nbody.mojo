@@ -15,9 +15,11 @@
 # This sample implements the nbody benchmarking in
 # https://benchmarksgame-team.pages.debian.net/benchmarksgame/performance/nbody.html
 
-from utils.index import StaticTuple
 from math import sqrt
+
 from benchmark import run
+
+from utils.index import StaticTuple
 
 alias PI = 3.141592653589793
 alias SOLAR_MASS = 4 * PI * PI

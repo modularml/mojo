@@ -16,22 +16,22 @@
 # sys module.
 
 from sys.info import (
-    os_is_linux,
-    os_is_windows,
-    os_is_macos,
-    has_sse4,
+    _current_cpu,
+    _current_target,
+    _triple_attr,
     has_avx,
     has_avx2,
     has_avx512f,
-    has_vnni,
-    has_neon,
-    is_apple_m1,
     has_intel_amx,
+    has_neon,
+    has_sse4,
+    has_vnni,
+    is_apple_m1,
     num_logical_cores,
     num_physical_cores,
-    _current_target,
-    _current_cpu,
-    _triple_attr,
+    os_is_linux,
+    os_is_macos,
+    os_is_windows,
 )
 
 

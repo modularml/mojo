@@ -5,9 +5,10 @@
 # ===----------------------------------------------------------------------=== #
 
 from time.time import _CTimeSpec
-from .fstat import stat_result
 
 from utils.index import StaticIntTuple
+
+from .fstat import stat_result
 
 alias dev_t = Int32
 alias mode_t = Int16

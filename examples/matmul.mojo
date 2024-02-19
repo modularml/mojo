@@ -14,11 +14,13 @@
 # This sample demonstrates how various systems optimizations can be applied to a
 # naive matmul implementation in Mojo to gain significant performance speedups
 
-import benchmark
 from random import rand
-from python import Python
+
+import benchmark
+from algorithm import Static2DTileUnitFunc as Tile2DFunc
+from algorithm import parallelize, vectorize
 from memory import memset_zero
-from algorithm import vectorize, parallelize, Static2DTileUnitFunc as Tile2DFunc
+from python import Python
 
 alias M = 512  # rows of A and C
 alias N = 4096  # cols of B and C

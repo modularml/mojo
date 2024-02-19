@@ -12,9 +12,11 @@ from os import listdir
 ```
 """
 
-from sys.info import os_is_windows, os_is_linux
 from collections import DynamicVector
-from memory.unsafe import Pointer, DTypePointer
+from sys.info import os_is_linux, os_is_windows
+
+from memory.unsafe import DTypePointer, Pointer
+
 from .path import isdir
 from .pathlike import PathLike
 

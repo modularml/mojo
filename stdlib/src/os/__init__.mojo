@@ -6,6 +6,6 @@
 """Implements the os package."""
 
 from .env import *
-from .pathlike import PathLike
-from .fstat import stat, lstat, stat_result
+from .fstat import lstat, stat, stat_result
 from .os import listdir
+from .pathlike import PathLike

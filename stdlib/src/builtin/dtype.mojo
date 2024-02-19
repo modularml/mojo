@@ -13,7 +13,6 @@ from sys.info import sizeof as _sizeof
 
 from algorithm.functional import unroll
 
-
 alias _mIsSigned = UInt8(1)
 alias _mIsInteger = UInt8(1 << 7)
 alias _mIsFloat = UInt8(1 << 6)

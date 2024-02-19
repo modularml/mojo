@@ -12,6 +12,7 @@ from os.path import isdir
 ```
 """
 
+from stat import S_ISDIR, S_ISLNK, S_ISREG
 from sys.info import has_neon, os_is_linux, os_is_macos, os_is_windows
 
 from .. import PathLike
@@ -21,7 +22,6 @@ from .._linux_x86 import _lstat as _lstat_linux_x86
 from .._linux_x86 import _stat as _stat_linux_x86
 from .._macos import _lstat as _lstat_macos
 from .._macos import _stat as _stat_macos
-from stat import S_ISDIR, S_ISLNK, S_ISREG
 
 
 # ===----------------------------------------------------------------------=== #

@@ -11,17 +11,18 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from math import iota
+from sys.info import num_logical_cores
+
 # RUN: %mojo -debug-level full %s | FileCheck %s
 import benchmark
-from complex import ComplexSIMD, ComplexFloat64
-from math import iota
+from algorithm import parallelize, vectorize
+from complex import ComplexFloat64, ComplexSIMD
 from python import Python
 from runtime.llcl import Runtime
-from sys.info import num_logical_cores
-from algorithm import parallelize, vectorize
 from tensor import Tensor
+
 from utils.index import Index
-from python import Python
 
 alias float_type = DType.float64
 alias int_type = DType.int64

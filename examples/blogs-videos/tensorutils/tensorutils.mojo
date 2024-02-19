@@ -11,8 +11,9 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from math import mod, trunc
+
 from tensor import Tensor
-from math import trunc, mod
 
 
 fn tensorprint[type: DType](t: Tensor[type]) -> None:

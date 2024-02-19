@@ -7,7 +7,7 @@
 """
 
 import os
-from os import PathLike, stat_result, listdir
+from os import PathLike, listdir, stat_result
 from sys.info import os_is_windows
 
 from memory import stack_allocation

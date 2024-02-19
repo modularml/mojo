@@ -12,16 +12,16 @@ from os import stat
 ```
 """
 
+from sys.info import has_neon, os_is_linux, os_is_macos, os_is_windows
 from time.time import _CTimeSpec
 
-from ._macos import _stat as _stat_macos, _lstat as _lstat_macos
-from ._linux_x86 import _stat as _stat_linux_x86, _lstat as _lstat_linux_x86
-from ._linux_aarch64 import (
-    _stat as _stat_linux_arm,
-    _lstat as _lstat_linux_arm,
-)
 from . import PathLike
-from sys.info import os_is_windows, os_is_linux, os_is_macos, has_neon
+from ._linux_aarch64 import _lstat as _lstat_linux_arm
+from ._linux_aarch64 import _stat as _stat_linux_arm
+from ._linux_x86 import _lstat as _lstat_linux_x86
+from ._linux_x86 import _stat as _stat_linux_x86
+from ._macos import _lstat as _lstat_macos
+from ._macos import _stat as _stat_macos
 
 
 # ===----------------------------------------------------------------------=== #

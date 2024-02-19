@@ -5,9 +5,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from testing import *
 from os import *
 from pathlib import Path
+
+from testing import *
 
 
 def test_listdir():
