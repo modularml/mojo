@@ -7,7 +7,7 @@
 """
 
 import os
-from os import PathLike, stat_result
+from os import PathLike, stat_result, listdir
 from sys.info import os_is_windows
 
 from memory import stack_allocation
@@ -269,3 +269,17 @@ struct Path(Stringable, CollectionElement, PathLike):
             result /= pathsegments[i]
 
         return result
+
+    fn listdir(self) raises -> DynamicVector[Path]:
+        """Gets the list of entries contained in the path provided.
+
+        Returns:
+          Returns the list of entries in the path provided.
+        """
+
+        var ls = listdir(self)
+        var res = DynamicVector[Path](capacity=len(ls))
+        for i in range(len(ls)):
+            res.append(ls[i])
+
+        return res

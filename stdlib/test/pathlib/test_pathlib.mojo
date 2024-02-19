@@ -32,6 +32,8 @@ def test_path():
 
     assert_not_equal(Path().stat().st_mode, 0)
 
+    assert_true(len(Path().listdir()) > 0)
+
 
 def test_path_exists():
     print("== test_path_exists")
