@@ -136,6 +136,15 @@ for x in v:
 - The `__refitem__` accessor method may now return a `Reference` instead of
   having to return an MLIR internal reference type.
 
+- The `os` package now containts the `stat` and `lstat` functions.
+
+- A new `os.path` package now allows one to query properties on paths.
+
+- The `pathlib.Path` now has functions to query properties of the path.
+
+- The `os` package now has a `PathLike` trait. A struct conforms to the
+  `PathLike` trait by implementing the `__fspath__` function.
+
 - `PythonObject` now implements `__is__` and `__isnot__` so that expressions
   of the form `x is y` and `x is not y` are well-formed.
 
