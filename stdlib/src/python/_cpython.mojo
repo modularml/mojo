@@ -181,7 +181,7 @@ struct CPython:
             print("CPython destroy")
             print("Number of remaining refs:", existing.total_ref_count.load())
         _py_finalize(existing.lib)
-        existing.lib._del_old()
+        existing.lib.close()
         existing.total_ref_count.free()
 
     fn Py_NoneType(inout self) -> PyObjectPtr:
