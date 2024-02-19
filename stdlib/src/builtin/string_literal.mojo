@@ -93,7 +93,7 @@ struct StringLiteral(Sized, Stringable, CollectionElement, Hashable, Boolable):
         Returns:
             True if they are equal.
         """
-        let length = len(self)
+        var length = len(self)
         if length != len(rhs):
             return False
 
@@ -136,8 +136,8 @@ fn _memcmp(
     s1: DTypePointer[DType.int8], s2: DTypePointer[DType.int8], count: Int
 ) -> Int:
     for i in range(count):
-        let s1i = s1[i]
-        let s2i = s2[i]
+        var s1i = s1[i]
+        var s2i = s2[i]
         if s1i == s2i:
             continue
         if s1i > s2i:

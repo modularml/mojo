@@ -54,7 +54,7 @@ fn test_partial_load_store():
         write_buffer[idx] = 0
 
     # Test partial load:
-    let partial_load_data = partial_simd_load[4](
+    var partial_load_data = partial_simd_load[4](
         read_buffer.data.offset(1),
         1,
         3,
@@ -70,25 +70,25 @@ fn test_partial_load_store():
         4,
         partial_load_data,  # idx  # lbound  # rbound
     )
-    let partial_store_data = write_buffer.simd_load[4](2)
+    var partial_store_data = write_buffer.simd_load[4](2)
     # CHECK: [0, 3, 99, 0]
     print[4, DType.index](partial_store_data)
 
     # Test NDBuffer partial load store
-    let read_nd_buffer = NDBuffer[
+    var read_nd_buffer = NDBuffer[
         DType.index,
         2,
         DimList(8, 4),
     ](read_data)
 
-    let write_nd_buffer = NDBuffer[
+    var write_nd_buffer = NDBuffer[
         DType.index,
         2,
         DimList(8, 4),
     ](write_data)
 
     # Test partial load:
-    let nd_partial_load_data = partial_simd_load[4](
+    var nd_partial_load_data = partial_simd_load[4](
         read_nd_buffer._offset(StaticIntTuple[2](3, 2)),
         0,
         2,
@@ -104,7 +104,7 @@ fn test_partial_load_store():
         3,  # rbound
         nd_partial_load_data,  # value
     )
-    let nd_partial_store_data = write_nd_buffer.simd_load[4](
+    var nd_partial_store_data = write_nd_buffer.simd_load[4](
         StaticIntTuple[2](3, 0)
     )
 

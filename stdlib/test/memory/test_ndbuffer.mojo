@@ -287,10 +287,10 @@ fn test_print():
     # CHECK{LITERAL}: [3, 4, 5]],
     # CHECK{LITERAL}: [[6, 7, 8],
     # CHECK{LITERAL}: [9, 10, 11]]], dtype=index, shape=2x2x3)
-    let tensor = Tensor[DType.index](2, 2, 3)
+    var tensor = Tensor[DType.index](2, 2, 3)
     iota(tensor.data(), tensor.num_elements())
 
-    let buffer = NDBuffer[DType.index, 3, DimList(2, 2, 3)](tensor.data())
+    var buffer = NDBuffer[DType.index, 3, DimList(2, 2, 3)](tensor.data())
 
     print(str(buffer))
     _ = tensor ^

@@ -20,13 +20,13 @@ fn strsv[
     var x_ptr = DTypePointer[DType.float32](x.data.address)
     var L_ptr = DTypePointer[DType.float32](L.data.address)
     var n: Int = size
-    let x_solved = Buffer[
+    var x_solved = Buffer[
         DType.float32, simd_width * simd_width
     ].aligned_stack_allocation[64]()
 
     while True:
         for j in range(simd_width):
-            let x_j = x_ptr[j]
+            var x_j = x_ptr[j]
             for i in range(j + 1, simd_width):
                 x_ptr[i] = x_j.fma(-L_ptr[i + j * size], x_ptr[i])
 
@@ -82,7 +82,7 @@ fn naive_strsv[
     size: Int
 ](L: Buffer[DType.float32, size * size], x: Buffer[DType.float32, size]):
     for j in range(size):
-        let x_j = x[j]
+        var x_j = x[j]
         for i in range(j + 1, size):
             x[i] = x[i] - x_j * L[i + j * size]
 
@@ -92,9 +92,9 @@ fn test_strsv():
     print("== test_strsv")
 
     alias size: Int = 64
-    let L = Buffer[DType.float32, size * size].stack_allocation()
-    let x0 = Buffer[DType.float32, size].stack_allocation()
-    let x1 = Buffer[DType.float32, size].stack_allocation()
+    var L = Buffer[DType.float32, size * size].stack_allocation()
+    var x0 = Buffer[DType.float32, size].stack_allocation()
+    var x1 = Buffer[DType.float32, size].stack_allocation()
 
     fill_L[size](L)
     fill_x[size](x0)

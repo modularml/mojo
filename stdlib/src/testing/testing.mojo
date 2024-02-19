@@ -196,7 +196,7 @@ fn assert_almost_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    let almost_equal = isclose(
+    var almost_equal = isclose(
         lhs, rhs, absolute_tolerance, relative_tolerance
     ).reduce_and()
     if not almost_equal:

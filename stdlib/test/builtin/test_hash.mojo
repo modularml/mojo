@@ -16,7 +16,7 @@ from testing import *
 
 
 def same_low_bits(i1: Int, i2: Int, bits: Int = 4) -> Int:
-    let mask = (1 << bits) - 1
+    var mask = (1 << bits) - 1
     return 1 if i1 & mask == i2 & mask else 0
 
 
@@ -40,10 +40,10 @@ def test_hash_byte_array():
 
 
 def _test_hash_int_simd[type: DType](bits: Int = 4):
-    let a = SIMD[type, 1](0)
-    let b = SIMD[type, 1](1)
-    let c = SIMD[type, 1](2)
-    let d = SIMD[type, 1](-1)
+    var a = SIMD[type, 1](0)
+    var b = SIMD[type, 1](1)
+    var c = SIMD[type, 1](2)
+    var d = SIMD[type, 1](-1)
 
     # Test that values hash deterministically
     assert_equal(_hash_simd(a), _hash_simd(a))

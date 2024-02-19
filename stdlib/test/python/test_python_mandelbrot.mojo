@@ -39,8 +39,8 @@ struct Matrix:
         self.data[row * self.cols + col] = val
 
     def to_numpy(self) -> PythonObject:
-        let np = Python.import_module("numpy")
-        let numpy_array = np.zeros((yn, xn), np.uint32)
+        var np = Python.import_module("numpy")
+        var numpy_array = np.zeros((yn, xn), np.uint32)
         for x in range(xn):
             for y in range(yn):
                 numpy_array.itemset((y, x), self[x, y])

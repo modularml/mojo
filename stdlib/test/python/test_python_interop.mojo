@@ -18,8 +18,8 @@ alias TEST_DIR = env_get_string["TEST_DIR"]()
 fn test_execute_python_string(inout python: Python) -> String:
     try:
         _ = Python.evaluate("print('evaluated by PyRunString')")
-        let py_string = Python.evaluate("'a' + 'b'")
-        let str = python.__str__(py_string.__str__())
+        var py_string = Python.evaluate("'a' + 'b'")
+        var str = python.__str__(py_string.__str__())
         return String(str)
     except e:
         return e.__str__()
@@ -28,10 +28,10 @@ fn test_execute_python_string(inout python: Python) -> String:
 fn test_local_import(inout python: Python) raises:
     try:
         Python.add_to_path(TEST_DIR)
-        let my_module: PythonObject = Python.import_module("my_module")
+        var my_module: PythonObject = Python.import_module("my_module")
         if my_module:
             _ = my_module.my_function("Mojo")
-            let foo = my_module.Foo("apple")
+            var foo = my_module.Foo("apple")
             foo.bar = "orange"
             # CHECK: orange
             print(python.__str__(foo.bar.__str__()))
@@ -40,12 +40,12 @@ fn test_local_import(inout python: Python) raises:
 
 
 fn test_is_dict():
-    let dict = Python.dict()
-    let list: PythonObject = [1, 2, 3]
+    var dict = Python.dict()
+    var list: PythonObject = [1, 2, 3]
     var cpython = _get_global_python_itf().cpython()
-    let should_be_true = cpython.PyDict_Check(dict.py_object)
+    var should_be_true = cpython.PyDict_Check(dict.py_object)
     print(should_be_true)
-    let should_be_false = cpython.PyDict_Check(list.py_object)
+    var should_be_false = cpython.PyDict_Check(list.py_object)
     print(should_be_false)
 
 
@@ -66,16 +66,16 @@ def main():
     print(obj)
 
     # CHECK: 189
-    let my_dictionary = Python.dict()
+    var my_dictionary = Python.dict()
     my_dictionary["a"] = 189
-    let needle = my_dictionary["a"]
-    let one_eight_nine = needle.__str__()
-    let mojo_one_eight_nine = one_eight_nine.__str__()
+    var needle = my_dictionary["a"]
+    var one_eight_nine = needle.__str__()
+    var mojo_one_eight_nine = one_eight_nine.__str__()
     print(mojo_one_eight_nine)
 
     # Verify key failure
-    let menu_dict = Python.dict()
-    let key: PythonObject = "starch"
+    var menu_dict = Python.dict()
+    var key: PythonObject = "starch"
     menu_dict["protein"] = "seitan"
 
     # CHECK: no starch on the menu

@@ -44,7 +44,7 @@ trait Intable:
     `Int`:
 
     ```mojo
-    let foo = Foo(42)
+    var foo = Foo(42)
     print(int(foo) == 42)
     ```
 
@@ -92,7 +92,7 @@ trait IntableRaising:
 
     ```mojo
     fn main() raises:
-        let x = Foo(42)
+        var x = Foo(42)
         print(int(x) == 42)
     ```
 
@@ -294,7 +294,7 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
             A string representation.
         """
         var buf = String._buffer_type()
-        let initial_buffer_size = _calc_initial_buffer_size(self)
+        var initial_buffer_size = _calc_initial_buffer_size(self)
         buf.reserve(initial_buffer_size)
         buf.size += _vec_fmt(buf.data, initial_buffer_size, "%li", self.value)
         buf.size += 1  # for the null terminator.
@@ -533,10 +533,10 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
         if rhs == 0:
             # this should raise an exception.
             return 0
-        let div: Int = self._positive_div(rhs)
+        var div: Int = self._positive_div(rhs)
         if self > 0 and rhs > 0:
             return div
-        let mod = self - div * rhs
+        var mod = self - div * rhs
         if ((rhs < 0) ^ (self < 0)) and mod:
             return div - 1
         return div
@@ -556,8 +556,8 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
             return 0
         if rhs > 0 and self > 0:
             return self._positive_rem(rhs)
-        let div: Int = self._positive_div(rhs)
-        let mod = self - div * rhs
+        var div: Int = self._positive_div(rhs)
+        var mod = self - div * rhs
         if ((rhs < 0) ^ (self < 0)) and mod:
             return mod + rhs
         return mod
@@ -575,10 +575,10 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
         if rhs == 0:
             # this should raise an exception.
             return StaticIntTuple[2](0, 0)
-        let div: Int = self._positive_div(rhs)
+        var div: Int = self._positive_div(rhs)
         if rhs > 0 and self > 0:
             return StaticIntTuple[2](div, self._positive_rem(rhs))
-        let mod = self - div * rhs
+        var mod = self - div * rhs
         if ((rhs < 0) ^ (self < 0)) and mod:
             return StaticIntTuple[2](div - 1, mod + rhs)
         return StaticIntTuple[2](div, mod)

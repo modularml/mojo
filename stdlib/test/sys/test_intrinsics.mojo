@@ -21,7 +21,7 @@ from memory.buffer import Buffer
 fn test_masked_load():
     print("== test_masked_load")
 
-    let vector = Buffer[DType.float32, 5].stack_allocation()
+    var vector = Buffer[DType.float32, 5].stack_allocation()
     vector.fill(1)
 
     # CHECK: [1.0, 1.0, 1.0, 1.0]
@@ -53,7 +53,7 @@ fn test_masked_load():
 fn test_masked_store():
     print("== test_masked_store")
 
-    let vector = Buffer[DType.float32, 5].stack_allocation()
+    var vector = Buffer[DType.float32, 5].stack_allocation()
     vector.fill(0)
 
     # CHECK: [0.0, 1.0, 2.0, 3.0]
@@ -73,7 +73,7 @@ fn test_masked_store():
 fn test_compressed_store():
     print("== test_compressed_store")
 
-    let vector = Buffer[DType.float32, 4].stack_allocation()
+    var vector = Buffer[DType.float32, 4].stack_allocation()
     vector.fill(0)
 
     # CHECK: [2.0, 3.0, 0.0, 0.0]
@@ -86,7 +86,7 @@ fn test_compressed_store():
     vector.simd_store[4](0, 0)
 
     # CHECK: [1.0, 3.0, 0.0, 0.0]
-    let val = SIMD[DType.float32, 4](0.0, 1.0, 3.0, 0.0)
+    var val = SIMD[DType.float32, 4](0.0, 1.0, 3.0, 0.0)
     compressed_store(val, vector.data, val != 0)
     print(vector.simd_load[4](0))
 
@@ -96,13 +96,13 @@ fn test_strided_load():
     print("== test_strided_load")
 
     alias size = 16
-    let vector = Buffer[DType.float32, size].stack_allocation()
+    var vector = Buffer[DType.float32, size].stack_allocation()
 
     for i in range(size):
         vector[i] = i
 
     # CHECK: [0.0, 4.0, 8.0, 12.0]
-    let s = strided_load[DType.float32, 4](vector.data, 4)
+    var s = strided_load[DType.float32, 4](vector.data, 4)
     print(s)
 
 
@@ -111,7 +111,7 @@ fn test_strided_store():
     print("== test_strided_store")
 
     alias size = 8
-    let vector = Buffer[DType.float32, size].stack_allocation()
+    var vector = Buffer[DType.float32, size].stack_allocation()
     vector.fill(0)
 
     strided_store(SIMD[DType.float32, 4](99, 12, 23, 56), vector.data, 2)

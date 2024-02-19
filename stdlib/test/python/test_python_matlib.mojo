@@ -13,15 +13,15 @@ from python import Python
 def main():
     try:
         var python = Python()
-        let np = Python.import_module("numpy")
-        let plt = Python.import_module("matplotlib.pyplot")
+        var np = Python.import_module("numpy")
+        var plt = Python.import_module("matplotlib.pyplot")
         if not plt:
             print("matplotlib not found")
 
-        let time = np.arange(0, 10, Float32(0.01))
-        let operand = time * Float32(-0.1)
-        let amplitude = np.exp(operand)
-        let position = amplitude * np.sin(time * 3)
+        var time = np.arange(0, 10, Float32(0.01))
+        var operand = time * Float32(-0.1)
+        var amplitude = np.exp(operand)
+        var position = amplitude * np.sin(time * 3)
 
         plt.plot(time, position)
         plt.plot(time, amplitude)

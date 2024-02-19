@@ -93,7 +93,7 @@ fn fill_a[size: Int](buf: NDBuffer[DType.float32, 2, DimList(size, size)]):
 
     for i in range(size):
         for j in range(size):
-            let val = Float32(i + 2 * j)
+            var val = Float32(i + 2 * j)
             buf[StaticIntTuple[2](i, j)] = val.value
 
 
@@ -102,7 +102,7 @@ fn fill_b[size: Int](buf: NDBuffer[DType.float32, 2, DimList(size, size)]):
 
     for i in range(size):
         for j in range(size):
-            let val = Float32(i // (j + 1) + j)
+            var val = Float32(i // (j + 1) + j)
             buf[StaticIntTuple[2](i, j)] = val.value
 
 
@@ -118,21 +118,21 @@ fn print_matrix[
 # CHECK-LABEL: test_naive_matmul
 fn test_naive_matmul[size: Int]():
     print("== test_naive_matmul")
-    let c = NDBuffer[
+    var c = NDBuffer[
         DType.float32,
         2,
         DimList(size, size),
     ].stack_allocation()
     c.fill(0)
 
-    let b = NDBuffer[
+    var b = NDBuffer[
         DType.float32,
         2,
         DimList(size, size),
     ].stack_allocation()
     fill_b[size](b)
 
-    let a = NDBuffer[
+    var a = NDBuffer[
         DType.float32,
         2,
         DimList(size, size),

@@ -41,8 +41,8 @@ fn mandelbrot_kernel_SIMD[
     simd_width: Int
 ](c: ComplexSIMD[float_type, simd_width]) -> SIMD[int_type, simd_width]:
     """A vectorized implementation of the inner mandelbrot computation."""
-    let cx = c.re
-    let cy = c.im
+    var cx = c.re
+    var cy = c.im
     var x = SIMD[float_type, simd_width](0)
     var y = SIMD[float_type, simd_width](0)
     var y2 = SIMD[float_type, simd_width](0)
@@ -65,16 +65,16 @@ fn main() raises:
 
     @parameter
     fn worker(row: Int):
-        let scale_x = (max_x - min_x) / width
-        let scale_y = (max_y - min_y) / height
+        var scale_x = (max_x - min_x) / width
+        var scale_y = (max_y - min_y) / height
 
         @__copy_capture(scale_x, scale_y)
         @parameter
         fn compute_vector[simd_width: Int](col: Int):
             """Each time we operate on a `simd_width` vector of pixels."""
-            let cx = min_x + (col + iota[float_type, simd_width]()) * scale_x
-            let cy = min_y + row * scale_y
-            let c = ComplexSIMD[float_type, simd_width](cx, cy)
+            var cx = min_x + (col + iota[float_type, simd_width]()) * scale_x
+            var cy = min_y + row * scale_y
+            var c = ComplexSIMD[float_type, simd_width](cx, cy)
             t.data().simd_store[simd_width](
                 row * width + col, mandelbrot_kernel_SIMD[simd_width](c)
             )
@@ -87,7 +87,7 @@ fn main() raises:
         for row in range(height):
             worker(row)
 
-    let vectorized = benchmark.run[bench[simd_width]](
+    var vectorized = benchmark.run[bench[simd_width]](
         max_runtime_secs=0.5
     ).mean()
     print("Number of threads:", num_logical_cores())
@@ -99,7 +99,7 @@ fn main() raises:
         fn bench_parallel[simd_width: Int]():
             parallelize[worker](height, height)
 
-        let parallelized = benchmark.run[bench_parallel[simd_width]](
+        var parallelized = benchmark.run[bench_parallel[simd_width]](
             max_runtime_secs=0.5
         ).mean()
         print("Parallelized:", parallelized, "s")

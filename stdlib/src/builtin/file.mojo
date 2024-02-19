@@ -44,8 +44,8 @@ struct _OwnedStringRef(Boolable):
             self.data.free()
 
     fn consume_as_error(owned self) -> Error:
-        let data = self.data
-        let length = self.length
+        var data = self.data
+        var length = self.length
         __mlir_op.`lit.ownership.mark_destroyed`(__get_ref_from_value(self))
         return Error {data: data, loaded_length: -length}
 
@@ -83,7 +83,7 @@ struct FileHandle:
           mode: The mode to open the file in (the mode can be "r" or "w").
         """
         var err_msg = _OwnedStringRef()
-        let handle = external_call[
+        var handle = external_call[
             "KGEN_CompilerRT_IO_FileOpen", DTypePointer[DType.invalid]
         ](path, mode, Pointer.address_of(err_msg))
 
@@ -139,7 +139,7 @@ struct FileHandle:
         var size_copy: Int64 = size
         var err_msg = _OwnedStringRef()
 
-        let buf = external_call["KGEN_CompilerRT_IO_FileRead", Pointer[Int8]](
+        var buf = external_call["KGEN_CompilerRT_IO_FileRead", Pointer[Int8]](
             self.handle,
             Pointer.address_of(size_copy),
             Pointer.address_of(err_msg),
@@ -166,7 +166,7 @@ struct FileHandle:
         var size_copy: Int64 = size
         var err_msg = _OwnedStringRef()
 
-        let buf = external_call[
+        var buf = external_call[
             "KGEN_CompilerRT_IO_FileReadBytes", Pointer[Int8]
         ](
             self.handle,
@@ -196,7 +196,7 @@ struct FileHandle:
             raise "invalid file handle"
 
         var err_msg = _OwnedStringRef()
-        let pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
+        var pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
             self.handle, offset, Pointer.address_of(err_msg)
         )
 

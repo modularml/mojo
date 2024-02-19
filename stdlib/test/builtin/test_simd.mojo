@@ -30,7 +30,7 @@ def test_simd():
     # CHECK: [1.{{0+}}, 1.{{0+}}]
     print(SIMD[DType.float16, 2](True))
 
-    let simd_val = iota[DType.index, 4]()
+    var simd_val = iota[DType.index, 4]()
 
     # CHECK: [0, 1, 2, 3]
     print(simd_val)
@@ -140,7 +140,7 @@ fn test_iota():
 fn test_slice():
     print("== test_slice")
 
-    let val = iota[DType.index, 4]()
+    var val = iota[DType.index, 4]()
 
     # CHECK: [0, 1]
     print(val.slice[2]())
@@ -148,7 +148,7 @@ fn test_slice():
     # CHECK: [2, 3]
     print(val.slice[2](2))
 
-    let s2 = iota[DType.int32, 2](0)
+    var s2 = iota[DType.int32, 2](0)
 
     # CHECK: 0
     print(s2.slice[1](0))
@@ -160,7 +160,7 @@ fn test_pow():
 
     alias simd_width = 4
 
-    let simd_val = iota[DType.float32, simd_width]()
+    var simd_val = iota[DType.float32, simd_width]()
 
     # CHECK: [0.0, 1.0, 4.0, 9.0]
     print(pow[DType.float32, DType.float32, simd_width](simd_val, 2.0))
@@ -180,7 +180,7 @@ fn test_pow():
     # CHECK: [0.0, 1.0, 8.0, 27.0]
     print(pow(simd_val, SIMD[DType.int32, simd_width](3)))
 
-    let simd_val_int = iota[DType.int32, simd_width]()
+    var simd_val_int = iota[DType.int32, simd_width]()
 
     # CHECK: [0, 1, 4, 9]
     print(pow(simd_val_int, 2))
@@ -198,7 +198,7 @@ fn test_simd_variadic():
 fn test_simd_bool():
     print("== test_simd_bool")
 
-    let v0 = iota[DType.index, 4]()
+    var v0 = iota[DType.index, 4]()
 
     # CHECK: [False, True, False, False]
     print((v0 > 0) & (v0 < 2))
@@ -288,7 +288,7 @@ def test_mod():
     assert_equal(UInt32(99) % UInt32(1), 0)
     assert_equal(UInt32(99) % UInt32(3), 0)
 
-    let a = SIMD[DType.float32, 16](
+    var a = SIMD[DType.float32, 16](
         3.1,
         3.1,
         3.1,
@@ -306,7 +306,7 @@ def test_mod():
         -3.1,
         -3.1,
     )
-    let b = SIMD[DType.float32, 16](
+    var b = SIMD[DType.float32, 16](
         3.2,
         2.2,
         1.2,
@@ -443,20 +443,20 @@ fn test_join():
     # CHECK: [3, 4]
     print(Int32(3).join(Int32(4)))
 
-    let s0 = SIMD[DType.index, 4](0, 1, 2, 3)
-    let s1 = SIMD[DType.index, 4](5, 6, 7, 8)
+    var s0 = SIMD[DType.index, 4](0, 1, 2, 3)
+    var s1 = SIMD[DType.index, 4](5, 6, 7, 8)
 
     # CHECK: [0, 1, 2, 3, 5, 6, 7, 8]
     print(s0.join(s1))
 
-    let s2 = SIMD[DType.index, 2](5, 6)
-    let s3 = SIMD[DType.index, 2](9, 10)
+    var s2 = SIMD[DType.index, 2](5, 6)
+    var s3 = SIMD[DType.index, 2](9, 10)
 
     # CHECK: [5, 6, 9, 10]
     print(s2.join(s3))
 
-    let s4 = iota[DType.index, 32](1)
-    let s5 = iota[DType.index, 32](33)
+    var s4 = iota[DType.index, 32](1)
+    var s5 = iota[DType.index, 32](33)
     # CHECK: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
     # CHECK: 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
     # CHECK: 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
@@ -476,7 +476,7 @@ def test_interleave():
 
 
 def test_deinterleave():
-    let ts = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
+    var ts = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
     assert_equal(ts[0], SIMD[DType.index, 2](0, 2))
     assert_equal(ts[1], SIMD[DType.index, 2](1, 3))
 

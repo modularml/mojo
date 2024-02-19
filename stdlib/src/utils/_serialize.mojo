@@ -73,7 +73,7 @@ fn _serialize[
     serialize_shape: Bool = True,
     serialize_end_line: Bool = True,
 ](ptr: DTypePointer, shape: TensorShape):
-    let rank = shape.rank()
+    var rank = shape.rank()
     if rank == 0:
         if serialize_end_line:
             serialize_fn("\n")
@@ -87,11 +87,11 @@ fn _serialize[
     # first and last 3 columns. The intermediaries are filled with '...'
     # to indicate something is here but we are not displaying it.
 
-    let column_elem_count = 1 if rank < 1 else shape[-1]
+    var column_elem_count = 1 if rank < 1 else shape[-1]
     # If the tensor is a rank-1 vector, then the number of rows is 1.
-    let row_elem_count = 1 if rank < 2 else shape[-2]
+    var row_elem_count = 1 if rank < 2 else shape[-2]
 
-    let matrix_elem_count = column_elem_count * row_elem_count
+    var matrix_elem_count = column_elem_count * row_elem_count
 
     # Open parens for every other dimension other than row_elem_count &
     # column_elem_count
@@ -180,9 +180,9 @@ fn _serialize_as_tensor[
     Returns:
       Tensor containing the bytes of object.
     """
-    let self_ptr = bitcast[Int8](Pointer.address_of(object))
+    var self_ptr = bitcast[Int8](Pointer.address_of(object))
     alias size = sizeof[type]()
-    let bytes = Tensor[DType.int8](size)
+    var bytes = Tensor[DType.int8](size)
     memcpy(bytes.data(), DTypePointer[DType.int8](self_ptr.address), size)
     return bytes ^
 
@@ -195,20 +195,20 @@ fn _serialize_to_file[type: DType](tensor: Tensor[type], path: Path) raises:
       tensor: Tensor to serialize.
       path: Path of file.
     """
-    let header_size = len(_SERIALIZATION_HEADER)
+    var header_size = len(_SERIALIZATION_HEADER)
     var header_bytes = Tensor[DType.int8](header_size)
 
     for i in range(header_size):
         header_bytes.simd_store(i, _SERIALIZATION_HEADER[i])
 
     var major_format: UInt32 = _SERIALIZATION_MAJOR_FORMAT
-    let major_format_bytes = _serialize_as_tensor(major_format)
+    var major_format_bytes = _serialize_as_tensor(major_format)
     var minor_format: UInt32 = _SERIALIZATION_MINOR_FORMAT
-    let minor_format_bytes = _serialize_as_tensor(minor_format)
+    var minor_format_bytes = _serialize_as_tensor(minor_format)
     var spec_size: UInt32 = sizeof[TensorSpec]()
-    let spec_size_bytes = _serialize_as_tensor(spec_size)
+    var spec_size_bytes = _serialize_as_tensor(spec_size)
     var spec = tensor.spec()
-    let spec_bytes = _serialize_as_tensor[TensorSpec](spec)
+    var spec_bytes = _serialize_as_tensor[TensorSpec](spec)
 
     var bytes = Tensor[DType.int8](
         header_bytes.num_elements()
@@ -224,7 +224,7 @@ fn _serialize_to_file[type: DType](tensor: Tensor[type], path: Path) raises:
     fn _copy_bytes(
         inout dest: Tensor[DType.int8], offset: Int, src: Tensor[DType.int8]
     ) -> Int:
-        let size = src.num_elements()
+        var size = src.num_elements()
         memcpy(
             dest.data() + offset,
             src.data(),

@@ -11,14 +11,14 @@ from python.python import Python
 
 
 fn main():
-    let python = Python()
+    var python = Python()
     try:
-        let np = Python.import_module("numpy")
+        var np = Python.import_module("numpy")
         var cpython = python.impl.cpython()
-        let size = 3
-        let a = np.random.rand(size, size)
-        let b = np.random.rand(size, size)
-        let c = np.matmul(a, b)
+        var size = 3
+        var a = np.random.rand(size, size)
+        var b = np.random.rand(size, size)
+        var c = np.matmul(a, b)
 
         # CHECK: [[a2:[0-9]+.[0-9]+]]
         # CHECK-NEXT: [[a2:[0-9]+.[0-9]+]]
@@ -30,10 +30,10 @@ fn main():
         # CHECK-NEXT: [[a8:[0-9]+.[0-9]+]]
         # CHECK-NEXT: [[a9:[0-9]+.[0-9]+]]
         for i in range(size):
-            let row = c[i]
+            var row = c[i]
             for j in range(size):
-                let w = row[j]
-                let x = cpython.PyFloat_AsDouble(w.py_object.value)
+                var w = row[j]
+                var x = cpython.PyFloat_AsDouble(w.py_object.value)
                 print(x)
     except:
         print("Python failed")

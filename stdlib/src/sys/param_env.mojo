@@ -13,8 +13,8 @@ name-value pairs defined on the command line. For example:
   from tensor import Tensor, TensorSpec
 
   alias float_type: DType = DType.float32 if is_defined["FLOAT32"]() else DType.float64
-  
-  let spec = TensorSpec(float_type, 256, 256)
+
+  var spec = TensorSpec(float_type, 256, 256)
   var image = Tensor[float_type](spec)
 ```
 

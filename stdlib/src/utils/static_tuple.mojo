@@ -40,7 +40,7 @@ fn _set_array_elem[
         val: the value to set.
         array: the array which is captured by reference.
     """
-    let ptr = __mlir_op.`pop.array.gep`(
+    var ptr = __mlir_op.`pop.array.gep`(
         Pointer.address_of(array).address, index.value
     )
     __mlir_op.`pop.store`(val, ptr)
@@ -174,7 +174,7 @@ struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
             The value at the specified position.
         """
         constrained[index < size]()
-        let val = __mlir_op.`pop.array.get`[
+        var val = __mlir_op.`pop.array.get`[
             _type = Self.element_type,
             index = index.value,
         ](self.array)
@@ -206,13 +206,13 @@ struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
         Returns:
             The value at the specified position.
         """
-        let offset = int(index)
+        var offset = int(index)
         debug_assert(offset < size, "index must be within bounds")
         # Copy the array so we can get its address, because we can't take the
         # address of 'self' in a non-mutating method.
         # TODO(Ownership): we should be able to get const references.
         var arrayCopy = self.array
-        let ptr = __mlir_op.`pop.array.gep`(
+        var ptr = __mlir_op.`pop.array.gep`(
             Pointer.address_of(arrayCopy).address, offset.value
         )
         return Pointer(ptr).load()
@@ -230,9 +230,9 @@ struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
             index: The index into the tuple.
             val: The value to store.
         """
-        let offset = int(index)
+        var offset = int(index)
         debug_assert(offset < size, "index must be within bounds")
-        let ptr = __mlir_op.`pop.array.gep`(
+        var ptr = __mlir_op.`pop.array.gep`(
             Pointer.address_of(self.array).address, offset.value
         )
         Pointer(ptr).store(val)

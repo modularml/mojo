@@ -49,7 +49,7 @@ struct _fdopen:
             stream_id: The stream id (either `STDOUT` or `STDERR`)
         """
         alias mode = "a"
-        let handle: Pointer[NoneType]
+        var handle: Pointer[NoneType]
 
         @parameter
         if os_is_windows():
@@ -83,13 +83,13 @@ fn _printf[*types: AnyRegType](fmt: StringLiteral, *arguments: *types):
         # the same type, otherwise you end up with signature conflicts when
         # using external_call.
         var args = VariadicList(arguments)
-        let args_ptr = Pointer.address_of(args)
+        var args_ptr = Pointer.address_of(args)
         _ = external_call["vprintf", Int32](
             fmt.data(), args_ptr.bitcast[Pointer[Int]]().load()
         )
     else:
         with _fdopen(_fdopen.STDOUT) as fd:
-            let num_characters_written = __mlir_op.`pop.external_call`[
+            var num_characters_written = __mlir_op.`pop.external_call`[
                 func = "KGEN_CompilerRT_fprintf".value,
                 variadicType = __mlir_attr[
                     `(`,
@@ -150,7 +150,7 @@ fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
-    let n = _snprintf(buffer, size, "%.17g", x.value)
+    var n = _snprintf(buffer, size, "%.17g", x.value)
     # If the buffer isn't big enough to add anything, then just return.
     if n + 2 >= size:
         return n
@@ -522,7 +522,7 @@ fn print[length: Int](shape: DimList):
     @always_inline
     @parameter
     fn _print_elem[idx: Int]():
-        let value = shape.at[idx]()
+        var value = shape.at[idx]()
 
         @parameter
         if idx != 0:
@@ -590,8 +590,8 @@ struct _StringableTuple[*Ts: Stringable](Sized):
 
     fn _at[i: Int](inout self) -> String:
         alias offset = Self._offset[i]()
-        let addr = Pointer.address_of(self).bitcast[Int8]().offset(offset)
-        let ptr = __mlir_op.`pop.pointer.bitcast`[
+        var addr = Pointer.address_of(self).bitcast[Int8]().offset(offset)
+        var ptr = __mlir_op.`pop.pointer.bitcast`[
             _type = __mlir_type[`!kgen.pointer<:`, Stringable, ` `, Ts[i], `>`]
         ](addr.address)
 

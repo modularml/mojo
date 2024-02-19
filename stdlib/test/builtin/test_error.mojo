@@ -19,7 +19,7 @@ fn main():
         # CHECK: MojoError: This is an error!
         print(e)
 
-    let myString: String = "FOO"
-    let error = Error(myString)
+    var myString: String = "FOO"
+    var error = Error(myString)
     # CHECK: FOO
     print(error)

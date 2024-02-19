@@ -31,7 +31,7 @@ struct TestCounter(CollectionElement):
 
 
 fn _poison_ptr() -> Pointer[Bool]:
-    let ptr = _get_global[
+    var ptr = _get_global[
         "TEST_VARIANT_POISON", _initialize_poison, _destroy_poison
     ]()
     return ptr.bitcast[Bool]()
@@ -42,7 +42,7 @@ fn assert_no_poison() raises:
 
 
 fn _initialize_poison(payload: Pointer[NoneType]) -> Pointer[NoneType]:
-    let poison = Pointer[Bool].alloc(1)
+    var poison = Pointer[Bool].alloc(1)
     poison.store(False)
     return poison.bitcast[NoneType]()
 
@@ -71,7 +71,7 @@ alias TestVariant = Variant[TestCounter, Poison]
 def test_basic():
     alias IntOrString = Variant[Int, String]
     var i = IntOrString(4)
-    let s = IntOrString(String("4"))
+    var s = IntOrString(String("4"))
 
     # isa
     assert_true(i.isa[Int]())
@@ -104,8 +104,8 @@ def test_copy():
 
 
 def test_move():
-    let v1 = TestVariant(TestCounter())
-    let v2 = v1
+    var v1 = TestVariant(TestCounter())
+    var v2 = v1
     assert_true(
         v2.get[TestCounter]().moved > v1.get[TestCounter]().moved,
         "didn't call moveinit",
@@ -125,7 +125,7 @@ struct ObservableDel(CollectionElement):
 def test_del():
     alias TestDeleterVariant = Variant[ObservableDel, Poison]
     var deleted: Bool = False
-    let v1 = TestDeleterVariant(ObservableDel(Pointer.address_of(deleted)))
+    var v1 = TestDeleterVariant(ObservableDel(Pointer.address_of(deleted)))
     _ = v1 ^  # call __del__
     assert_true(deleted)
     # test that we didn't call the other deleter too!
@@ -149,9 +149,9 @@ def test_set_calls_deleter():
 def test_take_doesnt_call_deleter():
     alias TestDeleterVariant = Variant[ObservableDel, Poison]
     var deleted: Bool = False
-    let v1 = TestDeleterVariant(ObservableDel(Pointer.address_of(deleted)))
+    var v1 = TestDeleterVariant(ObservableDel(Pointer.address_of(deleted)))
     assert_false(deleted)
-    let v2 = v1.take[ObservableDel]()
+    var v2 = v1.take[ObservableDel]()
     assert_false(deleted)
     _ = v2
     assert_true(deleted)

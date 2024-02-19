@@ -226,10 +226,10 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         Returns:
             The current value raised to the exponent.
         """
-        let lhs = __mlir_op.`pop.call_llvm_intrinsic`[
+        var lhs = __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = "llvm.fabs".value, _type = Self.fp_type
         ](self.value)
-        let result = __mlir_op.`pop.call_llvm_intrinsic`[
+        var result = __mlir_op.`pop.call_llvm_intrinsic`[
             intrin = "llvm.pow".value, _type = Self.fp_type
         ](lhs, rhs.value)
         return __mlir_op.`pop.call_llvm_intrinsic`[

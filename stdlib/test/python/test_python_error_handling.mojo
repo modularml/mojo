@@ -17,7 +17,7 @@ alias TEST_DIR = env_get_string["TEST_DIR"]()
 
 fn test_python_exception_import() raises:
     try:
-        let sys = Python.import_module("my_uninstalled_module")
+        var sys = Python.import_module("my_uninstalled_module")
     except e:
         print(e)
 
@@ -25,18 +25,18 @@ fn test_python_exception_import() raises:
 fn test_python_exception_getattr() raises:
     try:
         Python.add_to_path(TEST_DIR)
-        let my_module: PythonObject = Python.import_module("my_module")
+        var my_module: PythonObject = Python.import_module("my_module")
         if my_module:
-            let person = my_module.Person()
-            let expec_fail = person.undefined()
+            var person = my_module.Person()
+            var expec_fail = person.undefined()
     except e:
         print(e)
 
 
 fn test_python_exception_getitem() raises:
     try:
-        let list = PythonObject([1, 2, 3])
-        let should_fail = list[13]
+        var list = PythonObject([1, 2, 3])
+        var should_fail = list[13]
     except e:
         print(e)
 
@@ -44,9 +44,9 @@ fn test_python_exception_getitem() raises:
 fn test_python_exception_call() raises:
     try:
         Python.add_to_path(TEST_DIR)
-        let my_module: PythonObject = Python.import_module("my_module")
+        var my_module: PythonObject = Python.import_module("my_module")
         if my_module:
-            let person = my_module.AbstractPerson()
+            var person = my_module.AbstractPerson()
     except e:
         print(e)
 

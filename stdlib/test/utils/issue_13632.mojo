@@ -25,6 +25,6 @@ fn make_abcd_vector() -> DynamicVector[Int8]:
 
 
 fn main():
-    let vec = make_abcd_vector()
+    var vec = make_abcd_vector()
     # CHECK: 394
     print(sum_items(vec))

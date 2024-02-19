@@ -77,7 +77,7 @@ struct _FILETIME:
         # BEFORE subtracting windows offset the return value  does not fit in a signed int64
         # Taken from https://github.com/microsoft/STL/blob/c8d1efb6d504f6392acf8f6d01fd703f7c8826c0/stl/src/xtime.cpp#L50
         alias windowsToUnixEpochOffsetNs: Int = 0x19DB1DED53E8000
-        let interval_count: UInt64 = (
+        var interval_count: UInt64 = (
             self.dwHighDateTime.cast[DType.uint64]() << 32
         ) + self.dwLowDateTime.cast[DType.uint64]() - windowsToUnixEpochOffsetNs
         return int(interval_count * 100)
@@ -99,7 +99,7 @@ fn _clock_gettime(clockid: Int) -> _CTimeSpec:
 @always_inline
 fn _gettime_as_nsec_unix(clockid: Int) -> Int:
     if os_is_linux():
-        let ts = _clock_gettime(clockid)
+        var ts = _clock_gettime(clockid)
         return ts.as_nanoseconds()
     else:
         return int(
@@ -179,26 +179,26 @@ fn _time_function_windows[func: fn () capturing -> None]() -> Int:
     """Calculates elapsed time in Windows"""
 
     var ticks_per_sec: _WINDOWS_LARGE_INTEGER = 0
-    let ticks_per_sec_ptr = Pointer[_WINDOWS_LARGE_INTEGER].address_of(
+    var ticks_per_sec_ptr = Pointer[_WINDOWS_LARGE_INTEGER].address_of(
         ticks_per_sec
     )
     external_call["QueryPerformanceFrequency", NoneType](ticks_per_sec_ptr)
 
     var starting_tick_count: _WINDOWS_LARGE_INTEGER = 0
-    let start_ptr = Pointer[_WINDOWS_LARGE_INTEGER].address_of(
+    var start_ptr = Pointer[_WINDOWS_LARGE_INTEGER].address_of(
         starting_tick_count
     )
     var ending_tick_count: _WINDOWS_LARGE_INTEGER = 0
-    let end_ptr = Pointer[_WINDOWS_LARGE_INTEGER].address_of(ending_tick_count)
+    var end_ptr = Pointer[_WINDOWS_LARGE_INTEGER].address_of(ending_tick_count)
 
     external_call["QueryPerformanceCounter", NoneType](start_ptr)
     func()
     external_call["QueryPerformanceCounter", NoneType](end_ptr)
 
-    let elapsed_ticks = ending_tick_count - starting_tick_count
+    var elapsed_ticks = ending_tick_count - starting_tick_count
 
     # Note: Windows performance counter resolution is in µs.
-    let elapsed_time_in_ns = (elapsed_ticks * 1_000_000_000) // ticks_per_sec
+    var elapsed_time_in_ns = (elapsed_ticks * 1_000_000_000) // ticks_per_sec
     return int(elapsed_time_in_ns)
 
 
@@ -218,9 +218,9 @@ fn time_function[func: fn () capturing -> None]() -> Int:
     if os_is_windows():
         return _time_function_windows[func]()
 
-    let tic = now()
+    var tic = now()
     func()
-    let toc = now()
+    var toc = now()
     return toc - tic
 
 
@@ -236,13 +236,13 @@ fn sleep(sec: Float64):
         sec: The number of seconds to sleep for.
     """
     alias NANOSECONDS_IN_SECOND = 1_000_000_000
-    let total_secs = floor(sec)
+    var total_secs = floor(sec)
     var tv_spec = _CTimeSpec(
         int(total_secs.cast[DType.index]()),
         int((sec - total_secs) * NANOSECONDS_IN_SECOND),
     )
-    let req = Pointer[_CTimeSpec].address_of(tv_spec)
-    let rem = Pointer[_CTimeSpec].get_null()
+    var req = Pointer[_CTimeSpec].address_of(tv_spec)
+    var rem = Pointer[_CTimeSpec].get_null()
     _ = external_call["nanosleep", Int32](req, rem)
 
 

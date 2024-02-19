@@ -165,7 +165,7 @@ def main():
         ),
     )
 
-    let data2 = data1.shuffle[
+    var data2 = data1.shuffle[
         p[0],
         p[1],
         p[2],

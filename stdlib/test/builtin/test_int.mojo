@@ -19,7 +19,7 @@ fn test_int():
     print(Int(3) + Int(3))
 
     var n = Int(5)
-    let d = Int(2)
+    var d = Int(2)
     # CHECK: 2.5
     print(n / d)
     # CHECK: 2
@@ -37,8 +37,8 @@ fn test_int():
     # CHECK: 5
     print(Int(6) - Int(1))
 
-    let a = 0
-    let b = a + Int(1)
+    var a = 0
+    var b = a + Int(1)
     # CHECK: True
     print(min(a, b) == a)
     # CHECK: True

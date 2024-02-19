@@ -28,11 +28,11 @@ fn test_anypointer_of_move_only_type():
     # CHECK-LABEL: === test_anypointer
     print("=== test_anypointer")
 
-    let ptr = AnyPointer[MoveOnlyType].alloc(1)
+    var ptr = AnyPointer[MoveOnlyType].alloc(1)
     # CHECK: moved 42
     ptr.emplace_value(MoveOnlyType(42))
     # CHECK: moved 42
-    let value = ptr.take_value()
+    var value = ptr.take_value()
     # NOTE: Destructor is called before `print`.
     # CHECK: deleted 42
     # CHECK: value 42
@@ -41,9 +41,9 @@ fn test_anypointer_of_move_only_type():
 
 
 def test_anypointer_move_into_move_count():
-    let ptr = AnyPointer[_MoveCounter[Int]].alloc(1)
+    var ptr = AnyPointer[_MoveCounter[Int]].alloc(1)
 
-    let value = _MoveCounter(5)
+    var value = _MoveCounter(5)
     assert_equal(0, value.move_count)
     ptr.emplace_value(value ^)
 
@@ -53,7 +53,7 @@ def test_anypointer_move_into_move_count():
 
     assert_equal(1, __get_address_as_lvalue(ptr.value).move_count)
 
-    let ptr_2 = AnyPointer[_MoveCounter[Int]].alloc(1)
+    var ptr_2 = AnyPointer[_MoveCounter[Int]].alloc(1)
 
     ptr.move_into(ptr_2)
 
@@ -61,7 +61,7 @@ def test_anypointer_move_into_move_count():
 
 
 def test_refitem():
-    let ptr = AnyPointer[Int].alloc(1)
+    var ptr = AnyPointer[Int].alloc(1)
     ptr[0] = 0
     ptr[] += 1
     assert_equal(ptr[], 1)
@@ -69,7 +69,7 @@ def test_refitem():
 
 
 def test_refitem_offset():
-    let ptr = AnyPointer[Int].alloc(5)
+    var ptr = AnyPointer[Int].alloc(5)
     for i in range(5):
         ptr[i] = i
     for i in range(5):
@@ -78,14 +78,14 @@ def test_refitem_offset():
 
 
 def test_address_of():
-    let local = 1
+    var local = 1
     assert_not_equal(0, AnyPointer[Int].address_of(local).__as_index())
 
 
 def test_bitcast():
-    let local = 1
-    let ptr = AnyPointer[Int].address_of(local)
-    let aliased_ptr = ptr.bitcast[SIMD[DType.uint8, 4]]()
+    var local = 1
+    var ptr = AnyPointer[Int].address_of(local)
+    var aliased_ptr = ptr.bitcast[SIMD[DType.uint8, 4]]()
 
     assert_equal(ptr.__as_index(), ptr.bitcast[Int]().__as_index())
 
@@ -93,31 +93,31 @@ def test_bitcast():
 
 
 def test_anypointer_string():
-    let nullptr = AnyPointer[Int]()
+    var nullptr = AnyPointer[Int]()
     assert_equal(str(nullptr), "0x0")
 
-    let ptr = AnyPointer[Int].alloc(1)
+    var ptr = AnyPointer[Int].alloc(1)
     assert_true(str(ptr).startswith("0x"))
     assert_not_equal(str(ptr), "0x0")
     ptr.free()
 
 
 def test_eq():
-    let local = 1
-    let p1 = AnyPointer[Int].address_of(local)
-    let p2 = p1
+    var local = 1
+    var p1 = AnyPointer[Int].address_of(local)
+    var p2 = p1
     assert_equal(p1, p2)
 
-    let other_local = 2
-    let p3 = AnyPointer[Int].address_of(other_local)
+    var other_local = 2
+    var p3 = AnyPointer[Int].address_of(other_local)
     assert_not_equal(p1, p3)
 
-    let p4 = AnyPointer[Int].address_of(local)
+    var p4 = AnyPointer[Int].address_of(local)
     assert_equal(p1, p4)
 
 
 def test_comparisons():
-    let p1 = AnyPointer[Int].alloc(1)
+    var p1 = AnyPointer[Int].alloc(1)
 
     assert_true((p1 - 1) < p1)
     assert_true((p1 - 1) <= p1)

@@ -87,7 +87,7 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
-        let promise: Pointer[
+        var promise: Pointer[
             Self._promise_type
         ] = __mlir_op.`pop.coroutine.promise`(self._handle)
         return promise.bitcast[type]()
@@ -127,8 +127,8 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The constructed coroutine object.
         """
-        let self = Coroutine[type] {_handle: handle}
-        let parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
+        var self = Coroutine[type] {_handle: handle}
+        var parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
         self._get_ctx[_CoroutineContext]().store(
             _CoroutineContext {
                 _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
@@ -207,7 +207,7 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
-        let promise: Pointer[
+        var promise: Pointer[
             Self._promise_type
         ] = __mlir_op.`pop.coroutine.promise`(self._handle)
         return promise.bitcast[Self._var_type]()
@@ -219,7 +219,7 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The value of the fulfilled promise.
         """
-        let variant = self._get_promise().load()
+        var variant = self._get_promise().load()
         if __mlir_op.`kgen.variant.is`[index = Int(0).value](variant):
             raise __mlir_op.`kgen.variant.take`[index = Int(0).value](variant)
         return __mlir_op.`kgen.variant.take`[index = Int(1).value](variant)
@@ -250,8 +250,8 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The constructed coroutine object.
         """
-        let self = Self {_handle: handle}
-        let parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
+        var self = Self {_handle: handle}
+        var parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
         self._get_ctx[_CoroutineContext]().store(
             _CoroutineContext {
                 _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl

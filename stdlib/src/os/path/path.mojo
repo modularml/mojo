@@ -71,7 +71,7 @@ fn isdir(path: String) -> Bool:
     """
     _constrain_unix()
     try:
-        let st_mode = _get_stat_st_mode(path)
+        var st_mode = _get_stat_st_mode(path)
         if S_ISDIR(st_mode):
             return True
         return S_ISLNK(st_mode) and S_ISDIR(_get_lstat_st_mode(path))
@@ -112,7 +112,7 @@ fn isfile(path: String) -> Bool:
     """
     _constrain_unix()
     try:
-        let st_mode = _get_stat_st_mode(path)
+        var st_mode = _get_stat_st_mode(path)
         if S_ISREG(st_mode):
             return True
         return S_ISLNK(st_mode) and S_ISREG(_get_lstat_st_mode(path))

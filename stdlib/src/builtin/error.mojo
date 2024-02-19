@@ -64,8 +64,8 @@ struct Error(Stringable, Boolable):
         Returns:
             The constructed Error object.
         """
-        let length = len(src)
-        let dest = Pointer[Int8].alloc(length + 1)
+        var length = len(src)
+        var dest = Pointer[Int8].alloc(length + 1)
         memcpy(dest, src._as_ptr(), length)
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
@@ -80,8 +80,8 @@ struct Error(Stringable, Boolable):
         Returns:
             The constructed Error object.
         """
-        let length = len(src)
-        let dest = DTypePointer[DType.int8].alloc(length + 1)
+        var length = len(src)
+        var dest = DTypePointer[DType.int8].alloc(length + 1)
         memcpy(dest, src.data, length)
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
@@ -99,8 +99,8 @@ struct Error(Stringable, Boolable):
             The copy of the original error.
         """
         if existing.loaded_length < 0:
-            let length = -existing.loaded_length
-            let dest = Pointer[Int8].alloc(length + 1)
+            var length = -existing.loaded_length
+            var dest = Pointer[Int8].alloc(length + 1)
             memcpy(dest, existing.data, length)
             dest[length] = 0
             return Error {data: dest, loaded_length: existing.loaded_length}

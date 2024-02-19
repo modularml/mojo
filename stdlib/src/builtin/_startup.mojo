@@ -43,7 +43,7 @@ fn _get_current_or_global_runtime() -> Pointer[NoneType]:
     tasks will be that runtime. Otherwise, the singleton runtime is used, which
     is created with number of threads equal to the number of cores.
     """
-    let current_runtime = external_call[
+    var current_runtime = external_call[
         "KGEN_CompilerRT_LLCL_GetCurrentRuntime", Pointer[NoneType]
     ]()
     if current_runtime:

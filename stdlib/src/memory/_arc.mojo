@@ -9,8 +9,8 @@ Example usage:
 
 ```mojo
 from memory import Arc
-let p = Arc(4)
-let p2 = p
+var p = Arc(4)
+var p2 = p
 p2.set(3)
 print(3 == p.get())
 ```
@@ -82,7 +82,7 @@ struct Arc[T: CollectionElement](CollectionElement):
         Args:
             value: The value to manage.
         """
-        let self = Self {_inner: Pointer[Self._type].alloc(1)}
+        var self = Self {_inner: Pointer[Self._type].alloc(1)}
         __get_address_as_uninit_lvalue(self._inner.address) = Self._type(
             value ^
         )
@@ -102,7 +102,7 @@ struct Arc[T: CollectionElement](CollectionElement):
         Decrement the ref count for the reference. If there are no more
         references, delete the object and free its memory."""
         # Reference docs from Rust Arc: https://doc.rust-lang.org/src/alloc/sync.rs.html#2367-2402
-        let rc = __get_address_as_lvalue(self._inner.address).decrement()
+        var rc = __get_address_as_lvalue(self._inner.address).decrement()
         if rc < 1:
             # Call inner destructor, then free the memory
             _ = __get_address_as_owned_value(self._inner.address)

@@ -16,7 +16,7 @@ fn linear_fill[
     if t.num_elements() != len(elems):
         raise Error("must fill all elements of tensor")
 
-    let buf = t._to_buffer()
+    var buf = t._to_buffer()
     for i in range(t.num_elements()):
         buf[i] = elems[i]
 
@@ -43,17 +43,17 @@ fn compare[_dtype: DType, N: Int](x: Tensor, y: Tensor, label: String):
     var rtol = Tensor[_dtype](TensorShape(N))
 
     for i in range(N):
-        let xx = x[i].cast[_dtype]()
-        let yy = y[i].cast[_dtype]()
+        var xx = x[i].cast[_dtype]()
+        var yy = y[i].cast[_dtype]()
 
-        let d = abs[_dtype, 1](xx - yy)
-        let e = abs[_dtype, 1](d / yy)
+        var d = abs[_dtype, 1](xx - yy)
+        var e = abs[_dtype, 1](d / yy)
         atol[i] = d
         rtol[i] = e
 
     print(label)
-    let atol_minmax = get_minmax[_dtype](atol, N)
-    let rtol_minmax = get_minmax[_dtype](rtol, N)
+    var atol_minmax = get_minmax[_dtype](atol, N)
+    var rtol_minmax = get_minmax[_dtype](rtol, N)
     print("AbsErr-Min/Max", atol_minmax[0], atol_minmax[1])
     print("RelErr-Min/Max", rtol_minmax[0], rtol_minmax[1])
     print("==========================================================")

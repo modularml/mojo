@@ -184,7 +184,7 @@ fn rand[type: DType](owned shape: TensorShape) -> Tensor[type]:
     Returns:
         A new tensor of specified shape and filled with random elements.
     """
-    let tensor = Tensor[type](shape ^)
+    var tensor = Tensor[type](shape ^)
     rand(tensor.data(), tensor.num_elements())
     return tensor
 
@@ -202,7 +202,7 @@ fn rand[type: DType](owned spec: TensorSpec) -> Tensor[type]:
     Returns:
         A new tensor of specified specification and filled with random elements.
     """
-    let tensor = Tensor[type](spec ^)
+    var tensor = Tensor[type](spec ^)
     rand(tensor.data(), tensor.num_elements())
     return tensor
 
@@ -274,7 +274,7 @@ fn randn[
         A Tensor filled with random dtype samples from Normal(mean, variance).
     """
 
-    let tensor = Tensor[type](shape ^)
+    var tensor = Tensor[type](shape ^)
     randn(tensor.data(), tensor.num_elements(), mean, variance)
     return tensor
 
@@ -303,6 +303,6 @@ fn randn[
         A Tensor filled with random dtype samples from Normal(mean, variance).
     """
 
-    let tensor = Tensor[type](spec ^)
+    var tensor = Tensor[type](spec ^)
     randn(tensor.data(), tensor.num_elements(), mean, variance)
     return tensor

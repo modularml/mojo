@@ -14,15 +14,15 @@ fn test_static_tuple():
     print("== test_static_tuple")
 
     # CHECK: 1
-    let tup1 = StaticTuple[1, Int](1)
+    var tup1 = StaticTuple[1, Int](1)
     print(tup1[0])
 
     # CHECK: 1 1
-    let tup2 = StaticTuple[2, Int](1)
+    var tup2 = StaticTuple[2, Int](1)
     print(tup2[0], tup2[1])
 
     # CHECK: 1 2 3
-    let tup3 = StaticTuple[3, Int](1, 2, 3)
+    var tup3 = StaticTuple[3, Int](1, 2, 3)
     print(tup3[0], tup3[1], tup3[2])
 
     # CHECK: 1 1 1

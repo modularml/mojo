@@ -31,34 +31,34 @@ fn test_constructors() raises:
     assert_true(not String())
 
     # Construction from Int
-    let s0 = String(0)
+    var s0 = String(0)
     assert_equal("0", str(String(0)))
     assert_equal(1, len(s0))
 
-    let s1 = String(123)
+    var s1 = String(123)
     assert_equal("123", str(String(123)))
     assert_equal(3, len(s1))
 
     # Construction from StringLiteral
-    let s2 = String("abc")
+    var s2 = String("abc")
     assert_equal("abc", str(s2))
     assert_equal(3, len(s2))
 
 
 fn test_equality_operators() raises:
-    let s0 = String("abc")
-    let s1 = String("def")
+    var s0 = String("abc")
+    var s1 = String("def")
     assert_equal(s0, s0)
     assert_not_equal(s0, s1)
 
-    let s2 = String("abc")
+    var s2 = String("abc")
     assert_equal(s0, s2)
     # Explicitly invoke eq and ne operators
     assert_true(s0 == s2)
     assert_false(s0 != s2)
 
     # Is case sensitive
-    let s3 = "ABC"
+    var s3 = "ABC"
     assert_not_equal(s0, s3)
 
     # Implicit conversion can promote for eq and ne
@@ -67,33 +67,33 @@ fn test_equality_operators() raises:
 
 
 fn test_add() raises:
-    let s1 = String("123")
-    let s2 = String("abc")
-    let s3 = s1 + s2
+    var s1 = String("123")
+    var s2 = String("abc")
+    var s3 = s1 + s2
     assert_equal("123abc", s3)
 
-    let s4 = String("x")
-    let s5 = s4.join(1, 2, 3)
+    var s4 = String("x")
+    var s5 = s4.join(1, 2, 3)
     assert_equal("1x2x3", s5)
 
-    let s6 = s4.join(s1, s2)
+    var s6 = s4.join(s1, s2)
     assert_equal("123xabc", s6)
 
-    let s7 = String()
+    var s7 = String()
     assert_equal("abc", s2 + s7)
 
     assert_equal("abcdef", s2 + "def")
     assert_equal("123abc", "123" + s2)
 
-    let s8 = String("abc is ")
-    let s9 = AString()
+    var s8 = String("abc is ")
+    var s9 = AString()
     assert_equal("abc is a string", s8 + s9)
 
 
 fn test_string_join() raises:
-    let sep = String(",")
-    let s0 = String("abc")
-    let s1 = sep.join(s0, s0, s0, s0)
+    var sep = String(",")
+    var s0 = String("abc")
+    var s1 = sep.join(s0, s0, s0, s0)
     assert_equal("abc,abc,abc,abc", s1)
 
     assert_equal(sep.join(1, 2, 3), "1,2,3")
@@ -102,9 +102,9 @@ fn test_string_join() raises:
 
 
 fn test_stringref() raises:
-    let a = StringRef("AAA")
-    let b = StringRef("BBB")
-    let c = StringRef("AAA")
+    var a = StringRef("AAA")
+    var b = StringRef("BBB")
+    var c = StringRef("AAA")
 
     assert_equal(3, len(a))
     assert_equal(3, len(b))
@@ -123,8 +123,8 @@ fn test_stringref() raises:
 
 
 fn test_stringref_from_dtypepointer() raises:
-    let a = StringRef("AAA")
-    let b = StringRef(a.data)
+    var a = StringRef("AAA")
+    var b = StringRef(a.data)
     assert_equal(3, len(a))
     assert_equal(3, len(b))
     assert_equal(a, b)
@@ -152,7 +152,7 @@ fn test_chr() raises:
 
 
 fn test_string_indexing() raises:
-    let str = String("Hello Mojo!!")
+    var str = String("Hello Mojo!!")
 
     assert_equal("H", str[0])
     assert_equal("!", str[-1])
@@ -219,7 +219,7 @@ fn test_calc_initial_buffer_size_int64() raises:
 
 
 fn test_strref_from_start() raises:
-    let str = String("Hello")
+    var str = String("Hello")
 
     assert_equal(5, len(str))
 
@@ -238,7 +238,7 @@ fn test_strref_from_start() raises:
 
 
 fn test_contains() raises:
-    let str = String("Hello world")
+    var str = String("Hello world")
 
     assert_true(str.__contains__(""))
     assert_true(str.__contains__("He"))
@@ -251,7 +251,7 @@ fn test_contains() raises:
 
 
 fn test_find() raises:
-    let str = String("Hello world")
+    var str = String("Hello world")
 
     assert_equal(0, str.find(""))
     assert_equal(0, str.find("Hello"))
@@ -260,7 +260,7 @@ fn test_find() raises:
     assert_equal(-1, str.find("universe"))
 
     # Test find() offset is absolute, not relative (issue mojo/#1355)
-    let str2 = String("...a")
+    var str2 = String("...a")
     assert_equal(3, str2.find("a", 0))
     assert_equal(3, str2.find("a", 1))
     assert_equal(3, str2.find("a", 2))
@@ -274,7 +274,7 @@ fn test_find() raises:
 
 
 fn test_count() raises:
-    let str = String("Hello world")
+    var str = String("Hello world")
 
     assert_equal(12, str.count(""))
     assert_equal(1, str.count("Hell"))
@@ -289,11 +289,11 @@ fn test_count() raises:
 
 fn test_replace() raises:
     # Replace empty
-    let s1 = String("abc")
+    var s1 = String("abc")
     assert_equal("xaxbxc", s1.replace("", "x"))
     assert_equal("->a->b->c", s1.replace("", "->"))
 
-    let s2 = String("Hello Python")
+    var s2 = String("Hello Python")
     assert_equal("Hello Mojo", s2.replace("Python", "Mojo"))
     assert_equal("HELLo Python", s2.replace("Hell", "HELL"))
     assert_equal("Hello Python", s2.replace("HELL", "xxx"))
@@ -303,7 +303,7 @@ fn test_replace() raises:
     assert_equal("He--o Python", s2.replace("l", "-"))
     assert_equal("He-x--x-o Python", s2.replace("l", "-x-"))
 
-    let s3 = String("a   complex  test case  with some  spaces")
+    var s3 = String("a   complex  test case  with some  spaces")
     assert_equal("a  complex test case with some spaces", s3.replace("  ", " "))
 
 
@@ -345,17 +345,17 @@ fn test_split() raises:
         )
 
     # Split in middle
-    let d1 = String("n")
-    let in1 = String("faang")
-    let res1 = in1.split(d1)
+    var d1 = String("n")
+    var in1 = String("faang")
+    var res1 = in1.split(d1)
     assert_equal(len(res1), 2)
     assert_equal(res1[0], "faa")
     assert_equal(res1[1], "g")
 
     # Matches should be properly split in multiple case
-    let d2 = String(" ")
-    let in2 = String("modcon is coming soon")
-    let res2 = in2.split(d2)
+    var d2 = String(" ")
+    var in2 = String("modcon is coming soon")
+    var res2 = in2.split(d2)
     assert_equal(len(res2), 4)
     assert_equal(res2[0], "modcon")
     assert_equal(res2[1], "is")
@@ -363,16 +363,16 @@ fn test_split() raises:
     assert_equal(res2[3], "soon")
 
     # No match from the delimiter
-    let d3 = String("x")
-    let in3 = String("hello world")
-    let res3 = in3.split(d3)
+    var d3 = String("x")
+    var in3 = String("hello world")
+    var res3 = in3.split(d3)
     assert_equal(len(res3), 1)
     assert_equal(res3[0], "hello world")
 
     # Multiple character delimiter
-    let d4 = String("ll")
-    let in4 = String("hello")
-    let res4 = in4.split(d4)
+    var d4 = String("ll")
+    var in4 = String("hello")
+    var res4 = in4.split(d4)
     assert_equal(len(res4), 2)
     assert_equal(res4[0], "he")
     assert_equal(res4[1], "o")
@@ -447,54 +447,54 @@ fn test_isspace() raises:
 
 
 fn test_rstrip() raises:
-    let empty_string = String("")
+    var empty_string = String("")
     assert_true(empty_string.rstrip() == "")
 
-    let space_string = String(" \t\n\r\v\f  ")
+    var space_string = String(" \t\n\r\v\f  ")
     assert_true(space_string.rstrip() == "")
 
-    let str0 = String("     n ")
+    var str0 = String("     n ")
     assert_true(str0.rstrip() == "     n")
 
-    let str1 = String("string")
+    var str1 = String("string")
     assert_true(str1.rstrip() == "string")
 
-    let str2 = String("something \t\n\t\v\f")
+    var str2 = String("something \t\n\t\v\f")
     assert_true(str2.rstrip() == "something")
 
 
 fn test_lstrip() raises:
-    let empty_string = String("")
+    var empty_string = String("")
     assert_true(empty_string.lstrip() == "")
 
-    let space_string = String(" \t\n\r\v\f  ")
+    var space_string = String(" \t\n\r\v\f  ")
     assert_true(space_string.lstrip() == "")
 
-    let str0 = String("     n ")
+    var str0 = String("     n ")
     assert_true(str0.lstrip() == "n ")
 
-    let str1 = String("string")
+    var str1 = String("string")
     assert_true(str1.lstrip() == "string")
 
-    let str2 = String(" \t\n\t\v\fsomething")
+    var str2 = String(" \t\n\t\v\fsomething")
     assert_true(str2.lstrip() == "something")
 
 
 fn test_strip() raises:
     print("start strip")
-    let empty_string = String("")
+    var empty_string = String("")
     assert_true(empty_string.strip() == "")
 
-    let space_string = String(" \t\n\r\v\f  ")
+    var space_string = String(" \t\n\r\v\f  ")
     assert_true(space_string.strip() == "")
 
-    let str0 = String("     n ")
+    var str0 = String("     n ")
     assert_true(str0.strip() == "n")
 
-    let str1 = String("string")
+    var str1 = String("string")
     assert_true(str1.strip() == "string")
 
-    let str2 = String(" \t\n\t\v\fsomething \t\n\t\v\f")
+    var str2 = String(" \t\n\t\v\fsomething \t\n\t\v\f")
     assert_true(str2.strip() == "something")
 
 
@@ -518,7 +518,7 @@ Pink: No! Darkness! (Pink is floating in the air)"""
 
 
 fn test_startswith() raises:
-    let str = String("Hello world")
+    var str = String("Hello world")
 
     assert_true(str.startswith("Hello"))
     assert_false(str.startswith("Bye"))
@@ -529,7 +529,7 @@ fn test_startswith() raises:
 
 
 fn test_endswith() raises:
-    let str = String("Hello world")
+    var str = String("Hello world")
 
     assert_true(str.endswith(""))
     assert_true(str.endswith("world"))

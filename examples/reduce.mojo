@@ -34,24 +34,24 @@ alias type = DType.float32
 # Use the https://en.wikipedia.org/wiki/Kahan_summation_algorithm
 # Simple summation of the array elements
 fn naive_reduce_sum[size: Int](array: Tensor[type]) -> Float32:
-    let A = array
+    var A = array
     var my_sum = array[0]
     var c: Float32 = 0.0
     for i in range(array.dim(0)):
-        let y = array[i] - c
-        let t = my_sum + y
+        var y = array[i] - c
+        var t = my_sum + y
         c = (t - my_sum) - y
         my_sum = t
     return my_sum
 
 
 fn stdlib_reduce_sum[size: Int](array: Tensor[type]) -> Float32:
-    let my_sum = sum(array._to_buffer())
+    var my_sum = sum(array._to_buffer())
     return my_sum
 
 
 fn pretty_print(name: StringLiteral, elements: Int, time: Float64) raises:
-    let py = Python.import_module("builtins")
+    var py = Python.import_module("builtins")
     _ = py.print(
         py.str("{:<16} {:>11,} {:>8.2f}ms").format(
             String(name) + " elements:", elements, time
@@ -69,7 +69,7 @@ fn bench[
         var result = func[size](array)
         keep(result)
 
-    let ms = benchmark.run[runner](max_runtime_secs=0.5).mean(Unit.ms)
+    var ms = benchmark.run[runner](max_runtime_secs=0.5).mean(Unit.ms)
     pretty_print(name, size, ms)
 
 
@@ -79,8 +79,8 @@ fn main() raises:
         "Shows algorithm.sum from stdlib with much better performance\n"
     )
     # Create two 1-dimensional tensors i.e. arrays
-    let small_array = rand[type](size_small)
-    let large_array = rand[type](size_large)
+    var small_array = rand[type](size_small)
+    var large_array = rand[type](size_large)
 
     bench[naive_reduce_sum, size_small, "naive"](small_array)
     bench[naive_reduce_sum, size_large, "naive"](large_array)

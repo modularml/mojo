@@ -137,7 +137,7 @@ fn _get_dylib[
     init_fn: fn (Pointer[NoneType]) -> Pointer[NoneType],
     destroy_fn: fn (Pointer[NoneType]) -> None,
 ](payload: Pointer[NoneType] = Pointer[NoneType]()) -> DLHandle:
-    let ptr = _get_global[name, init_fn, destroy_fn](payload).bitcast[
+    var ptr = _get_global[name, init_fn, destroy_fn](payload).bitcast[
         DLHandle
     ]()
     return __get_address_as_lvalue(ptr.address)

@@ -97,7 +97,7 @@ struct Atomic[type: DType]:
         Returns:
             The original value before addition.
         """
-        let value_addr = Pointer.address_of(self.value)
+        var value_addr = Pointer.address_of(self.value)
         return Self._fetch_add(value_addr, rhs)
 
     @always_inline
@@ -131,7 +131,7 @@ struct Atomic[type: DType]:
         Returns:
             The original value before subtraction.
         """
-        let value_addr = Pointer.address_of(self.value.value)
+        var value_addr = Pointer.address_of(self.value.value)
         return __mlir_op.`pop.atomic.rmw`[
             bin_op = __mlir_attr.`#pop<bin_op sub>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
@@ -164,8 +164,8 @@ struct Atomic[type: DType]:
 
         @parameter
         if type.is_integral():
-            let value_addr = Pointer.address_of(self.value.value)
-            let cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
+            var value_addr = Pointer.address_of(self.value.value)
+            var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
                 bin_op = __mlir_attr.`#pop<bin_op sub>`,
                 failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
                 success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
@@ -183,13 +183,13 @@ struct Atomic[type: DType]:
         # operation on that.
 
         alias integral_type = FPUtils[type].integral_type
-        let value_integral_addr = Pointer.address_of(self.value.value).bitcast[
+        var value_integral_addr = Pointer.address_of(self.value.value).bitcast[
             __mlir_type[`!pop.scalar<`, integral_type.value, `>`]
         ]()
-        let expected_integral = _float_to_bits[1, type, integral_type](expected)
-        let desired_integral = _float_to_bits[1, type, integral_type](desired)
+        var expected_integral = _float_to_bits[1, type, integral_type](expected)
+        var desired_integral = _float_to_bits[1, type, integral_type](desired)
 
-        let cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
+        var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
             bin_op = __mlir_attr.`#pop<bin_op sub>`,
             failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
             success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
@@ -222,7 +222,7 @@ struct Atomic[type: DType]:
             "the input type must be arithmetic",
         ]()
 
-        let value_addr = Pointer.address_of(self.value.value)
+        var value_addr = Pointer.address_of(self.value.value)
         _ = __mlir_op.`pop.atomic.rmw`[
             bin_op = __mlir_attr.`#pop<bin_op max>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
@@ -250,7 +250,7 @@ struct Atomic[type: DType]:
             "the input type must be arithmetic",
         ]()
 
-        let value_addr = Pointer.address_of(self.value.value)
+        var value_addr = Pointer.address_of(self.value.value)
         _ = __mlir_op.`pop.atomic.rmw`[
             bin_op = __mlir_attr.`#pop<bin_op min>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,

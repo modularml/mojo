@@ -17,8 +17,8 @@ from testing import assert_false, assert_true
 fn test_dunder_methods(inout python: Python):
     print("=== test_dunder_methods ===")
     try:
-        let a = PythonObject(34)
-        let b = PythonObject(10)
+        var a = PythonObject(34)
+        var b = PythonObject(10)
 
         # __add__
         # CHECK-NEXT: 44
@@ -201,7 +201,7 @@ fn test_dunder_methods(inout python: Python):
         print(c)
 
         # __rshift__
-        let d = PythonObject(2)
+        var d = PythonObject(2)
         # CHECK-NEXT: 8
         c = a >> d
         print(c)
@@ -311,7 +311,7 @@ fn test_dunder_methods(inout python: Python):
 
 
 def test_bool_conversion() -> None:
-    let x: PythonObject = 1
+    var x: PythonObject = 1
     # CHECK: test_bool: True
     print("test_bool:", x == 0 or x == 1)
 
@@ -340,11 +340,11 @@ fn test_iter() raises -> None:
 fn test_string_conversions() -> None:
     fn test_string_literal() -> None:
         try:
-            let mojo_str: StringLiteral = "mojo"
-            let py_str = PythonObject(mojo_str)
-            let py_capitalized = py_str.capitalize()
+            var mojo_str: StringLiteral = "mojo"
+            var py_str = PythonObject(mojo_str)
+            var py_capitalized = py_str.capitalize()
             var py = Python()
-            let mojo_capitalized = py.__str__(py_capitalized)
+            var mojo_capitalized = py.__str__(py_capitalized)
             # CHECK: Mojo
             print(mojo_capitalized)
         except e:
@@ -352,12 +352,12 @@ fn test_string_conversions() -> None:
 
     fn test_string_ref() -> None:
         try:
-            let mojo_str: StringLiteral = "mojo"
-            let mojo_strref = StringRef(mojo_str)
-            let py_str = PythonObject(mojo_strref)
-            let py_capitalized = py_str.capitalize()
+            var mojo_str: StringLiteral = "mojo"
+            var mojo_strref = StringRef(mojo_str)
+            var py_str = PythonObject(mojo_strref)
+            var py_capitalized = py_str.capitalize()
             var py = Python()
-            let mojo_capitalized = py.__str__(py_capitalized)
+            var mojo_capitalized = py.__str__(py_capitalized)
             # CHECK: Mojo
             print(mojo_capitalized)
         except e:
@@ -365,22 +365,22 @@ fn test_string_conversions() -> None:
 
     fn test_string() -> None:
         try:
-            let mo_str = String("mo")
-            let jo_str = String("jo")
-            let mojo_str = mo_str + jo_str
-            let py_str = PythonObject(mojo_str)
-            let py_capitalized = py_str.capitalize()
+            var mo_str = String("mo")
+            var jo_str = String("jo")
+            var mojo_str = mo_str + jo_str
+            var py_str = PythonObject(mojo_str)
+            var py_capitalized = py_str.capitalize()
             var py = Python()
-            let mojo_capitalized = py.__str__(py_capitalized)
+            var mojo_capitalized = py.__str__(py_capitalized)
             # CHECK: Mojo
             print(mojo_capitalized)
         except e:
             print("Error occurred")
 
     fn test_type_object() -> None:
-        let py = Python()
-        let py_float = PythonObject(3.14)
-        let type_obj = py.type(py_float)
+        var py = Python()
+        var py_float = PythonObject(3.14)
+        var type_obj = py.type(py_float)
         # CHECK: <class 'float'>
         print(type_obj)
 
@@ -391,15 +391,15 @@ fn test_string_conversions() -> None:
 
 
 def test_len():
-    let empty_list = Python.evaluate("[]")
+    var empty_list = Python.evaluate("[]")
     # CHECK: 0
     print(len(empty_list))
 
-    let l1 = Python.evaluate("[1,2,3]")
+    var l1 = Python.evaluate("[1,2,3]")
     # CHECK: 3
     print(len(l1))
 
-    let l2 = Python.evaluate("[42,42.0]")
+    var l2 = Python.evaluate("[42,42.0]")
     # CHECK: 2
     print(len(l2))
 
@@ -418,8 +418,8 @@ def test_is():
 
     # Two separate lists/objects, and therefore are not the "same".
     # as told by the `__is__` function. They point to different addresses.
-    let l1 = Python.evaluate("[1,2,3]")
-    let l2 = Python.evaluate("[1,2,3]")
+    var l1 = Python.evaluate("[1,2,3]")
+    var l2 = Python.evaluate("[1,2,3]")
     assert_false(l1 is l2)
     assert_true(l1 is not l2)
 

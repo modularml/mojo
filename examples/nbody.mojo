@@ -64,9 +64,9 @@ fn advance(inout bodies: StaticTuple[NUM_BODIES, Planet], dt: Float64):
         for j in range(NUM_BODIES - i - 1):
             var body_i = bodies[i]
             var body_j = bodies[j + i + 1]
-            let diff = body_i.pos - body_j.pos
-            let diff_sqr = (diff * diff).reduce_add()
-            let mag = dt / (diff_sqr * sqrt(diff_sqr))
+            var diff = body_i.pos - body_j.pos
+            var diff_sqr = (diff * diff).reduce_add()
+            var mag = dt / (diff_sqr * sqrt(diff_sqr))
 
             body_i.velocity -= diff * body_j.mass * mag
             body_j.velocity += diff * body_i.mass * mag
@@ -86,7 +86,7 @@ fn energy(bodies: StaticTuple[NUM_BODIES, Planet]) -> Float64:
 
     @unroll
     for i in range(NUM_BODIES):
-        let body_i = bodies[i]
+        var body_i = bodies[i]
         e += (
             0.5
             * body_i.mass
@@ -94,22 +94,22 @@ fn energy(bodies: StaticTuple[NUM_BODIES, Planet]) -> Float64:
         )
 
         for j in range(NUM_BODIES - i - 1):
-            let body_j = bodies[j + i + 1]
-            let diff = body_i.pos - body_j.pos
-            let distance = sqrt((diff * diff).reduce_add())
+            var body_j = bodies[j + i + 1]
+            var diff = body_i.pos - body_j.pos
+            var distance = sqrt((diff * diff).reduce_add())
             e -= (body_i.mass * body_j.mass) / distance
 
     return e
 
 
 fn bench():
-    let Sun = Planet(
+    var Sun = Planet(
         0,
         0,
         SOLAR_MASS,
     )
 
-    let Jupiter = Planet(
+    var Jupiter = Planet(
         SIMD[DType.float64, 4](
             4.84143144246472090e00,
             -1.16032004402742839e00,
@@ -125,7 +125,7 @@ fn bench():
         9.54791938424326609e-04 * SOLAR_MASS,
     )
 
-    let Saturn = Planet(
+    var Saturn = Planet(
         SIMD[DType.float64, 4](
             8.34336671824457987e00,
             4.12479856412430479e00,
@@ -141,7 +141,7 @@ fn bench():
         2.85885980666130812e-04 * SOLAR_MASS,
     )
 
-    let Uranus = Planet(
+    var Uranus = Planet(
         SIMD[DType.float64, 4](
             1.28943695621391310e01,
             -1.51111514016986312e01,
@@ -157,7 +157,7 @@ fn bench():
         4.36624404335156298e-05 * SOLAR_MASS,
     )
 
-    let Neptune = Planet(
+    var Neptune = Planet(
         SIMD[DType.float64, 4](
             1.53796971148509165e01,
             -2.59193146099879641e01,

@@ -10,23 +10,23 @@ from python.python import Python
 
 
 fn test_string_to_python_to_mojo(inout python: Python) raises:
-    let py_string = PythonObject("mojo")
-    let py_string_capitalized = py_string.capitalize()
+    var py_string = PythonObject("mojo")
+    var py_string_capitalized = py_string.capitalize()
 
     # CHECK: Mojo
-    let cap_mojo_string = py_string_capitalized.__str__()
+    var cap_mojo_string = py_string_capitalized.__str__()
     print(cap_mojo_string)
 
 
 fn test_range() raises:
-    let array_size: PythonObject = 2
+    var array_size: PythonObject = 2
     # CHECK: 0
     # CHECK-NEXT: 1
     for i in range(array_size):
         print(i)
 
-    let start: PythonObject = 0
-    let end: PythonObject = 4
+    var start: PythonObject = 0
+    var end: PythonObject = 4
     # CHECK: 0
     # CHECK-NEXT: 1
     # CHECK-NEXT: 2
@@ -34,9 +34,9 @@ fn test_range() raises:
     for i in range(start, end):
         print(i)
 
-    let start2: PythonObject = 5
-    let end2: PythonObject = 10
-    let step: PythonObject = 2
+    var start2: PythonObject = 5
+    var end2: PythonObject = 10
+    var step: PythonObject = 2
     # CHECK: 5
     # CHECK-NEXT: 7
     # CHECK-NEXT: 9
@@ -46,7 +46,7 @@ fn test_range() raises:
 
 fn test_python_to_string() raises:
     # CHECK: environ({
-    let os = Python.import_module("os")
+    var os = Python.import_module("os")
     print(os.environ)
 
 

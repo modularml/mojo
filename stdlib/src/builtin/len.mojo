@@ -37,7 +37,7 @@ trait Sized:
     length:
 
     ```mojo
-    let foo = Foo(42)
+    var foo = Foo(42)
     print(len(foo) == 42)
     ```
 
@@ -86,7 +86,7 @@ trait SizedRaising:
 
     ```mojo
     fn main() raises:
-        let foo = Foo(42)
+        var foo = Foo(42)
         print(len(foo) == 42)
     ```
 

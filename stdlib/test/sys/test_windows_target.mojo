@@ -51,7 +51,7 @@ fn test_last_error():
     # GetProcessId takes the handle to a process and returns its id. If the
     # handle is null this will fail and returns an invalid handle error (error
     # code 6).
-    let succeeded = external_call["GetProcessId", Int](Pointer[Int].get_null())
+    var succeeded = external_call["GetProcessId", Int](Pointer[Int].get_null())
 
     # CHECK: 0
     print(succeeded)

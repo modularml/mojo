@@ -34,8 +34,8 @@ def test_math():
 
 fn test_bf_primitives():
     # we have to use dynamic values, otherwise these get evaled at compile time.
-    let a = randn_float64().cast[DType.bfloat16]()
-    let b = randn_float64().cast[DType.bfloat16]()
+    var a = randn_float64().cast[DType.bfloat16]()
+    var b = randn_float64().cast[DType.bfloat16]()
 
     print(a + b)
     print(a - b)

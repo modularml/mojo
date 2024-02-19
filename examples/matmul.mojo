@@ -47,7 +47,7 @@ struct Matrix[rows: Int, cols: Int]:
     ## Initialize with random values
     @staticmethod
     fn rand() -> Self:
-        let data = DTypePointer[type].alloc(rows * cols)
+        var data = DTypePointer[type].alloc(rows * cols)
         rand(data, rows * cols)
         return Self(data)
 
@@ -66,20 +66,20 @@ struct Matrix[rows: Int, cols: Int]:
 
 def run_matmul_python() -> Float64:
     Python.add_to_path(".")
-    let pymatmul: PythonObject = Python.import_module("pymatmul")
-    let py = Python.import_module("builtins")
+    var pymatmul: PythonObject = Python.import_module("pymatmul")
+    var py = Python.import_module("builtins")
 
-    let gflops = pymatmul.benchmark_matmul_python(128, 128, 128).to_float64()
+    var gflops = pymatmul.benchmark_matmul_python(128, 128, 128).to_float64()
     py.print(py.str("{:<13}{:>8.3f} GFLOPS").format("Python:", gflops))
 
     return gflops
 
 
 def run_matmul_numpy() -> Float64:
-    let pymatmul: PythonObject = Python.import_module("pymatmul")
-    let py = Python.import_module("builtins")
+    var pymatmul: PythonObject = Python.import_module("pymatmul")
+    var py = Python.import_module("builtins")
 
-    let gflops = pymatmul.benchmark_matmul_numpy(M, N, K).to_float64()
+    var gflops = pymatmul.benchmark_matmul_numpy(M, N, K).to_float64()
     py.print(py.str("{:<13}{:>8.3f} GFLOPS").format("Numpy:", gflops))
 
     return gflops
@@ -193,17 +193,17 @@ fn bench[
     fn test_fn():
         _ = func(C, A, B)
 
-    let secs = benchmark.run[test_fn](max_runtime_secs=0.5).mean()
+    var secs = benchmark.run[test_fn](max_runtime_secs=0.5).mean()
 
     A.data.free()
     B.data.free()
     C.data.free()
 
-    let gflops = ((2 * M * N * K) / secs) / 1e9
-    let speedup: Float64 = gflops / base_gflops
-    let numpy_speedup: Float64 = gflops / numpy_gflops
+    var gflops = ((2 * M * N * K) / secs) / 1e9
+    var speedup: Float64 = gflops / base_gflops
+    var numpy_speedup: Float64 = gflops / numpy_gflops
 
-    let py = Python.import_module("builtins")
+    var py = Python.import_module("builtins")
     _ = py.print(
         py.str("{:<13}{:>8.3f} GFLOPS {:>9.2f}x Python {:>5.2f}x Numpy").format(
             name, gflops, speedup, numpy_speedup
@@ -228,8 +228,8 @@ fn test_matrix_equal[
 
 
 fn test_all() raises:
-    let A = Matrix[M, K].rand()
-    let B = Matrix[K, N].rand()
+    var A = Matrix[M, K].rand()
+    var B = Matrix[K, N].rand()
     var C = Matrix[M, N]()
 
     matmul_naive(C, A, B)
@@ -254,8 +254,8 @@ fn main() raises:
 
     test_all()
     print("CPU Results\n")
-    let python_gflops = run_matmul_python()
-    let numpy_gflops = run_matmul_numpy()
+    var python_gflops = run_matmul_python()
+    var numpy_gflops = run_matmul_numpy()
 
     bench[matmul_naive, "Naive:"](python_gflops, numpy_gflops)
     bench[matmul_vectorized, "Vectorized: "](python_gflops, numpy_gflops)

@@ -43,7 +43,7 @@ def test_big_dict():
 def test_compact():
     var dict = Dict[String, Int]()
     for i in range(20):
-        let key = "key" + str(i)
+        var key = "key" + str(i)
         dict[key] = i + 1
         dict.pop(key)
     assert_equal(0, len(dict))

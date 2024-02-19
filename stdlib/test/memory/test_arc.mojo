@@ -12,8 +12,8 @@ from testing import *
 
 
 def test_basic():
-    let p = Arc(4)
-    let p2 = p
+    var p = Arc(4)
+    var p2 = p
     p2.set(3)
     assert_equal(3, p.get())
 
@@ -28,8 +28,8 @@ struct ObservableDel(CollectionElement):
 
 def test_deleter_not_called_until_no_references():
     var deleted = False
-    let p = Arc(ObservableDel(Pointer.address_of(deleted)))
-    let p2 = p
+    var p = Arc(ObservableDel(Pointer.address_of(deleted)))
+    var p2 = p
     _ = p ^
     assert_false(deleted)
 

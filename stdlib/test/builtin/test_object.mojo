@@ -111,7 +111,7 @@ def test_object_function():
 
 
 def test_non_object_getattr():
-    let a: object = [2, 3, 4]
+    var a: object = [2, 3, 4]
     try:
         a.foo(2)
     except e:
@@ -128,7 +128,7 @@ def matrix_setitem(borrowed self, borrowed i, borrowed value) -> object:
 
 
 def matrix_append(borrowed self, borrowed value) -> object:
-    let impl = self.value
+    var impl = self.value
     impl.append(value)
     return None
 
@@ -227,7 +227,7 @@ def main():
         a[3, 1] = "bar"
         # CHECK: 'bar'
         print(a[3, 1])
-        let c = a + b
+        var c = a + b
         # CHECK: [3, False, 5.5{{.*}}, ['foo', 'bar'], 'foo', 'bar']
         print(c)
         b.append(False)

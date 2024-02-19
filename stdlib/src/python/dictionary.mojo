@@ -53,7 +53,7 @@ struct _PyIter(Sized):
         Returns:
             The next item in the sequence.
         """
-        let result = self.nextItem.key
+        var result = self.nextItem.key
         var cpython = _get_global_python_itf().cpython()
         # PyDict_Next borrows the key and value but the PythonObject
         # instance we wrap it in steals it. To maintain accurate ref
@@ -132,7 +132,7 @@ struct Dictionary(Boolable):
 
     fn _setitem(self, key: PyObjectPtr, value: PyObjectPtr) raises:
         var cpython = _get_global_python_itf().cpython()
-        let result = cpython.PyDict_SetItem(self.py_object, key, value)
+        var result = cpython.PyDict_SetItem(self.py_object, key, value)
         Python.throw_python_exception_if_error_state(cpython)
 
     fn __getitem__(self, key: PythonObject) raises -> PythonObject:
@@ -145,7 +145,7 @@ struct Dictionary(Boolable):
           The value at the specified key.
         """
         var cpython = _get_global_python_itf().cpython()
-        let result = cpython.PyDict_GetItemWithError(
+        var result = cpython.PyDict_GetItemWithError(
             self.py_object, key.py_object
         )
         Python.throw_python_exception_if_error_state(cpython)
@@ -180,7 +180,7 @@ struct Dictionary(Boolable):
             The value of the dictionary attribute with the given name.
         """
         var cpython = _get_global_python_itf().cpython()
-        let result = cpython.PyObject_GetAttrString(self.py_object, name)
+        var result = cpython.PyObject_GetAttrString(self.py_object, name)
         Python.throw_python_exception_if_error_state(cpython)
         if result.is_null():
             raise Error("Attribute is not found.")

@@ -23,19 +23,19 @@ def test_set_construction():
 
 
 def test_len():
-    let s1 = Set[Int]()
+    var s1 = Set[Int]()
     assert_equal(0, len(s1))
 
-    let s2 = Set[Int](1, 2, 3)
+    var s2 = Set[Int](1, 2, 3)
     assert_equal(3, len(s2))
 
 
 def test_in():
-    let s1 = Set[Int]()
+    var s1 = Set[Int]()
     assert_false(0 in s1)
     assert_false(1 in s1)
 
-    let s2 = Set[Int](1, 2, 3)
+    var s2 = Set[Int](1, 2, 3)
     assert_false(0 in s2)
     assert_true(1 in s2)
     assert_true(2 in s2)
@@ -44,8 +44,8 @@ def test_in():
 
 
 def test_equal():
-    let s1 = Set[Int]()
-    let s2 = Set[Int](1, 2, 3)
+    var s1 = Set[Int]()
+    var s2 = Set[Int](1, 2, 3)
 
     assert_true(s1 == s1)
     assert_true(s2 == s2)
@@ -134,8 +134,8 @@ def test_union():
 
 
 def test_subtract():
-    let s1 = Set[Int]()
-    let s2 = Set[Int](1, 2, 3)
+    var s1 = Set[Int]()
+    var s2 = Set[Int](1, 2, 3)
 
     assert_equal(s1 - s1, s1)
     assert_equal(s1 - s2, s1)

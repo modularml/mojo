@@ -322,7 +322,7 @@ def test_vector_extend():
     assert_equal(vec[1], 2)
     assert_equal(vec[2], 3)
 
-    let copy = vec
+    var copy = vec
     vec.extend(copy)
 
     # vec == [1, 2, 3, 1, 2, 3]
@@ -416,7 +416,7 @@ def test_2d_dynamic_vector():
 # as reported in GH issue 27875 internally and
 # https://github.com/modularml/mojo/issues/1493
 def test_vector_copy_constructor():
-    let vec = DynamicVector[Int](capacity=1)
+    var vec = DynamicVector[Int](capacity=1)
     var vec_copy = vec
     vec_copy.push_back(1)  # Ensure copy constructor doesn't crash
     _ = vec ^  # To ensure previous one doesn't invoke move constuctor

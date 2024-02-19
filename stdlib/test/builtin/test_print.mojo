@@ -13,9 +13,9 @@ from utils.index import StaticIntTuple
 fn test_print():
     print("== test_print")
 
-    let a: SIMD[DType.float32, 2] = 5
-    let b: SIMD[DType.float64, 4] = 6
-    let c: SIMD[DType.index, 8] = 7
+    var a: SIMD[DType.float32, 2] = 5
+    var b: SIMD[DType.float64, 4] = 6
+    var c: SIMD[DType.index, 8] = 7
 
     # CHECK: False
     print(False)
@@ -41,15 +41,15 @@ fn test_print():
     # CHECK: 184467440737095516
     print(UInt64(-1))
 
-    let hello: StringRef = "Hello,"
-    let world: String = "world!"
-    let f: Bool = False
+    var hello: StringRef = "Hello,"
+    var world: String = "world!"
+    var f: Bool = False
     # CHECK: > Hello, world! 42 True False [5.0, 5.0] [7, 7, 7, 7, 7, 7, 7, 7]
     print(">", hello, world, 42, True, f, a, c)
 
     # CHECK: > 3.14000{{[0-9]+}} 99.90000{{[0-9]+}} -129.29018{{[0-9]+}} (1, 2, 3)
-    let float32: Float32 = 99.9
-    let float64: Float64 = -129.2901823
+    var float32: Float32 = 99.9
+    var float64: Float64 = -129.2901823
     print_no_newline("> ")
     print_no_newline(3.14, float32, float64, StaticIntTuple[3](1, 2, 3))
     print()
@@ -57,10 +57,10 @@ fn test_print():
     # CHECK: > 9223372036854775806
     print(">", 9223372036854775806)
 
-    let pi = 3.1415916535897743
+    var pi = 3.1415916535897743
     # CHECK: > 3.1415916535{{[0-9]+}}
     print(">", pi)
-    let x = (pi - 3.141591) * 1e6
+    var x = (pi - 3.141591) * 1e6
     # CHECK: > 0.6535{{[0-9]+}}
     print(">", x)
 
@@ -95,10 +95,10 @@ fn test_print():
 # CHECK-LABEL: test_issue_20421
 fn test_issue_20421():
     print("== test_issue_20421")
-    let a = Buffer[DType.uint8, 16 * 64].aligned_stack_allocation[64]()
+    var a = Buffer[DType.uint8, 16 * 64].aligned_stack_allocation[64]()
     for i in range(16 * 64):
         a[i] = i & 255
-    let av16 = a.data.offset(128 + 64 + 4).bitcast[DType.int32]().simd_load[4]()
+    var av16 = a.data.offset(128 + 64 + 4).bitcast[DType.int32]().simd_load[4]()
     # CHECK: [-943274556, -875902520, -808530484, -741158448]
     print(av16)
 

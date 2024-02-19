@@ -48,28 +48,28 @@ fn test_time():
     # CHECK: True
     print(now() > 0)
 
-    let t1 = time_function[time_me]()
+    var t1 = time_function[time_me]()
     # CHECK: True
     print(t1 > 1 * ns_per_sec)
     # CHECK: True
     print(t1 < 10 * ns_per_sec)
 
-    let t2 = time_templated_function[DType.float32]()
+    var t2 = time_templated_function[DType.float32]()
     # CHECK: True
     print(t2 > 1 * ns_per_sec)
     # CHECK: True
     print(t2 < 10 * ns_per_sec)
 
-    let t3 = time_capturing_function(42)
+    var t3 = time_capturing_function(42)
     # CHECK: True
     print(t3 > 1 * ns_per_sec)
     # CHECK: True
     print(t3 < 10 * ns_per_sec)
 
     # test now() directly since time_function doesn't use now on windows
-    let t4 = now()
+    var t4 = now()
     time_me()
-    let t5 = now()
+    var t5 = now()
     # CHECK: True
     print((t5 - t4) > 1 * ns_per_sec)
     # CHECK: True

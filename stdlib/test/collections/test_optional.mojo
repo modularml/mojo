@@ -11,8 +11,8 @@ from testing import *
 
 
 def test_basic():
-    let a = Optional(1)
-    let b = Optional[Int](None)
+    var a = Optional(1)
+    var b = Optional[Int](None)
 
     assert_true(a)
     assert_false(b)

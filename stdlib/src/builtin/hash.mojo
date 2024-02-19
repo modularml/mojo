@@ -34,15 +34,15 @@ from memory import memcpy, memset_zero, stack_allocation
 
 
 fn _HASH_SECRET() -> Int:
-    let ptr = _get_global[
+    var ptr = _get_global[
         "HASH_SECRET", _initialize_hash_secret, _destroy_hash_secret
     ]()
     return ptr.bitcast[Int]()[0]
 
 
 fn _initialize_hash_secret(payload: Pointer[NoneType]) -> Pointer[NoneType]:
-    let secret = random.random_ui64(0, math.limit.max_finite[DType.uint64]())
-    let data = Pointer[Int].alloc(1)
+    var secret = random.random_ui64(0, math.limit.max_finite[DType.uint64]())
+    var data = Pointer[Int].alloc(1)
     data.store(int(secret))
     return data.bitcast[NoneType]()
 
@@ -68,7 +68,7 @@ trait Hashable:
         fn __hash__(self) -> Int:
             return 4  # chosen by fair random dice roll
 
-    let foo = Foo()
+    var foo = Foo()
     print(hash(foo))
     ```
     """
@@ -221,8 +221,8 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
 
     ```mojo
     from random import rand
-    let n = 64
-    let rand_bytes = DTypePointer[DType.int8].alloc(n)
+    var n = 64
+    var rand_bytes = DTypePointer[DType.int8].alloc(n)
     rand(rand_bytes, n)
     hash(rand_bytes, n)
     ```
@@ -244,12 +244,12 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
 
     # Compute our SIMD strides and tail length
     # n == k * stride + r
-    let k = n // stride
-    let r = n % stride
+    var k = n // stride
+    var r = n % stride
     debug_assert(n == k * stride + r, "wrong hash tail math")
 
     # 1. Reinterpret the underlying data as a larger int type
-    let simd_data = bytes.bitcast[type]()
+    var simd_data = bytes.bitcast[type]()
 
     # 2. Compute DJBX33A, but strided across the SIMD vector width.
     #    This is almost the same as DBJX33A, except:
@@ -259,19 +259,19 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     #      have a slightly different power of 33 as a coefficient.
     var hash_data = _HASH_INIT[type, simd_width]()
     for i in range(k):
-        let update = simd_data.simd_load[simd_width](i * simd_width)
+        var update = simd_data.simd_load[simd_width](i * simd_width)
         hash_data = _HASH_UPDATE(hash_data, update)
 
     # 3. Copy the tail data (smaller than the SIMD register) into
     #    a final hash state update vector that's stack-allocated.
     if r != 0:
         var remaining = StaticTuple[stride, Int8]()
-        let ptr = DTypePointer[DType.int8](
+        var ptr = DTypePointer[DType.int8](
             Pointer.address_of(remaining).bitcast[Int8]()
         )
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
-        let last_value = ptr.bitcast[type]().simd_load[simd_width]()
+        var last_value = ptr.bitcast[type]().simd_load[simd_width]()
         hash_data = _HASH_UPDATE(hash_data, last_value)
 
     # Now finally, hash the final SIMD vector state. This will also use

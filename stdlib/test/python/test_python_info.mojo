@@ -12,8 +12,8 @@ from python import Python
 
 
 fn test_python_version(inout python: Python):
-    let version = "3.10.8 (main, Nov 24 2022, 08:08:27) [Clang 14.0.6 ]"
-    let pythonVersion = PythonVersion(version)
+    var version = "3.10.8 (main, Nov 24 2022, 08:08:27) [Clang 14.0.6 ]"
+    var pythonVersion = PythonVersion(version)
     # CHECK: 3
     print(pythonVersion.major)
     # CHECK: 10

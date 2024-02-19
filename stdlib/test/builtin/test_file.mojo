@@ -63,15 +63,15 @@ def test_file_read_bytes_multi():
     )
 
     # CHECK: Lorem ipsum
-    let tensor1 = f.read_bytes(12)
+    var tensor1 = f.read_bytes(12)
     print(StringRef(tensor1.data(), tensor1.num_elements()))
 
     # CHECK: dolor
-    let tensor2 = f.read_bytes(6)
+    var tensor2 = f.read_bytes(6)
     print(StringRef(tensor2.data(), tensor2.num_elements()))
 
     # Read where N is greater than the number of bytes in the file.
-    let s: String = f.read(1e9)
+    var s: String = f.read(1e9)
 
     # CHECK: 936
     print(len(s))
@@ -89,7 +89,7 @@ def test_file_read_bytes_multi():
 def test_file_read_path():
     print("== test_file_read_path")
 
-    let file_path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
+    var file_path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
 
     # CHECK: Lorem ipsum dolor sit amet, consectetur adipiscing elit.
     var f = open(file_path, "r")
@@ -101,7 +101,7 @@ def test_file_read_path():
 def test_file_path_direct_read():
     print("== test_file_path_direct_read")
 
-    let file_path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
+    var file_path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
     # CHECK: Lorem ipsum dolor sit amet, consectetur adipiscing elit.
     print(file_path.read_text())
 
@@ -126,7 +126,7 @@ def test_file_seek():
         Path(CURRENT_DIR) / "test_file_dummy_input.txt",
         "r",
     ) as f:
-        let pos = f.seek(6)
+        var pos = f.seek(6)
         assert_equal(pos, 6)
 
         alias expected_msg1 = "ipsum dolor sit amet, consectetur adipiscing elit."
@@ -175,14 +175,14 @@ def test_file_write_again():
 # CHECK-LABEL: test_buffer
 def test_buffer():
     print("== test_buffer")
-    let buf = Buffer[DType.float32, 4].stack_allocation()
+    var buf = Buffer[DType.float32, 4].stack_allocation()
     buf.fill(2.0)
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_buffer"
     buf.tofile(TEMP_FILE)
 
     with open(TEMP_FILE, "r") as f:
-        let str = f.read()
-        let buf_read = Buffer[DType.float32, 4](
+        var str = f.read()
+        var buf_read = Buffer[DType.float32, 4](
             str._as_ptr().bitcast[DType.float32]()
         )
         for i in range(4):
@@ -196,14 +196,14 @@ def test_buffer():
 # CHECK-LABEL: test_ndbuffer
 def test_ndbuffer():
     print("== test_ndbuffer")
-    let buf = NDBuffer[DType.float32, 2, DimList(2, 2)].stack_allocation()
+    var buf = NDBuffer[DType.float32, 2, DimList(2, 2)].stack_allocation()
     buf.fill(2.0)
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_ndbuffer"
     buf.tofile(TEMP_FILE)
 
     with open(TEMP_FILE, "r") as f:
-        let str = f.read()
-        let buf_read = NDBuffer[DType.float32, 2, DimList(2, 2)](
+        var str = f.read()
+        var buf_read = NDBuffer[DType.float32, 2, DimList(2, 2)](
             str._as_ptr().bitcast[DType.float32]()
         )
         for i in range(2):
@@ -222,7 +222,7 @@ def test_tensor():
     linear_fill(tensor, 1, 2, 3, 4)
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_tensor"
     tensor.tofile(TEMP_FILE)
-    let tensor_from_file = Tensor[DType.int8].fromfile(TEMP_FILE)
+    var tensor_from_file = Tensor[DType.int8].fromfile(TEMP_FILE)
 
     # CHECK-NOT: False
     for i in range(tensor.num_elements()):
@@ -232,13 +232,13 @@ def test_tensor():
 # CHECK-LABEL: test_tensor_load_save
 fn test_tensor_load_save() raises:
     print("== test_tensor_load_save")
-    let tensor = Tensor[DType.int8](2, 2, 3)
+    var tensor = Tensor[DType.int8](2, 2, 3)
     tensor._to_buffer().fill(2)
 
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_tensor_load_save"
     tensor.save(TEMP_FILE)
 
-    let tensor_loaded = Tensor[DType.int8].load(TEMP_FILE)
+    var tensor_loaded = Tensor[DType.int8].load(TEMP_FILE)
 
     # CHECK: True
     print(tensor == tensor_loaded)
