@@ -98,5 +98,7 @@ Below are some topics that we would love to hear community members’ opinions o
   favor of doing so, but on the other hand, we see tradeoffs as well, and a
   purely declarative form could be used.
 - Any other thoughts you wish to contribute — we are build systems and language
-  tooling nerds! Send us your thoughts on the GitHub Discussion thread
-  associated with this proposal, and let’s geek out.
+  tooling nerds! Send us your thoughts on [the GitHub Discussion thread
+  associated with this
+  proposal](https://github.com/modularml/mojo/discussions/1785), and let’s geek
+  out.
