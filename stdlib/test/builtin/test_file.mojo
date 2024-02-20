@@ -139,6 +139,13 @@ def test_file_seek():
             assert_equal(str(e)[: len(expected_msg)], expected_msg)
 
 
+# CHECK-LABEL: test_file_open_nodir
+def test_file_open_nodir():
+    print("== test_file_open_nodir")
+    var f = open(Path("test_file_open_nodir"), "w")
+    f.close()
+
+
 # CHECK-LABEL: test_file_write
 def test_file_write():
     print("== test_file_write")
@@ -252,6 +259,7 @@ def main():
     test_file_path_direct_read()
     test_file_read_context()
     test_file_seek()
+    test_file_open_nodir()
     test_file_write()
     test_file_write_again()
     test_buffer()
