@@ -362,6 +362,8 @@ modular install mojo
 - The `DynamicVector(capacity: Int)` constructor has been changed to take
   `capacity` as a keyword-only argument to prevent implicit conversion from Int.
 
+- `Variant.get[T]()` now returns a `Reference` to the value rather than a copy.
+
 ### 🛠️ Fixed
 
 - [#435](https://github.com/modularml/mojo/issues/435)

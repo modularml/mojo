@@ -102,7 +102,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             The contained data of the option as a T value.
         """
         debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value.get[T]()
+        return self._value.get[T]()[]
 
     fn take(owned self) -> T:
         """Unsafely move the value out of the Optional.

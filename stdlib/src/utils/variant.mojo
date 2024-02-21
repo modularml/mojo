@@ -13,9 +13,9 @@ from utils.variant import Variant
 alias IntOrString = Variant[Int, String]
 fn to_string(inout x: IntOrString) -> String:
   if x.isa[String]():
-    return x.get[String]()
+    return x.get[String]()[]
   # x.isa[Int]()
-  return str(x.get[Int]())
+  return str(x.get[Int]())[]
 
 # They have to be mutable for now, and implement CollectionElement
 var an_int = IntOrString(4)
@@ -94,9 +94,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     alias IntOrString = Variant[Int, String]
     fn to_string(inout x: IntOrString) -> String:
         if x.isa[String]():
-            return x.get[String]()
+            return x.get[String]()[]
         # x.isa[Int]()
-        return str(x.get[Int]())
+        return str(x.get[Int]()[])
 
     # They have to be mutable for now, and implement CollectionElement
     var an_int = IntOrString(4)
@@ -249,7 +249,13 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         alias idx = Self._check[T]()
         return self._state == idx
 
-    fn get[T: CollectionElement](self) -> T:
+    fn get[
+        T: CollectionElement,
+        mutability: __mlir_type.`i1`,
+        self_life: AnyLifetime[mutability].type,
+    ](self: Reference[Self, mutability, self_life].mlir_ref_type) -> Reference[
+        T, mutability, self_life
+    ]:
         """Get the value out of the variant as a type-checked type.
 
         This doesn't explicitly check that your value is of that type!
@@ -258,17 +264,20 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         and garbage member data.
 
         For now this has the limitations that it
-            - creates a copy of the internal data instead of returning a reference
             - requires the variant value to be mutable
 
         Parameters:
             T: The type of the value to get out.
+            mutability: The inferred mutability of the variant type.
+            self_life: The inferred lifetime of the variant type.
 
         Returns:
-            The internal data cast as a T value.
+            The internal data represented as a `Reference[T]`.
         """
-        debug_assert(self.isa[T](), "get: wrong variant type")
-        return __get_address_as_lvalue(self._get_ptr[T]().value)
+        debug_assert(Reference(self)[].isa[T](), "get: wrong variant type")
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Reference[T, mutability, self_life].mlir_ref_type
+        ](Reference(self)[]._get_ptr[T]().value)
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int16:

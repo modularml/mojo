@@ -80,8 +80,8 @@ def test_basic():
     assert_false(s.isa[Int]())
 
     # get
-    assert_equal(4, i.get[Int]())
-    assert_equal("4", s.get[String]())
+    assert_equal(4, i.get[Int]()[])
+    assert_equal("4", s.get[String]()[])
     # we don't test what happens when you `get` the wrong type.
     # have fun!
 
@@ -89,14 +89,14 @@ def test_basic():
     i.set[String]("i")
     assert_false(i.isa[Int]())
     assert_true(i.isa[String]())
-    assert_equal("i", i.get[String]())
+    assert_equal("i", i.get[String]()[])
 
 
 def test_copy():
     var v1 = TestVariant(TestCounter())
     var v2 = v1
     assert_true(
-        v2.get[TestCounter]().copied > v1.get[TestCounter]().copied,
+        v2.get[TestCounter]()[].copied > v1.get[TestCounter]()[].copied,
         "didn't call copyinit",
     )
     # test that we didn't call the other copyinit too!
@@ -107,7 +107,7 @@ def test_move():
     var v1 = TestVariant(TestCounter())
     var v2 = v1
     assert_true(
-        v2.get[TestCounter]().moved > v1.get[TestCounter]().moved,
+        v2.get[TestCounter]()[].moved > v1.get[TestCounter]()[].moved,
         "didn't call moveinit",
     )
     # test that we didn't call the other moveinit too!
@@ -159,8 +159,29 @@ def test_take_doesnt_call_deleter():
     assert_no_poison()
 
 
+def test_get_returns_mutable_reference():
+    var v1: Variant[Int, String] = 42
+    var x = v1.get[Int]()[]
+    assert_equal(42, x)
+    x = 100
+    assert_equal(100, x)
+    v1.set[String]("hello")
+    assert_equal(100, x)  # the x reference is still valid
+
+    var v2: Variant[Int, String] = String("something")
+    v2.get[String]()[] = "something else"
+    assert_equal(v2.get[String]()[], "something else")
+
+    var v3: Variant[Int, String] = 4
+    assert_equal(
+        v3._get_ptr[Int]().__as_index(),
+        Reference(v3)[]._get_ptr[Int]().__as_index(),
+    )
+
+
 def main():
     test_basic()
+    test_get_returns_mutable_reference()
     test_copy()
     test_move()
     test_del()
