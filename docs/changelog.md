@@ -244,6 +244,8 @@ modular install mojo
   var s = last_bound[1, 2, 3]()
   ```
 
+- `PythonObject` now conforms to the `SizedRaising` trait.
+
 ### 🦋 Changed
 
 - It is no longer possible to explicitly specify implicit argument parameters in
