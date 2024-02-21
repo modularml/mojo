@@ -94,6 +94,27 @@ modular install mojo
           print(files[i])
   ```
 
+- Mojo now has support for declaring signatures that use both variadic and
+  keyword-only arguments/parameters. E.g. the following is now possible:
+
+  ```mojo
+  fn prod_with_offset(*args: Int, offset: Int = 0) -> Int:
+    var res = 1
+    for i in range(len(args)):
+        res *= args[i]
+    return res + offset
+
+  print(prod_with_offset(2, 3, 4, 10))         # prints 240
+  print(prod_with_offset(2, 3, 4, offset=10))  # prints 34
+  ```
+
+  Note that variadic keyword-only arguments/parameters (a.k.a. `**kwargs`) are
+  not supported yet, i.e. the following is not allowed:
+
+  ```mojo
+  fn variadic_kw_only(a: Int, **kwargs: Int): ...
+  ```
+
 ### 🦋 Changed
 
 ### ❌ Removed
