@@ -1,0 +1,10 @@
+name: Build and Test Mojo OSS
+
+on:
+  pull_request:
+
+jobs:
+  test-pre-submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
