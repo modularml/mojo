@@ -51,99 +51,18 @@ modular install mojo
 
 ### ⭐️ New
 
-- Trivial types, like MLIR types and function types, can now be bound implicitly
-  to traits that require copy constructors or move constructors, such as
-  `Movable`, `Copyable`, and `CollectionElement`.
+- The `os` package now contains the [`stat()`](/mojo/stdlib/os/fstat#stat)
+  and [`lstat()`](/mojo/stdlib/os/fstat#lstat) functions.
 
-- Modules within packages can now use purely relative `from` imports:
+- A new [`os.path`](/mojo/stdlib/os/path/path) package now allows you to query
+  properties on paths.
 
-```mojo
-from . import another_module
-```
+- The [`pathlib.Path`](/mojo/stdlib/pathlib/path#path) now has functions to
+  query properties of the path.
 
-- `DynamicVector` now supports iteration. Iteration values
-  are references and require dereferencing.
-
-```mojo
-var v: DynamicVector[String]()
-v.append("Alice")
-v.append("Bob")
-v.append("Charlie")
-for x in v:
-  x[] = str("Hello, ") + x[]
-for x in v:
-  print(x[])
-```
-
-- We now have a `Set` type in our collections! `Set` is backed by a `Dict`,
-  so it has fast add, remove, and `in` checks, and requires member elements
-  to be `KeyElement`s.
-
-  ```mojo
-  from collections import Set
-
-  var set = Set[Int](1, 2, 3)
-  print(len(set))  # 3
-  set.add(4)
-
-  for element in set:
-      print(element[])
-
-  set -= Set[Int](3, 4, 5)
-  print(set == Set[Int](1, 2))  # True
-  print(set | Set[Int](0, 1) == Set[Int](0, 1, 2))  # True
-  let element = set.pop()
-  print(len(set))  # 1
-  ```
-
-- Mojo now has limited support to declare keyword-only arguments and parameters.
-  For example:
-
-  ```mojo
-  fn my_product(a: Int, b: Int = 1, *, c: Int, d: Int = 2):
-      print(a * b * c * d)
-
-  my_product(3, c=5)     # prints '30'
-  my_product(3, 5, d=7)  # error: missing 1 required keyword-only argument: 'c'
-  ```
-
-  Keyword-only parameters cannot be specified in a signature with variadics yet,
-  i.e. the following are not supported yet:
-
-  ```mojo
-  fn variadic_kw_only(x: Int, *args: Int, y: Int): ...
-
-  fn variadic_kw_only_params[*args: Int, p: Int]: ...
-  ```
-
-- Mojo now supports the `x in y` expression as syntax sugar for
-  `y.__contains__(x)` as well as `x not in y`.
-
-- A new magic `__lifetime_of(expr)` call will yield the lifetime of a memory
-  value.  We hope and expect that this will eventually be replaced by
-  `Reference(expr).lifetime` as the parameter system evolves, but this is
-  important in the meantime for use in function signatures.
-
-- A new magic `__type_of(expr)` call will yield the type of a value. This allows
-  one to refer type types of other variables. For example:
-
-  ```mojo
-  fn my_function(x: Int, y: __type_of(x)) -> Int:
-    let z : __type_of(x) = y
-    return z
-  ```
-
-- The `__refitem__` accessor method may now return a `Reference` instead of
-  having to return an MLIR internal reference type.
-
-- The `os` package now containts the `stat` and `lstat` functions.
-
-- A new `os.path` package now allows one to query properties on paths.
-
-- The `pathlib.Path` now has functions to query properties of the path.
-
-- The `os` package now has a `PathLike` trait. A struct conforms to the
-  `PathLike` trait by implementing the `__fspath__` function.
+- The `os` package now has a
+  [`PathLike`](/mojo/stdlib/os/pathlike.html#pathlike) trait. A struct conforms
+  to the `PathLike` trait by implementing the `__fspath__()` function.
 
 - The `listdir` method now exists on `pathlib.Path` and also exists in the `os`
   module to work on `PathLike` structs. For example, to list all the directories
@@ -175,23 +94,122 @@ for x in v:
           print(files[i])
   ```
 
+### 🦋 Changed
+
+### ❌ Removed
+
+### 🛠️ Fixed
+
+## 24.1 beta
+
+### ⭐️ New
+
+- Trivial types, like MLIR types and function types, can now be bound implicitly
+  to traits that require copy constructors or move constructors, such as
+  [`Movable`](/mojo/stdlib/builtin/value.html#movable),
+  [`Copyable`](/mojo/stdlib/builtin/value.html#copyable), and
+  [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement).
+
+- Modules within packages can now use purely relative `from` imports:
+
+  ```mojo
+  from . import another_module
+  ```
+
+- [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) now
+  supports iteration. Iteration values are instances of
+  [Reference](/mojo/stdlib/memory/unsafe#reference) and require dereferencing:
+
+  ```mojo
+  var v: DynamicVector[String]()
+  v.append("Alice")
+  v.append("Bob")
+  v.append("Charlie")
+  for x in v:
+    x[] = str("Hello, ") + x[]
+  for x in v:
+    print(x[])
+  ```
+
+- We now have a [`Set`](/mojo/stdlib/collections/set.html#set) type in our
+  collections! `Set` is backed by a `Dict`, so it has fast add, remove, and `in`
+  checks, and requires member elements to conform to the `KeyElement` trait.
+
+  ```mojo
+  from collections import Set
+
+  var set = Set[Int](1, 2, 3)
+  print(len(set))  # 3
+  set.add(4)
+
+  for element in set:
+      print(element[])
+
+  set -= Set[Int](3, 4, 5)
+  print(set == Set[Int](1, 2))  # True
+  print(set | Set[Int](0, 1) == Set[Int](0, 1, 2))  # True
+  let element = set.pop()
+  print(len(set))  # 1
+  ```
+
+- Mojo now has limited support for declaring keyword-only arguments and
+  parameters. For example:
+
+  ```mojo
+  fn my_product(a: Int, b: Int = 1, *, c: Int, d: Int = 2):
+      print(a * b * c * d)
+
+  my_product(3, c=5)     # prints '30'
+  my_product(3, 5, d=7)  # error: missing 1 required keyword-only argument: 'c'
+  ```
+
+  Keyword-only parameters cannot be specified in a signature with variadics yet.
+  For example, the following are not supported yet:
+
+  ```mojo
+  fn variadic_kw_only(x: Int, *args: Int, y: Int): ...
+
+  fn variadic_kw_only_params[*args: Int, p: Int](): ...
+  ```
+
+- Mojo now supports the `x in y` expression as syntax sugar for
+  `y.__contains__(x)` as well as `x not in y`.
+
+- A new magic `__lifetime_of(expr)` call will yield the lifetime of a memory
+  value.  We hope and expect that this will eventually be replaced by
+  `Reference(expr).lifetime` as the parameter system evolves, but this is
+  important in the meantime for use in function signatures.
+
+- A new magic `__type_of(expr)` call will yield the type of a value. This allows
+  one to refer type types of other variables. For example:
+
+  ```mojo
+  fn my_function(x: Int, y: __type_of(x)) -> Int:
+    let z : __type_of(x) = y
+    return z
+  ```
+
+- The `__refitem__()` accessor method may now return a
+  [`Reference`](/mojo/stdlib/memory/unsafe#reference) instead of having to
+  return an MLIR internal reference type.
+
 - `PythonObject` now implements `__is__` and `__isnot__` so that expressions
   of the form `x is y` and `x is not y` are well-formed.
 
 - Added [`AnyPointer.move_into()`](/mojo/stdlib/memory/anypointer.html#move_into)
   method, for moving a value from one pointer memory location to another.
 
-- Added new [`DynamicVector.reverse()`](/mojo/stdlib/collections/vector.html#reverse)
+- Added [`DynamicVector.reverse()`](/mojo/stdlib/collections/vector.html#reverse)
   method, which reverses the elements of the vector in place.
 
-- Added [`DynamicVector.extend`](/mojo/stdlib/collections/vector.html#extend)
+- Added [`DynamicVector.extend()`](/mojo/stdlib/collections/vector.html#extend)
   method, which extends a vector by consuming the elements of another vector.
 
 - Added built-in `hex()` function, which can be used to format any value whose
   type implements the `Intable` trait as a hexadecimal string.
 
-- Mojo now has syntax for unbound packs that allow users to unbind any number of
-  positional parameters explicitly. For example
+- Added new `*_` syntax that allows users to explicitly unbind any number of
+  positional parameters. For example:
 
   ```mojo
   struct StructWithDefault[a: Int, b: Int, c: Int = 8, d: Int = 9]: pass
@@ -214,9 +232,17 @@ for x in v:
   ```
 
   As demonstrated above, this syntax can be used to explicitly unbind an
-  arbitrary number of parameters, at the beginning, at the end, or in the middle
-  of the operand list. Note that the `*_` syntax will also mark optional
-  parameters as unbound (i.e. defaults are not applied).
+  arbitrary number of parameters, at the beginning, at the end, or in the
+  middle of the operand list. Since these unbound parameters must be explicitly
+  specified at some point, default values for these parameters are not applied.
+  For example:
+
+  ```mojo
+  alias last_bound = StructWithDefault[*_, 6]
+  # When using last_bound, you must specify a, b, and c. last_bound
+  # doesn't have a default value for `c`.
+  var s = last_bound[1, 2, 3]()
+  ```
 
 ### 🦋 Changed
 
@@ -224,12 +250,12 @@ for x in v:
   autoparameterized functions. This ability was an oversight and this is now an
   error:
 
-```mojo
-fn autoparameterized(x: SIMD):
-    pass
+  ```mojo
+  fn autoparameterized(x: SIMD):
+      pass
 
-autoparameterized[DType.int32, 1](3) # error: too many parameters
-```
+  autoparameterized[DType.int32, 1](3) # error: too many parameters
+  ```
 
 - `vectorize_unroll` has been removed, and `vectorize` now has a parameter named
   `unroll_factor` with a default value of 1. Increasing `unroll_factor` may
@@ -312,8 +338,6 @@ autoparameterized[DType.int32, 1](3) # error: too many parameters
 
 - The `DynamicVector(capacity: Int)` constructor has been changed to take
   `capacity` as a keyword-only argument to prevent implicit conversion from Int.
-
-### ❌ Removed
 
 ### 🛠️ Fixed
 
