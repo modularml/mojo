@@ -123,6 +123,10 @@ modular install mojo
 
 - [#1741](https://github.com/modularml/mojo/issues/1741) - Mojo documentation
   generation doesn't show `inout`/`owned` on variadic arguments.
+- [#1621](https://github.com/modularml/mojo/issues/1621) - VS Code does not
+  highlight `raises` and `capturing` in functional type expressions.
+- [#1617](https://github.com/modularml/mojo/issues/1617) - VS Code does not
+  highlight `fn` in specific contexts.
 
 ## 24.1 beta
 
