@@ -3,19 +3,8 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-"""Implements various testing utils.
-
-You can import these types from the `testing` package. For example:
-
-```mojo
-from testing import assert_true
-```
-"""
 
 
-# ===----------------------------------------------------------------------=== #
-# MoveOnly[T]
-# ===----------------------------------------------------------------------=== #
 struct MoveOnly[T: Movable](Movable):
     """Utility for testing MoveOnly types.
 
