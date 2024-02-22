@@ -92,6 +92,14 @@ fn test_print():
     print(Error("bad"))
 
 
+# CHECK-LABEL: test_print_end
+fn test_print_end():
+    print("== test_print_end")
+    # CHECK: Hello
+    # CHECK: World
+    print("Hello", end="World")
+
+
 # CHECK-LABEL: test_issue_20421
 fn test_issue_20421():
     print("== test_issue_20421")
@@ -105,4 +113,5 @@ fn test_issue_20421():
 
 fn main():
     test_print()
+    test_print_end()
     test_issue_20421()

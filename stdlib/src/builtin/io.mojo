@@ -585,6 +585,7 @@ struct _StringableTuple[*Ts: Stringable](Sized):
             )
 
     fn _print[i: Int](inout self):
+        # TODO: Allow controlling this separator from the caller.
         _put(" ")
         _put(self._at[i]())
 
@@ -614,8 +615,15 @@ fn _print_elements[
 
 
 @no_inline
-fn print[T: Stringable, *Ts: Stringable](first: T, *rest: *Ts):
-    """Prints a sequence of elements, joined by spaces, followed by a newline.
+fn print[
+    T: Stringable, *Ts: Stringable
+](first: T, *rest: *Ts, end: StringLiteral = "\n"):
+    """ "
+    Prints elements to the text stream.  Each element is separated by spaces and
+    followed by `end`.
+
+    In the future, there will be a `sep` keyword argument to allow specifying the
+    separator.  Currently, the default is hard-coded to be a space (`' '`).
 
     Parameters:
         T: The first element type.
@@ -624,10 +632,13 @@ fn print[T: Stringable, *Ts: Stringable](first: T, *rest: *Ts):
     Args:
         first: The first element.
         rest: The remaining elements.
+        end: The StringLiteral to write to the text stream after the elements have been written.
+
+        Print objects to the text stream file, separated by sep and followed by end. sep, end, file, and flush, if present, must be given as keyword arguments.
     """
     var vals = _StringableTuple[Ts](rest)
     _print_elements(first, vals)
-    put_new_line()
+    _printf(end)
 
 
 # FIXME(#8843, #12811): This should be removed, and instead implemented in terms

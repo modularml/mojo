@@ -267,6 +267,10 @@ modular install mojo
 
 - `PythonObject` now conforms to the `SizedRaising` trait.
 
+- `print()` function now accepts a keyword-only argument for the `end`
+  which is useful for controlling whether a newline is printed or not
+  after printing the elements.  By default, `end` defaults to "\n" as before.
+
 ### 🦋 Changed
 
 - It is no longer possible to explicitly specify implicit argument parameters in
