@@ -8,3 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+
+      - name: "Get the modular installer, install mojo compiler"
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install modular
+          modular clean
+          modular install mojo
+          mojo --version
