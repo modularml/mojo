@@ -146,6 +146,8 @@ modular install mojo
   highlight `raises` and `capturing` in functional type expressions.
 - [#1617](https://github.com/modularml/mojo/issues/1617) - VS Code does not
   highlight `fn` in specific contexts.
+- [#1740](https://github.com/modularml/mojo/issues/1740) - LSP shows unrelated
+  info when hovering over a struct.
 
 ## 24.1 beta
 
