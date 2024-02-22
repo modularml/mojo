@@ -158,6 +158,8 @@ modular install mojo
   binding alias to parametric function with default argument.
 - [#1248](https://github.com/modularml/mojo/issues/1248) - Crash when importing
   from file the same name as another file in the search path.
+- [#1354](https://github.com/modularml/mojo/issues/1354) - Crash when importing
+  from local package.
 
 ## 24.1 beta
 
