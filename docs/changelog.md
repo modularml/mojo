@@ -148,6 +148,16 @@ modular install mojo
   highlight `fn` in specific contexts.
 - [#1740](https://github.com/modularml/mojo/issues/1740) - LSP shows unrelated
   info when hovering over a struct.
+- [#1238](https://github.com/modularml/mojo/issues/1238) - File shadows Mojo
+  package path.
+- [#1429](https://github.com/modularml/mojo/issues/1429) - Crash when using
+  nested import statement.
+- [#1322](https://github.com/modularml/mojo/issues/1322) - Crash when missing
+  types in variadic argument.
+- [#1314](https://github.com/modularml/mojo/issues/1314) - Typecheck error when
+  binding alias to parametric function with default argument.
+- [#1248](https://github.com/modularml/mojo/issues/1248) - Crash when importing
+  from file the same name as another file in the search path.
 
 ## 24.1 beta
 
