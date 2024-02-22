@@ -157,9 +157,8 @@ fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
     # Don't do anything fancy. Just insert ".0" if there is no decimal and this
     # is not in exponent form.
     var p = buffer
-    # TODO(7585): Use `ord("-")` when it is possible at compile-time.
-    alias minus: Int8 = 45  # '-'
-    alias dot: Int8 = 46  # '.'
+    alias minus = ord("-")
+    alias dot = ord(".")
     if p.load() == minus:
         p += 1
     while p.load() != 0 and isdigit(p.load()):
@@ -168,7 +167,7 @@ fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
         return n
     p.store(dot)
     p += 1
-    p.store(48)  # '0'
+    p.store(ord("0"))
     p += 1
     p.store(0)
     return n + 2
