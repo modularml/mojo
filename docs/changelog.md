@@ -160,6 +160,8 @@ modular install mojo
   from file the same name as another file in the search path.
 - [#1354](https://github.com/modularml/mojo/issues/1354) - Crash when importing
   from local package.
+- [#1488](https://github.com/modularml/mojo/issues/1488) - Crash when setting
+  generic element field.
 
 ## 24.1 beta
 
