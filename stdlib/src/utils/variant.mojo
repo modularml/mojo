@@ -36,7 +36,7 @@ from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
 from algorithm.functional import unroll
-from memory.unsafe import emplace_ref_unsafe
+from memory.unsafe import emplace_ref_unsafe, _LITRef
 
 from utils.static_tuple import StaticTuple
 
@@ -45,20 +45,20 @@ from utils.static_tuple import StaticTuple
 struct _UnionSize[*Ts: CollectionElement]():
     @staticmethod
     fn compute() -> Int:
-        var size = 1
+        var size = 0
 
         @parameter
         fn each[i: Int]():
             size = max(size, align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
 
         unroll[each, len(VariadicList(Ts))]()
-        return size
+        return align_up(size, alignof[Int]())
 
 
 # FIXME(#27380): Can't pass *Ts to a function parameter, only type parameter.
 struct _UnionTypeIndex[T: CollectionElement, *Ts: CollectionElement]:
     @staticmethod
-    fn compute() -> Int16:
+    fn compute() -> Int8:
         var result = -1
 
         @parameter
@@ -116,9 +116,10 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     """
 
     alias _sentinel: Int = -1
-    alias _type = StaticTuple[_UnionSize[Ts].compute(), Int8]
+    alias _type = __mlir_type[
+        `!kgen.variant<[rebind(:`, __type_of(Ts), ` `, Ts, `)]>`
+    ]
     var _impl: Self._type
-    var _state: Int16
 
     fn _get_ptr[T: CollectionElement](self) -> AnyPointer[T]:
         constrained[
@@ -133,6 +134,17 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         ](ptr)
         return result
 
+    fn _get_state[
+        is_mut: __mlir_type.i1, lt: __mlir_type[`!lit.lifetime<`, is_mut, `>`]
+    ](self: _LITRef[Self, is_mut, lt, Int(0).value].type) -> Reference[
+        Int8, is_mut, lt
+    ]:
+        return (
+            Reference(self)
+            .bitcast_element[Int8]()
+            .offset(_UnionSize[Ts].compute())
+        )
+
     fn __init__[T: CollectionElement](inout self, owned value: T):
         """Create a variant with one of the types.
 
@@ -143,8 +155,8 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             value: The value to initialize the variant with.
         """
-        self._impl = Self._type()
-        self._state = Self._check[T]()
+        self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
+        self._get_state()[] = Self._check[T]()
         self._get_ptr[T]().emplace_value(value ^)
 
     fn __copyinit__(inout self, other: Self):
@@ -153,12 +165,12 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             other: The variant to copy from.
         """
-        self._impl = Self._type()
-        self._state = other._state
+        self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
+        self._get_state()[] = other._get_state()[]
 
         @parameter
         fn each[i: Int]():
-            if self._state == i:
+            if self._get_state()[] == i:
                 alias T = Ts[i]
                 emplace_ref_unsafe[T](
                     Reference(self._impl).bitcast_element[T](),
@@ -173,12 +185,12 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             other: The variant to move.
         """
-        self._impl = Self._type()
-        self._state = other._state
+        self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
+        self._get_state()[] = other._get_state()[]
 
         @parameter
         fn each[i: Int]():
-            if self._state == i:
+            if self._get_state()[] == i:
                 alias T = Ts[i]
                 # Calls the correct __moveinit__
                 self._get_ptr[T]().emplace_value(
@@ -194,7 +206,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     fn _call_correct_deleter(inout self):
         @parameter
         fn each[i: Int]():
-            if self._state == i:
+            if self._get_state()[] == i:
                 alias q = Ts[i]
                 __get_address_as_owned_value(self._get_ptr[q]().value).__del__()
 
@@ -217,8 +229,12 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Returns:
             The undelying data as an owned value.
         """
-        debug_assert(Self._check[T]() == self._state, "taking wrong type")
-        self._state = Self._sentinel  # don't call the variant's deleter later
+        debug_assert(
+            Self._check[T]() == self._get_state()[], "taking wrong type"
+        )
+        self._get_state()[] = (
+            Self._sentinel
+        )  # don't call the variant's deleter later
         return self._get_ptr[T]().take_value()
 
     fn set[T: CollectionElement](inout self, owned value: T):
@@ -234,7 +250,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             value: The new value to set the variant to.
         """
         self._call_correct_deleter()
-        self._state = Self._check[T]()
+        self._get_state()[] = Self._check[T]()
         self._get_ptr[T]().emplace_value(value ^)
 
     fn isa[T: CollectionElement](self) -> Bool:
@@ -247,7 +263,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             True if the variant contains the requested type.
         """
         alias idx = Self._check[T]()
-        return self._state == idx
+        return self._get_state()[] == idx
 
     fn get[
         T: CollectionElement,
@@ -280,5 +296,5 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         ](Reference(self)[]._get_ptr[T]().value)
 
     @staticmethod
-    fn _check[T: CollectionElement]() -> Int16:
+    fn _check[T: CollectionElement]() -> Int8:
         return _UnionTypeIndex[T, Ts].compute()
