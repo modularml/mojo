@@ -121,6 +121,9 @@ modular install mojo
 
 ### 🛠️ Fixed
 
+- [#1741](https://github.com/modularml/mojo/issues/1741) - Mojo documentation
+  generation doesn't show `inout`/`owned` on variadic arguments.
+
 ## 24.1 beta
 
 ### ⭐️ New
