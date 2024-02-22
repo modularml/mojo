@@ -744,7 +744,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         if not loc:
             return -1
 
-        return loc.__as_index() - self._as_ptr().__as_index()
+        return int(loc) - int(self._as_ptr())
 
     fn rfind(self, substr: String, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at

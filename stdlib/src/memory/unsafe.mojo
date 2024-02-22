@@ -442,7 +442,7 @@ fn emplace_ref_unsafe[
 @register_passable("trivial")
 struct Pointer[
     type: AnyRegType, address_space: AddressSpace = AddressSpace.GENERIC
-](Boolable, Stringable):
+](Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
     """Defines a Pointer struct that contains the address of a register passable
     type.
 
@@ -710,6 +710,15 @@ struct Pointer[
     @always_inline("nodebug")
     fn __as_index(self) -> Int:
         # Returns the pointer address as an index.
+        return int(self)
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Returns the pointer address as an integer.
+
+        Returns:
+          The address of the pointer as an Int.
+        """
         return __mlir_op.`pop.pointer_to_index`[
             _type = __mlir_type.`!pop.scalar<index>`
         ](self.address)
@@ -912,7 +921,7 @@ struct Pointer[
 @register_passable("trivial")
 struct DTypePointer[
     type: DType, address_space: AddressSpace = AddressSpace.GENERIC
-](Boolable, CollectionElement, Stringable):
+](Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
     """Defines a `DTypePointer` struct that contains an address of the given
     dtype.
 
@@ -1409,7 +1418,16 @@ struct DTypePointer[
     @always_inline("nodebug")
     fn __as_index(self) -> Int:
         # Returns the pointer address as an index.
-        return self.address.__as_index()
+        return int(self)
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Returns the pointer address as an integer.
+
+        Returns:
+          The address of the pointer as an Int.
+        """
+        return int(self.address)
 
     @always_inline
     fn is_aligned[alignment: Int](self) -> Bool:

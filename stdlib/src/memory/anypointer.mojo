@@ -17,7 +17,9 @@ from sys.intrinsics import _mlirtype_is_eq
 
 
 @register_passable("trivial")
-struct AnyPointer[T: Movable](Boolable, Stringable, EqualityComparable):
+struct AnyPointer[T: Movable](
+    Boolable, CollectionElement, Stringable, Intable, EqualityComparable
+):
     """This is a pointer type that can point to any generic value that is
     movable.
 
@@ -171,6 +173,15 @@ struct AnyPointer[T: Movable](Boolable, Stringable, EqualityComparable):
 
     @always_inline
     fn __as_index(self) -> Int:
+        return int(self)
+
+    @always_inline
+    fn __int__(self) -> Int:
+        """Returns the pointer address as an integer.
+
+        Returns:
+          The address of the pointer as an Int.
+        """
         return __mlir_op.`pop.pointer_to_index`[
             _type = __mlir_type.`!pop.scalar<index>`
         ](self.value)
@@ -185,7 +196,7 @@ struct AnyPointer[T: Movable](Boolable, Stringable, EqualityComparable):
         }
 
     fn __str__(self) -> String:
-        return hex(self.__as_index())
+        return hex(int(self))
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -194,7 +205,7 @@ struct AnyPointer[T: Movable](Boolable, Stringable, EqualityComparable):
         Returns:
             Whether the pointer is null.
         """
-        return self.__as_index() != Self().__as_index()
+        return int(self) != 0
 
     @always_inline
     fn __add__(self, offset: Int) -> Self:
@@ -206,7 +217,7 @@ struct AnyPointer[T: Movable](Boolable, Stringable, EqualityComparable):
         Returns:
             An offset pointer.
         """
-        return Self.__from_index(self.__as_index() + offset * sizeof[T]())
+        return Self.__from_index(int(self) + offset * sizeof[T]())
 
     @always_inline
     fn __sub__(self, offset: Int) -> Self:
