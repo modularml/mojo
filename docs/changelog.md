@@ -115,6 +115,25 @@ modular install mojo
   fn variadic_kw_only(a: Int, **kwargs: Int): ...
   ```
 
+- The Mojo LSP server will now generate fixits for populating empty
+  documentation strings:
+
+  ```mojo
+  fn foo(arg: Int):
+    """""" # Unexpected empty documentation string
+  ```
+
+  Applying the fixit from above will generate:
+
+  ```mojo
+  fn foo(arg: Int):
+    """[summary].
+
+    Args:
+        arg: [description].
+    """
+  ```
+
 ### 🦋 Changed
 
 ### ❌ Removed
