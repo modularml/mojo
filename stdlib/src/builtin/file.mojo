@@ -45,8 +45,9 @@ struct _OwnedStringRef(Boolable):
 
     fn consume_as_error(owned self) -> Error:
         var data = self.data
+        # Don't free self.data in our dtor.
+        self.data = DTypePointer[DType.int8]()
         var length = self.length
-        __mlir_op.`lit.ownership.mark_destroyed`(__get_ref_from_value(self))
         return Error {data: data, loaded_length: -length}
 
     fn __bool__(self) -> Bool:
