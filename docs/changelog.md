@@ -162,6 +162,12 @@ modular install mojo
   from local package.
 - [#1488](https://github.com/modularml/mojo/issues/1488) - Crash when setting
   generic element field.
+- [#1476](https://github.com/modularml/mojo/issues/1476) - Crash in interpreter
+  when calling functions in parameter context.
+- [#1537](https://github.com/modularml/mojo/issues/1537) - Crash when copying
+  parameter value.
+- [#1546](https://github.com/modularml/mojo/issues/1546) - Modify nested vector
+  element crashes parser.
 
 ## 24.1 beta
 
