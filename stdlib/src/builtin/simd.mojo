@@ -12,7 +12,7 @@ from math._numerics import FPUtils
 from math.limit import inf, isnan, neginf
 from math.math import _simd_apply, nan
 from sys import llvm_intrinsic
-from sys.info import has_avx512f, has_neon, is_x86, simdwidthof
+from sys.info import has_neon, is_x86, simdwidthof
 
 from builtin.hash import _hash_simd
 from debug.visualizers import lldb_formatter_wrapping_type
@@ -2081,21 +2081,5 @@ fn _floor[
     @parameter
     if has_neon() and type == DType.bfloat16:
         return _floor(x.cast[DType.float32]()).cast[type]()
-
-    @parameter
-    if (
-        has_avx512f()
-        and (simdwidthof[type]() == simd_width)
-        and (type == DType.float32)
-    ):
-        return llvm_intrinsic[
-            "llvm.x86.avx512.mask.rndscale.ps.512", SIMD[type, simd_width]
-        ](
-            x,
-            __mlir_attr.`1:i32`,
-            x,
-            __mlir_attr.`-1:i16`,
-            __mlir_attr.`4:i32`,
-        )
 
     return llvm_intrinsic["llvm.floor", SIMD[type, simd_width]](x)
