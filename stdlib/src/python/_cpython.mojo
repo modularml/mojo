@@ -39,16 +39,17 @@ struct PyObjectPtr:
         return PyObjectPtr {value: null_pointer}
 
     fn is_null(self) -> Bool:
-        return self.value.__as_index() == 0
+        return int(self.value) == 0
 
     fn __eq__(self, rhs: PyObjectPtr) -> Bool:
-        return self._get_ptr_as_int() == rhs._get_ptr_as_int()
+        return int(self.value) == int(rhs.value)
 
     fn __ne__(self, rhs: PyObjectPtr) -> Bool:
         return not (self == rhs)
 
+    # TODO: Consider removing this and inlining int(p.value) into callers
     fn _get_ptr_as_int(self) -> Int:
-        return self.value.__as_index()
+        return int(self.value)
 
 
 @value

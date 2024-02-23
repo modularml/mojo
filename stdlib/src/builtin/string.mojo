@@ -452,7 +452,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         if len(self) != len(other):
             return False
 
-        if self._as_ptr().__as_index() == other._as_ptr().__as_index():
+        if int(self._as_ptr()) == int(other._as_ptr()):
             return True
 
         return memcmp(self._as_ptr(), other._as_ptr(), len(self)) == 0
@@ -777,7 +777,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         if not loc:
             return -1
 
-        return loc.__as_index() - self._as_ptr().__as_index()
+        return int(loc) - int(self._as_ptr())
 
     fn split(self, delimiter: String) raises -> DynamicVector[String]:
         """Split the string by a delimiter.
@@ -842,7 +842,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
 
         for _ in range(occurrences):
-            var curr_offset = self_ptr.__as_index() - self_start.__as_index()
+            var curr_offset = int(self_ptr) - int(self_start)
 
             var idx = self.find(old, curr_offset)
 

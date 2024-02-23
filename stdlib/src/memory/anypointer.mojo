@@ -172,10 +172,6 @@ struct AnyPointer[T: Movable](
         ) = __get_address_as_owned_value(self.value)
 
     @always_inline
-    fn __as_index(self) -> Int:
-        return int(self)
-
-    @always_inline
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
 
@@ -241,7 +237,7 @@ struct AnyPointer[T: Movable](
         Returns:
             True if the two pointers are equal and False otherwise.
         """
-        return self.__as_index() == rhs.__as_index()
+        return int(self) == int(rhs)
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: Self) -> Bool:
@@ -265,7 +261,7 @@ struct AnyPointer[T: Movable](
         Returns:
             True if this pointer represents a lower address and False otherwise.
         """
-        return self.__as_index() < rhs.__as_index()
+        return int(self) < int(rhs)
 
     @always_inline("nodebug")
     fn __le__(self, rhs: Self) -> Bool:
@@ -278,7 +274,7 @@ struct AnyPointer[T: Movable](
         Returns:
             True if this pointer represents a lower address and False otherwise.
         """
-        return self.__as_index() <= rhs.__as_index()
+        return int(self) <= int(rhs)
 
     @always_inline("nodebug")
     fn __gt__(self, rhs: Self) -> Bool:
@@ -290,7 +286,7 @@ struct AnyPointer[T: Movable](
         Returns:
             True if this pointer represents a higher than or equal address and False otherwise.
         """
-        return self.__as_index() > rhs.__as_index()
+        return int(self) > int(rhs)
 
     @always_inline("nodebug")
     fn __ge__(self, rhs: Self) -> Bool:
@@ -303,7 +299,7 @@ struct AnyPointer[T: Movable](
         Returns:
             True if this pointer represents a higher than or equal address and False otherwise.
         """
-        return self.__as_index() >= rhs.__as_index()
+        return int(self) >= int(rhs)
 
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful

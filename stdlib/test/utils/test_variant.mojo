@@ -174,8 +174,8 @@ def test_get_returns_mutable_reference():
 
     var v3: Variant[Int, String] = 4
     assert_equal(
-        v3._get_ptr[Int]().__as_index(),
-        Reference(v3)[]._get_ptr[Int]().__as_index(),
+        int(v3._get_ptr[Int]()),
+        int(Reference(v3)[]._get_ptr[Int]()),
     )
 
 

@@ -1129,8 +1129,7 @@ fn strided_load[
         return addr.load() if mask else SIMD[type, 1]()
 
     var offset = (
-        addr.__as_index()
-        + stride * iota[DType.index, simd_width]() * sizeof[type]()
+        int(addr) + stride * iota[DType.index, simd_width]() * sizeof[type]()
     )
     var passthrough = SIMD[type, simd_width]()
     return gather[type, simd_width](
@@ -1208,8 +1207,7 @@ fn strided_store[
         return
 
     var offset = (
-        addr.__as_index()
-        + stride * iota[DType.index, simd_width]() * sizeof[type]()
+        int(addr) + stride * iota[DType.index, simd_width]() * sizeof[type]()
     )
     scatter[type, simd_width](value, offset.cast[DType.address](), mask)
 

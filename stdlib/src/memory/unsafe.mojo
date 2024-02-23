@@ -523,7 +523,7 @@ struct Pointer[
             A String containing the hexadecimal representation of the memory location
             destination of this pointer.
         """
-        return hex(self.__as_index())
+        return hex(int(self))
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
@@ -703,15 +703,6 @@ struct Pointer[
             nonTemporal = __mlir_attr.unit,
         ](value, self.address)
 
-    # ===------------------------------------------------------------------=== #
-    # Utilities
-    # ===------------------------------------------------------------------=== #
-
-    @always_inline("nodebug")
-    fn __as_index(self) -> Int:
-        # Returns the pointer address as an index.
-        return int(self)
-
     @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
@@ -810,7 +801,7 @@ struct Pointer[
         Returns:
             True if the two pointers are equal and False otherwise.
         """
-        return self.__as_index() == rhs.__as_index()
+        return int(self) == int(rhs)
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: Self) -> Bool:
@@ -822,7 +813,7 @@ struct Pointer[
         Returns:
             True if the two pointers are not equal and False otherwise.
         """
-        return self.__as_index() != rhs.__as_index()
+        return int(self) != int(rhs)
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: Self) -> Bool:
@@ -835,7 +826,7 @@ struct Pointer[
         Returns:
             True if this pointer represents a lower address and False otherwise.
         """
-        return self.__as_index() < rhs.__as_index()
+        return int(self) < int(rhs)
 
     # ===------------------------------------------------------------------=== #
     # Pointer Arithmetic
@@ -1416,11 +1407,6 @@ struct DTypePointer[
         self.address.bitcast[SIMD[type, width]]().nt_store(val)
 
     @always_inline("nodebug")
-    fn __as_index(self) -> Int:
-        # Returns the pointer address as an index.
-        return int(self)
-
-    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
 
@@ -1443,7 +1429,7 @@ struct DTypePointer[
         constrained[
             is_power_of_2(alignment), "alignment must be a power of 2."
         ]()
-        return self.__as_index() % alignment == 0
+        return int(self) % alignment == 0
 
     # ===------------------------------------------------------------------=== #
     # Pointer Arithmetic

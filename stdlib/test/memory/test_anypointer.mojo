@@ -79,7 +79,7 @@ def test_refitem_offset():
 
 def test_address_of():
     var local = 1
-    assert_not_equal(0, AnyPointer[Int].address_of(local).__as_index())
+    assert_not_equal(0, int(AnyPointer[Int].address_of(local)))
 
 
 def test_bitcast():
@@ -87,9 +87,9 @@ def test_bitcast():
     var ptr = AnyPointer[Int].address_of(local)
     var aliased_ptr = ptr.bitcast[SIMD[DType.uint8, 4]]()
 
-    assert_equal(ptr.__as_index(), ptr.bitcast[Int]().__as_index())
+    assert_equal(int(ptr), int(ptr.bitcast[Int]()))
 
-    assert_equal(ptr.__as_index(), aliased_ptr.__as_index())
+    assert_equal(int(ptr), int(aliased_ptr))
 
 
 def test_anypointer_string():
