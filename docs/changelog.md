@@ -184,6 +184,8 @@ your code to using var explicitly.
   parser to crash.
 - [#1562](https://github.com/modularml/mojo/issues/1562) - Crash when calling
   parametric type member function.
+- [#1577](https://github.com/modularml/mojo/issues/1577) - Crash when using
+  unresolved package as a variable.
 
 ## 24.1 beta
 
