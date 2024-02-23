@@ -74,7 +74,7 @@ struct AnyPointer[T: Movable](
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: T) -> Self:
+    fn address_of(inout arg: T) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -84,7 +84,7 @@ struct AnyPointer[T: Movable](
             An AnyPointer which contains the address of the argument.
         """
         return __mlir_op.`pop.pointer.bitcast`[_type = Self.pointer_type](
-            __mlir_op.`lit.ref.to_pointer`(__get_ref_from_value(arg))
+            __get_lvalue_as_address(arg)
         )
 
     @always_inline
