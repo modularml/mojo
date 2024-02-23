@@ -136,6 +136,18 @@ modular install mojo
 
 ### 🦋 Changed
 
+As another step towards [removing let
+declarations](https://github.com/modularml/mojo/blob/main/proposals/remove-let-decls.md)
+we have removed support for let declarations inside the compiler.  To ease
+migration, we parse let declarations as a var declaration, but please switch
+your code to using var explicitly.
+
+  ```mojo
+  fn test():
+    let x = 42 # treated as a var, but please update your code!
+    x = 9
+  ```
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
