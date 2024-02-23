@@ -188,6 +188,8 @@ your code to using var explicitly.
   unresolved package as a variable.
 - [#1579](https://github.com/modularml/mojo/issues/1579) - Member access into
   type instances causes a crash.
+- [#1602](https://github.com/modularml/mojo/issues/1602) - Interpreter failure
+  when constructing strings at compile time.
 
 ## 24.1 beta
 
