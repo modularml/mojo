@@ -168,6 +168,8 @@ modular install mojo
   parameter value.
 - [#1546](https://github.com/modularml/mojo/issues/1546) - Modify nested vector
   element crashes parser.
+- [#1558](https://github.com/modularml/mojo/issues/1558) - Invalid import causes
+  parser to crash.
 
 ## 24.1 beta
 
