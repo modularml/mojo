@@ -182,6 +182,8 @@ your code to using var explicitly.
   element crashes parser.
 - [#1558](https://github.com/modularml/mojo/issues/1558) - Invalid import causes
   parser to crash.
+- [#1562](https://github.com/modularml/mojo/issues/1562) - Crash when calling
+  parametric type member function.
 
 ## 24.1 beta
 
