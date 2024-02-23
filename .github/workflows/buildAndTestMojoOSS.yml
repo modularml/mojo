@@ -12,12 +12,7 @@ jobs:
       - name: "Get the modular installer, install mojo compiler"
         shell: bash
         run: |
-          sudo apt-get install -y apt-transport-https &&
-            keyring_location=/usr/share/keyrings/modular-installer-archive-keyring.gpg &&
-            curl -1sLf 'https://dl.modular.com/bBNWiLZX5igwHXeu/installer/gpg.0E4925737A3895AD.key' |  gpg --dearmor >> ${keyring_location} &&
-            curl -1sLf 'https://dl.modular.com/bBNWiLZX5igwHXeu/installer/config.deb.txt?distro=debian&codename=wheezy' > /etc/apt/sources.list.d/modular-installer.list &&
-            apt-get update &&
-            apt-get install -y modular
-          modular auth buildAndTestMojoOSS
+          echo "Downloading the Latest Mojo Compiler"
+          curl https://get.modular.com | sh - && modular auth buildAndTestMojoOSS
           modular install mojo
           mojo --version
