@@ -1844,6 +1844,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             shift >= -size and shift < size,
             "Constraint: -size <= shift < size",
         ]()
+
+        @parameter
+        if size == 1:
+            constrained[shift == 0, "for scalars the shift must be 0"]()
+            return self
         return llvm_intrinsic["llvm.experimental.vector.splice", Self](
             self, self, Int32(shift)
         )
@@ -1869,6 +1874,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             shift > -size and shift <= size,
             "Constraint: -size < shift <= size",
         ]()
+
+        @parameter
+        if size == 1:
+            constrained[shift == 0, "for scalars the shift must be 0"]()
+            return self
         return self.rotate_left[-shift]()
 
     # ===-------------------------------------------------------------------===#
@@ -1892,13 +1902,13 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             wrap-around, fill with zero).
         """
 
-        var zero_simd = Self()
-
         @parameter
         if shift == 0:
             return self
         elif shift == size:
             return 0
+
+        alias zero_simd = Self()
 
         return llvm_intrinsic["llvm.experimental.vector.splice", Self](
             self, zero_simd, Int32(shift)
@@ -1924,13 +1934,13 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Note the order of the llvm_intrinsic arguments below differ from
         # shift_left(), so we cannot directly reuse it here.
 
-        var zero_simd = Self()
-
         @parameter
         if shift == 0:
             return self
         elif shift == size:
             return 0
+
+        alias zero_simd = Self()
 
         return llvm_intrinsic["llvm.experimental.vector.splice", Self](
             zero_simd, self, Int32(-shift)
