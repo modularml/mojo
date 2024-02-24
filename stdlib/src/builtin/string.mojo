@@ -769,7 +769,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
 
         var loc = _memrmem(
             haystack_str._as_ptr(),
-            haystack_str.length,
+            len(haystack_str),
             substr._as_ptr(),
             len(substr),
         )
