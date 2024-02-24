@@ -190,6 +190,8 @@ your code to using var explicitly.
   type instances causes a crash.
 - [#1602](https://github.com/modularml/mojo/issues/1602) - Interpreter failure
   when constructing strings at compile time.
+- [#1696](https://github.com/modularml/mojo/issues/1696) - Fixed an issue that
+  caused syntax highlighting to occasionally fail.
 
 ## 24.1 beta
 
