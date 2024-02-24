@@ -9,7 +9,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from math._numerics import FPUtils
-from math.limit import inf, isnan, neginf
+from math.limit import inf, neginf
 from math.math import _simd_apply, nan
 from sys import llvm_intrinsic
 from sys.info import has_neon, is_x86, simdwidthof
