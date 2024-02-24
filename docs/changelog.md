@@ -134,6 +134,9 @@ modular install mojo
     """
   ```
 
+- The `find`, `rfind`, `count`, and `__contains__` now work on string literals.
+  This means that one can write `"Mojo" in "Hello Mojo"`.
+  
 - Breakpoints can now be inserted programmatically within the code via the
   use of `sys.breakpointhook` or the builtin `breakpoint` function.
 

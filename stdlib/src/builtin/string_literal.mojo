@@ -9,9 +9,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from debug.visualizers import lldb_formatter_wrapping_type
-from memory import memcmp
 from memory.unsafe import DTypePointer
-from .string import _memmem, _memrmem
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -139,53 +137,33 @@ struct StringLiteral(Sized, Stringable, CollectionElement, Hashable, Boolable):
         Returns:
           True if the string contains the substring.
         """
-        return self.find(substr) != -1
+        return substr in StringRef(self)
 
-    fn find(self, substr: StringLiteral) -> Int:
+    fn find(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
         Args:
           substr: The substring to find.
+          start: The offset from which to find.
 
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return 0
+        return StringRef(self).find(substr, start=start)
 
-        if len(self) < len(substr):
-            return -1
-
-        var loc = _memmem(self.data(), len(self), substr.data(), len(substr))
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self.data())
-
-    fn rfind(self, substr: StringLiteral) -> Int:
+    fn rfind(self, substr: StringLiteral, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
         `start`. If not found, returns -1.
 
         Args:
           substr: The substring to find.
+          start: The offset from which to find.
 
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return len(self)
-
-        if len(self) < len(substr):
-            return -1
-
-        var loc = _memrmem(self.data(), len(self), substr.data(), len(substr))
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self.data())
+        return StringRef(self).rfind(substr, start=start)
 
 
 # Use a local memcmp rather than memory.memcpy to avoid #31139 and #25100.

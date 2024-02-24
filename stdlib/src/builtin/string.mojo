@@ -11,8 +11,6 @@ These are Mojo built-ins, so you don't need to import them.
 from collections.dict import KeyElement
 from collections.vector import DynamicVector
 from math import abs as _abs
-from math import max as _max
-from math import min as _min
 from math.bit import ctlz
 from sys.info import bitwidthof
 
@@ -25,7 +23,6 @@ from utils.index import StaticIntTuple
 from utils.static_tuple import StaticTuple
 
 from .io import _snprintf, _snprintf_scalar, _StringableTuple
-from .range import _StridedRange
 
 # ===----------------------------------------------------------------------===#
 # ord
@@ -617,49 +614,6 @@ struct String(Sized, Stringable, KeyElement, Boolable):
 
         return copy
 
-    fn _strref_from_start(self, start: Int) -> StringRef:
-        """Gets the StringRef pointing to the substring after the specified slice start position.
-
-        If start is negative, it is interpreted as the number of characters
-        from the end of the string to start at.
-
-        Warning: This method is as dangerous as `String._strref_dangerous()`.
-
-        Args:
-            start: Starting index of the slice.
-
-        Returns:
-            A StringRef borrowed from the current string containing the
-            characters of the slice starting at start.
-        """
-
-        var self_len = len(self)
-
-        var abs_start: Int
-        if start < 0:
-            # Avoid out of bounds earlier than the start
-            # len = 5, start = -3,  then abs_start == 2, i.e. a partial string
-            # len = 5, start = -10, then abs_start == 0, i.e. the full string
-            abs_start = _max(self_len + start, 0)
-        else:
-            # Avoid out of bounds past the end
-            # len = 5, start = 2,   then abs_start == 2, i.e. a partial string
-            # len = 5, start = 8,   then abs_start == 5, i.e. an empty string
-            abs_start = _min(start, self_len)
-
-        debug_assert(
-            abs_start >= 0, "strref absolute start must be non-negative"
-        )
-        debug_assert(
-            abs_start <= self_len,
-            "strref absolute start must be less than source String len",
-        )
-
-        var data = self._as_ptr() + abs_start
-        var length = self_len - abs_start
-
-        return StringRef(data, length)
-
     fn _steal_ptr(inout self) -> DTypePointer[DType.int8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
@@ -711,7 +665,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         Returns:
           True if the string contains the substring.
         """
-        return self.find(substr) != -1
+        return substr._strref_dangerous() in self._strref_dangerous()
 
     fn find(self, substr: String, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
@@ -724,27 +678,10 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return 0
 
-        if len(self) < len(substr) + start:
-            return -1
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._strref_from_start(start)
-
-        var loc = _memmem(
-            haystack_str._as_ptr(),
-            len(haystack_str),
-            substr._as_ptr(),
-            len(substr),
+        return self._strref_dangerous().find(
+            substr._strref_dangerous(), start=start
         )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self._as_ptr())
 
     fn rfind(self, substr: String, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -757,27 +694,10 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         Returns:
           The offset of `substr` relative to the beginning of the string.
         """
-        if not substr:
-            return len(self)
 
-        if len(self) < len(substr) + start:
-            return -1
-
-        # The substring to search within, offset from the beginning if `start`
-        # is positive, and offset from the end if `start` is negative.
-        var haystack_str = self._strref_from_start(start)
-
-        var loc = _memrmem(
-            haystack_str._as_ptr(),
-            len(haystack_str),
-            substr._as_ptr(),
-            len(substr),
+        return self._strref_dangerous().rfind(
+            substr._strref_dangerous(), start=start
         )
-
-        if not loc:
-            return -1
-
-        return int(loc) - int(self._as_ptr())
 
     fn split(self, delimiter: String) raises -> DynamicVector[String]:
         """Split the string by a delimiter.
@@ -918,8 +838,7 @@ struct String(Sized, Stringable, KeyElement, Boolable):
             uses. Its intended usage is for data structures. See the `hash`
             builtin documentation for more details.
         """
-        var data = DTypePointer[DType.int8](self._buffer.data.value)
-        return hash(data, len(self))
+        return hash(self._strref_dangerous())
 
     fn _interleave(self, val: String) -> String:
         var res = DynamicVector[Int8]()
@@ -1027,84 +946,6 @@ fn _toggle_ascii_case(char: Int8) -> Int8:
     # ASCII defines A-Z and a-z as differing only in their 6th bit,
     # so converting is as easy as a bit flip.
     return char ^ (1 << 5)
-
-
-fn _memmem[
-    type: DType, range_fn: fn (Int, Int) -> _StridedRange
-](
-    haystack: DTypePointer[type],
-    haystack_len: Int,
-    needle: DTypePointer[type],
-    needle_len: Int,
-) -> DTypePointer[type]:
-    if not needle_len:
-        return haystack
-    if needle_len > haystack_len:
-        return DTypePointer[type]()
-    if needle_len == 1:
-        return _memchr[type, range_fn](haystack, needle[0], haystack_len)
-    for i in range_fn(haystack_len, needle_len):
-        if haystack[i] != needle[0]:
-            continue
-
-        if memcmp(haystack + i, needle, needle_len) == 0:
-            return haystack + i
-    return DTypePointer[type]()
-
-
-fn _memchr[
-    type: DType, range_fn: fn (Int, Int) -> _StridedRange
-](
-    source: DTypePointer[type],
-    char: Scalar[type],
-    len: Int,
-) -> DTypePointer[
-    type
-]:
-    if not len:
-        return DTypePointer[type]()
-    for i in range_fn(len, 1):
-        if source[i] == char:
-            return source + i
-    return DTypePointer[type]()
-
-
-@always_inline
-fn _forward_range(haystack_len: Int, needle_len: Int) -> _StridedRange:
-    return range(0, haystack_len - needle_len + 1, 1)
-
-
-@always_inline
-fn _reverse_range(haystack_len: Int, needle_len: Int) -> _StridedRange:
-    return range(haystack_len - needle_len, -1, -1)
-
-
-@always_inline
-fn _memmem[
-    type: DType
-](
-    haystack: DTypePointer[type],
-    haystack_len: Int,
-    needle: DTypePointer[type],
-    needle_len: Int,
-) -> DTypePointer[type]:
-    return _memmem[type, _forward_range](
-        haystack, haystack_len, needle, needle_len
-    )
-
-
-@always_inline
-fn _memrmem[
-    type: DType
-](
-    haystack: DTypePointer[type],
-    haystack_len: Int,
-    needle: DTypePointer[type],
-    needle_len: Int,
-) -> DTypePointer[type]:
-    return _memmem[type, _reverse_range](
-        haystack, haystack_len, needle, needle_len
-    )
 
 
 fn _calc_initial_buffer_size_int32(n0: Int) -> Int:

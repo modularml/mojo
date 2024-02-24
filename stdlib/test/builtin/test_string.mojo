@@ -218,25 +218,6 @@ fn test_calc_initial_buffer_size_int64() raises:
     assert_equal(20, _calc_initial_buffer_size_int64(18446744073709551615))
 
 
-fn test_strref_from_start() raises:
-    var str = String("Hello")
-
-    assert_equal(5, len(str))
-
-    assert_equal(str._strref_from_start(0), "Hello")
-    assert_equal(str._strref_from_start(1), "ello")
-    assert_equal(str._strref_from_start(4), "o")
-    assert_equal(str._strref_from_start(5), "")
-    assert_equal(str._strref_from_start(10), "")
-
-    assert_equal(str._strref_from_start(-1), "o")
-    assert_equal(str._strref_from_start(-3), "llo")
-    assert_equal(str._strref_from_start(-5), "Hello")
-    assert_equal(str._strref_from_start(-10), "Hello")
-
-    str._strref_keepalive()
-
-
 fn test_contains() raises:
     var str = String("Hello world")
 
@@ -555,7 +536,6 @@ fn main() raises:
     test_atol()
     test_calc_initial_buffer_size_int32()
     test_calc_initial_buffer_size_int64()
-    test_strref_from_start()
     test_contains()
     test_find()
     test_count()
