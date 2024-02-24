@@ -28,7 +28,7 @@ from memory import memcpy, memset_zero, stack_allocation
 # Doing so can help prevent DDOS attacks on data structures relying on these
 # hash functions. See `hash(bytes, n)` documentation for more details.
 # TODO(27659): This is always 0 right now
-# let HASH_SECRET = random.random_ui64(
+# var HASH_SECRET = random.random_ui64(
 #     0, math.limit.max_finite[DType.uint64]()
 # ).to_int()
 
