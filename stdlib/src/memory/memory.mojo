@@ -492,28 +492,22 @@ fn stack_allocation[
 
 
 # ===----------------------------------------------------------------------===#
-# aligned_alloc
+# malloc
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline
-fn _aligned_alloc[
-    type: AnyRegType, /, address_space: AddressSpace = AddressSpace.GENERIC
-](size: Int) -> Pointer[type, address_space]:
+fn _malloc[
+    type: AnyRegType,
+    /,
+    *,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+](size: Int, /, *, alignment: Int = -1) -> Pointer[type, address_space]:
     @parameter
     if triple_is_nvidia_cuda():
-        return _malloc[type, address_space=address_space](size)
-    else:
-        return _aligned_alloc[type, address_space=address_space](-1, size)
-
-
-@always_inline
-fn _aligned_alloc[
-    type: AnyRegType, /, address_space: AddressSpace = AddressSpace.GENERIC
-](alignment: Int, size: Int) -> Pointer[type, address_space]:
-    @parameter
-    if triple_is_nvidia_cuda():
-        return _malloc[type, address_space=address_space](size)
+        return external_call["malloc", Pointer[NoneType, address_space]](
+            size
+        ).bitcast[type]()
     else:
         return __mlir_op.`pop.aligned_alloc`[
             _type = Pointer[type, address_space].pointer_type
@@ -526,43 +520,14 @@ fn _aligned_alloc[
 
 
 @always_inline
-fn _aligned_free[
-    type: AnyRegType, /, address_space: AddressSpace = AddressSpace.GENERIC
-](ptr: Pointer[type, address_space]):
+fn _free(ptr: Pointer):
     @parameter
     if triple_is_nvidia_cuda():
-        _free(ptr)
+        external_call["free", NoneType](ptr.bitcast[NoneType]())
     else:
         __mlir_op.`pop.aligned_free`(ptr.address)
 
 
 @always_inline
-fn _aligned_free[
-    type: DType, /, address_space: AddressSpace = AddressSpace.GENERIC
-](ptr: DTypePointer[type, address_space]):
-    _aligned_free(ptr.address)
-
-
-# ===----------------------------------------------------------------------===#
-# _malloc
-# ===----------------------------------------------------------------------===#
-
-
-fn _malloc[
-    type: AnyRegType, /, address_space: AddressSpace = AddressSpace.GENERIC
-](size: Int) -> Pointer[type, address_space]:
-    return external_call["malloc", Pointer[NoneType, address_space]](
-        size
-    ).bitcast[type]()
-
-
-# ===----------------------------------------------------------------------===#
-# _free
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _free[
-    type: AnyRegType, /, address_space: AddressSpace = AddressSpace.GENERIC
-](ptr: Pointer[type, address_space]):
-    external_call["free", NoneType](ptr.bitcast[NoneType]())
+fn _free(ptr: DTypePointer):
+    _free(ptr.address)

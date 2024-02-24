@@ -27,7 +27,7 @@ from sys.intrinsics import strided_load, strided_store
 
 from gpu.memory import AddressSpace as GPUAddressSpace
 
-from .memory import _aligned_alloc, _aligned_free
+from .memory import _malloc, _free
 
 # ===----------------------------------------------------------------------===#
 # bitcast
@@ -732,14 +732,14 @@ struct Pointer[
         Returns:
             A new Pointer object which has been allocated on the heap.
         """
-        return _aligned_alloc[type, address_space=address_space](
-            alignment, count * sizeof[type]()
+        return _malloc[type, address_space=address_space](
+            count * sizeof[type](), alignment=alignment
         )
 
     @always_inline
     fn free(self):
         """Frees the heap allocated memory."""
-        return _aligned_free(self)
+        return _free(self)
 
     # ===------------------------------------------------------------------=== #
     # Casting
@@ -1113,14 +1113,14 @@ struct DTypePointer[
         Returns:
             A new `DTypePointer` object which has been allocated on the heap.
         """
-        return _aligned_alloc[Self.element_type, address_space=address_space](
-            alignment, count * sizeof[type]()
+        return _malloc[Self.element_type, address_space=address_space](
+            count * sizeof[type](), alignment=alignment
         )
 
     @always_inline
     fn free(self):
         """Frees the heap allocates memory."""
-        _aligned_free(self)
+        _free(self)
 
     # ===------------------------------------------------------------------=== #
     # Casting
