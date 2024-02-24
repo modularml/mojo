@@ -134,6 +134,9 @@ modular install mojo
     """
   ```
 
+- Breakpoints can now be inserted programmatically within the code via the
+  use of `sys.breakpointhook` or the builtin `breakpoint` function.
+
 ### 🦋 Changed
 
 As another step towards [removing let

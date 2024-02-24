@@ -22,10 +22,3 @@ fn trap[T: Stringable](message: T):
     lowered to a call of the abort() function."""
     print(message)
     __mlir_op.`llvm.intr.trap`()
-
-
-@always_inline("nodebug")
-fn debug_trap():
-    """Cause an execution trap with the intention of requesting the attention
-    of a debugger."""
-    __mlir_op.`llvm.intr.debugtrap`()
