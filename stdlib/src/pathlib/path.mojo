@@ -232,6 +232,19 @@ struct Path(Stringable, CollectionElement, PathLike):
         with open(self, "r") as f:
             return f.read_bytes()
 
+    fn write_text[stringable: Stringable](self, value: stringable) raises:
+        """Writes the value to the file as text.
+
+        Parameters:
+          stringable: The Stringable type.
+
+        Args:
+          value: The value to write.
+        """
+        """"""
+        with open(self, "w") as f:
+            f.write(str(value))
+
     @always_inline
     fn suffix(self) -> String:
         """The path's extension, if any.

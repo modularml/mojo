@@ -4,12 +4,14 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: !windows
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo -debug-level full -D TEMP_FILE=%t %s
 
 from pathlib import *
 from sys.param_env import env_get_string
 
 from testing import *
+
+alias TEMP_FILE = env_get_string["TEMP_FILE"]()
 
 
 def test_cwd():
@@ -77,6 +79,11 @@ def test_joinpath():
     assert_equal(Path() / "some" / "dir", Path().joinpath("some", "dir"))
 
 
+def test_read_write():
+    Path(TEMP_FILE).write_text("hello")
+    assert_equal(Path(TEMP_FILE).read_text(), "hello")
+
+
 def main():
     test_cwd()
     test_path()
@@ -85,3 +92,4 @@ def main():
     test_path_isfile()
     test_suffix()
     test_joinpath()
+    test_read_write()
