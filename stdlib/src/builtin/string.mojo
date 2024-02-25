@@ -466,7 +466,6 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         """
         return not (self == other)
 
-    # "str1"+"str2" -> "str1str2"
     @always_inline
     fn __add__(self, other: String) -> String:
         """Creates a string by appending another string at the end.
@@ -487,13 +486,11 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
         memcpy(
-            rebind[Pointer[Int8]](buffer.data),
-            rebind[Pointer[Int8]](self._buffer.data),
-            self_len,
+            rebind[Pointer[Int8]](buffer.data), self._as_ptr().address, self_len
         )
         memcpy(
             rebind[Pointer[Int8]](buffer.data + self_len),
-            rebind[Pointer[Int8]](other._buffer.data),
+            other._as_ptr().address,
             other_len,
         )
         buffer[total_len] = 0
@@ -518,7 +515,17 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         Args:
             other: The string to append.
         """
-        self = self + other
+        if not self:
+            self = other
+            return
+        if not other:
+            return
+        var self_len = len(self)
+        var other_len = len(other)
+        var total_len = self_len + other_len
+        self._buffer.resize(total_len + 1, 0)
+        memcpy(self._as_ptr() + self_len, other._as_ptr(), other_len)
+        self._buffer[total_len] = 0
 
     fn join[rank: Int](self, elems: StaticIntTuple[rank]) -> String:
         """Joins the elements from the tuple using the current string as a
