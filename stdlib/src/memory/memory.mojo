@@ -55,7 +55,7 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
 
         var diff = s1i - s2i
         for j in range(simd_width):
-            if diff[j] > 0:
+            if (diff[j] > 0).reduce_or():
                 return 1
             return -1
 
