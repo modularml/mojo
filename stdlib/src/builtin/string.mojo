@@ -491,9 +491,8 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         memcpy(
             rebind[Pointer[Int8]](buffer.data + self_len),
             other._as_ptr().address,
-            other_len,
+            other_len + 1,  # Also copy the terminator
         )
-        buffer[total_len] = 0
         return Self(buffer ^)
 
     @always_inline
@@ -524,8 +523,8 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         var other_len = len(other)
         var total_len = self_len + other_len
         self._buffer.resize(total_len + 1, 0)
-        memcpy(self._as_ptr() + self_len, other._as_ptr(), other_len)
-        self._buffer[total_len] = 0
+        # Copy the data alongside the terminator.
+        memcpy(self._as_ptr() + self_len, other._as_ptr(), other_len + 1)
 
     fn join[rank: Int](self, elems: StaticIntTuple[rank]) -> String:
         """Joins the elements from the tuple using the current string as a
