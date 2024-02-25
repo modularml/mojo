@@ -10,7 +10,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 import math
 from memory.unsafe import DTypePointer, Pointer
-from .range import _StridedRange
+from algorithm.reduction import _index_of_first_one
+from .dtype import _uint_type_of_width
 
 # ===----------------------------------------------------------------------===#
 # StringRef
@@ -345,8 +346,31 @@ struct StringRef(Sized, CollectionElement, Stringable, Hashable, Boolable):
 # ===----------------------------------------------------------------------===#
 
 
+@always_inline
+fn _memchr[
+    type: DType
+](source: DTypePointer[type], char: Scalar[type], len: Int) -> DTypePointer[
+    type
+]:
+    if not len:
+        return DTypePointer[type]()
+    alias simd_width = simdwidthof[type]()
+    var first_needle = SIMD[type, simd_width](char)
+    var vectorized_end = math.align_down(len, simd_width)
+    for i in range(0, vectorized_end, simd_width):
+        var hay = source.simd_load[simd_width](i)
+        var mask = hay == first_needle
+        if not mask:
+            return source + i + _index_of_first_one(mask)
+    for i in range(vectorized_end, len):
+        if source[i] == char:
+            return source + i
+    return DTypePointer[type]()
+
+
+@always_inline
 fn _memmem[
-    type: DType, range_fn: fn (Int, Int) -> _StridedRange
+    type: DType
 ](
     haystack: DTypePointer[type],
     haystack_len: Int,
@@ -358,55 +382,45 @@ fn _memmem[
     if needle_len > haystack_len:
         return DTypePointer[type]()
     if needle_len == 1:
-        return _memchr[type, range_fn](haystack, needle[0], haystack_len)
-    for i in range_fn(haystack_len, needle_len):
+        return _memchr[type](haystack, needle[0], haystack_len)
+
+    alias bool_mask_width = simdwidthof[DType.bool]()
+    var first_needle = SIMD[type, bool_mask_width](needle[0])
+    var vectorized_end = math.align_down(
+        haystack_len - needle_len + 1, bool_mask_width
+    )
+    for i in range(0, vectorized_end, bool_mask_width):
+        var bool_mask = haystack.simd_load[bool_mask_width](i) == first_needle
+        var mask = Pointer.address_of(bool_mask).bitcast[
+            Scalar[_uint_type_of_width[bool_mask_width]()]
+        ]().load()
+        while mask:
+            var offset = i + math.bit.cttz(mask)
+            if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
+                return haystack + offset
+            mask = mask & (mask - 1)
+
+    for i in range(vectorized_end, haystack_len - needle_len + 1):
         if haystack[i] != needle[0]:
             continue
 
-        if memcmp(haystack + i, needle, needle_len) == 0:
+        if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
             return haystack + i
     return DTypePointer[type]()
 
 
-fn _memchr[
-    type: DType, range_fn: fn (Int, Int) -> _StridedRange
-](
-    source: DTypePointer[type],
-    char: Scalar[type],
-    len: Int,
-) -> DTypePointer[
+@always_inline
+fn _memrchr[
+    type: DType
+](source: DTypePointer[type], char: Scalar[type], len: Int) -> DTypePointer[
     type
 ]:
     if not len:
         return DTypePointer[type]()
-    for i in range_fn(len, 1):
+    for i in range(len - 1, -1, -1):
         if source[i] == char:
             return source + i
     return DTypePointer[type]()
-
-
-@always_inline
-fn _forward_range(haystack_len: Int, needle_len: Int) -> _StridedRange:
-    return range(0, haystack_len - needle_len + 1, 1)
-
-
-@always_inline
-fn _reverse_range(haystack_len: Int, needle_len: Int) -> _StridedRange:
-    return range(haystack_len - needle_len, -1, -1)
-
-
-@always_inline
-fn _memmem[
-    type: DType
-](
-    haystack: DTypePointer[type],
-    haystack_len: Int,
-    needle: DTypePointer[type],
-    needle_len: Int,
-) -> DTypePointer[type]:
-    return _memmem[type, _forward_range](
-        haystack, haystack_len, needle, needle_len
-    )
 
 
 @always_inline
@@ -418,6 +432,15 @@ fn _memrmem[
     needle: DTypePointer[type],
     needle_len: Int,
 ) -> DTypePointer[type]:
-    return _memmem[type, _reverse_range](
-        haystack, haystack_len, needle, needle_len
-    )
+    if not needle_len:
+        return haystack
+    if needle_len > haystack_len:
+        return DTypePointer[type]()
+    if needle_len == 1:
+        return _memrchr[type](haystack, needle[0], haystack_len)
+    for i in range(haystack_len - needle_len, -1, -1):
+        if haystack[i] != needle[0]:
+            continue
+        if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
+            return haystack + i
+    return DTypePointer[type]()

@@ -632,3 +632,21 @@ fn _integral_type_of[type: DType]() -> DType:
         return DType.int64
 
     return type.invalid
+
+
+# ===-------------------------------------------------------------------===#
+# _uint_type_of_width
+# ===-------------------------------------------------------------------===#
+
+
+fn _uint_type_of_width[width: Int]() -> DType:
+    @parameter
+    if width == 8:
+        return DType.uint8
+    elif width == 16:
+        return DType.uint16
+    elif width == 32:
+        return DType.uint32
+    else:
+        constrained[width == 64]()
+        return DType.uint64
