@@ -14,6 +14,7 @@ from memory.anypointer import AnyPointer
 
 from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
+from memory.memory import _malloc, _free
 
 
 @register_passable("trivial")
@@ -66,11 +67,9 @@ struct AnyPointer[T: Movable](
         Returns:
             The pointer to the newly allocated array.
         """
-        return Self {
-            value: __mlir_op.`pop.aligned_alloc`[_type = Self.pointer_type](
-                alignof[T]().value, (sizeof[T]() * count).value
-            )
-        }
+        return Self.__from_index(
+            int(_malloc[Int8](sizeof[T]() * count, alignment=alignof[T]()))
+        )
 
     @staticmethod
     @always_inline("nodebug")
@@ -90,7 +89,7 @@ struct AnyPointer[T: Movable](
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
-        __mlir_op.`pop.aligned_free`(self.value)
+        Pointer[Int8].__from_index(int(self)).free()
 
     @always_inline
     fn bitcast[new_type: Movable](self) -> AnyPointer[new_type]:

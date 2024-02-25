@@ -714,6 +714,13 @@ struct Pointer[
             _type = __mlir_type.`!pop.scalar<index>`
         ](self.address)
 
+    @staticmethod
+    @always_inline
+    fn __from_index(value: Int) -> Self:
+        return __mlir_op.`pop.index_to_pointer`[_type = Self.pointer_type](
+            Scalar[DType.index](value).value
+        )
+
     # ===------------------------------------------------------------------=== #
     # Allocate/Free
     # ===------------------------------------------------------------------=== #
@@ -1414,6 +1421,11 @@ struct DTypePointer[
           The address of the pointer as an Int.
         """
         return int(self.address)
+
+    @staticmethod
+    @always_inline
+    fn __from_index(value: Int) -> Self:
+        return Self.pointer_type.__from_index(value)
 
     @always_inline
     fn is_aligned[alignment: Int](self) -> Bool:
