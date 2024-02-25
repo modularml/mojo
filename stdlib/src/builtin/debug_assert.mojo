@@ -59,10 +59,6 @@ fn debug_assert[boolable: Boolable](cond: boolable, msg: StringLiteral):
 fn _debug_assert_impl[boolable: Boolable](cond: boolable, msg: StringLiteral):
     """Asserts that the condition is true."""
 
-    @parameter
-    if triple_is_nvidia_cuda():
-        return
-
     # Print an error and fail.
     alias err = is_kernels_debug_build() or is_defined[
         "MOJO_ENABLE_ASSERTIONS"
@@ -78,7 +74,17 @@ fn _debug_assert_impl[boolable: Boolable](cond: boolable, msg: StringLiteral):
 
         @parameter
         if err:
-            print("Assert Error:", msg)
-            trap()
+
+            @parameter
+            if triple_is_nvidia_cuda():
+                trap()
+                return
+
+            trap("Assert Error:" + str(msg))
         else:
+
+            @parameter
+            if triple_is_nvidia_cuda():
+                print("Assert Warning")
+                return
             print("Assert Warning:", msg)

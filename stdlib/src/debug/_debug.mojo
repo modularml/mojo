@@ -15,10 +15,6 @@ fn trap():
     trap instruction, this intrinsic will be lowered to a call of the abort()
     function."""
 
-    @parameter
-    if triple_is_nvidia_cuda():
-        return
-
     __mlir_op.`llvm.intr.trap`()
 
 
@@ -29,8 +25,6 @@ fn trap[T: Stringable](message: T):
     lowered to a call of the abort() function."""
 
     @parameter
-    if triple_is_nvidia_cuda():
-        return
-
-    print(message)
+    if not triple_is_nvidia_cuda():
+        print(message)
     __mlir_op.`llvm.intr.trap`()
