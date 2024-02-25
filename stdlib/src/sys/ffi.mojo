@@ -185,16 +185,25 @@ fn _get_dylib_function[
     destroy_fn: fn (Pointer[NoneType]) -> None,
     result_type: AnyRegType,
 ](payload: Pointer[NoneType] = Pointer[NoneType]()) -> result_type:
-    return _get_dylib_function[func_name, result_type](
-        _get_dylib[name, init_fn, destroy_fn](payload)
+    alias func_cache_name = name + "/" + func_name
+    var func_ptr = _get_global_or_null[func_cache_name]()
+    if func_ptr:
+        return (
+            Pointer(__get_lvalue_as_address(func_ptr))
+            .bitcast[result_type]()
+            .load()
+        )
+
+    var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
+    var new_func = dylib._get_function[func_name, result_type]()
+    external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
+        StringRef(func_cache_name),
+        Pointer(__get_lvalue_as_address(new_func))
+        .bitcast[Pointer[NoneType]]()
+        .load(),
     )
 
-
-@always_inline
-fn _get_dylib_function[
-    func_name: StringLiteral, result_type: AnyRegType
-](dylib: DLHandle) -> result_type:
-    return dylib._get_function[func_name, result_type]()
+    return new_func
 
 
 # ===----------------------------------------------------------------------===#
