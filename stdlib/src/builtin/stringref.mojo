@@ -10,7 +10,6 @@ These are Mojo built-ins, so you don't need to import them.
 
 import math
 from memory.unsafe import DTypePointer, Pointer
-from algorithm.reduction import _index_of_first_one
 from .dtype import _uint_type_of_width
 
 # ===----------------------------------------------------------------------===#
@@ -354,14 +353,18 @@ fn _memchr[
 ]:
     if not len:
         return DTypePointer[type]()
-    alias simd_width = simdwidthof[type]()
-    var first_needle = SIMD[type, simd_width](char)
-    var vectorized_end = math.align_down(len, simd_width)
-    for i in range(0, vectorized_end, simd_width):
-        var hay = source.simd_load[simd_width](i)
-        var mask = hay == first_needle
-        if not mask:
-            return source + i + _index_of_first_one(mask)
+    alias bool_mask_width = simdwidthof[DType.bool]()
+    var first_needle = SIMD[type, bool_mask_width](char)
+    var vectorized_end = math.align_down(len, bool_mask_width)
+
+    for i in range(0, vectorized_end, bool_mask_width):
+        var bool_mask = source.simd_load[bool_mask_width](i) == first_needle
+        var mask = Pointer.address_of(bool_mask).bitcast[
+            Scalar[_uint_type_of_width[bool_mask_width]()]
+        ]().load()
+        if mask:
+            return source + i + math.bit.cttz(mask)
+
     for i in range(vectorized_end, len):
         if source[i] == char:
             return source + i
