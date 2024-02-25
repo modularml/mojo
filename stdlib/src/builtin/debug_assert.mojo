@@ -9,6 +9,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
+from sys.info import triple_is_nvidia_cuda
 from sys._build import is_kernels_debug_build
 from sys.param_env import is_defined
 
@@ -57,6 +58,10 @@ fn debug_assert[boolable: Boolable](cond: boolable, msg: StringLiteral):
 @always_inline
 fn _debug_assert_impl[boolable: Boolable](cond: boolable, msg: StringLiteral):
     """Asserts that the condition is true."""
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        return
 
     # Print an error and fail.
     alias err = is_kernels_debug_build() or is_defined[

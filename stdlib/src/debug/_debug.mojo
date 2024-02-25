@@ -6,12 +6,19 @@
 """Implements the trap functions.
 """
 
+from sys.info import triple_is_nvidia_cuda
+
 
 @always_inline("nodebug")
 fn trap():
     """Calls a target dependent trap instruction. If the target does not have a
     trap instruction, this intrinsic will be lowered to a call of the abort()
     function."""
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        return
+
     __mlir_op.`llvm.intr.trap`()
 
 
@@ -20,5 +27,10 @@ fn trap[T: Stringable](message: T):
     """Prints a message before calling a target dependent trap instruction.
     If the target does not have a trap instruction, this intrinsic will be
     lowered to a call of the abort() function."""
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        return
+
     print(message)
     __mlir_op.`llvm.intr.trap`()
