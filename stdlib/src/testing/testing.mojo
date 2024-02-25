@@ -60,41 +60,43 @@ fn assert_false[T: Boolable](val: T, msg: String = "") raises:
 # TODO: Collapse these two overloads for generic T that has the
 # Equality Comparable trait.
 @always_inline
-fn assert_equal(lhs: Int, rhs: Int) raises:
+fn assert_equal(lhs: Int, rhs: Int, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
 
     Args:
         lhs: The lhs of the equality.
         rhs: The rhs of the equality.
+        msg: The message to be printed if the assertion fails.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(str(lhs), str(rhs))
+        raise _assert_equal_error(str(lhs), str(rhs), msg=msg)
 
 
 @always_inline
-fn assert_equal(lhs: String, rhs: String) raises:
+fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
 
     Args:
         lhs: The lhs of the equality.
         rhs: The rhs of the equality.
+        msg: The message to be printed if the assertion fails.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(lhs, rhs)
+        raise _assert_equal_error(lhs, rhs, msg=msg)
 
 
 @always_inline
 fn assert_equal[
     type: DType, size: Int
-](lhs: SIMD[type, size], rhs: SIMD[type, size]) raises:
+](lhs: SIMD[type, size], rhs: SIMD[type, size], msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an
     Error is raised.
 
@@ -105,52 +107,53 @@ fn assert_equal[
     Args:
         lhs: The lhs of the equality.
         rhs: The rhs of the equality.
+        msg: The message to be printed if the assertion fails.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(str(lhs), str(rhs))
+        raise _assert_equal_error(str(lhs), str(rhs), msg=msg)
 
 
 @always_inline
-fn assert_not_equal(lhs: Int, rhs: Int) raises:
+fn assert_not_equal(lhs: Int, rhs: Int, msg: String = "") raises:
     """Asserts that the input values are not equal. If it is not then an
     Error is raised.
 
     Args:
         lhs: The lhs of the inequality.
         rhs: The rhs of the inequality.
+        msg: The message to be printed if the assertion fails.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise Error(
-            "AssertionError: " + str(lhs) + " is not equal to " + str(rhs)
-        )
+        raise _assert_not_equal_error(str(lhs), str(rhs), msg=msg)
 
 
 @always_inline
-fn assert_not_equal(lhs: String, rhs: String) raises:
+fn assert_not_equal(lhs: String, rhs: String, msg: String = "") raises:
     """Asserts that the input values are not equal. If it is not then an
     an Error is raised.
 
     Args:
         lhs: The lhs of the inequality.
         rhs: The rhs of the inequality.
+        msg: The message to be printed if the assertion fails.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise Error("AssertionError: " + lhs + " is not equal to " + rhs)
+        raise _assert_not_equal_error(str(lhs), str(rhs), msg=msg)
 
 
 @always_inline
 fn assert_not_equal[
     type: DType, size: Int
-](lhs: SIMD[type, size], rhs: SIMD[type, size]) raises:
+](lhs: SIMD[type, size], rhs: SIMD[type, size], msg: String = "") raises:
     """Asserts that the input values are not equal. If it is not then an
     Error is raised.
 
@@ -161,14 +164,13 @@ fn assert_not_equal[
     Args:
         lhs: The lhs of the inequality.
         rhs: The rhs of the inequality.
+        msg: The message to be printed if the assertion fails.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise Error(
-            "AssertionError: " + str(lhs) + " is not equal to " + str(rhs)
-        )
+        raise _assert_not_equal_error(str(lhs), str(rhs), msg=msg)
 
 
 @always_inline
@@ -210,13 +212,22 @@ fn assert_almost_equal[
         raise err
 
 
-fn _assert_equal_error(lhs: String, rhs: String) raises -> Error:
-    raise Error(
-        "AssertionError: `left == right` comparison failed:\n   left: "
-        + lhs
-        + "\n  right: "
-        + rhs
-    )
+fn _assert_equal_error(
+    lhs: String, rhs: String, msg: String = ""
+) raises -> Error:
+    var err = "AssertionError: `left == right` comparison failed:\n   left: " + lhs + "\n  right: " + rhs
+    if msg:
+        err += "\n  reason: " + msg
+    raise err
+
+
+fn _assert_not_equal_error(
+    lhs: String, rhs: String, msg: String = ""
+) raises -> Error:
+    var err = "AssertionError: `left != right` comparison failed:\n   left: " + lhs + "\n  right: " + rhs
+    if msg:
+        err += "\n  reason: " + msg
+    raise err
 
 
 struct assert_raises:
