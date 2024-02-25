@@ -204,6 +204,35 @@ fn bitcast[
     return bitcast[new_type, 1, src_type, 1](val)
 
 
+@always_inline("nodebug")
+fn bitcast[
+    new_type: DType, src_width: Int
+](val: SIMD[DType.bool, src_width]) -> Scalar[new_type]:
+    """Packs a SIMD bool into an integer.
+
+    Constraints:
+        The bitwidth of the two types must be the same.
+
+    Parameters:
+        new_type: The target type.
+        src_width: The source width.
+
+    Args:
+        val: The source value.
+
+    Returns:
+        A new integer scalar which has the same bitwidth as the bool vector.
+    """
+    constrained[
+        src_width == bitwidthof[Scalar[new_type]](),
+        "the source and destination types must have the same bitwidth",
+    ]()
+
+    return __mlir_op.`pop.bitcast`[
+        _type = __mlir_type[`!pop.scalar<`, new_type.value, `>`]
+    ](val.value)
+
+
 # ===----------------------------------------------------------------------===#
 # AddressSpace
 # ===----------------------------------------------------------------------===#
