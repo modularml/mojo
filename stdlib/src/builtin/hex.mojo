@@ -101,51 +101,44 @@ fn _write_int[
     # Process the integer value into its corresponding digits
     #
 
-    # NOTE:
-    #   Use Int64 instead of Int here so that the % and / operators use C-like
-    #   behavior of returning remainder and doing truncating division.
-    var value: Int64 = Int64(int(value0))
+    var value = Int64(int(value0))
 
     # TODO(#26444, Unicode support): Get an array of Character, not bytes.
-    var digit_chars_array: DynamicVector[Int8] = digit_chars.as_bytes()
+    var digit_chars_array = digit_chars._as_ptr()
 
-    # Prefix a '-' if the original int was negative.
+    # Prefix a '-' if the original int was negative and make positive.
     if value < 0:
-        alias minus: Int8 = ord("-")
-        fmt.push_back(minus)
+        fmt.push_back(ord("-"))
 
     # Add the custom number prefix, e.g. "0x" commonly used for hex numbers.
     # This comes *after* the minus sign, if present.
     fmt.extend(prefix.as_bytes())
 
     if value == 0:
-        fmt.push_back(digit_chars_array[0])
+        fmt.append(digit_chars_array[0])
         return
 
     var first_digit_pos = len(fmt)
 
-    var remaining_int: Int64 = value
+    var remaining_int = value
     if remaining_int >= 0:
-        while remaining_int != 0:
-            var digit_value = int(remaining_int % radix)
+        while remaining_int:
+            var digit_value = remaining_int % radix
 
             # Push the char representing the value of the least significant digit
-            var digit_char: Int8 = digit_chars_array[digit_value]
-            fmt.push_back(digit_char)
+            fmt.append(digit_chars_array[digit_value])
 
             # Drop the least significant digit
-            remaining_int = remaining_int / radix
+            remaining_int /= radix
     else:
-        while remaining_int != 0:
-            # `%` works differently for negative numbers in Mojo than in C
-            var digit_value = int(_abs(remaining_int % -radix))
+        while remaining_int:
+            var digit_value = _abs(remaining_int % -radix)
 
             # Push the char representing the value of the least significant digit
-            var digit_char: Int8 = digit_chars_array[digit_value]
-            fmt.push_back(digit_char)
+            fmt.append(digit_chars_array[digit_value])
 
             # Drop the least significant digit
-            remaining_int = remaining_int / radix
+            remaining_int /= radix
 
     # We pushed the digits with least significant digits coming first, but
     # the number should have least significant digits at the end, so reverse
