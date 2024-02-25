@@ -177,8 +177,11 @@ fn assert_almost_equal[
 ](
     lhs: SIMD[type, size],
     rhs: SIMD[type, size],
-    absolute_tolerance: SIMD[type, 1] = 1e-08,
-    relative_tolerance: SIMD[type, 1] = 1e-05,
+    /,
+    *,
+    msg: String = "",
+    atol: Scalar[type] = 1e-08,
+    rtol: Scalar[type] = 1e-05,
 ) raises:
     """Asserts that the input values are equal up to a tolerance. If it is
     not then an Error is raised.
@@ -190,24 +193,21 @@ fn assert_almost_equal[
     Args:
         lhs: The lhs of the equality.
         rhs: The rhs of the equality.
-        absolute_tolerance: The absolute tolerance.
-        relative_tolerance: The relative tolerance.
+        msg: The message to print.
+        atol: The absolute tolerance.
+        rtol: The relative tolerance.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    var almost_equal = isclose(
-        lhs, rhs, absolute_tolerance, relative_tolerance
-    ).reduce_and()
+    var almost_equal = isclose(lhs, rhs, atol=atol, rtol=rtol).reduce_and()
     if not almost_equal:
-        raise Error(
-            "AssertionError: "
-            + str(lhs)
-            + " is not close to "
-            + str(rhs)
-            + " with a diff of "
-            + abs(lhs - rhs)
-        )
+        var err = "AssertionError: " + str(lhs) + " is not close to " + str(
+            rhs
+        ) + " with a diff of " + abs(lhs - rhs)
+        if msg:
+            err += "(" + msg + ")"
+        raise err
 
 
 fn _assert_equal_error(lhs: String, rhs: String) raises -> Error:
