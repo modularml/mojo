@@ -5,3 +5,4 @@
 # ===----------------------------------------------------------------------=== #
 
 from .test_utils import *
+from .types import MoveCounter, MoveOnly

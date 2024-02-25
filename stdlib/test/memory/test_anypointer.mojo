@@ -3,11 +3,11 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s --dump-input=always
+# RUN: %mojo -debug-level full -I %kernels_test_root %s | FileCheck %s --dump-input=always
 
 from memory.anypointer import AnyPointer
 from testing import *
-from testing.testing import _MoveCounter
+from test_utils import MoveCounter
 
 
 struct MoveOnlyType(Movable):
@@ -41,9 +41,9 @@ fn test_anypointer_of_move_only_type():
 
 
 def test_anypointer_move_into_move_count():
-    var ptr = AnyPointer[_MoveCounter[Int]].alloc(1)
+    var ptr = AnyPointer[MoveCounter[Int]].alloc(1)
 
-    var value = _MoveCounter(5)
+    var value = MoveCounter(5)
     assert_equal(0, value.move_count)
     ptr.emplace_value(value ^)
 
@@ -53,7 +53,7 @@ def test_anypointer_move_into_move_count():
 
     assert_equal(1, __get_address_as_lvalue(ptr.value).move_count)
 
-    var ptr_2 = AnyPointer[_MoveCounter[Int]].alloc(1)
+    var ptr_2 = AnyPointer[MoveCounter[Int]].alloc(1)
 
     ptr.move_into(ptr_2)
 

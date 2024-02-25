@@ -31,3 +31,27 @@ struct MoveOnly[T: Movable](Movable):
         """
         self.data = other.data ^
         other.data = 0
+
+
+struct MoveCounter[T: CollectionElement](CollectionElement):
+    """Counts the number of moves performed on a value."""
+
+    var value: T
+    var move_count: Int
+
+    fn __init__(inout self, owned value: T):
+        """Construct a new instance of this type. This initial move is not counted.
+        """
+        self.value = value ^
+        self.move_count = 0
+
+    fn __moveinit__(inout self, owned existing: Self):
+        self.value = existing.value ^
+        self.move_count = existing.move_count + 1
+
+    # TODO: This type should not be Copyable, but has to be to satisfy
+    #       CollectionElement at the moment.
+    fn __copyinit__(inout self, existing: Self):
+        # print("ERROR: _MoveCounter copy constructor called unexpectedly!")
+        self.value = existing.value
+        self.move_count = existing.move_count

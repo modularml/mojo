@@ -3,12 +3,12 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo -debug-level full -I %kernels_test_root %s
 
 from collections.vector import DynamicVector, InlinedFixedVector
 
 from testing import *
-from testing.testing import _MoveCounter
+from test_utils import MoveCounter
 
 
 def test_inlined_fixed_vector():
@@ -261,12 +261,12 @@ def test_vector_reverse():
 
 def test_vector_reverse_move_count():
     # Create this vec with enough capacity to avoid moves due to resizing.
-    var vec = DynamicVector[_MoveCounter[Int]](capacity=5)
-    vec.push_back(_MoveCounter(1))
-    vec.push_back(_MoveCounter(2))
-    vec.push_back(_MoveCounter(3))
-    vec.push_back(_MoveCounter(4))
-    vec.push_back(_MoveCounter(5))
+    var vec = DynamicVector[MoveCounter[Int]](capacity=5)
+    vec.push_back(MoveCounter(1))
+    vec.push_back(MoveCounter(2))
+    vec.push_back(MoveCounter(3))
+    vec.push_back(MoveCounter(4))
+    vec.push_back(MoveCounter(5))
 
     assert_equal(len(vec), 5)
     assert_equal(__get_address_as_lvalue((vec.data + 0).value).value, 1)
@@ -354,14 +354,14 @@ def test_vector_extend_non_trivial():
 
     # Preallocate with enough capacity to avoid reallocation making the
     # move count checks below flaky.
-    var v1 = DynamicVector[_MoveCounter[String]](capacity=5)
-    v1.push_back(_MoveCounter[String]("Hello"))
-    v1.push_back(_MoveCounter[String]("World"))
+    var v1 = DynamicVector[MoveCounter[String]](capacity=5)
+    v1.push_back(MoveCounter[String]("Hello"))
+    v1.push_back(MoveCounter[String]("World"))
 
-    var v2 = DynamicVector[_MoveCounter[String]](capacity=3)
-    v2.push_back(_MoveCounter[String]("Foo"))
-    v2.push_back(_MoveCounter[String]("Bar"))
-    v2.push_back(_MoveCounter[String]("Baz"))
+    var v2 = DynamicVector[MoveCounter[String]](capacity=3)
+    v2.push_back(MoveCounter[String]("Foo"))
+    v2.push_back(MoveCounter[String]("Bar"))
+    v2.push_back(MoveCounter[String]("Baz"))
 
     v1.extend(v2)
 
