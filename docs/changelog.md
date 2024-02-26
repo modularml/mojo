@@ -49,6 +49,14 @@ modular install mojo
 
 ## UNRELEASED
 
+### 🔥 Legendary
+
+Mojo is now bundled with [the MAX platform](/max)!
+
+As such, the Mojo package version now matches the MAX version, which follows
+a `YY.MINOR.MICRO` version scheme. Because this is our first release in 2024,
+that makes this version `24.1`.
+
 ### ⭐️ New
 
 - The `os` package now contains the [`stat()`](/mojo/stdlib/os/fstat#stat)
