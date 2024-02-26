@@ -180,6 +180,11 @@ modular install mojo
   out for: a given struct should use one style or the other, mixing some of
   each won't work well.
 
+- The `ref` and `mutref` identifiers are no longer reserved as Mojo keywords.
+  We originally thought about using those as language sugar for references, but
+  we believe that generic language features combined with the `Reference` type
+  will provide a good experience without dedicated sugar.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
