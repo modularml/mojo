@@ -175,6 +175,11 @@ modular install mojo
   impact of using this new form: the compiler arranges to automatically return
   the value in a register without requiring you to worry about it.
 
+  The older `-> Self:` syntax is still supported in this release, but will be
+  removed in a subsequent one, so please migrate your code.  One thing to watch
+  out for: a given struct should use one style or the other, mixing some of
+  each won't work well.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
