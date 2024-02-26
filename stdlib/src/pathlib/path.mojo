@@ -241,7 +241,6 @@ struct Path(Stringable, CollectionElement, PathLike):
         Args:
           value: The value to write.
         """
-        """"""
         with open(self, "w") as f:
             f.write(str(value))
 
