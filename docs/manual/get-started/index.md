@@ -22,13 +22,10 @@ our web-based [Mojo Playground](#develop-in-the-mojo-playground).
 
 ## Get the Mojo SDK
 
-:::note Deprecation Notice
+:::note Get Mojo in MAX!
 
-The Mojo SDK is now included in the [MAX Developer
-Edition](/engine/get-started/). To provide a complete toolkit with simple
-dependencies, **the standalone Mojo SDK is now deprecated**. For now, you
-can still download Mojo as a standalone package, but you will soon need to
-instead install the `max` package to get the Mojo SDK.
+To provide a unified toolkit for AI developers, the Mojo SDK is now included in
+the [MAX platform](/max).
 
 :::
 
