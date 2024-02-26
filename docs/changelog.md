@@ -136,7 +136,7 @@ modular install mojo
 
 - The `find`, `rfind`, `count`, and `__contains__` now work on string literals.
   This means that one can write `"Mojo" in "Hello Mojo"`.
-  
+
 - Breakpoints can now be inserted programmatically within the code via the
   use of `sys.breakpointhook` or the builtin `breakpoint` function.
 
@@ -198,6 +198,8 @@ your code to using var explicitly.
   when constructing strings at compile time.
 - [#1696](https://github.com/modularml/mojo/issues/1696) - Fixed an issue that
   caused syntax highlighting to occasionally fail.
+- [#1549](https://github.com/modularml/mojo/issues/1549) - Fixed an issue when
+  the shift amount is out of range in `SIMD.shift_left` and `SIMD.shift_right`.
 
 ## 24.1 beta
 

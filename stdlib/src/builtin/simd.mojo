@@ -1902,6 +1902,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             wrap-around, fill with zero).
         """
 
+        constrained[
+            0 <= shift <= size,
+            (
+                "shift must be greater than or equal to 0 and less than equal"
+                " to the size"
+            ),
+        ]()
+
         @parameter
         if shift == 0:
             return self
@@ -1933,6 +1941,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         # Note the order of the llvm_intrinsic arguments below differ from
         # shift_left(), so we cannot directly reuse it here.
+
+        constrained[
+            0 <= shift <= size,
+            (
+                "shift must be greater than or equal to 0 and less than equal"
+                " to the size"
+            ),
+        ]()
 
         @parameter
         if shift == 0:
