@@ -385,26 +385,26 @@ fn test_islower() raises:
     assert_false(islower(ord("0")))
 
 
-fn test_tolower() raises:
-    assert_equal(String("HELLO").tolower(), "hello")
-    assert_equal(String("hello").tolower(), "hello")
-    assert_equal(String("FoOBaR").tolower(), "foobar")
+fn test_lower() raises:
+    assert_equal(String("HELLO").lower(), "hello")
+    assert_equal(String("hello").lower(), "hello")
+    assert_equal(String("FoOBaR").lower(), "foobar")
 
-    assert_equal(String("MOJO🔥").tolower(), "mojo🔥")
-
-    # TODO(#26444): Non-ASCII not supported yet
-    assert_equal(String("É").tolower(), "É")
-
-
-fn test_toupper() raises:
-    assert_equal(String("hello").toupper(), "HELLO")
-    assert_equal(String("HELLO").toupper(), "HELLO")
-    assert_equal(String("FoOBaR").toupper(), "FOOBAR")
-
-    assert_equal(String("mojo🔥").toupper(), "MOJO🔥")
+    assert_equal(String("MOJO🔥").lower(), "mojo🔥")
 
     # TODO(#26444): Non-ASCII not supported yet
-    assert_equal(String("É").toupper(), "É")
+    assert_equal(String("É").lower(), "É")
+
+
+fn test_upper() raises:
+    assert_equal(String("hello").upper(), "HELLO")
+    assert_equal(String("HELLO").upper(), "HELLO")
+    assert_equal(String("FoOBaR").upper(), "FOOBAR")
+
+    assert_equal(String("mojo🔥").upper(), "MOJO🔥")
+
+    # TODO(#26444): Non-ASCII not supported yet
+    assert_equal(String("É").upper(), "É")
 
 
 fn test_isspace() raises:
@@ -544,8 +544,8 @@ fn main() raises:
     test_split()
     test_isupper()
     test_islower()
-    test_tolower()
-    test_toupper()
+    test_lower()
+    test_upper()
     test_isspace()
     test_rstrip()
     test_lstrip()

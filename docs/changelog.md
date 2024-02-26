@@ -154,6 +154,9 @@ modular install mojo
     x = 9
   ```
 
+- The [`String`](/mojo/stdlib/builtin/string.html#string) methods `tolower`
+  and `toupper` have been renamed to `str.lower` and `str.upper`.
+
 - Initializers for `@register_passable` values may (and should!) now be
   specified with `inout self` just like memory types:
 

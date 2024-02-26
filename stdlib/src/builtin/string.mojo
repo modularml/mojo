@@ -858,8 +858,9 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         res.push_back(0)
         return String(res ^)
 
-    fn tolower(self) -> String:
-        """Returns a copy of the string with all ASCII cased characters converted to lowercase.
+    fn lower(self) -> String:
+        """Returns a copy of the string with all ASCII cased characters
+        converted to lowercase.
 
         Returns:
             A new string where cased letters have been convered to lowercase.
@@ -870,8 +871,9 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         # outside of the standard ASCII letters.
         return self._toggle_ascii_case[_is_ascii_uppercase]()
 
-    fn toupper(self) -> String:
-        """Returns a copy of the string with all ASCII cased characters converted to uppercase.
+    fn upper(self) -> String:
+        """Returns a copy of the string with all ASCII cased characters
+        converted to uppercase.
 
         Returns:
             A new string where cased letters have been converted to uppercase.
