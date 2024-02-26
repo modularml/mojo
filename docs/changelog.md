@@ -142,17 +142,38 @@ modular install mojo
 
 ### 🦋 Changed
 
-As another step towards [removing let
-declarations](https://github.com/modularml/mojo/blob/main/proposals/remove-let-decls.md)
-we have removed support for let declarations inside the compiler.  To ease
-migration, we parse let declarations as a var declaration, but please switch
-your code to using var explicitly.
+- As another step towards [removing let
+  declarations](https://github.com/modularml/mojo/blob/main/proposals/remove-let-decls.md)
+  we have removed support for let declarations inside the compiler.  To ease
+  migration, we parse let declarations as a var declaration, but please switch
+  your code to using var explicitly.
 
   ```mojo
   fn test():
     let x = 42 # treated as a var, but please update your code!
     x = 9
   ```
+
+- Initializers for `@register_passable` values may (and should!) now be
+  specified with `inout self` just like memory types:
+
+  ```mojo
+  @register_passable
+  struct YourPair:
+    var a: Int
+    var b: Int
+    fn __init__(inout self):
+        self.a = 42
+        self.b = 17
+    fn __copyinit__(inout self, existing: Self):
+        self.a = existing.a
+        self.b = existing.b
+  ```
+
+  This form makes the language more consistent, more similar to Python, and
+  easier to implement advanced features for.  There is also no performance
+  impact of using this new form: the compiler arranges to automatically return
+  the value in a register without requiring you to worry about it.
 
 ### ❌ Removed
 
