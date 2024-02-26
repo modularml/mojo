@@ -191,7 +191,7 @@ struct AnyPointer[T: Movable](
         }
 
     fn __str__(self) -> String:
-        return hex(int(self))
+        return hex(self)
 
     @always_inline
     fn __bool__(self) -> Bool:

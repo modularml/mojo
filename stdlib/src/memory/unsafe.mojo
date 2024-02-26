@@ -549,10 +549,10 @@ struct Pointer[
         """Format this pointer as a hexadecimal string.
 
         Returns:
-            A String containing the hexadecimal representation of the memory location
-            destination of this pointer.
+            A String containing the hexadecimal representation of the memory
+            location destination of this pointer.
         """
-        return hex(int(self))
+        return hex(self)
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
