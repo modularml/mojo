@@ -188,7 +188,7 @@ struct InlinedFixedVector[
             The element at the given index.
         """
         debug_assert(
-            -self.current_size < i < self.current_size,
+            -self.current_size <= i < self.current_size,
             "index must be within bounds",
         )
         var normalized_idx = i

@@ -33,6 +33,7 @@ def test_inlined_fixed_vector():
     assert_equal(3, vector[3])
     assert_equal(4, vector[4])
 
+    assert_equal(0, vector[-5])
     assert_equal(3, vector[-2])
     assert_equal(4, vector[-1])
 
