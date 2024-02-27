@@ -123,7 +123,7 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         var cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.toPython(integer)
 
-    fn __init__(inout self, float: FloatLiteral):
+    fn __init__(inout self, float: FloatLiteralOld):
         """Initialize the object with an floating-point value.
 
         Args:
@@ -216,8 +216,8 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
             @parameter
             if _mlirtype_is_eq[T, Int]():
                 obj = value.get[i, Int]()
-            elif _mlirtype_is_eq[T, FloatLiteral]():
-                obj = value.get[i, FloatLiteral]()
+            elif _mlirtype_is_eq[T, FloatLiteralOld]():
+                obj = value.get[i, FloatLiteralOld]()
             elif _mlirtype_is_eq[T, Bool]():
                 obj = value.get[i, Bool]()
             elif _mlirtype_is_eq[T, StringRef]():
@@ -259,8 +259,8 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
             @parameter
             if _mlirtype_is_eq[T, Int]():
                 obj = value.get[i, Int]()
-            elif _mlirtype_is_eq[T, FloatLiteral]():
-                obj = value.get[i, FloatLiteral]()
+            elif _mlirtype_is_eq[T, FloatLiteralOld]():
+                obj = value.get[i, FloatLiteralOld]()
             elif _mlirtype_is_eq[T, Bool]():
                 obj = value.get[i, Bool]()
             elif _mlirtype_is_eq[T, StringRef]():

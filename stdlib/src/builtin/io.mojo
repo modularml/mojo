@@ -437,7 +437,7 @@ fn print(x: Bool):
 
 
 @no_inline
-fn print(x: FloatLiteral):
+fn print(x: FloatLiteralOld):
     """Prints a float literal.
 
     Args:

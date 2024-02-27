@@ -273,7 +273,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     # Initializes from FP literal.
     @always_inline("nodebug")
-    fn __init__(value: FloatLiteral) -> Self:
+    fn __init__(value: FloatLiteralOld) -> Self:
         """Initializes the SIMD vector with a FP64 value.
 
         The input value is splatted (broadcast) across all the elements of the

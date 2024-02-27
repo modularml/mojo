@@ -3,19 +3,19 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-"""Implements the FloatLiteral class.
+"""Implements the FloatLiteralOld class.
 
 These are Mojo built-ins, so you don't need to import them.
 """
 
 # ===----------------------------------------------------------------------===#
-# FloatLiteral
+# FloatLiteralOld
 # ===----------------------------------------------------------------------===#
 
 
 @value
 @register_passable("trivial")
-struct FloatLiteral(Intable, Stringable, Boolable):
+struct FloatLiteralOld(Intable, Stringable, Boolable):
     """Mojo floating point literal type."""
 
     alias fp_type = __mlir_type.`!pop.scalar<f64>`
@@ -27,7 +27,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(value: FloatLiteral) -> Self:
+    fn __init__(value: FloatLiteralOld) -> Self:
         """Forwarding constructor.
 
         Args:
@@ -127,7 +127,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return self != 0.0
 
     @always_inline("nodebug")
-    fn __neg__(self) -> FloatLiteral:
+    fn __neg__(self) -> Self:
         """Return the negation of the double value.
 
         Returns:
@@ -140,7 +140,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __add__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __add__(self, rhs: Self) -> Self:
         """Add two doubles.
 
         Args:
@@ -152,7 +152,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return __mlir_op.`pop.add`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __sub__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __sub__(self, rhs: Self) -> Self:
         """Subtract two doubles.
 
         Args:
@@ -164,7 +164,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return __mlir_op.`pop.sub`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __mul__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __mul__(self, rhs: Self) -> Self:
         """Multiply two doubles.
 
         Args:
@@ -176,7 +176,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return __mlir_op.`pop.mul`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __truediv__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __truediv__(self, rhs: Self) -> Self:
         """Divide two doubles.
 
         Args:
@@ -188,7 +188,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return __mlir_op.`pop.div`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __floordiv__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __floordiv__(self, rhs: Self) -> Self:
         """Divide two doubles and round towards negative infinity.
 
         Args:
@@ -202,7 +202,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         ]((self / rhs).value)
 
     @always_inline("nodebug")
-    fn __mod__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __mod__(self, rhs: Self) -> Self:
         """Compute the remainder of dividing by a value.
 
         Args:
@@ -211,13 +211,13 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         Returns:
             The remainder of the division operation.
         """
-        var remainder: FloatLiteral = __mlir_op.`pop.rem`(self.value, rhs.value)
+        var remainder: Self = __mlir_op.`pop.rem`(self.value, rhs.value)
         if (self < 0.0) ^ (rhs < 0.0):
             remainder += rhs
         return remainder
 
     @always_inline("nodebug")
-    fn __pow__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __pow__(self, rhs: Self) -> Self:
         """Compute the power.
 
         Args:
@@ -241,7 +241,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: FloatLiteral):
+    fn __iadd__(inout self, rhs: Self):
         """In-place addition operator.
 
         Args:
@@ -250,7 +250,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: FloatLiteral):
+    fn __isub__(inout self, rhs: Self):
         """In-place subtraction operator.
 
         Args:
@@ -259,7 +259,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: FloatLiteral):
+    fn __imul__(inout self, rhs: Self):
         """In-place multiplication operator.
 
         Args:
@@ -268,7 +268,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         self = self * rhs
 
     @always_inline("nodebug")
-    fn __itruediv__(inout self, rhs: FloatLiteral):
+    fn __itruediv__(inout self, rhs: Self):
         """In-place division.
 
         Args:
@@ -277,7 +277,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         self = self / rhs
 
     @always_inline("nodebug")
-    fn __ifloordiv__(inout self, rhs: FloatLiteral):
+    fn __ifloordiv__(inout self, rhs: Self):
         """In-place floor division.
 
         Args:
@@ -286,7 +286,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         self = self // rhs
 
     @always_inline("nodebug")
-    fn __imod__(inout self, rhs: FloatLiteral):
+    fn __imod__(inout self, rhs: Self):
         """In-place remainder.
 
         Args:
@@ -295,7 +295,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         self = self % rhs
 
     @always_inline("nodebug")
-    fn __ipow__(inout self, rhs: FloatLiteral):
+    fn __ipow__(inout self, rhs: Self):
         """In-place power.
 
         Args:
@@ -308,7 +308,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __radd__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __radd__(self, rhs: Self) -> Self:
         """Reversed addition operator.
 
         Args:
@@ -320,7 +320,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return rhs + self
 
     @always_inline("nodebug")
-    fn __rsub__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __rsub__(self, rhs: Self) -> Self:
         """Reversed subtraction operator.
 
         Args:
@@ -332,7 +332,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return rhs - self
 
     @always_inline("nodebug")
-    fn __rmul__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __rmul__(self, rhs: Self) -> Self:
         """Reversed multiplication operator.
 
         Args:
@@ -344,7 +344,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return rhs * self
 
     @always_inline("nodebug")
-    fn __rtruediv__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __rtruediv__(self, rhs: Self) -> Self:
         """Reversed division.
 
         Args:
@@ -356,7 +356,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return rhs / self
 
     @always_inline("nodebug")
-    fn __rfloordiv__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __rfloordiv__(self, rhs: Self) -> Self:
         """Reversed floor division.
 
         Args:
@@ -369,7 +369,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return rhs // self
 
     @always_inline("nodebug")
-    fn __rmod__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __rmod__(self, rhs: Self) -> Self:
         """Reversed remainder.
 
         Args:
@@ -381,7 +381,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         return rhs % self
 
     @always_inline("nodebug")
-    fn __rpow__(self, rhs: FloatLiteral) -> FloatLiteral:
+    fn __rpow__(self, rhs: Self) -> Self:
         """Reversed power.
 
         Args:
@@ -397,7 +397,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __eq__(self, rhs: FloatLiteral) -> Bool:
+    fn __eq__(self, rhs: Self) -> Bool:
         """Compare for equality.
 
         Args:
@@ -411,7 +411,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         )
 
     @always_inline("nodebug")
-    fn __ne__(self, rhs: FloatLiteral) -> Bool:
+    fn __ne__(self, rhs: Self) -> Bool:
         """Compare for inequality.
 
         Args:
@@ -425,7 +425,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         )
 
     @always_inline("nodebug")
-    fn __lt__(self, rhs: FloatLiteral) -> Bool:
+    fn __lt__(self, rhs: Self) -> Bool:
         """Less than comparison.
 
         Args:
@@ -439,7 +439,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         )
 
     @always_inline("nodebug")
-    fn __le__(self, rhs: FloatLiteral) -> Bool:
+    fn __le__(self, rhs: Self) -> Bool:
         """Less than or equal to comparison.
 
         Args:
@@ -453,7 +453,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         )
 
     @always_inline("nodebug")
-    fn __gt__(self, rhs: FloatLiteral) -> Bool:
+    fn __gt__(self, rhs: Self) -> Bool:
         """Greater than comparison.
 
         Args:
@@ -467,7 +467,7 @@ struct FloatLiteral(Intable, Stringable, Boolable):
         )
 
     @always_inline("nodebug")
-    fn __ge__(self, rhs: FloatLiteral) -> Bool:
+    fn __ge__(self, rhs: Self) -> Bool:
         """Greater than or equal to comparison.
 
         Args:
