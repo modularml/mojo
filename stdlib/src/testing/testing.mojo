@@ -212,7 +212,7 @@ fn assert_almost_equal[
             rhs
         ) + " with a diff of " + abs(lhs - rhs)
         if msg:
-            err += "(" + msg + ")"
+            err += " (" + msg + ")"
         raise err
 
 
