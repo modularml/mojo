@@ -376,6 +376,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         Args:
             buff: The buffer.
         """
+
         # If a terminator does not already exist, then add it.
         if buff[-1]:
             buff.append(0)
