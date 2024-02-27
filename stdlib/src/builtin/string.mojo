@@ -80,7 +80,7 @@ fn chr(c: Int) -> String:
 
 
 # TODO: this is hard coded for decimal base
-fn atol(str: String) raises -> Int:
+fn _atol(str: StringRef) raises -> Int:
     """Parses the given string as a base-10 integer and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
@@ -96,24 +96,23 @@ fn atol(str: String) raises -> Int:
     if not str:
         raise Error("Empty String cannot be converted to integer.")
     var result = 0
-    var is_negative: Bool
-    var start: Int
+    var is_negative: Bool = False
+    var start: Int = 0
     if str[0] == "-":
         is_negative = True
         start = 1
-    else:
-        is_negative = False
-        start = 0
 
     alias ord_0 = ord("0")
     alias ord_9 = ord("9")
-    for pos in range(start, len(str)):
-        var digit = int(str._buffer[pos])
+    var buff = str._as_ptr()
+    var str_len = len(str)
+    for pos in range(start, str_len):
+        var digit = int(buff[pos])
         if ord_0 <= digit <= ord_9:
             result += digit - ord_0
         else:
             raise Error("String is not convertible to integer.")
-        if pos + 1 < len(str):
+        if pos + 1 < str_len:
             var nextresult = result * 10
             if nextresult < result:
                 raise Error(
@@ -123,6 +122,22 @@ fn atol(str: String) raises -> Int:
     if is_negative:
         result = -result
     return result
+
+
+fn atol(str: String) raises -> Int:
+    """Parses the given string as a base-10 integer and returns that value.
+
+    For example, `atol("19")` returns `19`. If the given string cannot be parsed
+    as an integer value, an error is raised. For example, `atol("hi")` raises an
+    error.
+
+    Args:
+        str: A string to be parsed as a base-10 integer.
+
+    Returns:
+        An integer value that represents the string, or otherwise raises.
+    """
+    return _atol(str._strref_dangerous())
 
 
 # ===----------------------------------------------------------------------===#
@@ -222,7 +237,7 @@ fn isspace(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 # String
 # ===----------------------------------------------------------------------===#
-struct String(Sized, Stringable, KeyElement, Boolable):
+struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
     """Represents a mutable string."""
 
     alias _buffer_type = DynamicVector[Int8]
@@ -944,6 +959,18 @@ struct String(Sized, Stringable, KeyElement, Boolable):
 
     fn _endswith_impl(self, suffix: String, start: Int = 0) -> Bool:
         return self.rfind(suffix, start) + len(suffix) == len(self)
+
+    fn __int__(self) raises -> Int:
+        """Parses the given string as a base-10 integer and returns that value.
+
+        For example, `int("19")` returns `19`. If the given string cannot be parsed
+        as an integer value, an error is raised. For example, `int("hi")` raises an
+        error.
+
+        Returns:
+            An integer value that represents the string, or otherwise raises.
+        """
+        return atol(self)
 
 
 # ===----------------------------------------------------------------------===#

@@ -10,6 +10,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from debug.visualizers import lldb_formatter_wrapping_type
 from memory.unsafe import DTypePointer
+from .string import _atol
 
 # ===----------------------------------------------------------------------===#
 # StringLiteral
@@ -18,7 +19,9 @@ from memory.unsafe import DTypePointer
 
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
-struct StringLiteral(Sized, Stringable, CollectionElement, Hashable, Boolable):
+struct StringLiteral(
+    Sized, IntableRaising, Stringable, CollectionElement, Hashable, Boolable
+):
     """This type represents a string literal.
 
     String literals are all null-terminated for compatibility with C APIs, but
@@ -164,6 +167,18 @@ struct StringLiteral(Sized, Stringable, CollectionElement, Hashable, Boolable):
           The offset of `substr` relative to the beginning of the string.
         """
         return StringRef(self).rfind(substr, start=start)
+
+    fn __int__(self) raises -> Int:
+        """Parses the given string as a base-10 integer and returns that value.
+
+        For example, `int("19")` returns `19`. If the given string cannot be parsed
+        as an integer value, an error is raised. For example, `int("hi")` raises an
+        error.
+
+        Returns:
+            An integer value that represents the string, or otherwise raises.
+        """
+        return _atol(self)
 
 
 # Use a local memcmp rather than memory.memcpy to avoid #31139 and #25100.

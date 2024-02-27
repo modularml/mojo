@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from testing import assert_equal, assert_false, assert_not_equal, assert_true
+from testing import *
 
 
 def test_basics():
@@ -74,9 +74,17 @@ def test_hash():
     assert_equal(hash("b"), hash("b"))
 
 
+def test_intable():
+    assert_equal(int("123"), 123)
+
+    with assert_raises():
+        int("hi")
+
+
 def main():
     test_basics()
     test_contains()
     test_find()
     test_rfind()
     test_hash()
+    test_intable()

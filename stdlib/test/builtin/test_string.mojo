@@ -522,7 +522,14 @@ fn test_endswith() raises:
     assert_false(str.endswith("llo", 2, 3))
 
 
-fn main() raises:
+def test_intable():
+    assert_equal(int(String("123")), 123)
+
+    with assert_raises():
+        int(String("hi"))
+
+
+def main():
     test_constructors()
     test_equality_operators()
     test_add()
@@ -553,3 +560,4 @@ fn main() raises:
     test_hash()
     test_startswith()
     test_endswith()
+    test_intable()

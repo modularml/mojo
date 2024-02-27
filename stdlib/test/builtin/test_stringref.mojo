@@ -25,5 +25,13 @@ def test_strref_from_start():
     assert_equal(str._from_start(-10), "Hello")
 
 
+def test_intable():
+    assert_equal(int(StringRef("123")), 123)
+
+    with assert_raises():
+        int(StringRef("hi"))
+
+
 def main():
     test_strref_from_start()
+    test_intable()

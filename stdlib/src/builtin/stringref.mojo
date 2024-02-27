@@ -11,6 +11,7 @@ These are Mojo built-ins, so you don't need to import them.
 import math
 from memory.unsafe import DTypePointer, Pointer
 from .dtype import _uint_type_of_width
+from .string import _atol
 
 # ===----------------------------------------------------------------------===#
 # StringRef
@@ -19,7 +20,9 @@ from .dtype import _uint_type_of_width
 
 @value
 @register_passable("trivial")
-struct StringRef(Sized, CollectionElement, Stringable, Hashable, Boolable):
+struct StringRef(
+    Sized, IntableRaising, CollectionElement, Stringable, Hashable, Boolable
+):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
     and a length, which need not be null terminated.
@@ -338,6 +341,18 @@ struct StringRef(Sized, CollectionElement, Stringable, Hashable, Boolable):
         var length = self_len - abs_start
 
         return StringRef(data, length)
+
+    fn __int__(self) raises -> Int:
+        """Parses the given string as a base-10 integer and returns that value.
+
+        For example, `int("19")` returns `19`. If the given string cannot be parsed
+        as an integer value, an error is raised. For example, `int("hi")` raises an
+        error.
+
+        Returns:
+            An integer value that represents the string, or otherwise raises.
+        """
+        return _atol(self)
 
 
 # ===----------------------------------------------------------------------===#
