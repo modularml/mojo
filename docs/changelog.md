@@ -216,6 +216,9 @@ that makes this version `24.1`.
   indexing. This means that one can write `vec[-1]` which is equivalent to
   `vec[len(vec)-1]`.
 
+- The `isinf` and `isfinite` methods have been moved from `math.limits` to
+  the `math` module.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
