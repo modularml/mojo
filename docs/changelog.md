@@ -49,6 +49,30 @@ modular install mojo
 
 ## UNRELEASED
 
+### ⭐️ New
+
+- String types all conform to the
+[`IntableRaising`](/mojo/stdlib/builtin/int#intableraising) trait. This means
+that you can now call `int("123")` to get the integer `123`. If the integer
+cannot be parsed from the string, then an error is raised.
+
+### 🦋 Changed
+
+- The [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) and
+  [`InlinedFixedVector`](/mojo/stdlib/collections/vector.html#inlinedfixedvector)
+  types now support negative indexing. This means that you can write `vec[-1]`
+  which is equivalent to `vec[len(vec)-1]`.
+
+- The [`isinf()`](/mojo/stdlib/math/math#isinf) and
+  [`isfinite()`](/mojo/stdlib/math/math#isfinite) methods have been moved from
+  `math.limits` to the `math` module.
+
+### ❌ Removed
+
+### 🛠️ Fixed
+
+## 24.1 (2024-02-29)
+
 ### 🔥 Legendary
 
 Mojo is now bundled with [the MAX platform](/max)!
@@ -78,9 +102,10 @@ that makes this version `24.1`.
   [`PathLike`](/mojo/stdlib/os/pathlike.html#pathlike) trait. A struct conforms
   to the `PathLike` trait by implementing the `__fspath__()` function.
 
-- The `listdir` method now exists on `pathlib.Path` and also exists in the `os`
-  module to work on `PathLike` structs. For example, to list all the directories
-  in the `/tmp` directory, one can write
+- The [`listdir`](/mojo/stdlib/pathlib/path#listdir) method now exists on
+  [`pathlib.Path`](/mojo/stdlib/pathlib/path) and also exists in the `os`
+  module to work on `PathLike` structs. For example, the following sample
+  lists all the directories in the `/tmp` directory:
 
   ```mojo
   from pathlib import Path
@@ -109,7 +134,7 @@ that makes this version `24.1`.
   ```
 
 - Mojo now has support for declaring signatures that use both variadic and
-  keyword-only arguments/parameters. E.g. the following is now possible:
+  keyword-only arguments/parameters. For example, the following is now possible:
 
   ```mojo
   fn prod_with_offset(*args: Int, offset: Int = 0) -> Int:
@@ -122,8 +147,8 @@ that makes this version `24.1`.
   print(prod_with_offset(2, 3, 4, offset=10))  # prints 34
   ```
 
-  Note that variadic keyword-only arguments/parameters (a.k.a. `**kwargs`) are
-  not supported yet, i.e. the following is not allowed:
+  Note that variadic keyword-only arguments/parameters (for example, `**kwargs`)
+  are not supported yet. That is, the following is not allowed:
 
   ```mojo
   fn variadic_kw_only(a: Int, **kwargs: Int): ...
@@ -148,18 +173,23 @@ that makes this version `24.1`.
     """
   ```
 
-- The `find`, `rfind`, `count`, and `__contains__` now work on string literals.
-  This means that one can write `"Mojo" in "Hello Mojo"`.
+- The `find()`, `rfind()`, `count()`, and `__contains__()` methods now work on
+  string literals. This means that you can write:
 
-- Breakpoints can now be inserted programmatically within the code via the
-  use of `sys.breakpointhook` or the builtin `breakpoint` function.
+  ```mojo
+  if "Mojo" in "Hello Mojo":
+    ...
+  ```
+
+- Breakpoints can now be inserted programmatically within the code using the
+  builtin [`breakpoint()`](/mojo/stdlib/builtin/breakpoint#breakpoint) function.
 
   Note: on Graviton instances, the debugger might not be able to resume after
   hitting this kind of breakpoint.
 
-- String types are now all Intable. This means that one can now perform
-  `int("123")` to get the integer `123`. If the integer cannot be parsed from
-  the string, then an error is raised.
+- Added a builtin [`Boolable`](/mojo/stdlib/builtin/bool#boolable) trait that
+  describes a type that can be represented as a boolean value. To conform to the
+  trait, a type must implement the `__bool__()` method.
 
 ### 🦋 Changed
 
@@ -178,11 +208,11 @@ that makes this version `24.1`.
     x = 9
   ```
 
-- The [`String`](/mojo/stdlib/builtin/string.html#string) methods `tolower`
-  and `toupper` have been renamed to `str.lower` and `str.upper`.
+- The [`String`](/mojo/stdlib/builtin/string.html#string) methods `tolower()`
+  and `toupper()` have been renamed to `str.lower()` and `str.upper()`.
 
-- Initializers for `@register_passable` values may (and should!) now be
-  specified with `inout self` just like memory types:
+- Initializers for `@register_passable` values can (and should!) now be
+  specified with `inout self` arguments just like memory-only types:
 
   ```mojo
   @register_passable
@@ -209,17 +239,9 @@ that makes this version `24.1`.
 
 - The `ref` and `mutref` identifiers are no longer reserved as Mojo keywords.
   We originally thought about using those as language sugar for references, but
-  we believe that generic language features combined with the `Reference` type
-  will provide a good experience without dedicated sugar.
-
-- The `DynamicVector` and `InlinedFixedVector` types now support negative
-  indexing. This means that one can write `vec[-1]` which is equivalent to
-  `vec[len(vec)-1]`.
-
-- The `isinf` and `isfinite` methods have been moved from `math.limits` to
-  the `math` module.
-
-### ❌ Removed
+  we believe that generic language features combined with the
+  [`Reference`](/mojo/stdlib/memory/unsafe#reference) type will provide a good
+  experience without dedicated sugar.
 
 ### 🛠️ Fixed
 
