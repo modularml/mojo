@@ -1408,16 +1408,17 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if output_width == 1:
             return self[offset]
 
-        return llvm_intrinsic[
-            "llvm.vector.extract",
-            __mlir_type[
-                `!pop.simd<`,
-                output_width.value,
-                `,`,
-                type.value,
-                `>`,
-            ],
-        ](self, offset)
+        if offset._positive_rem(simdwidthof[type]()) != 0:
+            var tmp = SIMD[type, output_width]()
+
+            @unroll
+            for i in range(output_width):
+                tmp[i] = self[i + offset]
+            return tmp
+
+        return llvm_intrinsic["llvm.vector.extract", SIMD[type, output_width]](
+            self, offset
+        )
 
     @always_inline("nodebug")
     fn join(self, other: Self) -> SIMD[type, 2 * size]:

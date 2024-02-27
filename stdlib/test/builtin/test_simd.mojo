@@ -489,6 +489,30 @@ def test_address():
     assert_true(Bool(Scalar[DType.address](1) < 12))
 
 
+def test_extract():
+    assert_equal(Int64(99).slice[1](0), 99)
+
+    assert_equal(
+        SIMD[DType.index, 4](99, 1, 2, 4).slice[4](),
+        SIMD[DType.index, 4](99, 1, 2, 4),
+    )
+
+    assert_equal(
+        SIMD[DType.index, 4](99, 1, 2, 4).slice[2](0),
+        SIMD[DType.index, 2](99, 1),
+    )
+
+    assert_equal(
+        SIMD[DType.index, 4](99, 1, 2, 4).slice[2](2),
+        SIMD[DType.index, 2](2, 4),
+    )
+
+    assert_equal(
+        SIMD[DType.index, 4](99, 1, 2, 4).slice[2](1),
+        SIMD[DType.index, 2](1, 2),
+    )
+
+
 def main():
     test_simd()
     test_cast()
@@ -506,3 +530,4 @@ def main():
     test_interleave()
     test_deinterleave()
     test_address()
+    test_extract()
