@@ -78,8 +78,10 @@ struct FloatLiteral(Intable, Stringable):
 
     @always_inline("nodebug")
     fn __int_literal__(self) -> Int:
-        """Casts to the floating point value to an IntLiteral. If there is a
+        """Casts the floating point value to an IntLiteral. If there is a
         fractional component, then the value is truncated towards zero.
+
+        Eg. `(4.5).__int_literal__()` returns `4`, and `(-3.7)` returns `3`.
 
         Returns:
             The value as an integer.
