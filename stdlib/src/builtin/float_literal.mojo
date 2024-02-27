@@ -3,22 +3,23 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-"""Implements the FloatLiteralOld class.
+"""Implements the FloatLiteral class.
 
 These are Mojo built-ins, so you don't need to import them.
 """
 
 # ===----------------------------------------------------------------------===#
-# FloatLiteralOld
+# FloatLiteral
 # ===----------------------------------------------------------------------===#
 
 
 @value
+@nonmaterializable(FloatLiteralOld)
 @register_passable("trivial")
-struct FloatLiteralOld(Intable, Stringable, Boolable):
+struct FloatLiteral(Intable, Stringable):
     """Mojo floating point literal type."""
 
-    alias fp_type = __mlir_type.`!pop.scalar<f64>`
+    alias fp_type = __mlir_type.`!kgen.float_literal`
     var value: Self.fp_type
     """The underlying storage for the floating point value."""
 
@@ -27,11 +28,11 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(value: FloatLiteralOld) -> Self:
+    fn __init__(value: FloatLiteral) -> Self:
         """Forwarding constructor.
 
         Args:
-           value: The double value.
+           value: The FloatLiteral value.
 
         Returns:
            The value.
@@ -39,49 +40,16 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         return value
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.f64) -> Self:
-        """Create a double value from a builtin MLIR f64 value.
+    fn __init__(value: Self.fp_type) -> Self:
+        """Create a FloatLiteral value from a kgen.float_literal value.
 
         Args:
-            value: The underlying MLIR value.
+            value: The float value.
 
         Returns:
-            A double value.
+            A FloatLiteral value.
         """
-        return __mlir_op.`pop.cast_from_builtin`[_type = Self.fp_type](value)
-
-    @always_inline("nodebug")
-    fn __init__(value: FloatLiteral) -> Self:
-        """Convert a FloatLiteral to a double value.
-
-        Args:
-            value: The literal value.
-
-        Returns:
-            The value as a double.
-        """
-        return Self(
-            __mlir_op.`kgen.float_literal.convert`[_type = __mlir_type.f64](
-                value.value
-            )
-        )
-
-    @always_inline("nodebug")
-    fn __init__(value: Int) -> Self:
-        """Convert an integer to a double value.
-
-        Args:
-            value: The integer value.
-
-        Returns:
-            The integer value as a double.
-        """
-        # FIXME(#29493): Unfurl this into a var decl to unnest.
-        return __mlir_op.`pop.cast`[_type = Self.fp_type](
-            __mlir_op.`pop.cast_from_builtin`[
-                _type = __mlir_type.`!pop.scalar<index>`
-            ](value.value)
-        )
+        return Self {value: value}
 
     @always_inline("nodebug")
     fn __init__(value: IntLiteral) -> Self:
@@ -93,19 +61,20 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             The integer value as a double.
         """
-        return Self(Int(value))
+        return Self(__mlir_op.`kgen.int_literal.to_float_literal`(value.value))
 
     # ===------------------------------------------------------------------===#
     # Conversion Operators
     # ===------------------------------------------------------------------===#
 
+    @always_inline("nodebug")
     fn __str__(self) -> String:
         """Get the float as a string.
 
         Returns:
             A string representation.
         """
-        return Float64(self)
+        return self
 
     @always_inline("nodebug")
     fn to_int(self) -> Int:
@@ -125,9 +94,7 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             The value as an integer.
         """
-        return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-            (self).value
-        )
+        return FloatLiteralOld(self).__int__()
 
     # ===------------------------------------------------------------------===#
     # Unary Operators
@@ -143,20 +110,20 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         return self != 0.0
 
     @always_inline("nodebug")
-    fn __neg__(self) -> Self:
+    fn __neg__(self) -> FloatLiteral:
         """Return the negation of the double value.
 
         Returns:
             The negated double value.
         """
-        return __mlir_op.`pop.neg`(self.value)
+        return self * Self(-1)
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __add__(self, rhs: Self) -> Self:
+    fn __add__(self, rhs: FloatLiteral) -> FloatLiteral:
         """Add two doubles.
 
         Args:
@@ -165,10 +132,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             The sum of the two values.
         """
-        return __mlir_op.`pop.add`(self.value, rhs.value)
+        return __mlir_op.`kgen.float_literal.binop`[
+            oper = __mlir_attr.`#kgen<float_literal.binop_kind add>`
+        ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __sub__(self, rhs: Self) -> Self:
+    fn __sub__(self, rhs: FloatLiteral) -> FloatLiteral:
         """Subtract two doubles.
 
         Args:
@@ -177,10 +146,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             The difference of the two values.
         """
-        return __mlir_op.`pop.sub`(self.value, rhs.value)
+        return __mlir_op.`kgen.float_literal.binop`[
+            oper = __mlir_attr.`#kgen<float_literal.binop_kind sub>`
+        ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __mul__(self, rhs: Self) -> Self:
+    fn __mul__(self, rhs: FloatLiteral) -> FloatLiteral:
         """Multiply two doubles.
 
         Args:
@@ -189,10 +160,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             The product of the two values.
         """
-        return __mlir_op.`pop.mul`(self.value, rhs.value)
+        return __mlir_op.`kgen.float_literal.binop`[
+            oper = __mlir_attr.`#kgen<float_literal.binop_kind mul>`
+        ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __truediv__(self, rhs: Self) -> Self:
+    fn __truediv__(self, rhs: FloatLiteral) -> FloatLiteral:
         """Divide two doubles.
 
         Args:
@@ -201,63 +174,20 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             The quotient of the two values.
         """
-        return __mlir_op.`pop.div`(self.value, rhs.value)
+        return __mlir_op.`kgen.float_literal.binop`[
+            oper = __mlir_attr.`#kgen<float_literal.binop_kind truediv>`
+        ](self.value, rhs.value)
 
-    @always_inline("nodebug")
-    fn __floordiv__(self, rhs: Self) -> Self:
-        """Divide two doubles and round towards negative infinity.
-
-        Args:
-            rhs: The value to divide.
-
-        Returns:
-            The quotient of the two values rounded towards negative infinity.
-        """
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = "llvm.floor".value, _type = Self.fp_type
-        ]((self / rhs).value)
-
-    @always_inline("nodebug")
-    fn __mod__(self, rhs: Self) -> Self:
-        """Compute the remainder of dividing by a value.
-
-        Args:
-            rhs: The divisor.
-
-        Returns:
-            The remainder of the division operation.
-        """
-        var remainder: Self = __mlir_op.`pop.rem`(self.value, rhs.value)
-        if (self < 0.0) ^ (rhs < 0.0):
-            remainder += rhs
-        return remainder
-
-    @always_inline("nodebug")
-    fn __pow__(self, rhs: Self) -> Self:
-        """Compute the power.
-
-        Args:
-            rhs: The exponent.
-
-        Returns:
-            The current value raised to the exponent.
-        """
-        var lhs = __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = "llvm.fabs".value, _type = Self.fp_type
-        ](self.value)
-        var result = __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = "llvm.pow".value, _type = Self.fp_type
-        ](lhs, rhs.value)
-        return __mlir_op.`pop.call_llvm_intrinsic`[
-            intrin = "llvm.copysign".value, _type = Self.fp_type
-        ](result, self.value)
+    # TODO - __floordiv__
+    # TODO - maybe __mod__?
+    # TODO - maybe __pow__?
 
     # ===------------------------------------------------------------------===#
     # In-place Arithmetic Operators
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __iadd__(inout self, rhs: Self):
+    fn __iadd__(inout self, rhs: FloatLiteral):
         """In-place addition operator.
 
         Args:
@@ -266,7 +196,7 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         self = self + rhs
 
     @always_inline("nodebug")
-    fn __isub__(inout self, rhs: Self):
+    fn __isub__(inout self, rhs: FloatLiteral):
         """In-place subtraction operator.
 
         Args:
@@ -275,7 +205,7 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         self = self - rhs
 
     @always_inline("nodebug")
-    fn __imul__(inout self, rhs: Self):
+    fn __imul__(inout self, rhs: FloatLiteral):
         """In-place multiplication operator.
 
         Args:
@@ -284,7 +214,7 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         self = self * rhs
 
     @always_inline("nodebug")
-    fn __itruediv__(inout self, rhs: Self):
+    fn __itruediv__(inout self, rhs: FloatLiteral):
         """In-place division.
 
         Args:
@@ -292,39 +222,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         """
         self = self / rhs
 
-    @always_inline("nodebug")
-    fn __ifloordiv__(inout self, rhs: Self):
-        """In-place floor division.
-
-        Args:
-            rhs: The value to divide.
-        """
-        self = self // rhs
-
-    @always_inline("nodebug")
-    fn __imod__(inout self, rhs: Self):
-        """In-place remainder.
-
-        Args:
-            rhs: The divisor.
-        """
-        self = self % rhs
-
-    @always_inline("nodebug")
-    fn __ipow__(inout self, rhs: Self):
-        """In-place power.
-
-        Args:
-            rhs: The exponent.
-        """
-        self = self**rhs
-
     # ===------------------------------------------------------------------===#
     # Reversed Operators
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __radd__(self, rhs: Self) -> Self:
+    fn __radd__(self, rhs: FloatLiteral) -> FloatLiteral:
         """Reversed addition operator.
 
         Args:
@@ -336,7 +239,7 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         return rhs + self
 
     @always_inline("nodebug")
-    fn __rsub__(self, rhs: Self) -> Self:
+    fn __rsub__(self, rhs: FloatLiteral) -> FloatLiteral:
         """Reversed subtraction operator.
 
         Args:
@@ -348,7 +251,7 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         return rhs - self
 
     @always_inline("nodebug")
-    fn __rmul__(self, rhs: Self) -> Self:
+    fn __rmul__(self, rhs: FloatLiteral) -> FloatLiteral:
         """Reversed multiplication operator.
 
         Args:
@@ -360,7 +263,7 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         return rhs * self
 
     @always_inline("nodebug")
-    fn __rtruediv__(self, rhs: Self) -> Self:
+    fn __rtruediv__(self, rhs: FloatLiteral) -> FloatLiteral:
         """Reversed division.
 
         Args:
@@ -371,49 +274,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         """
         return rhs / self
 
-    @always_inline("nodebug")
-    fn __rfloordiv__(self, rhs: Self) -> Self:
-        """Reversed floor division.
-
-        Args:
-            rhs: The value to be floor-divided by this.
-
-        Returns:
-            The result of dividing the given value by this, modulo any
-            remainder.
-        """
-        return rhs // self
-
-    @always_inline("nodebug")
-    fn __rmod__(self, rhs: Self) -> Self:
-        """Reversed remainder.
-
-        Args:
-            rhs: The divisor.
-
-        Returns:
-            The remainder after dividing the given value by this.
-        """
-        return rhs % self
-
-    @always_inline("nodebug")
-    fn __rpow__(self, rhs: Self) -> Self:
-        """Reversed power.
-
-        Args:
-            rhs: The number to be raised to the power of this.
-
-        Returns:
-            The result of raising the given number by this value.
-        """
-        return rhs**self
-
     # ===------------------------------------------------------------------===#
     # Comparison Operators
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __eq__(self, rhs: Self) -> Bool:
+    fn __eq__(self, rhs: FloatLiteral) -> Bool:
         """Compare for equality.
 
         Args:
@@ -422,12 +288,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             True if they are equal.
         """
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
-            self.value, rhs.value
-        )
+        return __mlir_op.`kgen.float_literal.cmp`[
+            pred = __mlir_attr.`#kgen<float_literal.cmp_pred eq>`
+        ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __ne__(self, rhs: Self) -> Bool:
+    fn __ne__(self, rhs: FloatLiteral) -> Bool:
         """Compare for inequality.
 
         Args:
@@ -436,12 +302,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             True if they are not equal.
         """
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-            self.value, rhs.value
-        )
+        return __mlir_op.`kgen.float_literal.cmp`[
+            pred = __mlir_attr.`#kgen<float_literal.cmp_pred ne>`
+        ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __lt__(self, rhs: Self) -> Bool:
+    fn __lt__(self, rhs: FloatLiteral) -> Bool:
         """Less than comparison.
 
         Args:
@@ -450,12 +316,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             True if this value is less than `rhs`.
         """
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred lt>`](
-            self.value, rhs.value
-        )
+        return __mlir_op.`kgen.float_literal.cmp`[
+            pred = __mlir_attr.`#kgen<float_literal.cmp_pred lt>`
+        ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __le__(self, rhs: Self) -> Bool:
+    fn __le__(self, rhs: FloatLiteral) -> Bool:
         """Less than or equal to comparison.
 
         Args:
@@ -464,12 +330,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             True if this value is less than or equal to `rhs`.
         """
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred le>`](
-            self.value, rhs.value
-        )
+        return __mlir_op.`kgen.float_literal.cmp`[
+            pred = __mlir_attr.`#kgen<float_literal.cmp_pred le>`
+        ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __gt__(self, rhs: Self) -> Bool:
+    fn __gt__(self, rhs: FloatLiteral) -> Bool:
         """Greater than comparison.
 
         Args:
@@ -478,12 +344,12 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             True if this value is greater than `rhs`.
         """
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred gt>`](
-            self.value, rhs.value
-        )
+        return __mlir_op.`kgen.float_literal.cmp`[
+            pred = __mlir_attr.`#kgen<float_literal.cmp_pred gt>`
+        ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __ge__(self, rhs: Self) -> Bool:
+    fn __ge__(self, rhs: FloatLiteral) -> Bool:
         """Greater than or equal to comparison.
 
         Args:
@@ -492,6 +358,6 @@ struct FloatLiteralOld(Intable, Stringable, Boolable):
         Returns:
             True if this value is greater than or equal to `rhs`.
         """
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ge>`](
-            self.value, rhs.value
-        )
+        return __mlir_op.`kgen.float_literal.cmp`[
+            pred = __mlir_attr.`#kgen<float_literal.cmp_pred ge>`
+        ](self.value, rhs.value)
