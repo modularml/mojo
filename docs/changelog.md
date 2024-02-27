@@ -148,6 +148,9 @@ that makes this version `24.1`.
 - Breakpoints can now be inserted programmatically within the code via the
   use of `sys.breakpointhook` or the builtin `breakpoint` function.
 
+  Note: on Graviton instances, the debugger might not be able to resume after
+  hitting this kind of breakpoint.
+
 - String types are now all Intable. This means that one can now perform
   `int("123")` to get the integer `123`. If the integer cannot be parsed from
   the string, then an error is raised.
