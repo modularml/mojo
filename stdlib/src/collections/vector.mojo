@@ -187,10 +187,18 @@ struct InlinedFixedVector[
         Returns:
             The element at the given index.
         """
-        debug_assert(i < self.current_size, "index must be within bounds")
-        if i < Self.static_size:
-            return self.static_data[i]
-        return self.dynamic_data[i - Self.static_size]
+        debug_assert(
+            -self.current_size < i < self.current_size,
+            "index must be within bounds",
+        )
+        var normalized_idx = i
+        if i < 0:
+            normalized_idx += len(self)
+
+        if normalized_idx < Self.static_size:
+            return self.static_data[normalized_idx]
+
+        return self.dynamic_data[normalized_idx - Self.static_size]
 
     @always_inline
     fn __setitem__(inout self, i: Int, value: type):
@@ -521,6 +529,8 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         Returns:
             A copy of the element at the given index.
         """
+        if i < 0:
+            return self[len(self) + i]
         return __get_address_as_lvalue((self.data + i).value)
 
     # TODO(30737): Replace __getitem__ with this as __refitem__, but lots of places use it

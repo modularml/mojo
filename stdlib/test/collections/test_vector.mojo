@@ -33,6 +33,9 @@ def test_inlined_fixed_vector():
     assert_equal(3, vector[3])
     assert_equal(4, vector[4])
 
+    assert_equal(3, vector[-2])
+    assert_equal(4, vector[-1])
+
     # Can assign past the static size into the regrowable dynamic data portion
     for j in range(5, 10):
         vector.append(j)
@@ -45,6 +48,8 @@ def test_inlined_fixed_vector():
     assert_equal(7, vector[7])
     assert_equal(8, vector[8])
     assert_equal(9, vector[9])
+
+    assert_equal(9, vector[-1])
 
     # Assign a specified index in the dynamic_data portion
     vector[5] = -2
@@ -113,6 +118,10 @@ def test_vector():
     assert_equal(2, vector[2])
     assert_equal(3, vector[3])
     assert_equal(4, vector[4])
+
+    assert_equal(0, vector[-5])
+    assert_equal(3, vector[-2])
+    assert_equal(4, vector[-1])
 
     vector[2] = -2
     assert_equal(-2, vector[2])
