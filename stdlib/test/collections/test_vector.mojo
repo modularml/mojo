@@ -37,6 +37,13 @@ def test_inlined_fixed_vector():
     assert_equal(3, vector[-2])
     assert_equal(4, vector[-1])
 
+    vector[-5] = 5
+    assert_equal(5, vector[-5])
+    vector[-2] = 3
+    assert_equal(3, vector[-2])
+    vector[-1] = 7
+    assert_equal(7, vector[-1])
+
     # Can assign past the static size into the regrowable dynamic data portion
     for j in range(5, 10):
         vector.append(j)
@@ -127,9 +134,16 @@ def test_vector():
     vector[2] = -2
     assert_equal(-2, vector[2])
 
+    vector[-5] = 5
+    assert_equal(5, vector[-5])
+    vector[-2] = 3
+    assert_equal(3, vector[-2])
+    vector[-1] = 7
+    assert_equal(7, vector[-1])
+
     # pop_back shall return the last element
     # and adjust the size
-    assert_equal(4, vector.pop_back())
+    assert_equal(7, vector.pop_back())
     assert_equal(4, len(vector))
 
     # Verify that capacity shrinks as the vector goes smaller

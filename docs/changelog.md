@@ -203,6 +203,10 @@ that makes this version `24.1`.
   we believe that generic language features combined with the `Reference` type
   will provide a good experience without dedicated sugar.
 
+- The `DynamicVector` and `InlinedFixedVector` types now support negative
+  indexing. This means that one can write `vec[-1]` which is equivalent to
+  `vec[len(vec)-1]`.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed

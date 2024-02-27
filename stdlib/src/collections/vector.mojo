@@ -208,11 +208,19 @@ struct InlinedFixedVector[
             i: The index of the element.
             value: The value to assign.
         """
-        debug_assert(i < self.current_size, "index must be within bounds")
-        if i < Self.static_size:
-            self.static_data[i] = value
+        debug_assert(
+            -self.current_size <= i < self.current_size,
+            "index must be within bounds",
+        )
+
+        var normalized_idx = i
+        if i < 0:
+            normalized_idx += len(self)
+
+        if normalized_idx < Self.static_size:
+            self.static_data[normalized_idx] = value
         else:
-            self.dynamic_data[i - Self.static_size] = value
+            self.dynamic_data[normalized_idx - Self.static_size] = value
 
     fn clear(inout self):
         """Clears the elements in the vector."""
@@ -515,8 +523,13 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
             i: The index of the element.
             value: The value to assign.
         """
-        _ = (self.data + i).take_value()
-        (self.data + i).emplace_value(value ^)
+
+        var normalized_idx = i
+        if i < 0:
+            normalized_idx += len(self)
+
+        _ = (self.data + normalized_idx).take_value()
+        (self.data + normalized_idx).emplace_value(value ^)
 
     fn __getitem__(self, i: Int) -> T:
         """Gets a copy of the vector element at the given index.
