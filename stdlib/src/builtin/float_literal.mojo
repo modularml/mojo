@@ -77,6 +77,18 @@ struct FloatLiteral(Intable, Stringable):
         return self
 
     @always_inline("nodebug")
+    fn __int_literal__(self) -> Int:
+        """Casts to the floating point value to an IntLiteral. If there is a
+        fractional component, then the value is truncated towards zero.
+
+        Returns:
+            The value as an integer.
+        """
+        return IntLiteral(
+            __mlir_op.`kgen.float_literal.to_int_literal`(self.value)
+        )
+
+    @always_inline("nodebug")
     fn to_int(self) -> Int:
         """Casts to the floating point value to an Int. If there is a fractional
         component, then the value is truncated towards zero.
@@ -94,7 +106,7 @@ struct FloatLiteral(Intable, Stringable):
         Returns:
             The value as an integer.
         """
-        return FloatLiteralOld(self).__int__()
+        return self.__int_literal__().__int__()
 
     # ===------------------------------------------------------------------===#
     # Unary Operators
