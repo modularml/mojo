@@ -20,7 +20,9 @@ from math import abs, isclose
 
 
 @always_inline
-fn assert_true[T: Boolable](val: T, msg: String = "") raises:
+fn assert_true[
+    T: Boolable
+](val: T, msg: String = "condition was unexpectedly False") raises:
     """Asserts that the input value is True. If it is not then an
     Error is raised.
 
@@ -39,7 +41,9 @@ fn assert_true[T: Boolable](val: T, msg: String = "") raises:
 
 
 @always_inline
-fn assert_false[T: Boolable](val: T, msg: String = "") raises:
+fn assert_false[
+    T: Boolable
+](val: T, msg: String = "condition was unexpectedly True") raises:
     """Asserts that the input value is False. If it is not then an Error is
     raised.
 
