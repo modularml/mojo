@@ -41,6 +41,16 @@ def test_deleter_not_called_until_no_references():
     assert_true(deleted)
 
 
+def test_arc_bitcast():
+    var arc_f32 = Arc[Scalar[DType.float32]](16.0)
+
+    var arc_i32 = arc_f32._bitcast[Scalar[DType.int32]]()
+
+    assert_equal(arc_f32.get(), 16.0)
+    assert_equal(arc_i32.get(), 1098907648)
+
+
 def main():
     test_basic()
     test_deleter_not_called_until_no_references()
+    test_arc_bitcast()

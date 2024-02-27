@@ -135,3 +135,35 @@ struct Arc[T: CollectionElement](CollectionElement):
             A copy of the managed value.
         """
         return __get_address_as_lvalue(self._inner.address).data
+
+    fn _data_ptr(self) -> AnyPointer[T]:
+        return AnyPointer.address_of(
+            __get_address_as_lvalue(self._inner.address).data
+        )
+
+    fn _bitcast[T2: CollectionElement](self) -> Arc[T2]:
+        constrained[
+            sizeof[T]() == sizeof[T2](),
+            (
+                "Arc._bitcast: Size of T and cast destination type T2 must be"
+                " the same"
+            ),
+        ]()
+
+        constrained[
+            alignof[T]() == alignof[T2](),
+            (
+                "Arc._bitcast: Alignment of T and cast destination type T2 must"
+                " be the same"
+            ),
+        ]()
+
+        var ptr: Pointer[_ArcInner[T]] = self._inner
+
+        # Add a +1 to the ref count, since we're creating a new `Arc` instance
+        # pointing at the same data.
+        _ = __get_address_as_lvalue(self._inner.address).increment()
+
+        var ptr2: Pointer[_ArcInner[T2]] = ptr.bitcast[_ArcInner[T2]]()
+
+        return Arc[T2] {_inner: ptr2}
