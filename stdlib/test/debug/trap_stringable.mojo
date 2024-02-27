@@ -3,7 +3,7 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: not not mojo --debug-level full %s 2>&1 | FileCheck %s -check-prefix=CHECK
+# RUN: not --crash mojo --debug-level full %s 2>&1 | FileCheck %s -check-prefix=CHECK
 
 from debug import trap
 

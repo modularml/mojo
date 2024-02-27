@@ -7,7 +7,7 @@
 # This file only tests the debug_assert function
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: not not %mojo -D MOJO_ENABLE_ASSERTIONS -debug-level full %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
+# RUN: not --crash %mojo -D MOJO_ENABLE_ASSERTIONS -debug-level full %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
 
 # CHECK-FAIL-LABEL: test_fail
