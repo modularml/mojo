@@ -339,20 +339,33 @@ struct String(Sized, Stringable, KeyElement, Boolable):
         self._buffer = existing._buffer ^
 
     @staticmethod
-    fn _unchecked_from_bytes(owned impl: Self._buffer_type) -> String:
+    fn _from_bytes(owned buff: DTypePointer[DType.int8]) -> String:
         """Construct a string from a sequence of bytes.
 
         This does no validation that the given bytes are valid in any specific
         String encoding.
 
         Args:
-            impl: The buffer. This should not have an existing NUL terminator.
+            buff: The buffer. This should have an existing terminator.
         """
 
-        # Add the NUL terminator.
-        impl.push_back(0)
+        return String(buff, len(StringRef(buff)) + 1)
 
-        return String(impl ^)
+    @staticmethod
+    fn _from_bytes(owned buff: Self._buffer_type) -> String:
+        """Construct a string from a sequence of bytes.
+
+        This does no validation that the given bytes are valid in any specific
+        String encoding.
+
+        Args:
+            buff: The buffer.
+        """
+        # If a terminator does not already exist, then add it.
+        if buff[len(buff) - 1]:
+            buff.append(0)
+
+        return String(buff ^)
 
     @always_inline
     fn __bool__(self) -> Bool:

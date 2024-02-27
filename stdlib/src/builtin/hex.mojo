@@ -60,7 +60,7 @@ fn _format_int[
 
     _write_int(buf, value, radix, digit_chars, prefix)
 
-    return String._unchecked_from_bytes(buf ^)
+    return String._from_bytes(buf ^)
 
 
 fn _write_int[
