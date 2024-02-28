@@ -25,7 +25,9 @@ our web-based [Mojo Playground](#develop-in-the-mojo-playground).
 :::note Get Mojo in MAX!
 
 To provide a unified toolkit for AI developers, the Mojo SDK is now included in
-the [MAX platform](/max).
+the [MAX SDK](/max). To install the MAX SDK, see
+[Get started with MAX Engine](/engine/get_started). If you want to install the
+standalone Mojo SDK, you're in the right place.
 
 :::
 
@@ -48,9 +50,10 @@ To use the Mojo SDK, you need a system that meets these specifications:
 Linux:
 
 - Ubuntu 20.04/22.04 LTS
-- x86-64 CPU (with [SSE4.2 or
-  newer](https://www.intel.com/content/www/us/en/support/articles/000057621/processors.html))
-  and a minimum of 8 GiB memory
+- x86-64 CPU (with [SSE4.2 or
+newer](https://www.intel.com/content/www/us/en/support/articles/000057621/processors.html))
+  or AWS Graviton2 CPU (or newer)
+- Minimum 8 GiB RAM
 - Python 3.8 - 3.11
 - g++ or clang++ C++ compiler
 
