@@ -56,6 +56,9 @@ modular install mojo
 that you can now call `int("123")` to get the integer `123`. If the integer
 cannot be parsed from the string, then an error is raised.
 
+- The `Tensor` type now has an `argmax` and `argmin` function to compute the
+  position of the max or min value.
+
 ### 🦋 Changed
 
 - The [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) and
@@ -243,7 +246,7 @@ that makes this version `24.1`.
   we believe that generic language features combined with the
   [`Reference`](/mojo/stdlib/memory/unsafe#reference) type will provide a good
   experience without dedicated sugar.
-  
+
 ### 🛠️ Fixed
 
 - [#1741](https://github.com/modularml/mojo/issues/1741) - Mojo documentation
