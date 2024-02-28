@@ -84,10 +84,7 @@ that makes this version `24.1`.
 ### ⭐️ New
 
 - The `FloatLiteral` type is now an infinite precision nonmaterializable type.
-  When materialized, `FloatLiteral` is converted to `FloatLiteralOld`, which is
-  the same as the old `FloatLiteral`.  However, we plan to remove
-  `FloatLiteralOld` in the future and have `FloatLiteral` materialize as the
-  `Float64` SIMD type.
+  When materialized, `FloatLiteral` is converted to `Float64`.
 
 - The `os` package now contains the [`stat()`](/mojo/stdlib/os/fstat#stat)
   and [`lstat()`](/mojo/stdlib/os/fstat#lstat) functions.
