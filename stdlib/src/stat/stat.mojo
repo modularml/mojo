@@ -34,7 +34,7 @@ fn S_ISLNK[intable: Intable](mode: intable) -> Bool:
     """
     Returns True if the mode is a symlink.
 
-    Params:
+    Parameters:
       intable: A type conforming to Intable.
 
     Args:
@@ -50,7 +50,7 @@ fn S_ISREG[intable: Intable](mode: intable) -> Bool:
     """
     Returns True if the mode is a regular file.
 
-    Params:
+    Parameters:
       intable: A type conforming to Intable.
 
     Args:
@@ -66,7 +66,7 @@ fn S_ISDIR[intable: Intable](mode: intable) -> Bool:
     """
     Returns True if the mode is a directory.
 
-    Params:
+    Parameters:
       intable: A type conforming to Intable.
 
     Args:
@@ -82,7 +82,7 @@ fn S_ISCHR[intable: Intable](mode: intable) -> Bool:
     """
     Returns True if the mode is a character device.
 
-    Params:
+    Parameters:
       intable: A type conforming to Intable.
 
     Args:
@@ -98,7 +98,7 @@ fn S_ISBLK[intable: Intable](mode: intable) -> Bool:
     """
     Returns True if the mode is a block device.
 
-    Params:
+    Parameters:
       intable: A type conforming to Intable.
 
     Args:
@@ -114,7 +114,7 @@ fn S_ISFIFO[intable: Intable](mode: intable) -> Bool:
     """
     Returns True if the mode is a fifo.
 
-    Params:
+    Parameters:
       intable: A type conforming to Intable.
 
     Args:
@@ -130,7 +130,7 @@ fn S_ISSOCK[intable: Intable](mode: intable) -> Bool:
     """
     Returns True if the mode is a socket.
 
-    Params:
+    Parameters:
       intable: A type conforming to Intable.
 
     Args:
