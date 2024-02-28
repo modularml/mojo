@@ -67,6 +67,10 @@ cannot be parsed from the string, then an error is raised.
   [`isfinite()`](/mojo/stdlib/math/math#isfinite) methods have been moved from
   `math.limits` to the `math` module.
 
+- The `ulp` function has been added to the `math` module. This allows one to get
+  the units of least precision (or units of last place) of a floating point
+  value.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
@@ -239,7 +243,7 @@ that makes this version `24.1`.
   we believe that generic language features combined with the
   [`Reference`](/mojo/stdlib/memory/unsafe#reference) type will provide a good
   experience without dedicated sugar.
-
+  
 ### 🛠️ Fixed
 
 - [#1741](https://github.com/modularml/mojo/issues/1741) - Mojo documentation
