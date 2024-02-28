@@ -1668,12 +1668,17 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             A new scalar which is the reduction of all vector elements.
         """
+        constrained[
+            size_out <= Self.size, "simd reduction cannot increase simd width"
+        ]()
 
         @parameter
         if size == 1:
             return self[0]
         elif size == 2:
             return func[type, 1](self[0], self[1])
+        elif size == size_out:
+            return rebind[SIMD[Self.type, size_out]](self)
         else:
             alias half_size: Int = size // 2
             var lhs = self.slice[half_size](0)

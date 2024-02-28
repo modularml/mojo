@@ -86,6 +86,9 @@ def test_simd():
     # CHECK: [7, 8]
     print(iota[DType.index, 8](1).reduce_max[2]())
 
+    # CHECK: [1, 2, 3, 4]
+    print(iota[DType.index, 4](1).reduce_max[4]())
+
     assert_equal(
         SIMD[DType.bool, 4](False, True, False, True)
         * SIMD[DType.bool, 4](False, True, True, False),
