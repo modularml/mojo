@@ -47,13 +47,17 @@ def test_equal():
     var s1 = Set[Int]()
     var s2 = Set[Int](1, 2, 3)
 
+    # TODO(#33178): Not using `assert_equal` and friends
+    # since Set is not Stringable
+
     assert_true(s1 == s1)
     assert_true(s2 == s2)
     assert_true(s1 == Set[Int]())
     assert_true(s2 == Set[Int](3, 2, 1))
-    assert_false(s1 == s2)
-    assert_false(s2 == Set[Int](1, 2, 2))
-    assert_false(s2 == Set[Int](1, 2, 4))
+    assert_true(s1 != s2)
+    assert_true(s2 != s1)
+    assert_true(s2 != Set[Int](1, 2, 2))
+    assert_true(s2 != Set[Int](1, 2, 4))
 
 
 def test_bool():

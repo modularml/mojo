@@ -108,8 +108,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             other: Another Set instance to check equality against.
 
         Returns:
-            True if `other` contains exactly the same elements and no more,
-            False if the sets are different.
+            True if the sets contain the same elements and False otherwise.
         """
         if len(self) != len(other):
             return False
@@ -117,6 +116,17 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             if e[] not in other:
                 return False
         return True
+
+    fn __ne__(self, other: Self) -> Bool:
+        """Set inequality.
+
+        Args:
+            other: Another Set instance to check equality against.
+
+        Returns:
+            True if the sets are different and False otherwise.
+        """
+        return not (self == other)
 
     fn __hash__(self) -> Int:
         """A hash value of the elements in the set.

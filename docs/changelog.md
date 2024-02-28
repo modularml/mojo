@@ -74,6 +74,9 @@ cannot be parsed from the string, then an error is raised.
   the units of least precision (or units of last place) of a floating point
   value.
 
+- `EqualityComparable` trait now requires `__ne__` function for conformance in addition
+  to the previously existing `__eq__` function.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
