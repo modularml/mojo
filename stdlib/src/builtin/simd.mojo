@@ -1421,6 +1421,52 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
+    fn insert[
+        input_width: Int
+    ](self, value: SIMD[type, input_width], offset: Int = 0) -> Self:
+        """Returns a the vector where the elements between `offset` and
+        `offset + input_width` have been replaced with the elements in `value`.
+
+        Parameters:
+            input_width: The width of the value input that is going to be
+              inserted.
+
+        Args:
+            value: The value to be inserted.
+            offset: The offset to insert at.
+
+        Returns:
+            A new vector whose elements at `self[offset:offset+input_width]`
+            contain the values of `value`.
+        """
+        debug_assert(
+            0 < input_width + offset <= size,
+            "insertion position must not exceed the size of the vector",
+        )
+
+        @parameter
+        if size == 1:
+            constrained[
+                input_width == 1, "the input width must be 1 if the size is 1"
+            ]()
+            return rebind[Self](value)
+
+        # You cannot insert into a SIMD value at positions that are not a
+        # multiple of the SIMD width via the `llvm.vector.insert` intrinsic,
+        # so resort to a for loop. Note that this can be made more intelligent
+        # by dividing the problem into the offset, offset+val, val+input_width
+        # where val is a value to align the offset to the simdwidth.
+        if offset._positive_rem(simdwidthof[type]()) != 0:
+            var tmp = self
+
+            @unroll
+            for i in range(input_width):
+                tmp[i + offset] = value[i]
+            return tmp
+
+        return llvm_intrinsic["llvm.vector.insert", Self](self, value, offset)
+
+    @always_inline("nodebug")
     fn join(self, other: Self) -> SIMD[type, 2 * size]:
         """Concatenates the two vectors together.
 
@@ -1495,13 +1541,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             ](other)
 
         var res = SIMD[type, 2 * size]()
-
-        res = llvm_intrinsic["llvm.vector.insert", SIMD[type, 2 * size]](
-            res, self, 0
-        )
-        return llvm_intrinsic["llvm.vector.insert", SIMD[type, 2 * size]](
-            res, other, size
-        )
+        res = res.insert(self)
+        return res.insert(other, size)
 
     @always_inline("nodebug")
     fn interleave(self, other: Self) -> SIMD[type, 2 * size]:

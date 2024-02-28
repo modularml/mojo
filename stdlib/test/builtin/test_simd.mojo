@@ -436,6 +436,36 @@ fn test_shift():
     print(SIMD[type, simd_width](1, 0, 1, 1).shift_right[4]())
 
 
+# CHECK-LABEL: test_insert
+fn test_insert():
+    print("== test_insert")
+
+    # CHECK: 4
+    print(Int32(3).insert(Int32(4)))
+
+    # CHECK: [9, 6, 2, 3]
+    print(SIMD[DType.index, 4](0, 1, 2, 3).insert(SIMD[DType.index, 2](9, 6)))
+
+    # CHECK: [0, 9, 6, 3]
+    print(
+        SIMD[DType.index, 4](0, 1, 2, 3).insert(SIMD[DType.index, 2](9, 6), 1)
+    )
+
+    # CHECK: [0, 1, 2, 3, 9, 6, 3, 7]
+    print(
+        SIMD[DType.index, 8](0, 1, 2, 3, 5, 6, 7, 8).insert(
+            SIMD[DType.index, 4](9, 6, 3, 7), 4
+        )
+    )
+
+    # CHECK: [0, 1, 2, 9, 6, 3, 7, 8]
+    print(
+        SIMD[DType.index, 8](0, 1, 2, 3, 5, 6, 7, 8).insert(
+            SIMD[DType.index, 4](9, 6, 3, 7), 3
+        )
+    )
+
+
 # CHECK-LABEL: test_join
 fn test_join():
     print("== test_join")
@@ -526,6 +556,7 @@ def main():
     test_mod()
     test_rotate()
     test_shift()
+    test_insert()
     test_join()
     test_interleave()
     test_deinterleave()
