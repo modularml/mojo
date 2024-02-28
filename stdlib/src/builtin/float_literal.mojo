@@ -14,7 +14,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 @value
-@nonmaterializable(FloatLiteralOld)
+@nonmaterializable(Float64)
 @register_passable("trivial")
 struct FloatLiteral(Intable, Stringable):
     """Mojo floating point literal type."""

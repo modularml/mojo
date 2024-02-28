@@ -437,18 +437,19 @@ fn print(x: Bool):
 
 
 @no_inline
-fn print(x: FloatLiteralOld):
-    """Prints a float literal.
+fn print(x: Int):
+    """Prints an integer value.
 
     Args:
         x: The value to print.
     """
-    print(Float64(x))
+    _put(x)
+    put_new_line()
 
 
 @no_inline
-fn print(x: Int):
-    """Prints an integer value.
+fn print(x: Float64):
+    """Prints a float value.
 
     Args:
         x: The value to print.

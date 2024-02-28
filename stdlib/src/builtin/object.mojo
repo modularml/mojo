@@ -716,13 +716,13 @@ struct object(IntableRaising, Boolable):
         self._value = Int64(value)
 
     @always_inline
-    fn __init__(inout self, value: FloatLiteralOld):
+    fn __init__(inout self, value: Float64):
         """Initializes the object with an floating-point value.
 
         Args:
             value: The float value.
         """
-        self._value = Float64(value)
+        self._value = value
 
     @always_inline
     fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
@@ -797,8 +797,8 @@ struct object(IntableRaising, Boolable):
             @parameter
             if _mlirtype_is_eq[T, Int]():
                 self._append(value.get[i, Int]())
-            elif _mlirtype_is_eq[T, FloatLiteralOld]():
-                self._append(value.get[i, FloatLiteralOld]())
+            elif _mlirtype_is_eq[T, Float64]():
+                self._append(value.get[i, Float64]())
             elif _mlirtype_is_eq[T, Bool]():
                 self._append(value.get[i, Bool]())
             elif _mlirtype_is_eq[T, StringRef]():

@@ -134,6 +134,29 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         }
 
     @always_inline("nodebug")
+    fn __init__(value: SIMD[DType.float64, 1]) -> Self:
+        """Initializes the SIMD vector with a float.
+
+        The value is splatted across all the elements of the SIMD
+        vector.
+
+        Args:
+            value: The input value.
+
+        Returns:
+            SIMD vector whose elements have the specified value.
+        """
+        _simd_construction_checks[type, size]()
+
+        var casted = __mlir_op.`pop.cast`[
+            _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
+        ](value.value)
+        var vec = __mlir_op.`pop.simd.splat`[
+            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        ](casted)
+        return Self {value: vec}
+
+    @always_inline("nodebug")
     fn __init__(value: Int) -> Self:
         """Initializes the SIMD vector with an integer.
 
@@ -271,24 +294,30 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         return result
 
-    # Initializes from FP literal.
     @always_inline("nodebug")
-    fn __init__(value: FloatLiteralOld) -> Self:
-        """Initializes the SIMD vector with a FP64 value.
+    fn __init__(value: FloatLiteral) -> Self:
+        """Initializes the SIMD vector with a float.
 
-        The input value is splatted (broadcast) across all the elements of the
-        SIMD vector.
+        The value is splatted across all the elements of the SIMD
+        vector.
 
         Args:
             value: The input value.
 
         Returns:
-            A SIMD vector whose elements have the specified value.
+            SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[type, size]()
+
+        var tn1 = __mlir_op.`kgen.float_literal.convert`[
+            _type = __mlir_type.f64
+        ](value.value)
+        var t0 = __mlir_op.`pop.cast_from_builtin`[
+            _type = __mlir_type.`!pop.scalar<f64>`
+        ](tn1)
         var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
-        ](value.value)
+        ](t0)
         var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)

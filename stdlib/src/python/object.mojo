@@ -123,14 +123,14 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         var cpython = _get_global_python_itf().cpython()
         self.py_object = cpython.toPython(integer)
 
-    fn __init__(inout self, float: FloatLiteralOld):
+    fn __init__(inout self, float: Float64):
         """Initialize the object with an floating-point value.
 
         Args:
             float: The float value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.PyFloat_FromDouble(float.value)
+        self.py_object = cpython.PyFloat_FromDouble(float)
 
     fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
         """Initialize the object with a generic scalar value. If the scalar
@@ -216,8 +216,8 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
             @parameter
             if _mlirtype_is_eq[T, Int]():
                 obj = value.get[i, Int]()
-            elif _mlirtype_is_eq[T, FloatLiteralOld]():
-                obj = value.get[i, FloatLiteralOld]()
+            elif _mlirtype_is_eq[T, Float64]():
+                obj = value.get[i, Float64]()
             elif _mlirtype_is_eq[T, Bool]():
                 obj = value.get[i, Bool]()
             elif _mlirtype_is_eq[T, StringRef]():
@@ -259,8 +259,8 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
             @parameter
             if _mlirtype_is_eq[T, Int]():
                 obj = value.get[i, Int]()
-            elif _mlirtype_is_eq[T, FloatLiteralOld]():
-                obj = value.get[i, FloatLiteralOld]()
+            elif _mlirtype_is_eq[T, Float64]():
+                obj = value.get[i, Float64]()
             elif _mlirtype_is_eq[T, Bool]():
                 obj = value.get[i, Bool]()
             elif _mlirtype_is_eq[T, StringRef]():

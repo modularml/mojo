@@ -1072,7 +1072,7 @@ fn _calc_initial_buffer_size(n0: Int) -> Int:
     return sign + _calc_initial_buffer_size_int64(n) + 1
 
 
-fn _calc_initial_buffer_size(n: FloatLiteralOld) -> Int:
+fn _calc_initial_buffer_size(n: Float64) -> Int:
     return 128 + 1  # Add 1 for the terminator
 
 
