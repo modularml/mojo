@@ -8,7 +8,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: is_kgen_debug
-# RUN: not not %mojo -debug-level full %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
+# RUN: not --crash %mojo -debug-level full %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
 
 # CHECK-FAIL-LABEL: test_fail

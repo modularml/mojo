@@ -3,7 +3,7 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: not not %mojo -debug-level full %s -an_argument | FileCheck %s
+# RUN: %mojo -debug-level full %s -an_argument | FileCheck %s
 # We pass an_argument here to avoid the compiler from optimizing the code
 # away.
 
