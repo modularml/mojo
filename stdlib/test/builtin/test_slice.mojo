@@ -61,3 +61,7 @@ fn main():
     # CHECK: 2
     # CHECK: foo
     print(slicable[1:2:"foo"])
+
+    # CHECK: False
+    alias is_end = Slice(None, None, None)._has_end()
+    print(is_end)
