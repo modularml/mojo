@@ -16,7 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 @value
 @nonmaterializable(Float64)
 @register_passable("trivial")
-struct FloatLiteral(Intable, Stringable):
+struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
     """Mojo floating point literal type."""
 
     alias fp_type = __mlir_type.`!kgen.float_literal`
