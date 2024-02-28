@@ -63,6 +63,11 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
         """
         return Self(__mlir_op.`kgen.int_literal.to_float_literal`(value.value))
 
+    alias nan = Self(__mlir_attr[`#kgen.float_literal<nan>`])
+    alias infinity = Self(__mlir_attr[`#kgen.float_literal<inf>`])
+    alias negative_infinity = Self(__mlir_attr[`#kgen.float_literal<neg_inf>`])
+    alias negative_zero = Self(__mlir_attr[`#kgen.float_literal<neg_zero>`])
+
     # ===------------------------------------------------------------------===#
     # Conversion Operators
     # ===------------------------------------------------------------------===#
@@ -77,11 +82,12 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
         return self
 
     @always_inline("nodebug")
-    fn __int__(self) -> Int:
+    fn __int_literal__(self) -> IntLiteral:
         """Casts the floating point value to an IntLiteral. If there is a
         fractional component, then the value is truncated towards zero.
 
-        Eg. `(4.5).__int__()` returns `4`, and `(-3.7)` returns `3`.
+        Eg. `(4.5).__int_literal__()` returns `4`, and `(-3.7).__int_literal__()`
+        returns `3`.
 
         Returns:
             The value as an integer.
@@ -90,13 +96,25 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
             __mlir_op.`kgen.float_literal.to_int_literal`(self.value)
         )
 
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Converts the FloatLiteral value to an Int. If there is a fractional
+        component, then the value is truncated towards zero.
+
+        Eg. `(4.5).__int__()` returns `4`, and `(-3.7).__int__()` returns `3`.
+
+        Returns:
+            The value as an integer.
+        """
+        return self.__int_literal__().__int__()
+
     # ===------------------------------------------------------------------===#
     # Unary Operators
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
-        """A double value is true if it is non-zero.
+        """A FloatLiteral value is true if it is non-zero.
 
         Returns:
             True if non-zero.
@@ -168,6 +186,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             The quotient of the two values.
         """
+        # TODO - Python raises an error on divide by 0.0 or -0.0
         return __mlir_op.`kgen.float_literal.binop`[
             oper = __mlir_attr.`#kgen<float_literal.binop_kind truediv>`
         ](self.value, rhs.value)
