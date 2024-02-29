@@ -156,11 +156,40 @@ def test_dtypepointer_string():
     ptr.free()
 
 
+def test_pointer_refitem():
+    var ptr = Pointer[Int].alloc(1)
+    ptr[] = 42
+    assert_equal(ptr[], 42)
+    ptr.free()
+
+
+def test_pointer_refitem_string():
+    alias payload = "$Modular!Mojo!HelloWorld^"
+    var ptr = Pointer[String].alloc(1)
+    ptr[] = payload
+    assert_equal(ptr[], payload)
+    ptr.free()
+
+
+def test_pointer_refitem_pair():
+    var ptr = Pointer[Pair].alloc(1)
+    ptr[].lo = 42
+    ptr[].hi = 24
+    #   NOTE: We want to write the below but we can't implement a generic assert_equal yet.
+    #   assert_equal(ptr[], Pair(42, 24))
+    assert_equal(ptr[].lo, 42)
+    assert_equal(ptr[].hi, 24)
+    ptr.free()
+
+
 def main():
     test_memcpy()
     test_memcpy_dtype()
     test_memcmp()
     test_memset()
 
-    test_pointer_string()
     test_dtypepointer_string()
+    test_pointer_refitem()
+    test_pointer_refitem_string()
+    test_pointer_refitem_pair()
+    test_pointer_string()

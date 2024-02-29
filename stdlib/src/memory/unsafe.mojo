@@ -499,6 +499,24 @@ struct Pointer[
     var address: Self.pointer_type
     """The pointed-to address."""
 
+    alias _mlir_ref_type = _LITRef[
+        type,
+        __mlir_attr.`1: i1`,
+        __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
+        address_space.value().value,
+    ].type
+
+    @always_inline("nodebug")
+    fn __refitem__(self) -> Self._mlir_ref_type:
+        """Enable subscript syntax `ref[]` to access the element.
+
+        Returns:
+            The MLIR reference for the Mojo compiler to use.
+        """
+        return __mlir_op.`lit.ref.from_pointer`[_type = Self._mlir_ref_type](
+            self.address
+        )
+
     @always_inline("nodebug")
     fn __init__() -> Self:
         """Constructs a null Pointer from the value of pop.pointer type.
