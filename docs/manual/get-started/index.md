@@ -88,9 +88,9 @@ Support for Windows will be added in a future release.
 
 Next, get started with **[Hello, world!](hello-world.html)**
 
-:::{.callout-note}
+:::note
 
-**Note:** To help us improve Mojo, we collect some basic system information and
+To help us improve Mojo, we collect some basic system information and
 crash reports. [Learn
 more](/mojo/faq.html#does-the-mojo-sdk-collect-telemetry).
 
@@ -138,58 +138,42 @@ brew upgrade modular
 ## Develop in the Mojo Playground
 
 Instead of downloading the Mojo SDK, you can also experiment with Mojo in our
-hosted Jupyter notebook environment called Mojo Playground. This is a hosted
-version of [JupyterLab](https://jupyterlab.readthedocs.io/en/latest/) that's
-running our latest Mojo kernel.
+online [Playground](/mojo/playground).
 
-To get access, just [log in to the Mojo Playground
-here](https://playground.modular.com).
+:::note
 
-![](./images/mojo-playground.png)
+The older [JupyterLab-based Playground](https://playground.modular.com) is still
+available until March 20th.
+
+:::
 
 ### What to expect
 
-- The Mojo Playground is a [JupyterHub](https://jupyter.org/hub) environment in
-which you get a private volume associated with your account, so you can create
-your own notebooks and they'll be saved across sessions.
+The Mojo Playground is a simple online editor where you can test out Mojo
+code for yourself.
 
-- We've included a handful of notebooks to show you Mojo basics and demonstrate
-its capabilities.
+- We've included a handful of code examples to show you Mojo basics and
+  demonstrate its capabilities.
 
-- The number of vCPU cores available in your cloud instance may vary, so
-baseline performance is not representative of the language. However, as you
-will see in the included `Matmul.ipynb` notebook, Mojo's
-relative performance over Python is significant.
+- This is an online sandbox and not useful for benchmarking.
+
+- You can download your code or share it as a gist, but there's no mechanism
+  for saving code in the Playground itself. Any changes will be lost when you
+  switch code examples (as well as in the event of a server refresh or update).
+  If you come up with something you want to save—save it locally!
+
+- The Playground environment doesn't include any Python packages. In the future
+  we intend to make some common Python packages available to import in the
+  Playground.
 
 - There might be some bugs. Please [report issues and feedback on
-GitHub](https://github.com/modularml/mojo/issues/new/choose).
-
-### Tips
-
-- If you want to keep any edits to the included notebooks, **rename the notebook
-files**. These files will reset upon any server refresh or update, sorry. So if
-you rename the files, your changes will be safe.
-
-- You can use `%%python` at the top of a notebook cell and write normal Python
-code. Variables, functions, and imports defined in a Python cell are available
-for access in subsequent Mojo cells.
+  GitHub](https://github.com/modularml/mojo/issues/new/choose).
 
 ### Caveats
 
-- Did we mention that the included notebooks will lose your changes?<br/>
-**Rename the files if you want to save your changes.**
+- The Mojo environment does not have network access, and you cannot install any
+  Mojo or Python packages. You only have access to Mojo and the Mojo standard
+  library.
 
-- The Mojo environment does not have network access, so you cannot install
-other tools or Python packages. However, we've included a variety of popular
-Python packages, such as `numpy`, `pandas`, and `matplotlib` (see how to
-[import Python modules](/mojo/manual/python/)).
-
-- Redefining implicit variables is not supported (variables without a `let` or
-`var` in front). If you’d like to redefine a variable across notebook cells,
-you must introduce the variable with  `var` (`let` variables are immutable).
-
-- You can’t use global variables inside functions—they’re only visible to
-other global variables.
-
-- For a longer list of things that don't work yet or have pain-points, see the
-[Mojo roadmap and sharp edges](/mojo/roadmap.html).
+- For a general list of things that don't work yet in Mojo or have pain-points,
+  see the [Mojo roadmap and sharp edges](/mojo/roadmap.html).
