@@ -8,6 +8,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from collections import Dict
 from collections.vector import DynamicVector
 from math import min as _min
 from os.atomic import Atomic
@@ -107,57 +108,44 @@ struct _RefCountedListRef:
         ptr.free()
 
 
-@register_passable
-struct _AttrsDictEntry(CollectionElement):
-    var key: StringLiteral
-    """The dictionary entry key. It is always a string literal."""
-    var value: _ObjectImpl
-    """The dictionary entry value."""
-
-    fn __copyinit__(existing: Self) -> Self:
-        return Self {key: existing.key, value: existing.value}
-
-
 struct _RefCountedAttrsDict:
     """This type contains the attribute dictionary for a dynamic object. The
     attribute dictionary is constructed once with a fixed number of elements.
     Those elements can be modified, but elements cannot be added or deleted
     after the dictionary is implemented. Because attribute are accessed
-    directly with `x.attr`, the key will always be a `StringLiteral`. Mojo
-    string literals are uniqued by the compiler, so we can compare pointers for
-    equality.
+    directly with `x.attr`, the key will always be a `StringLiteral`.
     """
 
     var refcount: Atomic[DType.index]
     """The number of live references to the attribute dictionary."""
-    # TODO: Actually implement a hash map. This is a list of pairs.
-    var impl: DynamicVector[_AttrsDictEntry]
-    """The implementation of the map. It is a list of pairs."""
+    var impl: Dict[StringLiteral, _ObjectImpl]
+    """The implementation of the map."""
 
     fn __init__(inout self):
         self.refcount = 1
-        self.impl = DynamicVector[_AttrsDictEntry]()
+        self.impl = Dict[StringLiteral, _ObjectImpl]()
 
     @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
-        for i in range(len(self.impl)):
-            var cur = self.impl[i]
-            if cur.key.data() == key.data():
-                self.impl[i].value.destroy()
-                self.impl[i] = _AttrsDictEntry {key: key, value: value}
-                return
+        if key in self.impl:
+            self.impl[key].destroy()
+            self.impl[key] = value
+            return
         raise Error(
-            "AttributeError: Object does not have an attribute of this name"
+            "AttributeError: Object does not have an attribute of name '"
+            + key
+            + "'"
         )
 
     @always_inline
     fn get(self, key: StringLiteral) raises -> _ObjectImpl:
-        for i in range(len(self.impl)):
-            var cur = self.impl[i]
-            if cur.key.data() == key.data():
-                return cur.value
+        var iter = self.impl.find(key)
+        if iter:
+            return iter.value()
         raise Error(
-            "AttributeError: Object does not have an attribute of this name"
+            "AttributeError: Object does not have an attribute of name '"
+            + key
+            + "'"
         )
 
 
@@ -200,11 +188,10 @@ struct _RefCountedAttrsDictRef:
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            var entry = _AttrsDictEntry {
-                key: values[i].key,
-                value: values[i].value._value.copy(),
-            }
-            __get_address_as_lvalue(ptr.address).impl.push_back(entry)
+            __get_address_as_lvalue(ptr.address).impl._insert(
+                values[i].key, values[i].value._value.copy()
+            )
+
         return Self {attrs: ptr.bitcast[Int8]()}
 
     @always_inline
@@ -220,11 +207,7 @@ struct _RefCountedAttrsDictRef:
         if prev != 1:
             return
 
-        # Run the destructor on the dictionary elements and then destroy the
-        # container.
-        var list = __get_address_as_owned_value(ptr.address).impl
-        for i in range(len(list)):
-            list[i].value.destroy()
+        # destroy the container.
         ptr.free()
 
 
@@ -1678,10 +1661,11 @@ struct object(IntableRaising, Boolable):
         else:
             _put("{")
             var ptr = self._value.get_obj_attrs_ptr().address
-            for k in range(len(__get_address_as_lvalue(ptr).impl)):
-                var value = __get_address_as_lvalue(ptr).impl[k]
+            var k: Int = 0
+            for entry in __get_address_as_lvalue(ptr).impl.items():
                 if k != 0:
                     _put(", ")
-                _printf("'%s' = ", value.key.data())
-                object(value.value.copy()).print()
+                _printf("'%s' = ", entry[].key)
+                object(entry[].value.copy()).print()
+                k += 1
             _put("}")

@@ -23,10 +23,8 @@ struct StringLiteral(
     Sized,
     IntableRaising,
     Stringable,
-    CollectionElement,
-    Hashable,
+    KeyElement,
     Boolable,
-    EqualityComparable,
 ):
     """This type represents a string literal.
 
