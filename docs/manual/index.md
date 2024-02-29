@@ -74,4 +74,4 @@ feedback](/mojo/community.html).
   - [Roadmap and sharp edges](roadmap.html)
   - [Changelog](changelog.html)
   - [FAQ](faq.html)
-  - [Community](community.html
+  - [Community](community.html)
