@@ -74,6 +74,12 @@ cannot be parsed from the string, then an error is raised.
 
 ### ❌ Removed
 
+- `let` declarations now produce a compile time error instead of a warning,
+  our next step in [removing let
+  declarations](https://github.com/modularml/mojo/blob/main/proposals/remove-let-decls.md).
+  The compiler still recognizes the `let` keyword for now in order to produce
+  a good error message, but that will be removed in subsequent releases.
+
 ### 🛠️ Fixed
 
 ## v24.1 (2024-02-29)
