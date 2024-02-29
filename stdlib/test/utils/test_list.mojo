@@ -34,6 +34,12 @@ fn test_dim_list():
     # CHECK: True
     print(lst1.all_known[1, 4]())
 
+    # CHECK: False
+    print(lst1.has_value[0]())
+
+    # CHECK: True
+    print(lst1.has_value[2]())
+
 
 # CHECK-LABEL: test_dim
 fn test_dim():
