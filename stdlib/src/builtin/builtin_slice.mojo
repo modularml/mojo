@@ -34,7 +34,7 @@ fn _default_or[T: AnyRegType](value: T, default: Int) -> Int:
 
 
 @register_passable("trivial")
-struct Slice(Sized):
+struct Slice(Sized, EqualityComparable):
     """Represents a slice expression.
 
     Objects of this type are generated when slice syntax is used within square

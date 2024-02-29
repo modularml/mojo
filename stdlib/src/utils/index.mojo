@@ -174,7 +174,7 @@ fn _bool_tuple_reduce[
 
 @value
 @register_passable("trivial")
-struct StaticIntTuple[size: Int](Sized, Stringable):
+struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
     """A base struct that implements size agnostic index functions.
 
     Parameters:
@@ -561,6 +561,21 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         )
 
     @always_inline
+    fn __ne__(self, rhs: StaticIntTuple[size]) -> Bool:
+        """Compares this tuple to another tuple for non-equality.
+
+        The tuples are non-equal if at least one element of LHS isn't equal to
+        the corresponding element from RHS.
+
+        Args:
+            rhs: The other tuple.
+
+        Returns:
+            The comparison result.
+        """
+        return not (self == rhs)
+
+    @always_inline
     fn __lt__(self, rhs: StaticIntTuple[size]) -> Bool:
         """Compares this tuple to another tuple using LT comparison.
 
@@ -655,21 +670,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable):
         return _bool_tuple_reduce[size, _reduce_and_fn](
             _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
         )
-
-    @always_inline
-    fn __ne__(self, rhs: StaticIntTuple[size]) -> Bool:
-        """Compares this tuple to another tuple for non-equality.
-
-        The tuples are non-equal if at least one element of LHS isn't equal to
-        the corresponding element from RHS.
-
-        Args:
-            rhs: The other tuple.
-
-        Returns:
-            The comparison result.
-        """
-        return not (self == rhs)
 
     fn __str__(self) -> String:
         """Get the tuple as a string.

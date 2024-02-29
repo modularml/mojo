@@ -21,7 +21,13 @@ from .string import _atol
 @value
 @register_passable("trivial")
 struct StringRef(
-    Sized, IntableRaising, CollectionElement, Stringable, Hashable, Boolable
+    Sized,
+    IntableRaising,
+    CollectionElement,
+    Stringable,
+    Hashable,
+    Boolable,
+    EqualityComparable,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters

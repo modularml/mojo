@@ -240,7 +240,7 @@ fn bitcast[
 
 @value
 @register_passable("trivial")
-struct AddressSpace:
+struct AddressSpace(EqualityComparable):
     """Address space of the pointer."""
 
     var _value: Int
@@ -292,6 +292,18 @@ struct AddressSpace:
           True if the two address spaces are equal and False otherwise.
         """
         return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __ne__(self, other: AddressSpace) -> Bool:
+        """True if the two address spaces are inequal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are inequal and False otherwise.
+        """
+        return not self == other
 
 
 # ===----------------------------------------------------------------------===#

@@ -9,7 +9,7 @@
 @value
 @nonmaterializable(Int)
 @register_passable("trivial")
-struct IntLiteral(Intable, Stringable, Boolable):
+struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and
     must be lowered to other integer types (like Int), but allow for

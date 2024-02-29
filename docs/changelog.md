@@ -70,6 +70,8 @@ cannot be parsed from the string, then an error is raised.
 - `EqualityComparable` trait now requires `__ne__` function for conformance in addition
   to the previously existing `__eq__` function.
 
+- Many types now declare conformance to `EqualityComparable` trait.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
