@@ -11,19 +11,21 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from math import iota
+from sys.info import num_logical_cores
+
 # RUN: %mojo -debug-level full %s | FileCheck %s
 import benchmark
-from complex import ComplexSIMD, ComplexFloat64
-from math import iota
+from algorithm import parallelize, vectorize
+from complex import ComplexFloat64, ComplexSIMD
 from python import Python
 from runtime.llcl import Runtime
-from sys.info import num_logical_cores
-from algorithm import parallelize, vectorize
 from tensor import Tensor
+
 from utils.index import Index
-from python import Python
 
 alias float_type = DType.float64
+alias int_type = DType.int64
 alias simd_width = 2 * simdwidthof[float_type]()
 
 alias width = 960
@@ -38,14 +40,14 @@ alias max_y = 1.5
 
 fn mandelbrot_kernel_SIMD[
     simd_width: Int
-](c: ComplexSIMD[float_type, simd_width]) -> SIMD[float_type, simd_width]:
+](c: ComplexSIMD[float_type, simd_width]) -> SIMD[int_type, simd_width]:
     """A vectorized implementation of the inner mandelbrot computation."""
-    let cx = c.re
-    let cy = c.im
+    var cx = c.re
+    var cy = c.im
     var x = SIMD[float_type, simd_width](0)
     var y = SIMD[float_type, simd_width](0)
     var y2 = SIMD[float_type, simd_width](0)
-    var iters = SIMD[float_type, simd_width](0)
+    var iters = SIMD[int_type, simd_width](0)
 
     var t: SIMD[DType.bool, simd_width] = True
     for i in range(MAX_ITERS):
@@ -60,32 +62,33 @@ fn mandelbrot_kernel_SIMD[
 
 
 fn main() raises:
-    let t = Tensor[float_type](height, width)
+    var t = Tensor[int_type](height, width)
 
     @parameter
     fn worker(row: Int):
-        let scale_x = (max_x - min_x) / width
-        let scale_y = (max_y - min_y) / height
+        var scale_x = (max_x - min_x) / width
+        var scale_y = (max_y - min_y) / height
 
+        @__copy_capture(scale_x, scale_y)
         @parameter
         fn compute_vector[simd_width: Int](col: Int):
             """Each time we operate on a `simd_width` vector of pixels."""
-            let cx = min_x + (col + iota[float_type, simd_width]()) * scale_x
-            let cy = min_y + row * scale_y
-            let c = ComplexSIMD[float_type, simd_width](cx, cy)
+            var cx = min_x + (col + iota[float_type, simd_width]()) * scale_x
+            var cy = min_y + row * scale_y
+            var c = ComplexSIMD[float_type, simd_width](cx, cy)
             t.data().simd_store[simd_width](
                 row * width + col, mandelbrot_kernel_SIMD[simd_width](c)
             )
 
         # Vectorize the call to compute_vector where call gets a chunk of pixels.
-        vectorize[simd_width, compute_vector](width)
+        vectorize[compute_vector, simd_width, width]()
 
     @parameter
     fn bench[simd_width: Int]():
         for row in range(height):
             worker(row)
 
-    let vectorized = benchmark.run[bench[simd_width]](
+    var vectorized = benchmark.run[bench[simd_width]](
         max_runtime_secs=0.5
     ).mean()
     print("Number of threads:", num_logical_cores())
@@ -95,10 +98,9 @@ fn main() raises:
         # Parallelized
         @parameter
         fn bench_parallel[simd_width: Int]():
-            parallelize[worker](rt, height, height)
-            # parallelize[worker](height, height)
+            parallelize[worker](height, height)
 
-        let parallelized = benchmark.run[bench_parallel[simd_width]](
+        var parallelized = benchmark.run[bench_parallel[simd_width]](
             max_runtime_secs=0.5
         ).mean()
         print("Parallelized:", parallelized, "s")

@@ -490,7 +490,7 @@ fn foo():
     fn bar(): # static function definition bound to 'bar'
         pass
     bar() # direct call
-    let f = bar # materialize 'bar' as a dynamic value
+    var f = bar # materialize 'bar' as a dynamic value
     f() # indirect call
 ```
 
@@ -511,7 +511,7 @@ values.
 
 ```mojo
 def pick_func(cond)  -> def() capturing:
-    let result: def() capturing # Mojo function type
+    var result: def() capturing # Mojo function type
     if cond:
         def bar0(): return 42
         result = bar0
@@ -579,8 +579,8 @@ struct StringRef:
 fn bar(x: StringRef): pass
 
 fn foo():
-    let s: String = "1234"
-    let ref: StringRef = s # unsafe reference
+    var s: String = "1234"
+    var ref: StringRef = s # unsafe reference
     bar(ref)
     _ = s # keep the backing memory alive!
 ```
@@ -605,7 +605,7 @@ fn printIntRef(x: UnsafeIntRef):
 
 var c: Int = 10
 # "reference" operator
-let ref = UnsafeIntRef(__get_lvalue_as_address(c)) # &Int -> Pointer[Int]
+var ref = UnsafeIntRef(__get_lvalue_as_address(c)) # &Int -> Pointer[Int]
 ```
 
 ### Parameter closure captures are unsafe references
@@ -652,7 +652,7 @@ fn print_it[f: fn() capturing -> String]():
     print(f())
 
 fn call_it():
-    let s: String = "hello world"
+    var s: String = "hello world"
     @parameter
     fn inner() -> String:
         return s # 's' captured by reference, so a copy is made here
@@ -666,7 +666,7 @@ explicitly.
 
 ```mojo
 fn call_it():
-    let s: String = "hello world"
+    var s: String = "hello world"
     @parameter
     fn inner() -> String:
         return s
@@ -683,7 +683,7 @@ out-of-bounds access (it will crash), and `Int` does not throw on divide by
 zero. In other words, most standard library types are considered "unsafe".
 
 ```mojo
-let v = DynamicVector[Int](0)
+var v = DynamicVector[Int](capacity=0)
 print(v[1]) # could crash or print garbage values (undefined behaviour)
 
 print(1//0) # does not raise and could print anything (undefined behaviour)
@@ -717,3 +717,25 @@ at the moment.
 The upstream dialects available in the Playground are the
 [`index`](https://mlir.llvm.org/docs/Dialects/IndexOps/) dialect and the
 [`LLVM`](https://mlir.llvm.org/docs/Dialects/LLVM/) dialect.
+
+### `@value` is limited with trait conformance check
+
+Structs with `@value` decorator still need to explicitly provide dundner
+methods such as `__init__`, `__copyinit__`, and `__moveinit__` when
+both of the following are true:
+
+- The struct has one or more fields that are self referencing
+  (such as `Pointer[Self]`).
+- The struct declares conformance to a trait that requires these dundner
+  methods.
+
+```mojo
+# test.mojo
+@value
+struct A(CollectionElement):
+    # error: 'DynamicVector' parameter #0 has 'CollectionElement' type, but value has type 'A'
+    var a: DynamicVector[Self]
+```
+
+In the example above, adding the `__moveinit__()` and `__copyinit__()` methods
+required by `CollectionElement` resolves this error.
