@@ -74,7 +74,7 @@ cannot be parsed from the string, then an error is raised.
 
 ### 🛠️ Fixed
 
-## 24.1 (2024-02-29)
+## v24.1 (2024-02-29)
 
 ### 🔥 Legendary
 
