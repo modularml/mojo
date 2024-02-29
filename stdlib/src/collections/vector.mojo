@@ -523,6 +523,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
             i: The index of the element.
             value: The value to assign.
         """
+        debug_assert(-self.size <= i < self.size, "index must be within bounds")
 
         var normalized_idx = i
         if i < 0:
@@ -531,6 +532,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         _ = (self.data + normalized_idx).take_value()
         (self.data + normalized_idx).emplace_value(value ^)
 
+    @always_inline
     fn __getitem__(self, i: Int) -> T:
         """Gets a copy of the vector element at the given index.
 
@@ -542,9 +544,13 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         Returns:
             A copy of the element at the given index.
         """
+        debug_assert(-self.size <= i < self.size, "index must be within bounds")
+
+        var normalized_idx = i
         if i < 0:
-            return self[len(self) + i]
-        return __get_address_as_lvalue((self.data + i).value)
+            normalized_idx += len(self)
+
+        return __get_address_as_lvalue((self.data + normalized_idx).value)
 
     # TODO(30737): Replace __getitem__ with this as __refitem__, but lots of places use it
     fn __get_ref[
@@ -561,6 +567,10 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         Returns:
             An immutable reference to the element at the given index.
         """
+        var normalized_idx = i
+        if i < 0:
+            normalized_idx += Reference(self)[].size
+
         # Mutability gets set to the local mutability of this
         # pointer value, ie. because we defined it with `let` it's now an
         # "immutable" reference regardless of the mutability of `self`.
@@ -569,7 +579,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         var base_ptr = Reference(self)[].data
         return __mlir_op.`lit.ref.from_pointer`[
             _type = Reference[T, mutability, self_life].mlir_ref_type
-        ]((base_ptr + i).value)
+        ]((base_ptr + normalized_idx).value)
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
