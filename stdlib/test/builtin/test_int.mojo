@@ -3,101 +3,78 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo -debug-level full %s
 
 from math import divmod, max, min
 
+from testing import *
 
-# CHECK-LABEL: test_int
-fn test_int():
-    print("== test_int")
-    # CHECK: 3
-    print(Int(3))
-    # CHECK: 5
-    print(Int(Int(5)))
-    # CHECK: 6
-    print(Int(3) + Int(3))
 
+def test_constructors():
+    var i1 = Int(3)  # Constructible from IntLiteral
+    var i2 = Int(Int(5))  # Constructible from Int
+
+
+def test_add():
+    assert_equal(6, Int(3) + Int(3))
+
+
+def test_sub():
+    assert_equal(3, Int(4) - Int(1))
+    assert_equal(5, Int(6) - Int(1))
+
+
+def test_div():
     var n = Int(5)
     var d = Int(2)
-    # CHECK: 2.5
-    print(n / d)
-    # CHECK: 2
+    assert_equal(2.5, n / d)
     n /= d
-    print(n)
+    assert_equal(2, n)
 
-    # CHECK: 1
-    print(Int(3) ** Int(0))
-    # CHECK: 27
-    print(Int(3) ** Int(3))
-    # CHECK: 81
-    print(Int(3) ** Int(4))
-    # CHECK: 3
-    print(Int(4) - Int(1))
-    # CHECK: 5
-    print(Int(6) - Int(1))
 
+def test_pow():
+    assert_equal(1, Int(3) ** Int(0))
+    assert_equal(27, Int(3) ** Int(3))
+    assert_equal(81, Int(3) ** Int(4))
+
+
+def test_int():
     var a = 0
     var b = a + Int(1)
-    # CHECK: True
-    print(min(a, b) == a)
-    # CHECK: True
-    print(max(a, b) == b)
+    assert_equal(a, min(a, b))
+    assert_equal(b, max(a, b))
 
 
-# CHECK-LABEL: test_floordiv
-fn test_floordiv():
-    print("== test_floordiv")
-
-    # CHECK: 1
-    print(Int(2) // Int(2))
-
-    # CHECK: 0
-    print(Int(2) // Int(3))
-
-    # CHECK: -1
-    print(Int(2) // Int(-2))
-
-    # CHECK: -50
-    print(Int(99) // Int(-2))
-
-    # CHECK: -1
-    print(Int(-1) // Int(10))
+def test_floordiv():
+    assert_equal(1, Int(2) // Int(2))
+    assert_equal(0, Int(2) // Int(3))
+    assert_equal(-1, Int(2) // Int(-2))
+    assert_equal(-50, Int(99) // Int(-2))
+    assert_equal(-1, Int(-1) // Int(10))
 
 
-# CHECK-LABEL: test_mod
-fn test_mod():
-    print("== test_mod")
-
-    # CHECK: 0
-    print(Int(99) % Int(1))
-    # CHECK: 0
-    print(Int(99) % Int(3))
-    # CHECK: -1
-    print(Int(99) % Int(-2))
-    # CHECK: 3
-    print(Int(99) % Int(8))
-    # CHECK: -5
-    print(Int(99) % Int(-8))
-    # CHECK: 0
-    print(Int(2) % Int(-1))
-    # CHECK: 0
-    print(Int(2) % Int(-2))
-    # CHECK: -1
-    print(Int(3) % Int(-2))
-    # CHECK: 1
-    print(Int(-3) % Int(2))
+def test_mod():
+    assert_equal(0, Int(99) % Int(1))
+    assert_equal(0, Int(99) % Int(3))
+    assert_equal(-1, Int(99) % Int(-2))
+    assert_equal(3, Int(99) % Int(8))
+    assert_equal(-5, Int(99) % Int(-8))
+    assert_equal(0, Int(2) % Int(-1))
+    assert_equal(0, Int(2) % Int(-2))
+    assert_equal(-1, Int(3) % Int(-2))
+    assert_equal(1, Int(-3) % Int(2))
 
 
-# CHECK-LABEL: test_divmod
-fn test_divmod():
-    print("== test_divmod")
-
-    # CHECK: (-2, 1)
-    print(divmod(-3, 2))
+def test_divmod():
+    assert_equal(StaticIntTuple[2](-2, 1), divmod(-3, 2))
 
 
-fn main():
+def main():
+    test_constructors()
+    test_add()
+    test_sub()
+    test_div()
+    test_pow()
     test_int()
     test_floordiv()
     test_mod()
