@@ -67,11 +67,11 @@ feedback](/mojo/community.html).
 
 - **Tools**
 
-  - [Debugging](tools/debugging.html)
+  - [Debugging](../tools/debugging.html)
 
 - **Project information**
 
-  - [Roadmap and sharp edges](roadmap.html)
-  - [Changelog](changelog.html)
-  - [FAQ](faq.html)
-  - [Community](community.html)
+  - [Roadmap and sharp edges](../roadmap.html)
+  - [Changelog](../changelog.html)
+  - [FAQ](../faq.html)
+  - [Community](../community.html)
