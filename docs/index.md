@@ -39,10 +39,5 @@ and seamlessly inter-op with the Python ecosystem.
 
 The Mojo SDK is available for Linux and macOS! 🔥
 
-<p><a class="modLink" href="https://developer.modular.com/download">Get the Mojo
-SDK</a></p>
-
-<p><a class="modLink" href="/mojo/community.html">Join our community</a></p>
-
 :::{#docs}
 :::
