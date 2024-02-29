@@ -18,26 +18,16 @@ It doesn't include all internal implementation changes.
 If you don't have Mojo yet, see the [get started
 guide](/mojo/manual/get-started/#get-the-mojo-sdk).
 
-To see your current Mojo version, run this:
+To see your Mojo version, run this:
 
 ```sh
 mojo --version
 ```
 
-To update Mojo to the latest release, run this:
+To update Mojo, first [update `modular`](/cli/#description), and then run this:
 
 ```sh
 modular update mojo
-```
-
-However, if your current version is 0.3.0 or lower, you'll need these additional
-commands:
-
-```sh
-sudo apt-get update
-sudo apt-get install modular
-modular clean
-modular install mojo
 ```
 
 [//]: # Here's the template to use when starting a new batch of notes:
