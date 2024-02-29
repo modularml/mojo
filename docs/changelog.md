@@ -18,27 +18,518 @@ It doesn't include all internal implementation changes.
 If you don't have Mojo yet, see the [get started
 guide](/mojo/manual/get-started/#get-the-mojo-sdk).
 
-To see your current Mojo version, run this:
+To see your Mojo version, run this:
 
 ```sh
 mojo --version
 ```
 
-To update Mojo to the latest release, run this:
+To update Mojo, first [update `modular`](/cli/#description), and then run this:
 
 ```sh
 modular update mojo
 ```
 
-However, if your current version is 0.3.0 or lower, you'll need these additional
-commands:
+## v24.1 (2024-02-29)
 
-```sh
-sudo apt-get update
-sudo apt-get install modular
-modular clean
-modular install mojo
-```
+### 🔥 Legendary
+
+- Mojo is now bundled with [the MAX platform](/max)!
+
+  As such, the Mojo package version now matches the MAX version, which follows
+  a `YY.MAJOR.MINOR` version scheme. Because this is our first release in 2024,
+  that makes this version `24.1`.
+
+- Mojo debugging support is here! The Mojo VS Code extension includes debugger
+  support. For details, see [Debugging](/mojo/tools/debugging) in the Mojo
+  Manual.
+
+### ⭐️ New
+
+- We now have a [`Set`](/mojo/stdlib/collections/set.html#set) type in our
+  collections! `Set` is backed by a `Dict`, so it has fast add, remove, and `in`
+  checks, and requires member elements to conform to the `KeyElement` trait.
+
+  ```mojo
+  from collections import Set
+
+  var set = Set[Int](1, 2, 3)
+  print(len(set))  # 3
+  set.add(4)
+
+  for element in set:
+      print(element[])
+
+  set -= Set[Int](3, 4, 5)
+  print(set == Set[Int](1, 2))  # True
+  print(set | Set[Int](0, 1) == Set[Int](0, 1, 2))  # True
+  let element = set.pop()
+  print(len(set))  # 1
+  ```
+
+- Mojo now supports the `x in y` expression as syntax sugar for
+  `y.__contains__(x)` as well as `x not in y`.
+
+- Mojo now has support for keyword-only arguments and parameters. For example:
+
+  ```mojo
+  fn my_product(a: Int, b: Int = 1, *, c: Int, d: Int = 2):
+      print(a * b * c * d)
+
+  my_product(3, c=5)     # prints '30'
+  my_product(3, 5, d=7)  # error: missing 1 required keyword-only argument: 'c'
+  ```
+
+  This includes support for declaring signatures that use both variadic and
+  keyword-only arguments/parameters. For example, the following is now possible:
+
+  ```mojo
+  fn prod_with_offset(*args: Int, offset: Int = 0) -> Int:
+    var res = 1
+    for i in range(len(args)):
+        res *= args[i]
+    return res + offset
+
+  print(prod_with_offset(2, 3, 4, 10))         # prints 240
+  print(prod_with_offset(2, 3, 4, offset=10))  # prints 34
+  ```
+
+  Note that variadic keyword-only arguments/parameters (for example, `**kwargs`)
+  are not supported yet. That is, the following is not allowed:
+
+  ```mojo
+  fn variadic_kw_only(a: Int, **kwargs): ...
+  ```
+
+  For more information, see
+  [Positional-only and keyword-only arguments](/mojo/manual/functions#positional-only-and-keyword-only-arguments)
+  in the Mojo Manual.
+
+- The `print()` function now accepts a keyword-only argument for the `end`
+  which is useful for controlling whether a newline is printed or not
+  after printing the elements.  By default, `end` defaults to "\n" as before.
+
+- The Mojo SDK can now be installed on AWS Graviton instances.
+
+- A new version of the [Mojo Playground](/mojo/playground) is available. The new
+  playground is a simple interactive editor for Mojo code, similar to the Rust
+  Playground or Go Playground. The old
+  [JupyterLab based playground](https://playground.modular.com) will remain
+  online until March 20th.
+
+- The Mojo LSP server will now generate fixits for populating empty
+  documentation strings:
+
+  ```mojo
+  fn foo(arg: Int):
+    """""" # Unexpected empty documentation string
+  ```
+
+  Applying the fixit from above will generate:
+
+  ```mojo
+  fn foo(arg: Int):
+    """[summary].
+
+    Args:
+        arg: [description].
+    """
+  ```
+
+- Added new `*_` syntax that allows users to explicitly unbind any number of
+  positional parameters. For example:
+
+  ```mojo
+  struct StructWithDefault[a: Int, b: Int, c: Int = 8, d: Int = 9]: pass
+
+  alias all_unbound = StructWithDefault[*_]
+  # equivalent to
+  alias all_unbound = StructWithDefault[_, _, _, _]
+
+  alias first_bound = StructWithDefault[5, *_]
+  # equivalent to
+  alias first_bound = StructWithDefault[5, _, _, _]
+
+  alias last_bound = StructWithDefault[*_, 6]
+  # equivalent to
+  alias last_bound = StructWithDefault[_, _, _, 6]
+
+  alias mid_unbound = StructWithDefault[3, *_, 4]
+  # equivalent to
+  alias mid_unbound = StructWithDefault[3, _, _, 4]
+  ```
+
+  As demonstrated above, this syntax can be used to explicitly unbind an
+  arbitrary number of parameters, at the beginning, at the end, or in the
+  middle of the operand list. Since these unbound parameters must be explicitly
+  specified at some point, default values for these parameters are not applied.
+  For example:
+
+  ```mojo
+  alias last_bound = StructWithDefault[*_, 6]
+  # When using last_bound, you must specify a, b, and c. last_bound
+  # doesn't have a default value for `c`.
+  var s = last_bound[1, 2, 3]()
+  ```
+
+  For more information see the Mojo Manual sections on
+  [partially-bound types](/mojo/manual/parameters/#fully-bound-partially-bound-and-unbound-types)
+  and
+  [automatic parameterization of functions](/mojo/manual/parameters/#automatic-parameterization-of-functions).
+
+- [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) now
+  supports iteration. Iteration values are instances of
+  [Reference](/mojo/stdlib/memory/unsafe#reference) and require dereferencing:
+
+  ```mojo
+  var v: DynamicVector[String]()
+  v.append("Alice")
+  v.append("Bob")
+  v.append("Charlie")
+  for x in v:
+    x[] = str("Hello, ") + x[]
+  for x in v:
+    print(x[])
+  ```
+
+- `DynamicVector` now has
+  [`reverse()`](/mojo/stdlib/collections/vector.html#reverse) and
+  [`extend()`](/mojo/stdlib/collections/vector.html#extend) methods.
+
+- The `mojo package` command now produces compilation agnostic packages.
+  Compilation options such as O0, or --debug-level, are no longer needed or
+  accepted. As a result, packages are now smaller, and extremely portable.
+
+- Initializers for `@register_passable` values can (and should!) now be
+  specified with `inout self` arguments just like memory-only types:
+
+  ```mojo
+  @register_passable
+  struct YourPair:
+    var a: Int
+    var b: Int
+    fn __init__(inout self):
+        self.a = 42
+        self.b = 17
+    fn __copyinit__(inout self, existing: Self):
+        self.a = existing.a
+        self.b = existing.b
+  ```
+
+  This form makes the language more consistent, more similar to Python, and
+  easier to implement advanced features for.  There is also no performance
+  impact of using this new form: the compiler arranges to automatically return
+  the value in a register without requiring you to worry about it.
+
+  The older `-> Self:` syntax is still supported in this release, but will be
+  removed in a subsequent one, so please migrate your code.  One thing to watch
+  out for: a given struct should use one style or the other, mixing some of
+  each won't work well.
+
+- The standard library `slice` type has been renamed to
+  [`Slice`](/mojo/stdlib/builtin/builtin_slice#slice), and a `slice`
+  function has been introduced.  This makes Mojo closer to Python and makes the
+  `Slice` type follow the naming conventions of other types like `Int`.
+
+- "Slice" syntax in subscripts is no longer hard coded to the builtin `slice`
+  type: it now works with any type accepted by a container's `__getitem__()`
+  method. For example:
+
+  ```mojo
+  @value
+  struct UnusualSlice:
+    var a: Int
+    var b: Float64
+    var c: String
+
+  struct YourContainer:
+    fn __getitem__(self, slice: UnusualSlice) -> T: ...
+  ```
+
+  Given this implementation, you can subscript into an instance of
+  `YourContainer` like `yc[42:3.14:"🔥"]` and the three values are passed to the
+  `UnusualSlice` constructor.
+
+- The `__refitem__()` accessor method may now return a
+  [`Reference`](/mojo/stdlib/memory/unsafe#reference) instead of having to
+  return an MLIR internal reference type.
+
+- Added [`AnyPointer.move_into()`](/mojo/stdlib/memory/anypointer.html#move_into)
+  method, for moving a value from one pointer memory location to another.
+
+- Added built-in [`hex()`](mojo/stdlib/builtin/hex#hex) function, which can be
+  used to format any value whose type implements the
+  [`Intable`](/mojo/stdlib/builtin/int#intable) trait as a hexadecimal string.
+
+- [`PythonObject`](/mojo/stdlib/python/object#pythonobject) now implements
+  `__is__` and `__isnot__` so that you can use expressions of the form `x is y`
+  and `x is not y` with `PythonObject`.
+
+- [`PythonObject`](/mojo/stdlib/python/object#pythonobject) now conforms to the
+  `SizedRaising` trait. This means the built-in
+  [`len()`](/mojo/stdlib/builtin/len#len) function now works on `PythonObject`.
+
+- The `os` package now contains the [`stat()`](/mojo/stdlib/os/fstat#stat)
+  and [`lstat()`](/mojo/stdlib/os/fstat#lstat) functions.
+
+- A new [`os.path`](/mojo/stdlib/os/path/path) package now allows you to query
+  properties on paths.
+
+- The `os` package now has a
+  [`PathLike`](/mojo/stdlib/os/pathlike.html#pathlike) trait. A struct conforms
+  to the `PathLike` trait by implementing the `__fspath__()` function.
+
+- The [`pathlib.Path`](/mojo/stdlib/pathlib/path#path) now has functions to
+  query properties of the path.
+
+- The [`listdir()`](/mojo/stdlib/pathlib/path#listdir) method now exists on
+  [`pathlib.Path`](/mojo/stdlib/pathlib/path) and also exists in the `os`
+  module to work on `PathLike` structs. For example, the following sample
+  lists all the directories in the `/tmp` directory:
+
+  ```mojo
+  from pathlib import Path
+
+  fn walktree(top: Path, inout files: DynamicVector[Path]):
+      try:
+          var ls = top.listdir()
+          for i in range(len(ls)):
+              var child = top / ls[i]
+              if child.is_dir():
+                  walktree(child, files)
+              elif child.is_file():
+                  files.append(child)
+              else:
+                  print("Skipping '" + str(child) + "'")
+      except:
+          return
+
+  fn main():
+      var files = DynamicVector[Path]()
+
+      walktree(Path("/tmp"), files)
+
+      for i in range(len(files)):
+          print(files[i])
+  ```
+
+- The [`find()`](/mojo/stdlib/builtin/string_literal#find),
+  [`rfind()`](/mojo/stdlib/builtin/string_literal#rfind),
+  [`count()`](/mojo/stdlib/builtin/string_literal#count), and
+  [`__contains__()`](/mojo/stdlib/builtin/string_literal#__contains__) methods
+  now work on string literals. This means that you can write:
+
+  ```mojo
+  if "Mojo" in "Hello Mojo":
+    ...
+  ```
+
+- Breakpoints can now be inserted programmatically within the code using the
+  builtin [`breakpoint()`](/mojo/stdlib/builtin/breakpoint#breakpoint) function.
+
+  Note: on Graviton instances, the debugger might not be able to resume after
+  hitting this kind of breakpoint.
+
+- Added a builtin [`Boolable`](/mojo/stdlib/builtin/bool#boolable) trait that
+  describes a type that can be represented as a boolean value. To conform to the
+  trait, a type must implement the `__bool__()` method.
+
+- Modules within packages can now use purely relative `from` imports:
+
+  ```mojo
+  from . import another_module
+  ```
+
+- Trivial types, like MLIR types and function types, can now be bound implicitly
+  to traits that require copy constructors or move constructors, such as
+  [`Movable`](/mojo/stdlib/builtin/value.html#movable),
+  [`Copyable`](/mojo/stdlib/builtin/value.html#copyable), and
+  [`CollectionElement`](/mojo/stdlib/builtin/value#collectionelement).
+
+- A new magic `__lifetime_of(expr)` call will yield the lifetime of a memory
+  value.  We hope and expect that this will eventually be replaced by
+  `Reference(expr).lifetime` as the parameter system evolves, but this is
+  important in the meantime for use in function signatures.
+
+- A new magic `__type_of(expr)` call will yield the type of a value. This allows
+  one to refer to types of other variables. For example:
+
+  ```mojo
+  fn my_function(x: Int, y: __type_of(x)) -> Int:
+    let z : __type_of(x) = y
+    return z
+  ```
+
+### 🦋 Changed
+
+- As another step towards [removing let
+  declarations](https://github.com/modularml/mojo/blob/main/proposals/remove-let-decls.md)
+  we have removed support for let declarations inside the compiler.  To ease
+  migration, we parse `let` declarations as a `var` declaration so your code
+  won't break.  We emit a warning about this, but please switch your code to
+  using `var` explicitly, because this migration support will be removed in a
+  subsequent update.
+
+  ```mojo
+  fn test():
+    # treated as a var, but please update your code!
+    let x = 42  # warning: 'let' is being removed, please use 'var' instead
+    x = 9
+  ```
+
+- It is no longer possible to explicitly specify implicit argument parameters in
+  [automatically parameterized
+  functions](/mojo/manual/parameters/#automatic-parameterization-of-functions)).
+  This ability was an oversight and this is now an error:
+
+  ```mojo
+  fn autoparameterized(x: SIMD):
+      pass
+
+  autoparameterized[DType.int32, 1](3) # error: too many parameters
+  ```
+
+- `vectorize_unroll` has been removed, and
+  [`vectorize`](/mojo/stdlib/algorithm/functional#vectorize) now has a parameter
+  named `unroll_factor` with a default value of 1. Increasing `unroll_factor`
+  may improve performance at the cost of binary size. See the
+  [loop unrolling blog here](https://www.modular.com/blog/what-is-loop-unrolling-how-you-can-speed-up-mojo)
+  for more details.
+
+- The `vectorize` signatures have changed with the closure `func` moved to the
+  first parameter:
+
+  ```mojo
+  vectorize[func, width, unroll_factor = 1](size)
+  vectorize[func, width, size, unroll_factor = 1]()
+  ```
+
+  The doc string has been updated with examples demonstrating the difference
+  between the two signatures.
+
+- The `unroll` signatures have changed with the closure `func` moved to the
+  first parameter:
+
+  ```mojo
+  unroll[func, unroll_count]()
+  ```
+
+- The signature of the [`NDBuffer`](/mojo/stdlib/memory/buffer#ndbuffer) and
+  [`Buffer`](/mojo/stdlib/memory/buffer#buffer) types have changed. Now, both
+  take the type as the first parameter and no longer require the shape
+  parameter. This allows you to use these types and have sensible defaults.
+  For example:
+
+  ```mojo
+  NDBuffer[DType.float32, 3]
+  ```
+
+  is equivalent to
+
+  ```mojo
+  NDBuffer[DType.float32, 3, DimList.create_unknown[3]()]
+  ```
+
+  Users can still specify the static shape (if known) to the type:
+
+  ```mojo
+  NDBuffer[DType.float32, 3, DimList(128, 128, 3)]
+  ```
+
+- The error message for missing function arguments is improved: instead of
+  describing the number of arguments (e.g. `callee expects at least 3 arguments,
+  but 1 was specified`) the missing arguments are now described by
+  name (e.g. `missing 2 required positional arguments: 'b', 'c'`).
+
+- The [`CollectionElement`](/mojo/stdlib/builtin/value#collectionelement) trait
+  is now a built-in trait and has been removed from `collections.vector`.
+
+- The `DynamicVector(capacity: Int)` constructor has been changed to take
+  `capacity` as a keyword-only argument to prevent implicit conversion from
+  `Int`.
+
+- [`Variant.get[T]()`](/mojo/stdlib/utils/variant#get) now returns a
+  [`Reference`](/mojo/stdlib/memory/unsafe#reference) to the value rather than a
+  copy.
+
+- The [`String`](/mojo/stdlib/builtin/string.html#string) methods `tolower()`
+  and `toupper()` have been renamed to `str.lower()` and `str.upper()`.
+
+- The `ref` and `mutref` identifiers are no longer reserved as Mojo keywords.
+  We originally thought about using those as language sugar for references, but
+  we believe that generic language features combined with the
+  [`Reference`](/mojo/stdlib/memory/unsafe#reference) type will provide a good
+  experience without dedicated sugar.
+
+### 🛠️ Fixed
+
+- [#435](https://github.com/modularml/mojo/issues/435)
+  Structs with Self type don't always work.
+- [#1540](https://github.com/modularml/mojo/issues/1540)
+  Crash in register_passable self referencing struct.
+- [#1664](https://github.com/modularml/mojo/issues/1664) - Improve error
+  message when `StaticTuple` is constructed with a negative size for
+  the number of elements.
+- [#1679](https://github.com/modularml/mojo/issues/1679) - crash on SIMD of zero
+  elements.
+- Various crashes on invalid code:
+  [#1230](https://github.com/modularml/mojo/issues/1230),
+  [#1699](https://github.com/modularml/mojo/issues/1699),
+  [#1708](https://github.com/modularml/mojo/issues/1708)
+- [#1223](https://github.com/modularml/mojo/issues/1223) - Crash when parametric
+  function is passed as (runtime) argument. The parser now errors out instead.
+- [#1530](https://github.com/modularml/mojo/issues/1530) - Crash during
+  diagnostic emission for parameter deduction failure.
+- [#1538](https://github.com/modularml/mojo/issues/1538) and [#1607](
+  https://github.com/modularml/mojo/issues/1607) - Crash when returning type
+  value instead of instance of expected type. This is a common mistake and the
+  error now includes a hint to point users to the problem.
+- [#1613](https://github.com/modularml/mojo/issues/1613) - Wrong type name in
+  error for incorrect `self` argument type in trait method declaration.
+- [#1670](https://github.com/modularml/mojo/issues/1670) - Crash on implicit
+  conversion in a global variable declaration.
+- [#1741](https://github.com/modularml/mojo/issues/1741) - Mojo documentation
+  generation doesn't show `inout`/`owned` on variadic arguments.
+- [#1621](https://github.com/modularml/mojo/issues/1621) - VS Code does not
+  highlight `raises` and `capturing` in functional type expressions.
+- [#1617](https://github.com/modularml/mojo/issues/1617) - VS Code does not
+  highlight `fn` in specific contexts.
+- [#1740](https://github.com/modularml/mojo/issues/1740) - LSP shows unrelated
+  info when hovering over a struct.
+- [#1238](https://github.com/modularml/mojo/issues/1238) - File shadows Mojo
+  package path.
+- [#1429](https://github.com/modularml/mojo/issues/1429) - Crash when using
+  nested import statement.
+- [#1322](https://github.com/modularml/mojo/issues/1322) - Crash when missing
+  types in variadic argument.
+- [#1314](https://github.com/modularml/mojo/issues/1314) - Typecheck error when
+  binding alias to parametric function with default argument.
+- [#1248](https://github.com/modularml/mojo/issues/1248) - Crash when importing
+  from file the same name as another file in the search path.
+- [#1354](https://github.com/modularml/mojo/issues/1354) - Crash when importing
+  from local package.
+- [#1488](https://github.com/modularml/mojo/issues/1488) - Crash when setting
+  generic element field.
+- [#1476](https://github.com/modularml/mojo/issues/1476) - Crash in interpreter
+  when calling functions in parameter context.
+- [#1537](https://github.com/modularml/mojo/issues/1537) - Crash when copying
+  parameter value.
+- [#1546](https://github.com/modularml/mojo/issues/1546) - Modify nested vector
+  element crashes parser.
+- [#1558](https://github.com/modularml/mojo/issues/1558) - Invalid import causes
+  parser to crash.
+- [#1562](https://github.com/modularml/mojo/issues/1562) - Crash when calling
+  parametric type member function.
+- [#1577](https://github.com/modularml/mojo/issues/1577) - Crash when using
+  unresolved package as a variable.
+- [#1579](https://github.com/modularml/mojo/issues/1579) - Member access into
+  type instances causes a crash.
+- [#1602](https://github.com/modularml/mojo/issues/1602) - Interpreter failure
+  when constructing strings at compile time.
+- [#1696](https://github.com/modularml/mojo/issues/1696) - Fixed an issue that
+  caused syntax highlighting to occasionally fail.
+- [#1549](https://github.com/modularml/mojo/issues/1549) - Fixed an issue when
+  the shift amount is out of range in `SIMD.shift_left` and `SIMD.shift_right`.
 
 ## v0.7.0 (2024-01-25)
 
@@ -47,7 +538,7 @@ modular install mojo
 - A new Mojo-native dictionary type,
   [`Dict`](/mojo/stdlib/collections/dict.html) for storing key-value pairs.
   `Dict` stores values that conform to the
-  [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
+  [`CollectionElement`](/mojo/stdlib/builtin/value#collectionelement)
   trait. Keys need to conform to the new
   [`KeyElement`](/mojo/stdlib/collections/dict.html#keyelement) trait, which is
   not yet implemented by other standard library types. In the short term, you
@@ -217,6 +708,47 @@ modular install mojo
   implementing the traditional get/set pairs.  Note: this may be changed in the
   future when references auto-dereference—at that point we may switch to just
   returning a reference from `__getattr__()`.
+- Parametric closures can now capture register passable typed values by copy
+  using the `__copy_capture` decorator. For example, the following code will
+  print `5`, not `2`.
+
+  ```mojo
+  fn foo(x: Int):
+      var z = x
+
+      @__copy_capture(z)
+      @parameter
+      fn formatter() -> Int:
+          return z
+      z = 2
+      print(formatter())
+
+  fn main():
+      foo(5)
+  ```
+
+- String now implements KeyElement and may be used as a key in Dict.
+- More robust support for structs with fields of self referencing types.
+  For example, the following code will work and print `0`:
+
+  ```mojo
+  struct Foo(CollectionElement):
+    var vec: DynamicVector[Self]
+
+    fn __init__(inout self: Self):
+        self.vec = DynamicVector[Self]()
+
+    fn __moveinit__(inout self: Self, owned existing: Self):
+        self.vec = existing.vec ^
+
+    fn __copyinit__(inout self: Self, existing: Self):
+        self.vec = existing.vec
+
+
+  fn main():
+    var foo = Foo()
+    print(len(foo.vec))
+  ```
 
 ### ❌ Removed
 
@@ -324,10 +856,6 @@ modular install mojo
 - The `@unroll(n)` decorator can now take a parameter expression for
   the unroll factor, i.e. `n` can be a parameter expression that is
   of integer type.
-
-- `vectorize` now has an overload to pass `size` as a parameter instead of an
-  argument. This allows the remainder of `size` / `simd_width` to run in a
-  single iteration.
 
 - The `cpython` module in the `python` package has been moved to be an internal
   module, i.e, `_cpython`.
@@ -442,7 +970,7 @@ modular install mojo
   ```
 
 - Several standard library types now conform to the
-  [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
+  [`CollectionElement`](/mojo/stdlib/builtin/value#collectionelement)
   trait.  These types include [`Bool`](/mojo/stdlib/builtins/bool.html#bool),
   [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral),
   [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector),
@@ -578,7 +1106,7 @@ modular install mojo
   - [`Stringable`](/mojo/stdlib/builtin/str.html#stringable)
   - [`Intable`](/mojo/stdlib/builtin/int.html#intable)
   - [`Sized`](/mojo/stdlib/builtin/len.html#sized)
-  - [`CollectionElement`](/mojo/stdlib/collections/vector.html#collectionelement)
+  - [`CollectionElement`](/mojo/stdlib/builtin/value#collectionelement)
 
 - We added built-in [`len()`](/mojo/stdlib/builtin/len.html#len),
   [`str()`](/mojo/stdlib/builtin/str.html#str), and

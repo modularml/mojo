@@ -2,6 +2,8 @@
 title: "Mojo Manual"
 sidebar_label: Introduction
 description: A comprehensive guide to the Mojo programming language.
+aliases:
+  - /mojo/programming-manual.html
 css: /static/styles/page-navigation.css
 website:
   open-graph:
@@ -33,13 +35,13 @@ feedback](/mojo/community.html).
   - [Get started with Mojo](get-started/index.html)
   - [Hello World!](get-started/hello-world.html)
 
-- **Basics**
+- **Language basics**
 
-  - [Language basics](basics.html)
+  - [Introduction to Mojo](basics.html)
   - [Functions](functions.html)
   - [Variables](variables.html)
   - [Structs](structs.html)
-  - [Traits](traits.html)
+  - [Modules and packages](packages.html)
 
 - **Value ownership**
 
@@ -53,8 +55,9 @@ feedback](/mojo/community.html).
   - [Life of a value](lifecycle/life.html)
   - [Death of a value](lifecycle/death.html)
 
-- **Metaprogramming**
+- **Traits and parameters**
 
+  - [Traits](traits.html)
   - [Parameterization: compile-time metaprogramming](parameters/index.html)
 
 - **Python**
@@ -62,15 +65,13 @@ feedback](/mojo/community.html).
   - [Python integration](python/index.html)
   - [Python types](python/types.html)
 
-- **Decorators**
+- **Tools**
 
-  - [Mojo decorators](decorators/index.html)
-  - [@always_inline](decorators/always-inline.html)
-  - [@nonmaterializable](decorators/nonmaterializable.html)
-  - [@parameter](decorators/parameter.html)
-  - [@register_passable](decorators/register-passable.html)
-  - [@staticmethod](decorators/staticmethod.html)
-  - [@unroll](decorators/unroll.html)
-  - [@value](decorators/value.html)
+  - [Debugging](tools/debugging.html)
 
-- [Modules and packages](packages.html)
+- **Project information**
+
+  - [Roadmap and sharp edges](roadmap.html)
+  - [Changelog](changelog.html)
+  - [FAQ](faq.html)
+  - [Community](community.html)

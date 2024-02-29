@@ -14,16 +14,13 @@
 # This sample demonstrates how various systems optimizations can be applied to a
 # naive matmul implementation in Mojo to gain significant performance speedups
 
-import benchmark
 from random import rand
-from python import Python
+
+import benchmark
+from algorithm import Static2DTileUnitFunc as Tile2DFunc
+from algorithm import parallelize, vectorize
 from memory import memset_zero
-from algorithm import (
-    vectorize,
-    vectorize_unroll,
-    parallelize,
-    Static2DTileUnitFunc as Tile2DFunc,
-)
+from python import Python
 
 alias M = 512  # rows of A and C
 alias N = 4096  # cols of B and C
@@ -52,7 +49,7 @@ struct Matrix[rows: Int, cols: Int]:
     ## Initialize with random values
     @staticmethod
     fn rand() -> Self:
-        let data = DTypePointer[type].alloc(rows * cols)
+        var data = DTypePointer[type].alloc(rows * cols)
         rand(data, rows * cols)
         return Self(data)
 
@@ -71,20 +68,20 @@ struct Matrix[rows: Int, cols: Int]:
 
 def run_matmul_python() -> Float64:
     Python.add_to_path(".")
-    let pymatmul: PythonObject = Python.import_module("pymatmul")
-    let py = Python.import_module("builtins")
+    var pymatmul: PythonObject = Python.import_module("pymatmul")
+    var py = Python.import_module("builtins")
 
-    let gflops = pymatmul.benchmark_matmul_python(128, 128, 128).to_float64()
+    var gflops = pymatmul.benchmark_matmul_python(128, 128, 128).to_float64()
     py.print(py.str("{:<13}{:>8.3f} GFLOPS").format("Python:", gflops))
 
     return gflops
 
 
 def run_matmul_numpy() -> Float64:
-    let pymatmul: PythonObject = Python.import_module("pymatmul")
-    let py = Python.import_module("builtins")
+    var pymatmul: PythonObject = Python.import_module("pymatmul")
+    var py = Python.import_module("builtins")
 
-    let gflops = pymatmul.benchmark_matmul_numpy(M, N, K).to_float64()
+    var gflops = pymatmul.benchmark_matmul_numpy(M, N, K).to_float64()
     py.print(py.str("{:<13}{:>8.3f} GFLOPS").format("Numpy:", gflops))
 
     return gflops
@@ -108,7 +105,7 @@ fn matmul_vectorized(inout C: Matrix, A: Matrix, B: Matrix):
                     m, n, C.load[nelts](m, n) + A[m, k] * B.load[nelts](k, n)
                 )
 
-            vectorize[nelts, C.cols, dot]()
+            vectorize[dot, nelts, size = C.cols]()
 
 
 # Parallelize the code by using the builtin parallelize function
@@ -123,7 +120,7 @@ fn matmul_parallelized(inout C: Matrix, A: Matrix, B: Matrix):
                     m, n, C.load[nelts](m, n) + A[m, k] * B.load[nelts](k, n)
                 )
 
-            vectorize[nelts, C.cols, dot]()
+            vectorize[dot, nelts, size = C.cols]()
 
     parallelize[calc_row](C.rows, C.rows)
 
@@ -152,7 +149,7 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
                         + A[m, k] * B.load[nelts](k, n + x),
                     )
 
-                vectorize[nelts, tile_x, dot]()
+                vectorize[dot, nelts, size=tile_x]()
 
         tile[calc_tile, tile_n, tile_k](C.cols, B.rows)
 
@@ -178,7 +175,7 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
                     )
 
                 alias unroll_factor = tile_x // nelts
-                vectorize_unroll[nelts, tile_x, unroll_factor, dot]()
+                vectorize[dot, nelts, tile_x, unroll_factor]()
 
         tile[calc_tile, tile_n, tile_k](C.cols, B.rows)
 
@@ -198,17 +195,17 @@ fn bench[
     fn test_fn():
         _ = func(C, A, B)
 
-    let secs = benchmark.run[test_fn](max_runtime_secs=0.5).mean()
+    var secs = benchmark.run[test_fn](max_runtime_secs=0.5).mean()
 
     A.data.free()
     B.data.free()
     C.data.free()
 
-    let gflops = ((2 * M * N * K) / secs) / 1e9
-    let speedup: Float64 = gflops / base_gflops
-    let numpy_speedup: Float64 = gflops / numpy_gflops
+    var gflops = ((2 * M * N * K) / secs) / 1e9
+    var speedup: Float64 = gflops / base_gflops
+    var numpy_speedup: Float64 = gflops / numpy_gflops
 
-    let py = Python.import_module("builtins")
+    var py = Python.import_module("builtins")
     _ = py.print(
         py.str("{:<13}{:>8.3f} GFLOPS {:>9.2f}x Python {:>5.2f}x Numpy").format(
             name, gflops, speedup, numpy_speedup
@@ -233,8 +230,8 @@ fn test_matrix_equal[
 
 
 fn test_all() raises:
-    let A = Matrix[M, K].rand()
-    let B = Matrix[K, N].rand()
+    var A = Matrix[M, K].rand()
+    var B = Matrix[K, N].rand()
     var C = Matrix[M, N]()
 
     matmul_naive(C, A, B)
@@ -259,8 +256,8 @@ fn main() raises:
 
     test_all()
     print("CPU Results\n")
-    let python_gflops = run_matmul_python()
-    let numpy_gflops = run_matmul_numpy()
+    var python_gflops = run_matmul_python()
+    var numpy_gflops = run_matmul_numpy()
 
     bench[matmul_naive, "Naive:"](python_gflops, numpy_gflops)
     bench[matmul_vectorized, "Vectorized: "](python_gflops, numpy_gflops)

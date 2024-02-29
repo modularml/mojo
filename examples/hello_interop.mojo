@@ -24,5 +24,5 @@ def main():
         print(x)
     Python.add_to_path(".")
     Python.add_to_path("./examples")
-    let test_module = Python.import_module("simple_interop")
+    var test_module = Python.import_module("simple_interop")
     test_module.test_interop_func()

@@ -3,7 +3,7 @@ title: Mojo decorators
 sidebar_label: Decorators
 sidebar_position: 1
 description: A reference of Mojo's built-in decorators
-toc: false
+hide_table_of_contents: true
 css: /static/styles/page-navigation.css
 website:
   open-graph:
@@ -32,3 +32,6 @@ as the `@value` decorator) above your code (such as a struct). The Mojo
 compiler then uses the decorator function to modify your code at compile time.
 
 The following pages describe each built-in decorator with examples.
+
+:::{#docs}
+:::
