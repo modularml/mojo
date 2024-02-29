@@ -681,7 +681,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
             if index == Self.EMPTY:
                 return slot
             self._next_index_slot(slot, perturb)
-        trap("Dict: no empty index in _find_empty_index")
+        abort("Dict: no empty index in _find_empty_index")
         return 0
 
     fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):

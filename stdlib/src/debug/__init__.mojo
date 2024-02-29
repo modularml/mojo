@@ -5,5 +5,5 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the debug package."""
 
-from ._debug import trap
+from ._debug import abort
 from .visualizers import lldb_formatter_wrapping_type

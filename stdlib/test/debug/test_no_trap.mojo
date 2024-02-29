@@ -13,5 +13,5 @@ from sys import argv
 # CHECK-LABEL: OK
 fn main():
     if len(argv()) == 0:
-        trap()
+        abort()
     print("== OK")

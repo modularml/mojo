@@ -5,9 +5,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: not --crash mojo --debug-level full %s 2>&1 | FileCheck %s -check-prefix=CHECK
 
-from debug import trap
+from debug import abort
 
 
 fn main():
     # CHECK: 123
-    trap(123)
+    abort(123)

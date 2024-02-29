@@ -13,7 +13,7 @@ from sys.info import triple_is_nvidia_cuda
 from sys._build import is_kernels_debug_build
 from sys.param_env import is_defined
 
-from debug import trap
+from debug import abort
 
 
 @always_inline
@@ -77,10 +77,10 @@ fn _debug_assert_impl[boolable: Boolable](cond: boolable, msg: StringLiteral):
 
             @parameter
             if triple_is_nvidia_cuda():
-                trap()
+                abort()
                 return
 
-            trap("Assert Error:" + str(msg))
+            abort("Assert Error:" + str(msg))
         else:
 
             @parameter
