@@ -293,26 +293,26 @@ def test_vector_reverse_move_count():
     vec.push_back(MoveCounter(5))
 
     assert_equal(len(vec), 5)
-    assert_equal(__get_address_as_lvalue((vec.data + 0).value).value, 1)
-    assert_equal(__get_address_as_lvalue((vec.data + 1).value).value, 2)
-    assert_equal(__get_address_as_lvalue((vec.data + 2).value).value, 3)
-    assert_equal(__get_address_as_lvalue((vec.data + 3).value).value, 4)
-    assert_equal(__get_address_as_lvalue((vec.data + 4).value).value, 5)
+    assert_equal(vec.data[0].value, 1)
+    assert_equal(vec.data[1].value, 2)
+    assert_equal(vec.data[2].value, 3)
+    assert_equal(vec.data[3].value, 4)
+    assert_equal(vec.data[4].value, 5)
 
-    assert_equal(__get_address_as_lvalue((vec.data + 0).value).move_count, 1)
-    assert_equal(__get_address_as_lvalue((vec.data + 1).value).move_count, 1)
-    assert_equal(__get_address_as_lvalue((vec.data + 2).value).move_count, 1)
-    assert_equal(__get_address_as_lvalue((vec.data + 3).value).move_count, 1)
-    assert_equal(__get_address_as_lvalue((vec.data + 4).value).move_count, 1)
+    assert_equal(vec.data[0].move_count, 1)
+    assert_equal(vec.data[1].move_count, 1)
+    assert_equal(vec.data[2].move_count, 1)
+    assert_equal(vec.data[3].move_count, 1)
+    assert_equal(vec.data[4].move_count, 1)
 
     vec.reverse()
 
     assert_equal(len(vec), 5)
-    assert_equal(__get_address_as_lvalue((vec.data + 0).value).value, 5)
-    assert_equal(__get_address_as_lvalue((vec.data + 1).value).value, 4)
-    assert_equal(__get_address_as_lvalue((vec.data + 2).value).value, 3)
-    assert_equal(__get_address_as_lvalue((vec.data + 3).value).value, 2)
-    assert_equal(__get_address_as_lvalue((vec.data + 4).value).value, 1)
+    assert_equal(vec.data[0].value, 5)
+    assert_equal(vec.data[1].value, 4)
+    assert_equal(vec.data[2].value, 3)
+    assert_equal(vec.data[3].value, 2)
+    assert_equal(vec.data[4].value, 1)
 
     # NOTE:
     # Earlier elements went through 2 moves and later elements went through 3
@@ -321,11 +321,11 @@ def test_vector_reverse_move_count():
     # earlier element to a temporary (+1 move), directly move the later element
     # into the position the earlier element was in, and then move from the
     # temporary into the later position (+1 move).
-    assert_equal(__get_address_as_lvalue((vec.data + 0).value).move_count, 2)
-    assert_equal(__get_address_as_lvalue((vec.data + 1).value).move_count, 2)
-    assert_equal(__get_address_as_lvalue((vec.data + 2).value).move_count, 1)
-    assert_equal(__get_address_as_lvalue((vec.data + 3).value).move_count, 3)
-    assert_equal(__get_address_as_lvalue((vec.data + 4).value).move_count, 3)
+    assert_equal(vec.data[0].move_count, 2)
+    assert_equal(vec.data[1].move_count, 2)
+    assert_equal(vec.data[2].move_count, 1)
+    assert_equal(vec.data[3].move_count, 3)
+    assert_equal(vec.data[4].move_count, 3)
 
     # Keep vec alive until after we've done the last `vec.data + N` read.
     _ = vec ^
@@ -396,11 +396,11 @@ def test_vector_extend_non_trivial():
     assert_equal(v1[3].value, "Bar")
     assert_equal(v1[4].value, "Baz")
 
-    assert_equal(__get_address_as_lvalue((v1.data + 0).value).move_count, 1)
-    assert_equal(__get_address_as_lvalue((v1.data + 1).value).move_count, 1)
-    assert_equal(__get_address_as_lvalue((v1.data + 2).value).move_count, 2)
-    assert_equal(__get_address_as_lvalue((v1.data + 3).value).move_count, 2)
-    assert_equal(__get_address_as_lvalue((v1.data + 4).value).move_count, 2)
+    assert_equal(v1.data[0].move_count, 1)
+    assert_equal(v1.data[1].move_count, 1)
+    assert_equal(v1.data[2].move_count, 2)
+    assert_equal(v1.data[3].move_count, 2)
+    assert_equal(v1.data[4].move_count, 2)
 
     # Keep v1 alive until after we've done the last `vec.data + N` read.
     _ = v1 ^
