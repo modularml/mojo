@@ -75,6 +75,9 @@ cannot be parsed from the string, then an error is raised.
 - The `trap` function has been renamed to `abort`.  It also has moved from the
   `debug` module to the `os` module.
 
+- `DynamicVector` has been renamed to `List`.  It has also moved from the `collections.vector`
+  module to `collections.list` module.
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,
