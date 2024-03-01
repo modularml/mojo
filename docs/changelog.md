@@ -418,6 +418,14 @@ cannot be parsed from the string, then an error is raised.
     return z
   ```
 
+- The signatureof elementwise op has been changed. The rank parameter of
+  elementwise op can be infered, so an elementwsie op can be called in the
+  following way:
+
+  ```mojo
+  elementwise[func, simd_width](shape)
+  ```
+
 ### 🦋 Changed
 
 - As another step towards [removing let
