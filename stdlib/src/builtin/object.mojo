@@ -9,7 +9,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict
-from collections.vector import DynamicVector
+from collections.vector import List
 from math import min as _min
 from os.atomic import Atomic
 from sys.intrinsics import _mlirtype_is_eq
@@ -68,11 +68,11 @@ struct _RefCountedList:
 
     fn __init__(inout self):
         self.refcount = 1
-        self.impl = DynamicVector[_ObjectImpl]()
+        self.impl = List[_ObjectImpl]()
 
     var refcount: Atomic[DType.index]
     """The number of live references to the list."""
-    var impl: DynamicVector[_ObjectImpl]
+    var impl: List[_ObjectImpl]
     """The list value."""
 
 

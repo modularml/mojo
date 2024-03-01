@@ -12,7 +12,7 @@ from base64 import b64encode
 ```
 """
 
-from collections.vector import DynamicVector
+from collections.vector import List
 from sys.info import simdwidthof
 
 from memory.unsafe import DTypePointer
@@ -35,7 +35,7 @@ fn b64encode(str: String) -> String:
     var b64chars = lookup.data()
 
     var length = len(str)
-    var out = DynamicVector[Int8](capacity=length + 1)
+    var out = List[Int8](capacity=length + 1)
 
     @parameter
     @always_inline

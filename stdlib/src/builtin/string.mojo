@@ -9,7 +9,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections.dict import KeyElement
-from collections.vector import DynamicVector
+from collections.vector import List
 from math import abs as _abs
 from math.bit import ctlz
 from sys.info import bitwidthof
@@ -240,7 +240,7 @@ fn isspace(c: Int8) -> Bool:
 struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
     """Represents a mutable string."""
 
-    alias _buffer_type = DynamicVector[Int8]
+    alias _buffer_type = List[Int8]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -254,7 +254,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         The buffer must be terminated with a null byte:
 
         ```mojo
-        var buf = DynamicVector[Int8]()
+        var buf = List[Int8]()
         buf.append(ord('H'))
         buf.append(ord('i'))
         buf.append(0)
@@ -629,7 +629,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         """
         return rebind[DTypePointer[DType.int8]](self._buffer.data)
 
-    fn as_bytes(self) -> DynamicVector[Int8]:
+    fn as_bytes(self) -> List[Int8]:
         """Retrieves the underlying byte sequence encoding the characters in
         this string.
 
@@ -734,14 +734,14 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             substr._strref_dangerous(), start=start
         )
 
-    fn split(self, delimiter: String) raises -> DynamicVector[String]:
+    fn split(self, delimiter: String) raises -> List[String]:
         """Split the string by a delimiter.
 
         Args:
           delimiter: The string to split on.
 
         Returns:
-          A DynamicVector of Strings containing the input split by the delimiter.
+          A List of Strings containing the input split by the delimiter.
 
         Raises:
           Error if an empty delimiter is specified.
@@ -749,7 +749,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         if not delimiter:
             raise Error("empty delimiter not allowed to be passed to split.")
 
-        var output = DynamicVector[String]()
+        var output = List[String]()
 
         var current_offset = 0
         while True:
@@ -793,7 +793,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         var old_len = len(old)
         var new_len = len(new)
 
-        var res = DynamicVector[Int8]()
+        var res = List[Int8]()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
 
         for _ in range(occurrences):
@@ -876,7 +876,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         return hash(self._strref_dangerous())
 
     fn _interleave(self, val: String) -> String:
-        var res = DynamicVector[Int8]()
+        var res = List[Int8]()
         var val_ptr = val._as_ptr()
         var self_ptr = self._as_ptr()
         res.reserve(len(val) * len(self) + 1)

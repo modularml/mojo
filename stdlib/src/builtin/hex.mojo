@@ -9,7 +9,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections.vector import DynamicVector
+from collections.vector import List
 from math import abs as _abs
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -56,7 +56,7 @@ fn _format_int[
     digit_chars: String = _DEFAULT_DIGIT_CHARS,
     prefix: String = "",
 ) raises -> String:
-    var buf = DynamicVector[Int8]()
+    var buf = List[Int8]()
 
     _write_int(buf, value, radix, digit_chars, prefix)
 
@@ -66,7 +66,7 @@ fn _format_int[
 fn _write_int[
     T: Intable
 ](
-    inout fmt: DynamicVector[Int8],
+    inout fmt: List[Int8],
     value0: T,
     radix: Int = 10,
     digit_chars: String = _DEFAULT_DIGIT_CHARS,

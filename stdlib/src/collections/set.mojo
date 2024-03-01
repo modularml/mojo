@@ -56,8 +56,8 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         for e in elements:
             self.add(e[])
 
-    fn __init__(inout self, elements: DynamicVector[T]):
-        """Construct a set from a DynamicVector of elements.
+    fn __init__(inout self, elements: List[T]):
+        """Construct a set from a List of elements.
 
         Args:
             elements: A vector of elements to add to the set.

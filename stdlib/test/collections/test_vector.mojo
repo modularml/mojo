@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full -I %kernels_test_root %s
 
-from collections.vector import DynamicVector, InlinedFixedVector
+from collections.vector import List, InlinedFixedVector
 
 from testing import *
 from test_utils import MoveCounter
@@ -103,7 +103,7 @@ def test_inlined_fixed_vector_with_default():
 
 
 def test_mojo_issue_698():
-    var vector = DynamicVector[Float64]()
+    var vector = List[Float64]()
     for i in range(5):
         vector.push_back(i)
 
@@ -115,7 +115,7 @@ def test_mojo_issue_698():
 
 
 def test_vector():
-    var vector = DynamicVector[Int]()
+    var vector = List[Int]()
 
     for i in range(5):
         vector.push_back(i)
@@ -174,7 +174,7 @@ def test_vector_reverse():
     # Test reversing the vector []
     #
 
-    var vec = DynamicVector[Int]()
+    var vec = List[Int]()
 
     assert_equal(len(vec), 0)
 
@@ -186,7 +186,7 @@ def test_vector_reverse():
     # Test reversing the vector [123]
     #
 
-    vec = DynamicVector[Int]()
+    vec = List[Int]()
 
     vec.push_back(123)
 
@@ -202,7 +202,7 @@ def test_vector_reverse():
     # Test reversing the vector ["one", "two", "three"]
     #
 
-    vec2 = DynamicVector[String]()
+    vec2 = List[String]()
     vec2.push_back("one")
     vec2.push_back("two")
     vec2.push_back("three")
@@ -223,7 +223,7 @@ def test_vector_reverse():
     # Test reversing the vector [5, 10]
     #
 
-    vec = DynamicVector[Int]()
+    vec = List[Int]()
     vec.push_back(5)
     vec.push_back(10)
 
@@ -242,7 +242,7 @@ def test_vector_reverse():
     # to produce [1, 2, 5, 4, 3]
     #
 
-    vec = DynamicVector[Int]()
+    vec = List[Int]()
     vec.push_back(1)
     vec.push_back(2)
     vec.push_back(3)
@@ -270,7 +270,7 @@ def test_vector_reverse():
     # last element.
     #
 
-    vec = DynamicVector[Int]()
+    vec = List[Int]()
     vec.push_back(1)
     vec.push_back(2)
     vec.push_back(3)
@@ -285,7 +285,7 @@ def test_vector_reverse():
 
 def test_vector_reverse_move_count():
     # Create this vec with enough capacity to avoid moves due to resizing.
-    var vec = DynamicVector[MoveCounter[Int]](capacity=5)
+    var vec = List[MoveCounter[Int]](capacity=5)
     vec.push_back(MoveCounter(1))
     vec.push_back(MoveCounter(2))
     vec.push_back(MoveCounter(3))
@@ -316,7 +316,7 @@ def test_vector_reverse_move_count():
 
     # NOTE:
     # Earlier elements went through 2 moves and later elements went through 3
-    # moves because the implementation of DynamicVector.reverse arbitrarily
+    # moves because the implementation of List.reverse arbitrarily
     # chooses to perform the swap of earlier and later elements by moving the
     # earlier element to a temporary (+1 move), directly move the later element
     # into the position the earlier element was in, and then move from the
@@ -336,7 +336,7 @@ def test_vector_extend():
     # Test extending the vector [1, 2, 3] with itself
     #
 
-    vec = DynamicVector[Int]()
+    vec = List[Int]()
     vec.push_back(1)
     vec.push_back(2)
     vec.push_back(3)
@@ -378,11 +378,11 @@ def test_vector_extend_non_trivial():
 
     # Preallocate with enough capacity to avoid reallocation making the
     # move count checks below flaky.
-    var v1 = DynamicVector[MoveCounter[String]](capacity=5)
+    var v1 = List[MoveCounter[String]](capacity=5)
     v1.push_back(MoveCounter[String]("Hello"))
     v1.push_back(MoveCounter[String]("World"))
 
-    var v2 = DynamicVector[MoveCounter[String]](capacity=3)
+    var v2 = List[MoveCounter[String]](capacity=3)
     v2.push_back(MoveCounter[String]("Foo"))
     v2.push_back(MoveCounter[String]("Bar"))
     v2.push_back(MoveCounter[String]("Baz"))
@@ -407,10 +407,10 @@ def test_vector_extend_non_trivial():
 
 
 def test_2d_dynamic_vector():
-    var vector = DynamicVector[DynamicVector[Int]]()
+    var vector = List[List[Int]]()
 
     for i in range(2):
-        var v = DynamicVector[Int]()
+        var v = List[Int]()
         for j in range(3):
             v.push_back(i + j)
         vector.push_back(v)
@@ -440,20 +440,20 @@ def test_2d_dynamic_vector():
 # as reported in GH issue 27875 internally and
 # https://github.com/modularml/mojo/issues/1493
 def test_vector_copy_constructor():
-    var vec = DynamicVector[Int](capacity=1)
+    var vec = List[Int](capacity=1)
     var vec_copy = vec
     vec_copy.push_back(1)  # Ensure copy constructor doesn't crash
     _ = vec ^  # To ensure previous one doesn't invoke move constuctor
 
 
 def test_vector_iter():
-    var vs = DynamicVector[Int]()
+    var vs = List[Int]()
     vs.append(1)
     vs.append(2)
     vs.append(3)
 
     # Borrow immutably
-    fn sum(vs: DynamicVector[Int]) -> Int:
+    fn sum(vs: List[Int]) -> Int:
         var sum = 0
         for v in vs:
             sum += v[]
@@ -463,7 +463,7 @@ def test_vector_iter():
 
 
 def test_vector_iter_mutable():
-    var vs = DynamicVector[Int]()
+    var vs = List[Int]()
     vs.append(1)
     vs.append(2)
     vs.append(3)

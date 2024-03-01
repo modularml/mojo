@@ -51,7 +51,7 @@ struct _DictEntryIter[
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the dictionary is mutable.
-        dict_lifetime: The lifetime of the DynamicVector
+        dict_lifetime: The lifetime of the List
     """
 
     alias imm_dict_lifetime = __mlir_attr[
@@ -100,7 +100,7 @@ struct _DictKeyIter[
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
-        dict_lifetime: The lifetime of the DynamicVector
+        dict_lifetime: The lifetime of the List
     """
 
     alias imm_dict_lifetime = __mlir_attr[
@@ -145,7 +145,7 @@ struct _DictValueIter[
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
-        dict_lifetime: The lifetime of the DynamicVector
+        dict_lifetime: The lifetime of the List
     """
 
     alias ref_type = Reference[V, dict_mutability, dict_lifetime]
@@ -419,7 +419,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     """The current reserved size of the dictionary."""
 
     var _index: _DictIndex
-    var _entries: DynamicVector[Optional[DictEntry[K, V]]]
+    var _entries: List[Optional[DictEntry[K, V]]]
 
     fn __init__(inout self):
         """Initialize an empty dictiontary."""
@@ -638,10 +638,8 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         )
 
     @staticmethod
-    fn _new_entries(reserved: Int) -> DynamicVector[Optional[DictEntry[K, V]]]:
-        var entries = DynamicVector[Optional[DictEntry[K, V]]](
-            capacity=reserved
-        )
+    fn _new_entries(reserved: Int) -> List[Optional[DictEntry[K, V]]]:
+        var entries = List[Optional[DictEntry[K, V]]](capacity=reserved)
         for i in range(reserved):
             entries.append(None)
         return entries

@@ -62,7 +62,7 @@ def test_equal():
 
 def test_bool():
     assert_false(Set[Int]())
-    assert_false(Set[Int](DynamicVector[Int]()))
+    assert_false(Set[Int](List[Int]()))
     assert_true(Set[Int](1))
     assert_true(Set[Int](1, 2, 3))
 

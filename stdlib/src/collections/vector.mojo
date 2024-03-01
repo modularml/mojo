@@ -244,25 +244,25 @@ struct InlinedFixedVector[
 
 
 # ===----------------------------------------------------------------------===#
-# DynamicVector
+# List
 # ===----------------------------------------------------------------------===#
 
 
 @value
-struct _DynamicVectorIter[
+struct _ListIter[
     T: CollectionElement,
     vector_mutability: __mlir_type.`i1`,
     vector_lifetime: AnyLifetime[vector_mutability].type,
 ]:
-    """Iterator for DynamicVector.
+    """Iterator for List.
 
     Parameters:
         T: The type of the elements in the list.
         vector_mutability: Whether the reference to the vector is mutable.
-        vector_lifetime: The lifetime of the DynamicVector
+        vector_lifetime: The lifetime of the List
     """
 
-    alias vector_type = DynamicVector[T]
+    alias vector_type = List[T]
 
     var index: Int
     var src: Reference[Self.vector_type, vector_mutability, vector_lifetime]
@@ -279,8 +279,8 @@ struct _DynamicVectorIter[
         return len(self.src[]) - self.index
 
 
-struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
-    """The `DynamicVector` type is a dynamically-allocated vector.
+struct List[T: CollectionElement](CollectionElement, Sized):
+    """The `List` type is a dynamically-allocated vector.
 
     It supports pushing and popping from the back resizing the underlying
     storage as needed.  When it is deallocated, it frees its memory.
@@ -369,7 +369,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         (self.data + self.size).emplace_value(value ^)
         self.size += 1
 
-    fn extend(inout self, owned other: DynamicVector[T]):
+    fn extend(inout self, owned other: List[T]):
         """Extends this vector by consuming the elements of `other`.
 
         Args:
@@ -478,7 +478,7 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         #               counts from the end.
         debug_assert(
             start >= 0,
-            "DynamicVector reverse start position must be non-negative",
+            "List reverse start position must be non-negative",
         )
 
         var earlier_idx = start
@@ -585,10 +585,14 @@ struct DynamicVector[T: CollectionElement](CollectionElement, Sized):
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
         self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DynamicVectorIter[T, mutability, self_life]:
+    ) -> _ListIter[
+        T, mutability, self_life
+    ]:
         """Iterate over elements of the vector, returning immutable references.
 
         Returns:
             An iterator of immutable references to the vector elements.
         """
-        return _DynamicVectorIter[T, mutability, self_life](0, Reference(self))
+        return _ListIter[T, mutability, self_life](0, Reference(self))
+
+    alias DynamicVector = List

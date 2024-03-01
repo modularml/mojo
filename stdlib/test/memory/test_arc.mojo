@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo --debug-level full %s
 
-from collections.vector import DynamicVector
+from collections.vector import List
 
 from memory._arc import Arc
 from testing import *
@@ -33,7 +33,7 @@ def test_deleter_not_called_until_no_references():
     _ = p ^
     assert_false(deleted)
 
-    var vec = DynamicVector[Arc[ObservableDel]]()
+    var vec = List[Arc[ObservableDel]]()
     vec.push_back(p2)
     _ = p2 ^
     assert_false(deleted)

@@ -282,7 +282,7 @@ struct Path(Stringable, CollectionElement, PathLike):
 
         return result
 
-    fn listdir(self) raises -> DynamicVector[Path]:
+    fn listdir(self) raises -> List[Path]:
         """Gets the list of entries contained in the path provided.
 
         Returns:
@@ -290,7 +290,7 @@ struct Path(Stringable, CollectionElement, PathLike):
         """
 
         var ls = listdir(self)
-        var res = DynamicVector[Path](capacity=len(ls))
+        var res = List[Path](capacity=len(ls))
         for i in range(len(ls)):
             res.append(ls[i])
 

@@ -5,18 +5,18 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from collections.vector import DynamicVector
+from collections.vector import List
 
 
-fn sum_items(data: DynamicVector[Int8]) -> Int:
+fn sum_items(data: List[Int8]) -> Int:
     var sum: Int = 0
     for i in range(len(data)):
         sum += int(data[i])
     return sum
 
 
-fn make_abcd_vector() -> DynamicVector[Int8]:
-    var v = DynamicVector[Int8]()
+fn make_abcd_vector() -> List[Int8]:
+    var v = List[Int8]()
     v.push_back(97)
     v.push_back(98)
     v.push_back(99)

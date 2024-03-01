@@ -12,7 +12,7 @@ from os import listdir
 ```
 """
 
-from collections import DynamicVector
+from collections import List
 from sys.info import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 
 from memory.unsafe import DTypePointer, Pointer
@@ -95,7 +95,7 @@ struct _DirHandle:
         """Closes the handle opened via popen."""
         _ = external_call["closedir", Int32](self._handle)
 
-    fn list(self) -> DynamicVector[String]:
+    fn list(self) -> List[String]:
         """Reads all the data from the handle.
 
         Returns:
@@ -108,13 +108,13 @@ struct _DirHandle:
         else:
             return self._list_macos()
 
-    fn _list_linux(self) -> DynamicVector[String]:
+    fn _list_linux(self) -> List[String]:
         """Reads all the data from the handle.
 
         Returns:
           A string containing the output of running the command.
         """
-        var res = DynamicVector[String]()
+        var res = List[String]()
 
         while True:
             var ep = external_call["readdir", Pointer[_dirent_linux]](
@@ -133,13 +133,13 @@ struct _DirHandle:
 
         return res
 
-    fn _list_macos(self) -> DynamicVector[String]:
+    fn _list_macos(self) -> List[String]:
         """Reads all the data from the handle.
 
         Returns:
           A string containing the output of running the command.
         """
-        var res = DynamicVector[String]()
+        var res = List[String]()
 
         while True:
             var ep = external_call["readdir", Pointer[_dirent_macos]](
@@ -162,7 +162,7 @@ struct _DirHandle:
 # ===----------------------------------------------------------------------=== #
 # listdir
 # ===----------------------------------------------------------------------=== #
-fn listdir(path: String = "") raises -> DynamicVector[String]:
+fn listdir(path: String = "") raises -> List[String]:
     """Gets the list of entries contained in the path provided.
 
     Args:
@@ -176,9 +176,7 @@ fn listdir(path: String = "") raises -> DynamicVector[String]:
     return dir.list()
 
 
-fn listdir[
-    pathlike: os.PathLike
-](path: pathlike) raises -> DynamicVector[String]:
+fn listdir[pathlike: os.PathLike](path: pathlike) raises -> List[String]:
     """Gets the list of entries contained in the path provided.
 
     Parameters:
