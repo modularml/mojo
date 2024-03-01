@@ -9,7 +9,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict
-from collections.vector import List
+from collections import List
 from math import min as _min
 from os.atomic import Atomic
 from sys.intrinsics import _mlirtype_is_eq

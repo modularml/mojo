@@ -9,7 +9,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections.dict import KeyElement
-from collections.vector import List
+from collections import List
 from math import abs as _abs
 from math.bit import ctlz
 from sys.info import bitwidthof

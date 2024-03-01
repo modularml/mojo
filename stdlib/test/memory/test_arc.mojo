@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo --debug-level full %s
 
-from collections.vector import List
+from collections import List
 
 from memory._arc import Arc
 from testing import *

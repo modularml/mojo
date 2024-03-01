@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from collections.vector import List
+from collections import List
 
 
 fn sum_items(data: List[Int8]) -> Int:

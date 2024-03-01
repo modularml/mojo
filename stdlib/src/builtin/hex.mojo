@@ -9,7 +9,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections.vector import List
+from collections import List
 from math import abs as _abs
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
