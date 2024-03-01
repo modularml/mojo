@@ -72,6 +72,9 @@ cannot be parsed from the string, then an error is raised.
 
 - Many types now declare conformance to `EqualityComparable` trait.
 
+- The `trap` function has been renamed to `abort`.  It also has moved from the
+  `debug` module to the `os` module.
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,

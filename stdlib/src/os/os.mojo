@@ -13,7 +13,7 @@ from os import listdir
 """
 
 from collections import DynamicVector
-from sys.info import os_is_linux, os_is_windows
+from sys.info import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 
 from memory.unsafe import DTypePointer, Pointer
 
@@ -192,3 +192,31 @@ fn listdir[
       Returns the list of entries in the path provided.
     """
     return listdir(path.__fspath__())
+
+
+@always_inline("nodebug")
+fn abort():
+    """Calls a target dependent trap instruction. If the target does not have a
+    trap instruction, this intrinsic will be lowered to a call of the abort()
+    function."""
+
+    __mlir_op.`llvm.intr.trap`()
+
+
+@always_inline("nodebug")
+fn abort[T: Stringable](message: T):
+    """Prints a message before calling a target dependent trap instruction.
+    If the target does not have a trap instruction, this intrinsic will be
+    lowered to a call of the abort() function.
+
+    Parameters:
+        T: The Stringable type.
+
+    Args:
+        message: The message to include when aborting.
+    """
+
+    @parameter
+    if not triple_is_nvidia_cuda():
+        print(message)
+    __mlir_op.`llvm.intr.trap`()

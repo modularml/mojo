@@ -13,7 +13,7 @@ from sys.info import triple_is_nvidia_cuda
 from sys._build import is_kernels_debug_build
 from sys.param_env import is_defined
 
-from debug import abort
+from os import abort
 
 
 @always_inline

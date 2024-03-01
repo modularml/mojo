@@ -7,5 +7,5 @@
 
 from .env import *
 from .fstat import lstat, stat, stat_result
-from .os import listdir
+from .os import abort, listdir
 from .pathlike import PathLike

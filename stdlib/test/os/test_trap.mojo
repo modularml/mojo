@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: not --crash mojo --debug-level full %s 2>&1 | FileCheck %s
 
-from debug import abort
+from os import abort
 
 
 fn main():
