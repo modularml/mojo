@@ -26,7 +26,7 @@ our web-based [Mojo Playground](#develop-in-the-mojo-playground).
 
 To provide a unified toolkit for AI developers, the Mojo SDK is now included in
 the [MAX SDK](/max). To install the MAX SDK, see
-[Get started with MAX Engine](/engine/get_started). If you want to install the
+[Get started with MAX Engine](/engine/get-started). If you want to install the
 standalone Mojo SDK, you're in the right place.
 
 :::

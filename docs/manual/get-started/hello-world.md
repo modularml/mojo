@@ -10,7 +10,7 @@ website:
     image: /static/images/mojo-social-card.png
 ---
 
-After you [install Mojo](/mojo/manual/get-started/setup.html), you can use the
+After you [install Mojo](/mojo/manual/get-started/), you can use the
 [Mojo CLI](/mojo/cli/) to build and run Mojo programs. So let's create the
 classic starter program that prints "Hello, world!", in three different ways.
 
