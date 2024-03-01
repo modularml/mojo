@@ -38,7 +38,7 @@ Javascript) and there is a divergence of naming for all these things:
 
 3. Mojo also has a notion of compile time value (`alias`), which means there are
 three concepts going around: `alias`, `let`, and `var`.  Most of the uses of
-(e.g.) Javascript `const`` is better served with `alias` than `let`.
+(e.g.) Javascript `const` is better served with `alias` than `let`.
 
 4. Both Swift and Rust encourage immutable values - Swift (and currently Mojo)
 warn about unneeded mutability, Rust makes mutability more verbose (`let mut`),
