@@ -37,7 +37,7 @@ struct _dirent_linux:
     """Length of the record."""
     var d_type: Int8
     """Type of file."""
-    var name: StaticTuple[Self.MAX_NAME_SIZE, Int8]
+    var name: StaticTuple[Int8, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
@@ -55,7 +55,7 @@ struct _dirent_macos:
     """Length of the name."""
     var d_type: Int8
     """Type of file."""
-    var name: StaticTuple[Self.MAX_NAME_SIZE, Int8]
+    var name: StaticTuple[Int8, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 

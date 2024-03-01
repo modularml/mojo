@@ -53,15 +53,15 @@ fn _reduce_and_fn(a: Bool, b: Bool) -> Bool:
 fn _int_tuple_binary_apply[
     size: Int,
     binary_fn: fn (Int, Int) -> Int,
-](a: StaticTuple[size, Int], b: StaticTuple[size, Int]) -> StaticTuple[
-    size, Int
+](a: StaticTuple[Int, size], b: StaticTuple[Int, size]) -> StaticTuple[
+    Int, size
 ]:
     """Applies a given element binary function to each pair of corresponding
     elements in two tuples.
 
     Example Usage:
-        var a: StaticTuple[size, Int]
-        var b: StaticTuple[size, Int]
+        var a: StaticTuple[Int, size]
+        var b: StaticTuple[Int, size]
         var c = _int_tuple_binary_apply[size, Int.add](a, b)
 
     Parameters:
@@ -76,7 +76,7 @@ fn _int_tuple_binary_apply[
         Tuple containing the result.
     """
 
-    var c = StaticTuple[size, Int]()
+    var c = StaticTuple[Int, size]()
 
     @always_inline
     @parameter
@@ -94,15 +94,16 @@ fn _int_tuple_binary_apply[
 fn _int_tuple_compare[
     size: Int,
     comp_fn: fn (Int, Int) -> Bool,
-](a: StaticTuple[size, Int], b: StaticTuple[size, Int]) -> StaticTuple[
-    size, mlir_bool
+](a: StaticTuple[Int, size], b: StaticTuple[Int, size]) -> StaticTuple[
+    mlir_bool,
+    size,
 ]:
     """Applies a given element compare function to each pair of corresponding
     elements in two tuples and produces a tuple of Bools containing result.
 
     Example Usage:
-        var a: StaticTuple[size, Int]
-        var b: StaticTuple[size, Int]
+        var a: StaticTuple[Int, size]
+        var b: StaticTuple[Int, size]
         var c = _int_tuple_compare[size, Int.less_than](a, b)
 
     Parameters:
@@ -117,7 +118,7 @@ fn _int_tuple_compare[
         Tuple containing the result.
     """
 
-    var c = StaticTuple[size, mlir_bool]()
+    var c = StaticTuple[mlir_bool, size]()
 
     @always_inline
     @parameter
@@ -135,12 +136,12 @@ fn _int_tuple_compare[
 fn _bool_tuple_reduce[
     size: Int,
     reduce_fn: fn (Bool, Bool) -> Bool,
-](a: StaticTuple[size, mlir_bool], init: Bool) -> Bool:
+](a: StaticTuple[mlir_bool, size], init: Bool) -> Bool:
     """Reduces the tuple argument with the given reduce function and initial
     value.
 
     Example Usage:
-        var a: StaticTuple[size, mlir_bool]
+        var a: StaticTuple[mlir_bool, size]
         var c = _bool_tuple_reduce[size, _reduce_and_fn](a, True)
 
     Parameters:
@@ -181,7 +182,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         size: The size of the tuple.
     """
 
-    var data: StaticTuple[size, Int]
+    var data: StaticTuple[Int, size]
     """The underlying storage of the tuple value."""
 
     @always_inline
@@ -369,7 +370,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
             ](values.at[idx]().get(), array)
 
         unroll[fill, size]()
-        return Self {data: StaticTuple[size, Int](array)}
+        return Self {data: StaticTuple[Int, size](array)}
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -421,7 +422,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         self.data[index] = val
 
     @always_inline("nodebug")
-    fn as_tuple(self) -> StaticTuple[size, Int]:
+    fn as_tuple(self) -> StaticTuple[Int, size]:
         """Converts this StaticIntTuple to StaticTuple.
 
         Returns:

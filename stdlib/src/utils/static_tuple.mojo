@@ -103,15 +103,14 @@ fn _static_tuple_construction_checks[size: Int]():
 
 @value
 @register_passable("trivial")
-struct StaticTuple[size: Int, _element_type: AnyRegType](Sized):
+struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
     """A statically sized tuple type which contains elements of homogeneous types.
 
     Parameters:
+        element_type: The type of the elements in the tuple.
         size: The size of the tuple.
-        _element_type: The type of the elements in the tuple.
     """
 
-    alias element_type = _element_type
     alias type = __mlir_type[
         `!pop.array<`, size.value, `, `, Self.element_type, `>`
     ]

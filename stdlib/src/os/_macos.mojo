@@ -42,7 +42,7 @@ struct _c_stat(Stringable):
     var st_flags: UInt32  # user defined flags for file
     var st_gen: UInt32  # file generation number
     var st_lspare: Int32  # RESERVED: DO NOT USE!
-    var st_qspare: StaticTuple[2, Int64]  # RESERVED: DO NOT USE!
+    var st_qspare: StaticTuple[Int64, 2]  # RESERVED: DO NOT USE!
 
     fn __init__() -> Self:
         return Self {
@@ -63,7 +63,7 @@ struct _c_stat(Stringable):
             st_flags: 0,
             st_gen: 0,
             st_lspare: 0,
-            st_qspare: StaticTuple[2, Int64](0, 0),
+            st_qspare: StaticTuple[Int64, 2](0, 0),
         }
 
     fn __str__(self) -> String:

@@ -14,14 +14,14 @@ from testing import assert_equal, assert_true, assert_false
 def test_static_tuple():
     print("== test_static_tuple")
 
-    var tup1 = StaticTuple[1, Int](1)
+    var tup1 = StaticTuple[Int, 1](1)
     assert_equal(tup1[0], 1)
 
-    var tup2 = StaticTuple[2, Int](1)
+    var tup2 = StaticTuple[Int, 2](1)
     assert_equal(tup2[0], 1)
     assert_equal(tup2[1], 1)
 
-    var tup3 = StaticTuple[3, Int](1, 2, 3)
+    var tup3 = StaticTuple[Int, 3](1, 2, 3)
     assert_equal(tup3[0], 1)
     assert_equal(tup3[1], 2)
     assert_equal(tup3[2], 3)

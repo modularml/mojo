@@ -47,7 +47,7 @@ struct Planet:
 alias NUM_BODIES = 5
 
 
-fn offset_momentum(inout bodies: StaticTuple[NUM_BODIES, Planet]):
+fn offset_momentum(inout bodies: StaticTuple[Planet, NUM_BODIES]):
     var p = SIMD[DType.float64, 4]()
 
     @unroll
@@ -60,7 +60,7 @@ fn offset_momentum(inout bodies: StaticTuple[NUM_BODIES, Planet]):
     bodies[0] = body
 
 
-fn advance(inout bodies: StaticTuple[NUM_BODIES, Planet], dt: Float64):
+fn advance(inout bodies: StaticTuple[Planet, NUM_BODIES], dt: Float64):
     @unroll
     for i in range(NUM_BODIES):
         for j in range(NUM_BODIES - i - 1):
@@ -83,7 +83,7 @@ fn advance(inout bodies: StaticTuple[NUM_BODIES, Planet], dt: Float64):
         bodies[i] = body
 
 
-fn energy(bodies: StaticTuple[NUM_BODIES, Planet]) -> Float64:
+fn energy(bodies: StaticTuple[Planet, NUM_BODIES]) -> Float64:
     var e: Float64 = 0
 
     @unroll
@@ -174,7 +174,7 @@ fn bench():
         ),
         5.15138902046611451e-05 * SOLAR_MASS,
     )
-    var system = StaticTuple[NUM_BODIES, Planet](
+    var system = StaticTuple[Planet, NUM_BODIES](
         Sun, Jupiter, Saturn, Uranus, Neptune
     )
     offset_momentum(system)

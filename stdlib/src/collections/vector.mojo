@@ -95,7 +95,7 @@ struct InlinedFixedVector[
     """
 
     alias static_size: Int = size
-    alias static_data_type = StaticTuple[size, type]
+    alias static_data_type = StaticTuple[type, size]
     var static_data: Self.static_data_type
     """The underlying static storage, used for small vectors."""
     var dynamic_data: Pointer[type]

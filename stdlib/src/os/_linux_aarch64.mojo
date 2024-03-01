@@ -40,7 +40,7 @@ struct _c_stat(Stringable):
     var st_mtimespec: _CTimeSpec  # time of last data modification
     var st_ctimespec: _CTimeSpec  # time of last status change
     var st_birthtimespec: _CTimeSpec  # time of file creation(birth)
-    var unused: StaticTuple[2, Int64]  # RESERVED: DO NOT USE!
+    var unused: StaticTuple[Int64, 2]  # RESERVED: DO NOT USE!
 
     fn __init__() -> Self:
         return Self {
@@ -60,7 +60,7 @@ struct _c_stat(Stringable):
             st_mtimespec: _CTimeSpec(),
             st_ctimespec: _CTimeSpec(),
             st_birthtimespec: _CTimeSpec(),
-            unused: StaticTuple[2, Int64](0, 0),
+            unused: StaticTuple[Int64, 2](0, 0),
         }
 
     fn __str__(self) -> String:

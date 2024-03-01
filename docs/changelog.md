@@ -78,6 +78,9 @@ cannot be parsed from the string, then an error is raised.
 - `DynamicVector` has been renamed to `List`.  It has also moved from the `collections.vector`
   module to `collections.list` module.
 
+- `StaticTuple` parameter order has changed to `StaticTuple[type, size]` for
+  consistency with `SIMD` and similar collection types.
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,

@@ -20,7 +20,7 @@ alias _kCompactElemPerSide = _kCompactMaxElemsToPrint // 2
 alias _SERIALIZATION_MAJOR_FORMAT: UInt32 = 0
 alias _SERIALIZATION_MINOR_FORMAT: UInt32 = 1
 # 0x93 🔥 0x93
-alias _SERIALIZATION_HEADER = StaticTuple[6, Int8](
+alias _SERIALIZATION_HEADER = StaticTuple[Int8, 6](
     0x93, 0xF0, 0x9F, 0x94, 0xA5, 0x93
 )
 
