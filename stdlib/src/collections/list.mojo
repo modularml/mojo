@@ -25,27 +25,27 @@ from memory.unsafe import Reference
 @value
 struct _ListIter[
     T: CollectionElement,
-    vector_mutability: __mlir_type.`i1`,
-    vector_lifetime: AnyLifetime[vector_mutability].type,
+    list_mutability: __mlir_type.`i1`,
+    list_lifetime: AnyLifetime[list_mutability].type,
 ]:
     """Iterator for List.
 
     Parameters:
         T: The type of the elements in the list.
-        vector_mutability: Whether the reference to the vector is mutable.
-        vector_lifetime: The lifetime of the List
+        list_mutability: Whether the reference to the list is mutable.
+        list_lifetime: The lifetime of the List
     """
 
-    alias vector_type = List[T]
+    alias list_type = List[T]
 
     var index: Int
-    var src: Reference[Self.vector_type, vector_mutability, vector_lifetime]
+    var src: Reference[Self.list_type, list_mutability, list_lifetime]
 
     fn __next__(
         inout self,
-    ) -> Reference[T, vector_mutability, vector_lifetime]:
+    ) -> Reference[T, list_mutability, list_lifetime]:
         self.index += 1
-        return self.src[].__get_ref[vector_mutability, vector_lifetime](
+        return self.src[].__get_ref[list_mutability, list_lifetime](
             self.index - 1
         )
 
@@ -54,7 +54,7 @@ struct _ListIter[
 
 
 struct List[T: CollectionElement](CollectionElement, Sized):
-    """The `List` type is a dynamically-allocated vector.
+    """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
     storage as needed.  When it is deallocated, it frees its memory.
@@ -64,60 +64,60 @@ struct List[T: CollectionElement](CollectionElement, Sized):
     """
 
     var data: AnyPointer[T]
-    """The underlying storage for the vector."""
+    """The underlying storage for the list."""
     var size: Int
-    """The number of elements in the vector."""
+    """The number of elements in the list."""
     var capacity: Int
-    """The amount of elements that can fit in the vector without resizing it."""
+    """The amount of elements that can fit in the list without resizing it."""
 
     fn __init__(inout self):
-        """Constructs an empty vector."""
+        """Constructs an empty list."""
         self.data = AnyPointer[T]()
         self.size = 0
         self.capacity = 0
 
     fn __init__(inout self, *, capacity: Int):
-        """Constructs a vector with the given capacity.
+        """Constructs a list with the given capacity.
 
         Args:
-            capacity: The requested capacity of the vector.
+            capacity: The requested capacity of the list.
         """
         self.data = AnyPointer[T].alloc(capacity)
         self.size = 0
         self.capacity = capacity
 
     fn __moveinit__(inout self, owned existing: Self):
-        """Move data of an existing vector into a new one.
+        """Move data of an existing list into a new one.
 
         Args:
-            existing: The existing vector.
+            existing: The existing list.
         """
         self.data = existing.data
         self.size = existing.size
         self.capacity = existing.capacity
 
     fn __copyinit__(inout self, existing: Self):
-        """Creates a deepcopy of the given vector.
+        """Creates a deepcopy of the given list.
 
         Args:
-            existing: The vector to copy.
+            existing: The list to copy.
         """
         self = Self(capacity=existing.capacity)
         for i in range(len(existing)):
             self.append(existing[i])
 
     fn __del__(owned self):
-        """Destroy all elements in the vector and free its memory."""
+        """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             _ = (self.data + i).take_value()
         if self.data:
             self.data.free()
 
     fn __len__(self) -> Int:
-        """Gets the number of elements in the vector.
+        """Gets the number of elements in the list.
 
         Returns:
-            The number of elements in the vector.
+            The number of elements in the list.
         """
         return self.size
 
@@ -133,7 +133,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.capacity = new_capacity
 
     fn append(inout self, owned value: T):
-        """Appends a value to this vector.
+        """Appends a value to this list.
 
         Args:
             value: The value to append.
@@ -144,10 +144,10 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size += 1
 
     fn extend(inout self, owned other: List[T]):
-        """Extends this vector by consuming the elements of `other`.
+        """Extends this list by consuming the elements of `other`.
 
         Args:
-            other: Vector whose elements will be added in order at the end of this vector.
+            other: List whose elements will be added in order at the end of this list.
         """
 
         var final_size = len(self) + len(other)
@@ -158,7 +158,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         # Defensively mark `other` as logically being empty, as we will be doing
         # consuming moves out of `other`, and so we want to avoid leaving `other`
         # in a partially valid state where some elements have been consumed
-        # but are still part of the valid `size` of the vector.
+        # but are still part of the valid `size` of the list.
         #
         # That invalid intermediate state of `other` could potentially be
         # visible outside this function if a `__moveinit__()` constructor were
@@ -172,7 +172,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             var src_ptr = other.data + i
 
             # This (TODO: optimistically) moves an element directly from the
-            # `other` vector into this vector using a single `T.__moveinit()__`
+            # `other` list into this list using a single `T.__moveinit()__`
             # call, without moving into an intermediate temporary value
             # (avoiding an extra redundant move constructor call).
             src_ptr.move_into(dest_ptr)
@@ -180,11 +180,11 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             dest_ptr = dest_ptr + 1
 
         # Update the size now that all new elements have been moved into this
-        # vector.
+        # list.
         self.size = final_size
 
     fn push_back(inout self, owned value: T):
-        """Appends a value to this vector.
+        """Appends a value to this list.
 
         Args:
             value: The value to append.
@@ -192,7 +192,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.append(value ^)
 
     fn pop_back(inout self) -> T:
-        """Pops a value from the back of this vector.
+        """Pops a value from the back of this list.
 
         Returns:
             The popped value.
@@ -218,11 +218,11 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self._realloc(new_capacity)
 
     fn resize(inout self, new_size: Int, value: T):
-        """Resizes the vector to the given new size.
+        """Resizes the list to the given new size.
 
         If the new size is smaller than the current one, elements at the end
         are discarded. If the new size is larger than the current one, the
-        vector is appended with new values elements up to the requested size.
+        list is appended with new values elements up to the requested size.
 
         Args:
             new_size: The new size.
@@ -236,13 +236,13 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size = new_size
 
     fn reverse(inout self):
-        """Reverses the elements of the vector."""
+        """Reverses the elements of the list."""
 
         self._reverse()
 
     # This method is private to avoid exposing the non-Pythonic `start` argument.
     fn _reverse(inout self, start: Int = 0):
-        """Reverses the elements of the vector at positions after `start`.
+        """Reverses the elements of the list at positions after `start`.
 
         Args:
             start: A non-negative integer indicating the position after which to reverse elements.
@@ -273,13 +273,13 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             later_idx -= 1
 
     fn clear(inout self):
-        """Clears the elements in the vector."""
+        """Clears the elements in the list."""
         for i in range(self.size):
             _ = (self.data + i).take_value()
         self.size = 0
 
     fn steal_data(inout self) -> AnyPointer[T]:
-        """Take ownership of the underlying pointer from the vector.
+        """Take ownership of the underlying pointer from the list.
 
         Returns:
             The underlying data.
@@ -291,7 +291,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         return ptr
 
     fn __setitem__(inout self, i: Int, owned value: T):
-        """Sets a vector element at the given index.
+        """Sets a list element at the given index.
 
         Args:
             i: The index of the element.
@@ -308,7 +308,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
 
     @always_inline
     fn __getitem__(self, i: Int) -> T:
-        """Gets a copy of the vector element at the given index.
+        """Gets a copy of the list element at the given index.
 
         FIXME(lifetimes): This should return a reference, not a copy!
 
@@ -333,7 +333,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self: Reference[Self, mutability, self_life].mlir_ref_type,
         i: Int,
     ) -> Reference[T, mutability, self_life]:
-        """Gets a reference to the vector element at the given index.
+        """Gets a reference to the list element at the given index.
 
         Args:
             i: The index of the element.
@@ -362,10 +362,10 @@ struct List[T: CollectionElement](CollectionElement, Sized):
     ) -> _ListIter[
         T, mutability, self_life
     ]:
-        """Iterate over elements of the vector, returning immutable references.
+        """Iterate over elements of the list, returning immutable references.
 
         Returns:
-            An iterator of immutable references to the vector elements.
+            An iterator of immutable references to the list elements.
         """
         return _ListIter[T, mutability, self_life](0, Reference(self))
 
