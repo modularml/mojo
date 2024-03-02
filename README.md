@@ -1,3 +1,9 @@
+<picture align="left">
+  <source media="(prefers-color-scheme: dark)" srcset="https://modular-assets.s3.amazonaws.com/images/mojo_github_logo_bg.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://modular-assets.s3.amazonaws.com/images/mojo_github_logo_bg.png">
+  <img src="https://modular-assets.s3.amazonaws.com/images/mojo_github_logo_bg.png">
+</picture>
+
 # Welcome to Mojo 🔥
 
 Mojo is a new programming language that bridges the gap between research 
