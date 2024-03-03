@@ -9,13 +9,6 @@ website:
     image: /static/images/mojo-social-card.png
 ---
 
-<style>
-    .content h3 {
-        font-size: 1rem;
-        font-weight: bold;
-    }
-</style>
-
 We tried to anticipate your questions about Mojo on this page. If this page
 doesn't answer all your questions, also check out our [Mojo community
 channels](/mojo/community.html).
