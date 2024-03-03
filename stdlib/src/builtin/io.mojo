@@ -591,12 +591,8 @@ struct _StringableTuple[*Ts: Stringable](Sized):
 
     fn _at[i: Int](inout self) -> String:
         alias offset = Self._offset[i]()
-        var addr = Pointer.address_of(self).bitcast[Int8]().offset(offset)
-        var ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[`!kgen.pointer<:`, Stringable, ` `, Ts[i], `>`]
-        ](addr.address)
-
-        return str(__get_address_as_lvalue(ptr))
+        var i8ptr = Pointer.address_of(self).bitcast[Int8]().offset(offset)
+        return str(Reference(i8ptr[]).bitcast_element[Ts[i]]()[])
 
     fn __len__(self) -> Int:
         return len(VariadicList(Ts))

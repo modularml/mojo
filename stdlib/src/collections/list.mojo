@@ -324,7 +324,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         if i < 0:
             normalized_idx += len(self)
 
-        return __get_address_as_lvalue((self.data + normalized_idx).value)
+        return (self.data + normalized_idx)[]
 
     # TODO(30737): Replace __getitem__ with this as __refitem__, but lots of places use it
     fn __get_ref[

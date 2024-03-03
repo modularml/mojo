@@ -89,6 +89,9 @@ cannot be parsed from the string, then an error is raised.
   The compiler still recognizes the `let` keyword for now in order to produce
   a good error message, but that will be removed in subsequent releases.
 
+- The `__get_address_as_lvalue` magic function has been removed.  You can now
+  get an LValue from a `Pointer` or `Reference` by using the `ptr[]` operator.
+
 ### 🛠️ Fixed
 
 ## v24.1 (2024-02-29)
