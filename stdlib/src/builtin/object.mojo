@@ -262,7 +262,7 @@ struct _Function:
 
 
 @register_passable
-struct _ObjectImpl(CollectionElement):
+struct _ObjectImpl(CollectionElement, Stringable):
     """This class is the underlying implementation of the value of an `object`.
     It is a variant of primitive types and pointers to implementations of more
     complex types.
@@ -574,6 +574,53 @@ struct _ObjectImpl(CollectionElement):
         else:
             lhs = lhs.convert_int_to_float()
 
+    fn __str__(self) -> String:
+        """Returns the name (in lowercase) of the specific object type."""
+        if self.is_none():
+            return "None"
+        if self.is_bool():
+            return str(self.get_as_bool())
+        if self.is_int():
+            return str(self.get_as_int())
+        if self.is_float():
+            return str(self.get_as_float())
+        if self.is_str():
+            return (
+                "'"
+                + str(
+                    StringRef(
+                        self.get_as_string().data, self.get_as_string().length
+                    )
+                )
+                + "'"
+            )
+        if self.is_func():
+            return "Function at address " + hex(self.get_as_func().value)
+        if self.is_list():
+            var res = String("[")
+            for j in range(self.get_list_length()):
+                if j != 0:
+                    res += ", "
+                res += str(object(self.get_list_element(j)))
+            res += "]"
+            return res
+
+        var ptr = self.get_obj_attrs_ptr()
+        var res = String("{")
+        var print_sep = False
+        for entry in ptr[].impl.items():
+            if print_sep:
+                res += ", "
+            res += (
+                "'"
+                + str(entry[].key)
+                + "' = "
+                + str(object(entry[].value.copy()))
+            )
+            print_sep = True
+        res += "}"
+        return res
+
     # ===------------------------------------------------------------------=== #
     # List Functions
     # ===------------------------------------------------------------------=== #
@@ -621,7 +668,7 @@ struct _ObjectImpl(CollectionElement):
 # ===----------------------------------------------------------------------=== #
 
 
-struct object(IntableRaising, Boolable):
+struct object(IntableRaising, Boolable, Stringable):
     """Represents an object without a concrete type.
 
     This is the type of arguments in `def` functions that do not have a type
@@ -872,7 +919,7 @@ struct object(IntableRaising, Boolable):
         return self._value.get_list_length() != 0
 
     fn __int__(self) raises -> Int:
-        """Performs conversion to integer conversion according to Python
+        """Performs conversion to integer according to Python
         semantics.
 
         Returns:
@@ -888,6 +935,15 @@ struct object(IntableRaising, Boolable):
             return int(self._value.get_as_float())
 
         raise "object type cannot be converted to an integer"
+
+    fn __str__(self) -> String:
+        """Performs conversion to string according to Python
+        semantics.
+
+        Returns:
+            The String representation of the object.
+        """
+        return str(self._value)
 
     # ===------------------------------------------------------------------=== #
     # Comparison Operators

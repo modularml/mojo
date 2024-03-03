@@ -47,7 +47,7 @@ fn test_ndbuffer_indexing():
 
     # Try to access element[5]
     # CHECK: 5
-    print[1, DType.index](bufferView1D[5])
+    print(bufferView1D[5])
 
     # ===------------------------------------------------------------------=== #
     # Test 2DBuffer:
@@ -62,7 +62,7 @@ fn test_ndbuffer_indexing():
     # Try to access element[4,5]
     # Result should be 4*6+5 = 29
     # CHECK: 29
-    print[1, DType.index](bufferView2D[4, 5])
+    print(bufferView2D[4, 5])
 
     # ===------------------------------------------------------------------=== #
     # Test 3DBuffer:
@@ -77,7 +77,7 @@ fn test_ndbuffer_indexing():
     # Try to access element[3,4,5]
     # Result should be 3*(5*6)+4*6+5 = 119
     # CHECK: 119
-    print[1, DType.index](bufferView3D[3, 4, 5])
+    print(bufferView3D[3, 4, 5])
 
     # ===------------------------------------------------------------------=== #
     # Test 4DBuffer:
@@ -92,7 +92,7 @@ fn test_ndbuffer_indexing():
     # Try to access element[2,3,4,5]
     # Result should be 2*4*5*6+3*5*6+4*6+5 = 359
     # CHECK: 359
-    print[1, DType.index](bufferView4D[2, 3, 4, 5])
+    print(bufferView4D[2, 3, 4, 5])
 
     # ===------------------------------------------------------------------=== #
     # Test 5DBuffer:
@@ -107,7 +107,7 @@ fn test_ndbuffer_indexing():
     # Try to access element[1,2,3,4,5]
     # Result should be 1*3*4*5*6+2*4*5*6+3*5*6+4*6+5 = 719
     # CHECK: 719
-    print[1, DType.index](bufferView5D[1, 2, 3, 4, 5])
+    print(bufferView5D[1, 2, 3, 4, 5])
 
 
 fn main():

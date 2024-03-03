@@ -180,7 +180,7 @@ def main():
         test_object_ctors()
         test_comparison_ops()
         test_arithmetic_ops()
-        # CHECK: function at 0x{{[a-float0-9]+}}
+        # CHECK: Function at address 0x{{[a-float0-9]+}}
         # CHECK-NEXT: 3
         # CHECK-NEXT: Error from function type
         test_object_function()

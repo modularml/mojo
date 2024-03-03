@@ -64,6 +64,9 @@ fn test_print():
     # CHECK: > 0.6535{{[0-9]+}}
     print(">", x)
 
+    # CHECK: Hello world
+    print(String("Hello world"))
+
     # CHECK: 32768
     print((UInt16(32768)))
     # CHECK: 65535
@@ -95,9 +98,19 @@ fn test_print():
 # CHECK-LABEL: test_print_end
 fn test_print_end():
     print("== test_print_end")
-    # CHECK: Hello
-    # CHECK: World
-    print("Hello", end="World")
+    # CHECK: Hello World
+    print("Hello", end=" World\n")
+
+
+# CHECK-LABEL: test_print_sep
+fn test_print_sep():
+    print("== test_print_sep")
+
+    # CHECK: a/b/c
+    print("a", "b", "c", sep="/")
+
+    # CHECK: a/1/2xx
+    print("a", 1, 2, sep="/", end="xx\n")
 
 
 # CHECK-LABEL: test_issue_20421
@@ -114,4 +127,5 @@ fn test_issue_20421():
 fn main():
     test_print()
     test_print_end()
+    test_print_sep()
     test_issue_20421()

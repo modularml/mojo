@@ -9,17 +9,12 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from math.math import align_up
-from os.atomic import Atomic
 from sys import external_call
 from sys.info import bitwidthof, os_is_windows, triple_is_nvidia_cuda
 
 from algorithm.functional import unroll
-from complex import ComplexSIMD as _ComplexSIMD
 from memory.unsafe import Pointer
-from python.object import PythonObject
 from tensor.tensor import Tensor
-
-from utils.index import StaticIntTuple
 from utils.list import DimList
 
 # ===----------------------------------------------------------------------=== #
@@ -77,32 +72,21 @@ struct _fdopen:
 
 @no_inline
 fn _printf[*types: AnyRegType](fmt: StringLiteral, *arguments: *types):
-    @parameter
-    if triple_is_nvidia_cuda():
-        # We need to make sure that the call to vprintf consistently uses
-        # the same type, otherwise you end up with signature conflicts when
-        # using external_call.
-        var args = VariadicList(arguments)
-        var args_ptr = Pointer.address_of(args)
-        _ = external_call["vprintf", Int32](
-            fmt.data(), args_ptr.bitcast[Pointer[Int]]().load()
-        )
-    else:
-        with _fdopen(_fdopen.STDOUT) as fd:
-            var num_characters_written = __mlir_op.`pop.external_call`[
-                func = "KGEN_CompilerRT_fprintf".value,
-                variadicType = __mlir_attr[
-                    `(`,
-                    `!kgen.pointer<none>,`,
-                    `!kgen.pointer<scalar<si8>>`,
-                    `) -> !pop.scalar<si32>`,
-                ],
-                _type=Int32,
-            ](fd.handle.address, fmt.data(), arguments)
-            # Note: currently ignoring errors if `fprintf` in the case that
-            # fprintf returns a negative value.
-            if num_characters_written > 0:
-                _ = external_call["fflush", Int32](fd)
+    with _fdopen(_fdopen.STDOUT) as fd:
+        var num_characters_written = __mlir_op.`pop.external_call`[
+            func = "KGEN_CompilerRT_fprintf".value,
+            variadicType = __mlir_attr[
+                `(`,
+                `!kgen.pointer<none>,`,
+                `!kgen.pointer<scalar<si8>>`,
+                `) -> !pop.scalar<si32>`,
+            ],
+            _type=Int32,
+        ](fd.handle.address, fmt.data(), arguments)
+        # Note: currently ignoring errors if `fprintf` in the case that
+        # fprintf returns a negative value.
+        if num_characters_written > 0:
+            _ = external_call["fflush", Int32](fd)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -301,7 +285,7 @@ fn _put_simd_scalar[type: DType](x: Scalar[type]):
         if triple_is_nvidia_cuda():
             _printf(format, x.cast[DType.float64]())
         else:
-            _put(String(x))
+            _put(str(x))
     elif type == DType.address:
         _printf(format, x)
     else:
@@ -372,193 +356,14 @@ fn put_new_line():
 
 
 @no_inline
-fn print():
-    """Prints a newline."""
-    put_new_line()
-
-
-# These specific overloads are defined for twofold:
-# 1. Reduce binary size
-# 2. The `Stringable` path in variadic print doesn't work on GPUs.
-
-
-@no_inline
-fn print(t: DType):
-    """Prints a DType.
+fn print(*, sep: StringLiteral = " ", end: StringLiteral = "\n"):
+    """Prints the end value.
 
     Args:
-        t: The DType to print.
+        sep: The separator used between elements.
+        end: The String to write after printing the elements.
     """
-    print(t.__str__())
-
-
-@no_inline
-fn print(x: String):
-    """Prints a string.
-
-    Args:
-        x: The string to print.
-    """
-    _put(x)
-    put_new_line()
-
-
-@no_inline
-fn print(x: StringRef):
-    """Prints a string.
-
-    Args:
-        x: The string to print.
-    """
-    _put(x)
-    put_new_line()
-
-
-@no_inline
-fn print(x: StringLiteral):
-    """Prints a string.
-
-    Args:
-        x: The string to print.
-    """
-    _put(StringRef(x))
-    put_new_line()
-
-
-@no_inline
-fn print(x: Bool):
-    """Prints a boolean value.
-
-    Args:
-        x: The value to print.
-    """
-    _put("True") if x else _put("False")
-    put_new_line()
-
-
-@no_inline
-fn print(x: Int):
-    """Prints an integer value.
-
-    Args:
-        x: The value to print.
-    """
-    _put(x)
-    put_new_line()
-
-
-@no_inline
-fn print(x: Float64):
-    """Prints a float value.
-
-    Args:
-        x: The value to print.
-    """
-    _put(x)
-    put_new_line()
-
-
-@no_inline
-fn print[
-    simd_width: Int,
-    type: DType,
-](vec: SIMD[type, simd_width]):
-    """Prints a SIMD value.
-
-    Parameters:
-        simd_width: The SIMD vector width.
-        type: The DType of the value.
-
-    Args:
-        vec: The SIMD value to print.
-    """
-
-    _put(vec)
-    put_new_line()
-
-
-@no_inline
-fn print[
-    simd_width: Int,
-    type: DType,
-](vec: _ComplexSIMD[type, simd_width]):
-    """Prints a SIMD value.
-
-    Parameters:
-        simd_width: The SIMD vector width.
-        type: The DType of the value.
-
-    Args:
-        vec: The complex value to print.
-    """
-    print(String(vec))
-
-
-@no_inline
-fn print[type: DType](x: Atomic[type]):
-    """Prints an atomic value.
-
-    Parameters:
-        type: The DType of the atomic value.
-
-    Args:
-        x: The value to print.
-    """
-    _put(x.value)
-    put_new_line()
-
-
-@no_inline
-fn print[length: Int](shape: DimList):
-    """Prints a DimList object.
-
-    Parameters:
-        length: The length of the DimList.
-
-    Args:
-        shape: The DimList object to print.
-    """
-
-    @always_inline
-    @parameter
-    fn _print_elem[idx: Int]():
-        var value = shape.at[idx]()
-
-        @parameter
-        if idx != 0:
-            _printf(", ")
-        _put(value.get().value)
-
-    _put("[")
-    unroll[_print_elem, length]()
-    _put("]")
-    put_new_line()
-
-
-@no_inline
-fn print(obj: object):
-    """Prints an object type.
-
-    Args:
-        obj: The object to print.
-    """
-    obj.print()
-    put_new_line()
-
-
-@no_inline
-fn print(err: Error):
-    """Prints an Error type.
-
-    Args:
-        err: The Error to print.
-    """
-    print(err.__str__())
-
-
-# ===----------------------------------------------------------------------=== #
-#  variadic print
-# ===----------------------------------------------------------------------=== #
+    _put(end)
 
 
 struct _StringableTuple[*Ts: Stringable](Sized):
@@ -584,9 +389,9 @@ struct _StringableTuple[*Ts: Stringable](Sized):
                 alignof[Ts[i]](),
             )
 
-    fn _print[i: Int](inout self):
+    fn _print[i: Int](inout self, /, *, sep: StringLiteral = " "):
         # TODO: Allow controlling this separator from the caller.
-        _put(" ")
+        _put(sep)
         _put(self._at[i]())
 
     fn _at[i: Int](inout self) -> String:
@@ -600,26 +405,28 @@ struct _StringableTuple[*Ts: Stringable](Sized):
 
 fn _print_elements[
     T: Stringable, *Ts: Stringable
-](first: T, inout rest: _StringableTuple[Ts]):
-    _put(first.__str__())
+](
+    first: T,
+    inout rest: _StringableTuple[Ts],
+    sep: StringLiteral = " ",
+    end: StringLiteral = "\n",
+):
+    _put(str(first))
 
     @parameter
     fn each[i: Int]():
-        rest._print[i]()
+        rest._print[i](sep=sep)
 
     unroll[each, len(VariadicList(Ts))]()
+    _put(end)
 
 
 @no_inline
 fn print[
     T: Stringable, *Ts: Stringable
-](first: T, *rest: *Ts, end: StringLiteral = "\n"):
-    """ "
-    Prints elements to the text stream.  Each element is separated by spaces and
-    followed by `end`.
-
-    In the future, there will be a `sep` keyword argument to allow specifying the
-    separator.  Currently, the default is hard-coded to be a space (`' '`).
+](first: T, *rest: *Ts, sep: StringLiteral = " ", end: StringLiteral = "\n"):
+    """Prints elements to the text stream. Each element is separated by `sep`
+    and followed by `end`.
 
     Parameters:
         T: The first element type.
@@ -628,13 +435,11 @@ fn print[
     Args:
         first: The first element.
         rest: The remaining elements.
-        end: The StringLiteral to write to the text stream after the elements have been written.
-
-        Print objects to the text stream file, separated by sep and followed by end. sep, end, file, and flush, if present, must be given as keyword arguments.
+        sep: The separator used between elements.
+        end: The String to write after printing the elements.
     """
     var vals = _StringableTuple[Ts](rest)
-    _print_elements(first, vals)
-    _printf(end)
+    _print_elements(first, vals, sep=sep, end=end)
 
 
 # FIXME(#8843, #12811): This should be removed, and instead implemented in terms
@@ -652,4 +457,4 @@ fn print_no_newline[T: Stringable, *Ts: Stringable](first: T, *rest: *Ts):
         rest: The remaining elements.
     """
     var vals = _StringableTuple[Ts](rest)
-    _print_elements(first, vals)
+    _print_elements(first, vals, end="")

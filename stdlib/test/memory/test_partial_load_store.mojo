@@ -61,7 +61,7 @@ fn test_partial_load_store():
         99,  # idx  # lbound  # rbound  # pad value
     )
     # CHECK: [99, 2, 3, 99]
-    print[4, DType.index](partial_load_data)
+    print(partial_load_data)
 
     # Test partial store:
     partial_simd_store[4](
@@ -72,7 +72,7 @@ fn test_partial_load_store():
     )
     var partial_store_data = write_buffer.simd_load[4](2)
     # CHECK: [0, 3, 99, 0]
-    print[4, DType.index](partial_store_data)
+    print(partial_store_data)
 
     # Test NDBuffer partial load store
     var read_nd_buffer = NDBuffer[
@@ -95,7 +95,7 @@ fn test_partial_load_store():
         123,  # lbound  # rbound  # pad value
     )
     # CHECK: [14, 15, 123, 123]
-    print[4, DType.index](nd_partial_load_data)
+    print(nd_partial_load_data)
 
     # Test partial store
     partial_simd_store[4](
@@ -109,7 +109,7 @@ fn test_partial_load_store():
     )
 
     # CHECK: [0, 14, 15, 123]
-    print[4, DType.index](nd_partial_store_data)
+    print(nd_partial_store_data)
 
 
 fn main():

@@ -20,7 +20,7 @@ fn test_dim_list():
     var lst1 = DimList(Dim(), 2, 3, 4)
 
     # CHECK: [1, 2, 3, 4]
-    print[4](lst0)
+    print(lst0)
 
     # CHECK: 24
     print(lst0.product[4]().get())
@@ -67,8 +67,8 @@ fn test_dim():
 def test_dim_to_string():
     assert_equal(str(Dim()), "?")
     assert_equal(str(Dim(33)), "33")
-    assert_equal(str(DimList(2, Dim(), 3)), "2, ?, 3")
-    assert_equal(str(DimList.create_unknown[5]()), "?, ?, ?, ?, ?")
+    assert_equal(str(DimList(2, Dim(), 3)), "[2, ?, 3]")
+    assert_equal(str(DimList.create_unknown[5]()), "[?, ?, ?, ?, ?]")
 
 
 # CHECK-LABEL: test_opt_param_int
