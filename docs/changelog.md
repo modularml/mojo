@@ -56,6 +56,10 @@ cannot be parsed from the string, then an error is raised.
   construction from a variadic number of values.  For example,
   `List[Int](1, 2, 3)` works now.
 
+- The `print` function now takes a `sep` and `end` as keyword. This means that
+  one can write `print("Hello", "Mojo", sep="/", end="!!!\n")` to print the
+  message `Hello/Mojo!!!\n` to the screen.
+
 ### 🦋 Changed
 
 - The [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) and
