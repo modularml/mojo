@@ -650,3 +650,65 @@ fn _uint_type_of_width[width: Int]() -> DType:
     else:
         constrained[width == 64]()
         return DType.uint64
+
+
+# ===-------------------------------------------------------------------===#
+# printf format
+# ===-------------------------------------------------------------------===#
+
+
+@always_inline
+fn _index_printf_format() -> StringLiteral:
+    @parameter
+    if bitwidthof[Int]() == 32:
+        return "%d"
+    elif os_is_windows():
+        return "%lld"
+    else:
+        return "%ld"
+
+
+@always_inline
+fn _get_dtype_printf_format[type: DType]() -> StringLiteral:
+    @parameter
+    if type == DType.bool:
+        return _index_printf_format()
+    elif type == DType.uint8:
+        return "%hhu"
+    elif type == DType.int8:
+        return "%hhi"
+    elif type == DType.uint16:
+        return "%hu"
+    elif type == DType.int16:
+        return "%hi"
+    elif type == DType.uint32:
+        return "%u"
+    elif type == DType.int32:
+        return "%i"
+    elif type == DType.int64:
+
+        @parameter
+        if os_is_windows():
+            return "%lld"
+        else:
+            return "%ld"
+    elif type == DType.uint64:
+
+        @parameter
+        if os_is_windows():
+            return "%llu"
+        else:
+            return "%lu"
+    elif type == DType.index:
+        return _index_printf_format()
+
+    elif type == DType.address:
+        return "%zx"
+
+    elif type.is_floating_point():
+        return "%.17g"
+
+    else:
+        constrained[False, "invalid dtype"]()
+
+    return ""

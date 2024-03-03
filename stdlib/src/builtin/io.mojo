@@ -12,6 +12,7 @@ from math.math import align_up
 from sys import external_call
 from sys.info import bitwidthof, os_is_windows, triple_is_nvidia_cuda
 
+from builtin.dtype import _get_dtype_printf_format
 from algorithm.functional import unroll
 from memory.unsafe import Pointer
 from tensor.tensor import Tensor
@@ -131,6 +132,41 @@ fn _snprintf[
     )
 
 
+@no_inline
+fn _snprintf_int(
+    buffer: Pointer[Int8],
+    size: Int,
+    x: Int,
+) -> Int:
+    return _snprintf(
+        buffer, size, _get_dtype_printf_format[DType.index](), x.value
+    )
+
+
+@no_inline
+fn _snprintf_scalar[
+    type: DType
+](buffer: Pointer[Int8], size: Int, x: Scalar[type],) -> Int:
+    alias format = _get_dtype_printf_format[type]()
+
+    @parameter
+    if type == DType.bool:
+        if x:
+            return _snprintf(buffer, size, "True")
+        else:
+            return _snprintf(buffer, size, "False")
+    elif type.is_integral():
+        return _snprintf(buffer, size, format, x)
+    elif (
+        type == DType.float16 or type == DType.bfloat16 or type == DType.float32
+    ):
+        # We need to cast the value to float64 to print it.
+        return _float_repr(buffer, size, x.cast[DType.float64]())
+    elif type == DType.float64:
+        return _float_repr(buffer, size, rebind[Float64](x))
+    return 0
+
+
 # ===----------------------------------------------------------------------=== #
 #  Helper functions to print a single pop scalar without spacing or new line.
 # ===----------------------------------------------------------------------=== #
@@ -164,96 +200,6 @@ fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
     return n + 2
 
 
-@always_inline
-fn _index_printf_format() -> StringLiteral:
-    @parameter
-    if bitwidthof[Int]() == 32:
-        return "%d"
-    elif os_is_windows():
-        return "%lld"
-    else:
-        return "%ld"
-
-
-@always_inline
-fn _get_dtype_printf_format[type: DType]() -> StringLiteral:
-    @parameter
-    if type == DType.bool:
-        return _index_printf_format()
-    elif type == DType.uint8:
-        return "%hhu"
-    elif type == DType.int8:
-        return "%hhi"
-    elif type == DType.uint16:
-        return "%hu"
-    elif type == DType.int16:
-        return "%hi"
-    elif type == DType.uint32:
-        return "%u"
-    elif type == DType.int32:
-        return "%i"
-    elif type == DType.int64:
-
-        @parameter
-        if os_is_windows():
-            return "%lld"
-        else:
-            return "%ld"
-    elif type == DType.uint64:
-
-        @parameter
-        if os_is_windows():
-            return "%llu"
-        else:
-            return "%lu"
-    elif type == DType.index:
-        return _index_printf_format()
-
-    elif type == DType.address:
-        return "%zx"
-
-    elif type.is_floating_point():
-        return "%.17g"
-
-    else:
-        constrained[False, "invalid dtype"]()
-
-    return ""
-
-
-@no_inline
-fn _snprintf_int(
-    buffer: Pointer[Int8],
-    size: Int,
-    x: Int,
-) -> Int:
-    return _snprintf(buffer, size, _index_printf_format(), x.value)
-
-
-@no_inline
-fn _snprintf_scalar[
-    type: DType
-](buffer: Pointer[Int8], size: Int, x: Scalar[type],) -> Int:
-    alias format = _get_dtype_printf_format[type]()
-
-    @parameter
-    if type == DType.bool:
-        if x:
-            return _snprintf(buffer, size, "True")
-        else:
-            return _snprintf(buffer, size, "False")
-    elif type.is_integral():
-        return _snprintf(buffer, size, format, x)
-    elif (
-        type == DType.float16 or type == DType.bfloat16 or type == DType.float32
-    ):
-        # We need to cast the value to float64 to print it.
-        return _float_repr(buffer, size, x.cast[DType.float64]())
-    elif type == DType.float64:
-        return _float_repr(buffer, size, rebind[Float64](x))
-    return 0
-
-
 # ===----------------------------------------------------------------------=== #
 #  _put
 # ===----------------------------------------------------------------------=== #
@@ -266,7 +212,7 @@ fn _put(x: Int):
     Args:
         x: The value to print.
     """
-    _printf(_index_printf_format(), x)
+    _printf(_get_dtype_printf_format[DType.index](), x)
 
 
 @no_inline
@@ -362,22 +308,6 @@ fn put_new_line():
 # ===----------------------------------------------------------------------=== #
 
 
-@no_inline
-fn print(
-    *, sep: StringLiteral = " ", end: StringLiteral = "\n", flush: Bool = False
-):
-    """Prints the end value.
-
-    Args:
-        sep: The separator used between elements.
-        end: The String to write after printing the elements.
-        flush: If set to true, then the stream is forcibly flushed.
-    """
-    _put(end)
-    if flush:
-        _flush()
-
-
 struct _StringableTuple[*Ts: Stringable](Sized):
     alias _type = __mlir_type[
         `!kgen.pack<:variadic<`, Stringable, `> `, Ts, `>`
@@ -436,6 +366,27 @@ fn _print_elements[
         _flush()
 
 
+# ===----------------------------------------------------------------------=== #
+#  print
+# ===----------------------------------------------------------------------=== #
+
+
+@no_inline
+fn print(
+    *, sep: StringLiteral = " ", end: StringLiteral = "\n", flush: Bool = False
+):
+    """Prints the end value.
+
+    Args:
+        sep: The separator used between elements.
+        end: The String to write after printing the elements.
+        flush: If set to true, then the stream is forcibly flushed.
+    """
+    _put(end)
+    if flush:
+        _flush()
+
+
 @no_inline
 fn print[
     T: Stringable, *Ts: Stringable
@@ -461,7 +412,9 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
     """
     var vals = _StringableTuple[Ts](rest)
-    _print_elements(first, vals, sep=sep, end=end, flush=flush)
+    _print_elements(first, vals, sep=sep, end=end)
+    if flush:
+        _flush()
 
 
 # FIXME(#8843, #12811): This should be removed, and instead implemented in terms
