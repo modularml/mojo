@@ -86,14 +86,14 @@ struct Arc[T: CollectionElement](CollectionElement):
         __get_address_as_uninit_lvalue(self._inner.address) = Self._type(
             value ^
         )
-        _ = __get_address_as_lvalue(self._inner.address).increment()
+        _ = self._inner[].increment()
         return self ^
 
     fn __copyinit__(other: Self) -> Self:
         """Copy an existing reference. Increment the refcount to the object."""
         # Order here does not matter since `other` is borrowed, and can't
         # be destroyed until our copy completes.
-        _ = __get_address_as_lvalue(other._inner.address).increment()
+        _ = other._inner[].increment()
         return Self {_inner: other._inner}
 
     fn __del__(owned self):
@@ -102,7 +102,7 @@ struct Arc[T: CollectionElement](CollectionElement):
         Decrement the ref count for the reference. If there are no more
         references, delete the object and free its memory."""
         # Reference docs from Rust Arc: https://doc.rust-lang.org/src/alloc/sync.rs.html#2367-2402
-        var rc = __get_address_as_lvalue(self._inner.address).decrement()
+        var rc = self._inner[].decrement()
         if rc < 1:
             # Call inner destructor, then free the memory
             _ = __get_address_as_owned_value(self._inner.address)
@@ -123,7 +123,7 @@ struct Arc[T: CollectionElement](CollectionElement):
             new_value: The new value to manage. Other pointers to the memory will
                 now see the new value.
         """
-        __get_address_as_lvalue(self._inner.address).data = new_value
+        self._inner[].data = new_value
 
     # TODO(lifetimes): return a reference rather than a copy
     fn get(self) -> T:
@@ -134,12 +134,10 @@ struct Arc[T: CollectionElement](CollectionElement):
         Returns:
             A copy of the managed value.
         """
-        return __get_address_as_lvalue(self._inner.address).data
+        return self._inner[].data
 
     fn _data_ptr(self) -> AnyPointer[T]:
-        return AnyPointer.address_of(
-            __get_address_as_lvalue(self._inner.address).data
-        )
+        return AnyPointer.address_of(self._inner[].data)
 
     fn _bitcast[T2: CollectionElement](self) -> Arc[T2]:
         constrained[
@@ -162,7 +160,7 @@ struct Arc[T: CollectionElement](CollectionElement):
 
         # Add a +1 to the ref count, since we're creating a new `Arc` instance
         # pointing at the same data.
-        _ = __get_address_as_lvalue(self._inner.address).increment()
+        _ = self._inner[].increment()
 
         var ptr2: Pointer[_ArcInner[T2]] = ptr.bitcast[_ArcInner[T2]]()
 

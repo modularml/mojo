@@ -51,13 +51,13 @@ def test_anypointer_move_into_move_count():
     # Test that `AnyPointer.move_into` performs exactly one move.
     # -----
 
-    assert_equal(1, __get_address_as_lvalue(ptr.value).move_count)
+    assert_equal(1, ptr[].move_count)
 
     var ptr_2 = AnyPointer[MoveCounter[Int]].alloc(1)
 
     ptr.move_into(ptr_2)
 
-    assert_equal(2, __get_address_as_lvalue(ptr_2.value).move_count)
+    assert_equal(2, ptr_2[].move_count)
 
 
 def test_refitem():

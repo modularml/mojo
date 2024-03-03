@@ -90,14 +90,12 @@ struct _RefCountedListRef:
 
     @always_inline
     fn copy(self) -> Self:
-        _ = __get_address_as_lvalue(
-            self.lst.bitcast[_RefCountedList]().address
-        ).refcount.fetch_add(1)
+        _ = self.lst.bitcast[_RefCountedList]()[].refcount.fetch_add(1)
         return Self {lst: self.lst}
 
     fn release(self):
         var ptr = self.lst.bitcast[_RefCountedList]()
-        var prev = __get_address_as_lvalue(ptr.address).refcount.fetch_sub(1)
+        var prev = ptr[].refcount.fetch_sub(1)
         if prev != 1:
             return
 
@@ -180,30 +178,23 @@ struct _RefCountedAttrsDictRef:
     """The reference to the dictionary."""
 
     @always_inline
-    fn __init__[  # FIXME(#29464): Should use autoparameterization.
-        elt_is_mutable: __mlir_type.i1,
-        lifetime: AnyLifetime[elt_is_mutable].type,
-    ](values: VariadicListMem[Attr, elt_is_mutable, lifetime]) -> Self:
+    fn __init__(values: VariadicListMem[Attr, _, _]) -> Self:
         var ptr = Pointer[_RefCountedAttrsDict].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            __get_address_as_lvalue(ptr.address).impl._insert(
-                values[i].key, values[i].value._value.copy()
-            )
+            ptr[].impl._insert(values[i].key, values[i].value._value.copy())
 
         return Self {attrs: ptr.bitcast[Int8]()}
 
     @always_inline
     fn copy(self) -> Self:
-        _ = __get_address_as_lvalue(
-            self.attrs.bitcast[_RefCountedAttrsDict]().address
-        ).refcount.fetch_add(1)
+        _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].refcount.fetch_add(1)
         return Self {attrs: self.attrs}
 
     fn release(self):
         var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()
-        var prev = __get_address_as_lvalue(ptr.address).refcount.fetch_sub(1)
+        var prev = ptr[].refcount.fetch_sub(1)
         if prev != 1:
             return
 
@@ -593,24 +584,20 @@ struct _ObjectImpl(CollectionElement):
 
     @always_inline
     fn list_append(self, value: Self):
-        __get_address_as_lvalue(self.get_list_ptr().address).impl.push_back(
-            value.value
-        )
+        self.get_list_ptr()[].impl.push_back(value.value)
 
     @always_inline
     fn get_list_length(self) -> Int:
-        return len(__get_address_as_lvalue(self.get_list_ptr().address).impl)
+        return len(self.get_list_ptr()[].impl)
 
     @always_inline
     fn get_list_element(self, i: Int) -> _ObjectImpl:
-        return (
-            __get_address_as_lvalue(self.get_list_ptr().address).impl[i].copy()
-        )
+        return self.get_list_ptr()[].impl[i].copy()
 
     @always_inline
     fn set_list_element(self, i: Int, value: _ObjectImpl):
-        __get_address_as_lvalue(self.get_list_ptr().address).impl[i].destroy()
-        __get_address_as_lvalue(self.get_list_ptr().address).impl[i] = value
+        self.get_list_ptr()[].impl[i].destroy()
+        self.get_list_ptr()[].impl[i] = value
 
     # ===------------------------------------------------------------------=== #
     # Object Attribute Functions
@@ -622,17 +609,11 @@ struct _ObjectImpl(CollectionElement):
 
     @always_inline
     fn set_obj_attr(self, key: StringLiteral, value: _ObjectImpl) raises:
-        __get_address_as_lvalue(self.get_obj_attrs_ptr().address).set(
-            key, value
-        )
+        self.get_obj_attrs_ptr()[].set(key, value)
 
     @always_inline
     fn get_obj_attr(self, key: StringLiteral) raises -> _ObjectImpl:
-        return (
-            __get_address_as_lvalue(self.get_obj_attrs_ptr().address)
-            .get(key)
-            .copy()
-        )
+        return self.get_obj_attrs_ptr()[].get(key).copy()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1660,9 +1641,9 @@ struct object(IntableRaising, Boolable):
             _printf("function at %p", self._value.get_as_func().value.address)
         else:
             _put("{")
-            var ptr = self._value.get_obj_attrs_ptr().address
-            var k: Int = 0
-            for entry in __get_address_as_lvalue(ptr).impl.items():
+            var ptr = self._value.get_obj_attrs_ptr()
+            var k = 0
+            for entry in ptr[].impl.items():
                 if k != 0:
                     _put(", ")
                 _printf("'%s' = ", entry[].key)

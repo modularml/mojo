@@ -229,8 +229,8 @@ struct InlinedFixedVector[
         self.current_size = 0
 
     @staticmethod
-    fn _deref_iter_impl(self: Pointer[Self], i: Int) -> type:
-        return __get_address_as_lvalue(self.address)[i]
+    fn _deref_iter_impl(selfptr: Pointer[Self], i: Int) -> type:
+        return selfptr[][i]
 
     alias _iterator = _VecIter[type, Self, Self._deref_iter_impl]
 

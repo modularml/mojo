@@ -174,7 +174,7 @@ fn _get_dylib[
     var ptr = _get_global[name, init_fn, destroy_fn](payload).bitcast[
         DLHandle
     ]()
-    return __get_address_as_lvalue(ptr.address)
+    return ptr[]
 
 
 @always_inline

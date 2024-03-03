@@ -25,13 +25,13 @@ from .object import PythonObject
 
 fn _init_global(ignored: Pointer[NoneType]) -> Pointer[NoneType]:
     var ptr = Pointer[CPython].alloc(1)
-    __get_address_as_lvalue(ptr.address) = CPython()
+    ptr[] = CPython()
     return ptr.bitcast[NoneType]()
 
 
 fn _destroy_global(python: Pointer[NoneType]):
     var p = python.bitcast[CPython]()
-    CPython.destroy(__get_address_as_lvalue(p.address))
+    CPython.destroy(p[])
     python.free()
 
 
@@ -51,7 +51,7 @@ struct _PythonInterfaceImpl:
         self._cpython = existing._cpython
 
     fn cpython(self) -> CPython:
-        return __get_address_as_lvalue(self._cpython.address)
+        return self._cpython[]
 
 
 struct Python:
