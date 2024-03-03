@@ -89,6 +89,14 @@ cannot be parsed from the string, then an error is raised.
 - `StaticTuple` parameter order has changed to `StaticTuple[type, size]` for
   consistency with `SIMD` and similar collection types.
 
+- The signature of the elementwise function has been changed. The new order is
+  is `function`, `simd_width`, and then `rank`. As a result, the rank parameter
+  can now be inferred and one can call elementwise via:
+
+  ```mojo
+  elementwise[func, simd_width](shape)
+  ```
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,
@@ -430,14 +438,6 @@ cannot be parsed from the string, then an error is raised.
   fn my_function(x: Int, y: __type_of(x)) -> Int:
     let z : __type_of(x) = y
     return z
-  ```
-
-- The signatureof elementwise op has been changed. The rank parameter of
-  elementwise op can be infered, so an elementwsie op can be called in the
-  following way:
-
-  ```mojo
-  elementwise[func, simd_width](shape)
   ```
 
 ### 🦋 Changed
