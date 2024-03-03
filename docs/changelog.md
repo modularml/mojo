@@ -52,6 +52,10 @@ cannot be parsed from the string, then an error is raised.
 - The `FloatLiteral` type is now an infinite precision nonmaterializable type.
   When materialized, `FloatLiteral` is converted to `Float64`.
 
+- The [`List`](/mojo/stdlib/collections/list.html#list) type now supports
+  construction from a variadic number of values.  For example,
+  `List[Int](1, 2, 3)` works now.
+
 ### 🦋 Changed
 
 - The [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) and

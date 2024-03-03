@@ -78,6 +78,18 @@ def test_list():
     assert_equal(2, list.capacity)
 
 
+def test_list_variadic_constructor():
+    var l = List[Int](2, 4, 6)
+    assert_equal(3, len(l))
+    assert_equal(2, l[0])
+    assert_equal(4, l[1])
+    assert_equal(6, l[2])
+
+    l.append(8)
+    assert_equal(4, len(l))
+    assert_equal(8, l[3])
+
+
 def test_list_reverse():
     #
     # Test reversing the list []
@@ -390,6 +402,7 @@ def test_list_iter_mutable():
 def main():
     test_mojo_issue_698()
     test_list()
+    test_list_variadic_constructor()
     test_list_reverse()
     test_list_reverse_move_count()
     test_list_extend()

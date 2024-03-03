@@ -86,6 +86,18 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size = 0
         self.capacity = capacity
 
+    # TODO: Avoid copying elements in once owned varargs
+    # allow transfers.
+    fn __init__(inout self, *values: T):
+        """Constructs a list from the given values.
+
+        Args:
+            values: The values to populate the list with.
+        """
+        self = List[T](capacity=len(values))
+        for value in values:
+            self.append(value[])
+
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing list into a new one.
 
