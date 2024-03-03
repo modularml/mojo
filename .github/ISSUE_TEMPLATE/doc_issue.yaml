@@ -1,6 +1,6 @@
 name: Documentation issue
 description: Report a problem with the Mojo docs
-title: "[Docs]: "
+title: "[Docs]"
 labels:
   - documentation
 body:

@@ -1,6 +1,6 @@
 name: Mojo feature request
 description: Suggest an enhancement for Mojo
-title: "[Feature Request]: "
+title: "[Feature Request]"
 labels:
   - "enhancement,mojo"
 body:
