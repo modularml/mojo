@@ -381,4 +381,6 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         """
         return _ListIter[T, mutability, self_life](0, Reference(self))
 
-    alias DynamicVector = List
+
+# An alias is provided for backward compatability.
+alias DynamicVector = List
