@@ -80,7 +80,7 @@ fn _debug_assert_impl[boolable: Boolable](cond: boolable, msg: StringLiteral):
                 abort()
                 return
 
-            abort("Assert Error:" + str(msg))
+            abort("Assert Error: " + str(msg))
         else:
 
             @parameter

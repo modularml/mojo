@@ -66,6 +66,17 @@ struct _fdopen:
 
 
 # ===----------------------------------------------------------------------=== #
+#  _flush
+# ===----------------------------------------------------------------------=== #
+
+
+@no_inline
+fn _flush():
+    with _fdopen(_fdopen.STDOUT) as fd:
+        _ = external_call["fflush", Int32](fd)
+
+
+# ===----------------------------------------------------------------------=== #
 #  _printf
 # ===----------------------------------------------------------------------=== #
 
@@ -73,7 +84,7 @@ struct _fdopen:
 @no_inline
 fn _printf[*types: AnyRegType](fmt: StringLiteral, *arguments: *types):
     with _fdopen(_fdopen.STDOUT) as fd:
-        var num_characters_written = __mlir_op.`pop.external_call`[
+        _ = __mlir_op.`pop.external_call`[
             func = "KGEN_CompilerRT_fprintf".value,
             variadicType = __mlir_attr[
                 `(`,
@@ -82,11 +93,7 @@ fn _printf[*types: AnyRegType](fmt: StringLiteral, *arguments: *types):
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](fd.handle.address, fmt.data(), arguments)
-        # Note: currently ignoring errors if `fprintf` in the case that
-        # fprintf returns a negative value.
-        if num_characters_written > 0:
-            _ = external_call["fflush", Int32](fd)
+        ](fd, fmt.data(), arguments)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -356,14 +363,19 @@ fn put_new_line():
 
 
 @no_inline
-fn print(*, sep: StringLiteral = " ", end: StringLiteral = "\n"):
+fn print(
+    *, sep: StringLiteral = " ", end: StringLiteral = "\n", flush: Bool = False
+):
     """Prints the end value.
 
     Args:
         sep: The separator used between elements.
         end: The String to write after printing the elements.
+        flush: If set to true, then the stream is forcibly flushed.
     """
     _put(end)
+    if flush:
+        _flush()
 
 
 struct _StringableTuple[*Ts: Stringable](Sized):
@@ -410,6 +422,7 @@ fn _print_elements[
     inout rest: _StringableTuple[Ts],
     sep: StringLiteral = " ",
     end: StringLiteral = "\n",
+    flush: Bool = False,
 ):
     _put(str(first))
 
@@ -419,12 +432,20 @@ fn _print_elements[
 
     unroll[each, len(VariadicList(Ts))]()
     _put(end)
+    if flush:
+        _flush()
 
 
 @no_inline
 fn print[
     T: Stringable, *Ts: Stringable
-](first: T, *rest: *Ts, sep: StringLiteral = " ", end: StringLiteral = "\n"):
+](
+    first: T,
+    *rest: *Ts,
+    sep: StringLiteral = " ",
+    end: StringLiteral = "\n",
+    flush: Bool = False,
+):
     """Prints elements to the text stream. Each element is separated by `sep`
     and followed by `end`.
 
@@ -437,9 +458,10 @@ fn print[
         rest: The remaining elements.
         sep: The separator used between elements.
         end: The String to write after printing the elements.
+        flush: If set to true, then the stream is forcibly flushed.
     """
     var vals = _StringableTuple[Ts](rest)
-    _print_elements(first, vals, sep=sep, end=end)
+    _print_elements(first, vals, sep=sep, end=end, flush=flush)
 
 
 # FIXME(#8843, #12811): This should be removed, and instead implemented in terms

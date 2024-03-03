@@ -216,5 +216,5 @@ fn abort[T: Stringable](message: T):
 
     @parameter
     if not triple_is_nvidia_cuda():
-        print(message)
+        print(message, flush=True)
     __mlir_op.`llvm.intr.trap`()

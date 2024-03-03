@@ -35,6 +35,9 @@ fn test_print():
     # CHECK: Hello
     print("Hello")
 
+    # CHECK: World
+    print("World", flush=True)
+
     # CHECK: 4294967295
     print(UInt32(-1))
 
