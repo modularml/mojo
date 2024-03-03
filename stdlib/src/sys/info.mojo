@@ -131,15 +131,17 @@ fn has_neon() -> Bool:
     Returns:
         True if the host system support the Neon instruction set.
     """
-    return (
-        is_apple_m1()
-        | __mlir_attr[
-            `#kgen.param.expr<target_has_feature,`,
-            _current_target(),
-            `, "neon" : !kgen.string`,
-            `> : i1`,
-        ]
-    )
+    alias neon_flag: Bool = __mlir_attr[
+        `#kgen.param.expr<target_has_feature,`,
+        _current_target(),
+        `, "neon" : !kgen.string`,
+        `> : i1`,
+    ]
+
+    @parameter
+    if neon_flag:
+        return True
+    return is_apple_silicone()
 
 
 @always_inline("nodebug")
@@ -197,6 +199,52 @@ fn is_apple_m1() -> Bool:
         `, "apple-m1" : !kgen.string`,
         `> : i1`,
     ]
+
+
+@always_inline("nodebug")
+fn is_apple_m2() -> Bool:
+    """Returns True if the host system is an Apple M2 with AMX support,
+    otherwise returns False.
+
+    Returns:
+        True if the host system is an Apple M2 with AMX support and False
+        otherwise.
+    """
+    return __mlir_attr[
+        `#kgen.param.expr<eq,`,
+        _current_cpu(),
+        `, "apple-m2" : !kgen.string`,
+        `> : i1`,
+    ]
+
+
+@always_inline("nodebug")
+fn is_apple_m3() -> Bool:
+    """Returns True if the host system is an Apple M3 with AMX support,
+    otherwise returns False.
+
+    Returns:
+        True if the host system is an Apple M3 with AMX support and False
+        otherwise.
+    """
+    return __mlir_attr[
+        `#kgen.param.expr<eq,`,
+        _current_cpu(),
+        `, "apple-m3" : !kgen.string`,
+        `> : i1`,
+    ]
+
+
+@always_inline("nodebug")
+fn is_apple_silicone() -> Bool:
+    """Returns True if the host system is an Apple Silicone with AMX support,
+    otherwise returns False.
+
+    Returns:
+        True if the host system is an Apple Silicone with AMX support and False
+        otherwise.
+    """
+    return is_apple_m1() or is_apple_m2() or is_apple_m3()
 
 
 @always_inline("nodebug")

@@ -6,7 +6,7 @@
 # REQUIRES: aarch64
 # COM: TODO (17471): Not all aarch64 have neon, so we need to guard against that,
 # for now just require apple-m1.
-# REQUIRES: apple-m1
+# REQUIRES: apple-silicone
 # RUN: %mojo -debug-level %s | FileCheck %s
 
 from sys.info import alignof, has_avx512f, has_neon, simdbitwidth
