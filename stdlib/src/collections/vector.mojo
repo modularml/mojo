@@ -16,11 +16,6 @@ from memory.unsafe import Pointer, Reference
 
 from utils.static_tuple import StaticTuple
 
-# TODO: Remove once we're ready to rip the bandaid off of the old
-# type of DynamicVector everywhere.  This (and the alias inside `list.mojo`)
-# are kept around only for a short amount of time right now.
-from . import List
-
 # ===----------------------------------------------------------------------===#
 # _VecIter
 # ===----------------------------------------------------------------------===#

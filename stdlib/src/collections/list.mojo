@@ -380,7 +380,3 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             An iterator of immutable references to the list elements.
         """
         return _ListIter[T, mutability, self_life](0, Reference(self))
-
-
-# An alias is provided for backward compatability.
-alias DynamicVector = List
