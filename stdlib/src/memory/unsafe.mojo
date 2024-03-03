@@ -71,7 +71,7 @@ fn bitcast[
     Returns:
         A new Pointer with the specified address.
     """
-    return bitcast[SIMD[type, 1], address_space](val)
+    return bitcast[Scalar[type], address_space](val)
 
 
 @always_inline("nodebug")
@@ -987,8 +987,8 @@ struct DTypePointer[
         address_space: The address space the pointer is in.
     """
 
-    alias element_type = SIMD[type, 1]
-    alias pointer_type = Pointer[SIMD[type, 1], address_space]
+    alias element_type = Scalar[type]
+    alias pointer_type = Pointer[Scalar[type], address_space]
     var address: Self.pointer_type
     """The pointed-to address."""
 
@@ -1022,10 +1022,10 @@ struct DTypePointer[
         """
         return Pointer[
             __mlir_type[`!pop.scalar<`, type.value, `>`], address_space
-        ](value).bitcast[SIMD[type, 1]]()
+        ](value).bitcast[Scalar[type]]()
 
     @always_inline("nodebug")
-    fn __init__(value: Pointer[SIMD[type, 1], address_space]) -> Self:
+    fn __init__(value: Pointer[Scalar[type], address_space]) -> Self:
         """Constructs a `DTypePointer` from a scalar pointer of the same type.
 
         Args:
@@ -1081,7 +1081,7 @@ struct DTypePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(inout arg: SIMD[type, 1]) -> Self:
+    fn address_of(inout arg: Scalar[type]) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -1093,7 +1093,7 @@ struct DTypePointer[
         return Self.pointer_type.address_of(arg)
 
     @always_inline("nodebug")
-    fn __getitem__[T: Intable](self, offset: T) -> SIMD[type, 1]:
+    fn __getitem__[T: Intable](self, offset: T) -> Scalar[type]:
         """Loads a single element (SIMD of size 1) from the pointer at the
         specified index.
 
@@ -1109,7 +1109,7 @@ struct DTypePointer[
         return self.load(offset)
 
     @always_inline("nodebug")
-    fn __setitem__[T: Intable](self, offset: T, val: SIMD[type, 1]):
+    fn __setitem__[T: Intable](self, offset: T, val: Scalar[type]):
         """Stores a single element value at the given offset.
 
         Parameters:
@@ -1206,7 +1206,7 @@ struct DTypePointer[
         return self.address.bitcast[SIMD[new_type, 1]]()
 
     @always_inline("nodebug")
-    fn _as_scalar_pointer(self) -> Pointer[SIMD[type, 1], address_space]:
+    fn _as_scalar_pointer(self) -> Pointer[Scalar[type], address_space]:
         """Converts the `DTypePointer` to a scalar pointer of the same dtype.
 
         Returns:
@@ -1229,7 +1229,7 @@ struct DTypePointer[
         _prefetch[params](self)
 
     @always_inline("nodebug")
-    fn load(self) -> SIMD[type, 1]:
+    fn load(self) -> Scalar[type]:
         """Loads a single element (SIMD of size 1) from the pointer at the
         current offset.
 
@@ -1239,7 +1239,7 @@ struct DTypePointer[
         return self.load(0)
 
     @always_inline("nodebug")
-    fn load[T: Intable](self, offset: T) -> SIMD[type, 1]:
+    fn load[T: Intable](self, offset: T) -> Scalar[type]:
         """Loads a single element (SIMD of size 1) from the pointer at the
         specified offset.
 
@@ -1283,7 +1283,7 @@ struct DTypePointer[
             The loaded value.
         """
         return self.aligned_simd_load[
-            width, alignof[SIMD[type, 1]]() if triple_is_nvidia_cuda() else 1
+            width, alignof[Scalar[type]]() if triple_is_nvidia_cuda() else 1
         ](offset)
 
     @always_inline("nodebug")
@@ -1323,7 +1323,7 @@ struct DTypePointer[
         ]()
 
     @always_inline("nodebug")
-    fn store[T: Intable](self, offset: T, val: SIMD[type, 1]):
+    fn store[T: Intable](self, offset: T, val: Scalar[type]):
         """Stores a single element value at the given offset.
 
         Parameters:
@@ -1336,7 +1336,7 @@ struct DTypePointer[
         self.offset(offset).store(val)
 
     @always_inline("nodebug")
-    fn store(self, val: SIMD[type, 1]):
+    fn store(self, val: Scalar[type]):
         """Stores a single element value.
 
         Args:
@@ -1384,7 +1384,7 @@ struct DTypePointer[
             val: The SIMD value to store.
         """
         self.aligned_simd_store[
-            width, alignof[SIMD[type, 1]]() if triple_is_nvidia_cuda() else 1
+            width, alignof[Scalar[type]]() if triple_is_nvidia_cuda() else 1
         ](val)
 
     @always_inline("nodebug")

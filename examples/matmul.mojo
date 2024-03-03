@@ -53,10 +53,10 @@ struct Matrix[rows: Int, cols: Int]:
         rand(data, rows * cols)
         return Self(data)
 
-    fn __getitem__(self, y: Int, x: Int) -> SIMD[type, 1]:
+    fn __getitem__(self, y: Int, x: Int) -> Scalar[type]:
         return self.load[1](y, x)
 
-    fn __setitem__(inout self, y: Int, x: Int, val: SIMD[type, 1]):
+    fn __setitem__(inout self, y: Int, x: Int, val: Scalar[type]):
         self.store[1](y, x, val)
 
     fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[type, nelts]:

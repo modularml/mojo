@@ -39,7 +39,7 @@ struct Atomic[type: DType]:
         """Constructs a new atomic value.
 
         Args:
-            value: Initial value represented as `SIMD[type, 1]` type.
+            value: Initial value represented as `Scalar[type]` type.
         """
         self.value = value
 

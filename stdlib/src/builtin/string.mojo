@@ -1076,7 +1076,7 @@ fn _calc_initial_buffer_size(n: Float64) -> Int:
     return 128 + 1  # Add 1 for the terminator
 
 
-fn _calc_initial_buffer_size[type: DType](n0: SIMD[type, 1]) -> Int:
+fn _calc_initial_buffer_size[type: DType](n0: Scalar[type]) -> Int:
     @parameter
     if type.is_integral():
         var n = _abs(n0)

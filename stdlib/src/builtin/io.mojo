@@ -279,7 +279,7 @@ fn _put(x: Int):
 
 
 @no_inline
-fn _put_simd_scalar[type: DType](x: SIMD[type, 1]):
+fn _put_simd_scalar[type: DType](x: Scalar[type]):
     """Prints a scalar value.
 
     Parameters:

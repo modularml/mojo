@@ -82,7 +82,7 @@ fn test_my_naive_matmul[
     """
     for m in range(c.dim[0]()):
         for n in range(c.dim[1]()):
-            var c_val: SIMD[type, 1] = 0
+            var c_val: Scalar[type] = 0
             for k in range(a.dim[1]()):
                 c_val += a[m, k] * b[k, n]
             c[StaticIntTuple[2](m, n)] = c_val

@@ -12,7 +12,7 @@ from tensor import Tensor, TensorShape
 
 fn linear_fill[
     type: DType
-](inout t: Tensor[type], elems: VariadicList[SIMD[type, 1]]) raises:
+](inout t: Tensor[type], elems: VariadicList[Scalar[type]]) raises:
     if t.num_elements() != len(elems):
         raise Error("must fill all elements of tensor")
 
@@ -21,9 +21,7 @@ fn linear_fill[
         buf[i] = elems[i]
 
 
-fn linear_fill[
-    type: DType
-](inout t: Tensor[type], *elems: SIMD[type, 1]) raises:
+fn linear_fill[type: DType](inout t: Tensor[type], *elems: Scalar[type]) raises:
     linear_fill(t, elems)
 
 

@@ -1126,7 +1126,7 @@ fn strided_load[
 
     @parameter
     if simd_width == 1:
-        return addr.load() if mask else SIMD[type, 1]()
+        return addr.load() if mask else Scalar[type]()
 
     var offset = (
         int(addr) + stride * iota[DType.index, simd_width]() * sizeof[type]()

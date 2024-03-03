@@ -449,7 +449,7 @@ fn stack_allocation[
     """
 
     return stack_allocation[
-        count, SIMD[type, 1], alignment=alignment, address_space=address_space
+        count, Scalar[type], alignment=alignment, address_space=address_space
     ]()
 
 

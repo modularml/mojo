@@ -40,10 +40,10 @@ def test_hash_byte_array():
 
 
 def _test_hash_int_simd[type: DType](bits: Int = 4):
-    var a = SIMD[type, 1](0)
-    var b = SIMD[type, 1](1)
-    var c = SIMD[type, 1](2)
-    var d = SIMD[type, 1](-1)
+    var a = Scalar[type](0)
+    var b = Scalar[type](1)
+    var c = Scalar[type](2)
+    var d = Scalar[type](-1)
 
     # Test that values hash deterministically
     assert_equal(_hash_simd(a), _hash_simd(a))

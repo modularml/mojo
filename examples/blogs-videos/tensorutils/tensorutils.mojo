@@ -36,7 +36,7 @@ fn tensorprint[type: DType](t: Tensor[type]) -> None:
         dim0 = t.dim(0)
         dim1 = t.dim(1)
         dim2 = t.dim(2)
-    var val: SIMD[type, 1] = 0.0
+    var val: Scalar[type] = 0.0
     for i in range(dim0):
         if i == 0 and rank == 3:
             print("[")
