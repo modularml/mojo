@@ -7,8 +7,8 @@
 
 from collections.vector import InlinedFixedVector
 
-from testing import *
 from test_utils import MoveCounter
+from testing import *
 
 
 def test_inlined_fixed_vector():

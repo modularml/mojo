@@ -12,10 +12,11 @@ from math.math import align_up
 from sys import external_call
 from sys.info import bitwidthof, os_is_windows, triple_is_nvidia_cuda
 
-from builtin.dtype import _get_dtype_printf_format
 from algorithm.functional import unroll
+from builtin.dtype import _get_dtype_printf_format
 from memory.unsafe import Pointer
 from tensor.tensor import Tensor
+
 from utils.list import DimList
 
 # ===----------------------------------------------------------------------=== #

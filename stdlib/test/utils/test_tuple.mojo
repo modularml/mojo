@@ -5,10 +5,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
+from testing import assert_equal, assert_false, assert_true
+
 from utils.index import StaticIntTuple
 from utils.static_tuple import StaticTuple
-
-from testing import assert_equal, assert_true, assert_false
 
 
 def test_static_tuple():

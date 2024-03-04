@@ -7,8 +7,8 @@
 
 from collections import List
 
-from testing import *
 from test_utils import MoveCounter
+from testing import *
 
 
 def test_mojo_issue_698():

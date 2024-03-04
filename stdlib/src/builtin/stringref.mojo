@@ -9,7 +9,9 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 import math
+
 from memory.unsafe import DTypePointer, Pointer
+
 from .dtype import _uint_type_of_width
 from .string import _atol
 

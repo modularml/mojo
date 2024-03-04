@@ -14,7 +14,8 @@ from memory.anypointer import AnyPointer
 
 from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
-from memory.memory import _malloc, _free
+
+from memory.memory import _free, _malloc
 
 
 @register_passable("trivial")

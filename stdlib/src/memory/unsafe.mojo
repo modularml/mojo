@@ -27,7 +27,7 @@ from sys.intrinsics import strided_load, strided_store
 
 from gpu.memory import AddressSpace as GPUAddressSpace
 
-from .memory import _malloc, _free
+from .memory import _free, _malloc
 
 # ===----------------------------------------------------------------------===#
 # bitcast
