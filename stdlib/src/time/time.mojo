@@ -49,8 +49,9 @@ struct _CTimeSpec(Stringable):
     var tv_sec: Int  # Seconds
     var tv_subsec: Int  # subsecond (nanoseconds on linux and usec on mac)
 
-    fn __init__() -> Self:
-        return Self {tv_sec: 0, tv_subsec: 0}
+    fn __init__(inout self):
+        self.tv_sec = 0
+        self.tv_subsec = 0
 
     fn as_nanoseconds(self) -> Int:
         @parameter
