@@ -141,7 +141,7 @@ fn has_neon() -> Bool:
     @parameter
     if neon_flag:
         return True
-    return is_apple_silicone()
+    return is_apple_silicon()
 
 
 @always_inline("nodebug")
@@ -236,12 +236,12 @@ fn is_apple_m3() -> Bool:
 
 
 @always_inline("nodebug")
-fn is_apple_silicone() -> Bool:
-    """Returns True if the host system is an Apple Silicone with AMX support,
+fn is_apple_silicon() -> Bool:
+    """Returns True if the host system is an Apple Silicon with AMX support,
     otherwise returns False.
 
     Returns:
-        True if the host system is an Apple Silicone with AMX support and False
+        True if the host system is an Apple Silicon with AMX support and False
         otherwise.
     """
     return is_apple_m1() or is_apple_m2() or is_apple_m3()
