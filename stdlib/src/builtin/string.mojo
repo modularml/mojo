@@ -423,6 +423,11 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         elif adjusted_span.end < 0:
             adjusted_span.end = len(self) + adjusted_span.end
 
+        if span.step < 0:
+            var tmp = adjusted_span.end
+            adjusted_span.end = adjusted_span.start - 1
+            adjusted_span.start = tmp - 1
+
         return adjusted_span
 
     @always_inline
@@ -446,8 +451,9 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         var buffer = Self._buffer_type()
         var adjusted_span_len = len(adjusted_span)
         buffer.resize(adjusted_span_len + 1, 0)
+        var ptr = self._as_ptr()
         for i in range(adjusted_span_len):
-            buffer[i] = self._as_ptr().offset(adjusted_span[i]).load()
+            buffer[i] = ptr[adjusted_span[i]]
         buffer[adjusted_span_len] = 0
         return Self(buffer ^)
 
