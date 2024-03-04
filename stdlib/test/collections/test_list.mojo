@@ -3,7 +3,7 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full -I %kernels_test_root %s
+# RUN: %mojo -debug-level full %s
 
 from collections import List
 
