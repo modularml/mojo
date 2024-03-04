@@ -641,21 +641,29 @@ struct Pointer[
     # Load/Store
     # ===------------------------------------------------------------------=== #
 
+    alias _default_alignment = alignof[type]() if triple_is_nvidia_cuda() else 1
+
     @always_inline("nodebug")
-    fn load(self) -> type:
+    fn load[*, alignment: Int = Self._default_alignment](self) -> type:
         """Loads the value the Pointer object points to.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
 
         Returns:
             The loaded value.
         """
-        return self.load(0)
+        return self.load[alignment=alignment](0)
 
     @always_inline("nodebug")
-    fn load[T: Intable](self, offset: T) -> type:
+    fn load[
+        T: Intable, *, alignment: Int = Self._default_alignment
+    ](self, offset: T) -> type:
         """Loads the value the Pointer object points to with the given offset.
 
         Parameters:
             T: The Intable type of the offset.
+            alignment: The minimal alignment of the address.
 
         Args:
             offset: The offset to load from.
@@ -663,37 +671,9 @@ struct Pointer[
         Returns:
             The loaded value.
         """
-        return self.aligned_load[alignment=1](offset)
-
-    @always_inline("nodebug")
-    fn aligned_load[alignment: Int, T: Intable](self, offset: T) -> type:
-        """Loads a value from the pointer with the guaranteed specified
-        alignment.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-            T: The Intable type of the offset.
-
-        Args:
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-        return self.offset(offset).aligned_load[alignment]()
-
-    @always_inline("nodebug")
-    fn aligned_load[alignment: Int](self) -> type:
-        """Loads a value from the pointer with the guaranteed specified
-        alignment.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Returns:
-            The loaded value.
-        """
-        return __mlir_op.`pop.load`[alignment = alignment.value](self.address)
+        return __mlir_op.`pop.load`[alignment = alignment.value](
+            self.offset(offset).address
+        )
 
     @always_inline("nodebug")
     fn store[T: Intable](self, offset: T, value: type):
@@ -1218,6 +1198,10 @@ struct DTypePointer[
     # Load/Store
     # ===------------------------------------------------------------------=== #
 
+    alias _default_alignment = alignof[
+        Scalar[type]
+    ]() if triple_is_nvidia_cuda() else 1
+
     @always_inline
     fn prefetch[params: PrefetchOptions](self):
         # Prefetch at the underlying address.
@@ -1229,22 +1213,26 @@ struct DTypePointer[
         _prefetch[params](self)
 
     @always_inline("nodebug")
-    fn load(self) -> Scalar[type]:
-        """Loads a single element (SIMD of size 1) from the pointer at the
-        current offset.
+    fn load[*, alignment: Int = Self._default_alignment](self) -> Scalar[type]:
+        """Loads the value the Pointer object points to.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
 
         Returns:
             The loaded value.
         """
-        return self.load(0)
+        return self.load[alignment=alignment](0)
 
     @always_inline("nodebug")
-    fn load[T: Intable](self, offset: T) -> Scalar[type]:
-        """Loads a single element (SIMD of size 1) from the pointer at the
-        specified offset.
+    fn load[
+        T: Intable, *, alignment: Int = Self._default_alignment
+    ](self, offset: T) -> Scalar[type]:
+        """Loads the value the Pointer object points to with the given offset.
 
         Parameters:
             T: The Intable type of the offset.
+            alignment: The minimal alignment of the address.
 
         Args:
             offset: The offset to load from.
@@ -1252,7 +1240,7 @@ struct DTypePointer[
         Returns:
             The loaded value.
         """
-        return self.simd_load[1](offset)
+        return self.address.load[alignment=alignment](offset)
 
     @always_inline("nodebug")
     fn simd_load[width: Int](self) -> SIMD[type, width]:
@@ -1318,8 +1306,8 @@ struct DTypePointer[
         Returns:
             The loaded SIMD value.
         """
-        return self.address.bitcast[SIMD[type, width]]().aligned_load[
-            alignment
+        return self.address.bitcast[SIMD[type, width]]().load[
+            alignment=alignment
         ]()
 
     @always_inline("nodebug")
