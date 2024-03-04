@@ -418,50 +418,19 @@ struct DType(Stringable, KeyElement):
         """Returns the size in bytes of the current DType.
 
         Returns:
-            Returns the size in bytes of the current DType and -1 if the size is
-            unknown.
+            Returns the size in bytes of the current DType.
         """
-        alias type_list = VariadicList[DType](
-            DType.bool,
-            DType.int8,
-            DType.uint8,
-            DType.int16,
-            DType.uint16,
-            DType.bfloat16,
-            DType.float16,
-            DType.int32,
-            DType.uint32,
-            DType.float32,
-            DType.tensor_float32,
-            DType.int64,
-            DType.uint64,
-            DType.float64,
-            DType.index,
-            DType.address,
-        )
-        var size = -1
-
-        @parameter
-        @always_inline
-        fn func[idx: Int]():
-            if type_list[idx] == self:
-                size = _sizeof[type_list[idx]]()
-                return
-
-        unroll[func, len(type_list)]()
-
-        return size
+        return __mlir_op.`pop.dtype.sizeof`(self.value)
 
     @always_inline
     fn bitwidth(self) -> Int:
         """Returns the size in bits of the current DType.
 
         Returns:
-            Returns the size in bits of the current DType and -1 if the size is
-            unknown.
+            Returns the size in bits of the current DType.
         """
         var size_in_bytes = self.sizeof()
-        return 8 * size_in_bytes if size_in_bytes > 0 else -1
+        return 8 * size_in_bytes
 
     # ===----------------------------------------------------------------------===#
     # dispatch_integral
