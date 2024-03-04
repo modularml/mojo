@@ -384,10 +384,7 @@ def test_list_iter():
 
 
 def test_list_iter_mutable():
-    var vs = List[Int]()
-    vs.append(1)
-    vs.append(2)
-    vs.append(3)
+    var vs = List[Int](1, 2, 3)
 
     for v in vs:
         v[] += 1
@@ -397,6 +394,36 @@ def test_list_iter_mutable():
         sum += v[]
 
     assert_equal(9, sum)
+
+
+def test_list_span():
+    var vs = List[Int](1, 2, 3)
+
+    var es = vs[1:]
+    assert_equal(es[0], 2)
+    assert_equal(es[1], 3)
+    assert_equal(len(es), 2)
+
+    es = vs[:-1]
+    assert_equal(es[0], 1)
+    assert_equal(es[1], 2)
+    assert_equal(len(es), 2)
+
+    es = vs[1:-1:1]
+    assert_equal(es[0], 2)
+    assert_equal(len(es), 1)
+
+    es = vs[::-1]
+    assert_equal(es[0], 3)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 1)
+    assert_equal(len(es), 3)
+
+    es = vs[:]
+    assert_equal(es[0], 1)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 3)
+    assert_equal(len(es), 3)
 
 
 def main():
@@ -411,3 +438,4 @@ def main():
     test_2d_dynamic_list()
     test_list_iter()
     test_list_iter_mutable()
+    test_list_span()

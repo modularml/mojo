@@ -94,7 +94,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         Args:
             values: The values to populate the list with.
         """
-        self = List[T](capacity=len(values))
+        self = Self(capacity=len(values))
         for value in values:
             self.append(value[])
 
@@ -317,6 +317,49 @@ struct List[T: CollectionElement](CollectionElement, Sized):
 
         _ = (self.data + normalized_idx).take_value()
         (self.data + normalized_idx).emplace_value(value ^)
+
+    @always_inline
+    fn _adjust_span(self, span: Slice) -> Slice:
+        """Adjusts the span based on the list length."""
+        var adjusted_span = span
+
+        if adjusted_span.start < 0:
+            adjusted_span.start = len(self) + adjusted_span.start
+
+        if not adjusted_span._has_end():
+            adjusted_span.end = len(self)
+        elif adjusted_span.end < 0:
+            adjusted_span.end = len(self) + adjusted_span.end
+
+        if span.step < 0:
+            var tmp = adjusted_span.end
+            adjusted_span.end = adjusted_span.start - 1
+            adjusted_span.start = tmp - 1
+
+        return adjusted_span
+
+    @always_inline
+    fn __getitem__(self, span: Slice) -> Self:
+        """Gets the sequence of elements at the specified positions.
+
+        Args:
+            span: A slice that specifies positions of the new list.
+
+        Returns:
+            A new list containing the list at the specified span.
+        """
+
+        var adjusted_span = self._adjust_span(span)
+        var adjusted_span_len = len(adjusted_span)
+
+        if not adjusted_span_len:
+            return Self()
+
+        var res = Self(capacity=len(adjusted_span))
+        for i in range(len(adjusted_span)):
+            res.append(self[adjusted_span[i]])
+
+        return res ^
 
     @always_inline
     fn __getitem__(self, i: Int) -> T:
