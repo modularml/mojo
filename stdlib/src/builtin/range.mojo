@@ -39,8 +39,9 @@ struct _ZeroStartingRange(Sized):
     var end: Int
 
     @always_inline("nodebug")
-    fn __init__(end: Int) -> Self:
-        return Self {curr: end, end: end}
+    fn __init__(inout self, end: Int):
+        self.curr = end
+        self.end = end
 
     @always_inline("nodebug")
     fn __iter__(self) -> Self:
@@ -117,12 +118,16 @@ struct _StridedRange(Sized):
     var step: Int
 
     @always_inline("nodebug")
-    fn __init__(end: Int) -> Self:
-        return Self {start: 0, end: end, step: 1}
+    fn __init__(inout self, end: Int):
+        self.start = 0
+        self.end = end
+        self.step = 1
 
     @always_inline("nodebug")
-    fn __init__(start: Int, end: Int) -> Self:
-        return Self {start: start, end: end, step: 1}
+    fn __init__(inout self, start: Int, end: Int):
+        self.start = start
+        self.end = end
+        self.step = 1
 
     @always_inline("nodebug")
     fn __iter__(self) -> _StridedRangeIterator:

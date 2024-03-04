@@ -38,7 +38,7 @@ struct _fdopen:
     alias STDERR = 2
     var handle: Pointer[NoneType]
 
-    fn __init__(stream_id: Int) -> Self:
+    fn __init__(inout self, stream_id: Int):
         """Creates a file handle to the stdout/stderr stream.
 
         Args:
@@ -56,7 +56,7 @@ struct _fdopen:
             handle = external_call["fdopen", Pointer[NoneType]](
                 _dup(stream_id), mode.data()
             )
-        return Self {handle: handle}
+        self.handle = handle
 
     fn __enter__(self) -> Self:
         return self

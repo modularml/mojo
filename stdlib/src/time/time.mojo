@@ -70,8 +70,9 @@ struct _FILETIME:
     var dwLowDateTime: UInt32
     var dwHighDateTime: UInt32
 
-    fn __init__() -> Self:
-        return Self {dwLowDateTime: 0, dwHighDateTime: 0}
+    fn __init__(inout self):
+        self.dwLowDateTime = 0
+        self.dwHighDateTime = 0
 
     fn as_nanoseconds(self) -> Int:
         # AFTER subtracting windows offset the return value fits in a signed int64
