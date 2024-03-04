@@ -34,7 +34,7 @@ fn _default_or[T: AnyRegType](value: T, default: Int) -> Int:
 
 
 @register_passable("trivial")
-struct Slice(Sized, EqualityComparable):
+struct Slice(Sized, Stringable, EqualityComparable):
     """Represents a slice expression.
 
     Objects of this type are generated when slice syntax is used within square
@@ -106,6 +106,20 @@ struct Slice(Sized, EqualityComparable):
             step: _default_or(step, 1),
         }
 
+    fn __str__(self) -> String:
+        """Gets the string representation of the span.
+
+        Returns:
+            The string representation of the span.
+        """
+        var res = str(self.start)
+        res += ":"
+        if self._has_end():
+            res += str(self.end)
+        res += ":"
+        res += str(self.step)
+        return res
+
     @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
         """Compare this slice to the other.
@@ -144,14 +158,7 @@ struct Slice(Sized, EqualityComparable):
             The length of the slice.
         """
 
-        @always_inline("nodebug")
-        fn div_ceil(numerator: Int, denominator: Int) -> Int:
-            return (numerator + denominator - 1) // denominator
-
-        if self.step > 0:
-            return div_ceil(self.end - self.start, self.step)
-        else:
-            return div_ceil(self.start - self.end, -self.step)
+        return len(range(self.start, self.end, self.step))
 
     @always_inline
     fn __getitem__(self, idx: Int) -> Int:
