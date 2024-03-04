@@ -5,6 +5,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
+from testing import *
+
 
 # CHECK-LABEL: test_none_end_folds
 fn test_none_end_folds():
@@ -45,9 +47,7 @@ struct Slicable:
         return a.c
 
 
-fn main():
-    test_none_end_folds()
-
+def test_slicable():
     # CHECK: Slicable
     print("Slicable")
     var slicable = Slicable()
@@ -62,6 +62,30 @@ fn main():
     # CHECK: foo
     print(slicable[1:2:"foo"])
 
-    # CHECK: False
+
+def test_has_end():
     alias is_end = Slice(None, None, None)._has_end()
-    print(is_end)
+    assert_false(is_end)
+
+
+struct SliceStringable:
+    fn __init__(inout self):
+        pass
+
+    fn __getitem__(self, a: Slice) -> String:
+        return str(a)
+
+
+def test_slice_stringable():
+    var s = SliceStringable()
+    assert_equal(s[2::-1], "2::-1")
+    assert_equal(s[1:-1:2], "1:-1:2")
+    assert_equal(s[:-1], "0:-1:1")
+
+
+def main():
+    test_none_end_folds()
+    test_slicable()
+    test_has_end()
+
+    test_slice_stringable()
