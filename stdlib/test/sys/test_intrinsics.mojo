@@ -60,7 +60,7 @@ fn test_masked_store():
     masked_store[4](
         iota[DType.float32, 4](), vector.data, iota[DType.float32, 4]() < 5
     )
-    print(vector.simd_load[4](0))
+    print(vector.load[width=4](0))
 
     # CHECK: [0.0, 1.0, 2.0, 3.0, 4.0, 33.0, 33.0, 33.0]
     masked_store[8](
@@ -80,15 +80,15 @@ fn test_compressed_store():
     compressed_store(
         iota[DType.float32, 4](), vector.data, iota[DType.float32, 4]() >= 2
     )
-    print(vector.simd_load[4](0))
+    print(vector.load[width=4](0))
 
     # Just clear the buffer.
-    vector.simd_store[4](0, 0)
+    vector.store[width=4](0, 0)
 
     # CHECK: [1.0, 3.0, 0.0, 0.0]
     var val = SIMD[DType.float32, 4](0.0, 1.0, 3.0, 0.0)
     compressed_store(val, vector.data, val != 0)
-    print(vector.simd_load[4](0))
+    print(vector.load[width=4](0))
 
 
 # CHECK-LABEL: test_strided_load

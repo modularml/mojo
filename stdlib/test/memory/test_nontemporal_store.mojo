@@ -37,7 +37,7 @@ fn test_non_temporal_store(m: Int):
     ]()
 
     for i in range(0, buffer_size, simd_width):
-        b2.simd_nt_store[simd_width](i, b1.simd_load[simd_width](i))
+        b2.simd_nt_store[simd_width](i, b1.load[width=simd_width](i))
 
     var b3 = NDBuffer[
         DType.float32,
@@ -52,7 +52,7 @@ fn test_non_temporal_store(m: Int):
 
     for j in range(buffer_size // simd_width):
         b4.simd_nt_store[simd_width](
-            Index(j, 0), b3.simd_load[simd_width](Index(j, 0))
+            Index(j, 0), b3.load[width=simd_width](Index(j, 0))
         )
 
     # The following introduces dependency on the input value so that
