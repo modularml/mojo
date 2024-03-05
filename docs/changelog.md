@@ -60,6 +60,11 @@ cannot be parsed from the string, then an error is raised.
   one can write `print("Hello", "Mojo", sep="/", end="!!!\n")` to print the
   message `Hello/Mojo!!!\n` to the screen.
 
+- The Mojo LSP server, via the new `-I` argument, now allows specifying
+  additional search paths to use when resolving imported modules in a document.
+  A corresponding `mojo.lsp.includeDirs` setting was added to the VS Code
+  extension as well.
+
 ### 🦋 Changed
 
 - The [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) and
