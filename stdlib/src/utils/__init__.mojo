@@ -4,3 +4,5 @@
 #
 # ===----------------------------------------------------------------------=== #
 """Implements the utils package."""
+
+from .stringref import StringRef

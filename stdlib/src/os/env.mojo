@@ -14,6 +14,7 @@ from os import setenv
 
 from sys import external_call
 from sys.info import os_is_linux, os_is_macos
+from utils import StringRef
 
 from memory.unsafe import DTypePointer
 

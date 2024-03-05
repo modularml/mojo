@@ -15,6 +15,7 @@ from sys import argv
 
 from sys import external_call
 
+from utils import StringRef
 from memory.unsafe import Pointer
 
 

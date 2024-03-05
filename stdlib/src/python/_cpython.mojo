@@ -11,6 +11,7 @@ from sys.ffi import DLHandle
 from memory.unsafe import DTypePointer, Pointer
 
 from utils.index import StaticIntTuple
+from utils import StringRef
 
 # https://github.com/python/cpython/blob/d45225bd66a8123e4a30314c627f2586293ba532/Include/compile.h#L7
 alias Py_single_input = 256

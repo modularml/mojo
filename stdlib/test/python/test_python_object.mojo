@@ -11,6 +11,7 @@ from python._cpython import CPython, PyObjectPtr
 from python.object import PythonObject
 from python.python import Python
 from testing import assert_false, assert_true
+from utils import StringRef
 
 
 # CHECK-LABEL: test_dunder_methods

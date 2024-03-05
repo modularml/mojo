@@ -12,8 +12,8 @@ import math
 
 from memory.unsafe import DTypePointer, Pointer
 
-from .dtype import _uint_type_of_width
-from .string import _atol
+from builtin.dtype import _uint_type_of_width
+from builtin.string import _atol
 
 # ===----------------------------------------------------------------------===#
 # StringRef

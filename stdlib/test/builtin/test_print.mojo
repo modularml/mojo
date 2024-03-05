@@ -7,6 +7,7 @@
 
 
 from utils.index import StaticIntTuple
+from utils import StringRef
 
 
 # CHECK-LABEL: test_print

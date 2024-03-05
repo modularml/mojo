@@ -10,6 +10,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from debug.visualizers import lldb_formatter_wrapping_type
 from memory.unsafe import DTypePointer
+from utils import StringRef
 
 from .string import _atol
 

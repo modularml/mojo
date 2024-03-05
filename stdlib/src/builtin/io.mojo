@@ -11,6 +11,7 @@ These are Mojo built-ins, so you don't need to import them.
 from math.math import align_up
 from sys import external_call
 from sys.info import bitwidthof, os_is_windows, triple_is_nvidia_cuda
+from utils import StringRef
 
 from algorithm.functional import unroll
 from builtin.dtype import _get_dtype_printf_format

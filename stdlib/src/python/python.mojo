@@ -15,6 +15,7 @@ from python import Python
 from sys import external_call
 from sys.ffi import _get_global
 from sys.info import sizeof
+from utils import StringRef
 
 from memory.unsafe import Pointer
 
