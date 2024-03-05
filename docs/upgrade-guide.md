@@ -59,7 +59,7 @@ You must change `vectorize_unroll[width, unroll_factor, fn](size)` to
 
 ```re
 vectorize_unroll\[(.*?), (.*?), (.*?)\]
-unroll[$3, $1, $2]
+vectorize[$3, $1, $2]
 ```
 
 ### `DynamicVector` constructor  `capacity` now keyword-only
