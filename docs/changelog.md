@@ -1683,7 +1683,7 @@ cannot be parsed from the string, then an error is raised.
 - [`TensorShape`](/mojo/stdlib/tensor/tensor_shape.html) and
   [`TensorSpec`](/mojo/stdlib/tensor/tensor_shape.html) now have constructors
   that take [`DynamicVector[Int]`](/mojo/stdlib/collections/vector.html#dynamicvector)
-  and [`StaticIntTuple`](/mojo/stdlib/utils/index_.html#staticinttuple) to
+  and [`StaticIntTuple`](/mojo/stdlib/utils/index#staticinttuple) to
   initialize shapes.
 
 - The [`String`](/mojo/stdlib/builtin/string.html#string) type now has the
@@ -2322,9 +2322,9 @@ All earlier releases were considered version 0.1.
 
 #### ⭐️ New
 
-- A new [`Tensor`](/mojo/MojoStdlib/Tensor.html) type has been introduced. This
-  tensor type manages its own data (unlike `NDBuffer` and `Buffer` which are
-  just views). Therefore, the tensor type performs its own allocation and
+- A new [`Tensor`](/mojo/stdlib/tensor/tensor#tensor) type has been introduced.
+  This tensor type manages its own data (unlike `NDBuffer` and `Buffer` which
+  are just views). Therefore, the tensor type performs its own allocation and
   free. Here is a simple example of using the tensor type to represent an RGB
   image and convert it to grayscale:
 
@@ -2502,7 +2502,7 @@ All earlier releases were considered version 0.1.
 - As a result, we've also re-written `HelloMojo.ipynb` to be much shorter and
   provide a more gentle first-user experience.
 
-- [`Coroutine` module documentation](/mojo/MojoBuiltin/Coroutine.html) is now
+- [`Coroutine` module documentation](/mojo/stdlib/builtin/coroutine) is now
   available.  Coroutines form the basis of Mojo's support for asynchronous
   execution.  Calls to `async fn`s can be stored into a `Coroutine`, from which
   they can be resumed, awaited upon, and have their results retrieved upon
@@ -2535,7 +2535,7 @@ All earlier releases were considered version 0.1.
 #### 🦋 Changed
 
 - The `simd_width` and `dtype_simd_width` functions in the
-  [`TargetInfo`](/mojo/MojoStdlib/TargetInfo.html) module
+  [`TargetInfo`](/mojo/stdlib/sys/info) module
   have been renamed to `simdwidthof`.
 
 - The `dtype_` prefix has been dropped from `alignof`, `sizeof`, and
@@ -2543,8 +2543,8 @@ All earlier releases were considered version 0.1.
   argument type, including `DType`.
 
 - The `inf`, `neginf`, `nan`, `isinf`, `isfinite`, and `isnan` functions were
-  moved from the [`Numerics`](/mojo/MojoStdlib/Numerics.html) module to the
-  [`Math`](/mojo/MojoStdlib/Math.html) module, to better align with Python's
+  moved from the `Numerics` module to the
+  [`Math`](/mojo/stdlib/math/math) module, to better align with Python's
   library structure.
 
 #### 🛠️ Fixed
@@ -2575,15 +2575,15 @@ All earlier releases were considered version 0.1.
 - You can now share `.ipynb` notebook files in Mojo Playground. Just save a
   file in the `shared` directory, and then right-click the file and select
   **Copy Sharable link**. To open a shared notebook, you must already have
-  [access to Mojo Playground](/mojo/get-started.html#get-started); when
-  you open a shared notebook, click **Import** at the top of the notebook to
-  save your own copy. For more details about this feature, see the instructions
-  inside the `help` directory, in the Mojo Playground file browser.
+  [access to Mojo Playground](/mojo/manual/get-started/#develop-in-the-mojo-playground);
+  when you open a shared notebook, click **Import** at the top of the notebook
+  to save your own copy. For more details about this feature, see the
+  instructions inside the `help` directory, in the Mojo Playground file browser.
 
 #### 🦋 Changed
 
 - The `unroll2()` and `unroll3()` functions in the
-  [`Functional`](/mojo/MojoStdlib/Functional.html) module have been renamed to
+  [`Functional`](/mojo/stdlib/algorithm/functional) module have been renamed to
   overload the `unroll()` function. These functions unroll 2D and 3D loops and
   `unroll()` can determine the intent based on the number of input parameters.
 
@@ -2596,7 +2596,7 @@ All earlier releases were considered version 0.1.
   definition with recursive reference crashes.
 
 - [Issue #285](https://github.com/modularml/mojo/issues/285) - The
-  [`TargetInfo`](/mojo/MojoStdlib/TargetInfo.html) module now includes
+  [`TargetInfo`](/mojo/stdlib/sys/info) module now includes
   `is_little_endian()` and `is_big_endian()` to check if the target host uses
   either little or big endian.
 
