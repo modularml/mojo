@@ -3,6 +3,8 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
+# TODO(#33762): This is causing recursive dirs to be created.
+# REQUIRES: DISABLED
 # RUN: rm -rf %t && mkdir -p %t
 # RUN: ln -s %S %t/tmp
 # RUN: %mojo -debug-level full -D TEMP_DIR=%t/tmp %s
