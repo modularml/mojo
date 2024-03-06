@@ -681,3 +681,47 @@ fn _get_dtype_printf_format[type: DType]() -> StringLiteral:
         constrained[False, "invalid dtype"]()
 
     return ""
+
+
+fn _get_runtime_dtype_size(type: DType) -> Int:
+    """
+    Get the size of the dynamic dtype.
+
+    We cannot directly using type.sizeof(), since that only works with
+    statically known dtypes. Instead, we have to perform a dispatch to
+    determine the size of the dtype.
+    """
+    alias type_list = List[DType](
+        DType.bool,
+        DType.int8,
+        DType.uint8,
+        DType.int16,
+        DType.uint16,
+        DType.bfloat16,
+        DType.float16,
+        DType.int32,
+        DType.uint32,
+        DType.float32,
+        DType.tensor_float32,
+        DType.int64,
+        DType.uint64,
+        DType.float64,
+        DType.index,
+        DType.address,
+    )
+    var size = -1
+
+    @parameter
+    @always_inline
+    fn func[idx: Int]():
+        alias concrete_type = type_list[idx]
+        if concrete_type == type:
+            size = sizeof[concrete_type]()
+            return
+
+    unroll[func, len(type_list)]()
+
+    if size == -1:
+        abort("unable to get the dtype size of " + str(type))
+
+    return size
