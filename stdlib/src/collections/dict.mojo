@@ -241,8 +241,25 @@ struct _DictIndex:
                 data[i] = _EMPTY
             self.data = data.bitcast[DType.invalid]()
 
-    fn __copyinit__(inout self, existing: Self):
-        self.data = existing.data
+    fn copy(self, reserved: Int) -> Self:
+        var index = Self(reserved)
+        if reserved <= 128:
+            var data = self.data.bitcast[DType.int8]()
+            var new_data = index.data.bitcast[DType.int8]()
+            memcpy(new_data, data, reserved)
+        elif reserved <= 2**16 - 2:
+            var data = self.data.bitcast[DType.int16]()
+            var new_data = index.data.bitcast[DType.int16]()
+            memcpy(new_data, data, reserved)
+        elif reserved <= 2**32 - 2:
+            var data = self.data.bitcast[DType.int32]()
+            var new_data = index.data.bitcast[DType.int32]()
+            memcpy(new_data, data, reserved)
+        else:
+            var data = self.data.bitcast[DType.int64]()
+            var new_data = index.data.bitcast[DType.int64]()
+            memcpy(new_data, data, reserved)
+        return index ^
 
     fn __moveinit__(inout self, owned existing: Self):
         self.data = existing.data
@@ -411,7 +428,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         self.size = existing.size
         self._n_entries = existing._n_entries
         self._reserved = existing._reserved
-        self._index = existing._index
+        self._index = existing._index.copy(existing._reserved)
         self._entries = existing._entries
 
     fn __copyinit__(inout self, existing: Self):
@@ -423,7 +440,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         self.size = existing.size
         self._n_entries = existing._n_entries
         self._reserved = existing._reserved
-        self._index = existing._index
+        self._index = existing._index.copy(existing._reserved)
         self._entries = existing._entries
 
     fn __moveinit__(inout self, owned existing: Self):

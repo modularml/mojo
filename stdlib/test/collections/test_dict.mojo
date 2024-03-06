@@ -9,6 +9,7 @@ from collections import Optional
 from collections.dict import Dict, KeyElement
 
 from testing import *
+from test_utils import CopyCounter
 
 
 def test_dict_construction():
@@ -147,6 +148,43 @@ def test_dict_copy():
     assert_equal(1, orig["a"])
 
 
+def test_dict_copy_delete_original():
+    var orig = Dict[String, Int]()
+    orig["a"] = 1
+
+    # test values copied to new Dict
+    var copy = Dict(orig)
+    # don't access the original dict, anymore, confirm that
+    # deleting the original doesn't violate the integrity of the copy
+    assert_equal(1, copy["a"])
+
+
+def test_dict_copy_add_new_item():
+    var orig = Dict[String, Int]()
+    orig["a"] = 1
+
+    # test values copied to new Dict
+    var copy = Dict(orig)
+    assert_equal(1, copy["a"])
+
+    # test there are two copies of dict and
+    # they don't share underlying memory
+    copy["b"] = 2
+    assert_false(2 in orig)
+
+
+def test_dict_copy_calls_copy_constructor():
+    var orig = Dict[String, CopyCounter]()
+    orig["a"] = CopyCounter() ^
+
+    # test values copied to new Dict
+    var copy = Dict(orig)
+    # I _may_ have thoughts about where our performance issues
+    # are coming from :)
+    assert_equal(5, orig["a"].copy_count)
+    assert_equal(6, copy["a"].copy_count)
+
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print_no_newline("Test", name_val, "...")
@@ -171,3 +209,10 @@ def main():
     test["test_iter_values", test_iter_values]()
     test["test_iter_values_mut", test_iter_values_mut]()
     test["test_iter_items", test_iter_items]()
+    test["test_dict_copy", test_dict_copy]()
+    test["test_dict_copy_add_new_item", test_dict_copy_add_new_item]()
+    test["test_dict_copy_delete_original", test_dict_copy_delete_original]()
+    test[
+        "test_dict_copy_calls_copy_constructor",
+        test_dict_copy_calls_copy_constructor,
+    ]()
