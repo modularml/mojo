@@ -12,12 +12,12 @@ Its implementation closely mirrors Python's `dict` implementation:
 - Performance and size are heavily optimized for small dictionaries, but can
   scale to large dictionaries.
 
-- Insertion order is implicitly preserved. Once `__iter__` is implemented
-  it will return a deterministic order based on insertion.
+- Insertion order is implicitly preserved. Iteration over keys, values, and
+  items have a deterministic order based on insertion.
 
 Key elements must implement the `KeyElement` trait, which encompasses
 Movable, Hashable, and EqualityComparable. It also includes CollectionElement
-and Copyable until we have references.
+and Copyable until we push references through the standard library types.
 
 Value elements must be CollectionElements for a similar reason. Both key and
 value types must always be Movable so we can resize the dictionary as it grows.
@@ -304,37 +304,10 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     print(len(d))      # prints 1
     ```
 
-    Note that until standard library types implement `KeyElement`, you must
-    create custom wrappers to use these as keys. For example, the following
-    `StringKey` type wraps a String value and implements the `KeyElement` trait:
-
-    ```mojo
-    from collections.dict import Dict, KeyElement
-
-    @value
-    struct StringKey(KeyElement):
-        var s: String
-
-        fn __init__(inout self, owned s: String):
-            self.s = s ^
-
-        fn __init__(inout self, s: StringLiteral):
-            self.s = String(s)
-
-        fn __hash__(self) -> Int:
-            var ptr = self.s._buffer.data.value
-            return hash(DTypePointer[DType.int8](ptr), len(self.s))
-
-        fn __eq__(self, other: Self) -> Bool:
-            return self.s == other.s
-
-    ```
-
     Parameters:
         K: The type of the dictionary key. Must be Hashable and EqualityComparable
            so we can find the key in the map.
-        V: The value type of the dictionary. Currently must be CollectionElement
-           since we don't have references.
+        V: The value type of the dictionary. Currently must be CollectionElement.
     """
 
     # Implementation:
