@@ -4,7 +4,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo -I %py_interop_bin_dir -I %test_py_interop_bin_dir %s
+# RUN: %mojo %s
 
 from python.object import PythonObject
 from python.python import Python

@@ -4,7 +4,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: disabled
-# RUN: %mojo -I %py_interop_bin_dir %s | FileCheck %s
+# RUN: %mojo %s | FileCheck %s
 
 
 from CPython import PythonVersion

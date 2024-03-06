@@ -4,7 +4,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo -I %py_interop_bin_dir -I %test_py_interop_bin_dir %s | FileCheck %s
+# RUN: %mojo %s | FileCheck %s
 
 from memory.unsafe import Pointer
 from python._cpython import CPython, PyObjectPtr

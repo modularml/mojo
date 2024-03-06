@@ -4,7 +4,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo -D TEST_DIR=%S -I %py_interop_bin_dir -I %test_py_interop_bin_dir %s | FileCheck %s
+# RUN: %mojo -D TEST_DIR=%S %s | FileCheck %s
 
 from sys.param_env import env_get_string
 

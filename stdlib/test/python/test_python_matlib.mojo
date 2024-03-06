@@ -4,7 +4,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: disabled
-# RUN: %mojo -I %py_interop_bin_dir %s
+# RUN: %mojo %s
 
 from CPython import CPython, PyObjectPtr
 from python import Python
