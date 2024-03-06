@@ -33,6 +33,21 @@ struct MoveOnly[T: Movable](Movable):
         other.data = 0
 
 
+struct CopyCounter(CollectionElement):
+    """Counts the number of copies performed on a value."""
+
+    var copy_count: Int
+
+    fn __init__(inout self):
+        self.copy_count = 0
+
+    fn __moveinit__(inout self, owned existing: Self):
+        self.copy_count = existing.copy_count
+
+    fn __copyinit__(inout self, existing: Self):
+        self.copy_count = existing.copy_count + 1
+
+
 struct MoveCounter[T: CollectionElement](CollectionElement):
     """Counts the number of moves performed on a value."""
 

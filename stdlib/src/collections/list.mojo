@@ -76,6 +76,16 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size = 0
         self.capacity = 0
 
+    fn __init__(inout self, existing: Self):
+        """Creates a deep copy of the given list.
+
+        Args:
+            existing: The list to copy.
+        """
+        self.__init__(capacity=existing.capacity)
+        for e in existing:
+            self.append(e[])
+
     fn __init__(inout self, *, capacity: Int):
         """Constructs a list with the given capacity.
 

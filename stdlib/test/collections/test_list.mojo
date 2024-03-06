@@ -7,7 +7,7 @@
 
 from collections import List
 
-from test_utils import MoveCounter
+from test_utils import CopyCounter, MoveCounter
 from testing import *
 
 
@@ -357,6 +357,23 @@ def test_2d_dynamic_list():
     assert_equal(2, list.capacity)
 
 
+def test_list_explicit_copy():
+    var list = List[CopyCounter]()
+    list.append(CopyCounter() ^)
+    var list_copy = List(list)
+    assert_equal(0, list.__get_ref(0)[].copy_count)
+    assert_equal(1, list_copy.__get_ref(0)[].copy_count)
+
+    var l2 = List[Int]()
+    for i in range(10):
+        l2.append(i)
+
+    var l2_copy = List(l2)
+    assert_equal(len(l2), len(l2_copy))
+    for i in range(len(l2)):
+        assert_equal(l2[i], l2_copy[i])
+
+
 # Ensure correct behavior of __copyinit__
 # as reported in GH issue 27875 internally and
 # https://github.com/modularml/mojo/issues/1493
@@ -434,6 +451,7 @@ def main():
     test_list_reverse_move_count()
     test_list_extend()
     test_list_extend_non_trivial()
+    test_list_explicit_copy()
     test_list_copy_constructor()
     test_2d_dynamic_list()
     test_list_iter()
