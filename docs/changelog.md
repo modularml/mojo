@@ -138,6 +138,13 @@ cannot be parsed from the string, then an error is raised.
 
 ### 🛠️ Fixed
 
+- [#1858](https://github.com/modularml/mojo/issues/1858) - Trait with parametric
+  methods regression.
+- [#1892](https://github.com/modularml/mojo/issues/1892) - Forbid unsupported
+  decorators on traits.
+- [#1735](https://github.com/modularml/mojo/issues/1735) - Trait-typed values
+  are incorrectly considered equal.
+
 ## v24.1 (2024-02-29)
 
 ### 🔥 Legendary
