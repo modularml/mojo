@@ -70,7 +70,7 @@ fn test_partial_load_store():
         4,
         partial_load_data,  # idx  # lbound  # rbound
     )
-    var partial_store_data = write_buffer.load[width=4](2)
+    var partial_store_data = write_buffer.simd_load[4](2)
     # CHECK: [0, 3, 99, 0]
     print(partial_store_data)
 
@@ -104,7 +104,7 @@ fn test_partial_load_store():
         3,  # rbound
         nd_partial_load_data,  # value
     )
-    var nd_partial_store_data = write_nd_buffer.load[width=4](
+    var nd_partial_store_data = write_nd_buffer.simd_load[4](
         StaticIntTuple[2](3, 0)
     )
 

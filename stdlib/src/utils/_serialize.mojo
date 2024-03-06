@@ -199,7 +199,7 @@ fn _serialize_to_file[type: DType](tensor: Tensor[type], path: Path) raises:
     var header_bytes = Tensor[DType.int8](header_size)
 
     for i in range(header_size):
-        header_bytes.store(i, _SERIALIZATION_HEADER[i])
+        header_bytes.simd_store(i, _SERIALIZATION_HEADER[i])
 
     var major_format: UInt32 = _SERIALIZATION_MAJOR_FORMAT
     var major_format_bytes = _serialize_as_tensor(major_format)

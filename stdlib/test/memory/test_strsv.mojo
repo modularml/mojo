@@ -40,7 +40,7 @@ fn strsv[
         for i in range(simd_width):
             # Broadcast one solution value to a simd vector.
             x_vec = x_ptr[i]
-            x_solved.store[width=simd_width](i * simd_width, x_vec)
+            x_solved.simd_store(i * simd_width, x_vec)
 
         x_ptr += simd_width
         L_ptr += simd_width
@@ -54,7 +54,7 @@ fn strsv[
             x_vec = x_ptr.simd_load[simd_width](i)
             # Move to right column by column within in a tile.
             for j in range(simd_width):
-                x_solved_vec = x_solved.load[width=simd_width](j * simd_width)
+                x_solved_vec = x_solved.simd_load[simd_width](j * simd_width)
                 L_col_vec = L_ptr.simd_load[simd_width](i + j * size)
                 x_vec = x_solved_vec.fma(-L_col_vec, x_vec)
             x_ptr.simd_store[simd_width](i, x_vec)
