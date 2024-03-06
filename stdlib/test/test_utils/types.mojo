@@ -30,7 +30,6 @@ struct MoveOnly[T: Movable](Movable):
             other: The other instance that we copying the payload from.
         """
         self.data = other.data ^
-        other.data = 0
 
 
 struct CopyCounter(CollectionElement):

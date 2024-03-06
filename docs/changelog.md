@@ -102,6 +102,29 @@ cannot be parsed from the string, then an error is raised.
   elementwise[func, simd_width](shape)
   ```
 
+- For the time being, dynamic type value will be disabled in the language, e.g.
+  the following will now fail with an error:
+
+  ```mojo
+  var t = Int  # dynamic type values not allowed
+
+  struct SomeType: ...
+
+  takes_type(SomeType)  # dynamic type values not allowed
+  ```
+
+  We want to take a step back and (re)design type valued variables,
+  existentials, and other dynamic features for more 🔥. This does not affect
+  type valued parameters, so the following will work as before:
+
+  ```mojo
+  alias t = Int  # still 🔥
+
+  struct SomeType: ...
+
+  takes_type[SomeType]()  # already 🔥
+  ```
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,
