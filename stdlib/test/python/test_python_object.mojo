@@ -311,35 +311,21 @@ fn test_dunder_methods(inout python: Python):
         pass
 
 
+# CHECK-LABEL: test_bool_conversion
 def test_bool_conversion() -> None:
+    print("=== test_bool_conversion ===")
     var x: PythonObject = 1
     # CHECK: test_bool: True
     print("test_bool:", x == 0 or x == 1)
 
 
-fn test_iter() raises -> None:
-    var list: PythonObject = ["apple", "orange", "banana"]
-    for fruit in list:
-        print("I like to eat", fruit)
-
-    var list2: PythonObject = []
-    for fruit in list2:
-        print("I have eaten", fruit)
-
-    var not_iterable: PythonObject = 3
-    for x in not_iterable:
-        print("I should not exist", x)
-
-    var mydict = Python.dict()
-    mydict["vegetable"] = "carrot"
-    mydict["dessert"] = "apple pie"
-    mydict["protein"] = "chicken"
-    for key in mydict:
-        print(key)
-
-
+# CHECK-LABEL: test_string_conversions
 fn test_string_conversions() -> None:
+    print("=== test_string_conversions ===")
+
+    # CHECK-LABEL: test_string_literal
     fn test_string_literal() -> None:
+        print("=== test_string_literal ===")
         try:
             var mojo_str: StringLiteral = "mojo"
             var py_str = PythonObject(mojo_str)
@@ -351,7 +337,9 @@ fn test_string_conversions() -> None:
         except e:
             print("Error occurred")
 
+    # CHECK-LABEL: test_string_ref
     fn test_string_ref() -> None:
+        print("=== test_string_ref ===")
         try:
             var mojo_str: StringLiteral = "mojo"
             var mojo_strref = StringRef(mojo_str)
@@ -364,7 +352,9 @@ fn test_string_conversions() -> None:
         except e:
             print("Error occurred")
 
+    # CHECK-LABEL: test_string
     fn test_string() -> None:
+        print("=== test_string ===")
         try:
             var mo_str = String("mo")
             var jo_str = String("jo")
@@ -378,7 +368,9 @@ fn test_string_conversions() -> None:
         except e:
             print("Error occurred")
 
+    # CHECK-LABEL: test_type_object
     fn test_type_object() -> None:
+        print("=== test_type_object ===")
         var py = Python()
         var py_float = PythonObject(3.14)
         var type_obj = py.type(py_float)
@@ -391,7 +383,9 @@ fn test_string_conversions() -> None:
     test_type_object()
 
 
+# CHECK-LABEL: test_len
 def test_len():
+    print("=== test_len ===")
     var empty_list = Python.evaluate("[]")
     # CHECK: 0
     print(len(empty_list))
@@ -405,7 +399,9 @@ def test_len():
     print(len(l2))
 
 
+# CHECK-LABEL: test_is
 def test_is():
+    print("=== test_is ===")
     var x = PythonObject(500)
     var y = PythonObject(500)
     assert_false(x is y)
@@ -425,6 +421,38 @@ def test_is():
     assert_true(l1 is not l2)
 
 
+# CHECK-LABEL: test_iter
+fn test_iter() raises -> None:
+    print("=== test_iter ===")
+
+    var list: PythonObject = ["apple", "orange", "banana"]
+    # CHECK: I like to eat apple
+    # CHECK: I like to eat orange
+    # CHECK: I like to eat banana
+    for fruit in list:
+        print("I like to eat", fruit)
+
+    var list2: PythonObject = []
+    # CHECK-NOT: I have eaten
+    for fruit in list2:
+        print("I have eaten", fruit)
+
+    var not_iterable: PythonObject = 3
+    # CHECK-NOT: I should not exist
+    for x in not_iterable:
+        print("I should not exist", x)
+
+    var mydict = Python.dict()
+    mydict["vegetable"] = "carrot"
+    mydict["dessert"] = "apple pie"
+    mydict["protein"] = "chicken"
+    # CHECK: vegetable
+    # CHECK: dessert
+    # CHECK: protein
+    for key in mydict:
+        print(key)
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -434,10 +462,4 @@ def main():
     test_string_conversions()
     test_len()
     test_is()
-    # CHECK: I like to eat apple
-    # CHECK: I like to eat orange
-    # CHECK: I like to eat banana
-    # CHECK: vegetable
-    # CHECK: dessert
-    # CHECK: protein
     test_iter()
