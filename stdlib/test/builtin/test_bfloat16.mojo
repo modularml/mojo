@@ -20,7 +20,11 @@ def test_methods():
     assert_equal(int(BFloat16(3.5)), 3)
 
     assert_almost_equal(BFloat16(4.4).cast[DType.float32](), 4.40625)
+    assert_equal(BFloat16(3.0).cast[DType.float32](), 3)
+    assert_equal(BFloat16(-3.0).cast[DType.float32](), -3)
+
     assert_almost_equal(Float32(4.4).cast[DType.bfloat16](), 4.4)
+
     assert_almost_equal(BFloat16(2.0), 2.0)
 
 

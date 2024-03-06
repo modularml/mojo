@@ -10,7 +10,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from math._numerics import FPUtils
 from math.limit import inf, neginf
-from math.math import _simd_apply, nan
+from math.math import _simd_apply, nan, isnan
 from sys import llvm_intrinsic
 from sys.info import has_neon, is_x86, simdwidthof
 
@@ -81,6 +81,23 @@ fn _simd_construction_checks[type: DType, size: Int]():
     ]()
 
 
+@always_inline("nodebug")
+fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
+    var zero = __mlir_op.`pop.cast`[
+        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
+    ](
+        __mlir_op.`kgen.param.constant`[
+            _type = __mlir_type[`!pop.scalar<index>`],
+            value = __mlir_attr[`#pop.simd<0> : !pop.scalar<index>`],
+        ]()
+    )
+    return SIMD[type, size] {
+        value: __mlir_op.`pop.simd.splat`[
+            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        ](zero)
+    }
+
+
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct SIMD[type: DType, size: Int = simdwidthof[type]()](
@@ -117,21 +134,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             SIMD vector whose elements are 0.
         """
         _simd_construction_checks[type, size]()
-        var zero = __mlir_op.`pop.cast`[
-            _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-        ](
-            __mlir_op.`kgen.param.constant`[
-                _type = __mlir_type[`!pop.scalar<index>`],
-                value = __mlir_attr[`#pop.simd<0> : !pop.scalar<index>`],
-            ]()
-        )
-        return Self {
-            value: __mlir_op.`pop.simd.splat`[
-                _type = __mlir_type[
-                    `!pop.simd<`, size.value, `, `, type.value, `>`
-                ]
-            ](zero)
-        }
+        return _unchecked_zero[type, size]()
 
     @always_inline("nodebug")
     fn __init__(value: SIMD[DType.float64, 1]) -> Self:
@@ -406,10 +409,24 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @parameter
+        if has_neon() and (type == DType.bfloat16 or target == DType.bfloat16):
+            # BF16 support on neon systems is not supported.
+            return _unchecked_zero[target, size]()
+
+        @parameter
         if type == DType.bool:
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
         elif target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
+        elif type == DType.bfloat16:
+            var cast_result = _bfloat16_to_f32(
+                rebind[SIMD[DType.bfloat16, size]](self)
+            ).cast[target]()
+            return rebind[SIMD[target, size]](cast_result)
+        elif target == DType.bfloat16:
+            return rebind[SIMD[target, size]](
+                _f32_to_bfloat16(self.cast[DType.float32]())
+            )
         elif target == DType.address:
             var index_val = __mlir_op.`pop.cast`[
                 _type = __mlir_type[`!pop.simd<`, size.value, `, index>`]
@@ -2175,3 +2192,104 @@ fn _floor[
         return _floor(x.cast[DType.float32]()).cast[type]()
 
     return llvm_intrinsic["llvm.floor", SIMD[type, simd_width]](x)
+
+
+# ===----------------------------------------------------------------------===#
+# bfloat16
+# ===----------------------------------------------------------------------===#
+
+alias _fp32_bf16_mantissa_diff = FPUtils[
+    DType.float32
+].mantissa_width() - FPUtils[DType.bfloat16].mantissa_width()
+
+
+@always_inline
+fn _bfloat16_to_f32_scalar(
+    val: Scalar[DType.bfloat16],
+) -> Scalar[DType.float32]:
+    @parameter
+    if has_neon():
+        # BF16 support on neon systems is not supported.
+        return _unchecked_zero[DType.float32, 1]()
+
+    var bfloat_bits = FPUtils.bitcast_to_integer(val)
+    return FPUtils[DType.float32].bitcast_from_integer(
+        bfloat_bits << _fp32_bf16_mantissa_diff
+    )
+
+
+@always_inline
+fn _bfloat16_to_f32[
+    size: Int
+](val: SIMD[DType.bfloat16, size]) -> SIMD[DType.float32, size]:
+    @parameter
+    if has_neon():
+        # BF16 support on neon systems is not supported.
+        return _unchecked_zero[DType.float32, size]()
+
+    @always_inline
+    @parameter
+    fn wrapper_fn[
+        input_type: DType, result_type: DType
+    ](val: Scalar[input_type]) capturing -> Scalar[result_type]:
+        return rebind[Scalar[result_type]](
+            _bfloat16_to_f32_scalar(rebind[Scalar[DType.bfloat16]](val))
+        )
+
+    return _simd_apply[
+        size,
+        DType.bfloat16,
+        DType.float32,
+        wrapper_fn,
+    ](val)
+
+
+@always_inline
+fn _f32_to_bfloat16_scalar(
+    val: Scalar[DType.float32],
+) -> Scalar[DType.bfloat16]:
+    @parameter
+    if has_neon():
+        # BF16 support on neon systems is not supported.
+        return _unchecked_zero[DType.bfloat16, 1]()
+
+    if isnan(val):
+        return -nan[DType.bfloat16]() if FPUtils.get_sign(val) else nan[
+            DType.bfloat16
+        ]()
+
+    var float_bits = FPUtils.bitcast_to_integer(val)
+
+    var lsb = (float_bits >> _fp32_bf16_mantissa_diff) & 1
+    var rounding_bias = 0x7FFF + lsb
+    float_bits += rounding_bias
+
+    var bfloat_bits = float_bits >> _fp32_bf16_mantissa_diff
+
+    return FPUtils[DType.bfloat16].bitcast_from_integer(bfloat_bits)
+
+
+@always_inline
+fn _f32_to_bfloat16[
+    size: Int
+](val: SIMD[DType.float32, size]) -> SIMD[DType.bfloat16, size]:
+    @parameter
+    if has_neon():
+        # BF16 support on neon systems is not supported.
+        return _unchecked_zero[DType.bfloat16, size]()
+
+    @always_inline
+    @parameter
+    fn wrapper_fn[
+        input_type: DType, result_type: DType
+    ](val: Scalar[input_type]) capturing -> Scalar[result_type]:
+        return rebind[Scalar[result_type]](
+            _f32_to_bfloat16_scalar(rebind[Scalar[DType.float32]](val))
+        )
+
+    return _simd_apply[
+        size,
+        DType.float32,
+        DType.bfloat16,
+        wrapper_fn,
+    ](val)
