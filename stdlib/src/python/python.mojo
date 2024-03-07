@@ -237,6 +237,6 @@ struct Python:
             `PythonObject` representing `None`.
         """
         var cpython = _get_global_python_itf().cpython()
-        var nonetype = cpython.Py_NoneType()
-        cpython.Py_IncRef(nonetype)
-        return PythonObject(nonetype)
+        var none = cpython.Py_None()
+        cpython.Py_IncRef(none)
+        return PythonObject(none)

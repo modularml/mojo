@@ -146,8 +146,8 @@ fn _py_finalize(lib: DLHandle):
 
 struct CPython:
     var lib: DLHandle
-    var noneType: PyObjectPtr
-    var dictType: PyObjectPtr
+    var none_value: PyObjectPtr
+    var dict_type: PyObjectPtr
     var logging_enabled: Bool
     var version: PythonVersion
     var total_ref_count: Pointer[Int]
@@ -167,18 +167,18 @@ struct CPython:
 
         self.lib = DLHandle(python_lib)
         self.total_ref_count = Pointer[Int].alloc(1)
-        self.noneType = PyObjectPtr(null_pointer)
-        self.dictType = PyObjectPtr(null_pointer)
+        self.none_value = PyObjectPtr(null_pointer)
+        self.dict_type = PyObjectPtr(null_pointer)
         self.logging_enabled = logging_enabled
         self.version = PythonVersion(_py_get_version(self.lib))
 
         _py_initialize(self.lib)
-        _ = self.Py_NoneType()
+        _ = self.Py_None()
         _ = self.PyDict_Type()
 
     @staticmethod
     fn destroy(inout existing: CPython):
-        existing.Py_DecRef(existing.noneType)
+        existing.Py_DecRef(existing.none_value)
         if existing.logging_enabled:
             print("CPython destroy")
             print("Number of remaining refs:", existing.total_ref_count.load())
@@ -186,25 +186,26 @@ struct CPython:
         existing.lib.close()
         existing.total_ref_count.free()
 
-    fn Py_NoneType(inout self) -> PyObjectPtr:
-        if self.noneType.is_null():
+    fn Py_None(inout self) -> PyObjectPtr:
+        """Get a None value, of type NoneType."""
+        if self.none_value.is_null():
             var list = self.PyList_New(0)
             var tuple = self.PyTuple_New(0)
             var callable = self.PyObject_GetAttrString(list, "reverse")
-            self.noneType = self.PyObject_CallObject(callable, tuple)
+            self.none_value = self.PyObject_CallObject(callable, tuple)
             self.Py_DecRef(tuple)
             self.Py_DecRef(callable)
             self.Py_DecRef(list)
-        return self.noneType
+        return self.none_value
 
     fn __del__(owned self):
         pass
 
     fn __copyinit__(inout self, existing: Self):
         self.lib = existing.lib
-        # NoneType is a global variable
-        self.noneType = existing.noneType
-        self.dictType = existing.dictType
+        # None is a global variable
+        self.none_value = existing.none_value
+        self.dict_type = existing.dict_type
         self.logging_enabled = existing.logging_enabled
         self.version = existing.version
         self.total_ref_count = existing.total_ref_count
@@ -663,9 +664,9 @@ struct CPython:
         return result
 
     fn PyDict_Type(inout self) -> PyObjectPtr:
-        if self.dictType.is_null():
-            self.dictType = self.lib.get_function[PyObjectPtr]("PyDict_Type")
-        return self.dictType
+        if self.dict_type.is_null():
+            self.dict_type = self.lib.get_function[PyObjectPtr]("PyDict_Type")
+        return self.dict_type
 
     fn PyObject_Type(inout self, obj: PyObjectPtr) -> PyObjectPtr:
         var f = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](

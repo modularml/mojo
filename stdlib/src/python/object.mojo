@@ -112,7 +112,7 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
             none: None.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.Py_NoneType()
+        self.py_object = cpython.Py_None()
         cpython.Py_IncRef(self.py_object)
 
     fn __init__(inout self, integer: Int):
