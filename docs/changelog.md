@@ -85,10 +85,10 @@ modular update mojo
 
   ```mojo
   fn prod_with_offset(*args: Int, offset: Int = 0) -> Int:
-    var res = 1
-    for i in range(len(args)):
-        res *= args[i]
-    return res + offset
+      var res = 1
+      for i in range(len(args)):
+          res *= args[i]
+      return res + offset
 
   print(prod_with_offset(2, 3, 4, 10))         # prints 240
   print(prod_with_offset(2, 3, 4, offset=10))  # prints 34
@@ -122,18 +122,18 @@ modular update mojo
 
   ```mojo
   fn foo(arg: Int):
-    """""" # Unexpected empty documentation string
+      """""" # Unexpected empty documentation string
   ```
 
   Applying the fixit from above will generate:
 
   ```mojo
   fn foo(arg: Int):
-    """[summary].
+      """[summary].
 
-    Args:
-        arg: [description].
-    """
+      Args:
+          arg: [description].
+      """
   ```
 
 - Added new `*_` syntax that allows users to explicitly unbind any number of
@@ -187,9 +187,9 @@ modular update mojo
   v.append("Bob")
   v.append("Charlie")
   for x in v:
-    x[] = str("Hello, ") + x[]
+      x[] = str("Hello, ") + x[]
   for x in v:
-    print(x[])
+      print(x[])
   ```
 
 - `DynamicVector` now has
@@ -206,14 +206,14 @@ modular update mojo
   ```mojo
   @register_passable
   struct YourPair:
-    var a: Int
-    var b: Int
-    fn __init__(inout self):
-        self.a = 42
-        self.b = 17
-    fn __copyinit__(inout self, existing: Self):
-        self.a = existing.a
-        self.b = existing.b
+      var a: Int
+      var b: Int
+      fn __init__(inout self):
+          self.a = 42
+          self.b = 17
+      fn __copyinit__(inout self, existing: Self):
+          self.a = existing.a
+          self.b = existing.b
   ```
 
   This form makes the language more consistent, more similar to Python, and
@@ -221,7 +221,7 @@ modular update mojo
   impact of using this new form: the compiler arranges to automatically return
   the value in a register without requiring you to worry about it.
 
-  The older `-> Self:` syntax is still supported in this release, but will be
+  The older `-> Self` syntax is still supported in this release, but will be
   removed in a subsequent one, so please migrate your code.  One thing to watch
   out for: a given struct should use one style or the other, mixing some of
   each won't work well.
@@ -238,12 +238,12 @@ modular update mojo
   ```mojo
   @value
   struct UnusualSlice:
-    var a: Int
-    var b: Float64
-    var c: String
+      var a: Int
+      var b: Float64
+      var c: String
 
   struct YourContainer:
-    fn __getitem__(self, slice: UnusualSlice) -> T: ...
+      fn __getitem__(self, slice: UnusualSlice) -> T: ...
   ```
 
   Given this implementation, you can subscript into an instance of
@@ -321,7 +321,7 @@ modular update mojo
 
   ```mojo
   if "Mojo" in "Hello Mojo":
-    ...
+      ...
   ```
 
 - Breakpoints can now be inserted programmatically within the code using the
@@ -356,8 +356,8 @@ modular update mojo
 
   ```mojo
   fn my_function(x: Int, y: __type_of(x)) -> Int:
-    let z : __type_of(x) = y
-    return z
+      let z: __type_of(x) = y
+      return z
   ```
 
 ### 🦋 Changed
@@ -372,9 +372,9 @@ modular update mojo
 
   ```mojo
   fn test():
-    # treated as a var, but please update your code!
-    let x = 42  # warning: 'let' is being removed, please use 'var' instead
-    x = 9
+      # treated as a var, but please update your code!
+      let x = 42  # warning: 'let' is being removed, please use 'var' instead
+      x = 9
   ```
 
 - It is no longer possible to explicitly specify implicit argument parameters in
@@ -733,21 +733,21 @@ modular update mojo
 
   ```mojo
   struct Foo(CollectionElement):
-    var vec: DynamicVector[Self]
+      var vec: DynamicVector[Self]
 
-    fn __init__(inout self: Self):
-        self.vec = DynamicVector[Self]()
+      fn __init__(inout self: Self):
+          self.vec = DynamicVector[Self]()
 
-    fn __moveinit__(inout self: Self, owned existing: Self):
-        self.vec = existing.vec ^
+      fn __moveinit__(inout self: Self, owned existing: Self):
+          self.vec = existing.vec ^
 
-    fn __copyinit__(inout self: Self, existing: Self):
-        self.vec = existing.vec
+      fn __copyinit__(inout self: Self, existing: Self):
+          self.vec = existing.vec
 
 
   fn main():
-    var foo = Foo()
-    print(len(foo.vec))
+      var foo = Foo()
+      print(len(foo.vec))
   ```
 
 ### ❌ Removed
@@ -788,13 +788,13 @@ modular update mojo
   ```mojo
   @adaptive
   fn foo[a: Bool]():
-    constrained[a]()
-    body1()
+      constrained[a]()
+      body1()
 
   @adaptive
   fn foo[a: Bool]():
-    constrained[not a]()
-    body2()
+      constrained[not a]()
+      body2()
   ```
 
   Can be rewritten as:
