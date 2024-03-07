@@ -67,6 +67,26 @@ cannot be parsed from the string, then an error is raised.
 
 ### 🦋 Changed
 
+- Structs and other nominal types are now allowed to implicitly conform to
+  traits. A struct implicitly conforms to a trait if it implements all the
+  requirements for the trait. For example, any struct that implements `__str__`
+  will implicitly conform to `Stringable`, and then is usable with `str`.
+
+  ```mojo
+  @value
+  struct Foo:
+      fn __str__(self) -> String:
+          return "foo!"
+
+  fn main():
+      print(str(Foo())) # prints 'foo!'
+  ```
+
+  Explicit conformance is still strongly encouraged where possible, because it
+  is useful for documentation and for communicating intentions. In the future,
+  explicit conformance will still be useful for features like default methods
+  and extensions.
+
 - The [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) and
   [`InlinedFixedVector`](/mojo/stdlib/collections/vector.html#inlinedfixedvector)
   types now support negative indexing. This means that you can write `vec[-1]`
