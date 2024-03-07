@@ -662,8 +662,8 @@ modular update mojo
 
   ```mojo
   fn main():
-      var a : String = "hello"
-      var b : String = " references"
+      var a: String = "hello"
+      var b: String = " references"
 
       var aref = Reference(a)
       aref[] += b
@@ -1235,7 +1235,7 @@ modular update mojo
 
   ```mojo
   # The `ret` variable has type `Tuple[Int, Int]`.
-  let ret = __mlir_op.`multi_result_op`[ _type = (Int, Int) ]()
+  let ret = __mlir_op.`multi_result_op`[_type=(Int, Int)]()
   ```
 
 - Mojo now has the ability to read raw bytes from a file using the
@@ -1428,7 +1428,7 @@ modular update mojo
 
   ```mojo
   fn foo[a: Int, b: Int = 42]():
-    print(a, "+", b)
+      print(a, "+", b)
 
   foo[a=5]()        # prints '5 + 42'
   foo[a=7, b=13]()  # prints '7 + 13'
@@ -1502,8 +1502,8 @@ modular update mojo
   ```mojo
   @value
   struct MyStruct:
-    fn __getitem__(self, x: Int, y: Int, z: Int) -> Int:
-      return x * y + z
+      fn __getitem__(self, x: Int, y: Int, z: Int) -> Int:
+          return x * y + z
 
   MyStruct()[z=7, x=3, y=5]  # returns 22
   ```
@@ -1804,27 +1804,27 @@ modular update mojo
 - Error messages from Python are now exposed in Mojo. For example the following
   should print `No module named 'my_uninstalled_module'`:
 
-    ```mojo
-    fn main():
-        try:
-            let my_module = Python.import_module("my_uninstalled_module")
-        except e:
-            print(e)
-    ```
+  ```mojo
+  fn main():
+      try:
+          let my_module = Python.import_module("my_uninstalled_module")
+      except e:
+          print(e)
+  ```
 
 - Error messages can now store dynamic messages. For example, the following
   should print "Failed on: Hello"
 
-    ```mojo
-    fn foo(x:String) raises:
-        raise Error("Failed on: " + x)
+  ```mojo
+  fn foo(x: String) raises:
+      raise Error("Failed on: " + x)
 
-    fn main():
-        try:
-            foo("Hello")
-        except e:
-            print(e)
-    ```
+  fn main():
+      try:
+          foo("Hello")
+      except e:
+          print(e)
+  ```
 
 ### 🦋 Changed
 
@@ -1918,29 +1918,29 @@ Code](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vsco
 - Mojo now has partial support for passing keyword arguments to functions and
   methods. For example the following should work:
 
-    ```mojo
-    fn foo(a: Int, b: Int = 3) -> Int:
-        return a * b
+  ```mojo
+  fn foo(a: Int, b: Int = 3) -> Int:
+      return a * b
 
-    fn main():
-        print(foo(6, b=7))  # prints '42'
-        print(foo(a=6, b=7))  # prints '42'
-        print(foo(b=7, a=6))  # prints '42'
-    ```
+  fn main():
+      print(foo(6, b=7))  # prints '42'
+      print(foo(a=6, b=7))  # prints '42'
+      print(foo(b=7, a=6))  # prints '42'
+  ```
 
   Parameters can also be inferred from keyword arguments, for example:
 
-    ```mojo
-    fn bar[A: AnyType, B: AnyType](a: A, b: B):
-        print("Hello 🔥")
+  ```mojo
+  fn bar[A: AnyType, B: AnyType](a: A, b: B):
+      print("Hello 🔥")
 
-    fn bar[B: AnyType](a: StringLiteral, b: B):
-        print(a)
+  fn bar[B: AnyType](a: StringLiteral, b: B):
+      print(a)
 
-    fn main():
-        bar(1, 2)  # prints `Hello 🔥`
-        bar(b=2, a="Yay!")  # prints `Yay!`
-    ```
+  fn main():
+      bar(1, 2)  # prints `Hello 🔥`
+      bar(b=2, a="Yay!")  # prints `Yay!`
+  ```
 
   For the time being, the following notable limitations apply:
 
@@ -1970,31 +1970,31 @@ Code](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vsco
   be added in the parameter domain, but are converted to `HasBool` when
   materialized.
 
-    ```mojo
-    @value
-    @register_passable("trivial")
-    struct HasBool:
+  ```mojo
+  @value
+  @register_passable("trivial")
+  struct HasBool:
       var x: Bool
       fn __init__(x: Bool) -> Self:
-        return Self {x: x}
+          return Self {x: x}
       @always_inline("nodebug")
       fn __init__(nms: NmStruct) -> Self:
-        return Self {x: True if (nms.x == 77) else False}
+          return Self {x: True if (nms.x == 77) else False}
 
-    @value
-    @nonmaterializable(HasBool)
-    @register_passable("trivial")
-    struct NmStruct:
+  @value
+  @nonmaterializable(HasBool)
+  @register_passable("trivial")
+  struct NmStruct:
       var x: Int
       @always_inline("nodebug")
       fn __add__(self: Self, rhs: Self) -> Self:
-        return NmStruct(self.x + rhs.x)
+          return NmStruct(self.x + rhs.x)
 
-    alias stillNmStruct = NmStruct(1) + NmStruct(2)
-    # When materializing to a run-time variable, it is automatically converted,
-    # even without a type annotation.
-    let convertedToHasBool = stillNmStruct
-    ```
+  alias stillNmStruct = NmStruct(1) + NmStruct(2)
+  # When materializing to a run-time variable, it is automatically converted,
+  # even without a type annotation.
+  let convertedToHasBool = stillNmStruct
+  ```
 
 - Mojo integer literals now produce the `IntLiteral` infinite precision integer
   type when used in the parameter domain.  `IntLiteral` is materialized to the
@@ -2016,19 +2016,19 @@ Code](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vsco
   compiler cannot prove that.  These were previously both named `__moveinit__`,
   with the following two signatures:
 
-    ```mojo
-    fn __moveinit__(inout self, owned existing: Self): ...
-    fn __moveinit__(inout self, inout existing: Self): ...
-    ```
+  ```mojo
+  fn __moveinit__(inout self, owned existing: Self): ...
+  fn __moveinit__(inout self, inout existing: Self): ...
+  ```
 
   We've changed the second form to get its own name to make it more clear that
   these are two separate operations: the second has been renamed to
   `__takeinit__`:
 
-    ```mojo
-    fn __moveinit__(inout self, owned existing: Self): ...
-    fn __takeinit__(inout self, inout existing: Self): ...
-    ```
+  ```mojo
+  fn __moveinit__(inout self, owned existing: Self): ...
+  fn __takeinit__(inout self, inout existing: Self): ...
+  ```
 
   The name is intended to connote that the operation takes the conceptual value
   from the source (without destroying it) unlike the first one which "moves" a
@@ -2160,35 +2160,35 @@ All earlier releases were considered version 0.1.
 - Mojo now supports using memory-only types in parameter expressions and as
   function or type parameters:
 
-    ```mojo
-    @value
-    struct IntPair:
-        var first: Int
-        var second: Int
+  ```mojo
+  @value
+  struct IntPair:
+      var first: Int
+      var second: Int
 
-    fn add_them[value: IntPair]() -> Int:
-        return value.first + value.second
+  fn add_them[value: IntPair]() -> Int:
+      return value.first + value.second
 
-    fn main():
-        print(add_them[IntPair(1, 2)]()) # prints '3'
-    ```
+  fn main():
+      print(add_them[IntPair(1, 2)]()) # prints '3'
+  ```
 
 - In addition, Mojo supports evaluating code that uses heap-allocated memory
   at compile-time and materializing compile-time values with heap-allocated
   memory into dynamic values:
 
-    ```mojo
-    fn fillVector(lowerBound: Int, upperBound: Int, step: Int) -> DynamicVector[Int]:
-        var result = DynamicVector[Int]()
-        for i in range(lowerBound, upperBound, step):
-            result.push_back(i)
-        return result
+  ```mojo
+  fn fillVector(lowerBound: Int, upperBound: Int, step: Int) -> DynamicVector[Int]:
+      var result = DynamicVector[Int]()
+      for i in range(lowerBound, upperBound, step):
+          result.push_back(i)
+      return result
 
-    fn main():
-        alias values = fillVector(5, 23, 7)
-        for i in range(0, values.__len__()):
-            print(values[i]) # prints '5', '12', and then '19'
-    ```
+  fn main():
+      alias values = fillVector(5, 23, 7)
+      for i in range(0, values.__len__()):
+          print(values[i]) # prints '5', '12', and then '19'
+  ```
 
 #### 🦋 Changed
 
@@ -2266,11 +2266,11 @@ All earlier releases were considered version 0.1.
 
   # Perform the RGB to grayscale transform.
   for y in range(height):
-    for x in range(width):
-      let r = image[y,x,0]
-      let g = image[y,x,1]
-      let b = image[y,x,2]
-      gray_scale_image[Index(y,x)] = 0.299 * r + 0.587 * g + 0.114 * b
+      for x in range(width):
+          let r = image[y, x, 0]
+          let g = image[y, x, 1]
+          let b = image[y, x, 2]
+          gray_scale_image[Index(y, x)] = 0.299 * r + 0.587 * g + 0.114 * b
   ```
 
 #### 🛠️ Fixed
@@ -2297,17 +2297,17 @@ All earlier releases were considered version 0.1.
   compiler time constant value, otherwise unrolling will fail with
   compilation error. This also doesn't make loop induction variable a parameter.
 
-    ```mojo
-      # Fully unroll the loop.
-      @unroll
-      for i in range(5):
-        print(i)
+  ```mojo
+  # Fully unroll the loop.
+  @unroll
+  for i in range(5):
+      print(i)
 
-      # Unroll the loop by a factor of 4 (with remainder iterations of 2).
-      @unroll(4)
-      for i in range(10):
-        print(i)
-    ```
+  # Unroll the loop by a factor of 4 (with remainder iterations of 2).
+  @unroll(4)
+  for i in range(10):
+      print(i)
+  ```
 
 - The Mojo REPL now prints the values of variables defined in the REPL. There is
   full support for scalars and structs. Non-scalar SIMD vectors are not
@@ -2341,7 +2341,7 @@ All earlier releases were considered version 0.1.
   @register_passable # error: cannot apply signature decorator after a body one!
   @value
   struct Foo:
-    pass
+      pass
   ```
 
 - Global variables can now be exported in Mojo compiled archives, using the
@@ -2664,10 +2664,10 @@ only in declared parameter names, e.g. the following now works correctly:
   like this:
 
   ```mojo
-    var someValue : T = ...
-    ...
-    takeValueAsOwned(someValue)
-    ...
+  var someValue: T = ...
+  ...
+  takeValueAsOwned(someValue)
+  ...
   ```
 
   When `takeValueAsOwned()` takes its argument as an
@@ -2878,9 +2878,9 @@ busy this week.
   ```mojo
   def foo(x):
       # This:
-      def bar(y): return x*y
+      def bar(y): return x * y
       # Is the same as:
-      let bar = lambda y: x*y
+      let bar = lambda y: x * y
   ```
 
   These closures cannot have input or result parameters, because they are always
@@ -2951,15 +2951,15 @@ busy this week.
   The `@value` decorator will synthesize the following members for you:
 
   ```mojo
-    fn __init__(inout self, owned name: String, age: Int):
-       self.name = name^
-       self.age = age
-    fn __copyinit__(inout self, existing: Self):
-       self.name = existing.name
-       self.age = existing.age
-    fn __moveinit__(inout self, owned existing: Self):
-       self.name = existing.name^
-       self.age = existing.age
+  fn __init__(inout self, owned name: String, age: Int):
+      self.name = name^
+      self.age = age
+  fn __copyinit__(inout self, existing: Self):
+      self.name = existing.name
+      self.age = existing.age
+  fn __moveinit__(inout self, owned existing: Self):
+      self.name = existing.name^
+      self.age = existing.age
   ```
 
   This decorator can greatly reduce the boilerplate needed to define common
@@ -2994,7 +2994,7 @@ busy this week.
   initialization than requiring the initializer be inline, e.g.:
 
   ```mojo
-  let x : Int
+  let x: Int
   if cond:
       x = foo()
   else:
@@ -3920,9 +3920,9 @@ busy this week.
   e.g.:
 
   ```mojo
-  alias a : __mlir_type.index
-  alias b : __mlir_type.index
-  idx_result_params[xyz*2 -> a, b]()
+  alias a: __mlir_type.index
+  alias b: __mlir_type.index
+  idx_result_params[xyz * 2 -> a, b]()
   ```
 
 - Various minor issues with implicit conversions are fixed. For instances,
