@@ -125,6 +125,12 @@ cannot be parsed from the string, then an error is raised.
   takes_type[SomeType]()  # already 🔥
   ```
 
+- `PythonObject.__iter__` now works correctly on more types of iterable Python
+  objects.  Attempting to iterate over non-iterable objects will now raise an
+  exception instead of behaving as if iterating over an empty sequence.
+  `__iter__` also now borrows `self` rather than requiring `inout`, allowing
+  code like `for value in my_dict.values():`.
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,

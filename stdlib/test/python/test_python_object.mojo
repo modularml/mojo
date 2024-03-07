@@ -10,7 +10,7 @@ from memory.unsafe import Pointer
 from python._cpython import CPython, PyObjectPtr
 from python.object import PythonObject
 from python.python import Python
-from testing import assert_false, assert_true
+from testing import assert_false, assert_true, assert_raises
 from utils import StringRef
 
 
@@ -438,9 +438,11 @@ fn test_iter() raises -> None:
         print("I have eaten", fruit)
 
     var not_iterable: PythonObject = 3
-    # CHECK-NOT: I should not exist
-    for x in not_iterable:
-        print("I should not exist", x)
+    with assert_raises():
+        for x in not_iterable:
+            # CHECK-NOT: I should not exist
+            print("I should not exist", x)
+            assert_false(True)
 
     var mydict = Python.dict()
     mydict["vegetable"] = "carrot"
@@ -451,6 +453,12 @@ fn test_iter() raises -> None:
     # CHECK: protein
     for key in mydict:
         print(key)
+
+    # CHECK: carrot
+    # CHECK: apple pie
+    # CHECK: chicken
+    for value in mydict.values():
+        print(value)
 
 
 def main():

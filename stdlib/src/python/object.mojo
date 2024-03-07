@@ -290,20 +290,19 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
         var cpython = _get_global_python_itf().cpython()
         cpython.Py_IncRef(self.py_object)
 
-    fn __iter__(inout self) -> _PyIter:
-        """Iterate over object if supported.
+    fn __iter__(self) raises -> _PyIter:
+        """Iterate over the object.
 
         Returns:
             An iterator object.
+
+        Raises:
+            If the object is not iterable.
         """
         var cpython = _get_global_python_itf().cpython()
-        if cpython.PySequence_Check(self.py_object) or cpython.PyIter_Check(
-            self.py_object
-        ):
-            var iter = cpython.PyObject_GetIter(self.py_object)
-            return _PyIter(iter)
-        else:
-            return _PyIter()
+        var iter = cpython.PyObject_GetIter(self.py_object)
+        Python.throw_python_exception_if_error_state(cpython)
+        return _PyIter(iter)
 
     fn __del__(owned self):
         """Destroy the object.
