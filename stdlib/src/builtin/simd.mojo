@@ -15,7 +15,7 @@ from sys import llvm_intrinsic
 from sys.info import has_neon, is_x86, simdwidthof
 
 from builtin.hash import _hash_simd
-from debug.visualizers import lldb_formatter_wrapping_type
+from utils._visualizers import lldb_formatter_wrapping_type
 from memory.unsafe import bitcast
 
 from utils.static_tuple import StaticTuple
