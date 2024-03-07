@@ -39,8 +39,9 @@ fn hex[T: Intable](value: T) -> String:
         # This should not be reachable as _format_int only throws if we pass
         # incompatible radix and custom digit chars, which we aren't doing
         # above.
-        abort("unexpected exception formatting value as hexadecimal: " + str(e))
-        return ""
+        return abort[String](
+            "unexpected exception formatting value as hexadecimal: " + str(e)
+        )
 
 
 # ===----------------------------------------------------------------------===#
