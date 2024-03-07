@@ -235,3 +235,14 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
             Pointer.address_of(self.array).address, offset.value
         )
         Pointer(ptr).store(val)
+
+    fn as_ptr(inout self) -> Pointer[Self.element_type]:
+        """Get a mutable pointer to the elements contained by this tuple.
+
+        Returns:
+            A pointer to the elements contained by this tuple.
+        """
+
+        var base_ptr = Pointer[Self.type].address_of(self.array).address
+        var ptr = __mlir_op.`pop.array.gep`(base_ptr, Int(0).value)
+        return Pointer(ptr)

@@ -10,3 +10,4 @@ from .list import List
 from .optional import Optional
 from .set import Set
 from .vector import CollectionElement
+from .list import List
