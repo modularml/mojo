@@ -63,7 +63,22 @@ fn test_mod():
     print(-3 % 2)
 
 
+# CHECK-LABEL: test_bit_width
+fn test_bit_width():
+    print("== test_bit_width")
+
+    # CHECK: 1
+    print((0)._bit_width())
+    # CHECK: 1
+    print((-1)._bit_width())
+    # CHECK: 9
+    print((255)._bit_width())
+    # CHECK: 9
+    print((-256)._bit_width())
+
+
 fn main():
     test_int()
     test_floordiv()
     test_mod()
+    test_bit_width()

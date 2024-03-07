@@ -69,6 +69,15 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         """
         return Int(self.__as_mlir_index())
 
+    @always_inline("nodebug")
+    fn _bit_width(self) -> IntLiteral:
+        """Get the (signed) bit width of the IntLiteral.
+
+        Returns:
+            The bit width.
+        """
+        return __mlir_op.`kgen.int_literal.bit_width`(self.value)
+
     @always_inline
     fn __str__(self) -> String:
         """Convert from IntLiteral to String.
