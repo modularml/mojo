@@ -1310,7 +1310,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn _shuffle_list[
-        mask: VariadicList[Int], output_size: Int = size
+        *mask: Int, output_size: Int = size
     ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation).
@@ -1326,13 +1326,43 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new vector of length `len` where the value at position `i` is
             `(self+other)[permutation[i]]`.
         """
-        alias length = len(mask)
+
+        @parameter
+        fn variadic_len[*mask: Int]() -> Int:
+            return __mlir_op.`pop.variadic.size`(mask)
+
+        @parameter
+        fn _convert_variadic_to_pop_array[
+            *mask: Int
+        ]() -> __mlir_type[
+            `!pop.array<`, variadic_len[mask]().value, `, `, Int, `>`
+        ]:
+            alias size = variadic_len[mask]()
+            var array = __mlir_op.`kgen.undef`[
+                _type = __mlir_type[
+                    `!pop.array<`, variadic_len[mask]().value, `, `, Int, `>`
+                ]
+            ]()
+
+            @always_inline
+            @parameter
+            fn fill[idx: Int]():
+                alias val = mask[idx]
+                var ptr = __mlir_op.`pop.array.gep`(
+                    Pointer.address_of(array).address, idx.value
+                )
+                __mlir_op.`pop.store`(val, ptr)
+
+            unroll[fill, size]()
+            return array
+
+        alias length = variadic_len[mask]()
         constrained[
             output_size == length,
             "size of the mask must match the output SIMD size",
         ]()
         return __mlir_op.`pop.simd.shuffle`[
-            mask = mask.value,
+            mask = _convert_variadic_to_pop_array[mask](),
             _type = __mlir_type[
                 `!pop.simd<`, output_size.value, `, `, type.value, `>`
             ],
@@ -1527,63 +1557,85 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if size == 1:
             return self._shuffle_list[
-                VariadicList[Int](0, 1),
-                2 * size,
+                0,
+                1,
+                output_size = 2 * size,
             ](other)
         elif size == 2:
             return self._shuffle_list[
-                VariadicList[Int](0, 1, 2, 3),
-                2 * size,
+                0,
+                1,
+                2,
+                3,
+                output_size = 2 * size,
             ](other)
         elif size == 4:
             return self._shuffle_list[
-                VariadicList[Int](0, 1, 2, 3, 4, 5, 6, 7),
-                2 * size,
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                output_size = 2 * size,
             ](other)
         elif size == 8:
             return self._shuffle_list[
-                VariadicList[Int](
-                    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
-                ),
-                2 * size,
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                output_size = 2 * size,
             ](other)
         elif size == 16:
             return self._shuffle_list[
-                VariadicList[Int](
-                    0,
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                    6,
-                    7,
-                    8,
-                    9,
-                    10,
-                    11,
-                    12,
-                    13,
-                    14,
-                    15,
-                    16,
-                    17,
-                    18,
-                    19,
-                    20,
-                    21,
-                    22,
-                    23,
-                    24,
-                    25,
-                    26,
-                    27,
-                    28,
-                    29,
-                    30,
-                    31,
-                ),
-                2 * size,
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                27,
+                28,
+                29,
+                30,
+                31,
+                output_size = 2 * size,
             ](other)
 
         var res = SIMD[type, 2 * size]()
