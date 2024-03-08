@@ -11,7 +11,6 @@ from os import PathLike, listdir, stat_result
 from sys.info import os_is_windows
 
 from memory import stack_allocation
-from tensor import Tensor
 from utils import StringRef
 
 alias DIR_SEPARATOR = "\\" if os_is_windows() else "/"
@@ -224,11 +223,11 @@ struct Path(Stringable, CollectionElement, PathLike):
         with open(self, "r") as f:
             return f.read()
 
-    fn read_bytes(self) raises -> Tensor[DType.int8]:
+    fn read_bytes(self) raises -> List[Int8]:
         """Returns content of the file as bytes.
 
         Returns:
-          Contents of file as 1D Tensor of bytes.
+          Contents of file as list of bytes.
         """
         with open(self, "r") as f:
             return f.read_bytes()

@@ -64,11 +64,11 @@ def test_file_read_bytes_multi():
     )
 
     # CHECK: Lorem ipsum
-    var tensor1 = f.read_bytes(12)
+    var tensor1 = Tensor[DType.int8](f.read_bytes(12))
     print(StringRef(tensor1.data(), tensor1.num_elements()))
 
     # CHECK: dolor
-    var tensor2 = f.read_bytes(6)
+    var tensor2 = Tensor[DType.int8](f.read_bytes(6))
     print(StringRef(tensor2.data(), tensor2.num_elements()))
 
     # Read where N is greater than the number of bytes in the file.

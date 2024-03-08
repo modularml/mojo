@@ -28,7 +28,6 @@ from os import PathLike
 from sys import external_call
 
 from memory.unsafe import AddressSpace, DTypePointer, Pointer
-from tensor import Tensor
 
 
 @register_passable
@@ -151,7 +150,7 @@ struct FileHandle:
 
         return String(buf, int(size_copy) + 1)
 
-    fn read_bytes(self, size: Int64 = -1) raises -> Tensor[DType.int8]:
+    fn read_bytes(self, size: Int64 = -1) raises -> List[Int8]:
         """Read from file buffer until we have `size` characters or we hit EOF.
         If `size` is negative or omitted, read until EOF.
 
@@ -178,7 +177,15 @@ struct FileHandle:
         if err_msg:
             raise (err_msg ^).consume_as_error()
 
-        return Tensor(DTypePointer[DType.int8](buf.address), int(size_copy))
+        var list = List[Int8](capacity=int(size_copy))
+
+        var list_ptr = Pointer[Int8].__from_index(int(list.data))
+
+        # Initialize the List elements and set the initialized size
+        memcpy(list_ptr, buf, int(size_copy))
+        list.size = int(size_copy)
+
+        return list
 
     fn seek(self, offset: UInt64) raises -> UInt64:
         """Seeks to the given offset in the file.
