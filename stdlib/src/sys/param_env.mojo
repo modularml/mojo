@@ -8,14 +8,12 @@
 You can use these functions to set parameter values or runtime constants based on
 name-value pairs defined on the command line. For example:
 
-  ```mojo
+```mojo
   from sys.param_env import is_defined
-  from tensor import Tensor, TensorSpec
 
-  alias float_type: DType = DType.float32 if is_defined["FLOAT32"]() else DType.float64
+  alias float_type = DType.float32 if is_defined["FLOAT32"]() else DType.float64
 
-  var spec = TensorSpec(float_type, 256, 256)
-  var image = Tensor[float_type](spec)
+  # Use `float_type` as a constant.
 ```
 
 And on the command line:
