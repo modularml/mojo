@@ -199,6 +199,9 @@ modular update mojo
   `__iter__` also now borrows `self` rather than requiring `inout`, allowing
   code like `for value in my_dict.values():`.
 
+- The `rand` and `randn` functions in the `random` package that return a `Tensor`
+  have moved to the `tensor` package.  Please update your imports accordingly.
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,

@@ -17,7 +17,6 @@ from sys.info import bitwidthof
 from time import now
 
 from memory.unsafe import DTypePointer
-from tensor import Tensor, TensorShape, TensorSpec
 
 
 fn _get_random_state() -> DTypePointer[DType.invalid]:
@@ -155,58 +154,6 @@ fn rand[type: DType](ptr: DTypePointer[type], size: Int):
         return
 
 
-fn rand[type: DType](*shape: Int) -> Tensor[type]:
-    """Constructs a new tensor with the specified shape and fills it with random
-    elements.
-
-    Parameters:
-        type: The dtype of the tensor.
-
-    Args:
-        shape: The tensor shape.
-
-    Returns:
-        A new tensor of specified shape and filled with random elements.
-    """
-    return rand[type](TensorShape(shape))
-
-
-fn rand[type: DType](owned shape: TensorShape) -> Tensor[type]:
-    """Constructs a new tensor with the specified shape and fills it with random
-    elements.
-
-    Parameters:
-        type: The dtype of the tensor.
-
-    Args:
-        shape: The tensor shape.
-
-    Returns:
-        A new tensor of specified shape and filled with random elements.
-    """
-    var tensor = Tensor[type](shape ^)
-    rand(tensor.data(), tensor.num_elements())
-    return tensor
-
-
-fn rand[type: DType](owned spec: TensorSpec) -> Tensor[type]:
-    """Constructs a new tensor with the specified specification and fills it
-    with random elements.
-
-    Parameters:
-        type: The dtype of the tensor.
-
-    Args:
-        spec: The tensor specification.
-
-    Returns:
-        A new tensor of specified specification and filled with random elements.
-    """
-    var tensor = Tensor[type](spec ^)
-    rand(tensor.data(), tensor.num_elements())
-    return tensor
-
-
 fn randn_float64(mean: Float64 = 0.0, variance: Float64 = 1.0) -> Float64:
     """Returns a random double sampled from Normal(mean, variance) distribution.
 
@@ -248,61 +195,3 @@ fn randn[
     for i in range(size):
         ptr[i] = randn_float64(mean, variance).cast[type]()
     return
-
-
-fn randn[
-    type: DType
-](
-    owned shape: TensorShape,
-    mean: Float64 = 0.0,
-    variance: Float64 = 1.0,
-) -> Tensor[type]:
-    """Constructs a new Tensor from the shape and fills it with random values from a Normal(mean, variance) distribution.
-
-    Constraints:
-        The type should be floating point.
-
-    Parameters:
-        type: The dtype of the pointer.
-
-    Args:
-        shape: The shape of the Tensor to fill with random values.
-        mean: Normal distribution mean.
-        variance: Normal distribution variance.
-
-    Returns:
-        A Tensor filled with random dtype samples from Normal(mean, variance).
-    """
-
-    var tensor = Tensor[type](shape ^)
-    randn(tensor.data(), tensor.num_elements(), mean, variance)
-    return tensor
-
-
-fn randn[
-    type: DType
-](
-    owned spec: TensorSpec,
-    mean: Float64 = 0.0,
-    variance: Float64 = 1.0,
-) -> Tensor[type]:
-    """Constructs a new Tensor from the spec and fills it with random values from a Normal(mean, variance) distribution.
-
-    Constraints:
-        The type should be floating point.
-
-    Parameters:
-        type: The dtype of the pointer.
-
-    Args:
-        spec: The spec of the Tensor to fill with random values.
-        mean: Normal distribution mean.
-        variance: Normal distribution variance.
-
-    Returns:
-        A Tensor filled with random dtype samples from Normal(mean, variance).
-    """
-
-    var tensor = Tensor[type](spec ^)
-    randn(tensor.data(), tensor.num_elements(), mean, variance)
-    return tensor
