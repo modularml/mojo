@@ -221,6 +221,8 @@ modular update mojo
   decorators on traits.
 - [#1735](https://github.com/modularml/mojo/issues/1735) - Trait-typed values
   are incorrectly considered equal.
+- [#1909](https://github.com/modularml/mojo/issues/1909) - Crash due to nested
+  import in unreachable block.
 
 ## v24.1 (2024-02-29)
 
