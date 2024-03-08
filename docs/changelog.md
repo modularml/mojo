@@ -42,9 +42,9 @@ modular update mojo
 ### ⭐️ New
 
 - String types all conform to the
-[`IntableRaising`](/mojo/stdlib/builtin/int#intableraising) trait. This means
-that you can now call `int("123")` to get the integer `123`. If the integer
-cannot be parsed from the string, then an error is raised.
+  [`IntableRaising`](/mojo/stdlib/builtin/int#intableraising) trait. This means
+  that you can now call `int("123")` to get the integer `123`. If the integer
+  cannot be parsed from the string, then an error is raised.
 
 - The `Tensor` type now has an `argmax` and `argmin` function to compute the
   position of the max or min value.
@@ -64,6 +64,54 @@ cannot be parsed from the string, then an error is raised.
   additional search paths to use when resolving imported modules in a document.
   A corresponding `mojo.lsp.includeDirs` setting was added to the VS Code
   extension as well.
+
+- Mojo now has support for variadic keyword argument, often referred to as
+  `**kwargs`. This means you can now declare and call functions like this:
+
+  ```mojo
+  fn print_nicely(**kwargs: Int) raises:
+    for key in kwargs.keys():
+        print(key[], "=", kwargs[key[]])
+
+   # prints:
+   # `a = 7`
+   # `y = 8`
+  print_nicely(a=7, y=8)
+  ```
+
+  There are currently a few limitations:
+  - The ownership semantics of variadic keyword arguments are always `owned`.
+    This is applied implicitly, and cannot be declared otherwise:
+
+    ```mojo
+    # Not supported yet.
+    fn borrowed_var_kwargs(borrowed **kwargs: Int): ...
+    ```
+
+  - Functions with variadic keyword arguments cannot have default values for
+    keyword-only arguments, e.g.
+
+    ```mojo
+    # Not allowed yet, because `b` is keyword-only with a default.
+    fn not_yet(*, b: Int = 9, **kwargs: Int): ...
+
+    # Okay, because `c` is positional-or-keyword, so it can have a default.
+    fn still_works(c: Int = 5, **kwargs: Int): ...
+    ```
+
+  - Dictionary unpacking is not supported yet:
+
+    ```mojo
+    fn takes_dict(d: Dict[String, Int]):
+      print_nicely(**d)  # Not supported yet.
+    ```
+
+  - Variadic keyword parameters are not supported yet:
+
+    ```mojo
+    # Not supported yet.
+    fn var_kwparams[**kwparams: Int](): ...
+    ```
 
 ### 🦋 Changed
 
