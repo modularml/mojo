@@ -4,8 +4,8 @@
 #
 # ===----------------------------------------------------------------------=== #
 
-from algorithm import unroll
 from memory.buffer import Buffer, DynamicRankBuffer, NDBuffer
+from . import unroll
 
 
 @always_inline

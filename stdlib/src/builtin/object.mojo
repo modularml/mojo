@@ -12,9 +12,8 @@ from collections import Dict, List
 from math import min as _min
 from os.atomic import Atomic
 from sys.intrinsics import _mlirtype_is_eq
-from utils import StringRef
+from utils import StringRef, unroll
 
-from algorithm.functional import unroll
 from memory import memcmp, memcpy
 from memory.unsafe import DTypePointer, Pointer
 
