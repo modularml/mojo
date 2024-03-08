@@ -1442,7 +1442,7 @@ cannot be parsed from the string, then an error is raised.
 - `String` now has an [`split()`](/mojo/stdlib/builtin/string.html#split) method
   analogous to Python's `str.split()`.
 
-- [`Path`](/stdlib/pathlib/path.html#path) now has a
+- [`Path`](/mojo/stdlib/pathlib/path.html#path) now has a
   [`suffix()`](/mojo/stdlib/pathlib/path.html#suffix) method analogous to
   Python's `pathlib.Path.suffix`.
 
@@ -2929,9 +2929,8 @@ only in declared parameter names, e.g. the following now works correctly:
 - Added missing dunder methods to `PythonObject`, enabling the use of common
   arithmetic and logical operators on imported Python values.
 
-- `PythonObject` is now [printable from
-Mojo](/mojo/notebooks/HelloMojo.html#python-integration), instead of requiring
-you to import Python's print function.
+- `PythonObject` is now printable from Mojo, instead of requiring you to import
+Python's print function.
 
 #### 🛠️ Fixed
 
