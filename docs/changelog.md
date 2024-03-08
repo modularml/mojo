@@ -215,6 +215,10 @@ modular update mojo
 
 ### 🛠️ Fixed
 
+- [#1362](https://github.com/modularml/mojo/issues/1362) - Parameter inference
+  now recursively matches function types.
+- [#951](https://github.com/modularml/mojo/issues/951) - Functions that were
+  both `async` and `@always_inline` incorrectly errored.
 - [#1858](https://github.com/modularml/mojo/issues/1858) - Trait with parametric
   methods regression.
 - [#1892](https://github.com/modularml/mojo/issues/1892) - Forbid unsupported
