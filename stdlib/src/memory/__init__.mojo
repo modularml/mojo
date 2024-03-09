@@ -13,6 +13,5 @@ from .memory import (
     memcpy,
     memset,
     memset_zero,
-    parallel_memcpy,
     stack_allocation,
 )
