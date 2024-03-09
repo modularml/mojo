@@ -8,21 +8,12 @@ from math import max
 from pathlib import Path
 
 from memory.unsafe import AddressSpace, DTypePointer, bitcast
-from tensor import Tensor, TensorShape, TensorSpec
 
 alias _kStartTensorMarker = "["
 alias _kEndTensorMarker = "]"
 alias _kTensorFiller = "..., "
 alias _kCompactMaxElemsToPrint = 7
 alias _kCompactElemPerSide = _kCompactMaxElemsToPrint // 2
-
-# Serialization constants
-alias _SERIALIZATION_MAJOR_FORMAT: UInt32 = 0
-alias _SERIALIZATION_MINOR_FORMAT: UInt32 = 1
-# 0x93 🔥 0x93
-alias _SERIALIZATION_HEADER = StaticTuple[Int8, 6](
-    0x93, 0xF0, 0x9F, 0x94, 0xA5, 0x93
-)
 
 
 fn _serialize_elements_compact[
@@ -72,8 +63,8 @@ fn _serialize[
     serialize_dtype: Bool = True,
     serialize_shape: Bool = True,
     serialize_end_line: Bool = True,
-](ptr: DTypePointer, shape: TensorShape):
-    var rank = shape.rank()
+](ptr: DTypePointer, shape: List[Int]):
+    var rank = len(shape)
     if rank == 0:
         if serialize_end_line:
             serialize_fn("\n")
@@ -162,91 +153,15 @@ fn _serialize[
     if serialize_dtype:
         serialize_fn(", dtype=")
         serialize_fn(ptr.type)
+
     if serialize_shape:
         serialize_fn(", shape=")
-        serialize_fn(shape.__str__())
+        var shape_str: String = ""
+        for i in range(len(shape)):
+            if i:
+                shape_str += "x"
+            shape_str += str(shape[i])
+        serialize_fn(shape_str)
+
     if serialize_end_line:
         serialize_fn("\n")
-
-
-fn _serialize_as_tensor[
-    type: AnyRegType
-](inout object: type) -> Tensor[DType.int8]:
-    """Serialize the given object into a Tensor of bytes.
-
-    Args:
-      object: Object to serialize.
-
-    Returns:
-      Tensor containing the bytes of object.
-    """
-    var self_ptr = bitcast[Int8](Pointer.address_of(object))
-    alias size = sizeof[type]()
-    var bytes = Tensor[DType.int8](size)
-    memcpy(bytes.data(), DTypePointer[DType.int8](self_ptr.address), size)
-    return bytes ^
-
-
-fn _serialize_to_file[type: DType](tensor: Tensor[type], path: Path) raises:
-    """Serialize given tensor to file. This method preserves
-       shape and datatype information.
-
-    Args:
-      tensor: Tensor to serialize.
-      path: Path of file.
-    """
-    var header_size = len(_SERIALIZATION_HEADER)
-    var header_bytes = Tensor[DType.int8](header_size)
-
-    for i in range(header_size):
-        header_bytes.simd_store(i, _SERIALIZATION_HEADER[i])
-
-    var major_format: UInt32 = _SERIALIZATION_MAJOR_FORMAT
-    var major_format_bytes = _serialize_as_tensor(major_format)
-    var minor_format: UInt32 = _SERIALIZATION_MINOR_FORMAT
-    var minor_format_bytes = _serialize_as_tensor(minor_format)
-    var spec_size: UInt32 = sizeof[TensorSpec]()
-    var spec_size_bytes = _serialize_as_tensor(spec_size)
-    var spec = tensor.spec()
-    var spec_bytes = _serialize_as_tensor[TensorSpec](spec)
-
-    var bytes = Tensor[DType.int8](
-        header_bytes.num_elements()
-        + major_format_bytes.num_elements()
-        + minor_format_bytes.num_elements()
-        + spec_size_bytes.num_elements()
-        + spec_bytes.num_elements()
-        + tensor.num_elements() * type.sizeof()
-    )
-    var copied: Int = 0
-
-    @always_inline("nodebug")
-    fn _copy_bytes(
-        inout dest: Tensor[DType.int8], offset: Int, src: Tensor[DType.int8]
-    ) -> Int:
-        var size = src.num_elements()
-        memcpy(
-            dest.data() + offset,
-            src.data(),
-            size,
-        )
-        return offset + size
-
-    copied = _copy_bytes(bytes, copied, header_bytes)
-    copied = _copy_bytes(bytes, copied, major_format_bytes)
-    copied = _copy_bytes(bytes, copied, minor_format_bytes)
-    copied = _copy_bytes(bytes, copied, spec_size_bytes)
-    # TODO: Numpy aligns this to 64 byte boundary.
-    copied = _copy_bytes(bytes, copied, spec_bytes)
-
-    # TODO: Avoid this copy.
-    memcpy(
-        bytes.data() + copied,
-        bitcast[DType.int8](tensor.data()),
-        tensor.num_elements() * type.sizeof(),
-    )
-    copied += tensor.num_elements() * type.sizeof()
-
-    debug_assert(bytes.num_elements() == copied, "expected these to be same.")
-
-    bytes.tofile(path)
