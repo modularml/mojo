@@ -8,6 +8,7 @@
 
 from utils.index import StaticIntTuple
 from utils import StringRef
+from memory.buffer import Buffer
 
 
 # CHECK-LABEL: test_print

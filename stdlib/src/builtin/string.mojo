@@ -15,7 +15,6 @@ from math.bit import ctlz
 from sys.info import bitwidthof
 
 from memory.anypointer import AnyPointer
-from memory.buffer import Buffer
 from memory.memory import memcmp, memcpy
 from memory.unsafe import DTypePointer, Pointer
 
