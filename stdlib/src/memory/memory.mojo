@@ -125,7 +125,7 @@ fn memcpy[
         count: The number of elements to copy.
     """
     var byte_count = count * sizeof[type]()
-    memcpy[DType.uint8](
+    memcpy(
         Buffer[DType.uint8, Dim(), address_space=address_space](
             dest.bitcast[UInt8](), byte_count
         ),
@@ -153,16 +153,7 @@ fn memcpy[
         src: The source pointer.
         count: The number of elements to copy (not bytes!).
     """
-    memcpy[DType.uint8, Dim(), address_space=address_space](
-        Buffer[DType.uint8, Dim(), address_space](
-            dest.bitcast[DType.uint8](),
-            count * sizeof[type](),
-        ),
-        Buffer[DType.uint8, Dim(), address_space](
-            src.bitcast[DType.uint8](),
-            count * sizeof[type](),
-        ),
-    )
+    return memcpy(dest.address, src.address, count)
 
 
 fn memcpy[
