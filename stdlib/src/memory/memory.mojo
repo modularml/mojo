@@ -324,20 +324,6 @@ fn parallel_memcpy[
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline
-fn _memset_simd[
-    address_space: AddressSpace
-](ptr: DTypePointer[DType.uint8, address_space], value: UInt8, count: Int):
-    @always_inline
-    @parameter
-    fn _set[simd_width: Int](idx: Int):
-        var splat_val = SIMD[DType.uint8, simd_width].splat(value)
-        ptr.simd_store[simd_width](idx, splat_val)
-
-    # Copy in 32-bit chunks
-    vectorize[_set, 32](count)
-
-
 @always_inline("nodebug")
 fn _memset_llvm[
     address_space: AddressSpace
