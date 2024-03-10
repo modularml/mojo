@@ -353,16 +353,13 @@ struct Reference[
     """The underlying MLIR reference."""
 
     @always_inline("nodebug")
-    fn __init__(value: Self.mlir_ref_type) -> Self:
+    fn __init__(inout self, value: Self.mlir_ref_type):
         """Constructs a Reference from the MLIR reference.
 
         Args:
             value: The MLIR reference.
-
-        Returns:
-            Constructed Reference object.
         """
-        return Self {value: value}
+        self.value = value
 
     @always_inline("nodebug")
     fn __refitem__(self) -> Self.mlir_ref_type:

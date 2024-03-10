@@ -331,6 +331,10 @@ struct VariadicListMem[
             # destroy in backwards order to match how arguments are normally torn
             # down when CheckLifetimes is left to its own devices.
             for i in range(len(self), 0, -1):
+                # This cannot use Reference(self[i - 1]) because the subscript
+                # will return a BValue, not an LValue.  We need to maintain the
+                # parametric mutability by keeping the Reference returned by
+                # refitem exposed.
                 self.__refitem__(i - 1).destroy_element_unsafe()
 
     @always_inline
