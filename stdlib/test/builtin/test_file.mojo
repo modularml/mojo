@@ -9,10 +9,7 @@
 from pathlib import Path
 from sys.info import os_is_windows
 from sys.param_env import env_get_string
-from utils import StringRef
 
-# TODO: rework the tests below to not depend on Tensor
-from tensor import Tensor
 from testing import assert_equal
 
 alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
@@ -63,12 +60,12 @@ def test_file_read_bytes_multi():
     )
 
     # CHECK: Lorem ipsum
-    var tensor1 = Tensor[DType.int8](f.read_bytes(12))
-    print(StringRef(tensor1.data(), tensor1.num_elements()))
+    var bytes1 = f.read_bytes(12)
+    print(String(bytes1))
 
     # CHECK: dolor
-    var tensor2 = Tensor[DType.int8](f.read_bytes(6))
-    print(StringRef(tensor2.data(), tensor2.num_elements()))
+    var bytes2 = f.read_bytes(6)
+    print(String(bytes2))
 
     # Read where N is greater than the number of bytes in the file.
     var s: String = f.read(1e9)
@@ -78,9 +75,6 @@ def test_file_read_bytes_multi():
 
     # CHECK: sit amet, consectetur adipiscing elit.
     print(s)
-
-    _ = tensor2 ^
-    _ = tensor1 ^
 
     f.close()
 
