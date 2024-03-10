@@ -11,9 +11,6 @@ from sys.info import os_is_windows
 from sys.param_env import env_get_string
 from utils import StringRef
 
-# TODO: rework the tests below to not depend on *Buffer
-from memory.buffer import Buffer, NDBuffer
-
 # TODO: rework the tests below to not depend on Tensor
 from tensor import Tensor
 from testing import assert_equal
@@ -182,49 +179,6 @@ def test_file_write_again():
     read_file.close()
 
 
-# CHECK-LABEL: test_buffer
-def test_buffer():
-    print("== test_buffer")
-    var buf = Buffer[DType.float32, 4].stack_allocation()
-    buf.fill(2.0)
-    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_buffer"
-    buf.tofile(TEMP_FILE)
-
-    with open(TEMP_FILE, "r") as f:
-        var str = f.read()
-        var buf_read = Buffer[DType.float32, 4](
-            str._as_ptr().bitcast[DType.float32]()
-        )
-        for i in range(4):
-            # CHECK: 0.0
-            print(buf[i] - buf_read[i])
-
-        # Ensure string is not destroyed before the above check.
-        _ = str[0]
-
-
-# CHECK-LABEL: test_ndbuffer
-def test_ndbuffer():
-    print("== test_ndbuffer")
-    var buf = NDBuffer[DType.float32, 2, DimList(2, 2)].stack_allocation()
-    buf.fill(2.0)
-    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_ndbuffer"
-    buf.tofile(TEMP_FILE)
-
-    with open(TEMP_FILE, "r") as f:
-        var str = f.read()
-        var buf_read = NDBuffer[DType.float32, 2, DimList(2, 2)](
-            str._as_ptr().bitcast[DType.float32]()
-        )
-        for i in range(2):
-            for j in range(2):
-                # CHECK: 0.0
-                print(buf[i, j] - buf_read[i, j])
-
-        # Ensure string is not destroyed before the above check.
-        _ = str[0]
-
-
 def main():
     test_file_read()
     test_file_read_multi()
@@ -236,5 +190,3 @@ def main():
     test_file_open_nodir()
     test_file_write()
     test_file_write_again()
-    test_buffer()
-    test_ndbuffer()

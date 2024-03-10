@@ -3,17 +3,21 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo -D TEMP_FILE_DIR=%T -debug-level full %s | FileCheck %s
 
 from math import iota
 from sys.intrinsics import PrefetchOptions
 
 from memory import memcmp, memset_zero
 from memory.buffer import NDBuffer, _compute_ndbuffer_offset
+from pathlib import Path
+from sys.param_env import env_get_string
 from tensor import Tensor
 
 from utils.index import Index, StaticIntTuple
 from utils.list import DimList
+
+alias TEMP_FILE_DIR = env_get_string["TEMP_FILE_DIR"]()
 
 
 # CHECK-LABEL: test_ndbuffer
@@ -296,10 +300,33 @@ fn test_print():
     _ = tensor ^
 
 
-fn main():
+# CHECK-LABEL: test_ndbuffer
+def test_ndbuffer_tofile():
+    print("== test_ndbuffer")
+    var buf = NDBuffer[DType.float32, 2, DimList(2, 2)].stack_allocation()
+    buf.fill(2.0)
+    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_ndbuffer"
+    buf.tofile(TEMP_FILE)
+
+    with open(TEMP_FILE, "r") as f:
+        var str = f.read()
+        var buf_read = NDBuffer[DType.float32, 2, DimList(2, 2)](
+            str._as_ptr().bitcast[DType.float32]()
+        )
+        for i in range(2):
+            for j in range(2):
+                # CHECK: 0.0
+                print(buf[i, j] - buf_read[i, j])
+
+        # Ensure string is not destroyed before the above check.
+        _ = str[0]
+
+
+def main():
     test_ndbuffer()
     test_fill()
     test_ndbuffer_prefetch()
     test_aligned_load_store()
     test_get_nd_index()
     test_print()
+    test_ndbuffer_tofile()
