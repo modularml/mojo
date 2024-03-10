@@ -227,6 +227,8 @@ modular update mojo
   are incorrectly considered equal.
 - [#1909](https://github.com/modularml/mojo/issues/1909) - Crash due to nested
   import in unreachable block.
+- [#1921](https://github.com/modularml/mojo/issues/1921) - Parser crashes
+  binding Reference to lvalue with subtype lifetime.
 
 ## v24.1 (2024-02-29)
 
