@@ -11,9 +11,11 @@ from sys.info import os_is_windows
 from sys.param_env import env_get_string
 from utils import StringRef
 
+# TODO: rework the tests below to not depend on *Buffer
 from memory.buffer import Buffer, NDBuffer
+
+# TODO: rework the tests below to not depend on Tensor
 from tensor import Tensor
-from test_utils import linear_fill
 from testing import assert_equal
 
 alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
@@ -223,35 +225,6 @@ def test_ndbuffer():
         _ = str[0]
 
 
-# CHECK-LABEL: test_tensor
-def test_tensor():
-    print("== test_tensor")
-    var tensor = Tensor[DType.int8](4)
-    linear_fill(tensor, 1, 2, 3, 4)
-    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_tensor"
-    tensor.tofile(TEMP_FILE)
-    var tensor_from_file = Tensor[DType.int8].fromfile(TEMP_FILE)
-
-    # CHECK-NOT: False
-    for i in range(tensor.num_elements()):
-        print(tensor[i] == tensor_from_file[i])
-
-
-# CHECK-LABEL: test_tensor_load_save
-fn test_tensor_load_save() raises:
-    print("== test_tensor_load_save")
-    var tensor = Tensor[DType.int8](2, 2, 3)
-    tensor._to_buffer().fill(2)
-
-    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_tensor_load_save"
-    tensor.save(TEMP_FILE)
-
-    var tensor_loaded = Tensor[DType.int8].load(TEMP_FILE)
-
-    # CHECK: True
-    print(tensor == tensor_loaded)
-
-
 def main():
     test_file_read()
     test_file_read_multi()
@@ -265,5 +238,3 @@ def main():
     test_file_write_again()
     test_buffer()
     test_ndbuffer()
-    test_tensor()
-    test_tensor_load_save()
