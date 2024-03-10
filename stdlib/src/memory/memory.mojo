@@ -23,7 +23,6 @@ from runtime.llcl import Runtime
 
 from utils.list import Dim
 
-from .buffer import Buffer
 from .unsafe import AddressSpace, DTypePointer, Pointer
 
 # ===----------------------------------------------------------------------===#
@@ -126,12 +125,13 @@ fn memcpy[
     """
     var byte_count = count * sizeof[type]()
     memcpy(
-        Buffer[DType.uint8, Dim(), address_space=address_space](
-            dest.bitcast[UInt8](), byte_count
+        DTypePointer[DType.uint8, address_space=address_space](
+            dest.bitcast[UInt8]()
         ),
-        Buffer[DType.uint8, Dim(), address_space=address_space](
-            src.bitcast[UInt8](), byte_count
+        DTypePointer[DType.uint8, address_space=address_space](
+            src.bitcast[UInt8]()
         ),
+        byte_count,
     )
 
 
@@ -153,30 +153,10 @@ fn memcpy[
         src: The source pointer.
         count: The number of elements to copy (not bytes!).
     """
-    return memcpy(dest.address, src.address, count)
+    var n = count * sizeof[type]()
 
-
-fn memcpy[
-    type: DType, size: Dim, address_space: AddressSpace
-](
-    dest: Buffer[type, size, address_space],
-    src: Buffer[type, size, address_space],
-):
-    """Copies a memory buffer from `src` to `dest`.
-
-    Parameters:
-        type: The element dtype.
-        size: Number of elements in the buffer.
-        address_space: The address space of the pointer.
-
-    Args:
-        dest: The destination buffer.
-        src: The source buffer.
-    """
-    var n = len(dest) * sizeof[type]()
-
-    var dest_data = dest.data.bitcast[DType.uint8]()
-    var src_data = src.data.bitcast[DType.uint8]()
+    var dest_data = dest.bitcast[DType.uint8]()
+    var src_data = src.bitcast[DType.uint8]()
 
     if n < 5:
         if n == 0:
