@@ -124,7 +124,9 @@ fn test_issue_20421():
     var a = Buffer[DType.uint8, 16 * 64].aligned_stack_allocation[64]()
     for i in range(16 * 64):
         a[i] = i & 255
-    var av16 = a.data.offset(128 + 64 + 4).bitcast[DType.int32]().simd_load[4]()
+    var av16 = a.data.offset(128 + 64 + 4).bitcast[DType.int32]().load[
+        width=4
+    ]()
     # CHECK: [-943274556, -875902520, -808530484, -741158448]
     print(av16)
 

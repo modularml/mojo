@@ -381,7 +381,7 @@ fn _memchr[
     var vectorized_end = math.align_down(len, bool_mask_width)
 
     for i in range(0, vectorized_end, bool_mask_width):
-        var bool_mask = source.simd_load[bool_mask_width](i) == first_needle
+        var bool_mask = source.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
             return source + i + math.bit.cttz(mask)
@@ -414,7 +414,7 @@ fn _memmem[
         haystack_len - needle_len + 1, bool_mask_width
     )
     for i in range(0, vectorized_end, bool_mask_width):
-        var bool_mask = haystack.simd_load[bool_mask_width](i) == first_needle
+        var bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         while mask:
             var offset = i + math.bit.cttz(mask)

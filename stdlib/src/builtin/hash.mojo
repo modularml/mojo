@@ -141,7 +141,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     var bytes = stack_allocation[int8_size, DType.uint8, alignment=alignment]()
     memset_zero(bytes, int8_size)
     bytes.bitcast[type]().simd_store[size](data)
-    return _hash_int8(bytes.simd_load[int8_size]())
+    return _hash_int8(bytes.load[width=int8_size]())
 
 
 fn _hash_int8[size: Int](data: SIMD[DType.uint8, size]) -> Int:
@@ -259,7 +259,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     #      have a slightly different power of 33 as a coefficient.
     var hash_data = _HASH_INIT[type, simd_width]()
     for i in range(k):
-        var update = simd_data.simd_load[simd_width](i * simd_width)
+        var update = simd_data.load[width=simd_width](i * simd_width)
         hash_data = _HASH_UPDATE(hash_data, update)
 
     # 3. Copy the tail data (smaller than the SIMD register) into
@@ -271,7 +271,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
         )
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
-        var last_value = ptr.bitcast[type]().simd_load[simd_width]()
+        var last_value = ptr.bitcast[type]().load[width=simd_width]()
         hash_data = _HASH_UPDATE(hash_data, last_value)
 
     # Now finally, hash the final SIMD vector state. This will also use

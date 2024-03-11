@@ -1210,25 +1210,29 @@ struct DTypePointer[
         _prefetch[params](self)
 
     @always_inline("nodebug")
-    fn load[*, alignment: Int = Self._default_alignment](self) -> Scalar[type]:
+    fn load[
+        *, width: Int = 1, alignment: Int = Self._default_alignment
+    ](self) -> SIMD[type, width]:
         """Loads the value the Pointer object points to.
 
         Parameters:
+            width: The SIMD width.
             alignment: The minimal alignment of the address.
 
         Returns:
             The loaded value.
         """
-        return self.load[alignment=alignment](0)
+        return self.load[width=width, alignment=alignment](0)
 
     @always_inline("nodebug")
     fn load[
-        T: Intable, *, alignment: Int = Self._default_alignment
-    ](self, offset: T) -> Scalar[type]:
+        T: Intable, *, width: Int = 1, alignment: Int = Self._default_alignment
+    ](self, offset: T) -> SIMD[type, width]:
         """Loads the value the Pointer object points to with the given offset.
 
         Parameters:
             T: The Intable type of the offset.
+            width: The SIMD width.
             alignment: The minimal alignment of the address.
 
         Args:
@@ -1237,39 +1241,12 @@ struct DTypePointer[
         Returns:
             The loaded value.
         """
-        return self.address.load[alignment=alignment](offset)
 
-    @always_inline("nodebug")
-    fn simd_load[width: Int](self) -> SIMD[type, width]:
-        """Loads a SIMD vector of elements from the pointer at the current
-        offset.
-
-        Parameters:
-            width: The SIMD width.
-
-        Returns:
-            The loaded value.
-        """
-        return self.simd_load[width](0)
-
-    @always_inline("nodebug")
-    fn simd_load[width: Int, T: Intable](self, offset: T) -> SIMD[type, width]:
-        """Loads a SIMD vector of elements from the pointer at the specified
-        offset.
-
-        Parameters:
-            width: The SIMD width.
-            T: The Intable type of the offset.
-
-        Args:
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-        return self.aligned_simd_load[
-            width, alignof[Scalar[type]]() if triple_is_nvidia_cuda() else 1
-        ](offset)
+        return (
+            self.address.offset(offset)
+            .bitcast[SIMD[type, width]]()
+            .load[alignment=alignment]()
+        )
 
     @always_inline("nodebug")
     fn aligned_simd_load[

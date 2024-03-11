@@ -47,8 +47,8 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
     alias simd_width = simdwidthof[s1.type]()
     var vector_end_simd = align_down(count, simd_width)
     for i in range(0, vector_end_simd, simd_width):
-        var s1i = s1.simd_load[simd_width](i)
-        var s2i = s2.simd_load[simd_width](i)
+        var s1i = s1.load[width=simd_width](i)
+        var s2i = s2.load[width=simd_width](i)
         if s1i == s2i:
             continue
 
@@ -205,7 +205,7 @@ fn memcpy[
     @parameter
     fn _copy[simd_width: Int](idx: Int):
         dest_data.simd_store[simd_width](
-            idx, src_data.simd_load[simd_width](idx)
+            idx, src_data.load[width=simd_width](idx)
         )
 
     # Copy in 32-bit chunks
