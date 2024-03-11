@@ -36,7 +36,7 @@ fn cwd() raises -> Path:
     return String(StringRef(buf))
 
 
-struct Path(Stringable, CollectionElement, PathLike):
+struct Path(Stringable, CollectionElement, PathLike, KeyElement):
     """The Path object."""
 
     var path: String
@@ -169,6 +169,15 @@ struct Path(Stringable, CollectionElement, PathLike):
           True if the paths are not equal and False otherwise.
         """
         return not self == other
+
+    fn __hash__(self) -> Int:
+        """Hash the underlying path string using builtin hash.
+
+        Returns:
+            An integer value containing the hash of the path string.
+        """
+
+        return hash(self.path)
 
     fn stat(self) raises -> stat_result:
         """Returns the stat information on the path.
