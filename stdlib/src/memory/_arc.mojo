@@ -17,9 +17,10 @@ print(3 == p.get())
 """
 
 from memory.anypointer import AnyPointer
+from memory.memory import stack_allocation
 
 
-struct _ArcInner[T: CollectionElement]:
+struct _ArcInner[T: Movable]:
     var refcount: Atomic[DType.int64]
     var data: T
 
@@ -40,8 +41,7 @@ struct _ArcInner[T: CollectionElement]:
         return self.refcount.fetch_sub(1) - 1
 
 
-@register_passable
-struct Arc[T: CollectionElement](CollectionElement):
+struct Arc[T: Movable](CollectionElement):
     """Atomic reference-counted pointer inspired by Rust Arc.
 
     Semantics:
@@ -75,26 +75,33 @@ struct Arc[T: CollectionElement](CollectionElement):
     alias _type = _ArcInner[T]
     var _inner: Pointer[Self._type]
 
-    fn __init__(owned value: T) -> Self:
+    fn __init__(inout self, owned value: T):
         """Construct a new thread-safe, reference-counted smart pointer,
         and move the value into heap memory managed by the new pointer.
 
         Args:
             value: The value to manage.
         """
-        var self = Self {_inner: Pointer[Self._type].alloc(1)}
+        self._inner = Pointer[Self._type].alloc(1)
         __get_address_as_uninit_lvalue(self._inner.address) = Self._type(
             value ^
         )
         _ = self._inner[].increment()
-        return self ^
 
-    fn __copyinit__(other: Self) -> Self:
+    fn __init__(inout self, *, owned inner: Pointer[Self._type]):
+        """Copy an existing reference. Increment the refcount to the object."""
+        _ = inner[].increment()
+        self._inner = inner
+
+    fn __copyinit__(inout self, other: Self):
         """Copy an existing reference. Increment the refcount to the object."""
         # Order here does not matter since `other` is borrowed, and can't
         # be destroyed until our copy completes.
-        _ = other._inner[].increment()
-        return Self {_inner: other._inner}
+        self.__init__(inner=other._inner)
+
+    fn __moveinit__(inout self, owned existing: Self):
+        """Move an existing reference."""
+        self._inner = existing._inner
 
     fn __del__(owned self):
         """Delete the smart pointer reference.
@@ -123,10 +130,14 @@ struct Arc[T: CollectionElement](CollectionElement):
             new_value: The new value to manage. Other pointers to the memory will
                 now see the new value.
         """
-        self._inner[].data = new_value
+        self._inner[].data = new_value ^
 
-    # TODO(lifetimes): return a reference rather than a copy
-    fn get(self) -> T:
+    fn __refitem__[
+        mutability: __mlir_type.`i1`,
+        lifetime: AnyLifetime[mutability].type,
+    ](self: Reference[Self, mutability, lifetime].mlir_ref_type) -> Reference[
+        T, mutability, lifetime
+    ]:
         """Get a copy of the managed value.
 
         When we have lifetimes this will not have to copy.
@@ -134,12 +145,17 @@ struct Arc[T: CollectionElement](CollectionElement):
         Returns:
             A copy of the managed value.
         """
-        return self._inner[].data
+        alias RefType = Reference[T, mutability, lifetime]
+        return RefType(
+            __mlir_op.`lit.ref.from_pointer`[_type = RefType.mlir_ref_type](
+                Reference(self)[]._data_ptr().value
+            )
+        )
 
     fn _data_ptr(self) -> AnyPointer[T]:
         return AnyPointer.address_of(self._inner[].data)
 
-    fn _bitcast[T2: CollectionElement](self) -> Arc[T2]:
+    fn _bitcast[T2: Movable](self) -> Arc[T2]:
         constrained[
             sizeof[T]() == sizeof[T2](),
             (
@@ -162,6 +178,4 @@ struct Arc[T: CollectionElement](CollectionElement):
         # pointing at the same data.
         _ = self._inner[].increment()
 
-        var ptr2: Pointer[_ArcInner[T2]] = ptr.bitcast[_ArcInner[T2]]()
-
-        return Arc[T2] {_inner: ptr2}
+        return Arc[T2](inner=ptr.bitcast[_ArcInner[T2]]())

@@ -15,7 +15,7 @@ def test_basic():
     var p = Arc(4)
     var p2 = p
     p2.set(3)
-    assert_equal(3, p.get())
+    assert_equal(3, p[])
 
 
 @value
@@ -46,8 +46,8 @@ def test_arc_bitcast():
 
     var arc_i32 = arc_f32._bitcast[Scalar[DType.int32]]()
 
-    assert_equal(arc_f32.get(), 16.0)
-    assert_equal(arc_i32.get(), 1098907648)
+    assert_equal(arc_f32[], 16.0)
+    assert_equal(arc_i32[], 1098907648)
 
 
 def main():
