@@ -1,5 +1,7 @@
 # Mojo Plotter
 
+This is supporting content for the video tutorial: [Cross Platform Mojo App with Conda, PyTorch and Matplotlib](https://www.youtube.com/watch?v=bmpjT0T4IDY)
+
 ## Installation
 
 ### Conda

@@ -1,0 +1,2 @@
+# Modverse
+This directory contains supporting artifacts for blogs, videos, and workshops. Each folder is prefixed by date in YYMM format so you can view our most recently released content, and contains a README.md with a link to the content.
