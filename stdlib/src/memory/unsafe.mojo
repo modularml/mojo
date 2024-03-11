@@ -1183,6 +1183,26 @@ struct DTypePointer[
         return self.address.bitcast[SIMD[new_type, 1]]()
 
     @always_inline("nodebug")
+    fn address_space_cast[
+        new_address_space: AddressSpace
+    ](self) -> DTypePointer[type, new_address_space]:
+        """Casts a Pointer to a different address space.
+
+        Parameters:
+            new_address_space: The address space.
+
+        Returns:
+            A new Pointer object with the specified type and the same address,
+            as the original Pointer but located in a different address space.
+        """
+
+        @parameter
+        if address_space == new_address_space:
+            return rebind[DTypePointer[type, new_address_space]](self)
+
+        return self.address.address_space_cast[new_address_space]()
+
+    @always_inline("nodebug")
     fn _as_scalar_pointer(self) -> Pointer[Scalar[type], address_space]:
         """Converts the `DTypePointer` to a scalar pointer of the same dtype.
 
