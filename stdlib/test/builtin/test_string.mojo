@@ -46,6 +46,14 @@ fn test_constructors() raises:
     assert_equal(3, len(s2))
 
 
+fn test_copy() raises:
+    var s0 = String("find")
+    var s1 = String(s0)
+    s1._buffer[3] = ord("e")
+    assert_equal("find", s0)
+    assert_equal("fine", s1)
+
+
 fn test_equality_operators() raises:
     var s0 = String("abc")
     var s1 = String("def")
@@ -538,6 +546,7 @@ def test_intable():
 
 def main():
     test_constructors()
+    test_copy()
     test_equality_operators()
     test_add()
     test_stringable()
