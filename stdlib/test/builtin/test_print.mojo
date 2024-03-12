@@ -8,7 +8,7 @@
 
 from utils.index import StaticIntTuple
 from utils import StringRef
-from memory.buffer import Buffer
+from memory.unsafe import DTypePointer
 
 
 # CHECK-LABEL: test_print
@@ -121,14 +121,13 @@ fn test_print_sep():
 # CHECK-LABEL: test_issue_20421
 fn test_issue_20421():
     print("== test_issue_20421")
-    var a = Buffer[DType.uint8, 16 * 64].aligned_stack_allocation[64]()
+    var a = DTypePointer[DType.uint8]().alloc(16 * 64, alignment=64)
     for i in range(16 * 64):
         a[i] = i & 255
-    var av16 = a.data.offset(128 + 64 + 4).bitcast[DType.int32]().load[
-        width=4
-    ]()
+    var av16 = a.offset(128 + 64 + 4).bitcast[DType.int32]().load[width=4]()
     # CHECK: [-943274556, -875902520, -808530484, -741158448]
     print(av16)
+    a.free()
 
 
 fn main():
