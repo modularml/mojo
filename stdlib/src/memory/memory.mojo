@@ -123,16 +123,62 @@ fn memcpy[
         src: The source pointer.
         count: The number of elements to copy.
     """
-    var byte_count = count * sizeof[type]()
-    memcpy(
-        DTypePointer[DType.uint8, address_space=address_space](
-            dest.bitcast[UInt8]()
-        ),
-        DTypePointer[DType.uint8, address_space=address_space](
-            src.bitcast[UInt8]()
-        ),
-        byte_count,
-    )
+    var n = count * sizeof[type]()
+
+    var dest_data = dest.bitcast[Int8]()
+    var src_data = src.bitcast[Int8]()
+
+    if n < 5:
+        if n == 0:
+            return
+        dest_data[0] = src_data[0]
+        dest_data[n - 1] = src_data[n - 1]
+        if n <= 2:
+            return
+        dest_data[1] = src_data[1]
+        dest_data[n - 2] = src_data[n - 2]
+        return
+
+    if n <= 16:
+        if n >= 8:
+            var ui64_size = sizeof[Int64]()
+            dest_data.bitcast[Int64]().store(src_data.bitcast[Int64]()[0])
+            dest_data.offset(n - ui64_size).bitcast[Int64]().store(
+                src_data.offset(n - ui64_size).bitcast[Int64]()[0]
+            )
+            return
+        var ui32_size = sizeof[Int32]()
+        dest_data.bitcast[Int32]().store(src_data.bitcast[Int32]()[0])
+        dest_data.offset(n - ui32_size).bitcast[Int32]().store(
+            src_data.offset(n - ui32_size).bitcast[Int32]()[0]
+        )
+        return
+
+    # TODO (#10566): This branch appears to cause a 12% regression in BERT by
+    # slowing down broadcast ops
+    # if n <= 32:
+    #    alias simd_16xui8_size = 16 * sizeof[Int8]()
+    #    dest_data.simd_store[16](src_data.simd_load[16]())
+    #    # note that some of these bytes may have already been written by the
+    #    # previous simd_store
+    #    dest_data.simd_store[16](
+    #        n - simd_16xui8_size, src_data.simd_load[16](n - simd_16xui8_size)
+    #    )
+    #    return
+
+    var dest_dtype_ptr = DTypePointer[DType.int8, address_space](dest_data)
+    var src_dtype_ptr = DTypePointer[DType.int8, address_space](src_data)
+
+    @always_inline
+    @__copy_capture(dest_data, src_data)
+    @parameter
+    fn _copy[simd_width: Int](idx: Int):
+        dest_dtype_ptr.simd_store(
+            idx, src_dtype_ptr.load[width=simd_width](idx)
+        )
+
+    # Copy in 32-byte chunks.
+    vectorize[_copy, 32](n)
 
 
 fn memcpy[
@@ -153,63 +199,7 @@ fn memcpy[
         src: The source pointer.
         count: The number of elements to copy (not bytes!).
     """
-    var n = count * sizeof[type]()
-
-    var dest_data = dest.bitcast[DType.uint8]()
-    var src_data = src.bitcast[DType.uint8]()
-
-    if n < 5:
-        if n == 0:
-            return
-        dest_data[0] = src_data[0]
-        dest_data[n - 1] = src_data[n - 1]
-        if n <= 2:
-            return
-        dest_data[1] = src_data[1]
-        dest_data[n - 2] = src_data[n - 2]
-        return
-
-    if n <= 16:
-        if n >= 8:
-            var ui64_size = sizeof[DType.uint64]()
-            dest_data.bitcast[DType.uint64]().store(
-                src_data.bitcast[DType.uint64]().load()
-            )
-            dest_data.offset(n - ui64_size).bitcast[DType.uint64]().store(
-                src_data.offset(n - ui64_size).bitcast[DType.uint64]().load()
-            )
-            return
-        var ui32_size = sizeof[DType.uint32]()
-        dest_data.bitcast[DType.uint32]().store(
-            src_data.bitcast[DType.uint32]().load()
-        )
-        dest_data.offset(n - ui32_size).bitcast[DType.uint32]().store(
-            src_data.offset(n - ui32_size).bitcast[DType.uint32]().load()
-        )
-        return
-
-    # TODO (#10566): This branch appears to cause a 12% regression in BERT by
-    # slowing down broadcast ops
-    # if n <= 32:
-    #    alias simd_16xui8_size = 16 * sizeof[DType.uint8]()
-    #    dest_data.simd_store[16](src_data.simd_load[16]())
-    #    # note that some of these bytes may have already been written by the
-    #    # previous simd_store
-    #    dest_data.simd_store[16](
-    #        n - simd_16xui8_size, src_data.simd_load[16](n - simd_16xui8_size)
-    #    )
-    #    return
-
-    @always_inline
-    @__copy_capture(dest_data, src_data)
-    @parameter
-    fn _copy[simd_width: Int](idx: Int):
-        dest_data.simd_store[simd_width](
-            idx, src_data.load[width=simd_width](idx)
-        )
-
-    # Copy in 32-bit chunks
-    vectorize[_copy, 32](n)
+    memcpy(dest.address, src.address, count)
 
 
 # ===----------------------------------------------------------------------===#
