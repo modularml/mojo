@@ -193,6 +193,8 @@ modular update mojo
   takes_type[SomeType]()  # already 🔥
   ```
 
+- `PythonObject` is now register-passable.
+
 - `PythonObject.__iter__` now works correctly on more types of iterable Python
   objects.  Attempting to iterate over non-iterable objects will now raise an
   exception instead of behaving as if iterating over an empty sequence.

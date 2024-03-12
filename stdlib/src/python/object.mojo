@@ -52,7 +52,7 @@ struct _PyIter(Sized):
         var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
         if maybeNextItem.is_null():
             self.isDone = True
-            self.preparedNextItem = 0
+            self.preparedNextItem = PyObjectPtr.null_ptr()
         else:
             self.preparedNextItem = maybeNextItem
             self.isDone = False
@@ -61,7 +61,7 @@ struct _PyIter(Sized):
         """Initialize an empty iterator."""
         self.iterator = PyObjectPtr.null_ptr()
         self.isDone = True
-        self.preparedNextItem = 0
+        self.preparedNextItem = PyObjectPtr.null_ptr()
 
     fn __next__(inout self: _PyIter) -> PythonObject:
         """Return the next item and update to point to subsequent item.
@@ -93,8 +93,10 @@ struct _PyIter(Sized):
             return 1
 
 
-@value
-struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
+@register_passable
+struct PythonObject(
+    Intable, Stringable, SizedRaising, Boolable, CollectionElement
+):
     """A Python object."""
 
     var py_object: PyObjectPtr
@@ -103,6 +105,16 @@ struct PythonObject(Intable, Stringable, SizedRaising, Boolable):
     fn __init__(inout self):
         """Initialize the object with a `None` value."""
         self.__init__(None)
+
+    fn __init__(inout self, ptr: PyObjectPtr):
+        """Initialize the object with a `PyObjectPtr` value.
+
+        Ownership of the reference will be assumed by `PythonObject`.
+
+        Args:
+            ptr: The `PyObjectPtr` to take ownership of.
+        """
+        self.py_object = ptr
 
     fn __init__(inout self, none: NoneType):
         """Initialize a none value object from a `None` literal.
