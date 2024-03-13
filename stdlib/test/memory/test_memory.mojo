@@ -8,7 +8,6 @@
 from sys.info import sizeof
 
 from memory import memcmp, memcpy, memset_zero
-from memory.buffer import Buffer
 from memory.unsafe import DTypePointer, Pointer
 from testing import assert_equal, assert_not_equal, assert_true
 
@@ -51,18 +50,21 @@ def test_memcpy():
 
     @parameter
     def _test_memcpy_buf[size: Int]():
-        var buf = Buffer[DType.uint8.value, size * 2].stack_allocation()
-        buf.fill(2)
-        memset_zero(buf.data + size, size)
-        var src = Buffer[DType.uint8.value, size * 2].stack_allocation()
-        src.fill(2)
-        var dst = Buffer[DType.uint8.value, size * 2].stack_allocation()
-        dst.fill(0)
+        var buf = DTypePointer[DType.uint8]().alloc(size * 2)
+        memset_zero(buf + size, size)
+        var src = DTypePointer[DType.uint8]().alloc(size * 2)
+        var dst = DTypePointer[DType.uint8]().alloc(size * 2)
+        for i in range(size * 2):
+            buf[i] = src[i] = 2
+            dst[i] = 0
 
-        memcpy(dst.data, src.data, size)
-        var err = memcmp(dst.data, buf.data, len(dst))
+        memcpy(dst, src, size)
+        var err = memcmp(dst, buf, size)
 
         assert_equal(err, 0)
+        buf.free()
+        src.free()
+        dst.free()
 
     _test_memcpy_buf[1]()
     _test_memcpy_buf[4]()
