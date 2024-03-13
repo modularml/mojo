@@ -67,7 +67,7 @@ struct Matrix[rows: Int, cols: Int]:
 
 
 def run_matmul_python() -> Float64:
-    Python.add_to_path(".")
+    Python.add_to_path("./examples")
     var pymatmul: PythonObject = Python.import_module("pymatmul")
     var py = Python.import_module("builtins")
 
@@ -145,8 +145,7 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store(
                         m,
                         n + x,
-                        C.load[nelts](m, n + x)
-                        + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 vectorize[dot, nelts, size=tile_x]()
@@ -170,8 +169,7 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store(
                         m,
                         n + x,
-                        C.load[nelts](m, n + x)
-                        + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 alias unroll_factor = tile_x // nelts
