@@ -15,25 +15,27 @@ from sys.intrinsics import (
 )
 
 from memory.buffer import Buffer
+from memory.unsafe import DTypePointer
 
 
 # CHECK-LABEL: test_masked_load
 fn test_masked_load():
     print("== test_masked_load")
 
-    var vector = Buffer[DType.float32, 5].stack_allocation()
-    vector.fill(1)
+    var vector = DTypePointer[DType.float32]().alloc(5)
+    for i in range(5):
+        vector[i] = 1
 
     # CHECK: [1.0, 1.0, 1.0, 1.0]
-    print(masked_load[4](vector.data, iota[DType.float32, 4]() < 5, 0))
+    print(masked_load[4](vector, iota[DType.float32, 4]() < 5, 0))
 
     # CHECK: [1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]
-    print(masked_load[8](vector.data, iota[DType.float32, 8]() < 5, 0))
+    print(masked_load[8](vector, iota[DType.float32, 8]() < 5, 0))
 
     # CHECK: [1.0, 1.0, 1.0, 1.0, 1.0, 15.0, 9.0, 3.0]
     print(
         masked_load[8](
-            vector.data,
+            vector,
             iota[DType.float32, 8]() < 5,
             SIMD[DType.float32, 8](43, 321, 12, 312, 323, 15, 9, 3),
         )
@@ -42,43 +44,45 @@ fn test_masked_load():
     # CHECK: [1.0, 1.0, 12.0, 312.0, 323.0, 15.0, 9.0, 3.0]
     print(
         masked_load[8](
-            vector.data,
+            vector,
             iota[DType.float32, 8]() < 2,
             SIMD[DType.float32, 8](43, 321, 12, 312, 323, 15, 9, 3),
         )
     )
+    vector.free()
 
 
 # CHECK-LABEL: test_masked_store
 fn test_masked_store():
     print("== test_masked_store")
 
-    var vector = Buffer[DType.float32, 5].stack_allocation()
-    vector.fill(0)
+    var vector = DTypePointer[DType.float32]().alloc(5)
+    memset_zero(vector, 5)
 
     # CHECK: [0.0, 1.0, 2.0, 3.0]
     masked_store[4](
-        iota[DType.float32, 4](), vector.data, iota[DType.float32, 4]() < 5
+        iota[DType.float32, 4](), vector, iota[DType.float32, 4]() < 5
     )
     print(vector.load[width=4](0))
 
     # CHECK: [0.0, 1.0, 2.0, 3.0, 4.0, 33.0, 33.0, 33.0]
     masked_store[8](
-        iota[DType.float32, 8](), vector.data, iota[DType.float32, 8]() < 5
+        iota[DType.float32, 8](), vector, iota[DType.float32, 8]() < 5
     )
-    print(masked_load[8](vector.data, iota[DType.float32, 8]() < 5, 33))
+    print(masked_load[8](vector, iota[DType.float32, 8]() < 5, 33))
+    vector.free()
 
 
 # CHECK-LABEL: test_compressed_store
 fn test_compressed_store():
     print("== test_compressed_store")
 
-    var vector = Buffer[DType.float32, 4].stack_allocation()
-    vector.fill(0)
+    var vector = DTypePointer[DType.float32]().alloc(5)
+    memset_zero(vector, 5)
 
     # CHECK: [2.0, 3.0, 0.0, 0.0]
     compressed_store(
-        iota[DType.float32, 4](), vector.data, iota[DType.float32, 4]() >= 2
+        iota[DType.float32, 4](), vector, iota[DType.float32, 4]() >= 2
     )
     print(vector.load[width=4](0))
 
@@ -87,8 +91,9 @@ fn test_compressed_store():
 
     # CHECK: [1.0, 3.0, 0.0, 0.0]
     var val = SIMD[DType.float32, 4](0.0, 1.0, 3.0, 0.0)
-    compressed_store(val, vector.data, val != 0)
+    compressed_store(val, vector, val != 0)
     print(vector.load[width=4](0))
+    vector.free()
 
 
 # CHECK-LABEL: test_strided_load
@@ -96,14 +101,15 @@ fn test_strided_load():
     print("== test_strided_load")
 
     alias size = 16
-    var vector = Buffer[DType.float32, size].stack_allocation()
+    var vector = DTypePointer[DType.float32]().alloc(size)
 
     for i in range(size):
         vector[i] = i
 
     # CHECK: [0.0, 4.0, 8.0, 12.0]
-    var s = strided_load[DType.float32, 4](vector.data, 4)
+    var s = strided_load[DType.float32, 4](vector, 4)
     print(s)
+    vector.free()
 
 
 # CHECK-LABEL: test_strided_store
@@ -111,10 +117,10 @@ fn test_strided_store():
     print("== test_strided_store")
 
     alias size = 8
-    var vector = Buffer[DType.float32, size].stack_allocation()
-    vector.fill(0)
+    var vector = DTypePointer[DType.float32]().alloc(size)
+    memset_zero(vector, size)
 
-    strided_store(SIMD[DType.float32, 4](99, 12, 23, 56), vector.data, 2)
+    strided_store(SIMD[DType.float32, 4](99, 12, 23, 56), vector, 2)
     # CHECK: 99.0
     # CHECK: 0.0
     # CHECK: 12.0
@@ -125,6 +131,7 @@ fn test_strided_store():
     # CHECK: 0.0
     for i in range(size):
         print(vector[i])
+    vector.free()
 
 
 fn main():
