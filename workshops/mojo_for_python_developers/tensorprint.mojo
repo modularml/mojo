@@ -3,7 +3,7 @@
 from tensor import Tensor, TensorShape, TensorSpec
 from math import trunc, mod
 fn tensorprint[type: DType](t: Tensor[type])->None:
-    let rank = t.rank()
+    var rank = t.rank()
     var dim0:Int=0
     var dim1:Int=0
     var dim2:Int=0
@@ -43,14 +43,14 @@ fn tensorprint[type: DType](t: Tensor[type])->None:
                     val = t[j,k]
                 if rank==3:
                     val = t[i,j,k]
-                let int_str: String
+                var int_str: String
                 if val > 0 or val == 0:
                     int_str = String(trunc(val).cast[DType.int32]())
                 else:
                     val = -val
                     int_str = "-"+String(trunc(val).cast[DType.int32]())
-                let float_str = String(mod(val,1))
-                let s = int_str+"."+float_str[2:6]
+                var float_str = String(mod(val,1))
+                var s = int_str+"."+float_str[2:6]
                 if k==0:
                     print_no_newline(s)
                 else:
