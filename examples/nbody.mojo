@@ -89,11 +89,7 @@ fn energy(bodies: StaticTuple[NUM_BODIES, Planet]) -> Float64:
     @unroll
     for i in range(NUM_BODIES):
         var body_i = bodies[i]
-        e += (
-            0.5
-            * body_i.mass
-            * ((body_i.velocity * body_i.velocity).reduce_add())
-        )
+        e += 0.5 * body_i.mass * ((body_i.velocity * body_i.velocity).reduce_add())
 
         for j in range(NUM_BODIES - i - 1):
             var body_j = bodies[j + i + 1]
@@ -174,9 +170,7 @@ fn bench():
         ),
         5.15138902046611451e-05 * SOLAR_MASS,
     )
-    var system = StaticTuple[NUM_BODIES, Planet](
-        Sun, Jupiter, Saturn, Uranus, Neptune
-    )
+    var system = StaticTuple[NUM_BODIES, Planet](Sun, Jupiter, Saturn, Uranus, Neptune)
     offset_momentum(system)
 
     print("Energy of System:", energy(system))
