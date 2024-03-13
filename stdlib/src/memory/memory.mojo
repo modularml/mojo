@@ -105,25 +105,85 @@ fn memcmp[
 # ===----------------------------------------------------------------------===#
 
 
-fn memcpy[
-    type: AnyRegType, address_space: AddressSpace
-](
-    dest: Pointer[type, address_space],
-    src: Pointer[type, address_space],
-    count: Int,
-):
+fn memcpy[count: Int](dest: Pointer, src: __type_of(dest)):
     """Copies a memory area.
 
     Parameters:
-        type: The element type.
-        address_space: The address space of the pointer.
+        count: The number of elements to copy (not bytes!).
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+    """
+    alias n = count * sizeof[dest.type]()
+
+    var dest_data = dest.bitcast[Int8]()
+    var src_data = src.bitcast[Int8]()
+
+    @parameter
+    if n < 5:
+
+        @unroll
+        for i in range(n):
+            dest_data[i] = src_data[i]
+        return
+
+    @parameter
+    if n <= 16:
+
+        @parameter
+        if n >= 8:
+            var ui64_size = sizeof[Int64]()
+            dest_data.bitcast[Int64]().store(src_data.bitcast[Int64]()[0])
+            dest_data.offset(n - ui64_size).bitcast[Int64]().store(
+                src_data.offset(n - ui64_size).bitcast[Int64]()[0]
+            )
+            return
+
+        var ui32_size = sizeof[Int32]()
+        dest_data.bitcast[Int32]().store(src_data.bitcast[Int32]()[0])
+        dest_data.offset(n - ui32_size).bitcast[Int32]().store(
+            src_data.offset(n - ui32_size).bitcast[Int32]()[0]
+        )
+        return
+
+    var dest_dtype_ptr = DTypePointer[DType.int8, dest.address_space](dest_data)
+    var src_dtype_ptr = DTypePointer[DType.int8, src.address_space](src_data)
+
+    @always_inline
+    @__copy_capture(dest_data, src_data)
+    @parameter
+    fn _copy[simd_width: Int](idx: Int):
+        dest_dtype_ptr.simd_store(
+            idx, src_dtype_ptr.load[width=simd_width](idx)
+        )
+
+    # Copy in 32-byte chunks.
+    vectorize[_copy, 32, size=n]()
+
+
+fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
+    """Copies a memory area.
+
+    Parameters:
+        count: The number of elements to copy (not bytes!).
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+    """
+    memcpy[count](dest.address, src.address)
+
+
+fn memcpy(dest: Pointer, src: __type_of(dest), count: Int):
+    """Copies a memory area.
 
     Args:
         dest: The destination pointer.
         src: The source pointer.
         count: The number of elements to copy.
     """
-    var n = count * sizeof[type]()
+    var n = count * sizeof[dest.type]()
 
     var dest_data = dest.bitcast[Int8]()
     var src_data = src.bitcast[Int8]()
@@ -166,8 +226,8 @@ fn memcpy[
     #    )
     #    return
 
-    var dest_dtype_ptr = DTypePointer[DType.int8, address_space](dest_data)
-    var src_dtype_ptr = DTypePointer[DType.int8, address_space](src_data)
+    var dest_dtype_ptr = DTypePointer[DType.int8, dest.address_space](dest_data)
+    var src_dtype_ptr = DTypePointer[DType.int8, src.address_space](src_data)
 
     @always_inline
     @__copy_capture(dest_data, src_data)
@@ -181,18 +241,8 @@ fn memcpy[
     vectorize[_copy, 32](n)
 
 
-fn memcpy[
-    type: DType, address_space: AddressSpace
-](
-    dest: DTypePointer[type, address_space],
-    src: DTypePointer[type, address_space],
-    count: Int,
-):
+fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
     """Copies a memory area.
-
-    Parameters:
-        type: The element dtype.
-        address_space: The address space of the pointer.
 
     Args:
         dest: The destination pointer.
