@@ -70,7 +70,9 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         Returns:
             The tuple element at the requested index.
         """
-        return __mlir_op.`kgen.pack.get`[_type=T, index = i.value](self.storage)
+        return rebind[T](
+            __mlir_op.`kgen.pack.get`[index = i.value](self.storage)
+        )
 
     @staticmethod
     fn _offset[i: Int]() -> Int:

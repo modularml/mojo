@@ -60,7 +60,9 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
         Returns:
             The element at the given index.
         """
-        return __mlir_op.`kgen.pack.get`[_type=T, index = i.value](self.storage)
+        return rebind[T](
+            __mlir_op.`kgen.pack.get`[index = i.value](self.storage)
+        )
 
 
 # ===----------------------------------------------------------------------===#
