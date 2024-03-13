@@ -1305,39 +1305,34 @@ struct DTypePointer[
         ]()
 
     @always_inline("nodebug")
-    fn store[T: Intable](self, offset: T, val: Scalar[type]):
+    fn store[
+        T: Intable, /, *, width: Int = 1
+    ](self, offset: T, val: SIMD[type, width]):
         """Stores a single element value at the given offset.
 
         Parameters:
             T: The Intable type of the offset.
+            width: The SIMD width.
 
         Args:
             offset: The offset to store to.
             val: The value to store.
         """
-        self.offset(offset).store(val)
+        self.offset(offset).store[width=width](val)
 
     @always_inline("nodebug")
-    fn store(self, val: Scalar[type]):
+    fn store[*, width: Int = 1](self, val: SIMD[type, width]):
         """Stores a single element value.
-
-        Args:
-            val: The value to store.
-        """
-        self.simd_store[1](val)
-
-    @always_inline("nodebug")
-    fn simd_store[width: Int](self, offset: Int, val: SIMD[type, width]):
-        """Stores a SIMD vector at the given offset.
 
         Parameters:
             width: The SIMD width.
 
         Args:
-            offset: The offset to store to.
-            val: The SIMD value to store.
+            val: The value to store.
         """
-        self.offset(offset).simd_store(val)
+        self.aligned_simd_store[
+            width, alignof[Scalar[type]]() if triple_is_nvidia_cuda() else 1
+        ](val)
 
     @always_inline("nodebug")
     fn simd_nt_store[
@@ -1354,20 +1349,6 @@ struct DTypePointer[
             val: The SIMD value to store.
         """
         self.offset(offset).simd_nt_store[width](val)
-
-    @always_inline("nodebug")
-    fn simd_store[width: Int](self, val: SIMD[type, width]):
-        """Stores a SIMD vector.
-
-        Parameters:
-            width: The SIMD width.
-
-        Args:
-            val: The SIMD value to store.
-        """
-        self.aligned_simd_store[
-            width, alignof[Scalar[type]]() if triple_is_nvidia_cuda() else 1
-        ](val)
 
     @always_inline("nodebug")
     fn simd_strided_load[

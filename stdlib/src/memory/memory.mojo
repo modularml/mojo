@@ -154,9 +154,7 @@ fn memcpy[count: Int](dest: Pointer, src: __type_of(dest)):
     @__copy_capture(dest_data, src_data)
     @parameter
     fn _copy[simd_width: Int](idx: Int):
-        dest_dtype_ptr.simd_store(
-            idx, src_dtype_ptr.load[width=simd_width](idx)
-        )
+        dest_dtype_ptr.store(idx, src_dtype_ptr.load[width=simd_width](idx))
 
     # Copy in 32-byte chunks.
     vectorize[_copy, 32, size=n]()
@@ -233,9 +231,7 @@ fn memcpy(dest: Pointer, src: __type_of(dest), count: Int):
     @__copy_capture(dest_data, src_data)
     @parameter
     fn _copy[simd_width: Int](idx: Int):
-        dest_dtype_ptr.simd_store(
-            idx, src_dtype_ptr.load[width=simd_width](idx)
-        )
+        dest_dtype_ptr.store(idx, src_dtype_ptr.load[width=simd_width](idx))
 
     # Copy in 32-byte chunks.
     vectorize[_copy, 32](n)

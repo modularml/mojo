@@ -140,7 +140,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     )
     var bytes = stack_allocation[int8_size, DType.uint8, alignment=alignment]()
     memset_zero(bytes, int8_size)
-    bytes.bitcast[type]().simd_store[size](data)
+    bytes.bitcast[type]().store[width=size](data)
     return _hash_int8(bytes.load[width=int8_size]())
 
 

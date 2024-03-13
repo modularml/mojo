@@ -87,7 +87,7 @@ fn test_compressed_store():
     print(vector.load[width=4](0))
 
     # Just clear the buffer.
-    vector.simd_store[4](0, 0)
+    vector.store[width=4](0, 0)
 
     # CHECK: [1.0, 3.0, 0.0, 0.0]
     var val = SIMD[DType.float32, 4](0.0, 1.0, 3.0, 0.0)
