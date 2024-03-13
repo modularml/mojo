@@ -16,8 +16,6 @@ from utils import StringRef, unroll
 from builtin.dtype import _get_dtype_printf_format
 from memory.unsafe import Pointer
 
-from utils.list import DimList
-
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
 # ===----------------------------------------------------------------------=== #
