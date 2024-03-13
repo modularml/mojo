@@ -145,8 +145,7 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store(
                         m,
                         n + x,
-                        C.load[nelts](m, n + x)
-                        + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 vectorize[dot, nelts, size=tile_x]()
@@ -170,8 +169,7 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store(
                         m,
                         n + x,
-                        C.load[nelts](m, n + x)
-                        + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 alias unroll_factor = tile_x // nelts
