@@ -199,21 +199,26 @@ fn listdir[pathlike: os.PathLike](path: pathlike) raises -> List[String]:
 
 
 @always_inline("nodebug")
-fn abort():
-    """Calls a target dependent trap instruction. If the target does not have a
-    trap instruction, this intrinsic will be lowered to a call of the abort()
-    function."""
+fn abort[result: Movable = NoneType]() -> result:
+    """Calls a target dependent trap instruction if available.
+
+    Parameters:
+        result: The result type.
+
+    Returns:
+        A null result type.
+    """
 
     __mlir_op.`llvm.intr.trap`()
+
+    return AnyPointer[result]().take_value()
 
 
 @always_inline("nodebug")
 fn abort[
     result: Movable = NoneType, *, stringable: Stringable
 ](message: stringable) -> result:
-    """Prints a message before calling a target dependent trap instruction.
-    If the target does not have a trap instruction, this intrinsic will be
-    lowered to a call of the abort() function.
+    """Calls a target dependent trap instruction if available.
 
     Parameters:
         result: The result type.
@@ -230,6 +235,4 @@ fn abort[
     if not triple_is_nvidia_cuda():
         print(message, flush=True)
 
-    abort()
-
-    return AnyPointer[result]().take_value()
+    return abort[result]()
