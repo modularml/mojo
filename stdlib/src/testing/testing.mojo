@@ -206,7 +206,7 @@ fn assert_almost_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    var almost_equal = isclose(lhs, rhs, atol=atol, rtol=rtol).reduce_and()
+    var almost_equal = isclose(lhs, rhs, atol=atol, rtol=rtol)
     if not almost_equal:
         var err = "AssertionError: " + str(lhs) + " is not close to " + str(
             rhs
