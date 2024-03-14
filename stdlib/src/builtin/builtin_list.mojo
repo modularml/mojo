@@ -406,3 +406,130 @@ struct VariadicListMem[
         return _VariadicListMemIter[
             element_type, elt_is_mutable, lifetime, __lifetime_of(self)
         ](0, self)
+
+
+# ===----------------------------------------------------------------------===#
+# VariadicPack
+# ===----------------------------------------------------------------------===#
+
+
+# TODO: We need to genericize VariadicPack over the kinds of types it holds,
+# instead of erasing them to AnyType. This would allow packs of values known to
+# be Stringable for example.
+struct VariadicPack[
+    elt_is_mutable: __mlir_type.i1,
+    lifetime: AnyLifetime[elt_is_mutable].type,
+    *element_types: AnyType,
+](Sized):
+    """A utility class to access variadic pack  arguments and provide an API for
+    doing things with them.
+
+    Parameters:
+        elt_is_mutable: True if the elements of the list are mutable for an
+                        inout or owned argument pack.
+        lifetime: The reference lifetime of the underlying elements.
+        element_types: The list of types held by the argument pack.
+    """
+
+    alias _mlir_pack_type = __mlir_type[
+        `!lit.ref.pack<:variadic<`,
+        AnyType,
+        `> `,
+        element_types,
+        `, `,
+        lifetime,
+        `>`,
+    ]
+
+    var _value: Self._mlir_pack_type
+    var _is_owned: Bool
+
+    @always_inline
+    fn __init__(inout self, value: Self._mlir_pack_type, is_owned: Bool):
+        """Constructs a VariadicPack from the internal representation.
+
+        Args:
+            value: The argument to construct the pack with.
+            is_owned: Whether this is an 'owned' pack or 'inout'/'borrowed'.
+        """
+        self._value = value
+        self._is_owned = is_owned
+
+    @always_inline
+    fn __del__(owned self):
+        """Destructor that releases elements if owned."""
+
+        # Immutable variadics never own the memory underlying them,
+        # microoptimize out a check of _is_owned.
+        @parameter
+        if not Bool(elt_is_mutable):
+            return
+        else:
+            # If the elements are unowned, just return.
+            if not self._is_owned:
+                return
+
+            alias len = Self.__len__()
+
+            @parameter
+            fn destroy_elt[i: Int]():
+                # destroy the elements in reverse order.
+                self.get_element[len - i - 1]().destroy_element_unsafe()
+
+            unroll[destroy_elt, len]()
+
+    @always_inline
+    @staticmethod
+    fn __len__() -> Int:
+        """Return the VariadicPack length.
+
+        Returns:
+            The number of elements in the variadic pack.
+        """
+        return __mlir_attr[
+            `#kgen.param.expr<variadic_size,`, element_types, `> : index`
+        ]
+
+    @always_inline
+    fn __len__(self) -> Int:
+        """Return the VariadicPack length.
+
+        Returns:
+            The number of elements in the variadic pack.
+        """
+        return Self.__len__()
+
+    @always_inline
+    fn get_element[
+        index: Int
+    ](self) -> Reference[
+        element_types[index.value], Self.elt_is_mutable, Self.lifetime
+    ]:
+        """Return a reference to an element of the pack.
+
+        Parameters:
+            index: The element of the pack to return.
+
+        Returns:
+            A reference to the element.  The Reference's mutability follows the
+            mutability of the pack argument convention.
+        """
+
+        return __mlir_op.`lit.ref.pack.get`[index = index.value](self._value)
+
+    @always_inline
+    fn each[func: fn[T: AnyType] (T) -> None](self):
+        """Apply a function to each element of the pack in order.  This applies
+        the specified function (which must be parametric on the element type) to
+        each element of the pack, from the first element to the last, passing
+        in each element as a borrowed argument.
+
+        Parameters:
+            func: The function to apply to each element.
+        """
+
+        @parameter
+        fn unrolled[i: Int]():
+            func(self.get_element[i]()[])
+
+        unroll[unrolled, Self.__len__()]()
