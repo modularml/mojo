@@ -20,3 +20,49 @@ jobs:
           echo 'export PATH="/home/runner/.modular/pkg/packages.modular.com_mojo/bin:$PATH"' >> "$BASHRC"
           source "$BASHRC"
           mojo --version
+
+      - name: Filter files changed
+        uses: dorny/paths-filter
+        id: filter
+        with:
+          # Enable listing of files matching each filter.
+          # Paths to files will be available in `${FILTER_NAME}_files` output variable.
+          # Paths will be escaped and space-delimited.
+          # Output is usable as command-line argument list in Linux shell.
+          list-files: shell
+
+          filters: |
+            mojo:
+              - added|modified: '**/*.mojo'
+              - added|modified: '**/*.🔥'
+
+      # While this may seem like debugging, it's useful to see what's going on
+      # at a glance in this workflow.
+      - name: Print file changes
+        run: |
+          echo "Mojo files changed below:"
+          echo ${{ steps.filter.outputs.mojo_files }}
+
+      - name: mojo-formatting
+        if: ${{ steps.filter.outputs.mojo == 'true' }}
+        run: |
+          shopt -s expand_aliases
+          VERBOSE=1 source $GITHUB_WORKSPACE/utils/start-modular.sh
+
+          # The list of files from the filter step is relative to the checkout
+          # root.
+          cd $GITHUB_WORKSPACE
+
+          mojo format ${{ steps.filter.outputs.mojo_files }}
+
+          # Check if any lines were formatted.  If any were, fail this step.
+          if [ $(git diff | wc -l) -gt 0 ]; then
+            echo -e "\nError! Mojo code not formatted. Run `mojo format` ...\n"
+            echo -e "\nFiles that don't match the proper formatting:\n"
+            git diff --name-only
+            echo -e "\nFull diff:\n"
+            git diff
+            exit 1
+          fi
+
+      # TODO: Support linting of markdown files using markdown-lint
