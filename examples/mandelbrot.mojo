@@ -88,9 +88,7 @@ fn main() raises:
         for row in range(height):
             worker(row)
 
-    var vectorized = benchmark.run[bench[simd_width]](
-        max_runtime_secs=0.5
-    ).mean()
+    var vectorized = benchmark.run[bench[simd_width]](max_runtime_secs=0.5).mean()
     print("Number of threads:", num_logical_cores())
     print("Vectorized:", vectorized, "s")
 
