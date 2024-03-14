@@ -8,7 +8,7 @@ body:
     attributes:
       value: |
         Thank you for helping us improve the Mojo docs!
-        
+
         Please add a title above and fill in the following fields so we can understand the problem.
 
   - type: input
