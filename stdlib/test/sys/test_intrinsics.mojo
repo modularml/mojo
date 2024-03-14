@@ -14,7 +14,6 @@ from sys.intrinsics import (
     strided_store,
 )
 
-from memory.buffer import Buffer
 from memory.unsafe import DTypePointer
 
 
