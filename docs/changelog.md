@@ -237,6 +237,8 @@ modular update mojo
   binding Reference to lvalue with subtype lifetime.
 - [#1945](https://github.com/modularml/mojo/issues/1945) - `Optional[T].or_else()`
   should return `T` instead of `Optional[T]`.
+- [#1940](https://github.com/modularml/mojo/issues/1940) - Constrain `math.copysign`
+  to floating point or integral types.
 
 ## v24.1 (2024-02-29)
 
