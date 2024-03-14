@@ -215,6 +215,10 @@ modular update mojo
 - The `__get_address_as_lvalue` magic function has been removed.  You can now
   get an LValue from a `Pointer` or `Reference` by using the `ptr[]` operator.
 
+- The type parameter for the `memcpy` function is now automatically inferred.
+  This means that calls to `memcpy` of the form `memcpy[Dtype.xyz](...)` would
+  no longer work and the user would have to change the code to `memcpy(...)`.
+
 ### 🛠️ Fixed
 
 - [#1362](https://github.com/modularml/mojo/issues/1362) - Parameter inference
