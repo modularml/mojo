@@ -40,8 +40,8 @@ def test_basic():
     var a1 = a.or_else(2)
     var b1 = b.or_else(2)
 
-    assert_equal(1, a1.value())
-    assert_equal(2, b1.value())
+    assert_equal(1, a1)
+    assert_equal(2, b1)
 
     assert_equal(1, (a ^).take())
 

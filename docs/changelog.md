@@ -235,6 +235,8 @@ modular update mojo
   import in unreachable block.
 - [#1921](https://github.com/modularml/mojo/issues/1921) - Parser crashes
   binding Reference to lvalue with subtype lifetime.
+- [#1945](https://github.com/modularml/mojo/issues/1945) - `Optional[T].or_else()`
+  should return `T` instead of `Optional[T]`.
 
 ## v24.1 (2024-02-29)
 

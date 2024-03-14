@@ -121,23 +121,24 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         debug_assert(self.__bool__(), ".take() on empty Optional")
         return self._value.take[T]()
 
-    fn or_else(self, default: T) -> Self:
-        """Make an Optional containing the same value, or a default value
-        if a value wasn't present.
+    fn or_else(self, default: T) -> T:
+        """Return the underlying value contained in the Optional or a default value if the Optional's underlying value is not present.
 
         Args:
             default: The new value to use if no value was present.
 
         Returns:
-            A new Optional containing the old value or default.
+            The underlying value contained in the Optional or a default value.
         """
-        return self or Optional(default)
+        if self.__bool__():
+            return self._value.get[T]()[]
+        return default
 
     fn __bool__(self) -> Bool:
         """Return true if the Optional has a value.
 
         Returns:
-            True if the optional has a valu and False otherwise.
+            True if the optional has a value and False otherwise.
         """
         return not self._value.isa[_NoneType]()
 
