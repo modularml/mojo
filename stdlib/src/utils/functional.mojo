@@ -9,9 +9,10 @@
 You can import these APIs from the `utils` package. For example:
 
 ```mojo
-from utils import unroll 
+from utils import unroll
 ```
 """
+
 
 # ===----------------------------------------------------------------------===#
 # unroll

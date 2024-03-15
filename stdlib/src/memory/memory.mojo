@@ -17,7 +17,7 @@ from math import align_down
 from sys import llvm_intrinsic
 from sys.info import sizeof, triple_is_nvidia_cuda
 
-from algorithm import vectorize
+from utils._vectorize import vectorize
 from gpu.memory import AddressSpace as GPUAddressSpace
 from runtime.llcl import Runtime
 
