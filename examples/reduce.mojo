@@ -20,7 +20,7 @@ from time import now
 
 from closed_source_algorithm import sum
 from benchmark import Unit, benchmark, keep
-from closed_source_memory.buffer import Buffer
+from buffer import Buffer
 from tensor import Tensor
 from python import Python
 from tensor import rand
