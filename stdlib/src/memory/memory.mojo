@@ -20,8 +20,6 @@ from sys.info import sizeof, triple_is_nvidia_cuda
 from .unsafe import _GPUAddressSpace
 from runtime.llcl import Runtime
 
-from utils.list import Dim
-
 from .unsafe import AddressSpace, DTypePointer, Pointer
 
 # ===----------------------------------------------------------------------===#
