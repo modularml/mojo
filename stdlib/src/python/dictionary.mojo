@@ -12,7 +12,7 @@ from python.dictionary import Dictionary
 ```
 """
 
-from utils import unroll
+from utils.loop import unroll
 from memory.unsafe import Pointer
 
 from ._cpython import CPython, PyKeyValuePair, PyObjectPtr

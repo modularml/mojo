@@ -6,10 +6,10 @@
 
 """Implements higher-order functions.
 
-You can import these APIs from the `utils` package. For example:
+You can import these APIs from the `utils.loop` module. For example:
 
 ```mojo
-from utils import unroll
+from utils.loop import unroll
 ```
 """
 

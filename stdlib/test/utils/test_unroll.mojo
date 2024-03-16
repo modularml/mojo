@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from utils import unroll
+from utils.loop import unroll
 
 from utils.index import StaticIntTuple
 
