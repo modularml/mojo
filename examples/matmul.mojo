@@ -174,8 +174,9 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
                         + A[m, k] * B.load[nelts](k, n + x),
                     )
 
-                alias unroll_factor = tile_x // nelts
-                vectorize[dot, nelts, tile_x, unroll_factor]()
+                vectorize[
+                    dot, nelts, size=tile_x, unroll_factor = tile_x // nelts
+                ]()
 
         tile[calc_tile, tile_n, tile_k](C.cols, B.rows)
 
