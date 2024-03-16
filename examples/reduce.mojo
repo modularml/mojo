@@ -18,7 +18,7 @@
 
 from time import now
 
-from closed_source_algorithm import sum
+from algorithm import sum
 from benchmark import Unit, benchmark, keep
 from buffer import Buffer
 from tensor import Tensor
