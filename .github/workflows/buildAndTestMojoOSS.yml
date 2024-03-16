@@ -16,6 +16,7 @@ name: Build and Test Mojo OSS
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 jobs:
   test-pre-submit:
@@ -36,7 +37,7 @@ jobs:
           mojo --version
 
       - name: Filter files changed
-        uses: dorny/paths-filter
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
           # Enable listing of files matching each filter.
