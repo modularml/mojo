@@ -17,7 +17,6 @@ from math import align_down
 from sys import llvm_intrinsic
 from sys.info import sizeof, triple_is_nvidia_cuda
 
-from utils._vectorize import vectorize
 from gpu.memory import AddressSpace as GPUAddressSpace
 from runtime.llcl import Runtime
 
@@ -150,14 +149,13 @@ fn memcpy[count: Int](dest: Pointer, src: __type_of(dest)):
     var dest_dtype_ptr = DTypePointer[DType.int8, dest.address_space](dest_data)
     var src_dtype_ptr = DTypePointer[DType.int8, src.address_space](src_data)
 
-    @always_inline
-    @__copy_capture(dest_data, src_data)
-    @parameter
-    fn _copy[simd_width: Int](idx: Int):
-        dest_dtype_ptr.store(idx, src_dtype_ptr.load[width=simd_width](idx))
-
     # Copy in 32-byte chunks.
-    vectorize[_copy, 32, size=n]()
+    alias chunk_size = 32
+    alias vector_end = align_down(n, chunk_size)
+    for i in range(0, vector_end, chunk_size):
+        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=chunk_size](i))
+    for i in range(vector_end, n):
+        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=1](i))
 
 
 fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
@@ -227,14 +225,13 @@ fn memcpy(dest: Pointer, src: __type_of(dest), count: Int):
     var dest_dtype_ptr = DTypePointer[DType.int8, dest.address_space](dest_data)
     var src_dtype_ptr = DTypePointer[DType.int8, src.address_space](src_data)
 
-    @always_inline
-    @__copy_capture(dest_data, src_data)
-    @parameter
-    fn _copy[simd_width: Int](idx: Int):
-        dest_dtype_ptr.store(idx, src_dtype_ptr.load[width=simd_width](idx))
-
     # Copy in 32-byte chunks.
-    vectorize[_copy, 32](n)
+    alias chunk_size = 32
+    var vector_end = align_down(n, chunk_size)
+    for i in range(0, vector_end, chunk_size):
+        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=chunk_size](i))
+    for i in range(vector_end, n):
+        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=1](i))
 
 
 fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
