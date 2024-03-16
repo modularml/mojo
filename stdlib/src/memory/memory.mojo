@@ -17,10 +17,7 @@ from math import align_down
 from sys import llvm_intrinsic
 from sys.info import sizeof, triple_is_nvidia_cuda
 
-from .unsafe import _GPUAddressSpace
-from runtime.llcl import Runtime
-
-from .unsafe import AddressSpace, DTypePointer, Pointer
+from .unsafe import AddressSpace, DTypePointer, Pointer, _GPUAddressSpace
 
 # ===----------------------------------------------------------------------===#
 # memcmp
