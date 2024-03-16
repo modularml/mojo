@@ -39,6 +39,28 @@ modular update mojo
 
 ## UNRELEASED
 
+### 🔥 Legendary
+
+- Structs and other nominal types are now allowed to implicitly conform to
+  traits. A struct implicitly conforms to a trait if it implements all the
+  requirements for the trait. For example, any struct that implements `__str__`
+  will implicitly conform to `Stringable`, and then is usable with `str`.
+
+  ```mojo
+  @value
+  struct Foo:
+      fn __str__(self) -> String:
+          return "foo!"
+
+  fn main():
+      print(str(Foo())) # prints 'foo!'
+  ```
+
+  Explicit conformance is still strongly encouraged where possible, because it
+  is useful for documentation and for communicating intentions. In the future,
+  explicit conformance will still be useful for features like default methods
+  and extensions.
+
 ### ⭐️ New
 
 - String types all conform to the
@@ -115,25 +137,11 @@ modular update mojo
 
 ### 🦋 Changed
 
-- Structs and other nominal types are now allowed to implicitly conform to
-  traits. A struct implicitly conforms to a trait if it implements all the
-  requirements for the trait. For example, any struct that implements `__str__`
-  will implicitly conform to `Stringable`, and then is usable with `str`.
-
-  ```mojo
-  @value
-  struct Foo:
-      fn __str__(self) -> String:
-          return "foo!"
-
-  fn main():
-      print(str(Foo())) # prints 'foo!'
-  ```
-
-  Explicit conformance is still strongly encouraged where possible, because it
-  is useful for documentation and for communicating intentions. In the future,
-  explicit conformance will still be useful for features like default methods
-  and extensions.
+- Mojo now warns about unused values in both `def` and `fn` declarations,
+  instead of completely disabling the warning in `def`s.  It never warns about
+  unused `object` or `PythonObject` values, tying the warning to these types
+  instead of the kind of function they are unused in.  This will help catch API
+  usage bugs in `def`s and make imported Python APIs more ergonomic in `fn`s.
 
 - The [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) and
   [`InlinedFixedVector`](/mojo/stdlib/collections/vector.html#inlinedfixedvector)
