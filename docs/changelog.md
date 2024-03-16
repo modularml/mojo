@@ -248,6 +248,11 @@ modular update mojo
 - [#1940](https://github.com/modularml/mojo/issues/1940) - Constrain `math.copysign`
   to floating point or integral types.
 
+## v24.1.1 (2024-03-18)
+
+This release includes installer improvements and enhanced error reporting for
+installation issues. Otherwise it is functionally identical to Mojo 24.1.
+
 ## v24.1 (2024-02-29)
 
 ### 🔥 Legendary
