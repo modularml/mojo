@@ -25,8 +25,6 @@ from sys.intrinsics import PrefetchOptions, _mlirtype_is_eq
 from sys.intrinsics import prefetch as _prefetch
 from sys.intrinsics import strided_load, strided_store
 
-from gpu.memory import AddressSpace as GPUAddressSpace
-
 from .memory import _free, _malloc
 
 # ===----------------------------------------------------------------------===#
@@ -240,6 +238,90 @@ fn bitcast[
 
 @value
 @register_passable("trivial")
+struct _GPUAddressSpace(EqualityComparable):
+    var _value: Int
+
+    # See https://docs.nvidia.com/cuda/nvvm-ir-spec/#address-space
+    alias GENERIC = AddressSpace(0)
+    """Generic address space."""
+    alias GLOBAL = AddressSpace(1)
+    """Global address space."""
+    alias CONSTANT = AddressSpace(2)
+    """Constant address space."""
+    alias SHARED = AddressSpace(3)
+    """Shared address space."""
+    alias PARAM = AddressSpace(4)
+    """Param address space."""
+    alias LOCAL = AddressSpace(5)
+    """Local address space."""
+
+    @always_inline("nodebug")
+    fn __init__(value: Int) -> Self:
+        return Self {_value: value}
+
+    @always_inline("nodebug")
+    fn value(self) -> Int:
+        """The integral value of the address space.
+
+        Returns:
+          The integral value of the address space.
+        """
+        return self._value
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """The integral value of the address space.
+
+        Returns:
+          The integral value of the address space.
+        """
+        return self._value
+
+    @always_inline("nodebug")
+    fn __eq__(self, other: Self) -> Bool:
+        """The True if the two address spaces are equal and False otherwise.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __eq__(self, other: AddressSpace) -> Bool:
+        """The True if the two address spaces are equal and False otherwise.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __ne__(self, other: Self) -> Bool:
+        """True if the two address spaces are inequal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are inequal and False otherwise.
+        """
+        return not self == other
+
+    @always_inline("nodebug")
+    fn __ne__(self, other: AddressSpace) -> Bool:
+        """True if the two address spaces are inequal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are inequal and False otherwise.
+        """
+        return not self == other
+
+
+@value
+@register_passable("trivial")
 struct AddressSpace(EqualityComparable):
     """Address space of the pointer."""
 
@@ -261,8 +343,8 @@ struct AddressSpace(EqualityComparable):
         return Self {_value: value}
 
     @always_inline("nodebug")
-    fn __init__(value: GPUAddressSpace) -> Self:
-        """Initializes the address space from the underlying value.
+    fn __init__(value: _GPUAddressSpace) -> Self:
+        """Initializes the address space from the underlying integeral value.
 
         Args:
           value: The address space value.
@@ -270,7 +352,7 @@ struct AddressSpace(EqualityComparable):
         Returns:
           The address space.
         """
-        return Self {_value: value.value()}
+        return Self {_value: int(value)}
 
     @always_inline("nodebug")
     fn value(self) -> Int:
@@ -282,7 +364,16 @@ struct AddressSpace(EqualityComparable):
         return self._value
 
     @always_inline("nodebug")
-    fn __eq__(self, other: AddressSpace) -> Bool:
+    fn __int__(self) -> Int:
+        """The integral value of the address space.
+
+        Returns:
+          The integral value of the address space.
+        """
+        return self._value
+
+    @always_inline("nodebug")
+    fn __eq__(self, other: Self) -> Bool:
         """True if the two address spaces are equal and False otherwise.
 
         Args:
@@ -294,7 +385,7 @@ struct AddressSpace(EqualityComparable):
         return self.value() == other.value()
 
     @always_inline("nodebug")
-    fn __ne__(self, other: AddressSpace) -> Bool:
+    fn __ne__(self, other: Self) -> Bool:
         """True if the two address spaces are inequal and False otherwise.
 
         Args:

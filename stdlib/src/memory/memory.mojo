@@ -17,7 +17,7 @@ from math import align_down
 from sys import llvm_intrinsic
 from sys.info import sizeof, triple_is_nvidia_cuda
 
-from gpu.memory import AddressSpace as GPUAddressSpace
+from .unsafe import _GPUAddressSpace
 from runtime.llcl import Runtime
 
 from utils.list import Dim
@@ -387,7 +387,7 @@ fn stack_allocation[
     """
 
     @parameter
-    if triple_is_nvidia_cuda() and address_space == GPUAddressSpace.SHARED:
+    if triple_is_nvidia_cuda() and address_space == _GPUAddressSpace.SHARED:
         return __mlir_op.`pop.global_alloc`[
             count = count.value,
             _type = Pointer[type, address_space].pointer_type,
