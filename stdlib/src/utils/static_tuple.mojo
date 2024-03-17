@@ -12,8 +12,9 @@ from utils.static_tuple import StaticTuple
 ```
 """
 
-from utils.loop import unroll
 from memory.unsafe import Pointer
+
+from utils.loop import unroll
 
 # ===----------------------------------------------------------------------===#
 # Utilities

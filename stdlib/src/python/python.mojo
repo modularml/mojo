@@ -15,9 +15,10 @@ from python import Python
 from sys import external_call
 from sys.ffi import _get_global
 from sys.info import sizeof
-from utils import StringRef
 
 from memory.unsafe import Pointer
+
+from utils import StringRef
 
 from ._cpython import CPython, Py_eval_input
 from .dictionary import Dictionary

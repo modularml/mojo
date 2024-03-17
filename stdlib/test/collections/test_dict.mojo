@@ -8,8 +8,8 @@
 from collections import Optional
 from collections.dict import Dict, KeyElement
 
-from testing import *
 from test_utils import CopyCounter
+from testing import *
 
 
 def test_dict_construction():

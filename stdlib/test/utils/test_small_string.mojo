@@ -5,10 +5,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo --debug-level full %s
 
-from testing import assert_true, assert_equal
+from testing import assert_equal, assert_true
 
-
-from utils.small_string import _FixedString, SmallString
+from utils.small_string import SmallString, _FixedString
 
 
 def main():

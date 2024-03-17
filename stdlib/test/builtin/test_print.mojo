@@ -6,9 +6,10 @@
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
 
-from utils.index import StaticIntTuple
-from utils import StringRef
 from memory.unsafe import DTypePointer
+
+from utils import StringRef
+from utils.index import StaticIntTuple
 
 
 # CHECK-LABEL: test_print

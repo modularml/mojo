@@ -15,8 +15,9 @@ from sys import argv
 
 from sys import external_call
 
-from utils import StringRef
 from memory.unsafe import Pointer
+
+from utils import StringRef
 
 
 # TODO: When we have global variables, this should be a global list.

@@ -13,10 +13,11 @@ from os import listdir
 """
 
 from collections import List
-from utils import StringRef
 from sys.info import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 
 from memory.unsafe import DTypePointer, Pointer
+
+from utils import StringRef
 
 from .path import isdir
 from .pathlike import PathLike

@@ -6,6 +6,7 @@
 """Implements a foreign functions interface (FFI)."""
 
 from memory.unsafe import DTypePointer, Pointer
+
 from utils import StringRef
 
 from .info import os_is_linux, os_is_windows

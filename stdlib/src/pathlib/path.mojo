@@ -11,6 +11,7 @@ from os import PathLike, listdir, stat_result
 from sys.info import os_is_windows
 
 from memory import stack_allocation
+
 from utils import StringRef
 
 alias DIR_SEPARATOR = "\\" if os_is_windows() else "/"

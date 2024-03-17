@@ -6,6 +6,7 @@
 # RUN: %mojo -debug-level full %s
 
 from testing import *
+
 from utils import StringRef
 
 

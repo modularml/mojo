@@ -10,14 +10,14 @@ These are Mojo built-ins, so you don't need to import them.
 
 from math._numerics import FPUtils
 from math.limit import inf, neginf
-from math.math import _simd_apply, nan, isnan
+from math.math import _simd_apply, isnan, nan
 from sys import llvm_intrinsic
 from sys.info import has_neon, is_x86, simdwidthof
 
 from builtin.hash import _hash_simd
-from utils._visualizers import lldb_formatter_wrapping_type
 from memory.unsafe import bitcast
 
+from utils._visualizers import lldb_formatter_wrapping_type
 from utils.static_tuple import StaticTuple
 
 from .dtype import _integral_type_of

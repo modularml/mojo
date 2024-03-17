@@ -35,9 +35,9 @@ from math.math import align_up, max
 from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
-from utils.loop import unroll
 from memory.unsafe import _LITRef, emplace_ref_unsafe
 
+from utils.loop import unroll
 from utils.static_tuple import StaticTuple
 
 
