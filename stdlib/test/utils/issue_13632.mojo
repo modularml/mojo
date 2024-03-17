@@ -17,10 +17,10 @@ fn sum_items(data: List[Int8]) -> Int:
 
 fn make_abcd_vector() -> List[Int8]:
     var v = List[Int8]()
-    v.push_back(97)
-    v.push_back(98)
-    v.push_back(99)
-    v.push_back(100)
+    v.append(97)
+    v.append(98)
+    v.append(99)
+    v.append(100)
     return v
 
 

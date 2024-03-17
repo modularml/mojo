@@ -109,7 +109,7 @@ fn _write_int[
 
     # Prefix a '-' if the original int was negative and make positive.
     if value < 0:
-        fmt.push_back(ord("-"))
+        fmt.append(ord("-"))
 
     # Add the custom number prefix, e.g. "0x" commonly used for hex numbers.
     # This comes *after* the minus sign, if present.

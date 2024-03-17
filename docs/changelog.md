@@ -212,6 +212,8 @@ modular update mojo
 - The `rand` and `randn` functions in the `random` package that return a `Tensor`
   have moved to the `tensor` package.  Please update your imports accordingly.
 
+- `List.push_back` has been removed.  Please use the `append` function instead.
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,

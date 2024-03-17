@@ -14,7 +14,7 @@ from testing import *
 def test_mojo_issue_698():
     var list = List[Float64]()
     for i in range(5):
-        list.push_back(i)
+        list.append(i)
 
     assert_equal(0.0, list[0])
     assert_equal(1.0, list[1])
@@ -27,7 +27,7 @@ def test_list():
     var list = List[Int]()
 
     for i in range(5):
-        list.push_back(i)
+        list.append(i)
 
     assert_equal(5, len(list))
     assert_equal(0, list[0])
@@ -109,7 +109,7 @@ def test_list_reverse():
 
     vec = List[Int]()
 
-    vec.push_back(123)
+    vec.append(123)
 
     assert_equal(len(vec), 1)
     assert_equal(vec[0], 123)
@@ -124,9 +124,9 @@ def test_list_reverse():
     #
 
     vec2 = List[String]()
-    vec2.push_back("one")
-    vec2.push_back("two")
-    vec2.push_back("three")
+    vec2.append("one")
+    vec2.append("two")
+    vec2.append("three")
 
     assert_equal(len(vec2), 3)
     assert_equal(vec2[0], "one")
@@ -145,8 +145,8 @@ def test_list_reverse():
     #
 
     vec = List[Int]()
-    vec.push_back(5)
-    vec.push_back(10)
+    vec.append(5)
+    vec.append(10)
 
     assert_equal(len(vec), 2)
     assert_equal(vec[0], 5)
@@ -164,11 +164,11 @@ def test_list_reverse():
     #
 
     vec = List[Int]()
-    vec.push_back(1)
-    vec.push_back(2)
-    vec.push_back(3)
-    vec.push_back(4)
-    vec.push_back(5)
+    vec.append(1)
+    vec.append(2)
+    vec.append(3)
+    vec.append(4)
+    vec.append(5)
 
     assert_equal(len(vec), 5)
     assert_equal(vec[0], 1)
@@ -192,9 +192,9 @@ def test_list_reverse():
     #
 
     vec = List[Int]()
-    vec.push_back(1)
-    vec.push_back(2)
-    vec.push_back(3)
+    vec.append(1)
+    vec.append(2)
+    vec.append(3)
 
     vec._reverse(start=len(vec))
 
@@ -207,11 +207,11 @@ def test_list_reverse():
 def test_list_reverse_move_count():
     # Create this vec with enough capacity to avoid moves due to resizing.
     var vec = List[MoveCounter[Int]](capacity=5)
-    vec.push_back(MoveCounter(1))
-    vec.push_back(MoveCounter(2))
-    vec.push_back(MoveCounter(3))
-    vec.push_back(MoveCounter(4))
-    vec.push_back(MoveCounter(5))
+    vec.append(MoveCounter(1))
+    vec.append(MoveCounter(2))
+    vec.append(MoveCounter(3))
+    vec.append(MoveCounter(4))
+    vec.append(MoveCounter(5))
 
     assert_equal(len(vec), 5)
     assert_equal(vec.data[0].value, 1)
@@ -258,9 +258,9 @@ def test_list_extend():
     #
 
     vec = List[Int]()
-    vec.push_back(1)
-    vec.push_back(2)
-    vec.push_back(3)
+    vec.append(1)
+    vec.append(2)
+    vec.append(3)
 
     assert_equal(len(vec), 3)
     assert_equal(vec[0], 1)
@@ -300,13 +300,13 @@ def test_list_extend_non_trivial():
     # Preallocate with enough capacity to avoid reallocation making the
     # move count checks below flaky.
     var v1 = List[MoveCounter[String]](capacity=5)
-    v1.push_back(MoveCounter[String]("Hello"))
-    v1.push_back(MoveCounter[String]("World"))
+    v1.append(MoveCounter[String]("Hello"))
+    v1.append(MoveCounter[String]("World"))
 
     var v2 = List[MoveCounter[String]](capacity=3)
-    v2.push_back(MoveCounter[String]("Foo"))
-    v2.push_back(MoveCounter[String]("Bar"))
-    v2.push_back(MoveCounter[String]("Baz"))
+    v2.append(MoveCounter[String]("Foo"))
+    v2.append(MoveCounter[String]("Bar"))
+    v2.append(MoveCounter[String]("Baz"))
 
     v1.extend(v2)
 
@@ -333,8 +333,8 @@ def test_2d_dynamic_list():
     for i in range(2):
         var v = List[Int]()
         for j in range(3):
-            v.push_back(i + j)
-        list.push_back(v)
+            v.append(i + j)
+        list.append(v)
 
     assert_equal(0, list[0][0])
     assert_equal(1, list[0][1])
@@ -380,7 +380,7 @@ def test_list_explicit_copy():
 def test_list_copy_constructor():
     var vec = List[Int](capacity=1)
     var vec_copy = vec
-    vec_copy.push_back(1)  # Ensure copy constructor doesn't crash
+    vec_copy.append(1)  # Ensure copy constructor doesn't crash
     _ = vec ^  # To ensure previous one doesn't invoke move constuctor
 
 

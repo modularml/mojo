@@ -632,7 +632,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
 
     @always_inline
     fn list_append(self, value: Self):
-        self.get_list_ptr()[].impl.push_back(value.value)
+        self.get_list_ptr()[].impl.append(value.value)
 
     @always_inline
     fn get_list_length(self) -> Int:

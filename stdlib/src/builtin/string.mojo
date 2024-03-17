@@ -762,11 +762,11 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             var loc = self.find(delimiter, current_offset)
             # delimiter not found, so add the search slice from where we're currently at
             if loc == -1:
-                output.push_back(self[current_offset:])
+                output.append(self[current_offset:])
                 break
 
             # We found a delimiter, so add the preceding string slice
-            output.push_back(self[current_offset:loc])
+            output.append(self[current_offset:loc])
 
             # Advance our search offset past the delimiter
             current_offset = loc + len(delimiter)
@@ -811,12 +811,12 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 
             # Copy preceding unchanged chars
             for _ in range(curr_offset, idx):
-                res.push_back(self_ptr.load())
+                res.append(self_ptr.load())
                 self_ptr += 1
 
             # Insert a copy of the new replacement string
             for i in range(new_len):
-                res.push_back(new_ptr.load(i))
+                res.append(new_ptr.load(i))
 
             self_ptr += old_len
 
@@ -824,10 +824,10 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             var val = self_ptr.load()
             if val == 0:
                 break
-            res.push_back(self_ptr.load())
+            res.append(self_ptr.load())
             self_ptr += 1
 
-        res.push_back(0)
+        res.append(0)
         return String(res ^)
 
     fn strip(self) -> String:
@@ -888,9 +888,9 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
-                res.push_back(val_ptr.load(j))
-            res.push_back(self_ptr.load(i))
-        res.push_back(0)
+                res.append(val_ptr.load(j))
+            res.append(self_ptr.load(i))
+        res.append(0)
         return String(res ^)
 
     fn lower(self) -> String:

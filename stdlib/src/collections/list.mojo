@@ -205,14 +205,6 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         # list.
         self.size = final_size
 
-    fn push_back(inout self, owned value: T):
-        """Appends a value to this list.
-
-        Args:
-            value: The value to append.
-        """
-        self.append(value ^)
-
     fn pop_back(inout self) -> T:
         """Pops a value from the back of this list.
 
