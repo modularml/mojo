@@ -4,15 +4,14 @@
 #
 # ===----------------------------------------------------------------------=== #
 
-from math.math import _simd_apply, abs, max
-from sys import external_call, llvm_intrinsic
+from builtin.simd import _simd_apply
+from sys import external_call
 
 
 @always_inline
 fn libm_call[
     type: DType, simd_width: Int, fn_fp32: StringLiteral, fn_fp64: StringLiteral
 ](arg: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    # TODO: add two strings as parameters for FP32 and FP64 function names in libm, like 'tanhf' and 'tanh'
     @always_inline("nodebug")
     @parameter
     fn _float32_dispatch[
@@ -31,7 +30,7 @@ fn libm_call[
 
     @parameter
     if type == DType.float64:
-        return _simd_apply[simd_width, type, type, _float64_dispatch](arg)
-    return _simd_apply[
-        simd_width, DType.float32, DType.float32, _float32_dispatch
-    ](arg.cast[DType.float32]()).cast[type]()
+        return _simd_apply[_float64_dispatch, type, simd_width](arg)
+    return _simd_apply[_float32_dispatch, DType.float32, simd_width](
+        arg.cast[DType.float32]()
+    ).cast[type]()

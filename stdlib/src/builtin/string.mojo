@@ -10,9 +10,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import List
 from collections.dict import KeyElement
-from math import abs as _abs
-from math.bit import ctlz
 from sys.info import bitwidthof
+from sys import llvm_intrinsic
 
 from memory.anypointer import AnyPointer
 from memory.memory import memcmp, memcpy
@@ -23,6 +22,31 @@ from utils.index import StaticIntTuple
 from utils.static_tuple import StaticTuple
 
 from .io import _snprintf, _snprintf_scalar, _StringableTuple
+
+# ===----------------------------------------------------------------------===#
+# Utilties
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _abs(x: Int) -> Int:
+    return x if x > 0 else -x
+
+
+@always_inline
+fn _abs(x: SIMD) -> __type_of(x):
+    return (x > 0).select(x, -x)
+
+
+@always_inline
+fn _ctlz(val: Int) -> Int:
+    return llvm_intrinsic["llvm.ctlz", Int](val, False)
+
+
+@always_inline("nodebug")
+fn _ctlz(val: SIMD) -> __type_of(val):
+    return llvm_intrinsic["llvm.ctlz", __type_of(val)](val, False)
+
 
 # ===----------------------------------------------------------------------===#
 # ord
@@ -1042,7 +1066,7 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
     )
     var n = UInt32(n0)
-    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ ctlz(n | 1))
+    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ _ctlz(n | 1))
     return (n0 + lookup_table[int(log2)]) >> 32
 
 

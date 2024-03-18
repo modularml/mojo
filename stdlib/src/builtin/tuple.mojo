@@ -82,8 +82,19 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         if i == 0:
             return 0
         else:
-            return align_up(
+            return _align_up(
                 Self._offset[i - 1]()
-                + align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
+                + _align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
                 alignof[Ts[i]](),
             )
+
+
+# ===----------------------------------------------------------------------=== #
+# Utilities
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _align_up(value: Int, alignment: Int) -> Int:
+    var div_ceil = (value + alignment - 1)._positive_div(alignment)
+    return div_ceil * alignment

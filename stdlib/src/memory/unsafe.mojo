@@ -13,7 +13,6 @@ from memory.unsafe import Pointer, AnyLifetime
 """
 
 
-from math import is_power_of_2
 from sys.info import (
     alignof,
     bitwidthof,
@@ -26,6 +25,24 @@ from sys.intrinsics import prefetch as _prefetch
 from sys.intrinsics import strided_load, strided_store
 
 from .memory import _free, _malloc
+
+# ===----------------------------------------------------------------------===#
+# Utilities
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _is_power_of_2(val: Int) -> Bool:
+    """Checks whether an integer is a power of two.
+
+    Args:
+      val: The integer to check.
+
+    Returns:
+      True if val is a power of two, otherwise False.
+    """
+    return (val & (val - 1) == 0) & (val != 0)
+
 
 # ===----------------------------------------------------------------------===#
 # bitcast
@@ -1552,7 +1569,7 @@ struct DTypePointer[
             otherwise.
         """
         constrained[
-            is_power_of_2(alignment), "alignment must be a power of 2."
+            _is_power_of_2(alignment), "alignment must be a power of 2."
         ]()
         return int(self) % alignment == 0
 

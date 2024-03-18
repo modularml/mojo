@@ -8,9 +8,13 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from math import abs as _abs
 
 from python.object import PythonObject
+
+
+# ===----------------------------------------------------------------------=== #
+# Utilities
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
@@ -31,6 +35,16 @@ fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
     """
     debug_assert(denominator != 0, "divide by zero")
     return (numerator + denominator - 1)._positive_div(denominator)
+
+
+@always_inline
+fn _abs(x: Int) -> Int:
+    return x if x > 0 else -x
+
+
+# ===----------------------------------------------------------------------=== #
+# Range
+# ===----------------------------------------------------------------------=== #
 
 
 @register_passable("trivial")

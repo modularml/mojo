@@ -18,19 +18,35 @@ There are a few main tools in this module:
     These are useful helpers to specialize for the general bytes implementation.
 """
 
-import math
 import random
 from sys.ffi import _get_global
 
 from memory import memcpy, memset_zero, stack_allocation
 
+# ===----------------------------------------------------------------------=== #
+# Utilities
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
+    return (numerator + denominator - 1)._positive_div(denominator)
+
+
+@always_inline
+fn _max(a: Int, b: Int) -> Int:
+    return a if a > b else b
+
+
+# ===----------------------------------------------------------------------=== #
+# Implementation
+# ===----------------------------------------------------------------------=== #
+
 # This hash secret is XOR-ed with the final hash value for common hash functions.
 # Doing so can help prevent DDOS attacks on data structures relying on these
 # hash functions. See `hash(bytes, n)` documentation for more details.
 # TODO(27659): This is always 0 right now
-# var HASH_SECRET = random.random_ui64(
-#     0, math.limit.max_finite[DType.uint64]()
-# ).to_int()
+# var HASH_SECRET = int(random.random_ui64(0, UInt64.MAX)
 
 
 fn _HASH_SECRET() -> Int:
@@ -41,7 +57,7 @@ fn _HASH_SECRET() -> Int:
 
 
 fn _initialize_hash_secret(payload: Pointer[NoneType]) -> Pointer[NoneType]:
-    var secret = random.random_ui64(0, math.limit.max_finite[DType.uint64]())
+    var secret = random.random_ui64(0, UInt64.MAX)
     var data = Pointer[Int].alloc(1)
     data.store(int(secret))
     return data.bitcast[NoneType]()
@@ -125,7 +141,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
         hash collision statistical properties for common data structures.
     """
     # Some types will have non-integer ratios, eg. DType.bool
-    alias int8_size = math.ceildiv(
+    alias int8_size = _div_ceil_positive(
         type.bitwidth(), DType.uint8.bitwidth()
     ) * size
     # Stack allocate bytes for `data` and load it into that memory.
@@ -135,7 +151,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     #   nondeterminism (read) or memory corruption (write)
     # TODO(#31160): use math.lcm
     # Technically this is LCM, but alignments should always be multiples of 2.
-    alias alignment = math.max(
+    alias alignment = _max(
         alignof[SIMD[type, size]](), alignof[SIMD[DType.uint8, int8_size]]()
     )
     var bytes = stack_allocation[int8_size, DType.uint8, alignment=alignment]()

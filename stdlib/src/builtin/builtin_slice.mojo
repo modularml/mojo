@@ -8,7 +8,6 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from math import limit
 from sys.intrinsics import _mlirtype_is_eq
 
 
@@ -16,7 +15,7 @@ from sys.intrinsics import _mlirtype_is_eq
 fn _int_max_value() -> Int:
     # FIXME: The `slice` type should have the concept of `None` indices, but the
     # effect of a `None` end index is the same as a very large end index.
-    return int(limit.max_finite[DType.int32]())
+    return int(Int32.MAX)
 
 
 @always_inline("nodebug")

@@ -31,7 +31,6 @@ print(to_string(who_knows))
 ```
 """
 
-from math.math import align_up, max
 from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
@@ -39,6 +38,27 @@ from memory.unsafe import _LITRef, emplace_ref_unsafe
 
 from utils.loop import unroll
 from utils.static_tuple import StaticTuple
+
+
+# ===----------------------------------------------------------------------=== #
+# Utilities
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _align_up(value: Int, alignment: Int) -> Int:
+    var div_ceil = (value + alignment - 1)._positive_div(alignment)
+    return div_ceil * alignment
+
+
+@always_inline
+fn _max(a: Int, b: Int) -> Int:
+    return a if a > b else b
+
+
+# ===----------------------------------------------------------------------=== #
+# Variant
+# ===----------------------------------------------------------------------=== #
 
 
 # FIXME(#27380): Can't pass *Ts to a function parameter, only type parameter.
@@ -49,10 +69,10 @@ struct _UnionSize[*Ts: CollectionElement]():
 
         @parameter
         fn each[i: Int]():
-            size = max(size, align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
+            size = _max(size, _align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
 
         unroll[each, len(VariadicList(Ts))]()
-        return align_up(size, alignof[Int]())
+        return _align_up(size, alignof[Int]())
 
 
 # FIXME(#27380): Can't pass *Ts to a function parameter, only type parameter.

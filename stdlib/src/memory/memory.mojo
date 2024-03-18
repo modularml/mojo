@@ -13,11 +13,20 @@ from memory import memcmp
 """
 
 
-from math import align_down
 from sys import llvm_intrinsic
 from sys.info import sizeof, triple_is_nvidia_cuda
 
 from .unsafe import AddressSpace, DTypePointer, Pointer, _GPUAddressSpace
+
+# ===----------------------------------------------------------------------=== #
+# Utilities
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _align_down(value: Int, alignment: Int) -> Int:
+    return value._positive_div(alignment) * alignment
+
 
 # ===----------------------------------------------------------------------===#
 # memcmp
@@ -39,7 +48,7 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         buffer.
     """
     alias simd_width = simdwidthof[s1.type]()
-    var vector_end_simd = align_down(count, simd_width)
+    var vector_end_simd = _align_down(count, simd_width)
     for i in range(0, vector_end_simd, simd_width):
         var s1i = s1.load[width=simd_width](i)
         var s2i = s2.load[width=simd_width](i)
@@ -146,7 +155,7 @@ fn memcpy[count: Int](dest: Pointer, src: __type_of(dest)):
 
     # Copy in 32-byte chunks.
     alias chunk_size = 32
-    alias vector_end = align_down(n, chunk_size)
+    alias vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
         dest_dtype_ptr.store(i, src_dtype_ptr.load[width=chunk_size](i))
     for i in range(vector_end, n):
@@ -222,7 +231,7 @@ fn memcpy(dest: Pointer, src: __type_of(dest), count: Int):
 
     # Copy in 32-byte chunks.
     alias chunk_size = 32
-    var vector_end = align_down(n, chunk_size)
+    var vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
         dest_dtype_ptr.store(i, src_dtype_ptr.load[width=chunk_size](i))
     for i in range(vector_end, n):

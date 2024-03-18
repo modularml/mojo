@@ -12,8 +12,7 @@ from os.atomic import Atomic
 ```
 """
 
-from math._numerics import FPUtils
-from math.math import _float_to_bits
+from builtin.dtype import _integral_type_of
 
 from memory.unsafe import Pointer, bitcast
 
@@ -182,12 +181,12 @@ struct Atomic[type: DType]:
         # values to their integral representation and perform the atomic
         # operation on that.
 
-        alias integral_type = FPUtils[type].integral_type
+        alias integral_type = _integral_type_of[type]()
         var value_integral_addr = Pointer.address_of(self.value.value).bitcast[
             __mlir_type[`!pop.scalar<`, integral_type.value, `>`]
         ]()
-        var expected_integral = _float_to_bits[1, type, integral_type](expected)
-        var desired_integral = _float_to_bits[1, type, integral_type](desired)
+        var expected_integral = bitcast[integral_type](expected)
+        var desired_integral = bitcast[integral_type](desired)
 
         var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
             bin_op = __mlir_attr.`#pop<bin_op sub>`,

@@ -12,7 +12,6 @@ from sys.intrinsics import PrefetchLocality
 ```
 """
 
-from math import iota
 from sys.info import sizeof
 
 from memory.unsafe import AddressSpace, DTypePointer
@@ -1128,9 +1127,10 @@ fn strided_load[
     if simd_width == 1:
         return addr.load() if mask else Scalar[type]()
 
-    var offset = (
-        int(addr) + stride * iota[DType.index, simd_width]() * sizeof[type]()
-    )
+    var iota = llvm_intrinsic[
+        "llvm.experimental.stepvector", SIMD[DType.index, simd_width]
+    ]()
+    var offset = (int(addr) + stride * iota * sizeof[type]())
     var passthrough = SIMD[type, simd_width]()
     return gather[type, simd_width](
         offset.cast[DType.address](), mask, passthrough
@@ -1206,9 +1206,10 @@ fn strided_store[
             addr.store(value[0])
         return
 
-    var offset = (
-        int(addr) + stride * iota[DType.index, simd_width]() * sizeof[type]()
-    )
+    var iota = llvm_intrinsic[
+        "llvm.experimental.stepvector", SIMD[DType.index, simd_width]
+    ]()
+    var offset = int(addr) + stride * iota * sizeof[type]()
     scatter[type, simd_width](value, offset.cast[DType.address](), mask)
 
 

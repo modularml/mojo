@@ -12,10 +12,19 @@ from collections import List
 ```
 """
 
-from math import max
 
 from memory.anypointer import AnyPointer
 from memory.unsafe import Reference
+
+# ===----------------------------------------------------------------------===#
+# Utilties
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _max(a: Int, b: Int) -> Int:
+    return a if a > b else b
+
 
 # ===----------------------------------------------------------------------===#
 # List
@@ -161,7 +170,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             value: The value to append.
         """
         if self.size >= self.capacity:
-            self._realloc(max(1, self.capacity * 2))
+            self._realloc(_max(1, self.capacity * 2))
         (self.data + self.size).emplace_value(value ^)
         self.size += 1
 

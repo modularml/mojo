@@ -8,7 +8,6 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from math.math import align_up
 from sys import external_call
 from sys.info import bitwidthof, os_is_windows, triple_is_nvidia_cuda
 
@@ -16,6 +15,17 @@ from builtin.dtype import _get_dtype_printf_format
 from memory.unsafe import Pointer
 
 from utils import StringRef, unroll
+
+# ===----------------------------------------------------------------------=== #
+# Utilities
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _align_up(value: Int, alignment: Int) -> Int:
+    var div_ceil = (value + alignment - 1)._positive_div(alignment)
+    return div_ceil * alignment
+
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
@@ -324,9 +334,9 @@ struct _StringableTuple[*Ts: Stringable](Sized):
         if i == 0:
             return 0
         else:
-            return align_up(
+            return _align_up(
                 Self._offset[i - 1]()
-                + align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
+                + _align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
                 alignof[Ts[i]](),
             )
 

@@ -8,11 +8,36 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-import math
 
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol
 from memory.unsafe import DTypePointer, Pointer
+
+# ===----------------------------------------------------------------------=== #
+# Utilities
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _align_up(value: Int, alignment: Int) -> Int:
+    var div_ceil = (value + alignment - 1)._positive_div(alignment)
+    return div_ceil * alignment
+
+
+@always_inline
+fn _align_down(value: Int, alignment: Int) -> Int:
+    return value._positive_div(alignment) * alignment
+
+
+@always_inline
+fn _min(a: Int, b: Int) -> Int:
+    return a if a < b else b
+
+
+@always_inline
+fn _max(a: Int, b: Int) -> Int:
+    return a if a > b else b
+
 
 # ===----------------------------------------------------------------------===#
 # StringRef
@@ -329,12 +354,12 @@ struct StringRef(
             # Avoid out of bounds earlier than the start
             # len = 5, start = -3,  then abs_start == 2, i.e. a partial string
             # len = 5, start = -10, then abs_start == 0, i.e. the full string
-            abs_start = math.max(self_len + start, 0)
+            abs_start = _max(self_len + start, 0)
         else:
             # Avoid out of bounds past the end
             # len = 5, start = 2,   then abs_start == 2, i.e. a partial string
             # len = 5, start = 8,   then abs_start == 5, i.e. an empty string
-            abs_start = math.min(start, self_len)
+            abs_start = _min(start, self_len)
 
         debug_assert(
             abs_start >= 0, "strref absolute start must be non-negative"
@@ -367,6 +392,16 @@ struct StringRef(
 # ===----------------------------------------------------------------------===#
 
 
+@always_inline("nodebug")
+fn _cttz(val: Int) -> Int:
+    return llvm_intrinsic["llvm.cttz", Int](val, False)
+
+
+@always_inline("nodebug")
+fn _cttz(val: SIMD) -> __type_of(val):
+    return llvm_intrinsic["llvm.cttz", __type_of(val)](val, False)
+
+
 @always_inline
 fn _memchr[
     type: DType
@@ -377,13 +412,13 @@ fn _memchr[
         return DTypePointer[type]()
     alias bool_mask_width = simdwidthof[DType.bool]()
     var first_needle = SIMD[type, bool_mask_width](char)
-    var vectorized_end = math.align_down(len, bool_mask_width)
+    var vectorized_end = _align_down(len, bool_mask_width)
 
     for i in range(0, vectorized_end, bool_mask_width):
         var bool_mask = source.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
-            return source + i + math.bit.cttz(mask)
+            return source + i + _cttz(mask)
 
     for i in range(vectorized_end, len):
         if source[i] == char:
@@ -409,14 +444,14 @@ fn _memmem[
 
     alias bool_mask_width = simdwidthof[DType.bool]()
     var first_needle = SIMD[type, bool_mask_width](needle[0])
-    var vectorized_end = math.align_down(
+    var vectorized_end = _align_down(
         haystack_len - needle_len + 1, bool_mask_width
     )
     for i in range(0, vectorized_end, bool_mask_width):
         var bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         while mask:
-            var offset = i + math.bit.cttz(mask)
+            var offset = i + _cttz(mask)
             if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
                 return haystack + offset
             mask = mask & (mask - 1)

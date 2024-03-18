@@ -12,7 +12,29 @@ from testing import assert_true
 ```
 """
 from collections import Optional
-from math import abs, isclose
+
+# ===----------------------------------------------------------------------=== #
+# Utilities
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _abs(x: SIMD) -> __type_of(x):
+    return (x > 0).select(x, -x)
+
+
+@always_inline
+fn _isclose(
+    a: SIMD, b: __type_of(a), *, atol: Scalar[a.type], rtol: Scalar[a.type]
+) -> SIMD[DType.bool, a.size]:
+    @parameter
+    if a.type.is_bool() or a.type.is_integral():
+        return a == b
+
+    var atol_vec = SIMD[a.type, a.size](atol)
+    var rtol_vec = SIMD[a.type, a.size](rtol)
+    return _abs(a - b) <= (atol_vec.max(rtol_vec * _abs(a).max(_abs(b))))
+
 
 # ===----------------------------------------------------------------------=== #
 # Assertions
@@ -200,17 +222,17 @@ fn assert_almost_equal[
         lhs: The lhs of the equality.
         rhs: The rhs of the equality.
         msg: The message to print.
-        atol: The absolute tolerance.
+        atol: The _absolute tolerance.
         rtol: The relative tolerance.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    var almost_equal = isclose(lhs, rhs, atol=atol, rtol=rtol)
+    var almost_equal = _isclose(lhs, rhs, atol=atol, rtol=rtol)
     if not almost_equal:
         var err = "AssertionError: " + str(lhs) + " is not close to " + str(
             rhs
-        ) + " with a diff of " + abs(lhs - rhs)
+        ) + " with a diff of " + _abs(lhs - rhs)
         if msg:
             err += " (" + msg + ")"
         raise err

@@ -10,7 +10,6 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import List
-from math import abs as _abs
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -47,6 +46,11 @@ fn hex[T: Intable](value: T) -> String:
 # ===----------------------------------------------------------------------===#
 # Integer formatting utilities
 # ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _abs(x: SIMD) -> __type_of(x):
+    return (x > 0).select(x, -x)
 
 
 fn _format_int[

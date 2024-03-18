@@ -12,7 +12,7 @@ from time import now
 ```
 """
 
-from math import floor
+from builtin.simd import _floor
 from sys import external_call
 from sys.info import os_is_linux, os_is_windows
 
@@ -238,7 +238,7 @@ fn sleep(sec: Float64):
         sec: The number of seconds to sleep for.
     """
     alias NANOSECONDS_IN_SECOND = 1_000_000_000
-    var total_secs = floor(sec)
+    var total_secs = _floor(sec)
     var tv_spec = _CTimeSpec(
         int(total_secs.cast[DType.index]()),
         int((sec - total_secs) * NANOSECONDS_IN_SECOND),

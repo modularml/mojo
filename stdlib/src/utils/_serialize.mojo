@@ -4,7 +4,6 @@
 #
 # ===----------------------------------------------------------------------=== #
 
-from math import max
 from pathlib import Path
 
 from memory.unsafe import AddressSpace, DTypePointer, bitcast
@@ -14,6 +13,11 @@ alias _kEndTensorMarker = "]"
 alias _kTensorFiller = "..., "
 alias _kCompactMaxElemsToPrint = 7
 alias _kCompactElemPerSide = _kCompactMaxElemsToPrint // 2
+
+
+@always_inline
+fn _max(a: Int, b: Int) -> Int:
+    return a if a > b else b
 
 
 fn _serialize_elements_compact[
@@ -96,7 +100,7 @@ fn _serialize[
     # product of all dims other than last two.
 
     var num_matrices = 1
-    for i in range(max(rank - 2, 0)):
+    for i in range(_max(rank - 2, 0)):
         num_matrices *= shape[i]
 
     var matrix_idx = 0

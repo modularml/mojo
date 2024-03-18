@@ -8,9 +8,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from math._numerics import FPUtils
-from math.limit import inf, neginf
-from math.math import _simd_apply, isnan, nan
+from utils._numerics import FPUtils
+from utils._numerics import isnan as _isnan, nan as _nan
 from sys import llvm_intrinsic
 from sys.info import has_neon, is_x86, simdwidthof
 
@@ -2300,12 +2299,7 @@ fn _bfloat16_to_f32[
             _bfloat16_to_f32_scalar(rebind[Scalar[DType.bfloat16]](val))
         )
 
-    return _simd_apply[
-        size,
-        DType.bfloat16,
-        DType.float32,
-        wrapper_fn,
-    ](val)
+    return _simd_apply[wrapper_fn, DType.float32, size](val)
 
 
 @always_inline
@@ -2317,8 +2311,8 @@ fn _f32_to_bfloat16_scalar(
         # BF16 support on neon systems is not supported.
         return _unchecked_zero[DType.bfloat16, 1]()
 
-    if isnan(val):
-        return -nan[DType.bfloat16]() if FPUtils.get_sign(val) else nan[
+    if _isnan(val):
+        return -_nan[DType.bfloat16]() if FPUtils.get_sign(val) else _nan[
             DType.bfloat16
         ]()
 
@@ -2351,12 +2345,7 @@ fn _f32_to_bfloat16[
             _f32_to_bfloat16_scalar(rebind[Scalar[DType.float32]](val))
         )
 
-    return _simd_apply[
-        size,
-        DType.float32,
-        DType.bfloat16,
-        wrapper_fn,
-    ](val)
+    return _simd_apply[wrapper_fn, DType.bfloat16, size](val)
 
 
 # ===----------------------------------------------------------------------===#
@@ -2552,3 +2541,75 @@ fn _min_finite[type: DType]() -> Scalar[type]:
     else:
         constrained[False, "min_finite() called on unsupported type"]()
         return 0
+
+
+# ===----------------------------------------------------------------------===#
+# _simd_apply
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _simd_apply[
+    func: fn[input_type: DType, result_type: DType] (
+        Scalar[input_type]
+    ) capturing -> Scalar[result_type],
+    result_type: DType,
+    simd_width: Int,
+](x: SIMD[_, simd_width]) -> SIMD[result_type, simd_width]:
+    """Returns a value whose elements corresponds to applying `func` to each
+    element in the vector.
+
+    Parameter:
+      simd_width: Width of the input and output SIMD vectors.
+      input_type: Type of the input to func.
+      result_type: Result type of func.
+      func: Function to apply to the SIMD vector.
+
+    Args:
+      x: the input value.
+
+    Returns:
+      A SIMD vector whose element at index `i` is `func(x[i])`.
+    """
+    var result = SIMD[result_type, simd_width]()
+
+    @unroll
+    for i in range(simd_width):
+        result[i] = func[x.type, result_type](x[i])
+
+    return result
+
+
+@always_inline
+fn _simd_apply[
+    func: fn[lhs_type: DType, rhs_type: DType, result_type: DType] (
+        Scalar[lhs_type], Scalar[rhs_type]
+    ) capturing -> Scalar[result_type],
+    result_type: DType,
+    simd_width: Int,
+](x: SIMD[_, simd_width], y: SIMD[_, simd_width]) -> SIMD[
+    result_type, simd_width
+]:
+    """Returns a value whose elements corresponds to applying `func` to each
+    element in the vector.
+
+    Parameter:
+      simd_width: Width of the input and output SIMD vectors.
+      input_type: Type of the input to func.
+      result_type: Result type of func.
+      func: Function to apply to the SIMD vector.
+
+    Args:
+      x: the lhs input value.
+      y: the rhs input value.
+
+    Returns:
+      A SIMD vector whose element at index `i` is `func(x[i], y[i])`.
+    """
+    var result = SIMD[result_type, simd_width]()
+
+    @unroll
+    for i in range(simd_width):
+        result[i] = func[x.type, y.type, result_type](x[i], y[i])
+
+    return result

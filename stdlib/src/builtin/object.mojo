@@ -9,7 +9,6 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict, List
-from math import min as _min
 from os.atomic import Atomic
 from sys.intrinsics import _mlirtype_is_eq
 
@@ -20,6 +19,16 @@ from utils import StringRef
 from utils.loop import unroll
 
 from .io import _printf, _put
+
+# ===----------------------------------------------------------------------=== #
+# Utilities
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _min(a: Int, b: Int) -> Int:
+    return a if a < b else b
+
 
 # ===----------------------------------------------------------------------=== #
 # _ObjectImpl
