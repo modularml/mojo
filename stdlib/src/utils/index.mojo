@@ -16,8 +16,6 @@ from utils.index import StaticIntTuple
 from builtin.io import _get_dtype_printf_format
 from builtin.string import _calc_initial_buffer_size, _vec_fmt
 
-from utils.list import DimList
-
 from . import unroll
 from .static_tuple import StaticTuple
 
@@ -346,31 +344,6 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         """
         constrained[size > 0]()
         return Self {data: values}
-
-    @always_inline
-    fn __init__(values: DimList) -> Self:
-        """Creates a tuple constant using the specified values.
-
-        Args:
-            values: The list of values.
-
-        Returns:
-            A tuple with the values filled in.
-        """
-        var array = __mlir_op.`pop.array.repeat`[
-            _type = __mlir_type[`!pop.array<`, size.value, `, `, Int, `>`]
-        ](Int(0))
-
-        @always_inline
-        @parameter
-        fn fill[idx: Int]():
-            array = __mlir_op.`pop.array.replace`[
-                _type = __mlir_type[`!pop.array<`, size.value, `, `, Int, `>`],
-                index = idx.value,
-            ](values.at[idx]().get(), array)
-
-        unroll[fill, size]()
-        return Self {data: StaticTuple[Int, size](array)}
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
