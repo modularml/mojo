@@ -63,7 +63,7 @@ struct Matrix[rows: Int, cols: Int]:
         return self.data.simd_load[nelts](y * self.cols + x)
 
     fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[type, nelts]):
-        return self.data.store[width=nelts](y * self.cols + x, val)
+        return self.data.simd_store[nelts](y * self.cols + x, val)
 
 
 def run_matmul_python() -> Float64:
