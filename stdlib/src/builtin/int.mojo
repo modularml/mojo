@@ -167,6 +167,12 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
     var value: __mlir_type.index
     """The underlying storage for the integer value."""
 
+    alias MAX = int(Scalar[DType.index].MAX)
+    """Returns the maximum integer value."""
+
+    alias MIN = int(Scalar[DType.index].MIN)
+    """Returns the minimum value of type."""
+
     @always_inline("nodebug")
     fn __init__() -> Int:
         """Default constructor.

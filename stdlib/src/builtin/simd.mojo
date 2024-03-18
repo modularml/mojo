@@ -124,6 +124,18 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     var value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
     """The underlying storage for the vector."""
 
+    alias MAX = Self(_inf[type]())
+    """Gets a +inf value for the SIMD value."""
+
+    alias MIN = Self(_neginf[type]())
+    """Gets a -inf value for the SIMD value."""
+
+    alias MAX_FINITE = Self(_max_finite[type]())
+    """Returns the maximum finite value of SIMD value."""
+
+    alias MIN_FINITE = Self(_min_finite[type]())
+    """Returns the minimum (lowest) finite value of SIMD value."""
+
     @always_inline("nodebug")
     fn __init__() -> Self:
         """Default initializer of the SIMD vector.
@@ -2345,3 +2357,198 @@ fn _f32_to_bfloat16[
         DType.bfloat16,
         wrapper_fn,
     ](val)
+
+
+# ===----------------------------------------------------------------------===#
+# Limits
+# ===----------------------------------------------------------------------===#
+
+
+# ===----------------------------------------------------------------------===#
+# inf
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn _inf[type: DType]() -> Scalar[type]:
+    """Gets a +inf value for the given dtype.
+
+    Constraints:
+        Can only be used for FP dtypes.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The +inf value of the given dtype.
+    """
+
+    @parameter
+    if type == DType.float16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f16>`],
+                value = __mlir_attr[`#pop.simd<"inf"> : !pop.scalar<f16>`],
+            ]()
+        )
+    elif type == DType.bfloat16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<bf16>`],
+                value = __mlir_attr[`#pop.simd<"inf"> : !pop.scalar<bf16>`],
+            ]()
+        )
+    elif type == DType.float32:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f32>`],
+                value = __mlir_attr[`#pop.simd<"inf"> : !pop.scalar<f32>`],
+            ]()
+        )
+    elif type == DType.float64:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f64>`],
+                value = __mlir_attr[`#pop.simd<"inf"> : !pop.scalar<f64>`],
+            ]()
+        )
+    return _max_finite[type]()
+
+
+# ===----------------------------------------------------------------------===#
+# neginf
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn _neginf[type: DType]() -> Scalar[type]:
+    """Gets a -inf value for the given dtype.
+
+    Constraints:
+        Can only be used for FP dtypes.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The -inf value of the given dtype.
+    """
+
+    @parameter
+    if type == DType.float16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f16>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<f16>`],
+            ]()
+        )
+    elif type == DType.bfloat16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<bf16>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<bf16>`],
+            ]()
+        )
+    elif type == DType.float32:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f32>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<f32>`],
+            ]()
+        )
+    elif type == DType.float64:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f64>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<f64>`],
+            ]()
+        )
+    return _min_finite[type]()
+
+
+# ===----------------------------------------------------------------------===#
+# max_finite
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _max_finite[type: DType]() -> Scalar[type]:
+    """Returns the maximum finite value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The maximum representable value of the type. Does not include infinity for
+        floating-point types.
+    """
+
+    @parameter
+    if type == DType.int8:
+        return 127
+    elif type == DType.uint8:
+        return 255
+    elif type == DType.int16:
+        return 32767
+    elif type == DType.uint16:
+        return 65535
+    elif type == DType.int32 or (
+        type == DType.index and sizeof[DType.index]() == sizeof[DType.int32]()
+    ):
+        return 2147483647
+    elif type == DType.uint32:
+        return 4294967295
+    elif type == DType.float32:
+        return 3.40282346638528859812e38
+    elif type == DType.int64 or (
+        type == DType.index and sizeof[DType.index]() == sizeof[DType.int64]()
+    ):
+        return 9223372036854775807
+    elif type == DType.uint64:
+        return 18446744073709551615
+    elif type == DType.float64:
+        return 1.79769313486231570815e308
+    elif type == DType.bfloat16:
+        return 3.38953139e38
+    else:
+        constrained[False, "max_finite() called on unsupported type"]()
+        return 0
+
+
+# ===----------------------------------------------------------------------===#
+# min_finite
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn _min_finite[type: DType]() -> Scalar[type]:
+    """Returns the minimum (lowest) finite value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The minimum representable value of the type. Does not include negative
+        infinity for floating-point types.
+    """
+
+    @parameter
+    if type.is_unsigned():
+        return 0
+    elif type == DType.int8:
+        return -128
+    elif type == DType.int16:
+        return -32768
+    elif type == DType.int32:
+        return -2147483648
+    elif type == DType.float32:
+        return -_max_finite[type]()
+    elif type == DType.int64:
+        return -9223372036854775808
+    elif type == DType.float64:
+        return -_max_finite[type]()
+    elif type == DType.bfloat16:
+        return -_max_finite[type]()
+    else:
+        constrained[False, "min_finite() called on unsupported type"]()
+        return 0
