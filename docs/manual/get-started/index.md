@@ -71,7 +71,7 @@ Support for Windows will be added in a future release.
 1. Open a terminal and install the [`modular`](/cli/) command line tool:
 
     ```sh
-    curl https://get.modular.com | sh -
+    curl -s https://get.modular.com | sh -
     ```
 
 2. Then sign in to your Modular account with this command:
