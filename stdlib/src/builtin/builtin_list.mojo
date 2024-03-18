@@ -416,6 +416,7 @@ struct VariadicListMem[
 # TODO: We need to genericize VariadicPack over the kinds of types it holds,
 # instead of erasing them to AnyType. This would allow packs of values known to
 # be Stringable for example.
+@register_passable
 struct VariadicPack[
     elt_is_mutable: __mlir_type.i1,
     lifetime: AnyLifetime[elt_is_mutable].type,
