@@ -218,11 +218,11 @@ fn memcpy(dest: Pointer, src: __type_of(dest), count: Int):
     # slowing down broadcast ops
     # if n <= 32:
     #    alias simd_16xui8_size = 16 * sizeof[Int8]()
-    #    dest_data.simd_store[16](src_data.simd_load[16]())
+    #    dest_data.store[width=16](src_data.load[width=16]())
     #    # note that some of these bytes may have already been written by the
     #    # previous simd_store
-    #    dest_data.simd_store[16](
-    #        n - simd_16xui8_size, src_data.simd_load[16](n - simd_16xui8_size)
+    #    dest_data.store[width=16](
+    #        n - simd_16xui8_size, src_data.load[width=16](n - simd_16xui8_size)
     #    )
     #    return
 

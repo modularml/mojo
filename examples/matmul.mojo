@@ -60,7 +60,7 @@ struct Matrix[rows: Int, cols: Int]:
         self.store[1](y, x, val)
 
     fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[type, nelts]:
-        return self.data.simd_load[nelts](y * self.cols + x)
+        return self.data.load[width=nelts](y * self.cols + x)
 
     fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[type, nelts]):
         return self.data.simd_store[nelts](y * self.cols + x, val)
