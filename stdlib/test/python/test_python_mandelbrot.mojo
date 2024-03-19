@@ -82,7 +82,7 @@ def mandlebrot_kernel(c: Complex) -> Int:
     z = c
     for i in range(max_iter):
         z = z * z + c
-        if z.squared_norm() > 4:
+        if z.norm() > 4:
             return i
     return max_iter
 

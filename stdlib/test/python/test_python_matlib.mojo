@@ -6,7 +6,7 @@
 # REQUIRES: disabled
 # RUN: %mojo %s
 
-from CPython import CPython, PyObjectPtr
+from python._cpython import CPython, PyObjectPtr
 from python import Python
 
 

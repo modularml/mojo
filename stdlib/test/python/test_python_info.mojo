@@ -3,11 +3,11 @@
 # This file is Modular Inc proprietary.
 #
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: disabled
+# XFAIL: asan && !system-darwin
 # RUN: %mojo %s | FileCheck %s
 
 
-from CPython import PythonVersion
+from python._cpython import PythonVersion
 from python import Python
 
 
