@@ -45,14 +45,14 @@ struct _PyIter(Sized):
         self.dict = existing.dict
         self.nextItem = existing.nextItem
 
-    fn __init__(inout self, dict: Dictionary):
+    fn __init__(inout self, dictionary: Dictionary):
         """Initialize an iterator.
 
         Args:
-            dict: The Dictionary to traverse.
+            dictionary: The Dictionary to traverse.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.dict = dict
+        self.dict = dictionary
         self.nextItem = cpython.PyDict_Next(self.dict.py_object, 0)
 
     fn __next__(inout self: _PyIter) -> PythonObject:
@@ -91,13 +91,14 @@ struct Dictionary(Boolable):
     var py_object: PyObjectPtr
     """The underlying pyobject pointer of this dictionary."""
 
-    fn __init__(inout self, dict: PyObjectPtr):
+    fn __init__(inout self, dict_obj: PyObjectPtr):
         """Initialize the dictionary with the given pyobject pointer.
 
         Args:
-            dict: The pyobject pointer used to initialize the new dictionary.
+            dict_obj: The pyobject pointer used to initialize the new
+              dictionary.
         """
-        self.py_object = dict
+        self.py_object = dict_obj
 
     fn __copyinit__(inout self, existing: Self):
         """Copy the dictionary.

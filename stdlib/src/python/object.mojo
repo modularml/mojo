@@ -191,24 +191,24 @@ struct PythonObject(
         """
         self = PythonObject(str(value))
 
-    fn __init__(inout self, str: StringRef):
+    fn __init__(inout self, strref: StringRef):
         """Initialize the object from a string reference.
 
         Args:
-            str: The string value.
+            strref: The string reference.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(str)
+        self.py_object = cpython.toPython(strref)
 
-    fn __init__(inout self, str: String):
+    fn __init__(inout self, string: String):
         """Initialize the object from a string.
 
         Args:
-            str: The string value.
+            string: The string value.
         """
         var cpython = _get_global_python_itf().cpython()
-        self.py_object = cpython.toPython(str._strref_dangerous())
-        str._strref_keepalive()
+        self.py_object = cpython.toPython(string._strref_dangerous())
+        string._strref_keepalive()
 
     fn __init__[*Ts: AnyRegType](inout self, value: ListLiteral[Ts]):
         """Initialize the object from a list literal.
@@ -434,20 +434,20 @@ struct PythonObject(
         """
         var size = len(args)
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(size)
+        var tuple_obj = cpython.PyTuple_New(size)
         for i in range(size):
             var arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
-            var wasSuccessful = cpython.PyTuple_SetItem(tuple, i, arg_value)
+            var wasSuccessful = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
             if wasSuccessful == 1:
                 raise Error()
 
-        var callable = cpython.PyObject_GetAttrString(
+        var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, "__getitem__"
         )
-        var result = cpython.PyObject_CallObject(callable, tuple)
-        cpython.Py_DecRef(callable)
-        cpython.Py_DecRef(tuple)
+        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
+        cpython.Py_DecRef(callable_obj)
+        cpython.Py_DecRef(tuple_obj)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
 
@@ -455,60 +455,60 @@ struct PythonObject(
         self, method_name: StringRef
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(0)
-        var callable = cpython.PyObject_GetAttrString(
+        var tuple_obj = cpython.PyTuple_New(0)
+        var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, method_name
         )
-        if callable.is_null():
+        if callable_obj.is_null():
             raise Error()
-        var result = cpython.PyObject_CallObject(callable, tuple)
-        cpython.Py_DecRef(tuple)
-        cpython.Py_DecRef(callable)
+        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
+        cpython.Py_DecRef(tuple_obj)
+        cpython.Py_DecRef(callable_obj)
         return PythonObject(result)
 
     fn _call_single_arg_method(
         self, method_name: StringRef, rhs: PythonObject
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(1)
-        var wasSuccessful = cpython.PyTuple_SetItem(tuple, 0, rhs.py_object)
+        var tuple_obj = cpython.PyTuple_New(1)
+        var wasSuccessful = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)
         cpython.Py_IncRef(rhs.py_object)
 
         if wasSuccessful == 1:
             raise Error()
-        var callable = cpython.PyObject_GetAttrString(
+        var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, method_name
         )
-        if callable.is_null():
+        if callable_obj.is_null():
             raise Error()
-        var result = cpython.PyObject_CallObject(callable, tuple)
-        cpython.Py_DecRef(tuple)
-        cpython.Py_DecRef(callable)
+        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
+        cpython.Py_DecRef(tuple_obj)
+        cpython.Py_DecRef(callable_obj)
         return PythonObject(result)
 
     fn _call_single_arg_inplace_method(
         inout self, method_name: StringRef, rhs: PythonObject
     ) raises:
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(1)
-        var wasSuccessful = cpython.PyTuple_SetItem(tuple, 0, rhs.py_object)
+        var tuple_obj = cpython.PyTuple_New(1)
+        var wasSuccessful = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)
         cpython.Py_IncRef(rhs.py_object)
 
         if wasSuccessful == 1:
             raise Error()
-        var callable = cpython.PyObject_GetAttrString(
+        var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, method_name
         )
-        if callable.is_null():
+        if callable_obj.is_null():
             raise Error()
 
         # Destroy previously stored pyobject
         if not self.py_object.is_null():
             cpython.Py_DecRef(self.py_object)
 
-        self.py_object = cpython.PyObject_CallObject(callable, tuple)
-        cpython.Py_DecRef(tuple)
-        cpython.Py_DecRef(callable)
+        self.py_object = cpython.PyObject_CallObject(callable_obj, tuple_obj)
+        cpython.Py_DecRef(tuple_obj)
+        cpython.Py_DecRef(callable_obj)
 
     fn __mul__(self, rhs: PythonObject) raises -> PythonObject:
         """Multiplication.
@@ -1033,19 +1033,19 @@ struct PythonObject(
         """
         var size = len(args)
         var cpython = _get_global_python_itf().cpython()
-        var tuple = cpython.PyTuple_New(size)
+        var tuple_obj = cpython.PyTuple_New(size)
         for i in range(size):
             var arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
-            var wasSuccessful = cpython.PyTuple_SetItem(tuple, i, arg_value)
+            var wasSuccessful = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
             if wasSuccessful == 1:
                 raise Error()
 
-        var callable = self.py_object
-        cpython.Py_IncRef(callable)
-        var result = cpython.PyObject_CallObject(callable, tuple)
-        cpython.Py_DecRef(callable)
-        cpython.Py_DecRef(tuple)
+        var callable_obj = self.py_object
+        cpython.Py_IncRef(callable_obj)
+        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
+        cpython.Py_DecRef(callable_obj)
+        cpython.Py_DecRef(tuple_obj)
         Python.throw_python_exception_if_error_state(cpython)
         # Python always returns non null on success.
         # A void function returns the singleton None.
@@ -1095,7 +1095,9 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         var python_str: PythonObject = cpython.PyObject_Str(self.py_object)
         # copy the string
-        var str = String(cpython.PyUnicode_AsUTF8AndSize(python_str.py_object))
+        var mojo_str = String(
+            cpython.PyUnicode_AsUTF8AndSize(python_str.py_object)
+        )
         # keep python object alive so the copy can occur
         _ = python_str
-        return str
+        return mojo_str

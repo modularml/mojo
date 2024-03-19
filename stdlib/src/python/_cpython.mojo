@@ -71,20 +71,20 @@ struct PythonVersion:
         var version_string = String(version)
         var components = StaticIntTuple[3]()
         var start = 0
-        var next = 0
+        var next_idx = 0
         var i = 0
-        while next < len(version_string) and i < 3:
-            if version_string[next] == "." or (
-                version_string[next] == " " and i == 2
+        while next_idx < len(version_string) and i < 3:
+            if version_string[next_idx] == "." or (
+                version_string[next_idx] == " " and i == 2
             ):
-                var c = version_string[start:next]
+                var c = version_string[start:next_idx]
                 try:
                     components[i] = atol(c)
                 except:
                     components[i] = -1
                 i += 1
-                start = next + 1
-            next += 1
+                start = next_idx + 1
+            next_idx += 1
         return PythonVersion(components[0], components[1], components[2])
 
 
@@ -196,13 +196,13 @@ struct CPython:
     fn Py_None(inout self) -> PyObjectPtr:
         """Get a None value, of type NoneType."""
         if self.none_value.is_null():
-            var list = self.PyList_New(0)
-            var tuple = self.PyTuple_New(0)
-            var callable = self.PyObject_GetAttrString(list, "reverse")
-            self.none_value = self.PyObject_CallObject(callable, tuple)
-            self.Py_DecRef(tuple)
-            self.Py_DecRef(callable)
-            self.Py_DecRef(list)
+            var list_obj = self.PyList_New(0)
+            var tuple_obj = self.PyTuple_New(0)
+            var callable_obj = self.PyObject_GetAttrString(list_obj, "reverse")
+            self.none_value = self.PyObject_CallObject(callable_obj, tuple_obj)
+            self.Py_DecRef(tuple_obj)
+            self.Py_DecRef(callable_obj)
+            self.Py_DecRef(list_obj)
         return self.none_value
 
     fn __del__(owned self):
@@ -263,11 +263,11 @@ struct CPython:
         return r
 
     fn PyDict_SetItem(
-        inout self, dict: PyObjectPtr, key: PyObjectPtr, value: PyObjectPtr
+        inout self, dict_obj: PyObjectPtr, key: PyObjectPtr, value: PyObjectPtr
     ) -> Int:
         var r = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> Int32
-        ](StringRef("PyDict_SetItem"))(dict, key, value)
+        ](StringRef("PyDict_SetItem"))(dict_obj, key, value)
         if self.logging_enabled:
             print(
                 "PyDict_SetItem, key: ",
@@ -278,11 +278,11 @@ struct CPython:
         return int(r)
 
     fn PyDict_GetItemWithError(
-        inout self, dict: PyObjectPtr, key: PyObjectPtr
+        inout self, dict_obj: PyObjectPtr, key: PyObjectPtr
     ) -> PyObjectPtr:
         var result = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
-        ](StringRef("PyDict_GetItemWithError"))(dict, key)
+        ](StringRef("PyDict_GetItemWithError"))(dict_obj, key)
         if self.logging_enabled:
             print("PyDict_GetItemWithError, key: ", key._get_ptr_as_int())
         return result
@@ -310,11 +310,11 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyRun_SimpleString(inout self, str: StringRef) -> Bool:
+    fn PyRun_SimpleString(inout self, strref: StringRef) -> Bool:
         """Executes the given Python code.
 
         Args:
-            str: The python code to execute.
+            strref: The python code to execute.
 
         Returns:
             `True` if the code executed successfully or `False` if the code
@@ -322,14 +322,14 @@ struct CPython:
         """
         var status = self.lib.get_function[
             fn (DTypePointer[DType.int8]) -> Int
-        ](StringRef("PyRun_SimpleString"))(str.data)
+        ](StringRef("PyRun_SimpleString"))(strref.data)
         # PyRun_SimpleString returns 0 on success and -1 if an exception was
         # raised.
         return status == 0
 
     fn PyRun_String(
         inout self,
-        str: StringRef,
+        strref: StringRef,
         globals: PyObjectPtr,
         locals: PyObjectPtr,
         run_mode: Int,
@@ -339,13 +339,13 @@ struct CPython:
                 fn (
                     DTypePointer[DType.int8], Int32, PyObjectPtr, PyObjectPtr
                 ) -> DTypePointer[DType.int8]
-            ]("PyRun_String")(str.data, Int32(run_mode), globals, locals)
+            ]("PyRun_String")(strref.data, Int32(run_mode), globals, locals)
         )
         if self.logging_enabled:
             print(
                 result._get_ptr_as_int(),
                 " NEWREF PyRun_String, str:",
-                str,
+                strref,
                 ", ptr: ",
                 result._get_ptr_as_int(),
                 ", refcnt:",
@@ -396,19 +396,19 @@ struct CPython:
 
     fn PyObject_CallObject(
         inout self,
-        callable: PyObjectPtr,
+        callable_obj: PyObjectPtr,
         args: PyObjectPtr,
     ) -> PyObjectPtr:
         var r = self.lib.get_function[
             fn (PyObjectPtr, PyObjectPtr) -> PyObjectPtr
-        ]("PyObject_CallObject")(callable, args)
+        ]("PyObject_CallObject")(callable_obj, args)
         if self.logging_enabled:
             print(
                 r._get_ptr_as_int(),
                 " NEWREF PyObject_CallObject, refcnt:",
                 self._Py_REFCNT(r),
                 ", callable obj:",
-                callable._get_ptr_as_int(),
+                callable_obj._get_ptr_as_int(),
             )
         self._inc_total_rc()
         return r
@@ -450,7 +450,7 @@ struct CPython:
 
     fn PyTuple_SetItem(
         inout self,
-        tuple: PyObjectPtr,
+        tuple_obj: PyObjectPtr,
         index: Int,
         element: PyObjectPtr,
     ) -> Int:
@@ -459,15 +459,15 @@ struct CPython:
         self._dec_total_rc()
         return self.lib.get_function[fn (PyObjectPtr, Int, PyObjectPtr) -> Int](
             StringRef("PyTuple_SetItem")
-        )(tuple, index, element)
+        )(tuple_obj, index, element)
 
-    fn PyString_FromStringAndSize(inout self, str: StringRef) -> PyObjectPtr:
+    fn PyString_FromStringAndSize(inout self, strref: StringRef) -> PyObjectPtr:
         var r = self.lib.get_function[
             fn (
                 DTypePointer[DType.int8], Int, DTypePointer[DType.int8]
             ) -> PyObjectPtr
         ](StringRef("PyUnicode_DecodeUTF8"))(
-            str.data, str.length, "strict".data()
+            strref.data, strref.length, "strict".data()
         )
         if self.logging_enabled:
             print(
@@ -475,7 +475,7 @@ struct CPython:
                 " NEWREF PyString_FromStringAndSize, refcnt:",
                 self._Py_REFCNT(r),
                 ", str:",
-                str,
+                strref,
             )
         self._inc_total_rc()
         return r
@@ -522,9 +522,9 @@ struct CPython:
         self._inc_total_rc()
         return r
 
-    fn PyList_New(inout self, len: Int) -> PyObjectPtr:
+    fn PyList_New(inout self, length: Int) -> PyObjectPtr:
         var r = self.lib.get_function[fn (Int) -> PyObjectPtr]("PyList_New")(
-            len
+            length
         )
         if self.logging_enabled:
             print(
@@ -532,25 +532,27 @@ struct CPython:
                 " NEWREF PyList_New, refcnt:",
                 self._Py_REFCNT(r),
                 ", list size:",
-                len,
+                length,
             )
         self._inc_total_rc()
         return r
 
     fn PyList_SetItem(
-        inout self, list: PyObjectPtr, index: Int, value: PyObjectPtr
+        inout self, list_obj: PyObjectPtr, index: Int, value: PyObjectPtr
     ) -> PyObjectPtr:
         # PyList_SetItem steals the reference - the element object will be
         # destroyed along with the list
         self._dec_total_rc()
         return self.lib.get_function[
             fn (PyObjectPtr, Int, PyObjectPtr) -> PyObjectPtr
-        ]("PyList_SetItem")(list, index, value)
+        ]("PyList_SetItem")(list_obj, index, value)
 
-    fn PyList_GetItem(inout self, list: PyObjectPtr, index: Int) -> PyObjectPtr:
+    fn PyList_GetItem(
+        inout self, list_obj: PyObjectPtr, index: Int
+    ) -> PyObjectPtr:
         return self.lib.get_function[fn (PyObjectPtr, Int) -> PyObjectPtr](
             "PyList_GetItem"
-        )(list, index)
+        )(list_obj, index)
 
     fn toPython(inout self, litString: StringRef) -> PyObjectPtr:
         return self.PyString_FromStringAndSize(litString)
@@ -709,22 +711,22 @@ struct CPython:
         return iter
 
     fn PyIter_Next(inout self, iterator: PyObjectPtr) -> PyObjectPtr:
-        var next = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
+        var next_obj = self.lib.get_function[fn (PyObjectPtr) -> PyObjectPtr](
             "PyIter_Next"
         )(iterator)
         if self.logging_enabled:
             print(
-                next._get_ptr_as_int(),
+                next_obj._get_ptr_as_int(),
                 " NEWREF PyIter_Next from ",
                 iterator._get_ptr_as_int(),
                 ", refcnt(obj):",
-                self._Py_REFCNT(next),
+                self._Py_REFCNT(next_obj),
                 "refcnt(iter)",
                 self._Py_REFCNT(iterator),
             )
-        if next._get_ptr_as_int() != 0:
+        if next_obj._get_ptr_as_int() != 0:
             self._inc_total_rc()
-        return next
+        return next_obj
 
     fn PyIter_Check(inout self, obj: PyObjectPtr) -> Bool:
         var follows_iter_protocol = self.lib.get_function[
