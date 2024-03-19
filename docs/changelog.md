@@ -214,6 +214,8 @@ modular update mojo
 
 - `List.push_back` has been removed.  Please use the `append` function instead.
 
+- `utils.list` has moved to `buffer.list`.  Please update your imports accordingly.
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,

@@ -8,7 +8,7 @@
 from testing import *
 
 from utils.index import StaticIntTuple
-from utils.list import Dim, DimList
+from buffer.list import Dim, DimList
 
 
 # CHECK-LABEL: test_dim_list
