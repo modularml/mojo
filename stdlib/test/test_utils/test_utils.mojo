@@ -4,8 +4,9 @@
 #
 # ===----------------------------------------------------------------------=== #
 
-from builtin.simd import _simd_apply
 from sys import external_call
+
+from builtin.simd import _simd_apply
 
 
 @always_inline

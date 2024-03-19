@@ -17,8 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import List
 from collections.dict import KeyElement
-from sys.info import bitwidthof
 from sys import llvm_intrinsic
+from sys.info import bitwidthof
 
 from memory.anypointer import AnyPointer
 from memory.memory import memcmp, memcpy

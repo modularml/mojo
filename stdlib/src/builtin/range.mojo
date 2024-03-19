@@ -18,7 +18,6 @@ These are Mojo built-ins, so you don't need to import them.
 
 from python.object import PythonObject
 
-
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #

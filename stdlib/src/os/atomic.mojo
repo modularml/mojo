@@ -20,7 +20,6 @@ from os.atomic import Atomic
 """
 
 from builtin.dtype import _integral_type_of
-
 from memory.unsafe import Pointer, bitcast
 
 

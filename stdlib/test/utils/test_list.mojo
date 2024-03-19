@@ -5,10 +5,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
+from buffer.list import Dim, DimList
 from testing import *
 
 from utils.index import StaticIntTuple
-from buffer.list import Dim, DimList
 
 
 # CHECK-LABEL: test_dim_list

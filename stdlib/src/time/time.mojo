@@ -19,10 +19,10 @@ from time import now
 ```
 """
 
-from builtin.simd import _floor
 from sys import external_call
 from sys.info import os_is_linux, os_is_windows
 
+from builtin.simd import _floor
 from memory.unsafe import Pointer
 
 # ===----------------------------------------------------------------------===#

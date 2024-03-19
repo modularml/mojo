@@ -46,7 +46,6 @@ from memory.unsafe import _LITRef, emplace_ref_unsafe
 from utils.loop import unroll
 from utils.static_tuple import StaticTuple
 
-
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
