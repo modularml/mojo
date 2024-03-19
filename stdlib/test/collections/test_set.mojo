@@ -250,7 +250,7 @@ def test_pop_insertion_order():
 
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
-    print_no_newline("Test", name_val, "...")
+    print("Test", name_val, "...", end="")
     try:
         _ = test_fn()
     except e:
