@@ -445,22 +445,6 @@ fn test_iter() raises -> None:
             print("I should not exist", x)
             assert_false(True)
 
-    var mydict = Python.dict()
-    mydict["vegetable"] = "carrot"
-    mydict["dessert"] = "apple pie"
-    mydict["protein"] = "chicken"
-    # CHECK: vegetable
-    # CHECK: dessert
-    # CHECK: protein
-    for key in mydict:
-        print(key)
-
-    # CHECK: carrot
-    # CHECK: apple pie
-    # CHECK: chicken
-    for value in mydict.values():
-        print(value)
-
 
 def main():
     # initializing Python instance calls init_python

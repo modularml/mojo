@@ -28,7 +28,6 @@ from memory.unsafe import Pointer
 from utils import StringRef
 
 from ._cpython import CPython, Py_eval_input
-from .dictionary import Dictionary
 from .object import PythonObject
 
 
@@ -81,25 +80,25 @@ struct Python:
         """
         self.impl = existing.impl
 
-    fn eval(inout self, str: StringRef) -> Bool:
+    fn eval(inout self, code: StringRef) -> Bool:
         """Executes the given Python code.
 
         Args:
-            str: The python code to execute.
+            code: The python code to execute.
 
         Returns:
             `True` if the code executed successfully or `False` if the code
             raised an exception.
         """
         var cpython = self.impl.cpython()
-        return cpython.PyRun_SimpleString(str)
+        return cpython.PyRun_SimpleString(code)
 
     @staticmethod
-    fn evaluate(str: StringRef) raises -> PythonObject:
+    fn evaluate(expr: StringRef) raises -> PythonObject:
         """Executes the given Python code.
 
         Args:
-            str: The Python expression to evaluate.
+            expr: The Python expression to evaluate.
 
         Returns:
             `PythonObject` containing the result of the evaluation.
@@ -108,20 +107,18 @@ struct Python:
         var module = PythonObject(cpython.PyImport_AddModule("__main__"))
         # PyImport_AddModule returns a borrowed reference - IncRef it to keep it alive.
         cpython.Py_IncRef(module.py_object)
-        var dictionary = PythonObject(
-            cpython.PyModule_GetDict(module.py_object)
-        )
+        var dict_obj = PythonObject(cpython.PyModule_GetDict(module.py_object))
         # PyModule_GetDict returns a borrowed reference - IncRef it to keep it alive.
-        cpython.Py_IncRef(dictionary.py_object)
+        cpython.Py_IncRef(dict_obj.py_object)
         var result = cpython.PyRun_String(
-            str, dictionary.py_object, dictionary.py_object, Py_eval_input
+            expr, dict_obj.py_object, dict_obj.py_object, Py_eval_input
         )
         # We no longer need module and dictionary, release them.
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
 
     @staticmethod
-    fn add_to_path(str: String) raises:
+    fn add_to_path(dir_path: String) raises:
         """Adds a directory to the Python path.
 
         This might be necessary to import a Python module via `import_module()`.
@@ -138,15 +135,15 @@ struct Python:
         ```
 
         Args:
-            str: The path to a Python module you want to import.
+            dir_path: The path to a Python module you want to import.
         """
         var cpython = _get_global_python_itf().cpython()
         var sys = Python.import_module("sys")
-        var directory: PythonObject = str
+        var directory: PythonObject = dir_path
         _ = sys.path.append(directory)
 
     @staticmethod
-    fn import_module(str: StringRef) raises -> PythonObject:
+    fn import_module(module: StringRef) raises -> PythonObject:
         """Imports a Python module.
 
         This provides you with a module object you can use just like you would
@@ -161,7 +158,7 @@ struct Python:
         ```
 
         Args:
-            str: The Python module name. This module must be visible from the
+            module: The Python module name. This module must be visible from the
                 list of available Python paths (you might need to add the
                 module's path with `add_to_path()`).
 
@@ -169,21 +166,11 @@ struct Python:
             The Python module.
         """
         var cpython = _get_global_python_itf().cpython()
-        var module_maybe = cpython.PyImport_ImportModule(str)
+        var module_maybe = cpython.PyImport_ImportModule(module)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(module_maybe)
 
-    @staticmethod
-    fn dict() -> Dictionary:
-        """Construct an empty Python dictionary.
-
-        Returns:
-            The constructed empty Python dictionary.
-        """
-        var cpython = _get_global_python_itf().cpython()
-        return Dictionary(cpython.PyDict_New())
-
-    fn __str__(inout self, str: PythonObject) -> StringRef:
+    fn __str__(inout self, str_obj: PythonObject) -> StringRef:
         """Return a string representing the given Python object.
 
         This function allows to convert Python objects to Mojo string type.
@@ -192,7 +179,7 @@ struct Python:
             Mojo string representing the given Python object.
         """
         var cpython = self.impl.cpython()
-        return cpython.PyUnicode_AsUTF8AndSize(str.py_object)
+        return cpython.PyUnicode_AsUTF8AndSize(str_obj.py_object)
 
     @staticmethod
     fn throw_python_exception_if_error_state(inout cpython: CPython) raises:

@@ -24,7 +24,6 @@ from sys.intrinsics import _mlirtype_is_eq
 from utils import StringRef, unroll
 
 from ._cpython import CPython, PyObjectPtr
-from .dictionary import Dictionary
 from .python import Python, _get_global_python_itf
 
 
@@ -354,15 +353,6 @@ struct PythonObject(
         Args:
             name: The name of the object attribute to set.
             newValue: The new value to be set for that attribute.
-        """
-        return self._setattr(name, newValue.py_object)
-
-    fn __setattr__(self, name: StringLiteral, newValue: Dictionary) raises:
-        """Set the given dict for the object attribute with the given name.
-
-        Args:
-            name: The name of the object attribute to set.
-            newValue: The new dict value to be set for that attribute.
         """
         return self._setattr(name, newValue.py_object)
 
