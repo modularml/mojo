@@ -123,7 +123,9 @@ Linux:
 
 ```sh
 sudo apt update
+```
 
+```sh
 sudo apt install modular
 ```
 
@@ -131,7 +133,9 @@ Mac:
 
 ```sh
 brew update
+```
 
+```sh
 brew upgrade modular
 ```
 
