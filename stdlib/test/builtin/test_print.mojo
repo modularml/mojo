@@ -56,8 +56,8 @@ fn test_print():
     # CHECK: > 3.14000{{[0-9]+}} 99.90000{{[0-9]+}} -129.29018{{[0-9]+}} (1, 2, 3)
     var float32: Float32 = 99.9
     var float64: Float64 = -129.2901823
-    print_no_newline("> ")
-    print_no_newline(3.14, float32, float64, StaticIntTuple[3](1, 2, 3))
+    print("> ", end="")
+    print(3.14, float32, float64, StaticIntTuple[3](1, 2, 3), end="")
     print()
 
     # CHECK: > 9223372036854775806

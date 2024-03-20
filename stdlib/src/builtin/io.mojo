@@ -431,21 +431,3 @@ fn print[
     _print_elements(first, vals, sep=sep, end=end)
     if flush:
         _flush()
-
-
-# FIXME(#8843, #12811): This should be removed, and instead implemented in terms
-# of `print` and keyword arguments.
-@no_inline
-fn print_no_newline[T: Stringable, *Ts: Stringable](first: T, *rest: *Ts):
-    """Prints a sequence of elements, joined by spaces.
-
-    Parameters:
-        T: The first element type.
-        Ts: The remaining element types.
-
-    Args:
-        first: The first element.
-        rest: The remaining elements.
-    """
-    var vals = _StringableTuple[Ts](rest)
-    _print_elements(first, vals, end="")

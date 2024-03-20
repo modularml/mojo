@@ -231,6 +231,8 @@ modular update mojo
   This means that calls to `memcpy` of the form `memcpy[Dtype.xyz](...)` would
   no longer work and the user would have to change the code to `memcpy(...)`.
 
+- `print_no_newline` has been removed.  Please use `print(end="")` instead.
+
 ### 🛠️ Fixed
 
 - [#1362](https://github.com/modularml/mojo/issues/1362) - Parameter inference
@@ -251,6 +253,8 @@ modular update mojo
   should return `T` instead of `Optional[T]`.
 - [#1940](https://github.com/modularml/mojo/issues/1940) - Constrain `math.copysign`
   to floating point or integral types.
+- [#1838](https://github.com/modularml/mojo/issues/1838) - Variadic `print`
+  does not work when specifying `end=""`
 
 ## v24.1.1 (2024-03-18)
 
