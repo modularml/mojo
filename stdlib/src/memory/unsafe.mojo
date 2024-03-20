@@ -788,46 +788,26 @@ struct Pointer[
         )
 
     @always_inline("nodebug")
-    fn store[T: Intable](self, offset: T, value: type):
+    fn store[
+        T: Intable, /, *, alignment: Int = Self._default_alignment
+    ](self, offset: T, value: type):
         """Stores the specified value to the location the Pointer object points
         to with the given offset.
 
         Parameters:
             T: The Intable type of the offset.
+            alignment: The minimal alignment of the address.
 
         Args:
             offset: The offset to store to.
             value: The value to store.
         """
-        self.offset(offset).store(value)
+        self.offset(offset).store[alignment=alignment](value)
 
     @always_inline("nodebug")
-    fn store(self, value: type):
+    fn store[*, alignment: Int = Self._default_alignment](self, value: type):
         """Stores the specified value to the location the Pointer object points
         to.
-
-        Args:
-            value: The value to store.
-        """
-        self.aligned_store[alignment=1](value)
-
-    @always_inline("nodebug")
-    fn aligned_store[alignment: Int, T: Intable](self, offset: T, value: type):
-        """Stores a value with a guaranteed alignment.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-            T: The Intable type of the offset.
-
-        Args:
-            offset: The offset to store to.
-            value: The value to store.
-        """
-        self.offset(offset).aligned_store[alignment](value)
-
-    @always_inline("nodebug")
-    fn aligned_store[alignment: Int](self, value: type):
-        """Stores a value with a guaranteed alignment.
 
         Parameters:
             alignment: The minimal alignment of the address.
@@ -1421,33 +1401,41 @@ struct DTypePointer[
 
     @always_inline("nodebug")
     fn store[
-        T: Intable, /, *, width: Int = 1
+        T: Intable,
+        /,
+        *,
+        width: Int = 1,
+        alignment: Int = Self._default_alignment,
     ](self, offset: T, val: SIMD[type, width]):
         """Stores a single element value at the given offset.
 
         Parameters:
             T: The Intable type of the offset.
             width: The SIMD width.
+            alignment: The minimal alignment of the address.
 
         Args:
             offset: The offset to store to.
             val: The value to store.
         """
-        self.offset(offset).store[width=width](val)
+        self.offset(offset).store[width=width, alignment=alignment](val)
 
     @always_inline("nodebug")
-    fn store[*, width: Int = 1](self, val: SIMD[type, width]):
+    fn store[
+        *, width: Int = 1, alignment: Int = Self._default_alignment
+    ](self, val: SIMD[type, width]):
         """Stores a single element value.
 
         Parameters:
             width: The SIMD width.
+            alignment: The minimal alignment of the address.
 
         Args:
             val: The value to store.
         """
-        self.aligned_simd_store[
-            width, alignof[Scalar[type]]() if triple_is_nvidia_cuda() else 1
-        ](val)
+        self.address.bitcast[SIMD[type, width]]().store[alignment=alignment](
+            val
+        )
 
     @always_inline("nodebug")
     fn simd_nt_store[
@@ -1500,38 +1488,6 @@ struct DTypePointer[
             stride: The stride between stores.
         """
         strided_store(val, self, int(stride), True)
-
-    @always_inline("nodebug")
-    fn aligned_simd_store[
-        width: Int, alignment: Int, T: Intable
-    ](self, offset: T, val: SIMD[type, width]):
-        """Stores a SIMD vector at the given offset with a guaranteed alignment.
-
-        Parameters:
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-            T: The Intable type of the offset.
-
-        Args:
-            offset: The offset to store to.
-            val: The SIMD value to store.
-        """
-        self.offset(offset).aligned_simd_store[width, alignment](val)
-
-    @always_inline("nodebug")
-    fn aligned_simd_store[
-        width: Int, alignment: Int
-    ](self, val: SIMD[type, width]):
-        """Stores a SIMD vector with a guaranteed alignment.
-
-        Parameters:
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            val: The SIMD value to store.
-        """
-        self.address.bitcast[SIMD[type, width]]().aligned_store[alignment](val)
 
     @always_inline("nodebug")
     fn simd_nt_store[width: Int](self, val: SIMD[type, width]):
