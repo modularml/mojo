@@ -71,4 +71,4 @@ jobs:
         run: |
           export MODULAR_HOME="/home/runner/.modular"
           export PATH="/home/runner/.modular/pkg/packages.modular.com_mojo/bin:$PATH"
-          ./scripts/run-examples.sh
+          ./examples/run-examples.sh
