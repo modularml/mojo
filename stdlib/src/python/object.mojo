@@ -428,9 +428,9 @@ struct PythonObject(
         for i in range(size):
             var arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
-            var wasSuccessful = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
-            if wasSuccessful == 1:
-                raise Error()
+            var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
+            if result != 0:
+                raise Error("internal error: PyTuple_SetItem failed")
 
         var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, "__getitem__"
@@ -450,7 +450,7 @@ struct PythonObject(
             self.py_object, method_name
         )
         if callable_obj.is_null():
-            raise Error()
+            raise Error("internal error: PyObject_GetAttrString failed")
         var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
         cpython.Py_DecRef(tuple_obj)
         cpython.Py_DecRef(callable_obj)
@@ -461,36 +461,35 @@ struct PythonObject(
     ) raises -> PythonObject:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
-        var wasSuccessful = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)
+        var result = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)
+        if result != 0:
+            raise Error("internal error: PyTuple_SetItem failed")
         cpython.Py_IncRef(rhs.py_object)
-
-        if wasSuccessful == 1:
-            raise Error()
         var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, method_name
         )
         if callable_obj.is_null():
-            raise Error()
-        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
+            raise Error("internal error: PyObject_GetAttrString failed")
+        var result_obj = cpython.PyObject_CallObject(callable_obj, tuple_obj)
         cpython.Py_DecRef(tuple_obj)
         cpython.Py_DecRef(callable_obj)
-        return PythonObject(result)
+        return PythonObject(result_obj)
 
     fn _call_single_arg_inplace_method(
         inout self, method_name: StringRef, rhs: PythonObject
     ) raises:
         var cpython = _get_global_python_itf().cpython()
         var tuple_obj = cpython.PyTuple_New(1)
-        var wasSuccessful = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)
-        cpython.Py_IncRef(rhs.py_object)
+        var result = cpython.PyTuple_SetItem(tuple_obj, 0, rhs.py_object)
+        if result != 0:
+            raise Error("internal error: PyTuple_SetItem failed")
 
-        if wasSuccessful == 1:
-            raise Error()
+        cpython.Py_IncRef(rhs.py_object)
         var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, method_name
         )
         if callable_obj.is_null():
-            raise Error()
+            raise Error("internal error: PyObject_GetAttrString failed")
 
         # Destroy previously stored pyobject
         if not self.py_object.is_null():
@@ -1030,18 +1029,18 @@ struct PythonObject(
         for i in range(num_pos_args):
             var arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
-            var wasSuccessful = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
-            if wasSuccessful == 1:
-                raise Error()
+            var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
+            if result != 0:
+                raise Error("internal error: PyTuple_SetItem failed")
 
         var dict_obj = cpython.PyDict_New()
         for entry in kwargs.items():
             var key = cpython.toPython(entry[].key._strref_dangerous())
-            var wasSuccessful = cpython.PyDict_SetItem(
+            var result = cpython.PyDict_SetItem(
                 dict_obj, key, entry[].value.py_object
             )
-            if wasSuccessful == 1:
-                raise Error()
+            if result != 0:
+                raise Error("internal error: PyDict_SetItem failed")
 
         var callable_obj = self.py_object
         cpython.Py_IncRef(callable_obj)
