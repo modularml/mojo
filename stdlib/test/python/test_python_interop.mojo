@@ -18,25 +18,40 @@ alias TEST_DIR = env_get_string["TEST_DIR"]()
 fn test_execute_python_string(inout python: Python) -> String:
     try:
         _ = Python.evaluate("print('evaluated by PyRunString')")
-        var py_string = Python.evaluate("'a' + 'b'")
-        var str = python.__str__(py_string.__str__())
-        return String(str)
+        return Python.evaluate("'a' + 'b'")
     except e:
-        return e.__str__()
+        return e
 
 
-fn test_local_import(inout python: Python) raises:
+fn test_local_import(inout python: Python) -> String:
     try:
         Python.add_to_path(TEST_DIR)
         var my_module: PythonObject = Python.import_module("my_module")
         if my_module:
-            _ = my_module.my_function("Mojo")
             var foo = my_module.Foo("apple")
             foo.bar = "orange"
-            # CHECK: orange
-            print(python.__str__(foo.bar.__str__()))
+            return foo.bar
+        return "no module, no fruit"
     except e:
-        print(e)
+        return e
+
+
+fn test_call(inout python: Python) -> String:
+    try:
+        Python.add_to_path(TEST_DIR)
+        var my_module: PythonObject = Python.import_module("my_module")
+        return str(
+            my_module.eat_it_all(
+                "carrot",
+                "bread",
+                "rice",
+                fruit="pear",
+                protein="fish",
+                cake="yes",
+            )
+        )
+    except e:
+        return e
 
 
 fn test_is_dict():
@@ -51,7 +66,11 @@ fn test_is_dict():
 
 def main():
     var python = Python()
-    test_local_import(python)
+    # CHECK: orange
+    print(test_local_import(python))
+
+    # CHECK: carrot ('bread', 'rice') fruit=pear {'protein': 'fish', 'cake': 'yes'}
+    print(test_call(python))
 
     # CHECK: [1, 2.4, True, 'False']
     var obj: PythonObject = [1, 2.4, True, "False"]

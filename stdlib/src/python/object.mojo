@@ -1025,27 +1025,40 @@ struct PythonObject(
 
     # see https://github.com/python/cpython/blob/main/Objects/call.c
     # for decrement rules
-    fn __call__(self, *args: PythonObject) raises -> PythonObject:
+    fn __call__(
+        self, *args: PythonObject, **kwargs: PythonObject
+    ) raises -> PythonObject:
         """Call the underlying object as if it were a function.
 
         Returns:
             The return value from the called object.
         """
-        var size = len(args)
         var cpython = _get_global_python_itf().cpython()
-        var tuple_obj = cpython.PyTuple_New(size)
-        for i in range(size):
+
+        var num_pos_args = len(args)
+        var tuple_obj = cpython.PyTuple_New(num_pos_args)
+        for i in range(num_pos_args):
             var arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
             var wasSuccessful = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
             if wasSuccessful == 1:
                 raise Error()
 
+        var dict_obj = cpython.PyDict_New()
+        for entry in kwargs.items():
+            var key = cpython.toPython(entry[].key._strref_dangerous())
+            var wasSuccessful = cpython.PyDict_SetItem(
+                dict_obj, key, entry[].value.py_object
+            )
+            if wasSuccessful == 1:
+                raise Error()
+
         var callable_obj = self.py_object
         cpython.Py_IncRef(callable_obj)
-        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
+        var result = cpython.PyObject_Call(callable_obj, tuple_obj, dict_obj)
         cpython.Py_DecRef(callable_obj)
         cpython.Py_DecRef(tuple_obj)
+        cpython.Py_DecRef(dict_obj)
         Python.throw_python_exception_if_error_state(cpython)
         # Python always returns non null on success.
         # A void function returns the singleton None.

@@ -23,3 +23,7 @@ class AbstractPerson(ABC):
 
 def my_function(name):
     return f"Formatting the string from Lit with Python: {name}"
+
+
+def eat_it_all(veggie, *args, fruit, **kwargs):
+    return f"{veggie} {args} fruit={fruit} {kwargs}"

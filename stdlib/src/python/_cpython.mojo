@@ -413,6 +413,26 @@ struct CPython:
         self._inc_total_rc()
         return r
 
+    fn PyObject_Call(
+        inout self,
+        callable_obj: PyObjectPtr,
+        args: PyObjectPtr,
+        kwargs: PyObjectPtr,
+    ) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (PyObjectPtr, PyObjectPtr, PyObjectPtr) -> PyObjectPtr
+        ]("PyObject_Call")(callable_obj, args, kwargs)
+        if self.logging_enabled:
+            print(
+                r._get_ptr_as_int(),
+                " NEWREF PyObject_Call, refcnt:",
+                self._Py_REFCNT(r),
+                ", callable obj:",
+                callable_obj._get_ptr_as_int(),
+            )
+        self._inc_total_rc()
+        return r
+
     fn PyObject_IsTrue(
         inout self,
         obj: PyObjectPtr,
