@@ -12,4 +12,20 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the stat package."""
 
-from .stat import *
+from .stat import (
+    S_IFMT,
+    S_IFDIR,
+    S_IFCHR,
+    S_IFBLK,
+    S_IFREG,
+    S_IFIFO,
+    S_IFLNK,
+    S_IFSOCK,
+    S_ISLNK,
+    S_ISREG,
+    S_ISDIR,
+    S_ISCHR,
+    S_ISBLK,
+    S_ISFIFO,
+    S_ISSOCK,
+)

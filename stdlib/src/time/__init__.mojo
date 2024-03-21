@@ -12,4 +12,4 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the time package."""
 
-from .time import *
+from .time import now, time_function, sleep

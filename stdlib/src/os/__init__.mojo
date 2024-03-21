@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the os package."""
 
-from .env import *
+from .atomic import Atomic
+from .env import setenv, getenv
 from .fstat import lstat, stat, stat_result
 from .os import abort, listdir
 from .pathlike import PathLike

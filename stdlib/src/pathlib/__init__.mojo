@@ -1,4 +1,4 @@
-# ===----------------------------------------------------------------------=== #
+# ===----------------------------------------------------------------------===
 # Copyright (c) 2024, Modular Inc. All rights reserved.
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions:
@@ -12,4 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the pathlib package."""
 
-from .path import *
+from .path import (
+    DIR_SEPARATOR,
+    cwd,
+    Path,
+)

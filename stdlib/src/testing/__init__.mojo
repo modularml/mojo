@@ -11,4 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from .testing import *
+from .testing import (
+    assert_true,
+    assert_false,
+    assert_equal,
+    assert_not_equal,
+    assert_almost_equal,
+    assert_raises,
+)

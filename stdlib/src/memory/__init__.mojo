@@ -13,12 +13,24 @@
 """Implements the memory package."""
 
 from .memory import (
-    AddressSpace,
-    DTypePointer,
-    Pointer,
     memcmp,
     memcpy,
     memset,
     memset_zero,
     stack_allocation,
 )
+
+from .anypointer import (
+    AnyPointer,
+)
+
+from .unsafe import (
+    bitcast,
+    AddressSpace,
+    Reference,
+    emplace_ref_unsafe,
+    Pointer,
+    DTypePointer,
+)
+
+# TODO: consider making Arc public and import it here
