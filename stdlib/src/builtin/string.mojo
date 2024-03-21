@@ -1001,14 +1001,37 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
 
-        For example, `int("19")` returns `19`. If the given string cannot be parsed
-        as an integer value, an error is raised. For example, `int("hi")` raises an
-        error.
+        For example, `int("19")` returns `19`. If the given string cannot be
+        parsed as an integer value, an error is raised. For example, `int("hi")`
+        raises an error.
 
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
         return atol(self)
+
+    fn __mul__(self, n: Int) -> String:
+        """Concatenates the string `n` times.
+
+        Args:
+            n : The number of times to concatenate the string.
+
+        Returns:
+            The string concantenated `n` times.
+        """
+        if n <= 0:
+            return ""
+        var len_self = len(self)
+        var count = len_self * n + 1
+        var buf = Self._buffer_type(capacity=count)
+        buf.resize(count, 0)
+        for i in range(n):
+            memcpy(
+                rebind[DTypePointer[DType.int8]](buf.data) + len_self * i,
+                self._as_ptr(),
+                len_self,
+            )
+        return String(buf ^)
 
 
 # ===----------------------------------------------------------------------===#

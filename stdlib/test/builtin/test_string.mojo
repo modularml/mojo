@@ -542,7 +542,13 @@ def test_intable():
     assert_equal(int(String("123")), 123)
 
     with assert_raises():
-        int(String("hi"))
+        _ = int(String("hi"))
+
+
+def test_string_mul():
+    assert_equal(String("*") * 0, "")
+    assert_equal(String("!") * 10, String("!!!!!!!!!!"))
+    assert_equal(String("ab") * 5, "ababababab")
 
 
 def main():
@@ -578,3 +584,4 @@ def main():
     test_startswith()
     test_endswith()
     test_intable()
+    test_string_mul()
