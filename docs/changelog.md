@@ -61,6 +61,15 @@ modular update mojo
   explicit conformance will still be useful for features like default methods
   and extensions.
 
+- Mojo's Python interoperability now supports passing keyword arguments to
+  Python callables.
+
+  ```mojo
+  from python import Python
+  var my_module = Python.import_module("my_module")
+  my_module.foo(1, 2, 3, fruit="apple", dessert="cake")
+  ```
+
 ### ⭐️ New
 
 - String types all conform to the
