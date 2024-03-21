@@ -81,9 +81,9 @@ In this example, it only works when `mymodule.mojo` is in the same directory as
 reside in other directories. That is, unless you treat the directory as a Mojo
 package, as described in the next section.
 
-:::{.callout-note}
+:::note
 
-**Note:** A Mojo module may include a `main()` function and may also be
+Mojo module may include a `main()` function and may also be
 executable, but that's generally not the practice and modules typically include
 APIs to be imported and used in other Mojo programs.
 
@@ -161,9 +161,9 @@ the import statement and it all works the same:
 from mypack.mymodule import MyPair
 ```
 
-:::{.callout-note}
+:::note
 
-**Note:** If you want to rename your package, you cannot simply edit the
+If you want to rename your package, you cannot simply edit the
 `.mojopkg` or `.📦` filename, because the package name is encoded in the file.
 You must instead run `mojo package` again to specify a new name.
 
@@ -232,9 +232,9 @@ statement, and it also works:
 from algorithm import map
 ```
 
-:::{.callout-note}
+:::note
 
-**Note:** Which modules in the standard library are imported to the package
+Which modules in the standard library are imported to the package
 scope varies, and is subject to change. Refer to the [documentation for each
 module](/mojo/lib.html) to see how you can import its members.
 

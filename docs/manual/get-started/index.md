@@ -14,6 +14,9 @@ website:
     image: /static/images/mojo-social-card.png
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Mojo SDK is currently available for Ubuntu Linux systems and macOS
 systems running on Apple silicon. Support for Windows is
 coming soon. You can also develop from Windows or Intel macOS using a container
@@ -68,6 +71,13 @@ Support for Windows will be added in a future release.
 
 ### Install Mojo
 
+:::tip Already have modular?
+
+If you already have the `modular` tool,
+[update](/cli/#description) to version 0.5.1 or newer, and go to step 2.
+
+:::
+
 1. Open a terminal and install the [`modular`](/cli/) command line tool:
 
     ```sh
@@ -86,7 +96,41 @@ Support for Windows will be added in a future release.
     modular install mojo
     ```
 
+4. Set environment variables so you can access the
+   [`mojo`](/mojo/cli/) CLI:
+
+    <Tabs>
+      <TabItem value="bash" label="Bash">
+
+      If you're using Bash, run this command:
+
+      ```sh
+      MOJO_PATH=$(modular config mojo.path) \
+        && BASHRC=$( [ -f "$HOME/.bash_profile" ] && echo "$HOME/.bash_profile" || echo "$HOME/.bashrc" ) \
+        && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> "$BASHRC" \
+        && echo 'export PATH="'$MOJO_PATH'/bin:$PATH"' >> "$BASHRC" \
+        && source "$BASHRC"
+      ```
+
+      </TabItem>
+      <TabItem value="zsh" label="ZSH">
+
+      If you're using ZSH, run this command:
+
+      ```sh
+      MOJO_PATH=$(modular config mojo.path) \
+        && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> ~/.zshrc \
+        && echo 'export PATH="'$MOJO_PATH'/bin:$PATH"' >> ~/.zshrc \
+        && source ~/.zshrc
+      ```
+
+      </TabItem>
+    </Tabs>
+
 Next, get started with **[Hello, world!](hello-world.html)**
+
+If you have issues during install, check our [known
+issues](/mojo/roadmap.html#mojo-sdk-known-issues).
 
 :::note
 
