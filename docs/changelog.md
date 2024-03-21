@@ -161,9 +161,6 @@ modular update mojo
 
 - Many types now declare conformance to `EqualityComparable` trait.
 
-- The `trap` function has been renamed to `abort`.  It also has moved from the
-  `debug` module to the `os` module.
-
 - `DynamicVector` has been renamed to `List`.  It has also moved from the `collections.vector`
   module to `collections.list` module.
 
@@ -209,12 +206,19 @@ modular update mojo
   `__iter__` also now borrows `self` rather than requiring `inout`, allowing
   code like `for value in my_dict.values():`.
 
-- The `rand` and `randn` functions in the `random` package that return a `Tensor`
-  have moved to the `tensor` package.  Please update your imports accordingly.
-
 - `List.push_back` has been removed.  Please use the `append` function instead.
 
-- `utils.list` has moved to `buffer.list`.  Please update your imports accordingly.
+- We took the opportunity to rehome some modules into their correct package
+  as we were going through the process of open-sourcing the Mojo Standard
+  Library.  Specifically, the following are some breaking changes worth
+  calling out.  Please update your import statements accordingly.
+  - `utils.list` has moved to `buffer.list`.
+  - `rand` and `randn` functions in the `random` package that return a `Tensor`
+     have moved to the `tensor` package.
+  - `Buffer`, `NDBuffer`, and friends have moved from the `memory` package
+    into a new `buffer` package.
+  - The `trap` function has been renamed to `abort`.  It also has moved from the
+    `debug` module to the `os` module.
 
 ### ❌ Removed
 
@@ -232,6 +236,14 @@ modular update mojo
   no longer work and the user would have to change the code to `memcpy(...)`.
 
 - `print_no_newline` has been removed.  Please use `print(end="")` instead.
+
+- `memcpy` on `Buffer` has been removed in favor of just overloads for `Pointer`
+  and `DTypePointer`.
+
+- `parallel_memcpy` has been removed from the Standard Library for now.
+
+  - The functions `max_or_inf`, `min_or_neginf` have been removed from
+    `math.limit` and just inlined into their use in SIMD.
 
 ### 🛠️ Fixed
 
