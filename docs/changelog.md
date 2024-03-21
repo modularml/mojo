@@ -144,6 +144,9 @@ modular update mojo
     fn var_kwparams[**kwparams: Int](): ...
     ```
 
+  - Added new `collections.OptionalReg` type, a register-passable alternative
+    to `Optional`.
+
 ### 🦋 Changed
 
 - Mojo now warns about unused values in both `def` and `fn` declarations,

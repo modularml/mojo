@@ -40,6 +40,11 @@ struct _NoneType(CollectionElement):
     pass
 
 
+# ===----------------------------------------------------------------------===#
+# Optional
+# ===----------------------------------------------------------------------===#
+
+
 @value
 struct Optional[T: CollectionElement](CollectionElement, Boolable):
     """A type modeling a value which may or may not be present.
@@ -156,6 +161,148 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             False if the optional has a value and True otherwise.
         """
         return not self
+
+    fn __and__[type: Boolable](self, other: type) -> Bool:
+        """Return true if self has a value and the other value is coercible to
+        True.
+
+        Parameters:
+            type: Type coercible to Bool.
+
+        Args:
+            other: Value to compare to.
+
+        Returns:
+            True if both inputs are True after boolean coercion.
+        """
+        return self.__bool__() and other.__bool__()
+
+    fn __rand__[type: Boolable](self, other: type) -> Bool:
+        """Return true if self has a value and the other value is coercible to
+        True.
+
+        Parameters:
+            type: Type coercible to Bool.
+
+        Args:
+            other: Value to compare to.
+
+        Returns:
+            True if both inputs are True after boolean coercion.
+        """
+        return self.__bool__() and other.__bool__()
+
+    fn __or__[type: Boolable](self, other: type) -> Bool:
+        """Return true if self has a value or the other value is coercible to
+        True.
+
+        Parameters:
+            type: Type coercible to Bool.
+
+        Args:
+            other: Value to compare to.
+
+        Returns:
+            True if either inputs is True after boolean coercion.
+        """
+        return self.__bool__() or other.__bool__()
+
+    fn __ror__[type: Boolable](self, other: type) -> Bool:
+        """Return true if self has a value or the other value is coercible to
+        True.
+
+        Parameters:
+            type: Type coercible to Bool.
+
+        Args:
+            other: Value to compare to.
+
+        Returns:
+            True if either inputs is True after boolean coercion.
+        """
+        return self.__bool__() or other.__bool__()
+
+
+# ===----------------------------------------------------------------------===#
+# OptionalReg
+# ===----------------------------------------------------------------------===#
+
+
+@register_passable("trivial")
+struct OptionalReg[T: AnyRegType](Boolable):
+    """A register-passable optional type.
+
+    This struct optionally contains a value. It only works with trivial register
+    passable types at the moment.
+
+    Parameters:
+        T: The type of value stored in the Optional.
+    """
+
+    alias _type = __mlir_type[`!kgen.variant<`, T, `, i1>`]
+    var _value: Self._type
+
+    fn __init__() -> Self:
+        """Create an optional without a value.
+
+        Returns:
+            The optional.
+        """
+        return Self(None)
+
+    fn __init__(value: T) -> Self:
+        """Create an optional with a value.
+
+        Args:
+            value: The value.
+
+        Returns:
+            The optional.
+        """
+        return Self {
+            _value: __mlir_op.`kgen.variant.create`[
+                _type = Self._type, index = Int(0).value
+            ](value)
+        }
+
+    fn __init__(value: NoneType) -> Self:
+        """Create an optional without a value from a None literal.
+
+        Args:
+            value: The None value.
+
+        Returns:
+            The optional without a value.
+        """
+        return Self {
+            _value: __mlir_op.`kgen.variant.create`[
+                _type = Self._type, index = Int(1).value
+            ](__mlir_attr.`false`)
+        }
+
+    fn value(self) -> T:
+        """Get the optional value.
+
+        Returns:
+            The contained value.
+        """
+        return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
+
+    fn __bool__(self) -> Bool:
+        """Return true if the optional has a value.
+
+        Returns:
+            True if the optional has a valu and False otherwise.
+        """
+        return __mlir_op.`kgen.variant.is`[index = Int(0).value](self._value)
+
+    fn __invert__(self) -> Bool:
+        """Return False if the optional has a value.
+
+        Returns:
+            False if the optional has a value and True otherwise.
+        """
+        return not self.__bool__()
 
     fn __and__[type: Boolable](self, other: type) -> Bool:
         """Return true if self has a value and the other value is coercible to

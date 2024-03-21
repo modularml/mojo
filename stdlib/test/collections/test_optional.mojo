@@ -5,7 +5,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from collections.optional import Optional
+from collections.optional import Optional, OptionalReg
 
 from testing import *
 
@@ -46,5 +46,24 @@ def test_basic():
     assert_equal(1, (a ^).take())
 
 
+def test_optional_reg_basic():
+    print("== test_optional_reg_basic")
+
+    var val: OptionalReg[Int] = None
+    assert_false(val.__bool__())
+
+    val = 15
+    assert_true(val.__bool__())
+
+    assert_equal(val.value(), 15)
+
+    assert_true(val or False)
+    assert_true(val and True)
+
+    assert_true(False or val)
+    assert_true(True and val)
+
+
 def main():
     test_basic()
+    test_optional_reg_basic()
