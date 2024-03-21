@@ -95,7 +95,7 @@ A Mojo package is just a collection of Mojo modules in a directory that
 includes an `__init__.mojo` file. By organizing modules together in a
 directory, you can then import all the modules together or individually.
 Optionally, you can also compile the package into a `.mojopkg` or `.📦` file
-that's easier to share.
+that's easier to share and still compatible with other system architectures.
 
 You can import a package and its modules either directly from source files or
 from a compiled `.mojopkg`/`.📦` file. It makes no real difference to Mojo
@@ -138,8 +138,16 @@ as `main.mojo`. So, you can compile it into a package file like this:
 mojo package mypackage -o mypack.mojopkg
 ```
 
-Then the `mypackage` source can be moved somewhere else, and the project
-files now look like this:
+:::note
+
+A `.mojopkg` file contains non-elaborated code, so you can share it across
+systems. The code becomes an architecture-specific executable only after it's
+imported into a Mojo program that's then compiled with `mojo build`.
+
+:::
+
+Now, you can move the `mypackage` source somewhere else, and the project files
+now look like this:
 
 ```ini
 main.mojo
