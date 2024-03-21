@@ -63,18 +63,6 @@ struct Slice(Sized, Stringable, EqualityComparable):
     """The step increment value of the slice."""
 
     @always_inline("nodebug")
-    fn __init__(end: Int) -> Self:
-        """Construct slice given the end value.
-
-        Args:
-            end: The end value.
-
-        Returns:
-            The constructed slice.
-        """
-        return Self {start: 0, end: end, step: 1}
-
-    @always_inline("nodebug")
     fn __init__(start: Int, end: Int) -> Self:
         """Construct slice given the start and end values.
 
@@ -193,7 +181,7 @@ fn slice(end: Int) -> Slice:
     Returns:
         The constructed slice.
     """
-    return Slice(end)
+    return Slice(0, end)
 
 
 @always_inline("nodebug")
