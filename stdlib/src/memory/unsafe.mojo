@@ -1364,42 +1364,6 @@ struct DTypePointer[
         )
 
     @always_inline("nodebug")
-    fn aligned_simd_load[
-        width: Int, alignment: Int, T: Intable
-    ](self, offset: T) -> SIMD[type, width]:
-        """Loads a SIMD vector of elements from the pointer at the specified
-        offset with the guaranteed specified alignment.
-
-        Parameters:
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-            T: The Intable type of the offset.
-
-        Args:
-            offset: The offset to load from.
-
-        Returns:
-            The loaded SIMD value.
-        """
-        return self.offset(offset).aligned_simd_load[width, alignment]()
-
-    @always_inline("nodebug")
-    fn aligned_simd_load[width: Int, alignment: Int](self) -> SIMD[type, width]:
-        """Loads a SIMD vector of elements from the pointer at the current
-        offset with the guaranteed specified alignment.
-
-        Parameters:
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Returns:
-            The loaded SIMD value.
-        """
-        return self.address.bitcast[SIMD[type, width]]().load[
-            alignment=alignment
-        ]()
-
-    @always_inline("nodebug")
     fn store[
         T: Intable,
         /,
