@@ -231,7 +231,7 @@ compliant; otherwise, an error will be shown. This is also enforced by the LSP
 with warnings for anything that doesn’t conform, you can generate docstrings
 based on the signature using an LSP Quick Fix:
 
-![PREMERGE](PREMERGE)
+![VS Code documentation lint quick fix](./images/doc-lint-quick-fix.png)
 
 We follow the Google convention for
 [docstrings outlined here](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods)
