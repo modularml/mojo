@@ -62,12 +62,15 @@ modular update mojo
   and extensions.
 
 - Mojo's Python interoperability now supports passing keyword arguments to
-  Python callables.
+  Python callables:
 
   ```mojo
   from python import Python
-  var my_module = Python.import_module("my_module")
-  my_module.foo(1, 2, 3, fruit="apple", dessert="cake")
+
+  def main():
+      plt = Python.import_module("matplotlib.pyplot")
+      plt.plot((5, 10), (10, 15), color="red")
+      plt.show()
   ```
 
 ### ⭐️ New
