@@ -19,6 +19,10 @@ config.name = "Mojo Standard Library"
 # suffixes: A list of file extensions to treat as test files.
 config.suffixes = [".mojo"]
 
+# test_utils does not contain tests, just source code
+# that we run `mojo package` on to be used by other tests
+config.excludes = ["test_utils"]
+
 # test_source_root: The root path where tests are located.
 config.test_source_root = Path(__file__).parent.resolve()
 
