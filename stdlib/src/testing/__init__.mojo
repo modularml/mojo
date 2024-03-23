@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Implements the testing package."""
+
 from .testing import (
     assert_true,
     assert_false,

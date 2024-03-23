@@ -147,8 +147,8 @@ modular update mojo
     fn var_kwparams[**kwparams: Int](): ...
     ```
 
-  - Added new `collections.OptionalReg` type, a register-passable alternative
-    to `Optional`.
+- Added new `collections.OptionalReg` type, a register-passable alternative
+  to `Optional`.
 
 ### 🦋 Changed
 
@@ -231,9 +231,11 @@ modular update mojo
   - `rand` and `randn` functions in the `random` package that return a `Tensor`
      have moved to the `tensor` package.
   - `Buffer`, `NDBuffer`, and friends have moved from the `memory` package
-    into a new `buffer` package.
+     into a new `buffer` package.
   - The `trap` function has been renamed to `abort`.  It also has moved from the
     `debug` module to the `os` module.
+  - `parallel_memcpy` has moved from the `memory` package into
+     the `buffer` package.
 
 ### ❌ Removed
 
@@ -255,10 +257,8 @@ modular update mojo
 - `memcpy` on `Buffer` has been removed in favor of just overloads for `Pointer`
   and `DTypePointer`.
 
-- `parallel_memcpy` has been removed from the Standard Library for now.
-
-  - The functions `max_or_inf`, `min_or_neginf` have been removed from
-    `math.limit` and just inlined into their use in SIMD.
+- The functions `max_or_inf`, `min_or_neginf` have been removed from
+  `math.limit` and just inlined into their use in SIMD.
 
 ### 🛠️ Fixed
 

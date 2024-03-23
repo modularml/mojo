@@ -11,8 +11,6 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 """Implements the StringRef class.
-
-These are Mojo built-ins, so you don't need to import them.
 """
 
 

@@ -11,6 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+"""Implements a string that has a small-string optimization which
+   avoids heap allocations for short strings.
+"""
+
 from sys.info import sizeof
 
 from memory import memcpy
