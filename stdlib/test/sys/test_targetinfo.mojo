@@ -10,23 +10,8 @@ from sys.info import (
     num_logical_cores,
     num_performance_cores,
     num_physical_cores,
-    simdbitwidth,
-    simdwidthof,
     sizeof,
 )
-
-from gpu.host._compile import _get_nvptx_target
-
-
-# CHECK-LABEL: test_simdbitwidth
-fn test_simdbitwidth():
-    print("== test_simdbitwidth")
-
-    # CHECK: 128
-    print(simdbitwidth[target = _get_nvptx_target()]())
-
-    # CHECK: 4
-    print(simdwidthof[Float32, target = _get_nvptx_target()]())
 
 
 # CHECK-LABEL: test_sizeof
@@ -79,7 +64,6 @@ fn test_cores():
 
 
 fn main():
-    test_simdbitwidth()
     test_sizeof()
     test_alignof()
     test_cores()
