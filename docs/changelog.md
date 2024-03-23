@@ -170,6 +170,26 @@ modular update mojo
     execution. This allows for writing additional code within a doc string
     example that is only used to ensure the example is runnable/testable.
 
+  - Doc string code blocks can now `%#` to hide lines of code from documentation
+    generation.
+
+    For example:
+
+    ```mojo
+    var value = 5
+    %# print(value)
+    ```
+
+    will generate documentation of the form:
+
+    ```mojo
+    var value = 5
+    ```
+
+    Hidden lines are processed as if they were normal code lines during test
+    execution. This allows for writing additional code within a doc string
+    example that is only used to ensure the example is runnable/testable.
+
 ### 🦋 Changed
 
 - Mojo now warns about unused values in both `def` and `fn` declarations,
