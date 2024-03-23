@@ -5,8 +5,6 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from math import max, min
-
 
 # CHECK-LABEL: test_int
 fn test_int():

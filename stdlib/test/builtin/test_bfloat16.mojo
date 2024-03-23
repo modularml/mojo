@@ -4,7 +4,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
-from math import *
+
 from random import randn_float64
 from sys.info import has_neon
 
@@ -26,14 +26,6 @@ def test_methods():
     assert_almost_equal(Float32(4.4).cast[DType.bfloat16](), 4.4)
 
     assert_almost_equal(BFloat16(2.0), 2.0)
-
-
-def test_math():
-    assert_equal(exp(BFloat16(2.0)), 7.375)
-    assert_equal(cos(BFloat16(2.0)), -0.416015625)
-
-    assert_equal(floor(BFloat16(2.0)), 2.0)
-    assert_equal(ceil(BFloat16(2.0)), 2.0)
 
 
 fn test_bf_primitives():
@@ -80,6 +72,5 @@ def main():
     @parameter
     if not has_neon():
         test_methods()
-        test_math()
 
         test_bf_primitives()

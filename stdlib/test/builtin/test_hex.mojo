@@ -5,8 +5,6 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from math.limit import max_finite, min_finite
-
 from builtin.hex import _format_int
 from testing import assert_equal
 
@@ -23,11 +21,17 @@ fn test_format_int() raises:
 
     # Max and min i64 values in base 10
     assert_equal(
-        _format_int(max_finite[DType.int64](), 10), "9223372036854775807"
+        # TODO(#35504): Use max_finite() here again
+        # _format_int(max_finite[DType.int64](), 10), "9223372036854775807"
+        _format_int(Int(9223372036854775807), 10),
+        "9223372036854775807",
     )
 
     assert_equal(
-        _format_int(min_finite[DType.int64](), 10), "-9223372036854775808"
+        # TODO(#35504): Use min_finite() here again
+        # _format_int(min_finite[DType.int64](), 10), "-9223372036854775808"
+        _format_int(Int(-9223372036854775808), 10),
+        "-9223372036854775808",
     )
 
 
@@ -41,7 +45,9 @@ fn test_hex() raises:
     assert_equal(hex(1 << 16), "0x10000")
 
     # Max and min i64 values in base 16
-    assert_equal(hex(max_finite[DType.int64]()), "0x7fffffffffffffff")
+    # TODO(#35504): Use max_finite() here again
+    # assert_equal(hex(max_finite[DType.int64]()), "0x7fffffffffffffff")
+    assert_equal(hex(Int(9223372036854775807)), "0x7fffffffffffffff")
 
     #
     # Negative values
@@ -52,7 +58,9 @@ fn test_hex() raises:
     assert_equal(hex(-10), "-0xa")
     assert_equal(hex(-255), "-0xff")
 
-    assert_equal(hex(min_finite[DType.int64]()), "-0x8000000000000000")
+    # TODO(#35504): Use min_finite() here again
+    # assert_equal(hex(min_finite[DType.int64]()), "-0x8000000000000000")
+    assert_equal(hex(Int(-9223372036854775808)), "-0x8000000000000000")
 
 
 def main():
