@@ -277,6 +277,13 @@ modular update mojo
   - `parallel_memcpy` has moved from the `memory` package into
      the `buffer` package.
 
+- The `*_` expression in parameter expressions is now required to occur at the
+  end of a positional parameter list, instead of being allowed in the middle.
+  This is no longer supported: `SomeStruct[*_, 42]` but `SomeStruct[42, *_]` is
+  still allowed. We narrowed this because we want to encourage type designers
+  to get the order of parameters right, and want to extend `*_` to support
+  keyword parameters as well in the future.
+
 ### ❌ Removed
 
 - `let` declarations now produce a compile time error instead of a warning,
