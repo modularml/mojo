@@ -18,30 +18,30 @@ features that are essential to Mojo's mission.
 
 ### Core Library Improvements
 
-- Removing `AnyRegType` in the Standard Library in favor of `AnyType`
+- Remove `AnyRegType` in the Standard Library in favor of `AnyType`.
 
-- *Unify Pointer and AnyPointer.*
+- Unify Pointer and AnyPointer.
 
-- Applying `Reference` types and lifetimes throughout APIs and types.
+- Apply `Reference` types and lifetimes throughout APIs and types.
 
-- Design API conventions and expected behavior for core container types such
+- Design API conventions and expected behavior for core collection types such
   as `List`, `String`, `Dict` .
 
 ### Generic Programming Improvements
 
 - Define core traits for generic programming models.
 
-- Defining an iterator model and implementing iterator support for core types.
+- Define an iterator model and implement iterator support for core types.
 
-- *Standardize collection meta type names (eg. element_type, key_type,*
-  *value_type).*
+- Standardize collection meta type names (eg. *element_type*, *key_type*, and
+  *value_type*).
 
-### Improving Python Interop
+### Improve Python Interop
 
-- Improving `PythonObject` (including `object`) using new Mojo language
+- Improve `PythonObject` (including `object`) using new Mojo language
   features.
 
 ### Performance Improvements
 
 - Set up performance benchmarking infrastructure along with regression tests for
-  perf-sensitive data structure and algorithms.
+  perf-sensitive data structures and algorithms.

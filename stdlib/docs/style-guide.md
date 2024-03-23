@@ -1,7 +1,7 @@
 # Coding Standards & Style Guide
 
 This document describes conventions that Mojo Standard Library code should
-adhere to. Its coverages ranges from non-semantic conventions like code
+adhere to. Its coverages range from non-semantic conventions like code
 formatting, to semantics like value lifecycle behavior that Standard Library
 types should generally conform to.
 
@@ -28,7 +28,7 @@ it is required to be a leaf dependency.
     > test             # stdlib unit tests
 ```
 
-All Mojo source files must end with the extension `.mojo` or `.🔥`
+All Mojo source files must end with the extension `.mojo` or `.🔥`.
 
 #### Mojo Format
 
@@ -44,7 +44,7 @@ All done! ✨ 🍰 ✨
 ```
 
 Unless otherwise noted, Mojo Standard Library code should follow the formatting
-produced by `mojo format`
+produced by `mojo format`.
 
 #### Whitespace
 
@@ -168,7 +168,7 @@ accepting pull requests that propose extensive formatting or renaming changes.
 
 ```mojo
 struct LinkedList[T: Movable]           # 🔴 Avoid
-struct LinkedList[ElementType: Movable] # 🟢 Preferre
+struct LinkedList[ElementType: Movable] # 🟢 Preferred
 ```
 
 #### ℹ️ Order type parameters ahead of value parameters
@@ -214,7 +214,8 @@ struct MyStruct:
 
 ### Import Statements
 
-- Explicitly import functions used rather than relying on transitive imports
+- Explicitly import entities (functions, structs, aliases) used rather
+  than relying on transitive imports.
 - Import only what you use; in general, prefer not to use
   `from some_package import *`.
 - Import statements should be sorted lexicographically.
@@ -225,7 +226,7 @@ Every public function and public struct (including data fields) in the Standard
 Library must have doc strings. There is tooling to ensure public functions
 adhere to the doc string validation.
 
-You can run `mojo doc -warn-missing-doc-strings <path_to_stdlib>` to validate
+You can run `./stdlib/scripts/check-doc-strings.sh` to validate
 doc strings. If the command exits with a 0 exit code, the doc strings are
 compliant; otherwise, an error will be shown. This is also enforced by the LSP
 with warnings for anything that doesn’t conform, you can generate docstrings

@@ -34,7 +34,7 @@ sync with the last released version of Mojo. Use the examples here if you’re
 using a release build of Mojo.
 
 - The [`nightly`](https://github.com/modularml/mojo/tree/nightly) branch, which
-is sync with the Mojo nightly build and subject to breakage. Use this branch
+is in sync with the Mojo nightly build and subject to breakage. Use this branch
 for [contributions](./CONTRIBUTING.md).
 
 This repo represents the Mojo open source effort. We are continuing to open

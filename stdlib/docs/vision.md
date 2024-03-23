@@ -14,7 +14,7 @@ intend to ignite enthusiasm to contribute to the expanding Mojo package
 ecosystem.
 
 - The Standard Library prioritizes
-  **Performance > Safety > Portability > Debugg ability.**
+  **Performance > Safety > Portability > Debuggability.**
 
 - **Respectable performance by default.** Standard Library intends to provide
 respectable performance by default — but not perfect performance. We support
@@ -77,14 +77,14 @@ inline.
 
 - **Consistent API and behavior across all stdlib primitives.** A higher-level
   goal of the stdlib is to be an example of well-written mojo code. For example,
-  all containers should behave consistently with:
+  all collections should behave consistently with:
 
-  - Default-constructed containers do not allocate memory unless they are
+  - Default-constructed collections do not allocate memory unless they are
     holding an element.
-  - Containers provide no thread safety unless mentioned explicitly.
-  - Commonly implemented container operations use the same method names across
+  - Collections provide no thread safety unless mentioned explicitly.
+  - Commonly implemented collection operations use the same method names across
     all implementations.
-  - Naming of public aliases/parameters common among containers (akin to
+  - Naming of public aliases/parameters common among collections (akin to
     `value_type` and friends in C++).
 
 - **Interoperability with Python code** allows progressively migrating code to

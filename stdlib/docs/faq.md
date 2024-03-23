@@ -33,14 +33,14 @@ the entire library to have everything work on `AnyType` and be generalized to
 not just work on `AnyRegType`. Several things need to be worked in tandem with
 the compiler team to make this possible.
 
-#### 4. LLCL and MLIR ops are private APIs?
+#### 2. LLCL and MLIR ops are private APIs?
 
 LLCL entry points and MLIR operators are private undocumented APIs. We provide
 no backward compatibility guarantees and therefore they can change at any time.
 These particular areas of the standard library are in active development and we
 commit to releasing them when their public-facing API has stabilized.
 
-#### 5. Why are some Standard Library modules missing from the open-source code?
+#### 3. Why are some Standard Library modules missing from the open-source code?
 
 When we were preparing to open source the Standard Library, we realized that
 some modules weren't ready for open-source release. For example:
@@ -52,10 +52,10 @@ some modules weren't ready for open-source release. For example:
 - Some modules may have proprietary aspects that require additional review and
   refinement.
 
-For the short term, we've left these modules as closed source. The built version
-of the Mojo Standard Library will include these closed-source modules as well as
-the open-source modules, so Mojo users still have the full set of primitives
-available to them.
+For the short term, we've left these modules as closed source. The shipped
+Mojo SDK contains the pre-built Mojo packages for these closed source modules
+in addition to the open-source modules, so Mojo users still have the full
+set of primitives available to them.
 
 Over time, we hope to move most of the closed-source modules into the
 open-source repo.

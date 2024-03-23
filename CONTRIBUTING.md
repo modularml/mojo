@@ -119,7 +119,7 @@ accepted. For example:
 
 - Changes that do not align with the published roadmap or the core principles of
   the standard library.
-- Code without tests — especially for core primitives.
+- Code without tests—especially for core primitives.
 - Changes that break existing API or implicit behavior semantics.
 - Changes where the contributors’ favorite feature or system isn’t being used
   and they submit a change unilaterally switching the project to use it. For
@@ -127,7 +127,7 @@ accepted. For example:
   changing the repository to use their favorite build system.
 - Adding support for esoteric platforms.
 - Adding dependencies to the code base.
-- Broad formatting or refactoring changes
+- Broad formatting or refactoring changes.
 - Changes that need broad community consensus.
 - Changes if contributors are not responsive.
 - Adding an entire new module without going through the RFC/proposal process.
@@ -177,7 +177,7 @@ We want to be sure that you spend your time efficiently and prepare changes that
 aren’t controversial and get stuck in long rounds of reviews. See the sections
 on [Contributing to Docs and Examples](#contributing-to-docs-and-examples) and
 [Contributing to the Standard Library](#contributing-to-the-standard-library)
-for more details
+for more details.
 
 #### 3. Create a pull request
 
@@ -185,7 +185,7 @@ If your change is one of the improvements described above or it has been
 discussed and agreed upon by the project maintainers, please create a pull
 request into the `nightly` branch and include the following:
 
-- A short commit message.
+- A short commit title describing the change.
 - A detailed commit description that includes rationalization for the change
   and/or explanation of the problem that it solves, with a link to any relevant
   GitHub issues.

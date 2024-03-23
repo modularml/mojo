@@ -29,18 +29,18 @@ source ~/.zshrc
 ## Cloning the Repository
 
 ```bash
-git clone https://github.com/modularml/mojo/stdlib
+git clone https://github.com/modularml/mojo/
 ```
 
 ## Building the Standard Library
 
 To build the Standard Library, you can run the script
-[`build-stdlib.sh`](../scripts/build-stdlib.sh) from the `scripts` directory in
-the top-level of the repo. This will create a build artifacts directory,
+[`build-stdlib.sh`](../scripts/build-stdlib.sh) from the `scripts` directory
+inside the `stdlib` directory. This will create a build artifacts directory,
 `build`, in the top-level of the repo and produce the `stdlib.mojopkg` inside.
 
 ```bash
-./scripts/build-stdlib.sh
+./stdlib/scripts/build-stdlib.sh
 ```
 
 ## Testing the Standard Library
@@ -57,21 +57,22 @@ To run the unit tests, you first need to install a few dependencies:
 When you download `lit`, make sure you add the path to `lit` to your `PATH` if
 needed. Some of the tests use `FileCheck` or `not` binaries that ship with LLVM.
 For example, if you download LLVM via `homebrew`, these would be in
-`/opt/homebrew/Cellar/llvm/<version>/bin` for example. You need to add this path
-to your `PATH` when doing development for those tests. Over time, we’re looking
-to move away from `FileCheck` in favor of writing the unit tests using our own
-`testing` module and remove this dependency requirements for contributors. We
+`/opt/homebrew/Cellar/llvm/<version>/bin`. You need to add this path
+to your `PATH` in order to run these tests. In the near future, we will be
+moving away from `FileCheck` in favor of writing the unit tests using our own
+`testing` module and remove this dependency requirement for contributors. We
 are happy to welcome contributions in this area!
 
 ### Running the Standard Library Tests
 
 We provide a simple Bash script to build the Standard Library package and
 `test_utils` package that is used by the test suite.  Just run
-`./scripts/run-tests.sh` which will produce the necessary `mojopkg` files inside
-your `build` directory and then run `lit -sv test/stdlib`.
+`./stdlib/scripts/run-tests.sh` which will produce the necessary
+`mojopkg` files inside your `build` directory and then run
+`lit -sv stdlib/test`.
 
 ```bash
-./scripts/run-tests.sh
+./stdlib/scripts/run-tests.sh
 ```
 
 ### Running a subset of the Standard Library Unit Tests
@@ -81,8 +82,7 @@ normal options that the `lit` tool provides.  For example, to run just the
 builtin and collections tests, you can
 
 ```bash
-cd test/stdlib
-lit -sv builtin collections
+lit -sv stdlib/test/builtin stdlib/test/collections
 ```
 
 This can quickly speed up your iteration when doing development to avoid running
@@ -117,5 +117,5 @@ relevant files changed compared to the remote:
 git diff origin/main --name-only -- '*.mojo' | xargs mojo format
 ```
 
-You can also consider setting up your editor to auto format Mojo files upon
-saving.
+You can also consider setting up your editor to automatically format
+Mojo files upon saving.
