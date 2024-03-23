@@ -159,8 +159,8 @@ You can use a pull request to propose a change or bug fix to the Mojo Standard
 Library, Mojo examples, or Mojo documentation. This page gives an overview of
 the process, especially for first-time contributors.
 
-**Note:** Pull requests should be submitted against the **main** branch, which
-represents the most recent nightly build.
+**Note:** Pull requests should be submitted against the `nightly` branch,
+which represents the most recent nightly build.
 
 ### Pull Request Process
 
@@ -183,7 +183,7 @@ for more details
 
 If your change is one of the improvements described above or it has been
 discussed and agreed upon by the project maintainers, please create a pull
-request into the `main` branch and include the following:
+request into the `nightly` branch and include the following:
 
 - A short commit message.
 - A detailed commit description that includes rationalization for the change

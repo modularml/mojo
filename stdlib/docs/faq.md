@@ -40,15 +40,22 @@ no backward compatibility guarantees and therefore they can change at any time.
 These particular areas of the standard library are in active development and we
 commit to releasing them when their public-facing API has stabilized.
 
-#### 5. What are closed-source packages for the Mojo Standard Library?
+#### 5. Why are some Standard Library modules missing from the open-source code?
 
-As we prepared the Mojo Standard Library for its open-source release, we
-produced an open-source module and a closed-source module. The open-source
-module contains all the Mojo source code for the Standard Library primitives
-that are available for use. The Mojo Standard Library closed-source packages
-contain Standard Library primitives that are available for use — however, we are
-not releasing their source code publicly at this time for two main reasons.
-The source is expected to change rapidly in the near term and will be released
-publicly after that rate of change has stabilized. Additionally, proprietary
-aspects of these primitives require further internal review and refinement
-before they can be confidently shared with the community.
+When we were preparing to open source the Standard Library, we realized that
+some modules weren't ready for open-source release. For example:
+
+- Some modules are expected to change rapidly in the near term, and need to
+  stabilize.
+- Some modules are too tightly integrated into other portions of MAX and need to
+  be refactored.
+- Some modules may have proprietary aspects that require additional review and
+  refinement.
+
+For the short term, we've left these modules as closed source. The built version
+of the Mojo Standard Library will include these closed-source modules as well as
+the open-source modules, so Mojo users still have the full set of primitives
+available to them.
+
+Over time, we hope to move most of the closed-source modules into the
+open-source repo.
