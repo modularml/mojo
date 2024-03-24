@@ -9,6 +9,7 @@ from sys.info import sizeof
 
 from memory import memcmp, memcpy, memset_zero
 from memory.unsafe import DTypePointer, Pointer
+from math import *
 from testing import assert_equal, assert_not_equal, assert_true
 
 from utils.index import Index
@@ -120,6 +121,109 @@ def test_memcmp():
     assert_equal(errors2, 0)
 
 
+def test_memcmp_extensive[
+    type: DType, extermes: StringLiteral = ""
+](count: Int):
+    var ptr1 = Pointer[Scalar[type]].alloc(count)
+    var ptr2 = Pointer[Scalar[type]].alloc(count)
+
+    var dptr1 = DTypePointer[type].alloc(count)
+    var dptr2 = DTypePointer[type].alloc(count)
+
+    for i in range(count):
+        ptr1[i] = i
+        dptr1[i] = i
+
+        @parameter
+        if extermes == "":
+            ptr2[i] = i + 1
+            dptr2[i] = i + 1
+        elif extermes == "nan":
+            ptr2[i] = nan[type]()
+            dptr2[i] = nan[type]()
+        elif extermes == "inf":
+            ptr2[i] = Scalar[type].MAX
+            dptr2[i] = Scalar[type].MAX
+
+    assert_equal(
+        memcmp(ptr1, ptr1, count),
+        0,
+        "for dtype=" + str(type) + ";count=" + str(count),
+    )
+    print("memcmp(ptr1, ptr2, count) = ", memcmp(ptr1, ptr2, count))
+    assert_equal(
+        memcmp(ptr1, ptr2, count),
+        -1,
+        "for dtype=" + str(type) + ";count=" + str(count),
+    )
+    assert_equal(
+        memcmp(ptr2, ptr1, count),
+        1,
+        "for dtype=" + str(type) + ";count=" + str(count),
+    )
+
+    assert_equal(
+        memcmp(dptr1, dptr1, count),
+        0,
+        "for dtype="
+        + str(type)
+        + ";extremes="
+        + str(extermes)
+        + ";count="
+        + str(count),
+    )
+    assert_equal(
+        memcmp(dptr1, dptr2, count),
+        -1,
+        "for dtype="
+        + str(type)
+        + ";extremes="
+        + str(extermes)
+        + ";count="
+        + str(count),
+    )
+    assert_equal(
+        memcmp(dptr2, dptr1, count),
+        1,
+        "for dtype="
+        + str(type)
+        + ";extremes="
+        + str(extermes)
+        + ";count="
+        + str(count),
+    )
+
+    ptr1.free()
+    ptr2.free()
+    dptr1.free()
+    dptr2.free()
+
+
+def test_memcmp_extensive():
+    test_memcmp_extensive[DType.int8](1)
+    test_memcmp_extensive[DType.int8](3)
+
+    test_memcmp_extensive[DType.index](3)
+    test_memcmp_extensive[DType.index](simdwidthof[Int]())
+    test_memcmp_extensive[DType.index](4 * simdwidthof[DType.index]())
+    test_memcmp_extensive[DType.index](4 * simdwidthof[DType.index]() + 1)
+    test_memcmp_extensive[DType.index](4 * simdwidthof[DType.index]() - 1)
+
+    test_memcmp_extensive[DType.float32](3)
+    test_memcmp_extensive[DType.float32](simdwidthof[DType.float32]())
+    test_memcmp_extensive[DType.float32](4 * simdwidthof[DType.float32]())
+    test_memcmp_extensive[DType.float32](4 * simdwidthof[DType.float32]() + 1)
+    test_memcmp_extensive[DType.float32](4 * simdwidthof[DType.float32]() - 1)
+
+    test_memcmp_extensive[DType.float32, "nan"](3)
+    test_memcmp_extensive[DType.float32, "nan"](99)
+    test_memcmp_extensive[DType.float32, "nan"](254)
+
+    test_memcmp_extensive[DType.float32, "inf"](3)
+    test_memcmp_extensive[DType.float32, "inf"](99)
+    test_memcmp_extensive[DType.float32, "inf"](254)
+
+
 def test_memset():
     print("== test_memset")
     var pair = Pair(1, 2)
@@ -189,6 +293,7 @@ def main():
     test_memcpy()
     test_memcpy_dtype()
     test_memcmp()
+    test_memcmp_extensive()
     test_memset()
 
     test_dtypepointer_string()

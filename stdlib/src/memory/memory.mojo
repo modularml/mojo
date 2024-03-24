@@ -22,6 +22,7 @@ from memory import memcmp
 
 from sys import llvm_intrinsic
 from sys.info import sizeof, triple_is_nvidia_cuda
+from builtin.dtype import _integral_type_of
 
 from .unsafe import AddressSpace, DTypePointer, Pointer, _GPUAddressSpace
 
@@ -41,6 +42,41 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 
 
 @always_inline
+fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
+    constrained[s1.type.is_integral(), "the input dtype must be integral"]()
+    alias simd_width = simdwidthof[s1.type]()
+    if count < simd_width:
+        for i in range(count):
+            var s1i = s1[i]
+            var s2i = s2[i]
+            var diff = s1i - s2i
+            if diff:
+                return 1 if diff > 0 else -1
+        return 0
+
+    var vector_end_simd = _align_down(count, simd_width)
+    for i in range(0, vector_end_simd, simd_width):
+        var s1i = s1.load[width=simd_width](i)
+        var s2i = s2.load[width=simd_width](i)
+        var diff = s1i - s2i
+        if (diff != 0).reduce_or():
+            for j in range(simd_width):
+                return 1 if diff[j] > 0 else -1
+
+    var last = count - simd_width
+    if last <= 0:
+        return 0
+
+    var s1i = s1.load[width=simd_width](last)
+    var s2i = s2.load[width=simd_width](last)
+    var diff = s1i - s2i
+    if (diff != 0).reduce_or():
+        for j in range(simd_width):
+            return 1 if diff[j] > 0 else -1
+    return 0
+
+
+@always_inline
 fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
     """Compares two buffers. Both strings are assumed to be of the same length.
 
@@ -54,30 +90,25 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         s1 < s2. The comparison is performed by the first different byte in the
         buffer.
     """
-    alias simd_width = simdwidthof[s1.type]()
-    var vector_end_simd = _align_down(count, simd_width)
-    for i in range(0, vector_end_simd, simd_width):
-        var s1i = s1.load[width=simd_width](i)
-        var s2i = s2.load[width=simd_width](i)
-        if s1i == s2i:
-            continue
 
-        var diff = s1i - s2i
-        for j in range(simd_width):
-            if (diff[j] > 0).reduce_or():
-                return 1
-            return -1
+    @parameter
+    if s1.type.is_floating_point():
+        alias integral_type = _integral_type_of[s1.type]()
+        return _memcmp_impl(
+            s1.bitcast[integral_type](), s2.bitcast[integral_type](), count
+        )
 
-    for i in range(vector_end_simd, count):
-        var s1i = s1[i]
-        var s2i = s2[i]
-        if s1i == s2i:
-            continue
+    var byte_count = count * sizeof[s1.type]()
 
-        if s1i > s2i:
-            return 1
-        return -1
-    return 0
+    @parameter
+    if sizeof[s1.type]() >= sizeof[DType.int32]():
+        return _memcmp_impl(
+            s1.bitcast[DType.int32](),
+            s2.bitcast[DType.int32](),
+            byte_count // sizeof[DType.int32](),
+        )
+
+    return _memcmp_impl(s1, s2, count)
 
 
 @always_inline
@@ -104,10 +135,17 @@ fn memcmp[
         s1 < s2. The comparison is performed by the first different byte in the
         byte strings.
     """
-    var ds1 = DTypePointer[DType.uint8, address_space](s1.bitcast[UInt8]())
-    var ds2 = DTypePointer[DType.uint8, address_space](s2.bitcast[UInt8]())
     var byte_count = count * sizeof[type]()
-    return memcmp(ds1, ds2, byte_count)
+
+    @parameter
+    if sizeof[type]() >= sizeof[DType.int32]():
+        var ds1 = DTypePointer[DType.int32, address_space](s1.bitcast[Int32]())
+        var ds2 = DTypePointer[DType.int32, address_space](s2.bitcast[Int32]())
+        return _memcmp_impl(ds1, ds2, byte_count // sizeof[DType.int32]())
+
+    var ds1 = DTypePointer[DType.int8, address_space](s1.bitcast[Int8]())
+    var ds2 = DTypePointer[DType.int8, address_space](s2.bitcast[Int8]())
+    return _memcmp_impl(ds1, ds2, byte_count)
 
 
 # ===----------------------------------------------------------------------===#
