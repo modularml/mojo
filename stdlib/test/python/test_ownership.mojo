@@ -24,7 +24,7 @@ fn test_import(inout python: Python) raises -> String:
         var str = String(python.__str__(py_string))
         return str
     except e:
-        return e.__str__()
+        return str(e)
 
 
 fn test_list(inout python: Python) raises -> String:
@@ -34,7 +34,7 @@ fn test_list(inout python: Python) raises -> String:
         var py_string = my_list.__str__()
         return String(python.__str__(py_string))
     except e:
-        return e.__str__()
+        return str(e)
 
 
 fn test_tuple(inout python: Python) raises -> String:
@@ -44,17 +44,14 @@ fn test_tuple(inout python: Python) raises -> String:
         var py_string = my_tuple.__str__()
         return String(python.__str__(py_string))
     except e:
-        return e.__str__()
+        return str(e)
 
 
 fn test_call_ownership(inout python: Python) raises -> String:
-    try:
-        var obj: PythonObject = [1, "5"]
-        var py_string = obj.__str__()
-        var string = python.__str__(py_string)
-        return String(string)
-    except e:
-        return e.__str__()
+    var obj: PythonObject = [1, "5"]
+    var py_string = obj.__str__()
+    var string = python.__str__(py_string)
+    return String(string)
 
 
 fn test_getitem_ownership(inout python: Python) raises -> String:
@@ -64,7 +61,7 @@ fn test_getitem_ownership(inout python: Python) raises -> String:
         var string = python.__str__(py_string)
         return String(string)
     except e:
-        return e.__str__()
+        return str(e)
 
 
 fn test_getattr_ownership(inout python: Python) raises -> String:
@@ -76,7 +73,7 @@ fn test_getattr_ownership(inout python: Python) raises -> String:
         var string = python.__str__(py_string)
         return String(string)
     except e:
-        return e.__str__()
+        return str(e)
 
 
 def main():
