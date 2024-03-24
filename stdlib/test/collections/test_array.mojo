@@ -7,7 +7,7 @@
 
 from testing import assert_equal
 
-from utils.small_string import _ArrayMem
+from utils.inlined_string import _ArrayMem
 
 
 def main():

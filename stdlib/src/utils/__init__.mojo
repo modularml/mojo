@@ -17,8 +17,8 @@ from .index import (
     Index,
     product,
 )
+from .inlined_string import InlinedString
 from .loop import unroll
-from .small_string import SmallString
 from .static_tuple import StaticTuple
 from .stringref import StringRef
 from .variant import Variant

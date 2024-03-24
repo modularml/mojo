@@ -23,12 +23,12 @@ from utils.static_tuple import StaticTuple
 from utils.variant import Variant
 
 # ===----------------------------------------------------------------------===#
-# SmallString
+# InlinedString
 # ===----------------------------------------------------------------------===#
 
 
 @value
-struct SmallString(Sized, Stringable, CollectionElement):
+struct InlinedString(Sized, Stringable, CollectionElement):
     """A string that performs small-string optimization to avoid heap allocations for short strings.
     """
 
@@ -55,7 +55,7 @@ struct SmallString(Sized, Stringable, CollectionElement):
         self._storage = Self.Layout(fixed ^)
 
     fn __init__(inout self, literal: StringLiteral):
-        """Constructs a SmallString value given a string literal.
+        """Constructs a InlinedString value given a string literal.
 
         Args:
             literal: The input constant string.
@@ -141,7 +141,7 @@ struct SmallString(Sized, Stringable, CollectionElement):
                 self._storage.get[_FixedString[Self.SMALL_CAP]]()[] += strref
             except e:
                 abort(
-                    "unreachable: SmallString append to FixedString failed: "
+                    "unreachable: InlinedString append to FixedString failed: "
                     + str(e),
                 )
         else:
@@ -201,7 +201,7 @@ struct SmallString(Sized, Stringable, CollectionElement):
         string += other._strref_dangerous()
         return string
 
-    fn __add__(self, other: SmallString) -> Self:
+    fn __add__(self, other: InlinedString) -> Self:
         """Construct a string by appending another string at the end of this string.
 
         Args:
