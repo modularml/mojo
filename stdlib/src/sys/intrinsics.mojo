@@ -835,18 +835,11 @@ struct PrefetchOptions:
     """Indicates i-cache or d-cache prefetching."""
 
     @always_inline("nodebug")
-    fn __init__() -> Self:
-        """
-        Constructs an instance of PrefetchOptions with default params.
-
-        Returns:
-            The Prefetch configuration constructed.
-        """
-        return Self {
-            rw: PrefetchRW.READ,
-            locality: PrefetchLocality.HIGH,
-            cache: PrefetchCache.DATA,
-        }
+    fn __init__(inout self):
+        """Constructs an instance of PrefetchOptions with default params."""
+        self.rw = PrefetchRW.READ
+        self.locality = PrefetchLocality.HIGH
+        self.cache = PrefetchCache.DATA
 
     @always_inline("nodebug")
     fn for_read(self) -> Self:
