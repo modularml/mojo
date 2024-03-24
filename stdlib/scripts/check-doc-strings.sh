@@ -8,7 +8,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-REPO_ROOT="${SCRIPT_DIR}/.."
+REPO_ROOT="${SCRIPT_DIR}/../.."
 
 check_doc_string() {
   local pkg=$1
