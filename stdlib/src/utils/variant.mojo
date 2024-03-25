@@ -103,8 +103,8 @@ struct _UnionTypeIndex[T: CollectionElement, *Ts: CollectionElement]:
 struct Variant[*Ts: CollectionElement](CollectionElement):
     """A runtime-variant type.
 
-    Data for this type is stored internally: its size is the largest size
-    of any of its variants.
+    Data for this type is stored internally. Currently, its size is the
+    largest size of any of its variants plus a 16-bit discriminant.
 
     You can
         - use `isa[T]()` to check what type a variant is
