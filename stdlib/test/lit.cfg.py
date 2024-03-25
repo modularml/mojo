@@ -7,6 +7,7 @@
 from pathlib import Path
 import os
 import platform
+import shutil
 
 import lit.formats
 import lit.llvm
@@ -47,6 +48,15 @@ config.substitutions.insert(0, ("%mojo", "mojo"))
 # without this, the `mojo` compiler would use its own `stdlib.mojopkg`
 # it ships with which is not what we want.
 os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = str(build_root)
+
+
+# Check if the `not` binary from LLVM is available.
+def has_not():
+    return shutil.which("not") is not None
+
+
+if has_not():
+    config.available_features.add("has_not")
 
 # Pass through several environment variables
 # to the underlying subprocesses that run the tests.

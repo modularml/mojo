@@ -7,6 +7,7 @@
 # This file only tests the debug_assert function
 #
 # ===----------------------------------------------------------------------=== #
+# REQUIRES: has_not
 # RUN: not --crash %mojo -D MOJO_ENABLE_ASSERTIONS -debug-level full %s 2>&1 | FileCheck %s
 
 
