@@ -329,6 +329,8 @@ modular update mojo
   to floating point or integral types.
 - [#1838](https://github.com/modularml/mojo/issues/1838) - Variadic `print`
   does not work when specifying `end=""`
+- [#1826](https://github.com/modularml/mojo/issues/1826) - The `SIMD.reduce` methods
+  correctly handle edge cases where `size_out >= size`.
 
 ## v24.1.1 (2024-03-18)
 
