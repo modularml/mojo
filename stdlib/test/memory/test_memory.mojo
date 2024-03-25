@@ -9,7 +9,7 @@ from sys.info import sizeof
 
 from memory import memcmp, memcpy, memset_zero
 from memory.unsafe import DTypePointer, Pointer
-from math import *
+from utils._numerics import nan
 from testing import assert_equal, assert_not_equal, assert_true
 
 from utils.index import Index
