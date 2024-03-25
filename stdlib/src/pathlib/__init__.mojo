@@ -1,4 +1,4 @@
-# ===----------------------------------------------------------------------===
+# ===----------------------------------------------------------------------=== #
 # Copyright (c) 2024, Modular Inc. All rights reserved.
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions:

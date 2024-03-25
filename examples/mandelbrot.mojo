@@ -11,10 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+# RUN: %mojo -debug-level full %s | FileCheck %s
+
 from math import iota
 from sys.info import num_logical_cores
 
-# RUN: %mojo -debug-level full %s | FileCheck %s
 import benchmark
 from algorithm import parallelize, vectorize
 from complex import ComplexFloat64, ComplexSIMD
