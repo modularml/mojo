@@ -53,7 +53,7 @@ For more general questions or to chat with other Mojo developers, check out our
 To learn more about Mojo, see the
 [Mojo Manual](https://docs.modular.com/mojo/manual/).
 
-## Thanks To Our Contributors
+## Thanks to our contributors
 
 <a href="https://github.com/modularml/mojo/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=modularml/mojo" />

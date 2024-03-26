@@ -1,6 +1,6 @@
-# Welcome to the Mojo Standard Library
+# Welcome to the Mojo standard library
 
-This folder contains the open-source Mojo Standard Library! 🔥
+This folder contains the open-source Mojo standard library! 🔥
 
 We're thrilled to have you join our community of developers eager to build a
 vibrant and supportive ecosystem. If you just want to *use* the Mojo Standard
@@ -10,7 +10,7 @@ standalone Mojo SDK:
 - [Get the MAX SDK.](https://docs.modular.com/engine/get-started)
 - [Get the Mojo SDK.](https://docs.modular.com/mojo/manual/get-started/)
 
-## Vision and Roadmap
+## Vision and roadmap
 
 We have written down the principles that inform our decisions about what
 features we work on and what bugs we prioritize. Before you consider making
@@ -22,28 +22,28 @@ guide our development efforts.
 - Our [Roadmap](./docs/roadmap.md) identifies concrete development goals as we
 work towards an even more robust and feature-rich standard library.
 
-## Contributing to the Mojo Standard Library
+## Contributing to the Mojo standard library
 
 As a contributor, your efforts and expertise are invaluable in driving the
-evolution of the Mojo Standard Library. The [Mojo Contributor
-Guide](../CONTRIBUTING.md) provides all the information necessary to make
+evolution of the Mojo standard library. The [Mojo contributor
+guide](../CONTRIBUTING.md) provides all the information necessary to make
 meaningful contributions—from understanding the submission process to
 adhering to best practices:
 
-- [Mojo Contributor Guide](../CONTRIBUTING.md)
+- [Mojo contributor guide](../CONTRIBUTING.md)
 
-## Getting Started
+## Getting started
 
 Follow our provided documentation to prepare your environment for building the
 standard library, and then test your setup with our automated testing suite.
 For additional information, the FAQ page is your go-to resource.
 
-- [Mojo Standard Library Development](./docs/development.md)
+- [Mojo standard library development](./docs/development.md)
 - [FAQ](./docs/faq.md)
 
-## Code of Conduct
+## Code of conduct
 
-[Code of Conduct](../CODE_OF_CONDUCT.md)
+[Code of conduct](../CODE_OF_CONDUCT.md)
 
 ## License
 
@@ -55,5 +55,5 @@ See the license file in the repository for more details.
 
 For any inquiries, bug reports, or feature requests, please [open an
 issue](https://github.com/modularml/mojo/issues) on the GitHub repository. See
-the [Mojo Contributor Guide](../CONTRIBUTING.md) for guidelines on filing good
+the [Mojo contributor guide](../CONTRIBUTING.md) for guidelines on filing good
 bugs.

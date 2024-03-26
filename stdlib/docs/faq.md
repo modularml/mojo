@@ -1,13 +1,13 @@
-# Frequently Asked Questions
+# Frequently asked questions
 
 A lot of questions about Mojo as a whole can be answered on the
 [FAQ on our website](https://docs.modular.com/mojo/faq).
-This document is specifically focused on the Standard Library with contributors
+This document is specifically focused on the standard library with contributors
 in mind.
 
-## Standard Library
+## Mojo standard library
 
-### Contributing & Development
+### Contributing & development
 
 #### 1. What platforms does Mojo support?
 
@@ -22,7 +22,7 @@ Don’t Panic! 😃 Check out our
 include all the essential information to avoid unnecessary delays in getting
 your issues resolved.
 
-### Standard Library Code
+### Standard library code
 
 #### 1. Why do we have both `AnyRegType` and `AnyType`?
 
@@ -35,7 +35,7 @@ the compiler team to make this possible.
 
 #### 2. Are the MLIR dialects private?
 
-The Standard Library makes use of internal MLIR dialects such as `pop`, `kgen`,
+The standard library makes use of internal MLIR dialects such as `pop`, `kgen`,
 and `lit`.  Currently, these are private, undocumented APIs.  We provide
 no backward compatibility guarantees and therefore they can change at any time.
 These particular areas of the compiler and standard library are in active
@@ -45,15 +45,15 @@ public-facing API has stabilized.
 #### 3. What is the compiler-runtime?
 
 Mojo depends on certain features that are still written in C++, collectively
-called "the compiler runtime." This may manifest in the Standard Library code
+called "the compiler runtime." This may manifest in the standard library code
 through references like `KGEN_CompilerRT_LLCL_CreateRuntime`. Like the MLIR
 dialects, the compiler runtime is currently private and undocumented.
 
 We plan on reducing the C++ dependencies in the future.
 
-#### 4. Why are some Standard Library modules missing from the open-source code?
+#### 4. Why are some standard library modules missing from the open-source code?
 
-When we were preparing to open source the Standard Library, we realized that
+When we were preparing to open source the standard library, we realized that
 some modules weren't ready for open-source release. For example:
 
 - Some modules are expected to change rapidly in the near term, and need to
