@@ -26,6 +26,14 @@ echo 'export PATH="/Users/joe/.modular/pkg/packages.modular.com_nightly_mojo/bin
 source ~/.zshrc
 ```
 
+Install the nightly Mojo extension by searching for `Mojo nightly` in the
+extensions marketplace:
+
+![mojo-nightly-extension](nightly-extension.png)
+
+You can only have one Mojo extension enabled at a time, remember to switch back
+when using the stable release!
+
 ## Cloning the Repository
 
 ```bash
