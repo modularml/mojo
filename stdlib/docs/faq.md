@@ -33,14 +33,25 @@ the entire library to have everything work on `AnyType` and be generalized to
 not just work on `AnyRegType`. Several things need to be worked in tandem with
 the compiler team to make this possible.
 
-#### 2. LLCL and MLIR ops are private APIs?
+#### 2. Are the MLIR dialects private?
 
-LLCL entry points and MLIR operators are private undocumented APIs. We provide
+The Standard Library makes use of internal MLIR dialects such as `pop`, `kgen`,
+and `lit`.  Currently, these are private, undocumented APIs.  We provide
 no backward compatibility guarantees and therefore they can change at any time.
-These particular areas of the standard library are in active development and we
-commit to releasing them when their public-facing API has stabilized.
+These particular areas of the compiler and standard library are in active
+development and we are exploring how we can release them when their
+public-facing API has stabilized.
 
-#### 3. Why are some Standard Library modules missing from the open-source code?
+#### 3. What is the compiler-runtime?
+
+Mojo depends on certain features that are still written in C++, collectively
+called "the compiler runtime." This may manifest in the Standard Library code
+through references like `KGEN_CompilerRT_LLCL_CreateRuntime`. Like the MLIR
+dialects, the compiler runtime is currently private and undocumented.
+
+We plan on reducing the C++ dependencies in the future.
+
+#### 4. Why are some Standard Library modules missing from the open-source code?
 
 When we were preparing to open source the Standard Library, we realized that
 some modules weren't ready for open-source release. For example:
