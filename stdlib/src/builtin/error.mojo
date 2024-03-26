@@ -140,6 +140,7 @@ struct Error(Stringable, Boolable):
         """
         return self.__str__()
 
+    @always_inline
     fn _message(self) -> String:
         """Converts the Error to string representation.
 

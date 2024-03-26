@@ -362,6 +362,7 @@ struct _StringableTuple[*Ts: Stringable](Sized):
                 alignof[Ts[i]](),
             )
 
+    @always_inline
     fn _print[i: Int](inout self, /, *, sep: StringLiteral = " "):
         # TODO: Allow controlling this separator from the caller.
         _put(sep)
@@ -376,6 +377,7 @@ struct _StringableTuple[*Ts: Stringable](Sized):
         return len(VariadicList(Ts))
 
 
+@always_inline
 fn _print_elements[
     T: Stringable, *Ts: Stringable
 ](

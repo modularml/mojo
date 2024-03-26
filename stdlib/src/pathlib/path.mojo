@@ -78,6 +78,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         """
         self.path = existing.path ^
 
+    @always_inline
     fn __copyinit__(inout self, existing: Self):
         """Copy constructor for the path struct.
 
@@ -132,6 +133,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         else:
             self.path += DIR_SEPARATOR + suffix
 
+    @always_inline
     fn __str__(self) -> String:
         """Returns a string representation of the path.
 
@@ -140,6 +142,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         """
         return self.path
 
+    @always_inline
     fn __fspath__(self) -> String:
         """Returns a string representation of the path.
 
@@ -205,6 +208,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         """
         return os.lstat(self)
 
+    @always_inline
     fn exists(self) -> Bool:
         """Returns True if the path exists and False otherwise.
 

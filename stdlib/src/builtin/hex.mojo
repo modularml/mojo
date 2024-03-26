@@ -21,6 +21,7 @@ from collections import List
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
+@always_inline
 fn hex[T: Intable](value: T) -> String:
     """Returns the hex string represention of the given integer.
 
@@ -75,6 +76,7 @@ fn _format_int[
     return String._from_bytes(buf ^)
 
 
+@always_inline
 fn _write_int[
     T: Intable
 ](

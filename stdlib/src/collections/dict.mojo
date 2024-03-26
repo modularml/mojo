@@ -75,6 +75,7 @@ struct _DictEntryIter[
     fn __iter__(self) -> Self:
         return self
 
+    @always_inline
     fn __next__(inout self) -> Self.ref_type:
         while True:
             debug_assert(self.index < self.src[]._reserved, "dict iter bounds")
@@ -226,6 +227,7 @@ struct _DictIndex:
 
     var data: DTypePointer[DType.invalid]
 
+    @always_inline
     fn __init__(inout self, reserved: Int):
         if reserved <= 128:
             var data = DTypePointer[DType.int8].alloc(reserved)
@@ -418,6 +420,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     var _index: _DictIndex
     var _entries: List[Optional[DictEntry[K, V]]]
 
+    @always_inline
     fn __init__(inout self):
         """Initialize an empty dictiontary."""
         self.size = 0
@@ -426,6 +429,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         self._index = _DictIndex(self._reserved)
         self._entries = Self._new_entries(self._reserved)
 
+    @always_inline
     fn __init__(inout self, existing: Self):
         """Copy an existing dictiontary.
 
@@ -635,6 +639,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         )
 
     @staticmethod
+    @always_inline
     fn _new_entries(reserved: Int) -> List[Optional[DictEntry[K, V]]]:
         var entries = List[Optional[DictEntry[K, V]]](capacity=reserved)
         for i in range(reserved):

@@ -100,6 +100,7 @@ struct FileHandle:
 
         self.handle = handle
 
+    @always_inline
     fn __del__(owned self):
         """Closes the file handle."""
         try:
@@ -131,6 +132,7 @@ struct FileHandle:
         self.handle = existing.handle
         existing.handle = DTypePointer[DType.invalid]()
 
+    @always_inline
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads the data from the file.
 
@@ -236,6 +238,7 @@ struct FileHandle:
         """
         self._write(data._as_ptr(), len(data))
 
+    @always_inline
     fn write(self, data: StringRef) raises:
         """Write the data to the file.
 
@@ -244,6 +247,7 @@ struct FileHandle:
         """
         self._write(data.data, len(data))
 
+    @always_inline
     fn _write[
         address_space: AddressSpace
     ](self, ptr: DTypePointer[DType.int8, address_space], len: Int) raises:

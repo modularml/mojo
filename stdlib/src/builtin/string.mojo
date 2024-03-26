@@ -111,6 +111,7 @@ fn chr(c: Int) -> String:
 
 
 # TODO: this is hard coded for decimal base
+@always_inline
 fn _atol(str: StringRef) raises -> Int:
     """Parses the given string as a base-10 integer and returns that value.
 
@@ -275,6 +276,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
+    @always_inline
     fn __str__(self) -> String:
         return self
 
@@ -385,6 +387,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         self._buffer = existing._buffer ^
 
     @staticmethod
+    @always_inline
     fn _from_bytes(owned buff: DTypePointer[DType.int8]) -> String:
         """Construct a string from a sequence of bytes.
 
@@ -950,6 +953,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         # outside of the standard ASCII letters.
         return self._toggle_ascii_case[_is_ascii_lowercase]()
 
+    @always_inline
     fn _toggle_ascii_case[check_case: fn (Int8) -> Bool](self) -> String:
         var copy: String = self
 
@@ -995,6 +999,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             return self._endswith_impl(suffix, start)
         return self[start:end]._endswith_impl(suffix)
 
+    @always_inline
     fn _endswith_impl(self, suffix: String, start: Int = 0) -> Bool:
         return self.rfind(suffix, start) + len(suffix) == len(self)
 
@@ -1116,6 +1121,7 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
         result += 4
 
 
+@always_inline
 fn _calc_initial_buffer_size(n0: Int) -> Int:
     var n = _abs(n0)
     var sign = 0 if n0 > 0 else 1

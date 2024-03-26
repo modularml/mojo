@@ -144,6 +144,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         for i in range(len(existing)):
             self.append(existing[i])
 
+    @always_inline
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
@@ -159,6 +160,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         """
         return self.size
 
+    @always_inline
     fn _realloc(inout self, new_capacity: Int):
         var new_data = AnyPointer[T].alloc(new_capacity)
 
@@ -182,6 +184,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         (self.data + self.size).emplace_value(value ^)
         self.size += 1
 
+    @always_inline
     fn extend(inout self, owned other: List[T]):
         """Extends this list by consuming the elements of `other`.
 
@@ -222,6 +225,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         # list.
         self.size = final_size
 
+    @always_inline
     fn pop_back(inout self) -> T:
         """Pops a value from the back of this list.
 
@@ -235,6 +239,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
                 self._realloc(self.capacity // 2)
         return ret_val ^
 
+    @always_inline
     fn reserve(inout self, new_capacity: Int):
         """Reserves the requested capacity.
 
@@ -248,6 +253,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             return
         self._realloc(new_capacity)
 
+    @always_inline
     fn resize(inout self, new_size: Int, value: T):
         """Resizes the list to the given new size.
 
@@ -272,6 +278,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self._reverse()
 
     # This method is private to avoid exposing the non-Pythonic `start` argument.
+    @always_inline
     fn _reverse(inout self, start: Int = 0):
         """Reverses the elements of the list at positions after `start`.
 
