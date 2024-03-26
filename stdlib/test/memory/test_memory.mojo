@@ -157,7 +157,6 @@ def test_memcmp_extensive[
         0,
         "for dtype=" + str(type) + ";count=" + str(count),
     )
-    print("memcmp(ptr1, ptr2, count) = ", memcmp(ptr1, ptr2, count))
     assert_equal(
         memcmp(ptr1, ptr2, count),
         -1,
