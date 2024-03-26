@@ -185,6 +185,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         self._get_state()[] = Self._check[T]()
         self._get_ptr[T]().emplace_value(value ^)
 
+    @always_inline
     fn __copyinit__(inout self, other: Self):
         """Creates a deep copy of an existing variant.
 
@@ -205,6 +206,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         unroll[each, len(VariadicList(Ts))]()
 
+    @always_inline
     fn __moveinit__(inout self, owned other: Self):
         """Move initializer for the variant.
 
@@ -229,6 +231,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """Destroy the variant."""
         self._call_correct_deleter()
 
+    @always_inline
     fn _call_correct_deleter(inout self):
         @parameter
         fn each[i: Int]():
