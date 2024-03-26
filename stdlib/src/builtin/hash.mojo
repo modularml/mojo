@@ -130,6 +130,7 @@ alias _HASH_INIT = _djbx33a_init
 alias _HASH_UPDATE = _djbx33a_hash_update
 
 
+@always_inline
 fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     """Hash a SIMD byte vector using direct DJBX33A hash algorithm.
 

@@ -285,6 +285,7 @@ struct _FixedString[CAP: Int](Sized, Stringable, CollectionElement):
         self.buffer = _ArrayMem[Int8, CAP]()
         self.size = 0
 
+    @always_inline
     fn __init__(inout self, literal: StringLiteral) raises:
         """Constructs a FixedString value given a string literal.
 
@@ -309,6 +310,7 @@ struct _FixedString[CAP: Int](Sized, Stringable, CollectionElement):
     # Trait Interfaces
     # ===------------------------------------------------------------------=== #
 
+    @always_inline
     fn __str__(self) -> String:
         return String(self._strref_dangerous())
 
@@ -331,6 +333,7 @@ struct _FixedString[CAP: Int](Sized, Stringable, CollectionElement):
         """
         self.__iadd__(string._strref_dangerous())
 
+    @always_inline
     fn __iadd__(inout self, strref: StringRef) raises:
         """Appends another string to this string.
 

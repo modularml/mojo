@@ -99,6 +99,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         """
         self = Self()
 
+    @always_inline
     fn value(self) -> T:
         """Unsafely retrieve the value out of the Optional.
 
@@ -280,6 +281,7 @@ struct OptionalReg[T: AnyRegType](Boolable):
             ](__mlir_attr.`false`)
         }
 
+    @always_inline
     fn value(self) -> T:
         """Get the optional value.
 

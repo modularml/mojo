@@ -153,6 +153,7 @@ fn memcmp[
 # ===----------------------------------------------------------------------===#
 
 
+@always_inline
 fn memcpy[count: Int](dest: Pointer, src: __type_of(dest)):
     """Copies a memory area.
 
@@ -207,6 +208,7 @@ fn memcpy[count: Int](dest: Pointer, src: __type_of(dest)):
         dest_dtype_ptr.store(i, src_dtype_ptr.load[width=1](i))
 
 
+@always_inline
 fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
     """Copies a memory area.
 
@@ -220,6 +222,7 @@ fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
     memcpy[count](dest.address, src.address)
 
 
+@always_inline
 fn memcpy(dest: Pointer, src: __type_of(dest), count: Int):
     """Copies a memory area.
 
@@ -283,6 +286,7 @@ fn memcpy(dest: Pointer, src: __type_of(dest), count: Int):
         dest_dtype_ptr.store(i, src_dtype_ptr.load[width=1](i))
 
 
+@always_inline
 fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
     """Copies a memory area.
 

@@ -953,6 +953,7 @@ struct object(IntableRaising, Boolable, Stringable):
 
         raise "object type cannot be converted to an integer"
 
+    @always_inline
     fn __str__(self) -> String:
         """Performs conversion to string according to Python
         semantics.
