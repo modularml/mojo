@@ -1,4 +1,4 @@
-# Mojo contributor guide
+# Mojo Contributor Guide
 
 Welcome to the Mojo community! 🔥 We’re very excited that you’re interested in
 contributing to the project. To help you get started and ensure a smooth
@@ -8,7 +8,7 @@ There are many ways to contribute to the project, from joining the
 [Discord community](https://www.discord.gg/modular), to filing bugs, to
 contributing documentation, examples, or code.
 
-## Submitting bugs
+## Submitting Bugs
 
 Reporting issues is a great way to contribute to the project. Mojo uses GitHub
 Issues for tracking bugs.
@@ -21,25 +21,25 @@ Also, before opening a new issue, take a moment to search through the already
 submitted issues to avoid creating duplicate issues for the maintainers to
 address.
 
-### Writing high-quality bugs
+### Writing High-Quality Bugs
 
 We encourage you to provide as much information about the issue as practical.
 The more details you provide, the faster we can resolve the issue. The following
 is a template of the information that should accompany every submitted issue.
 
-#### Issue template
+#### Issue Template
 
 - **Summary.** A descriptive summary of the issue.
 - **Description.** A detailed account of the bug, including what was expected
   and what occurred.
-- **Environment details.**
+- **Environment Details.**
   - Mojo Compiler Version
   - Operating System version
   - Hardware Specifications
-- **Severity/frequency.** An assessment of the impact ranging from inconvenience
+- **Severity/Frequency.** An assessment of the impact ranging from inconvenience
   to a blocker.
 
-## Contributing to docs and examples
+## Contributing to Docs and Examples
 
 We’re happy to accept pull requests for the docs and examples.
 If your change is any one of the following, please create a pull request and we
@@ -67,7 +67,7 @@ require difficult reviews and rework, or that might get rejected.
 See [Pull Requests](#pull-requests) for information on creating your first pull
 request.
 
-## Contributing to the standard library
+## Contributing to the Standard Library
 
 The standard library team is dedicated to creating a vibrant technical community
 around the Mojo programming language. Our vision includes a diverse and
@@ -84,12 +84,12 @@ For more information on our priorities, see the following documents:
 For technical details on developing for the standard library, see the following
 documents:
 
-- [Developing the standard library](./stdlib/docs/development.md) covers building,
+- [Developing the Standard Library](./stdlib/docs/development.md) covers building,
   testing, and other information you’ll need to work in the standard library.
 - [Coding Standards and Style Guide](./stdlib/docs/style-guide.md) provides
   guidelines for writing code for the standard library.
 
-### Accepting open source PRs
+### Accepting Open Source PRs
 
 To ensure a streamlined process, contributors are encouraged to focus on
 enhancements, bug fixes, and optimizations aligned with the library's
@@ -153,7 +153,7 @@ This process is heavily inspired by the process used by several other
 open-source projects. We’ll add more documentation in the future as we gain
 experience with the process.
 
-## Pull requests
+## Pull Requests
 
 You can use a pull request to propose a change or bug fix to the Mojo Standard
 Library, Mojo examples, or Mojo documentation. This page gives an overview of
@@ -162,122 +162,28 @@ the process, especially for first-time contributors.
 **Note:** Pull requests should be submitted against the `nightly` branch,
 which represents the most recent nightly build.
 
-### Pull request process
+### Pull Request Process
 
-#### First-time checklist
+#### 1. First-time checklist
 
 Before you start your first pull request, please complete this checklist:
 
 - Read this entire contributor guide.
 - Read the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
-#### Evaluate and get buy-in on the change
+#### 2. Evaluate and get buy-in on the change
 
 We want to be sure that you spend your time efficiently and prepare changes that
 aren’t controversial and get stuck in long rounds of reviews. See the sections
 on [Contributing to Docs and Examples](#contributing-to-docs-and-examples) and
-[Contributing to the standard library](#contributing-to-the-standard-library)
+[Contributing to the Standard Library](#contributing-to-the-standard-library)
 for more details.
 
-#### Fork and clone the repo
-
-Go to the [Mojo repo](https://github.com/modularml/mojo) and click the fork
-button:
-
-![Create Fork](stdlib/docs/images/create-fork.png)
-
-Clone your forked repo locally with the command:
-
-```bash
-git clone git@github.com:[your-username]/mojo.git
-cd mojo
-```
-
-Add the upstream remote and fetch it:
-
-```bash
-git remote add upstream git@github.com:modularml/mojo.git
-git fetch upstream
-```
-
-#### Branching off nightly
-
-Make sure to branch off `nightly` to work on your PR:
-
-```bash
-git checkout upstream/nightly
-git checkout -b my-fix-pr
-```
-
-You should periodically make sure you've synced the latest changes, especially
-before raising a PR:
-
-```bash
-git fetch upstream
-git rebase upstream/nightly
-```
-
-#### Getting the nightly Mojo compiler
-
-Now that you're on the nightly branch, you need to install the latest nightly
-Mojo compiler:
-
-```bash
-curl https://get.modular.com | sh -
-
-modular auth
-
-modular install nightly/mojo
-```
-
-If you already have an older `nightly/mojo` compiler, replace
-`modular install nightly/mojo` with `modular update nightly/mojo`.
-
-Then, follow the instructions from the `modular` tool in adding the `mojo`
-compiler to your `PATH` such as:
-
-```bash
-echo export MODULAR_HOME="$HOME/.modular" >> ~/.zshrc
-echo 'export PATH="$HOME/.modular/pkg/packages.modular.com_nightly_mojo/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-If you're using bash, replace the three `~/.zshrc` above with `~/.bashrc`.
-
-#### Mojo nightly vscode extension
-
-Install the [Mojo nightly VS Code
-extension](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo-nightly):
-
-<img src="./stdlib/docs/images/nightly-extension.png" width=350 />
-
-You can only have one Mojo extension enabled at a time, remember to switch back
-when using the stable release!
-
-#### Create a pull request
+#### 3. Create a pull request
 
 If your change is one of the improvements described above or it has been
 discussed and agreed upon by the project maintainers, please create a pull
-request into the `nightly` branch.
-
-First push your changes:
-
-```bash
-git push -u [your-username] my-fix-pr
-```
-
-You'll see a link to create a PR:
-
-```plaintext
-remote: Create a pull request for 'my-fix-pr' on GitHub by visiting:
-remote:      https://github.com/jackos/mojo/pull/new/my-fix-pr
-```
-
-Make sure you point it to the `nightly` branch:
-
-![Base Branch](stdlib/docs/images/base-branch.png)
-
-Now fill out the details:
+request into the `nightly` branch and include the following:
 
 - A short commit title describing the change.
 - A detailed commit description that includes rationalization for the change
@@ -345,7 +251,7 @@ By making a contribution to this project, I certify that:
     this project or the open source license(s) involved.
 ```
 
-### Review time SLA
+### Review Time SLA
 
 The team commits to reviewing submitted pull requests within a week of
 submission.

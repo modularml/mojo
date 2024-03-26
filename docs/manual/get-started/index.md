@@ -55,7 +55,7 @@ Linux:
 - Ubuntu 20.04/22.04 LTS
 - x86-64 CPU (with [SSE4.2 or
 newer](https://www.intel.com/content/www/us/en/support/articles/000057621/processors.html))
-  or AWS Graviton2/3 CPU
+  or AWS Graviton2 CPU or newer
 - Minimum 8 GiB RAM
 - Python 3.8 - 3.11
 - g++ or clang++ C++ compiler

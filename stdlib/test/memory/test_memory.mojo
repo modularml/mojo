@@ -279,6 +279,7 @@ def test_pointer_refitem():
 def test_pointer_refitem_string():
     alias payload = "$Modular!Mojo!HelloWorld^"
     var ptr = Pointer[String].alloc(1)
+    __get_address_as_uninit_lvalue(ptr.address) = String()
     ptr[] = payload
     assert_equal(ptr[], payload)
     ptr.free()

@@ -51,7 +51,7 @@ that's in the same directory as `mymodule.mojo`:
 from mymodule import MyPair
 
 fn main():
-    var mine = MyPair(2, 4)
+    let mine = MyPair(2, 4)
     mine.dump()
 ```
 
@@ -62,7 +62,7 @@ through the module name. For example:
 import mymodule
 
 fn main():
-    var mine = mymodule.MyPair(2, 4)
+    let mine = mymodule.MyPair(2, 4)
     mine.dump()
 ```
 
@@ -72,7 +72,7 @@ You can also create an alias for an imported member with `as`, like this:
 import mymodule as my
 
 fn main():
-    var mine = my.MyPair(2, 4)
+    let mine = my.MyPair(2, 4)
     mine.dump()
 ```
 
@@ -124,7 +124,7 @@ name like this:
 from mypackage.mymodule import MyPair
 
 fn main():
-    var mine = MyPair(2, 4)
+    let mine = MyPair(2, 4)
     mine.dump()
 ```
 
