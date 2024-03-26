@@ -73,4 +73,4 @@ fn b64encode(str: String) -> String:
             out.append(b64chars.load((si_1 * 4) % 64))
         out.append(ord("="))
     out.append(0)
-    return String(out ^)
+    return String(out^)

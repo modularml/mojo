@@ -37,14 +37,14 @@ def test_deleter_not_called_until_no_references():
     var deleted = False
     var p = Arc(ObservableDel(Pointer.address_of(deleted)))
     var p2 = p
-    _ = p ^
+    _ = p^
     assert_false(deleted)
 
     var vec = List[Arc[ObservableDel]]()
     vec.append(p2)
-    _ = p2 ^
+    _ = p2^
     assert_false(deleted)
-    _ = vec ^
+    _ = vec^
     assert_true(deleted)
 
 

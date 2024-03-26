@@ -181,7 +181,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         """
         if self.size >= self.capacity:
             self._realloc(_max(1, self.capacity * 2))
-        (self.data + self.size).emplace_value(value ^)
+        (self.data + self.size).emplace_value(value^)
         self.size += 1
 
     @always_inline
@@ -237,7 +237,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         if self.size * 4 < self.capacity:
             if self.capacity > 1:
                 self._realloc(self.capacity // 2)
-        return ret_val ^
+        return ret_val^
 
     @always_inline
     fn reserve(inout self, new_capacity: Int):
@@ -305,7 +305,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
 
             var tmp = earlier_ptr.take_value()
             later_ptr.move_into(earlier_ptr)
-            later_ptr.emplace_value(tmp ^)
+            later_ptr.emplace_value(tmp^)
 
             earlier_idx += 1
             later_idx -= 1
@@ -342,7 +342,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             normalized_idx += len(self)
 
         _ = (self.data + normalized_idx).take_value()
-        (self.data + normalized_idx).emplace_value(value ^)
+        (self.data + normalized_idx).emplace_value(value^)
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
@@ -385,7 +385,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         for i in range(len(adjusted_span)):
             res.append(self[adjusted_span[i]])
 
-        return res ^
+        return res^
 
     @always_inline
     fn __getitem__(self, i: Int) -> T:

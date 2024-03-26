@@ -183,7 +183,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
         self._get_state()[] = Self._check[T]()
-        self._get_ptr[T]().emplace_value(value ^)
+        self._get_ptr[T]().emplace_value(value^)
 
     @always_inline
     fn __copyinit__(inout self, other: Self):
@@ -280,7 +280,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._call_correct_deleter()
         self._get_state()[] = Self._check[T]()
-        self._get_ptr[T]().emplace_value(value ^)
+        self._get_ptr[T]().emplace_value(value^)
 
     fn isa[T: CollectionElement](self) -> Bool:
         """Check if the variant contains the required type.

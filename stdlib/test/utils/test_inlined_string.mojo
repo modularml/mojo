@@ -100,7 +100,7 @@ def test_small_string_construction():
     var heap_s1 = String("hello")
     var heap_s1_addr = int(heap_s1._as_ptr())
 
-    var s3 = InlinedString(heap_s1 ^)
+    var s3 = InlinedString(heap_s1^)
 
     # Test that a InlinedString constructed from a String uses the same
     # allocation as the original String (even if the String size is small

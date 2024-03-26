@@ -33,7 +33,7 @@ struct TestCounter(CollectionElement):
         self.moved = other.moved
 
     fn __moveinit__(inout self, owned other: Self):
-        self.copied = other.copied ^
+        self.copied = other.copied^
         self.moved = other.moved + 1
 
 
@@ -133,7 +133,7 @@ def test_del():
     alias TestDeleterVariant = Variant[ObservableDel, Poison]
     var deleted: Bool = False
     var v1 = TestDeleterVariant(ObservableDel(Pointer.address_of(deleted)))
-    _ = v1 ^  # call __del__
+    _ = v1^  # call __del__
     assert_true(deleted)
     # test that we didn't call the other deleter too!
     assert_no_poison()
@@ -147,7 +147,7 @@ def test_set_calls_deleter():
     v1.set[ObservableDel](ObservableDel(Pointer.address_of(deleted2)))
     assert_true(deleted)
     assert_false(deleted2)
-    _ = v1 ^
+    _ = v1^
     assert_true(deleted2)
     # test that we didn't call the poison deleter too!
     assert_no_poison()

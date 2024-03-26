@@ -182,7 +182,7 @@ def test_dict_copy_add_new_item():
 
 def test_dict_copy_calls_copy_constructor():
     var orig = Dict[String, CopyCounter]()
-    orig["a"] = CopyCounter() ^
+    orig["a"] = CopyCounter()^
 
     # test values copied to new Dict
     var copy = Dict(orig)

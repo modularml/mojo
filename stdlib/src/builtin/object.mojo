@@ -184,7 +184,7 @@ struct Attr:
             value: The object value of the attribute.
         """
         self.key = key
-        self.value = value ^
+        self.value = value^
 
 
 @register_passable("trivial")

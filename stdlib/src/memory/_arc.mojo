@@ -33,7 +33,7 @@ struct _ArcInner[T: Movable]:
 
     fn __init__(inout self, owned value: T):
         self.refcount = 0
-        self.data = value ^
+        self.data = value^
 
     fn increment(inout self) -> Int64:
         """Atomically increment the refcount.
@@ -90,9 +90,7 @@ struct Arc[T: Movable](CollectionElement):
             value: The value to manage.
         """
         self._inner = Pointer[Self._type].alloc(1)
-        __get_address_as_uninit_lvalue(self._inner.address) = Self._type(
-            value ^
-        )
+        __get_address_as_uninit_lvalue(self._inner.address) = Self._type(value^)
         _ = self._inner[].increment()
 
     fn __init__(inout self, *, owned inner: Pointer[Self._type]):
@@ -137,7 +135,7 @@ struct Arc[T: Movable](CollectionElement):
             new_value: The new value to manage. Other pointers to the memory will
                 now see the new value.
         """
-        self._inner[].data = new_value ^
+        self._inner[].data = new_value^
 
     fn __refitem__[
         mutability: __mlir_type.`i1`,
