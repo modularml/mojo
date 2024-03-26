@@ -202,7 +202,7 @@ modular update mojo
   instead of the kind of function they are unused in.  This will help catch API
   usage bugs in `def`s and make imported Python APIs more ergonomic in `fn`s.
 
-- The [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) and
+- The [`DynamicVector`](/mojo/stdlib/collections/list#list) and
   [`InlinedFixedVector`](/mojo/stdlib/collections/vector.html#inlinedfixedvector)
   types now support negative indexing. This means that you can write `vec[-1]`
   which is equivalent to `vec[len(vec)-1]`.
@@ -488,7 +488,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   and
   [automatic parameterization of functions](/mojo/manual/parameters/#automatic-parameterization-of-functions).
 
-- [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) now
+- [`DynamicVector`](/mojo/stdlib/collections/list#list) now
   supports iteration. Iteration values are instances of
   [Reference](/mojo/stdlib/memory/unsafe#reference) and require dereferencing:
 
@@ -738,8 +738,8 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   unroll[func, unroll_count]()
   ```
 
-- The signature of the [`NDBuffer`](/mojo/stdlib/memory/buffer#ndbuffer) and
-  [`Buffer`](/mojo/stdlib/memory/buffer#buffer) types have changed. Now, both
+- The signature of the [`NDBuffer`](/mojo/stdlib/buffer/buffer#ndbuffer) and
+  [`Buffer`](/mojo/stdlib/buffer/buffer#buffer) types have changed. Now, both
   take the type as the first parameter and no longer require the shape
   parameter. This allows you to use these types and have sensible defaults.
   For example:
@@ -1097,11 +1097,11 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
 
 - The `_OldDynamicVector` type that worked only on register passable element
   types has been removed.  Please migrate uses to
-  [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) which
+  [`DynamicVector`](/mojo/stdlib/collections/list#list) which
   works on both register passable and memory types.
 
 - The `UnsafeFixedVector` in `utils.vector` has been removed. We recommend using
-  either [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector)
+  either [`DynamicVector`](/mojo/stdlib/collections/list#list)
   or [`InlinedFixedVector`](/mojo/stdlib/collections/vector.html#inlinedfixedvector)
   instead.
 
@@ -1297,7 +1297,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   [`CollectionElement`](/mojo/stdlib/builtin/value#collectionelement)
   trait.  These types include [`Bool`](/mojo/stdlib/builtin/bool.html#bool),
   [`StringLiteral`](/mojo/stdlib/builtin/string_literal.html#stringliteral),
-  [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector),
+  [`DynamicVector`](/mojo/stdlib/collections/list#list),
   [`Tensor`](/mojo/stdlib/tensor/tensor.html#tensor),
   [`TensorShape`](/mojo/stdlib/tensor/tensor_shape.html#tensor_shape),
   and [`TensorSpec`](/mojo/stdlib/tensor/tensor_spec.html#tensor_spec).
@@ -1438,7 +1438,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   types that implement the `Sized`, `Stringable`, and `Intable` traits,
   respectively.
 
-- [`DynamicVector`](/mojo/stdlib/collections/vector.html#dynamicvector) is now a
+- [`DynamicVector`](/mojo/stdlib/collections/list#list) is now a
   proper generic collection that can use any type that implements the `Movable`
   and `Copyable` traits. This means you can now write, for example,
   `DynamicVector[String]`. Also, `DynamicVector` now invokes its element
@@ -1926,7 +1926,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
 
 - [`TensorShape`](/mojo/stdlib/tensor/tensor_shape.html) and
   [`TensorSpec`](/mojo/stdlib/tensor/tensor_shape.html) now have constructors
-  that take [`DynamicVector[Int]`](/mojo/stdlib/collections/vector.html#dynamicvector)
+  that take [`DynamicVector[Int]`](/mojo/stdlib/collections/list#list)
   and [`StaticIntTuple`](/mojo/stdlib/utils/index#staticinttuple) to
   initialize shapes.
 
@@ -1962,8 +1962,8 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   that one can just use `InlinedFixedVector` as `InlinedFixedVector[Float32]`
   and the default size is used.
 
-- `write_file()` method in [`Buffer`](/mojo/stdlib/memory/buffer.html#buffer)
-  and [`NDBuffer`](/mojo/stdlib/memory/buffer.html#ndbuffer) is renamed to
+- `write_file()` method in [`Buffer`](/mojo/stdlib/buffer/buffer.html#buffer)
+  and [`NDBuffer`](/mojo/stdlib/buffer/buffer.html#ndbuffer) is renamed to
   `tofile()` to match the Python naming.
 
 - Mojo will now utilize all available cores across all NUMA sockets on the host
