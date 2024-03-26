@@ -52,7 +52,7 @@ def test_anypointer_move_into_move_count():
 
     var value = MoveCounter(5)
     assert_equal(0, value.move_count)
-    ptr.emplace_value(value ^)
+    ptr.emplace_value(value^)
 
     # -----
     # Test that `AnyPointer.move_into` performs exactly one move.

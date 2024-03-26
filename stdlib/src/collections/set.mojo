@@ -79,7 +79,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         Args:
             other: The existing Set instance to move from.
         """
-        self._data = other._data ^
+        self._data = other._data^
 
     fn __contains__(self, t: T) -> Bool:
         """Whether or not the set contains an element.
@@ -213,7 +213,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         for e in self:
             if e[] not in other:
                 result.add(e[])
-        return result ^
+        return result^
 
     fn __isub__(inout self, other: Self):
         """In-place set subtraction.
@@ -299,7 +299,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         for o in other:
             result.add(o[])
 
-        return result ^
+        return result^
 
     fn intersection(self, other: Self) -> Self:
         """Set intersection.
@@ -316,7 +316,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             if v[] in other:
                 result.add(v[])
 
-        return result ^
+        return result^
 
     fn remove_all(inout self, other: Self):
         """In-place set subtraction.

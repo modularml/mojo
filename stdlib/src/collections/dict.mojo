@@ -205,8 +205,8 @@ struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
             value: The value of the entry.
         """
         self.hash = hash(key)
-        self.key = key ^
-        self.value = value ^
+        self.key = key^
+        self.value = value^
 
 
 alias _EMPTY = -1
@@ -268,7 +268,7 @@ struct _DictIndex:
             var data = self.data.bitcast[DType.int64]()
             var new_data = index.data.bitcast[DType.int64]()
             memcpy(new_data, data, reserved)
-        return index ^
+        return index^
 
     fn __moveinit__(inout self, owned existing: Self):
         self.data = existing.data
@@ -463,8 +463,8 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         self.size = existing.size
         self._n_entries = existing._n_entries
         self._reserved = existing._reserved
-        self._index = existing._index ^
-        self._entries = existing._entries ^
+        self._index = existing._index^
+        self._entries = existing._entries^
 
     fn __getitem__(self, key: K) raises -> V:
         """Retrieve a value out of the dictionary.
@@ -647,7 +647,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         return entries
 
     fn _insert(inout self, owned key: K, owned value: V):
-        self._insert(DictEntry[K, V](key ^, value ^))
+        self._insert(DictEntry[K, V](key^, value^))
 
     fn _insert(inout self, owned entry: DictEntry[K, V]):
         self._maybe_resize()
@@ -656,7 +656,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         var index: Int
         found, slot, index = self._find_index(entry.hash, entry.key)
 
-        self._entries[index] = entry ^
+        self._entries[index] = entry^
         if not found:
             self._set_index(slot, index)
             self.size += 1
@@ -725,7 +725,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
         self.size = 0
         self._n_entries = 0
         self._index = _DictIndex(self._reserved)
-        var old_entries = self._entries ^
+        var old_entries = self._entries^
         self._entries = self._new_entries(self._reserved)
 
         for i in range(len(old_entries)):

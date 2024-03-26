@@ -311,7 +311,7 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
         buf.reserve(initial_buffer_size)
         buf.size += _vec_fmt(buf.data, initial_buffer_size, "%li", self.value)
         buf.size += 1  # for the null terminator.
-        return buf ^
+        return buf^
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:

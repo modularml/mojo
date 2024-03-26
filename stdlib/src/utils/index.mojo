@@ -685,7 +685,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         buf.size += _vec_fmt(buf.data + buf.size, 2, ")")
 
         buf.size += 1  # for the null terminator.
-        return buf ^
+        return buf^
 
 
 # ===----------------------------------------------------------------------===#

@@ -547,7 +547,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             buf.size += _vec_fmt(buf.data + buf.size, 2, "]")
 
         buf.size += 1  # for the null terminator.
-        return String(buf ^)
+        return String(buf^)
 
     @always_inline("nodebug")
     fn to_int(self) -> Int:

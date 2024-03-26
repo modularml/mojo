@@ -76,7 +76,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         Args:
             existing: The existing Path.
         """
-        self.path = existing.path ^
+        self.path = existing.path^
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):

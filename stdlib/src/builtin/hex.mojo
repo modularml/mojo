@@ -73,7 +73,7 @@ fn _format_int[
 
     _write_int(buf, value, radix, digit_chars, prefix)
 
-    return String._from_bytes(buf ^)
+    return String._from_bytes(buf^)
 
 
 @always_inline

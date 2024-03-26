@@ -583,7 +583,7 @@ fn emplace_ref_unsafe[
         value: The value to write into it.
     """
     var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(dest.value)
-    __get_address_as_uninit_lvalue(kgen_ptr) = value ^
+    __get_address_as_uninit_lvalue(kgen_ptr) = value^
 
 
 # ===----------------------------------------------------------------------===#
