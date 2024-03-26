@@ -1,12 +1,12 @@
-# Mojo Standard Library Development
+# Mojo standard library development
 
 This document covers the essentials of getting started developing for the
 standard library.
 
-## Getting the Nightly Mojo Compiler
+## Getting the nightly Mojo compiler
 
 To get started, you need to install the latest nightly mojo compiler. The
-Standard Library only guarantees compatibility with the latest nightly `mojo`
+standard library only guarantees compatibility with the latest nightly `mojo`
 compiler.
 
 ```bash
@@ -34,15 +34,15 @@ extensions marketplace:
 You can only have one Mojo extension enabled at a time, remember to switch back
 when using the stable release!
 
-## Cloning the Repository
+## Cloning the repository
 
 ```bash
 git clone https://github.com/modularml/mojo/
 ```
 
-## Building the Standard Library
+## Building the standard library
 
-To build the Standard Library, you can run the script
+To build the standard library, you can run the script
 [`build-stdlib.sh`](../scripts/build-stdlib.sh) from the `scripts` directory
 inside the `stdlib` directory. This will create a build artifacts directory,
 `build`, in the top-level of the repo and produce the `stdlib.mojopkg` inside.
@@ -51,9 +51,9 @@ inside the `stdlib` directory. This will create a build artifacts directory,
 ./stdlib/scripts/build-stdlib.sh
 ```
 
-## Testing the Standard Library
+## Testing the standard library
 
-### Installing Unit Test Dependencies
+### Installing unit test dependencies
 
 To run the unit tests, you first need to install a few dependencies:
 
@@ -71,9 +71,9 @@ moving away from `FileCheck` in favor of writing the unit tests using our own
 `testing` module and remove this dependency requirement for contributors. We
 are happy to welcome contributions in this area!
 
-### Running the Standard Library Tests
+### Running the standard library tests
 
-We provide a simple Bash script to build the Standard Library package and
+We provide a simple Bash script to build the standard library package and
 `test_utils` package that is used by the test suite.  Just run
 `./stdlib/scripts/run-tests.sh` which will produce the necessary
 `mojopkg` files inside your `build` directory and then run
@@ -83,7 +83,7 @@ We provide a simple Bash script to build the Standard Library package and
 ./stdlib/scripts/run-tests.sh
 ```
 
-### Running a subset of the Standard Library Unit Tests
+### Running a subset of the standard library unit tests
 
 If you’d like to run just a subset of the tests, feel free to use all of the
 normal options that the `lit` tool provides.  For example, to run just the
@@ -108,7 +108,7 @@ If you run into any issues when running the tests,
 [please file an issue](https://github.com/modularml/mojo/issues) and we’ll take
 a look.
 
-## Formatting Changes
+## Formatting changes
 
 Please make sure your changes are formatted before submitting a Pull Request.
 Otherwise, CI will fail in its lint and formatting checks.  The `mojo` compiler
