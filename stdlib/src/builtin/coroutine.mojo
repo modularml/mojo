@@ -141,7 +141,7 @@ struct Coroutine[type: AnyRegType]:
                 _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
             }
         )
-        return self ^
+        return self^
 
     @always_inline
     fn __del__(owned self):
@@ -264,7 +264,7 @@ struct RaisingCoroutine[type: AnyRegType]:
                 _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
             }
         )
-        return self ^
+        return self^
 
     @always_inline
     fn __del__(owned self):

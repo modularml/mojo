@@ -256,7 +256,7 @@ def test_list_reverse_move_count():
     assert_equal(vec.data[4].move_count, 3)
 
     # Keep vec alive until after we've done the last `vec.data + N` read.
-    _ = vec ^
+    _ = vec^
 
 
 def test_list_extend():
@@ -331,7 +331,7 @@ def test_list_extend_non_trivial():
     assert_equal(v1.data[4].move_count, 2)
 
     # Keep v1 alive until after we've done the last `vec.data + N` read.
-    _ = v1 ^
+    _ = v1^
 
 
 def test_2d_dynamic_list():
@@ -366,7 +366,7 @@ def test_2d_dynamic_list():
 
 def test_list_explicit_copy():
     var list = List[CopyCounter]()
-    list.append(CopyCounter() ^)
+    list.append(CopyCounter()^)
     var list_copy = List(list)
     assert_equal(0, list.__get_ref(0)[].copy_count)
     assert_equal(1, list_copy.__get_ref(0)[].copy_count)
@@ -388,7 +388,7 @@ def test_list_copy_constructor():
     var vec = List[Int](capacity=1)
     var vec_copy = vec
     vec_copy.append(1)  # Ensure copy constructor doesn't crash
-    _ = vec ^  # To ensure previous one doesn't invoke move constuctor
+    _ = vec^  # To ensure previous one doesn't invoke move constuctor
 
 
 def test_list_iter():

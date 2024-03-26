@@ -52,7 +52,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
     fn __init__(inout self):
         """Constructs a new empty string."""
         var fixed = _FixedString[Self.SMALL_CAP]()
-        self._storage = Self.Layout(fixed ^)
+        self._storage = Self.Layout(fixed^)
 
     fn __init__(inout self, literal: StringLiteral):
         """Constructs a InlinedString value given a string literal.
@@ -64,7 +64,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         if len(literal) <= Self.SMALL_CAP:
             try:
                 var fixed = _FixedString[Self.SMALL_CAP](literal)
-                self._storage = Self.Layout(fixed ^)
+                self._storage = Self.Layout(fixed^)
             except e:
                 abort(
                     "unreachable: Construction of FixedString of validated"
@@ -76,7 +76,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
                 self._storage = Self.Layout(String(""))
         else:
             var heap = String(literal)
-            self._storage = Self.Layout(heap ^)
+            self._storage = Self.Layout(heap^)
 
     fn __init__(inout self, owned heap_string: String):
         """Construct a new small string by taking ownership of an existing
@@ -85,7 +85,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         Args:
             heap_string: The heap string to take ownership of.
         """
-        self._storage = Self.Layout(heap_string ^)
+        self._storage = Self.Layout(heap_string^)
 
     # ===------------------------------------------------------------------=== #
     # Trait Interfaces
@@ -171,7 +171,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
             # Add the NUL byte
             buffer.append(0)
 
-            self._storage = Self.Layout(String(buffer ^))
+            self._storage = Self.Layout(String(buffer^))
 
     fn __add__(self, other: StringLiteral) -> Self:
         """Construct a string by appending another string at the end of this string.

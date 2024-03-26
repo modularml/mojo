@@ -21,7 +21,7 @@ struct MoveOnly[T: Movable](Movable):
         Args:
             i: The test data payload.
         """
-        self.data = i ^
+        self.data = i^
 
     fn __moveinit__(inout self, owned other: Self):
         """Move construct a MoveOnly from an existing variable.
@@ -29,7 +29,7 @@ struct MoveOnly[T: Movable](Movable):
         Args:
             other: The other instance that we copying the payload from.
         """
-        self.data = other.data ^
+        self.data = other.data^
 
 
 struct CopyCounter(CollectionElement):
@@ -56,11 +56,11 @@ struct MoveCounter[T: CollectionElement](CollectionElement):
     fn __init__(inout self, owned value: T):
         """Construct a new instance of this type. This initial move is not counted.
         """
-        self.value = value ^
+        self.value = value^
         self.move_count = 0
 
     fn __moveinit__(inout self, owned existing: Self):
-        self.value = existing.value ^
+        self.value = existing.value^
         self.move_count = existing.move_count + 1
 
     # TODO: This type should not be Copyable, but has to be to satisfy

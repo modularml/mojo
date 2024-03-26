@@ -148,7 +148,7 @@ struct AnyPointer[T: Movable](
         Args:
             value: The value to emplace.
         """
-        __get_address_as_uninit_lvalue(self.value) = value ^
+        __get_address_as_uninit_lvalue(self.value) = value^
 
     @always_inline
     fn move_into(self, dest: AnyPointer[T]):

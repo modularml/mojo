@@ -297,7 +297,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         Args:
             impl: The buffer.
         """
-        self._buffer = impl ^
+        self._buffer = impl^
 
     @always_inline
     fn __init__(inout self):
@@ -316,7 +316,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         buffer.resize(length + 1, 0)
         memcpy(rebind[DTypePointer[DType.int8]](buffer.data), str.data, length)
         buffer[length] = 0
-        self._buffer = buffer ^
+        self._buffer = buffer^
 
     @always_inline
     fn __init__(inout self, str: StringLiteral):
@@ -384,7 +384,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         Args:
             existing: The string to move.
         """
-        self._buffer = existing._buffer ^
+        self._buffer = existing._buffer^
 
     @staticmethod
     @always_inline
@@ -415,7 +415,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         if buff[-1]:
             buff.append(0)
 
-        return String(buff ^)
+        return String(buff^)
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -442,7 +442,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         var buf = Self._buffer_type(capacity=1)
         buf.append(self._buffer[idx])
         buf.append(0)
-        return String(buf ^)
+        return String(buf^)
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
@@ -489,7 +489,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         for i in range(adjusted_span_len):
             buffer[i] = ptr[adjusted_span[i]]
         buffer[adjusted_span_len] = 0
-        return Self(buffer ^)
+        return Self(buffer^)
 
     @always_inline
     fn __len__(self) -> Int:
@@ -562,7 +562,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             other._as_ptr().address,
             other_len + 1,  # Also copy the terminator
         )
-        return Self(buffer ^)
+        return Self(buffer^)
 
     @always_inline
     fn __radd__(self, other: String) -> String:
@@ -862,7 +862,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             self_ptr += 1
 
         res.append(0)
-        return String(res ^)
+        return String(res^)
 
     fn strip(self) -> String:
         """Return a copy of the string with leading and trailing whitespace characters removed.
@@ -925,7 +925,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
                 res.append(val_ptr.load(j))
             res.append(self_ptr.load(i))
         res.append(0)
-        return String(res ^)
+        return String(res^)
 
     fn lower(self) -> String:
         """Returns a copy of the string with all ASCII cased characters
@@ -1036,7 +1036,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
                 self._as_ptr(),
                 len_self,
             )
-        return String(buf ^)
+        return String(buf^)
 
 
 # ===----------------------------------------------------------------------===#
