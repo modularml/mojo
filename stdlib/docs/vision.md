@@ -2,7 +2,7 @@
 
 ## Principles
 
-The following are “North Star” principles for the Mojo Standard Library.
+The following are “North Star” principles for the Mojo standard library.
 These principles will inform multiple future decisions from what features we
 work on to what bugs we prioritize during triage. In short, the standard library
 vision is the ideal we may never reach, but we collectively show up every day
@@ -13,10 +13,10 @@ encour aged to engage with the standard library and language evolution. We
 intend to ignite enthusiasm to contribute to the expanding Mojo package
 ecosystem.
 
-- The Standard Library prioritizes
+- The standard library prioritizes
   **Performance > Safety > Portability > Debuggability.**
 
-- **Respectable performance by default.** Standard Library intends to provide
+- **Respectable performance by default.** standard library intends to provide
 respectable performance by default — but not perfect performance. We support
 low-level controls that enable performance tuning by systems engineers. While
 providing consistently strong performance over time, we do so with minimal
@@ -25,22 +25,22 @@ regressions.
 - **Portability by default.** The use of MLIR enables portability across a
 variety of platforms without writing per-platform code in the standard library.
 
-- **The standard library does not have special privileges.** Standard Library
+- **The standard library does not have special privileges.** standard library
 types are not special and do not enjoy elevated privileges over user-contributed
 code. This empowers Mojicians to create primitives equally as expressive as core
 language primitives.
 
-- **Fully utilize available hardware.** The Standard Library should not inhibit
+- **Fully utilize available hardware.** The standard library should not inhibit
 using any available hardware on the system. On the contrary, standard library
 primitives will enable users to maximize the utility of all available system
 hardware.
 
-- **Standard Library features prioritize AI workload optimizations.** Mojo
+- **standard library features prioritize AI workload optimizations.** Mojo
 ultimately aims to be a multi-purpose programming language used to solve
 problems in the systems programming domain. However, we will prioritize standard
 library features and optimizations that improve the state of the art for AI.
 
-## What's Not in the Vision
+## What's not in the vision
 
 We reject the following vision statements, and the reasoning for each is written
 inline.
@@ -50,7 +50,7 @@ inline.
   integrated with the MAX engine architecture, and will remain part of the MAX
   engine codebase.
 
-## Objectives and Goals
+## Objectives and goals
 
 - Make unsafe or risky things explicit. Software using unsafe constructs is
   inevitable, but it must be minimized and explicit to the reader. Safe things
@@ -72,7 +72,7 @@ inline.
   primitives maximizing the parallelism potential of the system.
 
 - **First-class debugging features.** Integration with Mojo debugger by
-  incorporating LLDB visualizers for the Standard Library types and collections
+  incorporating LLDB visualizers for the standard library types and collections
   to make debugging easy.
 
 - **Consistent API and behavior across all stdlib primitives.** A higher-level
@@ -91,7 +91,7 @@ inline.
   Mojo over time to not force an entire rewrite just to improve the performance
   of code where it matters most.
 
-## Non-Goals
+## Non-goals
 
 While some of these may be common goals of modern programming languages, the
 value doesn’t outweigh the costs for us right now as we are moving fast to build

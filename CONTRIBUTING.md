@@ -1,4 +1,4 @@
-# Mojo Contributor Guide
+# Mojo contributor guide
 
 Welcome to the Mojo community! 🔥 We’re very excited that you’re interested in
 contributing to the project. To help you get started and ensure a smooth
@@ -8,7 +8,7 @@ There are many ways to contribute to the project, from joining the
 [Discord community](https://www.discord.gg/modular), to filing bugs, to
 contributing documentation, examples, or code.
 
-## Submitting Bugs
+## Submitting bugs
 
 Reporting issues is a great way to contribute to the project. Mojo uses GitHub
 Issues for tracking bugs.
@@ -21,25 +21,25 @@ Also, before opening a new issue, take a moment to search through the already
 submitted issues to avoid creating duplicate issues for the maintainers to
 address.
 
-### Writing High-Quality Bugs
+### Writing high-quality bugs
 
 We encourage you to provide as much information about the issue as practical.
 The more details you provide, the faster we can resolve the issue. The following
 is a template of the information that should accompany every submitted issue.
 
-#### Issue Template
+#### Issue template
 
 - **Summary.** A descriptive summary of the issue.
 - **Description.** A detailed account of the bug, including what was expected
   and what occurred.
-- **Environment Details.**
+- **Environment details.**
   - Mojo Compiler Version
   - Operating System version
   - Hardware Specifications
-- **Severity/Frequency.** An assessment of the impact ranging from inconvenience
+- **Severity/frequency.** An assessment of the impact ranging from inconvenience
   to a blocker.
 
-## Contributing to Docs and Examples
+## Contributing to docs and examples
 
 We’re happy to accept pull requests for the docs and examples.
 If your change is any one of the following, please create a pull request and we
@@ -67,7 +67,7 @@ require difficult reviews and rework, or that might get rejected.
 See [Pull Requests](#pull-requests) for information on creating your first pull
 request.
 
-## Contributing to the Standard Library
+## Contributing to the standard library
 
 The standard library team is dedicated to creating a vibrant technical community
 around the Mojo programming language. Our vision includes a diverse and
@@ -84,12 +84,12 @@ For more information on our priorities, see the following documents:
 For technical details on developing for the standard library, see the following
 documents:
 
-- [Developing the Standard Library](./stdlib/docs/development.md) covers building,
+- [Developing the standard library](./stdlib/docs/development.md) covers building,
   testing, and other information you’ll need to work in the standard library.
 - [Coding Standards and Style Guide](./stdlib/docs/style-guide.md) provides
   guidelines for writing code for the standard library.
 
-### Accepting Open Source PRs
+### Accepting open source PRs
 
 To ensure a streamlined process, contributors are encouraged to focus on
 enhancements, bug fixes, and optimizations aligned with the library's
@@ -153,7 +153,7 @@ This process is heavily inspired by the process used by several other
 open-source projects. We’ll add more documentation in the future as we gain
 experience with the process.
 
-## Pull Requests
+## Pull requests
 
 You can use a pull request to propose a change or bug fix to the Mojo Standard
 Library, Mojo examples, or Mojo documentation. This page gives an overview of
@@ -162,7 +162,7 @@ the process, especially for first-time contributors.
 **Note:** Pull requests should be submitted against the `nightly` branch,
 which represents the most recent nightly build.
 
-### Pull Request Process
+### Pull request process
 
 #### 1. First-time checklist
 
@@ -176,7 +176,7 @@ Before you start your first pull request, please complete this checklist:
 We want to be sure that you spend your time efficiently and prepare changes that
 aren’t controversial and get stuck in long rounds of reviews. See the sections
 on [Contributing to Docs and Examples](#contributing-to-docs-and-examples) and
-[Contributing to the Standard Library](#contributing-to-the-standard-library)
+[Contributing to the standard library](#contributing-to-the-standard-library)
 for more details.
 
 #### 3. Create a pull request
@@ -251,7 +251,7 @@ By making a contribution to this project, I certify that:
     this project or the open source license(s) involved.
 ```
 
-### Review Time SLA
+### Review time SLA
 
 The team commits to reviewing submitted pull requests within a week of
 submission.
