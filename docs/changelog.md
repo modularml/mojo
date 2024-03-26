@@ -41,6 +41,10 @@ modular update mojo
 
 ### 🔥 Legendary
 
+- The Mojo standard library is now open source! Check out the
+  [README](https://github.com/modularml/mojo/blob/nightly/stdlib/README.md)
+  for everything you need to get started.
+
 - Structs and other nominal types are now allowed to implicitly conform to
   traits. A struct implicitly conforms to a trait if it implements all the
   requirements for the trait. For example, any struct that implements `__str__`
