@@ -170,6 +170,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.data = new_data
         self.capacity = new_capacity
 
+    @always_inline
     fn append(inout self, owned value: T):
         """Appends a value to this list.
 
