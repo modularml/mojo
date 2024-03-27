@@ -3,45 +3,19 @@
 This document covers the essentials of getting started developing for the
 standard library.
 
-## Getting the nightly Mojo compiler
+## Prerequisites
 
-To get started, you need to install the latest nightly mojo compiler. The
-standard library only guarantees compatibility with the latest nightly `mojo`
-compiler.
+If this is your first time contributing, you should read everything in
+[CONTRIBUTING.md](../../CONTRIBUTING.md#fork-and-clone-the-repo). Logistically
+you need to do the following:
 
-```bash
-curl https://get.modular.com | sh -
-modular auth
-modular install nightly/mojo
-```
+- [Fork and clone the repo](../../CONTRIBUTING.md#fork-and-clone-the-repo)
+- [Branch off nightly](../../CONTRIBUTING.md#branching-off-nightly)
+- [Install the nightly Mojo compiler](../../CONTRIBUTING.md#getting-the-nightly-mojo-compiler)
 
-If you already have an older `nightly/mojo` compiler, replace
-`modular install nightly/mojo` with `modular update nightly/mojo`.
+And if you're using vscode:
 
-Then, follow the instructions from the `modular` tool in adding the `mojo`
-compiler to your `PATH` such as:
-
-```bash
-echo 'export MODULAR_HOME="$HOME/.modular"' >> ~/.zshrc
-echo 'export PATH="$HOME/.modular/pkg/packages.modular.com_nightly_mojo/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-If you're using bash, replace the three `~/.zshrc` above with `~/.bashrc`.
-
-## Mojo nightly vscode extension
-
-Install the nightly Mojo extension by searching for `Mojo nightly` in the
-extensions marketplace:
-
-![mojo-nightly-extension](./images/nightly-extension.png)
-
-You can only have one Mojo extension enabled at a time, remember to switch back
-when using the stable release!
-
-## Fork and clone the repository
-
-Follow the steps in [CONTRIBUTING.md](../../CONTRIBUTING.md#fork-and-clone-the-repo)
+- [Install the nightly vscode extension](../../CONTRIBUTING.md#mojo-nightly-vscode-extension)
 
 ## Building the standard library
 
@@ -148,10 +122,7 @@ If you're having trouble figuring out how everything fits together, this
 tutorial will take you on a journey for making a change and raising a PR from
 start to finish.
 
-Prerequisites:
-
-- [Get the Nightly Mojo Compiler](#getting-the-nightly-mojo-compiler).
-- [Fork and clone the repo](../../CONTRIBUTING.md#fork-and-clone-the-repo)
+First follow everything in the [prerequisites](#prerequisites)
 
 __IMPORTANT__ We'll be in the `mojo/stdlib` folder for this tutorial, check and
 make sure you're in that location if anything goes wrong:
@@ -350,8 +321,8 @@ The last step is to [run mojo format](#formatting-changes) on all the files.
 Make sure that you've had a look at all the materials from the standard library
 [README.md](../README.md). This change wouldn't be accepted because it's missing
 tests, and doesn't add useful functionality that warrants new functions. If you
-did have a worthwhile change you wanted to raise, follow the steps in the
-[CONTRIBUTING.md](../../CONTRIBUTING.md)
+did have a worthwhile change you wanted to raise, follow the steps to
+[create a pull request](../../CONTRIBUTING.md#create-a-pull-request).
 
 Congratulations! You've now got an idea on how to contribute to the standard
 library, test your changes, and raise a PR.
