@@ -7,8 +7,6 @@ Modular's internal workflows. The roadmap updates act as a forcing function for
 discussions with the Mojo community to ensure the standard library contributors
 both internally and externally are aligned on the future technical direction.
 
-For more about our long-term aspirations, check out our [Vision doc](vision.md).
-
 ## 2024 Q2+ roadmap
 
 The following are high-level themes the Mojo standard library team will be

@@ -305,7 +305,7 @@ error: CHECK: expected string not found in input
 
 Lets fix the test that we just added:
 
-```mojo
+```plaintext
 # CHECK-LABEL: test_print_cwd
 
 def test_print_cwd():
@@ -327,7 +327,7 @@ Total Discovered Tests: 1
 
 Success! Now we have a test for our new function.
 
-The last step is to [run `mojo format -l 80`](#formatting-changes) on all the files.
+The last step is to [run mojo format](#formatting-changes) on all the files.
 
 ### Raising a PR
 

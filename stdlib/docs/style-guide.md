@@ -46,8 +46,7 @@ All done! ✨ 🍰 ✨
 ```
 
 Unless otherwise noted, Mojo standard library code should follow the formatting
-produced by `mojo format -l 80`. Note that the default `mojo format` command is not enough.
-You need to specify that there is a limit of 80 characters per line with `-l 80`.
+produced by `mojo format`.
 
 #### Whitespace
 

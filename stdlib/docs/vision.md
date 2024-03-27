@@ -3,8 +3,6 @@
 This page outlines the principles we aspire to follow and the more concrete
 objectives and goals we aim to accomplish in the Mojo standard library.
 
-For details about our near-term objectives, see the [Roadmap doc](roadmap.md).
-
 ## Principles
 
 The following are “North Star” principles for the Mojo standard library.
@@ -95,6 +93,7 @@ We reject the following principle statements:
   Mojo over time to not force an entire rewrite just to improve the performance
   of code where it matters most.
 
+### Non-goals
 ### Non-goals
 
 While some of the following may be common goals of other languages, the
