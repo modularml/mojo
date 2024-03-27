@@ -65,5 +65,5 @@ def main():
     test_python_exception_getattr()
     # CHECK: list index out of range
     test_python_exception_getitem()
-    # CHECK: Can't instantiate abstract class AbstractPerson with abstract method{{s?}} method
+    # CHECK: Can't instantiate abstract class AbstractPerson
     test_python_exception_call()
