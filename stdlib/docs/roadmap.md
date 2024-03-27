@@ -1,6 +1,6 @@
 # Mojo standard library roadmap
 
-## Roadmap cadence
+This is a high-level plan for the Mojo standard library.
 
 We plan to update this roadmap approximately every 6 months, in alignment with
 Modular's internal workflows. The roadmap updates act as a forcing function for
@@ -10,21 +10,22 @@ both internally and externally are aligned on the future technical direction.
 ## 2024 Q2+ roadmap
 
 The following are high-level themes the Mojo standard library team will be
-working on over the next 6-months. Keep in mind that Mojo and the Mojo Standard
-Library are in early development with many features landing over the months
-ahead. Currently, that means we are focused on the core system programming
-features that are essential to Mojo's mission.
+working on over the next 6 months. Keep in mind that Mojo and the Mojo standard
+library are still in early development and many features will land in the
+months ahead. Currently, that means we are focused on the core system
+programming features that are essential to [Mojo's
+mission](https://docs.modular.com/mojo/why-mojo).
 
 ### Core library improvements
 
 - Remove `AnyRegType` in the standard library in favor of `AnyType`.
 
-- Unify Pointer and AnyPointer.
+- Unify `Pointer` and `AnyPointer`.
 
 - Apply `Reference` types and lifetimes throughout APIs and types.
 
 - Design API conventions and expected behavior for core collection types such
-  as `List`, `String`, `Dict` .
+  as `List`, `String`, and `Dict`.
 
 ### Generic programming improvements
 
@@ -32,8 +33,8 @@ features that are essential to Mojo's mission.
 
 - Define an iterator model and implement iterator support for core types.
 
-- Standardize collection meta type names (eg. *element_type*, *key_type*, and
-  *value_type*).
+- Standardize collection meta type names (such as *element_type*, *key_type*,
+  and *value_type*).
 
 ### Improve Python interop
 
