@@ -14,6 +14,7 @@ and tools. Please add any significant user-visible changes here.
 ### 🔥 Legendary
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 - The Mojo standard library is now open source! Check out the
   [README](https://github.com/modularml/mojo/blob/nightly/stdlib/README.md)
@@ -52,10 +53,13 @@ and tools. Please add any significant user-visible changes here.
   ```
 
 >>>>>>> 01ec9ce ([docs] Cherrypick doc changes to `docs/external/` files (#35948))
+=======
+>>>>>>> cfe777b ([Docs] Update changelog for 24.2. (#35920) (#35965))
 ### ⭐️ New
 
 - The `sys` module now contains an `exit` function that would exit a Mojo
   program with the specified error code.
+<<<<<<< HEAD
 
 - The constructors for `tensor.Tensor` have been changed to be more consistent.
   As a result, one has to pass in the shape as first argument (instead of the
@@ -4521,3 +4525,11 @@ busy this week.
 >>>>>>> 64c4f70 ([DO NOT REVIEW] Cherry-picked reverts for 24.2 (#35837))
 =======
 >>>>>>> 01ec9ce ([docs] Cherrypick doc changes to `docs/external/` files (#35948))
+=======
+
+### 🦋 Changed
+
+### ❌ Removed
+
+### 🛠️ Fixed
+>>>>>>> cfe777b ([Docs] Update changelog for 24.2. (#35920) (#35965))
