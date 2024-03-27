@@ -305,7 +305,7 @@ error: CHECK: expected string not found in input
 
 Lets fix the test that we just added:
 
-```plaintext
+```mojo
 # CHECK-LABEL: test_print_cwd
 
 def test_print_cwd():
