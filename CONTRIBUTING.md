@@ -184,7 +184,7 @@ for more details.
 Go to the [Mojo repo](https://github.com/modularml/mojo) and click the fork
 button:
 
-![Create Fork](./images/create-fork.png)
+![Create Fork](stdlib/docs/images/create-fork.png)
 
 Clone your forked repo locally with the command:
 
@@ -249,7 +249,7 @@ If you're using bash, replace the three `~/.zshrc` above with `~/.bashrc`.
 Install the [Mojo nightly VS Code
 extension](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo-nightly):
 
-<img src="./images/nightly-extension.png" width=350 />
+<img src="./stdlib/docs/images/nightly-extension.png" width=350 />
 
 You can only have one Mojo extension enabled at a time, remember to switch back
 when using the stable release!
@@ -275,7 +275,7 @@ remote:      https://github.com/jackos/mojo/pull/new/my-fix-pr
 
 Make sure you point it to the `nightly` branch:
 
-![Base Branch](images/base-branch.png)
+![Base Branch](stdlib/docs/images/base-branch.png)
 
 Now fill out the details:
 
