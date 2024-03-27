@@ -200,19 +200,59 @@ git remote add upstream git@github.com:modularml/mojo.git
 git fetch upstream
 ```
 
-Branch off `nightly` to work on your PR:
+#### Branching off nightly
+
+Make sure to branch off `nightly` to work on your PR:
 
 ```bash
 git checkout upstream/nightly
 git checkout -b my-fix-pr
 ```
 
-Before raising a PR make sure you've synched the latest changes:
+You should periodically make sure you've synced the latest changes, especially
+before raising a PR:
 
 ```bash
 git fetch upstream
 git rebase upstream/nightly
 ```
+
+#### Getting the nightly Mojo compiler
+
+Now that you're on the nightly branch, you need to install the latest nightly
+Mojo compiler:
+
+```bash
+curl https://get.modular.com | sh -
+
+modular auth
+
+modular install nightly/mojo
+```
+
+If you already have an older `nightly/mojo` compiler, replace
+`modular install nightly/mojo` with `modular update nightly/mojo`.
+
+Then, follow the instructions from the `modular` tool in adding the `mojo`
+compiler to your `PATH` such as:
+
+```bash
+echo export MODULAR_HOME="$HOME/.modular" >> ~/.zshrc
+echo 'export PATH="$HOME/.modular/pkg/packages.modular.com_nightly_mojo/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+If you're using bash, replace the three `~/.zshrc` above with `~/.bashrc`.
+
+#### Mojo nightly vscode extension
+
+Install the nightly Mojo extension by searching for `Mojo nightly` in the
+extensions marketplace:
+
+![mojo-nightly-extension](./images/nightly-extension.png)
+
+You can only have one Mojo extension enabled at a time, remember to switch back
+when using the stable release!
 
 #### Create a pull request
 
