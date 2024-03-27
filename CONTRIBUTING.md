@@ -164,14 +164,14 @@ which represents the most recent nightly build.
 
 ### Pull request process
 
-#### 1. First-time checklist
+#### First-time checklist
 
 Before you start your first pull request, please complete this checklist:
 
 - Read this entire contributor guide.
 - Read the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
-#### 2. Evaluate and get buy-in on the change
+#### Evaluate and get buy-in on the change
 
 We want to be sure that you spend your time efficiently and prepare changes that
 aren’t controversial and get stuck in long rounds of reviews. See the sections
@@ -179,11 +179,65 @@ on [Contributing to Docs and Examples](#contributing-to-docs-and-examples) and
 [Contributing to the standard library](#contributing-to-the-standard-library)
 for more details.
 
-#### 3. Create a pull request
+#### Fork and clone the repo
+
+Go to the [Mojo repo](https://github.com/modularml/mojo) and click the fork
+button:
+
+![Create Fork](./images/create-fork.png)
+
+Clone your forked repo locally with the command:
+
+```bash
+git clone git@github.com:[your-username]/mojo.git
+cd mojo
+```
+
+Add the upstream remote and fetch it:
+
+```bash
+git remote add upstream git@github.com:modularml/mojo.git
+git fetch upstream
+```
+
+Branch off `nightly` to work on your PR:
+
+```bash
+git checkout upstream/nightly
+git checkout -b my-fix-pr
+```
+
+Before raising a PR make sure you've synched the latest changes:
+
+```bash
+git fetch upstream
+git rebase upstream/nightly
+```
+
+#### Create a pull request
 
 If your change is one of the improvements described above or it has been
 discussed and agreed upon by the project maintainers, please create a pull
-request into the `nightly` branch and include the following:
+request into the `nightly` branch.
+
+First push your changes:
+
+```bash
+git push -u [your-username] my-fix-pr
+```
+
+You'll see a link to create a PR:
+
+```plaintext
+remote: Create a pull request for 'my-fix-pr' on GitHub by visiting:
+remote:      https://github.com/jackos/mojo/pull/new/my-fix-pr
+```
+
+Make sure you point it to the `nightly` branch:
+
+![Base Branch](images/base-branch.png)
+
+Now fill out the details:
 
 - A short commit title describing the change.
 - A detailed commit description that includes rationalization for the change
