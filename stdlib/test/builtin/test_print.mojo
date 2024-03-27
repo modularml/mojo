@@ -54,6 +54,12 @@ fn test_print():
     # CHECK: 184467440737095516
     print(UInt64(-1))
 
+    # CHECK: 0x16
+    print(Scalar[DType.address](22))
+
+    # CHECK: 0xdeadbeaf
+    print(Scalar[DType.address](0xDEADBEAF))
+
     var hello: StringRef = "Hello,"
     var world: String = "world!"
     var f: Bool = False
