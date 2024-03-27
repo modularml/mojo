@@ -1,27 +1,27 @@
 # Mojo standard library development
 
-This document covers the essentials of getting started developing for the
-standard library.
+This document covers the essentials of developing for the standard library.
 
 ## Prerequisites
 
-If this is your first time contributing, you should read everything in
-[CONTRIBUTING.md](../../CONTRIBUTING.md#fork-and-clone-the-repo). Logistically
+If this is your first time contributing, first read everything in
+[CONTRIBUTING.md](../../CONTRIBUTING.md#fork-and-clone-the-repo). Logistically,
 you need to do the following:
 
-- [Fork and clone the repo](../../CONTRIBUTING.md#fork-and-clone-the-repo)
-- [Branch off nightly](../../CONTRIBUTING.md#branching-off-nightly)
-- [Install the nightly Mojo compiler](../../CONTRIBUTING.md#getting-the-nightly-mojo-compiler)
+1. [Fork and clone the repo](../../CONTRIBUTING.md#fork-and-clone-the-repo)
+2. [Branch off nightly](../../CONTRIBUTING.md#branching-off-nightly)
+3. [Install the nightly Mojo compiler](../../CONTRIBUTING.md#getting-the-nightly-mojo-compiler)
 
-And if you're using vscode:
+And if you're using VS Code:
 
-- [Install the nightly vscode extension](../../CONTRIBUTING.md#mojo-nightly-vscode-extension)
+- [Install the nightly VS Code
+  extension](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo-nightly)
 
 ## Building the standard library
 
-To build the standard library, you can run the script
-[`build-stdlib.sh`](../scripts/build-stdlib.sh) from the `scripts` directory
-inside the `stdlib` directory. This will create a build artifacts directory,
+To build the standard library, you can run the
+[`build-stdlib.sh`](../scripts/build-stdlib.sh) script from the
+`mojo/stdlib/scripts/` directory. This will create a build artifacts directory,
 `build`, in the top-level of the repo and produce the `stdlib.mojopkg` inside.
 
 ```bash
@@ -49,6 +49,7 @@ If you are on Ubuntu you can:
 
 ```bash
 sudo apt update
+
 sudo apt install llvm
 ```
 
@@ -61,21 +62,29 @@ area!
 
 ### Running the standard library tests
 
+We provide a simple Bash script to build the standard library package and
+`test_utils` package that is used by the test suite.
+
+Just run `./stdlib/scripts/run-tests.sh` which will produce the necessary
+`mojopkg` files inside your `build` directory, and then run `lit -sv
+stdlib/test`.
+
 ```bash
 ./stdlib/scripts/run-tests.sh
+
+lit -sv stdlib/test
 ```
 
-This will produce the necessary `mojopkg` files inside your `build` directory
-and then run `lit -sv stdlib/test`. All the tests should pass on the `nightly`
-branch with the nightly mojo compiler. If you've pulled the latest changes and
-they're still failing please
-[open a GitHub issue](https://github.com/modularml/mojo/issues/new?assignees=&labels=bug%2Cmojo&projects=&template=mojo_bug_report.yaml&title=%5BBUG%5D).
+All the tests should pass on the `nightly` branch with the nightly Mojo
+compiler. If you've pulled the latest changes and they're still failing please
+[open a GitHub
+issue](https://github.com/modularml/mojo/issues/new?assignees=&labels=bug%2Cmojo&projects=&template=mojo_bug_report.yaml&title=%5BBUG%5D).
 
 ### Running a subset of the Standard Library Unit Tests
 
 If you’d like to run just a subset of the tests, feel free to use all of the
 normal options that the `lit` tool provides.  For example, to run just the
-builtin and collections tests, you can
+`builtin` and `collections` tests:
 
 ```bash
 lit -sv stdlib/test/builtin stdlib/test/collections
@@ -98,7 +107,7 @@ a look.
 
 ## Formatting changes
 
-Please make sure your changes are formatted before submitting a Pull Request.
+Please make sure your changes are formatted before submitting a pull request.
 Otherwise, CI will fail in its lint and formatting checks.  The `mojo` compiler
 provides a `format` command.  So, you can format your changes like so:
 
@@ -118,15 +127,16 @@ Mojo files upon saving.
 
 ## Tutorial
 
-If you're having trouble figuring out how everything fits together, this
-tutorial will take you on a journey for making a change and raising a PR from
-start to finish.
+Here is a complete walkthrough, showing how to make a change to the Mojo
+standard library, test it, and raise a PR.
 
-First follow everything in the [prerequisites](#prerequisites)
+First, follow everything in the [prerequisites](#prerequisites).
 
 __IMPORTANT__ We'll be in the `mojo/stdlib` folder for this tutorial, check and
 make sure you're in that location if anything goes wrong:
 `cd [path-to-repo]/stdlib`
+
+### A simple change
 
 Let's try adding a small piece of functionality to `path.mojo`:
 
@@ -151,7 +161,7 @@ from .path import (
 ```
 
 Now you can create a temporary file named `main.mojo` for trying out the new
-behaviour. You wouldn't commit this, it's just to experiment with the
+behavior. You wouldn't commit this file, it's just to experiment with the
 functionality before you write tests:
 
 ```mojo
@@ -169,11 +179,13 @@ Now when you run `mojo main.mojo` it'll reflect the changes:
 cwd: /Users/jack/src/mojo/stdlib
 ```
 
-### Standard library dependencies
+### A change with dependencies
 
-This works alright for one file, but what if you're modifying multiple standard
-library files that depend on each other? Try adding this to `os.mojo` which
-depends on what we just added to `pathlib.mojo`:
+Here's a more tricky example that modifies multiple standard library files that
+depend on each other.
+
+Try adding this to `os.mojo`, which depends on what we just added to
+`pathlib.mojo`:
 
 ```mojo
 # ./stdlib/src/os/os.mojo
@@ -195,8 +207,8 @@ the command:
 ```
 
 This builds the standard library and places it at the root of the repo in
-`../build/stdlib.mojopkg`, now we can edit `main.mojo` to use the normal import
-os syntax:
+`../build/stdlib.mojopkg`. Now we can edit `main.mojo` to use the normal import
+syntax:
 
 ```mojo
 import os
@@ -205,8 +217,9 @@ def main():
     os.print_paths()
 ```
 
-And use the env var below to instruct Mojo to prioritize imports from the
-standard library we just built, over the one that ships with Mojo:
+We also need to set the following environment variable that tells Mojo to
+prioritize imports from the standard library we just built, over the one that
+ships with Mojo:
 
 ```bash
 MODULAR_MOJO_NIGHTLY_IMPORT_PATH=../build mojo main.mojo
@@ -235,18 +248,18 @@ export MODULAR_MOJO_NIGHTLY_IMPORT_PATH=../build
 ls **/*.mojo | entr sh -c "./scripts/build-stdlib.sh && mojo main.mojo"
 ```
 
-Now every time you save a Mojo file, it will package the standard library and
-run `main.mojo`.
+Now, every time you save a Mojo file, it packages the standard library and
+runs `main.mojo`.
 
 ### Running tests
 
-If you haven't already follow the steps at:
+If you haven't already, follow the steps at:
 [Installing unit test dependencies](#installing-unit-test-dependencies)
 
 ### Adding a test
 
-This will show you how the `FileCheck` utility works, first turn it on by adding
-it to the end of line 7 in `./stdlib/test/pathlib/test_pathlib.mojo`:
+This will show you how the `FileCheck` utility works. First, turn it on by
+adding it to the end of line 7 in `./stdlib/test/pathlib/test_pathlib.mojo`:
 
 ```mojo
 # RUN: %mojo -debug-level full -D TEMP_FILE=%t %s | FileCheck %s
@@ -271,7 +284,7 @@ def main():
     test_print_cwd()
 ```
 
-Now instead of testing all the modules, we can just test pathlib:
+Now, instead of testing all the modules, we can just test `pathlib`:
 
 ```bash
 lit -sv test/pathlib
@@ -302,8 +315,8 @@ def test_print_cwd():
     print_cwd()
 ```
 
-We're now checking that `print_cwd` is prefixed with `cwd:` just like the function
-we added. Run the test again:
+We're now checking that `print_cwd` is prefixed with `cwd:` just like the
+function we added. Run the test again:
 
 ```plaintext
 Testing Time: 0.65s
