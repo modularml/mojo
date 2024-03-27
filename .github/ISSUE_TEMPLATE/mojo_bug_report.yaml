@@ -16,6 +16,12 @@ body:
     attributes:
       label: Bug description
       description: Describe the bug you encountered and what you expected to happen.
+      value: |
+        ### Actual behavior
+        <!-- Add a clear and concise description of what actually happened. -->
+
+        ### Expected behavior
+        <!-- Add a clear and concise description of what you expected to happen. -->
     validations:
       required: true
 
