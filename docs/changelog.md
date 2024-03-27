@@ -533,19 +533,6 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   out for: a given struct should use one style or the other, mixing some of
   each won't work well.
 
-- The `inout self` initializer form is **required** for initializers of
-  `@register_passable` types that may raise errors:
-
-  ```mojo
-  @register_passable
-  struct RaisingCtor:
-      fn __init__(inout self) raises:
-          raise
-  ```
-
-- `async` functions that may raise errors have been temporarily disabled in this
-  build. The implementation of Mojo async is undergoing a rework 🚧.
-
 - The standard library `slice` type has been renamed to
   [`Slice`](/mojo/stdlib/builtin/builtin_slice#slice), and a `slice`
   function has been introduced.  This makes Mojo closer to Python and makes the
