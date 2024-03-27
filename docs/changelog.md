@@ -166,6 +166,9 @@ and tools. Please add any significant user-visible changes here.
     execution. This allows for writing additional code within a doc string
     example that is only used to ensure the example is runnable/testable.
 
+- The `sys` module now contains an `exit` function that would exit a Mojo
+  program with the specified error code.
+
 ### 🦋 Changed
 
 - Mojo now warns about unused values in both `def` and `fn` declarations,
