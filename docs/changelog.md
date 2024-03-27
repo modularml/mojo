@@ -13,6 +13,45 @@ and tools. Please add any significant user-visible changes here.
 
 ### 🔥 Legendary
 
+<<<<<<< HEAD
+=======
+- The Mojo standard library is now open source! Check out the
+  [README](https://github.com/modularml/mojo/blob/nightly/stdlib/README.md)
+  for everything you need to get started.
+
+- Structs and other nominal types are now allowed to implicitly conform to
+  traits. A struct implicitly conforms to a trait if it implements all the
+  requirements for the trait. For example, any struct that implements `__str__`
+  will implicitly conform to `Stringable`, and then is usable with `str`.
+
+  ```mojo
+  @value
+  struct Foo:
+      fn __str__(self) -> String:
+          return "foo!"
+
+  fn main():
+      print(str(Foo())) # prints 'foo!'
+  ```
+
+  Explicit conformance is still strongly encouraged where possible, because it
+  is useful for documentation and for communicating intentions. In the future,
+  explicit conformance will still be useful for features like default methods
+  and extensions.
+
+- Mojo's Python interoperability now supports passing keyword arguments to
+  Python callables:
+
+  ```mojo
+  from python import Python
+
+  def main():
+      plt = Python.import_module("matplotlib.pyplot")
+      plt.plot((5, 10), (10, 15), color="red")
+      plt.show()
+  ```
+
+>>>>>>> 01ec9ce ([docs] Cherrypick doc changes to `docs/external/` files (#35948))
 ### ⭐️ New
 
 - The `sys` module now contains an `exit` function that would exit a Mojo
@@ -29,6 +68,101 @@ and tools. Please add any significant user-visible changes here.
 
 ### 🦋 Changed
 
+<<<<<<< HEAD
+=======
+- Mojo now warns about unused values in both `def` and `fn` declarations,
+  instead of completely disabling the warning in `def`s.  It never warns about
+  unused `object` or `PythonObject` values, tying the warning to these types
+  instead of the kind of function they are unused in.  This will help catch API
+  usage bugs in `def`s and make imported Python APIs more ergonomic in `fn`s.
+
+- The [`DynamicVector`](/mojo/stdlib/collections/list#list) and
+  [`InlinedFixedVector`](/mojo/stdlib/collections/vector.html#inlinedfixedvector)
+  types now support negative indexing. This means that you can write `vec[-1]`
+  which is equivalent to `vec[len(vec)-1]`.
+
+- The [`isinf()`](/mojo/stdlib/math/math#isinf) and
+  [`isfinite()`](/mojo/stdlib/math/math#isfinite) methods have been moved from
+  `math.limits` to the `math` module.
+
+- The `ulp` function has been added to the `math` module. This allows one to get
+  the units of least precision (or units of last place) of a floating point
+  value.
+
+- `EqualityComparable` trait now requires `__ne__` function for conformance in addition
+  to the previously existing `__eq__` function.
+
+- Many types now declare conformance to `EqualityComparable` trait.
+
+- `DynamicVector` has been renamed to `List`.  It has also moved from the `collections.vector`
+  module to `collections.list` module.
+
+- `StaticTuple` parameter order has changed to `StaticTuple[type, size]` for
+  consistency with `SIMD` and similar collection types.
+
+- The signature of the elementwise function has been changed. The new order is
+  is `function`, `simd_width`, and then `rank`. As a result, the rank parameter
+  can now be inferred and one can call elementwise via:
+
+  ```mojo
+  elementwise[func, simd_width](shape)
+  ```
+
+- For the time being, dynamic type value will be disabled in the language, e.g.
+  the following will now fail with an error:
+
+  ```mojo
+  var t = Int  # dynamic type values not allowed
+
+  struct SomeType: ...
+
+  takes_type(SomeType)  # dynamic type values not allowed
+  ```
+
+  We want to take a step back and (re)design type valued variables,
+  existentials, and other dynamic features for more 🔥. This does not affect
+  type valued parameters, so the following will work as before:
+
+  ```mojo
+  alias t = Int  # still 🔥
+
+  struct SomeType: ...
+
+  takes_type[SomeType]()  # already 🔥
+  ```
+
+- `PythonObject` is now register-passable.
+
+- `PythonObject.__iter__` now works correctly on more types of iterable Python
+  objects.  Attempting to iterate over non-iterable objects will now raise an
+  exception instead of behaving as if iterating over an empty sequence.
+  `__iter__` also now borrows `self` rather than requiring `inout`, allowing
+  code like `for value in my_dict.values():`.
+
+- `List.push_back` has been removed.  Please use the `append` function instead.
+
+- We took the opportunity to rehome some modules into their correct package
+  as we were going through the process of open-sourcing the Mojo Standard
+  Library.  Specifically, the following are some breaking changes worth
+  calling out.  Please update your import statements accordingly.
+  - `utils.list` has moved to `buffer.list`.
+  - `rand` and `randn` functions in the `random` package that return a `Tensor`
+     have moved to the `tensor` package.
+  - `Buffer`, `NDBuffer`, and friends have moved from the `memory` package
+     into a new `buffer` package.
+  - The `trap` function has been renamed to `abort`.  It also has moved from the
+    `debug` module to the `os` module.
+  - `parallel_memcpy` has moved from the `memory` package into
+     the `buffer` package.
+
+- The `*_` expression in parameter expressions is now required to occur at the
+  end of a positional parameter list, instead of being allowed in the middle.
+  This is no longer supported: `SomeStruct[*_, 42]` but `SomeStruct[42, *_]` is
+  still allowed. We narrowed this because we want to encourage type designers
+  to get the order of parameters right, and want to extend `*_` to support
+  keyword parameters as well in the future.
+
+>>>>>>> 01ec9ce ([docs] Cherrypick doc changes to `docs/external/` files (#35948))
 ### ❌ Removed
 
 ### 🛠️ Fixed
@@ -57,6 +191,7 @@ and tools. Please add any significant user-visible changes here.
   does not work when specifying `end=""`
 - [#1826](https://github.com/modularml/mojo/issues/1826) - The `SIMD.reduce` methods
   correctly handle edge cases where `size_out >= size`.
+<<<<<<< HEAD
 
 ## v24.1.1 (2024-03-18)
 
@@ -4384,3 +4519,5 @@ busy this week.
   consistent with Python generics and don't have the less than ambiguity
   other languages have.
 >>>>>>> 64c4f70 ([DO NOT REVIEW] Cherry-picked reverts for 24.2 (#35837))
+=======
+>>>>>>> 01ec9ce ([docs] Cherrypick doc changes to `docs/external/` files (#35948))

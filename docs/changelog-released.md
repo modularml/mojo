@@ -30,6 +30,7 @@ To update Mojo, first [update `modular`](/cli/#description), and then run this:
 modular update mojo
 ```
 
+<<<<<<< HEAD
 ## v24.2 (2024-03-28)
 
 ### 🔥 Legendary
@@ -423,6 +424,8 @@ modular update mojo
 - [#1826](https://github.com/modularml/mojo/issues/1826) - The `SIMD.reduce` methods
   correctly handle edge cases where `size_out >= size`.
 
+=======
+>>>>>>> 01ec9ce ([docs] Cherrypick doc changes to `docs/external/` files (#35948))
 ## v24.1.1 (2024-03-18)
 
 This release includes installer improvements and enhanced error reporting for
@@ -624,6 +627,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   out for: a given struct should use one style or the other, mixing some of
   each won't work well.
 
+<<<<<<< HEAD
 - The `inout self` initializer form is **required** for initializers of
   `@register_passable` types that may raise errors:
 
@@ -637,6 +641,8 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
 - `async` functions that may raise errors have been temporarily disabled in this
   build. The implementation of Mojo async is undergoing a rework 🚧.
 
+=======
+>>>>>>> 01ec9ce ([docs] Cherrypick doc changes to `docs/external/` files (#35948))
 - The standard library `slice` type has been renamed to
   [`Slice`](/mojo/stdlib/builtin/builtin_slice#slice), and a `slice`
   function has been introduced.  This makes Mojo closer to Python and makes the
