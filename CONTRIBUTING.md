@@ -246,10 +246,10 @@ If you're using bash, replace the three `~/.zshrc` above with `~/.bashrc`.
 
 #### Mojo nightly vscode extension
 
-Install the nightly Mojo extension by searching for `Mojo nightly` in the
-extensions marketplace:
+Install the [Mojo nightly VS Code
+extension](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo-nightly):
 
-![mojo-nightly-extension](./images/nightly-extension.png)
+<img src="./images/nightly-extension.png" width=350 />
 
 You can only have one Mojo extension enabled at a time, remember to switch back
 when using the stable release!
