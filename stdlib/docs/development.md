@@ -305,7 +305,11 @@ error: CHECK: expected string not found in input
 
 Lets fix the test that we just added:
 
+<<<<<<< HEAD
 ```mojo
+=======
+```plaintext
+>>>>>>> ff0bbfc ([docs] Cherrypick latest docs for `docs/oss-materials/` (#35953))
 # CHECK-LABEL: test_print_cwd
 
 def test_print_cwd():

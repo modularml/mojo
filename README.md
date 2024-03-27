@@ -46,7 +46,11 @@ program](https://https://docs.modular.com/mojo/manual/get-started/hello-world).
 
 The nightly Mojo builds are subject to breakage and provide an inside
 view of how the development of Mojo is progressing.  Use at your own risk
+<<<<<<< HEAD
 and be patient! Install them using the instructions [here](./CONTRIBUTING.md).
+=======
+and be patient! Intall them using the instructions [here](./CONTRIBUTING.md).
+>>>>>>> ff0bbfc ([docs] Cherrypick latest docs for `docs/oss-materials/` (#35953))
 
 ## Contributing
 

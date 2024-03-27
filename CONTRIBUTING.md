@@ -184,7 +184,11 @@ for more details.
 Go to the [Mojo repo](https://github.com/modularml/mojo) and click the fork
 button:
 
+<<<<<<< HEAD
 ![Create Fork](stdlib/docs/images/create-fork.png)
+=======
+![Create Fork](./images/create-fork.png)
+>>>>>>> ff0bbfc ([docs] Cherrypick latest docs for `docs/oss-materials/` (#35953))
 
 Clone your forked repo locally with the command:
 
@@ -249,7 +253,11 @@ If you're using bash, replace the three `~/.zshrc` above with `~/.bashrc`.
 Install the [Mojo nightly VS Code
 extension](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo-nightly):
 
+<<<<<<< HEAD
 <img src="./stdlib/docs/images/nightly-extension.png" width=350 />
+=======
+<img src="./images/nightly-extension.png" width=350 />
+>>>>>>> ff0bbfc ([docs] Cherrypick latest docs for `docs/oss-materials/` (#35953))
 
 You can only have one Mojo extension enabled at a time, remember to switch back
 when using the stable release!
@@ -275,7 +283,11 @@ remote:      https://github.com/jackos/mojo/pull/new/my-fix-pr
 
 Make sure you point it to the `nightly` branch:
 
+<<<<<<< HEAD
 ![Base Branch](stdlib/docs/images/base-branch.png)
+=======
+![Base Branch](images/base-branch.png)
+>>>>>>> ff0bbfc ([docs] Cherrypick latest docs for `docs/oss-materials/` (#35953))
 
 Now fill out the details:
 
