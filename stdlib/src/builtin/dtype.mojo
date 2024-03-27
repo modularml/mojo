@@ -679,7 +679,7 @@ fn _get_dtype_printf_format[type: DType]() -> StringLiteral:
         return _index_printf_format()
 
     elif type == DType.address:
-        return "%zx"
+        return "%p"
 
     elif type.is_floating_point():
         return "%.17g"
