@@ -291,20 +291,22 @@ fn test_insert():
 
     # CHECK: [0, 9, 6, 3]
     print(
-        SIMD[DType.index, 4](0, 1, 2, 3).insert(SIMD[DType.index, 2](9, 6), 1)
+        SIMD[DType.index, 4](0, 1, 2, 3).insert[offset=1](
+            SIMD[DType.index, 2](9, 6)
+        )
     )
 
     # CHECK: [0, 1, 2, 3, 9, 6, 3, 7]
     print(
-        SIMD[DType.index, 8](0, 1, 2, 3, 5, 6, 7, 8).insert(
-            SIMD[DType.index, 4](9, 6, 3, 7), 4
+        SIMD[DType.index, 8](0, 1, 2, 3, 5, 6, 7, 8).insert[offset=4](
+            SIMD[DType.index, 4](9, 6, 3, 7)
         )
     )
 
     # CHECK: [0, 1, 2, 9, 6, 3, 7, 8]
     print(
-        SIMD[DType.index, 8](0, 1, 2, 3, 5, 6, 7, 8).insert(
-            SIMD[DType.index, 4](9, 6, 3, 7), 3
+        SIMD[DType.index, 8](0, 1, 2, 3, 5, 6, 7, 8).insert[offset=3](
+            SIMD[DType.index, 4](9, 6, 3, 7)
         )
     )
 
@@ -333,7 +335,8 @@ def test_address():
 
 
 def test_extract():
-    assert_equal(Int64(99).slice[1](0), 99)
+    assert_equal(Int64(99).slice[1](), 99)
+    assert_equal(Int64(99).slice[1, offset=0](), 99)
 
     assert_equal(
         SIMD[DType.index, 4](99, 1, 2, 4).slice[4](),
@@ -341,17 +344,17 @@ def test_extract():
     )
 
     assert_equal(
-        SIMD[DType.index, 4](99, 1, 2, 4).slice[2](0),
+        SIMD[DType.index, 4](99, 1, 2, 4).slice[2, offset=0](),
         SIMD[DType.index, 2](99, 1),
     )
 
     assert_equal(
-        SIMD[DType.index, 4](99, 1, 2, 4).slice[2](2),
+        SIMD[DType.index, 4](99, 1, 2, 4).slice[2, offset=2](),
         SIMD[DType.index, 2](2, 4),
     )
 
     assert_equal(
-        SIMD[DType.index, 4](99, 1, 2, 4).slice[2](1),
+        SIMD[DType.index, 4](99, 1, 2, 4).slice[2, offset=1](),
         SIMD[DType.index, 2](1, 2),
     )
 
