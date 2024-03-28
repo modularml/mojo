@@ -24,7 +24,6 @@ fn test_string_to_python_to_mojo(inout python: Python) raises:
     var cap_mojo_string = str(py_string_capitalized)
     print(cap_mojo_string)
 
-
 fn test_range() raises:
     var array_size: PythonObject = 2
     # CHECK: 0
