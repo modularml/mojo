@@ -14,6 +14,9 @@ website:
     image: /static/images/mojo-social-card.png
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 The Mojo SDK is currently available for Ubuntu Linux systems and macOS
 systems running on Apple silicon. Support for Windows is
 coming soon. You can also develop from Windows or Intel macOS using a container
@@ -26,7 +29,7 @@ our web-based [Mojo Playground](#develop-in-the-mojo-playground).
 
 To provide a unified toolkit for AI developers, the Mojo SDK is now included in
 the [MAX SDK](/max). To install the MAX SDK, see
-[Get started with MAX Engine](/engine/get_started). If you want to install the
+[Get started with MAX Engine](/engine/get-started). If you want to install the
 standalone Mojo SDK, you're in the right place.
 
 :::
@@ -52,7 +55,7 @@ Linux:
 - Ubuntu 20.04/22.04 LTS
 - x86-64 CPU (with [SSE4.2 or
 newer](https://www.intel.com/content/www/us/en/support/articles/000057621/processors.html))
-  or AWS Graviton2 CPU (or newer)
+  or AWS Graviton2/3 CPU
 - Minimum 8 GiB RAM
 - Python 3.8 - 3.11
 - g++ or clang++ C++ compiler
@@ -68,10 +71,17 @@ Support for Windows will be added in a future release.
 
 ### Install Mojo
 
+:::tip Already have modular?
+
+If you already have the `modular` tool,
+[update](/cli/#description) to version 0.5.1 or newer, and go to step 2.
+
+:::
+
 1. Open a terminal and install the [`modular`](/cli/) command line tool:
 
     ```sh
-    curl https://get.modular.com | sh -
+    curl -s https://get.modular.com | sh -
     ```
 
 2. Then sign in to your Modular account with this command:
@@ -86,7 +96,41 @@ Support for Windows will be added in a future release.
     modular install mojo
     ```
 
+4. Set environment variables so you can access the
+   [`mojo`](/mojo/cli/) CLI:
+
+    <Tabs>
+      <TabItem value="bash" label="Bash">
+
+      If you're using Bash, run this command:
+
+      ```sh
+      MOJO_PATH=$(modular config mojo.path) \
+        && BASHRC=$( [ -f "$HOME/.bash_profile" ] && echo "$HOME/.bash_profile" || echo "$HOME/.bashrc" ) \
+        && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> "$BASHRC" \
+        && echo 'export PATH="'$MOJO_PATH'/bin:$PATH"' >> "$BASHRC" \
+        && source "$BASHRC"
+      ```
+
+      </TabItem>
+      <TabItem value="zsh" label="ZSH">
+
+      If you're using ZSH, run this command:
+
+      ```sh
+      MOJO_PATH=$(modular config mojo.path) \
+        && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> ~/.zshrc \
+        && echo 'export PATH="'$MOJO_PATH'/bin:$PATH"' >> ~/.zshrc \
+        && source ~/.zshrc
+      ```
+
+      </TabItem>
+    </Tabs>
+
 Next, get started with **[Hello, world!](hello-world.html)**
+
+If you have issues during install, check our [known
+issues](/mojo/roadmap.html#mojo-sdk-known-issues).
 
 :::note
 
@@ -123,7 +167,9 @@ Linux:
 
 ```sh
 sudo apt update
+```
 
+```sh
 sudo apt install modular
 ```
 
@@ -131,7 +177,9 @@ Mac:
 
 ```sh
 brew update
+```
 
+```sh
 brew upgrade modular
 ```
 

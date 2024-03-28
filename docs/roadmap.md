@@ -561,7 +561,7 @@ collections of types with lifetimes, like `String`, the elements have to be
 manually destructed. Doing so requires quite an ugly pattern, shown in the next
 section.
 
-The `DynamicVector` type has been updated to use traits, and invokes destructors
+The `List` type has been updated to use traits, and invokes destructors
 properly.
 
 ### No safe value references
@@ -726,7 +726,7 @@ both of the following are true:
 
 - The struct has one or more fields that are self referencing
   (such as `Pointer[Self]`).
-- The struct declares conformance to a trait that requires these dundner
+- The struct declares conformance to a trait that requires these dunder
   methods.
 
 ```mojo
@@ -739,3 +739,57 @@ struct A(CollectionElement):
 
 In the example above, adding the `__moveinit__()` and `__copyinit__()` methods
 required by `CollectionElement` resolves this error.
+
+### `or` expression is statically typed
+
+Because Mojo has static typing, the `or` expression can't currently mimic the
+behavior of Python. In Python, the result type of the `or` expression is
+dynamic, based on the runtime values:
+
+```python
+i: int = 0
+s: str = "hello"
+print(type(i or s)) # prints <class 'str'>
+i = 5
+print(type(i or s)) # prints <class 'int'>
+```
+
+In Mojo, given the expression `(a or b)`, the compiler needs to statically
+determine a result type that the types of `a` and `b` can both be converted to.
+
+For example, currently an `Int` can be implicitly converted to a `String`, but a
+`String` can't be implicitly converted to an `Int`. So given an integer value
+`i` and a string value `s`, the value of `(i or s)` will *always* be a `String`.
+
+### `StringLiteral` behaves differently than `String`
+
+String literals behave differently than `String` values in Mojo code. For
+example:
+
+```mojo
+fn main():
+    var g: Int = 0
+    var h: String = "hello"
+    print(g or h)  # prints `hello`
+    print(g or "hello")  # prints `True`
+```
+
+While the `IntLiteral` and `FloatLiteral` types convert or *materialize* at
+runtime into `Int` and `Float64` values, respectively, string literals continue
+to exist at runtime as `StringLiteral` values. This can result in surprising
+behavior because `StringLiteral` has a more restricted API than `String`.
+
+In the example above, because the `or` expression is statically typed,
+and `Int` cannot be implicitly converted to a `StringLiteral`, the compiler
+chooses a result type that both `Int` and `StringLiteral` can be converted to—in
+this case, `Bool`.
+
+We plan to address this issue in the future, but in the near term, you can avoid
+the inconsistency between `StringLiteral` and `String` problems by explicitly
+converting string literals to `String` values. For example:
+
+```mojo
+var h: String = "hello"
+# or
+print(g or str("hello"))
+```
