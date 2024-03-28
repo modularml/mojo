@@ -11,10 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+# RUN: %mojo -debug-level full %s | FileCheck %s
+
 from math import iota
 from sys.info import num_logical_cores
 
-# RUN: %mojo -debug-level full %s | FileCheck %s
 import benchmark
 from algorithm import parallelize, vectorize
 from complex import ComplexFloat64, ComplexSIMD
@@ -76,19 +77,21 @@ fn main() raises:
             var cx = min_x + (col + iota[float_type, simd_width]()) * scale_x
             var cy = min_y + row * scale_y
             var c = ComplexSIMD[float_type, simd_width](cx, cy)
-            t.data().simd_store[simd_width](
+            t.data().store[width=simd_width](
                 row * width + col, mandelbrot_kernel_SIMD[simd_width](c)
             )
 
         # Vectorize the call to compute_vector where call gets a chunk of pixels.
-        vectorize[compute_vector, simd_width, width]()
+        vectorize[compute_vector, simd_width, size=width]()
 
     @parameter
     fn bench[simd_width: Int]():
         for row in range(height):
             worker(row)
 
-    var vectorized = benchmark.run[bench[simd_width]](max_runtime_secs=0.5).mean()
+    var vectorized = benchmark.run[bench[simd_width]](
+        max_runtime_secs=0.5
+    ).mean()
     print("Number of threads:", num_logical_cores())
     print("Vectorized:", vectorized, "s")
 

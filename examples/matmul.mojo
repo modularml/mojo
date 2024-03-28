@@ -53,17 +53,17 @@ struct Matrix[rows: Int, cols: Int]:
         rand(data, rows * cols)
         return Self(data)
 
-    fn __getitem__(self, y: Int, x: Int) -> SIMD[type, 1]:
+    fn __getitem__(self, y: Int, x: Int) -> Scalar[type]:
         return self.load[1](y, x)
 
-    fn __setitem__(inout self, y: Int, x: Int, val: SIMD[type, 1]):
+    fn __setitem__(inout self, y: Int, x: Int, val: Scalar[type]):
         self.store[1](y, x, val)
 
     fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[type, nelts]:
-        return self.data.simd_load[nelts](y * self.cols + x)
+        return self.data.load[width=nelts](y * self.cols + x)
 
     fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[type, nelts]):
-        return self.data.simd_store[nelts](y * self.cols + x, val)
+        return self.data.store[width=nelts](y * self.cols + x, val)
 
 
 def run_matmul_python() -> Float64:
@@ -145,7 +145,8 @@ fn matmul_tiled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store(
                         m,
                         n + x,
-                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x)
+                        + A[m, k] * B.load[nelts](k, n + x),
                     )
 
                 vectorize[dot, nelts, size=tile_x]()
@@ -169,11 +170,13 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
                     C.store(
                         m,
                         n + x,
-                        C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x),
+                        C.load[nelts](m, n + x)
+                        + A[m, k] * B.load[nelts](k, n + x),
                     )
 
-                alias unroll_factor = tile_x // nelts
-                vectorize[dot, nelts, tile_x, unroll_factor]()
+                vectorize[
+                    dot, nelts, size=tile_x, unroll_factor = tile_x // nelts
+                ]()
 
         tile[calc_tile, tile_n, tile_k](C.cols, B.rows)
 
