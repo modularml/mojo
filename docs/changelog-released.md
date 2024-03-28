@@ -281,6 +281,25 @@ modular update mojo
 
 #### 🦋 Changed
 
+- The `simd_load()`, `simd_store()`, `aligned_simd_load()`, and
+  `aligned_simd_store()` methods on
+  [`DTypePointer`](/mojo/stdlib/memory/unsafe#dtypepointer),
+  [`Buffer`](/mojo/stdlib/buffer/buffer#buffer), and
+  [`NDBuffer`](/mojo/stdlib/buffer/buffer#ndbuffer) have been merged into
+  a more expressive set of `load()` and `store()` methods with keyword-only
+  `width` and `alignment` parameters:
+
+  ```mojo
+  # Doesn't work
+  my_simd = my_buffer.simd_load[simd_width](index)
+  # Works
+  my_simd = my_buffer.load[width=simd_width](index)
+  # Doesn't work
+  my_buffer.aligned_simd_store[width, alignment](my_simd)
+  # Works
+  my_buffer.store[width=width, alignment=alignment](my_simd)
+  ```
+
 - The
   [`EqualityComparable`](/mojo/stdlib/builtin/equality_comparable#equalitycomparable)
   trait now requires the `__ne__()` method for conformance in addition to the
@@ -448,6 +467,7 @@ modular update mojo
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> 40dcf00 ([Docs] Mojo documentation cherry picks (#36060))
 - The `simd_load()` and `simd_store()` methods on
@@ -468,6 +488,8 @@ modular update mojo
 >>>>>>> cfe777b ([Docs] Update changelog for 24.2. (#35920) (#35965))
 =======
 >>>>>>> 40dcf00 ([Docs] Mojo documentation cherry picks (#36060))
+=======
+>>>>>>> 3090d2b ([Docs] Update load()/store() item and move it to top of removed secti… (#36120))
 - The functions `max_or_inf()`, `min_or_neginf()` have been removed from
   `math.limit`. These functions were only used by the SIMD type.
 
