@@ -168,4 +168,4 @@ fn str[T: StringableRaising](value: T) raises -> String:
     Raises:
         If there is an error when computing the string representation of the type.
     """
-    return str(value)
+    return value.__str__()
