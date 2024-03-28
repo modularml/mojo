@@ -36,7 +36,7 @@ struct AnyPointer[T: Movable](
         T: The pointer element type, which must be movable.
     """
 
-    alias pointer_type = __mlir_type[`!kgen.pointer<:`, Movable, ` `, T, `>`]
+    alias pointer_type = __mlir_type[`!kgen.pointer<`, T, `>`]
     """The underlying pointer type."""
     var value: Self.pointer_type
     """The underlying pointer."""

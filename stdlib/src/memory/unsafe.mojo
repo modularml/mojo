@@ -435,9 +435,7 @@ struct _LITRef[
     addr_space: __mlir_type.index = Int(0).__mlir_index__(),
 ]:
     alias type = __mlir_type[
-        `!lit.ref<:`,
-        AnyType,
-        ` `,
+        `!lit.ref<`,
         element_type,
         `, `,
         lifetime,
@@ -538,9 +536,7 @@ struct Reference[
         # to KGEN pointer.
         var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
         var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[
-                `!kgen.pointer<:`, AnyType, ` `, new_element_type, `>`
-            ]
+            _type = __mlir_type[`!kgen.pointer<`, new_element_type, `>`]
         ](kgen_ptr)
         return __mlir_op.`lit.ref.from_pointer`[
             _type = _LITRef[new_element_type, is_mutable, lifetime].type
