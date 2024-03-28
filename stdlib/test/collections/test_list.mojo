@@ -84,6 +84,28 @@ def test_list():
     assert_equal(0, len(list))
     assert_equal(2, list.capacity)
 
+    # Test pop with index
+    for i in range(6):
+        list.append(i)
+    
+    # try poping from index 3 for 3 times
+    for i in range(3, 6):
+        assert_equal(i, list.pop(3))
+
+    # list should have 3 elements now 
+    assert_equal(3, len(list))
+    assert_equal(0, list[0])
+    assert_equal(1, list[1])
+    assert_equal(2, list[2])
+
+    # Test pop with negative index
+    for i in range(0, 3):
+        assert_equal(i, list.pop(-len(list)))
+
+    # list should be empty now and check capacity as usual
+    assert_equal(0, len(list))
+    assert_equal(2, list.capacity)
+
 
 def test_list_variadic_constructor():
     var l = List[Int](2, 4, 6)
