@@ -45,12 +45,25 @@ config.test_source_root = Path(__file__).parent.resolve()
 # Substitute %mojo for just `mojo` itself.
 config.substitutions.insert(0, ("%mojo", "mojo"))
 
+pre_built_packages_path = (
+    Path(os.environ["MODULAR_HOME"])
+    / "pkg"
+    / "packages.modular.com_nightly_mojo"
+    / "lib"
+    / "mojo"
+)
+
+os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = (
+    f"{build_root},{pre_built_packages_path}"
+)
+
 # Pass through several environment variables
 # to the underlying subprocesses that run the tests.
 lit.llvm.initialize(lit_config, config)
 lit.llvm.llvm_config.with_system_environment(
     [
         "MODULAR_HOME",
+        "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
         "PATH",
     ]
 )
