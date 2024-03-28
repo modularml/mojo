@@ -36,16 +36,13 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
     """The underlying storage for the list."""
 
     @always_inline("nodebug")
-    fn __init__(*args: *Ts) -> Self:
+    fn __init__(inout self, *args: *Ts):
         """Construct the list literal from the given values.
 
         Args:
             args: The init values.
-
-        Returns:
-            The constructed ListLiteral.
         """
-        return Self {storage: args}
+        self.storage = args
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -113,29 +110,23 @@ struct VariadicList[type: AnyRegType](Sized):
     alias IterType = _VariadicListIter[type]
 
     @always_inline
-    fn __init__(*value: type) -> Self:
+    fn __init__(inout self, *value: type):
         """Constructs a VariadicList from a variadic list of arguments.
 
         Args:
             value: The variadic argument list to construct the variadic list
               with.
-
-        Returns:
-            The VariadicList constructed.
         """
-        return value
+        self = value
 
     @always_inline
-    fn __init__(value: Self.storage_type) -> Self:
+    fn __init__(inout self, value: Self.storage_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
             value: The variadic argument to construct the list with.
-
-        Returns:
-            The VariadicList constructed.
         """
-        return Self {value: value}
+        self.value = value
 
     @always_inline
     fn __len__(self) -> Int:
