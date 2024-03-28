@@ -21,7 +21,7 @@ fn test_string_to_python_to_mojo(inout python: Python) raises:
     var py_string_capitalized = py_string.capitalize()
 
     # CHECK: Mojo
-    var cap_mojo_string = py_string_capitalized.__str__()
+    var cap_mojo_string = str(py_string_capitalized)
     print(cap_mojo_string)
 
 

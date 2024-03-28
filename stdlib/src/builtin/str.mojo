@@ -136,7 +136,7 @@ fn str[T: Stringable](value: T) -> String:
     Returns:
         The string representation of the object.
     """
-    return value.__str__()
+    return str(value)
 
 
 @always_inline
@@ -168,4 +168,4 @@ fn str[T: StringableRaising](value: T) raises -> String:
     Raises:
         If there is an error when computing the string representation of the type.
     """
-    return value.__str__()
+    return str(value)
