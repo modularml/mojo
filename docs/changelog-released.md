@@ -101,6 +101,7 @@ modular update mojo
   ```
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   For more details (and a list of current limitations), see [Variadic keyword
   arguments](/mojo/manual/functions#variadic-keyword-arguments) in the Mojo
   manual.
@@ -140,6 +141,11 @@ modular update mojo
     fn var_kwparams[**kwparams: Int](): ...
     ```
 >>>>>>> cfe777b ([Docs] Update changelog for 24.2. (#35920) (#35965))
+=======
+  For more details (and a list of current limitations), see [Variadic keyword
+  arguments](/mojo/manual/functions#variadic-keyword-arguments) in the Mojo
+  manual.
+>>>>>>> 40dcf00 ([Docs] Mojo documentation cherry picks (#36060))
 
 #### 🦋 Changed or removed
 
@@ -251,12 +257,18 @@ modular update mojo
 - The `Tensor` type now has [`argmax()`](/mojo/stdlib/tensor/tensor#argmax) and
   [`argmin()`](/mojo/stdlib/tensor/tensor#argmin) functions to compute the
 <<<<<<< HEAD
+<<<<<<< HEAD
   position of the max or min value. Note: this should return a `Tensor[Int]`
   but currently the output tensor is the same type as the input tensor. This
   will be fixed in a future release.
 =======
   position of the max or min value.
 >>>>>>> cfe777b ([Docs] Update changelog for 24.2. (#35920) (#35965))
+=======
+  position of the max or min value. Note: this should return a `Tensor[Int]`
+  but currently the output tensor is the same type as the input tensor. This
+  will be fixed in a future release.
+>>>>>>> 40dcf00 ([Docs] Mojo documentation cherry picks (#36060))
 
 - Added a new
   [`collections.OptionalReg`](/mojo/stdlib/collections/optional#optionalreg)
@@ -392,12 +404,18 @@ modular update mojo
   `mojo.lsp.includeDirs` setting in the VS Code extension.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 ### Other changes
 
 #### ❌ Removed
 =======
 ### ❌ Removed
 >>>>>>> cfe777b ([Docs] Update changelog for 24.2. (#35920) (#35965))
+=======
+### Other changes
+
+#### ❌ Removed
+>>>>>>> 40dcf00 ([Docs] Mojo documentation cherry picks (#36060))
 
 - The `__get_address_as_lvalue` magic function has been removed.  You can now
   get an LValue from a `Pointer` or `Reference` by using the dereference
@@ -429,6 +447,9 @@ modular update mojo
   ```
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 40dcf00 ([Docs] Mojo documentation cherry picks (#36060))
 - The `simd_load()` and `simd_store()` methods on
   [`DTypePointer`](/mojo/stdlib/memory/unsafe#dtypepointer),
   [`Buffer`](/mojo/stdlib/buffer/buffer#buffer), and
@@ -442,8 +463,11 @@ modular update mojo
   my_simd = my_buffer.load[simd_width, alignment](index)
   ```
 
+<<<<<<< HEAD
 =======
 >>>>>>> cfe777b ([Docs] Update changelog for 24.2. (#35920) (#35965))
+=======
+>>>>>>> 40dcf00 ([Docs] Mojo documentation cherry picks (#36060))
 - The functions `max_or_inf()`, `min_or_neginf()` have been removed from
   `math.limit`. These functions were only used by the SIMD type.
 
@@ -451,10 +475,14 @@ modular update mojo
   Please use `print(end="")` instead.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 #### 🛠️ Fixed
 =======
 ### 🛠️ Fixed
 >>>>>>> cfe777b ([Docs] Update changelog for 24.2. (#35920) (#35965))
+=======
+#### 🛠️ Fixed
+>>>>>>> 40dcf00 ([Docs] Mojo documentation cherry picks (#36060))
 
 - [#1362](https://github.com/modularml/mojo/issues/1362) - Parameter inference
   now recursively matches function types.
