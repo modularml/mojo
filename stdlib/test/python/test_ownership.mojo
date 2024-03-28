@@ -38,7 +38,7 @@ fn test_list(inout python: Python) raises -> String:
     try:
         var b: PythonObject = Python.import_module("builtins")
         var my_list = PythonObject([1, 2.34, "False"])
-        var py_string = my_list.__str__()
+        var py_string = str(my_list)
         return String(python.__str__(py_string))
     except e:
         return str(e)
@@ -48,7 +48,7 @@ fn test_tuple(inout python: Python) raises -> String:
     try:
         var b: PythonObject = Python.import_module("builtins")
         var my_tuple = PythonObject((1, 2.34, "False"))
-        var py_string = my_tuple.__str__()
+        var py_string = str(my_tuple)
         return String(python.__str__(py_string))
     except e:
         return str(e)
@@ -56,7 +56,7 @@ fn test_tuple(inout python: Python) raises -> String:
 
 fn test_call_ownership(inout python: Python) raises -> String:
     var obj: PythonObject = [1, "5"]
-    var py_string = obj.__str__()
+    var py_string = str(obj)
     var string = python.__str__(py_string)
     return String(string)
 
@@ -64,7 +64,7 @@ fn test_call_ownership(inout python: Python) raises -> String:
 fn test_getitem_ownership(inout python: Python) raises -> String:
     try:
         var obj: PythonObject = [1, "5"]
-        var py_string = obj[1].__str__()
+        var py_string = str(obj[1])
         var string = python.__str__(py_string)
         return String(string)
     except e:
@@ -76,7 +76,7 @@ fn test_getattr_ownership(inout python: Python) raises -> String:
         Python.add_to_path(TEST_DIR)
         var my_module: PythonObject = Python.import_module("my_module")
         var obj = my_module.Foo(4)
-        var py_string = obj.bar.__str__()
+        var py_string = str(obj.bar)
         var string = python.__str__(py_string)
         return String(string)
     except e:
