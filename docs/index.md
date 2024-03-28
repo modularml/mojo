@@ -4,13 +4,6 @@ sidebar_label: Overview
 hide_table_of_contents: true
 description: A programming language that bridges the gap between AI research
   and production, unlocking speed and usability.
-image: /static/images/max-mojo-logo.png
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
-toc: false
 anchor-sections: false
 listing:
   - id: docs

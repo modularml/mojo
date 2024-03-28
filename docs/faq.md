@@ -261,11 +261,8 @@ uses matrix multiplication to show off some Mojo features in a scenario that
 you would never attempt in pure Python. So that implementation is like a “toy”
 matmul implementation and it doesn’t measure up to the state of the art.
 
-Plus, if you're using the [Mojo Playground](https://playground.modular.com),
-that VM environment is not set up for stable performance evaluation. Modular
-has a separate matmul implementation written in Mojo (and used by the [Modular
-MAX Engine](/engine)) that is not available with this release, but you can read
-about it in [this blog
+Modular has a separate matmul implementation written in Mojo and used by
+[MAX Engine](/engine), which you can read about it in [this blog
 post](https://www.modular.com/blog/the-worlds-fastest-unified-matrix-multiplication).
 
 ### Are there any AI related performance benchmarks for Mojo?
