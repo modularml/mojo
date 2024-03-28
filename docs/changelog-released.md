@@ -96,40 +96,9 @@ modular update mojo
   print_nicely(a=7, y=8)
   ```
 
-  There are currently a few limitations:
-
-  - The ownership semantics of variadic keyword arguments are always `owned`.
-    This is applied implicitly, and cannot be declared otherwise:
-
-    ```mojo
-    # Not supported yet.
-    fn borrowed_var_kwargs(borrowed **kwargs: Int): ...
-    ```
-
-  - Functions with variadic keyword arguments cannot have default values for
-    keyword-only arguments. For example:
-
-    ```mojo
-    # Not allowed yet, because `b` is keyword-only with a default.
-    fn not_yet(*, b: Int = 9, **kwargs: Int): ...
-
-    # Okay, because `c` is positional-or-keyword, so it can have a default.
-    fn still_works(c: Int = 5, **kwargs: Int): ...
-    ```
-
-  - Dictionary unpacking is not supported yet:
-
-    ```mojo
-    fn takes_dict(d: Dict[String, Int]):
-      print_nicely(**d)  # Not supported yet.
-    ```
-
-  - Variadic keyword _parameters_ are not supported yet:
-
-    ```mojo
-    # Not supported yet.
-    fn var_kwparams[**kwparams: Int](): ...
-    ```
+  For more details (and a list of current limitations), see [Variadic keyword
+  arguments](/mojo/manual/functions#variadic-keyword-arguments) in the Mojo
+  manual.
 
 #### 🦋 Changed or removed
 
@@ -240,7 +209,9 @@ modular update mojo
 
 - The `Tensor` type now has [`argmax()`](/mojo/stdlib/tensor/tensor#argmax) and
   [`argmin()`](/mojo/stdlib/tensor/tensor#argmin) functions to compute the
-  position of the max or min value.
+  position of the max or min value. Note: this should return a `Tensor[Int]`
+  but currently the output tensor is the same type as the input tensor. This
+  will be fixed in a future release.
 
 - Added a new
   [`collections.OptionalReg`](/mojo/stdlib/collections/optional#optionalreg)
@@ -375,7 +346,9 @@ modular update mojo
   on the command line, using the `-I` option, or you can add them to the
   `mojo.lsp.includeDirs` setting in the VS Code extension.
 
-### ❌ Removed
+### Other changes
+
+#### ❌ Removed
 
 - The `__get_address_as_lvalue` magic function has been removed.  You can now
   get an LValue from a `Pointer` or `Reference` by using the dereference
@@ -406,13 +379,26 @@ modular update mojo
   memcpy(destBuffer.data, srcBuffer.data, count)
   ```
 
+- The `simd_load()` and `simd_store()` methods on
+  [`DTypePointer`](/mojo/stdlib/memory/unsafe#dtypepointer),
+  [`Buffer`](/mojo/stdlib/buffer/buffer#buffer), and
+  [`NDBuffer`](/mojo/stdlib/buffer/buffer#ndbuffer) have been removed in favor
+  of `load()` and `store()`:
+
+  ```mojo
+  # Doesn't work
+  my_simd = my_buffer.simd_load[simd_width](index)
+  # Works
+  my_simd = my_buffer.load[simd_width, alignment](index)
+  ```
+
 - The functions `max_or_inf()`, `min_or_neginf()` have been removed from
   `math.limit`. These functions were only used by the SIMD type.
 
 - As mentioned previously, the `print_no_newline()` function has been removed.
   Please use `print(end="")` instead.
 
-### 🛠️ Fixed
+#### 🛠️ Fixed
 
 - [#1362](https://github.com/modularml/mojo/issues/1362) - Parameter inference
   now recursively matches function types.
