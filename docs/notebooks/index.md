@@ -22,8 +22,7 @@ listing:
 ---
 
 The following pages are rendered from the Jupyter notebooks that are [available
-on GitHub](https://github.com/modularml/mojo/tree/main/examples/notebooks)
-and in the [Mojo Playground](https://playground.modular.com/).
+on GitHub](https://github.com/modularml/mojo/tree/main/examples/notebooks).
 
 <p><br/></p>
 

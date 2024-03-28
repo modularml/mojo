@@ -32,46 +32,46 @@ feedback](/mojo/community.html).
 
 - **Get started**
 
-  - [Get started with Mojo](get-started/index.html)
-  - [Hello World!](get-started/hello-world.html)
+  - [Get started with Mojo](/mojo/manual/get-started/index.html)
+  - [Hello World!](/mojo/manual/get-started/hello-world.html)
 
 - **Language basics**
 
-  - [Introduction to Mojo](basics.html)
-  - [Functions](functions.html)
-  - [Variables](variables.html)
-  - [Structs](structs.html)
-  - [Modules and packages](packages.html)
+  - [Introduction to Mojo](/mojo/manual/basics.html)
+  - [Functions](/mojo/manual/functions.html)
+  - [Variables](/mojo/manual/variables.html)
+  - [Structs](/mojo/manual/structs.html)
+  - [Modules and packages](/mojo/manual/packages.html)
 
 - **Value ownership**
 
-  - [Intro to value ownership](values/index.html)
-  - [Value semantics](values/value-semantics.html)
-  - [Ownership and borrowing](values/ownership.html)
+  - [Intro to value ownership](/mojo/manual/values/index.html)
+  - [Value semantics](/mojo/manual/values/value-semantics.html)
+  - [Ownership and borrowing](/mojo/manual/values/ownership.html)
 
 - **Value lifecycle**
 
-  - [Intro to value lifecycle](lifecycle/index.html)
-  - [Life of a value](lifecycle/life.html)
-  - [Death of a value](lifecycle/death.html)
+  - [Intro to value lifecycle](/mojo/manual/lifecycle/index.html)
+  - [Life of a value](/mojo/manual/lifecycle/life.html)
+  - [Death of a value](/mojo/manual/lifecycle/death.html)
 
 - **Traits and parameters**
 
-  - [Traits](traits.html)
-  - [Parameterization: compile-time metaprogramming](parameters/index.html)
+  - [Traits](/mojo/manual/traits.html)
+  - [Parameterization: compile-time metaprogramming](/mojo/manual/parameters/index.html)
 
 - **Python**
 
-  - [Python integration](python/index.html)
-  - [Python types](python/types.html)
+  - [Python integration](/mojo/manual/python/index.html)
+  - [Python types](/mojo/manual/python/types.html)
 
 - **Tools**
 
-  - [Debugging](tools/debugging.html)
+  - [Debugging](/mojo/tools/debugging.html)
 
 - **Project information**
 
-  - [Roadmap and sharp edges](roadmap.html)
-  - [Changelog](changelog.html)
-  - [FAQ](faq.html)
-  - [Community](community.html)
+  - [Roadmap and sharp edges](/mojo/roadmap.html)
+  - [Changelog](/mojo/changelog.html)
+  - [FAQ](/mojo/faq.html)
+  - [Community](/mojo/community.html)

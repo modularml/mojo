@@ -10,34 +10,23 @@ website:
     image: /static/images/mojo-social-card.png
 ---
 
-After you [install Mojo](/mojo/manual/get-started/setup.html), you can use the
+After you [install the MAX SDK](/engine/get-started) or
+[Mojo SDK](/mojo/manual/get-started/) or  you can use the
 [Mojo CLI](/mojo/cli/) to build and run Mojo programs. So let's create the
 classic starter program that prints "Hello, world!", in three different ways.
 
-:::{.callout-note}
+## Before you start
 
-**Before you start:**
+Before you start, make sure the `MODULAR_HOME` and `PATH` environment variables
+are set, as described in the install procedure, so you can run the `mojo`
+command:
 
-You must set the `MODULAR_HOME` and `PATH` environment variables, as described
-in the output when you ran `modular install mojo`. For example, if you're using
-bash or zsh, add the following lines to your configuration file
-(`.bash_profile`, `.bashrc`, or `.zshrc`):
-
-```sh
-export MODULAR_HOME="$HOME/.modular"
-export PATH="$MODULAR_HOME/pkg/packages.modular.com_mojo/bin:$PATH"
-```
-
-Then source the file you just updated, for example:
-
-```sh
-source ~/.bash_profile
+```text
+mojo --version
 ```
 
 If you have other issues during install, check our [known
 issues](/mojo/roadmap.html#mojo-sdk-known-issues).
-
-:::
 
 ## 1. Run code in the REPL
 

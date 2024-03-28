@@ -16,13 +16,14 @@
 # large array of values to produce a single result.
 # Reductions and scans are common algorithm patterns in parallel computing.
 
-from random import rand
 from time import now
 
 from algorithm import sum
 from benchmark import Unit, benchmark, keep
-from memory.buffer import Buffer
+from buffer import Buffer
+from tensor import Tensor
 from python import Python
+from tensor import rand
 
 # Change these numbers to reduce on different sizes
 alias size_small: Int = 1 << 21
