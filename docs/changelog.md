@@ -22,6 +22,11 @@ and tools. Please add any significant user-visible changes here.
   As a result, one has to pass in the shape as first argument (instead of the
   second) when constructing a tensor with pointer data.
 
+- The constructor for `tensor.Tensor` will now splat a scalar if its passed in.
+  For example, `Tensor[DType.float32](TensorShape(2,2), 0)` will construct a
+  `2x2` tensor which is initialized with all zeros. This provides an easy way
+  to fill the data of a tensor.
+
 ### 🦋 Changed
 
 ### ❌ Removed
