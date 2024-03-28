@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-name: Test Examples
+name: Standard Library tests and examples
 
 on:
   pull_request:
@@ -66,8 +66,9 @@ jobs:
 
           python3 -m pip install lit
 
-      - name: Run examples
+      - name: Run standard library tests and examples
         run: |
           export MODULAR_HOME="/home/runner/.modular"
           export PATH="/home/runner/.modular/pkg/packages.modular.com_nightly_mojo/bin:$PATH"
+          ./stdlib/scripts/run-tests.sh
           ./examples/run-examples.sh
