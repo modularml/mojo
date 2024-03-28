@@ -1475,8 +1475,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn slice[
-        output_width: Int
-    ](self, offset: Int = 0) -> SIMD[type, output_width]:
+        output_width: Int, /, *, offset: Int = 0
+    ](self) -> SIMD[type, output_width]:
         """Returns a slice of the vector of the specified width with the given
         offset.
 
@@ -1486,8 +1486,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         Parameters:
             output_width: The output SIMD vector size.
-
-        Args:
             offset: The given offset for the slice.
 
         Returns:
@@ -1495,16 +1493,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self[offset:offset+output_width]`.
         """
         constrained[
-            0 < output_width <= size,
+            0 < output_width + offset <= size,
             "output width must be a positive integer less than simd size",
         ]()
-        debug_assert(output_width + offset <= size, "slice is out of range")
 
         @parameter
         if output_width == 1:
             return self[offset]
 
-        if offset._positive_rem(simdwidthof[type]()) != 0:
+        @parameter
+        if offset % simdwidthof[type]():
             var tmp = SIMD[type, output_width]()
 
             @unroll
@@ -1517,28 +1515,25 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn insert[
-        input_width: Int
-    ](self, value: SIMD[type, input_width], offset: Int = 0) -> Self:
+    fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
         """Returns a the vector where the elements between `offset` and
         `offset + input_width` have been replaced with the elements in `value`.
 
         Parameters:
-            input_width: The width of the value input that is going to be
-              inserted.
+            offset: The offset to insert at.
 
         Args:
             value: The value to be inserted.
-            offset: The offset to insert at.
 
         Returns:
             A new vector whose elements at `self[offset:offset+input_width]`
             contain the values of `value`.
         """
-        debug_assert(
+        alias input_width = value.size
+        constrained[
             0 < input_width + offset <= size,
             "insertion position must not exceed the size of the vector",
-        )
+        ]()
 
         @parameter
         if size == 1:
@@ -1552,7 +1547,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # so resort to a for loop. Note that this can be made more intelligent
         # by dividing the problem into the offset, offset+val, val+input_width
         # where val is a value to align the offset to the simdwidth.
-        if offset._positive_rem(simdwidthof[type]()) != 0:
+        @parameter
+        if offset % simdwidthof[type]():
             var tmp = self
 
             @unroll
@@ -1660,7 +1656,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         var res = SIMD[type, 2 * size]()
         res = res.insert(self)
-        return res.insert(other, size)
+        return res.insert[offset=size](other)
 
     @always_inline("nodebug")
     fn interleave(self, other: Self) -> SIMD[type, 2 * size]:
@@ -1770,8 +1766,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return rebind[SIMD[Self.type, size_out]](self)
         else:
             alias half_size: Int = size // 2
-            var lhs = self.slice[half_size](0)
-            var rhs = self.slice[half_size](half_size)
+            var lhs = self.slice[half_size, offset=0]()
+            var rhs = self.slice[half_size, offset=half_size]()
 
             @parameter
             if half_size != size_out:
