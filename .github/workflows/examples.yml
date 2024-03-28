@@ -40,12 +40,12 @@ jobs:
         run: |
           curl -s https://get.modular.com | sh -
 
-      - name: Install stable Mojo compiler
+      - name: Install nightly Mojo compiler
         run: |
           # The <auth_token> of "examples" is arbitrary but something
           # needs to be provided.
           modular auth examples
-          modular install mojo
+          modular install nightly/mojo
 
       - name: Install build tools
         run: |
@@ -69,5 +69,5 @@ jobs:
       - name: Run examples
         run: |
           export MODULAR_HOME="/home/runner/.modular"
-          export PATH="/home/runner/.modular/pkg/packages.modular.com_mojo/bin:$PATH"
+          export PATH="/home/runner/.modular/pkg/packages.modular.com_nightly_mojo/bin:$PATH"
           ./examples/run-examples.sh
