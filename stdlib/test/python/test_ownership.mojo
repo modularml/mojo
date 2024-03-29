@@ -25,78 +25,58 @@ from testing import assert_equal
 alias TEST_DIR = env_get_string["TEST_DIR"]()
 
 
-fn test_import(inout python: Python) raises -> String:
-    try:
-        Python.add_to_path(TEST_DIR)
-        var my_module: PythonObject = Python.import_module("my_module")
-        var py_string = my_module.my_function("Hello")
-        var str = String(python.__str__(py_string))
-        return str
-    except e:
-        return str(e)
+fn test_import(inout python: Python) raises:
+    Python.add_to_path(TEST_DIR)
+    var my_module: PythonObject = Python.import_module("my_module")
+    var py_string = my_module.my_function("Hello")
+    var str = String(python.__str__(py_string))
+    assert_equal(str, "Formatting the string from Lit with Python: Hello")
 
 
-fn test_list(inout python: Python) raises -> String:
-    try:
-        var b: PythonObject = Python.import_module("builtins")
-        var my_list = PythonObject([1, 2.34, "False"])
-        var py_string = str(my_list)
-        return String(python.__str__(py_string))
-    except e:
-        return str(e)
+fn test_list(inout python: Python) raises:
+    var b: PythonObject = Python.import_module("builtins")
+    var my_list = PythonObject([1, 2.34, "False"])
+    var py_string = str(my_list)
+    assert_equal(py_string, "[1, 2.34, 'False']")
 
 
-fn test_tuple(inout python: Python) raises -> String:
-    try:
-        var b: PythonObject = Python.import_module("builtins")
-        var my_tuple = PythonObject((1, 2.34, "False"))
-        var py_string = str(my_tuple)
-        return String(python.__str__(py_string))
-    except e:
-        return str(e)
+fn test_tuple(inout python: Python) raises:
+    var b: PythonObject = Python.import_module("builtins")
+    var my_tuple = PythonObject((1, 2.34, "False"))
+    var py_string = str(my_tuple)
+    assert_equal(py_string, "(1, 2.34, 'False')")
 
 
-fn test_call_ownership(inout python: Python) raises -> String:
+fn test_call_ownership(inout python: Python) raises:
     var obj: PythonObject = [1, "5"]
     var py_string = str(obj)
     var string = python.__str__(py_string)
-    return String(string)
+    assert_equal(string, "[1, '5']")
 
 
-fn test_getitem_ownership(inout python: Python) raises -> String:
-    try:
-        var obj: PythonObject = [1, "5"]
-        var py_string = str(obj[1])
-        var string = python.__str__(py_string)
-        return String(string)
-    except e:
-        return str(e)
+fn test_getitem_ownership(inout python: Python) raises:
+    var obj: PythonObject = [1, "5"]
+    var py_string = str(obj[1])
+    var string = python.__str__(py_string)
+    assert_equal(string, "5")
 
 
-fn test_getattr_ownership(inout python: Python) raises -> String:
-    try:
-        Python.add_to_path(TEST_DIR)
-        var my_module: PythonObject = Python.import_module("my_module")
-        var obj = my_module.Foo(4)
-        var py_string = str(obj.bar)
-        var string = python.__str__(py_string)
-        return String(string)
-    except e:
-        return str(e)
+fn test_getattr_ownership(inout python: Python) raises:
+    Python.add_to_path(TEST_DIR)
+    var my_module: PythonObject = Python.import_module("my_module")
+    var obj = my_module.Foo(4)
+    var py_string = str(obj.bar)
+    var string = python.__str__(py_string)
+    assert_equal(string, "4")
 
 
 def main():
     # initializing Python instance calls init_python
     var python = Python()
 
-    assert_equal(test_list(python), "[1, 2.34, 'False']")
-
-    assert_equal(test_tuple(python), "(1, 2.34, 'False')")
-
-    assert_equal(test_call_ownership(python), "[1, '5']")
-
-    assert_equal(test_getitem_ownership(python), "5")
-
-    assert_equal(test_getattr_ownership(python), "4")
-
-    assert_equal(test_import(python), "Formatting the string from Lit with Python: Hello")
+    test_list(python)
+    test_tuple(python)
+    test_call_ownership(python)
+    test_getitem_ownership(python)
+    test_getattr_ownership(python)
+    test_import(python)
