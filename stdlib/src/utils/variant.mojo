@@ -53,8 +53,8 @@ from utils.static_tuple import StaticTuple
 
 @always_inline
 fn _align_up(value: Int, alignment: Int) -> Int:
-    var ceildiv = (value + alignment - 1)._positive_div(alignment)
-    return ceildiv * alignment
+    var div_ceil = (value + alignment - 1)._positive_div(alignment)
+    return div_ceil * alignment
 
 
 @always_inline

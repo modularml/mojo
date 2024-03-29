@@ -36,7 +36,7 @@ from memory import memcpy, memset_zero, stack_allocation
 
 
 @always_inline
-fn _ceildiv_positive(numerator: Int, denominator: Int) -> Int:
+fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
     return (numerator + denominator - 1)._positive_div(denominator)
 
 
@@ -149,7 +149,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
         hash collision statistical properties for common data structures.
     """
     # Some types will have non-integer ratios, eg. DType.bool
-    alias int8_size = _ceildiv_positive(
+    alias int8_size = _div_ceil_positive(
         type.bitwidth(), DType.uint8.bitwidth()
     ) * size
     # Stack allocate bytes for `data` and load it into that memory.
