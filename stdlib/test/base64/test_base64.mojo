@@ -10,33 +10,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo -debug-level full %s
 
 from base64 import b64encode
+from testing import assert_equal
+
+def test_b64encode():
+    assert_equal(b64encode("a"), "YQ==")
+
+    assert_equal(b64encode("fo"), "Zm8=")
+
+    assert_equal(b64encode("Hello Mojo!!!"), "SGVsbG8gTW9qbyEhIQ==")
+
+    assert_equal(b64encode("Hello 🔥!!!"), "SGVsbG8g8J+UpSEhIQ==")
+
+    assert_equal(
+        b64encode("the quick brown fox jumps over the lazy dog"),
+        "dGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==",
+    ) 
+
+    assert_equal(b64encode("ABCDEFabcdef"), "QUJDREVGYWJjZGVm")
 
 
-# CHECK-LABEL: test_b64encode
-fn test_b64encode():
-    print("== test_b64encode")
-
-    # CHECK: YQ==
-    print(b64encode("a"))
-
-    # CHECK: Zm8=
-    print(b64encode("fo"))
-
-    # CHECK: SGVsbG8gTW9qbyEhIQ==
-    print(b64encode("Hello Mojo!!!"))
-
-    # CHECK: SGVsbG8g8J+UpSEhIQ==
-    print(b64encode("Hello 🔥!!!"))
-
-    # CHECK: dGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==
-    print(b64encode("the quick brown fox jumps over the lazy dog"))
-
-    # CHECK: QUJDREVGYWJjZGVm
-    print(b64encode("ABCDEFabcdef"))
-
-
-fn main():
+def main():
     test_b64encode()
