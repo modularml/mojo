@@ -1,0 +1,4 @@
+# Code owners for the Mojo repository
+
+# Standard Library
+/stdlib/ @modularml/mojo-standard-library
