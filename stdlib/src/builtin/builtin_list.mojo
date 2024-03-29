@@ -45,7 +45,7 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
         Returns:
             The constructed ListLiteral.
         """
-        return Self {storage: args}
+        self.storage = args
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:

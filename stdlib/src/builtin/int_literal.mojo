@@ -35,13 +35,9 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
     )
 
     @always_inline("nodebug")
-    fn __init__() -> Self:
-        """Default constructor.
-
-        Returns:
-            The constructed Self object.
-        """
-        return Self._zero
+    fn __init__(inout self):
+        """Default constructor."""
+        self = Self._zero
 
     @always_inline("nodebug")
     fn __init__(value: __mlir_type.`!kgen.int_literal`) -> Self:

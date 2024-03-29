@@ -144,16 +144,13 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     """Returns the minimum (lowest) finite value of SIMD value."""
 
     @always_inline("nodebug")
-    fn __init__() -> Self:
+    fn __init__(inout self):
         """Default initializer of the SIMD vector.
 
         By default the SIMD vectors are initialized to all zeros.
-
-        Returns:
-            SIMD vector whose elements are 0.
         """
         _simd_construction_checks[type, size]()
-        return _unchecked_zero[type, size]()
+        self = _unchecked_zero[type, size]()
 
     @always_inline("nodebug")
     fn __init__(value: SIMD[DType.float64, 1]) -> Self:
