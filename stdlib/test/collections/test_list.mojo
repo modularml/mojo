@@ -99,12 +99,18 @@ def test_list():
     assert_equal(2, list[2])
 
     # Test pop with negative index
-    for i in range(0, 3):
+    for i in range(0, 2):
         assert_equal(i, list.pop(-len(list)))
 
-    # list should be empty now and check capacity as usual
+    # test default index as well
+    assert_equal(2, list.pop())
+    list.append(2)
+    assert_equal(2, list.pop())
+
+    # list should be empty now
     assert_equal(0, len(list))
-    assert_equal(2, list.capacity)
+    # capacity should be 1 according to shrink_to_fit behavior
+    assert_equal(1, list.capacity)
 
 
 def test_list_variadic_constructor():

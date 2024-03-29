@@ -240,7 +240,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         return ret_val^
 
     @always_inline
-    fn pop(inout self, i: Int) -> T:
+    fn pop(inout self, i: Int = -1) -> T:
         """Pops a value from the list at the given index.
 
         Args:
