@@ -24,7 +24,7 @@ from python.object import PythonObject
 
 
 @always_inline
-fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
+fn _ceildiv_positive(numerator: Int, denominator: Int) -> Int:
     """Divides an integer by another integer, and round up to the nearest
     integer.
 
@@ -161,7 +161,7 @@ struct _StridedRange(Sized):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        return _div_ceil_positive(_abs(self.start - self.end), _abs(self.step))
+        return _ceildiv_positive(_abs(self.start - self.end), _abs(self.step))
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:

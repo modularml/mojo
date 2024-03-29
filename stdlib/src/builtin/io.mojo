@@ -30,8 +30,8 @@ from utils import StringRef, unroll
 
 @always_inline
 fn _align_up(value: Int, alignment: Int) -> Int:
-    var div_ceil = (value + alignment - 1)._positive_div(alignment)
-    return div_ceil * alignment
+    var ceildiv = (value + alignment - 1)._positive_div(alignment)
+    return ceildiv * alignment
 
 
 # ===----------------------------------------------------------------------=== #
