@@ -1061,63 +1061,51 @@ struct DTypePointer[
     """The pointed-to address."""
 
     @always_inline("nodebug")
-    fn __init__() -> Self:
-        """Constructs a null `DTypePointer` from the given type.
+    fn __init__(inout self):
+        """Constructs a null `DTypePointer` from the given type."""
 
-        Returns:
-            Constructed `DTypePointer` object.
-        """
-
-        return Self {address: Self.pointer_type()}
+        self.address = Self.pointer_type()
 
     @always_inline("nodebug")
     fn __init__(
+        inout self,
         value: __mlir_type[
             `!kgen.pointer<scalar<`,
             type.value,
             `>,`,
             address_space.value().value,
             `>`,
-        ]
-    ) -> Self:
+        ],
+    ):
         """Constructs a `DTypePointer` from a scalar pointer of the same type.
 
         Args:
             value: The scalar pointer.
-
-        Returns:
-            Constructed `DTypePointer`.
         """
-        return Pointer[
+        self = Pointer[
             __mlir_type[`!pop.scalar<`, type.value, `>`], address_space
         ](value).bitcast[Scalar[type]]()
 
     @always_inline("nodebug")
-    fn __init__(value: Pointer[Scalar[type], address_space]) -> Self:
+    fn __init__(inout self, value: Pointer[Scalar[type], address_space]):
         """Constructs a `DTypePointer` from a scalar pointer of the same type.
 
         Args:
             value: The scalar pointer.
-
-        Returns:
-            Constructed `DTypePointer`.
         """
-        return Self {address: value}
+        self.address = value
 
     @always_inline("nodebug")
-    fn __init__(value: Scalar[DType.address]) -> Self:
+    fn __init__(inout self, value: Scalar[DType.address]):
         """Constructs a `DTypePointer` from the value of scalar address.
 
         Args:
             value: The input pointer index.
-
-        Returns:
-            Constructed `DTypePointer` object.
         """
         var address = __mlir_op.`pop.index_to_pointer`[
             _type = Self.pointer_type.pointer_type
         ](value.cast[DType.index]().value)
-        return Self {address: address}
+        self.address = address
 
     @staticmethod
     @always_inline("nodebug")
