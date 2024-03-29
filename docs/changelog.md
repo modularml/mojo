@@ -31,6 +31,10 @@ and tools. Please add any significant user-visible changes here.
   shorter alias is equivalent to writing `--debug-level full`. This option is
   also available in the `mojo debug` command, but is already the default.
 
+- Due to an oversight there was a `ceildiv` and `div_ceil` function in the
+  `math` module. These two functions have been reconciled with the `div_ceil`
+  being removed.
+
 ### 🦋 Changed
 
 ### ❌ Removed
