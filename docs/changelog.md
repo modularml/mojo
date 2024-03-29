@@ -37,6 +37,11 @@ and tools. Please add any significant user-visible changes here.
 
 ### 🦋 Changed
 
+- The behavior of `mojo build` when invoked without an output `-o` argument has
+  changed slightly: `mojo build ./test-dir/program.mojo` now outputs an
+  executable to the path `./program`, whereas before it would output to the path
+  `./test-dir/program`.
+
 ### ❌ Removed
 
 ### 🛠️ Fixed
