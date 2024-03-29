@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo -D TEST_DIR=%S %s | FileCheck %s
+# RUN: %mojo -D TEST_DIR=%S %s
 
 from sys.param_env import env_get_string
 
@@ -19,6 +19,8 @@ from memory.unsafe import Pointer
 from python._cpython import CPython, PyObjectPtr
 from python.object import PythonObject
 from python.python import Python
+
+from testing import assert_equal
 
 alias TEST_DIR = env_get_string["TEST_DIR"]()
 
@@ -87,20 +89,14 @@ def main():
     # initializing Python instance calls init_python
     var python = Python()
 
-    # CHECK: [1, 2.34, 'False']
-    print(test_list(python))
+    assert_equal(test_list(python), "[1, 2.34, 'False']")
 
-    # CHECK: (1, 2.34, 'False')
-    print(test_tuple(python))
+    assert_equal(test_tuple(python), "(1, 2.34, 'False')")
 
-    # CHECK: [1, '5']
-    print(test_call_ownership(python))
+    assert_equal(test_call_ownership(python), "[1, '5']")
 
-    # CHECK: 5
-    print(test_getitem_ownership(python))
+    assert_equal(test_getitem_ownership(python), "5")
 
-    # CHECK: 4
-    print(test_getattr_ownership(python))
+    assert_equal(test_getattr_ownership(python), "4")
 
-    # CHECK: Formatting the string from Lit with Python: Hello
-    print(test_import(python))
+    assert_equal(test_import(python), "Formatting the string from Lit with Python: Hello")
