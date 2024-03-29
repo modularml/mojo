@@ -27,6 +27,10 @@ and tools. Please add any significant user-visible changes here.
   `2x2` tensor which is initialized with all zeros. This provides an easy way
   to fill the data of a tensor.
 
+- The `mojo build` and `mojo run` commands now support a `-g` option. This
+  shorter alias is equivalent to writing `--debug-level full`. This option is
+  also available in the `mojo debug` command, but is already the default.
+
 ### 🦋 Changed
 
 ### ❌ Removed
