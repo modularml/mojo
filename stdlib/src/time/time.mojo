@@ -44,7 +44,7 @@ alias _MSEC_PER_SEC = 1000
 alias _NSEC_PER_SEC = _NSEC_PER_USEC * _USEC_PER_MSEC * _MSEC_PER_SEC
 
 # LARGE_INTEGER in Windows represent a signed 64 bit integer. Internally it
-# is implemented as a union of of one 64 bit integer or two 32 bit integers
+# is implemented as a union of one 64 bit integer or two 32 bit integers
 # for 64/32 bit compilers.
 # https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-large_integer-r1
 alias _WINDOWS_LARGE_INTEGER = Int64
