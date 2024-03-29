@@ -22,7 +22,6 @@ from sys.info import triple_is_nvidia_cuda
 from sys.param_env import is_defined
 
 
-@always_inline
 fn debug_assert(cond: Bool, msg: StringLiteral):
     """Asserts that the condition is true.
 
@@ -40,7 +39,6 @@ fn debug_assert(cond: Bool, msg: StringLiteral):
     _debug_assert_impl(cond, msg)
 
 
-@always_inline
 fn debug_assert[boolable: Boolable](cond: boolable, msg: StringLiteral):
     """Asserts that the condition is true.
 
@@ -61,7 +59,6 @@ fn debug_assert[boolable: Boolable](cond: boolable, msg: StringLiteral):
     _debug_assert_impl(cond, msg)
 
 
-@always_inline
 fn _debug_assert_impl[boolable: Boolable](cond: boolable, msg: StringLiteral):
     """Asserts that the condition is true."""
 
