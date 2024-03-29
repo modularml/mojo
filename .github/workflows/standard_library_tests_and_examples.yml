@@ -24,7 +24,12 @@ permissions:
 
 jobs:
   test-examples:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-14"]
+
+    runs-on: ${{ matrix.os }}
+
     defaults:
       run:
         shell: bash
@@ -47,7 +52,13 @@ jobs:
           modular auth examples
           modular install nightly/mojo
 
-      - name: Install build tools
+          # Put Mojo on the PATH
+          echo "MODULAR_HOME=$HOME/.modular" >> $GITHUB_ENV
+
+          echo "$HOME/.modular/pkg/packages.modular.com_nightly_mojo/bin" >> $GITHUB_PATH
+
+      - name: Install build tools (Linux)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
@@ -108,9 +119,16 @@ jobs:
             exit 1
           fi
 
+      - name: Install build tools (macOS)
+        if: ${{ matrix.os == 'macos-14' }}
+        run: |
+          # Install `lit` for use in the tests
+          brew install lit
+
+          # Ensure `FileCheck` from the pre-installed LLVM 15 package is visible
+          echo $(brew --prefix llvm@15)/bin/ >> $GITHUB_PATH
+
       - name: Run standard library tests and examples
         run: |
-          export MODULAR_HOME="/home/runner/.modular"
-          export PATH="/home/runner/.modular/pkg/packages.modular.com_nightly_mojo/bin:$PATH"
           ./stdlib/scripts/run-tests.sh
           ./examples/run-examples.sh
