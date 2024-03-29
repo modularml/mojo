@@ -32,3 +32,7 @@ and tools. Please add any significant user-visible changes here.
 ### ❌ Removed
 
 ### 🛠️ Fixed
+
+- [#1987](https://github.com/modularml/mojo/issues/1987) Defining `main`
+  in a Mojo package is an error, for now. This is not intended to work yet,
+  erroring for now will help to prevent accidental undefined behavior.
