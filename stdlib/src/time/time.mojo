@@ -83,7 +83,7 @@ struct _FILETIME:
 
     fn as_nanoseconds(self) -> Int:
         # AFTER subtracting windows offset the return value fits in a signed int64
-        # BEFORE subtracting windows offset the return value  does not fit in a signed int64
+        # BEFORE subtracting windows offset the return value does not fit in a signed int64
         # Taken from https://github.com/microsoft/STL/blob/c8d1efb6d504f6392acf8f6d01fd703f7c8826c0/stl/src/xtime.cpp#L50
         alias windowsToUnixEpochOffsetNs: Int = 0x19DB1DED53E8000
         var interval_count: UInt64 = (
