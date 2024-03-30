@@ -1750,29 +1750,23 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             func: The reduce function to apply to elements in this SIMD.
             size_out: The width of the reduction.
 
+        Constraints:
+            `size_out` must not exceed width of the vector.
+
         Returns:
             A new scalar which is the reduction of all vector elements.
         """
-        constrained[
-            size_out <= Self.size, "simd reduction cannot increase simd width"
-        ]()
+        constrained[0 < size_out <= size, "reduction cannot increase simd width"]()
+        constrained[size_out & (size_out - 1) == 0, "simd width must be power of 2"]()
 
         @parameter
-        if size == 1:
-            return self[0]
-        elif size == 2:
-            return func[type, 1](self[0], self[1])
-        elif size == size_out:
-            return rebind[SIMD[Self.type, size_out]](self)
+        if size == size_out:
+            return rebind[SIMD[type, size_out]](self)
         else:
-            alias half_size: Int = size // 2
+            alias half_size = size // 2
             var lhs = self.slice[half_size, offset=0]()
             var rhs = self.slice[half_size, offset=half_size]()
-
-            @parameter
-            if half_size != size_out:
-                return func[type, half_size](lhs, rhs).reduce[func, size_out]()
-            return rebind[SIMD[type, size_out]](func[type, half_size](lhs, rhs))
+            return func[type, half_size](lhs, rhs).reduce[func, size_out]()
 
     @always_inline("nodebug")
     fn reduce_max[size_out: Int = 1](self) -> SIMD[type, size_out]:
