@@ -42,15 +42,11 @@ struct AnyPointer[T: Movable](
     """The underlying pointer."""
 
     @always_inline
-    fn __init__() -> Self:
-        """Create a null pointer.
-
-        Returns:
-            A null pointer.
-        """
-        return Self {
-            value: __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
-        }
+    fn __init__(inout self):
+        """Create a null pointer."""
+        self.value = __mlir_attr[
+            `#interp.pointer<0> : `, self.pointer_type
+        ]
 
     @always_inline
     fn __init__(value: Self.pointer_type) -> Self:
