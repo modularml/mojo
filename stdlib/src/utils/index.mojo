@@ -191,13 +191,13 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
     """The underlying storage of the tuple value."""
 
     @always_inline
-    fn __init__() -> Self:
+    fn __init__(inout self):
         """Constructs a static int tuple of the given size.
 
         Returns:
             The constructed tuple.
         """
-        return 0
+        self = 0
 
     @always_inline
     fn __init__(value: __mlir_type.index) -> Self:

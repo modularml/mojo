@@ -126,14 +126,10 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
     """The underlying storage for the static tuple."""
 
     @always_inline
-    fn __init__() -> Self:
-        """Constructs an empty (undefined) tuple.
-
-        Returns:
-            The tuple.
-        """
+    fn __init__(inout self):
+        """Constructs an empty (undefined) tuple."""
         _static_tuple_construction_checks[size]()
-        return Self {array: __mlir_op.`kgen.undef`[_type = Self.type]()}
+        self.array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
     fn __init__(*elems: Self.element_type) -> Self:
