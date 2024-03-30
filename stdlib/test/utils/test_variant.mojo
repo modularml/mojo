@@ -15,7 +15,7 @@
 from sys.ffi import _get_global
 
 from memory.unsafe import Pointer
-from testing import *
+from testing import assert_equal, assert_false, assert_true
 
 from utils.variant import Variant
 
@@ -38,9 +38,7 @@ struct TestCounter(CollectionElement):
 
 
 fn _poison_ptr() -> Pointer[Bool]:
-    var ptr = _get_global[
-        "TEST_VARIANT_POISON", _initialize_poison, _destroy_poison
-    ]()
+    var ptr = _get_global["TEST_VARIANT_POISON", _initialize_poison, _destroy_poison]()
     return ptr.bitcast[Bool]()
 
 

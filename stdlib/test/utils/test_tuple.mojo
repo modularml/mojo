@@ -54,19 +54,13 @@ def test_static_int_tuple():
         "(-3, -3, -3, -3)",
     )
 
-    assert_equal(
-        str(StaticIntTuple[2](10, 11) // StaticIntTuple[2](3, 4)), "(3, 2)"
-    )
+    assert_equal(str(StaticIntTuple[2](10, 11) // StaticIntTuple[2](3, 4)), "(3, 2)")
 
     # Note: index comparison is intended for access bound checking, which is
     #  usually all-element semantic, i.e. true if true for all positions.
-    assert_true(
-        StaticIntTuple[5](1, 2, 3, 4, 5) < StaticIntTuple[5](4, 5, 6, 7, 8)
-    )
+    assert_true(StaticIntTuple[5](1, 2, 3, 4, 5) < StaticIntTuple[5](4, 5, 6, 7, 8))
 
-    assert_false(
-        StaticIntTuple[4](3, 5, -1, -2) > StaticIntTuple[4](0, 0, 0, 0)
-    )
+    assert_false(StaticIntTuple[4](3, 5, -1, -2) > StaticIntTuple[4](0, 0, 0, 0))
 
     assert_equal(len(StaticIntTuple[4](3, 5, -1, -2)), 4)
 
