@@ -69,22 +69,22 @@ struct _c_stat(Stringable):
         }
 
     fn __str__(self) -> String:
-        var res = String("{\n")
-        res += "st_dev: " + str(self.st_dev) + ",\n"
-        res += "st_mode: " + str(self.st_mode) + ",\n"
-        res += "st_nlink: " + str(self.st_nlink) + ",\n"
-        res += "st_ino: " + str(self.st_ino) + ",\n"
-        res += "st_uid: " + str(self.st_uid) + ",\n"
-        res += "st_gid: " + str(self.st_gid) + ",\n"
-        res += "st_rdev: " + str(self.st_rdev) + ",\n"
-        res += "st_size: " + str(self.st_size) + ",\n"
-        res += "st_blksize: " + str(self.st_blksize) + ",\n"
-        res += "st_blocks: " + str(self.st_blocks) + ",\n"
-        res += "st_atimespec: " + str(self.st_atimespec) + ",\n"
-        res += "st_mtimespec: " + str(self.st_mtimespec) + ",\n"
-        res += "st_ctimespec: " + str(self.st_ctimespec) + ",\n"
-        res += "st_birthtimespec: " + str(self.st_birthtimespec) + "\n"
-        return res + "}"
+        return "{\n" +
+            "st_dev: {self.st_dev},\n" +
+            "st_mode: {self.st_mode},\n" +
+            "st_nlink: {self.st_nlink},\n" +
+            "st_ino: {self.st_ino},\n" +
+            "st_uid: {self.st_uid},\n" +
+            "st_gid: {self.st_gid},\n" +
+            "st_rdev: {self.st_rdev},\n" +
+            "st_size: {self.st_size},\n" +
+            "st_blksize: {self.st_blksize},\n" +
+            "st_blocks: {self.st_blocks},\n" +
+            "st_atimespec: {self.st_atimespec},\n" +
+            "st_mtimespec: {self.st_mtimespec},\n" +
+            "st_ctimespec: {self.st_ctimespec},\n" +
+            "st_birthtimespec: {self.st_birthtimespec}\n" +
+            "}"
 
     fn _to_stat_result(self) -> stat_result:
         return stat_result(
