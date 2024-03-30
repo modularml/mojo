@@ -16,7 +16,7 @@
 
 from random import random_ui64
 
-from testing import *
+from testing import assert_equal
 
 
 fn gen_perm() -> StaticIntTuple[64]:

@@ -13,7 +13,7 @@
 # RUN: mojo --debug-level full %s
 
 from builtin._location import _SourceLocation
-from testing import *
+from testing import assert_equal
 
 
 def main():

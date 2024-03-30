@@ -12,7 +12,13 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from testing import *
+from testing import (
+    assert_equal,
+    assert_not_equal,
+    assert_true,
+    assert_false,
+    assert_raises,
+)
 
 
 def test_basics():

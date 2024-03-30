@@ -14,7 +14,7 @@
 
 from sys.info import has_neon, simdwidthof
 
-from testing import *
+from testing import assert_equal, assert_not_equal, assert_true
 
 
 # CHECK-LABEL: test_cast
@@ -250,11 +250,7 @@ fn test_shift():
     print(SIMD[DType.uint32, 8](11, 0, 13, 12, 0, 100, 0, 0).shift_right[5]())
 
     # CHECK: [0.0, 0.0, 0.0, 0.0, 0.0, 11.1, 0.0, 13.1]
-    print(
-        SIMD[DType.float64, 8](11.1, 0, 13.1, 12.2, 0, 100.4, 0, 0).shift_right[
-            5
-        ]()
-    )
+    print(SIMD[DType.float64, 8](11.1, 0, 13.1, 12.2, 0, 100.4, 0, 0).shift_right[5]())
 
     # CHECK: [1, 0, 1, 1]
     print(SIMD[type, simd_width](1, 0, 1, 1).shift_left[0]())
@@ -290,11 +286,7 @@ fn test_insert():
     print(SIMD[DType.index, 4](0, 1, 2, 3).insert(SIMD[DType.index, 2](9, 6)))
 
     # CHECK: [0, 9, 6, 3]
-    print(
-        SIMD[DType.index, 4](0, 1, 2, 3).insert[offset=1](
-            SIMD[DType.index, 2](9, 6)
-        )
-    )
+    print(SIMD[DType.index, 4](0, 1, 2, 3).insert[offset=1](SIMD[DType.index, 2](9, 6)))
 
     # CHECK: [0, 1, 2, 3, 9, 6, 3, 7]
     print(
