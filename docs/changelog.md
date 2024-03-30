@@ -37,6 +37,12 @@ and tools. Please add any significant user-visible changes here.
   changed slightly: `mojo build ./test-dir/program.mojo` now outputs an
   executable to the path `./program`, whereas before it would output to the path
   `./test-dir/program`.
+- The REPL no longer allows type level variable declarations to be
+  uninitialized, e.g. it will reject `var s: String`.  This is because it does
+  not do proper lifetime tracking (yet!) across cells, and so such code would
+  lead to a crash.  You can work around this by initializing to a dummy value
+  and overwriting later.  This limitation only applies to top level variables,
+  variables in functions work as they always have.
 
 ### ❌ Removed
 
