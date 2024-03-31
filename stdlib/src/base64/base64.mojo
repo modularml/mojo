@@ -47,7 +47,7 @@ fn b64encode(str: String) -> String:
     @parameter
     @always_inline
     fn s(idx: Int) -> Int:
-        return int(str._buffer[idx])
+        return int(str._as_ptr().bitcast[DType.uint8]()[idx])
 
     # This algorithm is based on https://arxiv.org/abs/1704.00605
     var end = length - (length % 3)
