@@ -504,13 +504,7 @@ struct VariadicPack[
     fn get_element[
         index: Int
     ](self) -> Reference[
-        # FIXME: Shouldn't need a rebind here.
-        __mlir_attr[
-            `#kgen.param.expr<rebind, `,
-            element_types[index.value],
-            `>: `,
-            AnyType,
-        ],
+        element_types[index.value],
         Self.elt_is_mutable,
         Self.lifetime,
     ]:
@@ -523,20 +517,19 @@ struct VariadicPack[
             A reference to the element.  The Reference's mutability follows the
             mutability of the pack argument convention.
         """
+        var ref_elt = __mlir_op.`lit.ref.pack.get`[index = index.value](
+            self._value
+        )
 
-        return rebind[
-            Reference[
-                # FIXME: Shouldn't need a rebind here.
-                __mlir_attr[
-                    `#kgen.param.expr<rebind, `,
-                    element_types[index.value],
-                    `>: `,
-                    AnyType,
-                ],
-                Self.elt_is_mutable,
-                Self.lifetime,
-            ]
-        ](__mlir_op.`lit.ref.pack.get`[index = index.value](self._value))
+        # Rebind the !lit.ref to agree on the element type.  This is needed
+        # because we're getting a low level rebind to AnyType when the
+        # element_types[index] expression is erased to AnyType for Reference.
+        alias result_ref = Reference[
+            element_types[index.value],
+            Self.elt_is_mutable,
+            Self.lifetime,
+        ]
+        return rebind[result_ref.mlir_ref_type](ref_elt)
 
     # FIXME!: the T in the function should be element_trait bound not AnyType
     # bound.
