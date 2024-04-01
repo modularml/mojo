@@ -87,12 +87,12 @@ def test_list():
     # Test pop with index
     for i in range(6):
         list.append(i)
-    
+
     # try poping from index 3 for 3 times
     for i in range(3, 6):
         assert_equal(i, list.pop(3))
 
-    # list should have 3 elements now 
+    # list should have 3 elements now
     assert_equal(3, len(list))
     assert_equal(0, list[0])
     assert_equal(1, list[1])
