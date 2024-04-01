@@ -130,10 +130,7 @@ def test_list_reverse():
     # Test reversing the list ["one", "two", "three"]
     #
 
-    vec2 = List[String]()
-    vec2.append("one")
-    vec2.append("two")
-    vec2.append("three")
+    vec2 = List[String]("one", "two", "three")
 
     assert_equal(len(vec2), 3)
     assert_equal(vec2[0], "one")
