@@ -545,6 +545,20 @@ fn test_endswith() raises:
     assert_false(str.endswith("llo", 2, 3))
 
 
+def test_removeprefix():
+    assert_equal(String("hello world").removeprefix("hello"), " world")
+    assert_equal(String("hello world").removeprefix("world"), "hello world")
+    assert_equal(String("hello world").removeprefix("hello world"), "")
+    assert_equal(String("hello world").removeprefix("llo wor"), "hello world")
+
+
+def test_removesuffix():
+    assert_equal(String("hello world").removesuffix("world"), "hello ")
+    assert_equal(String("hello world").removesuffix("hello"), "hello world")
+    assert_equal(String("hello world").removesuffix("hello world"), "")
+    assert_equal(String("hello world").removesuffix("llo wor"), "hello world")
+
+
 def test_intable():
     assert_equal(int(String("123")), 123)
 
@@ -590,5 +604,7 @@ def main():
     test_hash()
     test_startswith()
     test_endswith()
+    test_removeprefix()
+    test_removesuffix()
     test_intable()
     test_string_mul()
