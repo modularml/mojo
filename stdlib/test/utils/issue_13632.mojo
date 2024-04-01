@@ -23,12 +23,7 @@ fn sum_items(data: List[Int8]) -> Int:
 
 
 fn make_abcd_vector() -> List[Int8]:
-    var v = List[Int8]()
-    v.append(97)
-    v.append(98)
-    v.append(99)
-    v.append(100)
-    return v
+    return List[Int8](97, 98, 99, 100)
 
 
 fn main():
