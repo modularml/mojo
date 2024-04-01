@@ -487,9 +487,15 @@ struct VariadicPack[
         Returns:
             The number of elements in the variadic pack.
         """
-        return __mlir_attr[
-            `#kgen.param.expr<variadic_size,`, element_types, `> : index`
-        ]
+
+        @parameter
+        fn variadic_size(
+            x: __mlir_type[`!kgen.variadic<`, AnyType, `>`]
+        ) -> Int:
+            return __mlir_op.`pop.variadic.size`(x)
+
+        alias result = variadic_size(element_types)
+        return result
 
     @always_inline
     fn __len__(self) -> Int:
