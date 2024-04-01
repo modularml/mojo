@@ -52,7 +52,7 @@ fn test_atomic():
 
 
 # CHECK-LABEL: test_atomic_floating_point
-fn test_atomic_floating_poInt__():
+fn test_atomic_floating_point__():
     print("== test_atomic_floating_point")
 
     var atom: Atomic[DType.float32] = Float32(3.0)
@@ -87,6 +87,44 @@ fn test_atomic_floating_poInt__():
     print(atom.value)
 
 
+# CHECK-LABEL: test_atomic_move_constructor
+fn test_atomic_move_constructor():
+    print("== test_atomic_move_constructor")
+
+    var atom: Atomic[DType.index] = 3
+    var atom2 = atom^
+
+    # CHECK: 3
+    print(atom2.value)
+
+    atom2 += 4
+
+    # CHECK: 7
+    print(atom2.value)
+
+    atom2 -= 4
+
+    # CHECK: 3
+    print(atom2.value)
+
+    # CHECK: 3
+    atom2.max(0)
+    print(atom2.value)
+
+    # CHECK: 42
+    atom2.max(42)
+    print(atom2.value)
+
+    # CHECK: 3
+    atom2.min(3)
+    print(atom2.value)
+
+    # CHECK: 0
+    atom2.min(0)
+    print(atom2.value)
+
+
 fn main():
     test_atomic()
-    test_atomic_floating_poInt__()
+    test_atomic_floating_point__()
+    test_atomic_move_constructor()
