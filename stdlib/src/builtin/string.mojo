@@ -1054,6 +1054,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         print(String('BaseTestCase').removeprefix('Test'))
         # 'BaseTestCase'
         ```
+
         Args:
           prefix: The prefix to remove from the string.
 
