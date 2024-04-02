@@ -21,6 +21,7 @@ from sys.intrinsics import _mlirtype_is_eq
 
 from memory import memcmp, memcpy
 from memory.unsafe import DTypePointer, Pointer
+from memory._arc import Arc
 
 from utils import StringRef
 from utils.loop import unroll
@@ -92,6 +93,26 @@ struct _RefCountedList:
     var impl: List[_ObjectImpl]
     """The list value."""
 
+struct _List(Movable):
+    var impl: List[_ObjectImpl]
+    """The list value."""
+
+    fn __init__(inout self):
+        self.impl = List[_ObjectImpl]()
+
+    fn __moveinit__(inout self, owned existing: Self):
+        self.impl = existing.impl
+        existing.impl = List[_ObjectImpl]()
+
+    fn __del__(owned self):
+        for i in range(len(self.impl)):
+            self.impl[i].destroy()
+
+struct _RCList:
+    var impl: Arc[_List]
+
+    fn __init__(inout self):
+        self.impl = Arc[_List](_List())
 
 @register_passable("trivial")
 struct _RefCountedListRef:
@@ -101,26 +122,17 @@ struct _RefCountedListRef:
 
     @always_inline
     fn __init__() -> Self:
-        var ptr = Pointer[_RefCountedList].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
+        var ptr = Pointer[_RCList].alloc(1)
+        __get_address_as_uninit_lvalue(ptr.address) = _RCList()
         return Self {lst: ptr.bitcast[NoneType]()}
 
     @always_inline
     fn copy(self) -> Self:
-        _ = self.lst.bitcast[_RefCountedList]()[].refcount.fetch_add(1)
+        _ = self.lst.bitcast[_RCList]()[].impl
         return Self {lst: self.lst}
 
     fn release(self):
-        var ptr = self.lst.bitcast[_RefCountedList]()
-        var prev = ptr[].refcount.fetch_sub(1)
-        if prev != 1:
-            return
-
-        # Run the destructor on the list elements and then destroy the list.
-        var list = __get_address_as_owned_value(ptr.address).impl
-        for i in range(len(list)):
-            list[i].destroy()
-        ptr.free()
+        var ptr = self.lst.bitcast[_RCList]()[].impl
 
 
 struct _RefCountedAttrsDict:
@@ -646,9 +658,10 @@ struct _ObjectImpl(CollectionElement, Stringable):
     # List Functions
     # ===------------------------------------------------------------------=== #
 
+    # Get inner _List
     @always_inline
-    fn get_list_ptr(self) -> Pointer[_RefCountedList]:
-        return self.get_as_list().lst.bitcast[_RefCountedList]()
+    fn get_list_ptr(self) -> Arc[_List]:
+        return self.get_as_list().lst.bitcast[_RCList]()[].impl
 
     @always_inline
     fn list_append(self, value: Self):
