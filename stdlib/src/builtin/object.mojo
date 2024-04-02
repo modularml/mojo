@@ -232,7 +232,7 @@ struct _Function:
     fn __init__[FnT: AnyRegType](inout self, value: FnT):
         # FIXME: No "pointer bitcast" for signature function pointers.
         var f = Pointer[Int16]()
-        Pointer(__get_lvalue_as_address(f)).bitcast[FnT]().store(value)
+        Reference(f).get_unsafe_pointer().bitcast[FnT]().store(value)
         self.value = f
 
     alias fn0 = fn () raises -> object
