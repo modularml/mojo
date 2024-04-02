@@ -490,7 +490,7 @@ struct VariadicPack[
 
         @parameter
         fn variadic_size(
-            x: __mlir_type[`!kgen.variadic<`, AnyType, `>`]
+            x: __mlir_type[`!kgen.variadic<`, element_trait, `>`]
         ) -> Int:
             return __mlir_op.`pop.variadic.size`(x)
 
