@@ -650,7 +650,6 @@ struct _ObjectImpl(CollectionElement, Stringable):
     # List Functions
     # ===------------------------------------------------------------------=== #
 
-    # Get inner _List
     @always_inline
     fn get_list_ptr(self) -> Arc[_List]:
         return self.get_as_list().lst.bitcast[_RefCountedList]()[].impl
