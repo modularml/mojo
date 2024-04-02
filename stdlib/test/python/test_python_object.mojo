@@ -453,13 +453,28 @@ fn test_iter() raises:
             assert_false(True)
 
 
+fn test_setitem() raises:
+    var ll = PythonObject([1, 2, 3, "food"])
+    # CHECK: [1, 2, 3, 'food']
+    print(ll)
+    ll[1] = "nomnomnom"
+    # CHECK: [1, 'nomnomnom', 3, 'food']
+    print(ll)
+
+
 fn test_dict() raises:
     var d = Dict[PythonObject, PythonObject]()
-    d["food"] = 123
+    d["food"] = "remove this"
     d["fries"] = "yes"
+    d["food"] = 123  # intentionally replace to ensure keys stay in order
 
     var dd = PythonObject(d)
     # CHECK: {'food': 123, 'fries': 'yes'}
+    print(dd)
+
+    dd["food"] = "salad"
+    dd[42] = Python.evaluate("[4, 2]")
+    # CHECK: {'food': 'salad', 'fries': 'yes', 42: [4, 2]}
     print(dd)
 
 
@@ -473,4 +488,5 @@ def main():
     test_len()
     test_is()
     test_iter()
+    test_setitem()
     test_dict()
