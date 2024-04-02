@@ -63,7 +63,7 @@ struct _ImmutableString:
     """The length of the string."""
 
     @always_inline
-    fn __init__(data: Pointer[Int8], length: Int):
+    fn __init__(inout self, data: Pointer[Int8], length: Int):
         self.data = data
         self.length = length
 
@@ -289,7 +289,8 @@ struct _ObjectImpl(CollectionElement, Stringable):
     It is a variant of primitive types and pointers to implementations of more
     complex types.
 
-    We choose Int64 and Float64 to store all integer and float values respectively.
+    We choose Int64 and Float64 to store all integer and float values 
+    respectively.
     TODO: These should be BigInt and BigFloat one day.
     """
 
@@ -722,8 +723,8 @@ struct object(IntableRaising, Boolable, Stringable):
 
     @always_inline
     fn __init__(inout self, impl: _ObjectImpl):
-        """Initializes the object with an implementation value. This is meant for
-        internal use only.
+        """Initializes the object with an implementation value. This is meant 
+        for internal use only.
 
         Args:
             impl: The object implementation.
