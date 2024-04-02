@@ -288,8 +288,8 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         debug_assert(
             new_size <= self.size,
             (
-                "New size must be smaller than or equal to current size when no new"
-                " value is provided."
+                "New size must be smaller than or equal to current size when no"
+                " new value is provided."
             ),
         )
         for i in range(new_size, self.size):
