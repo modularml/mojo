@@ -24,7 +24,7 @@ jobs:
           on-failed-regex-create-review: true
           on-failed-regex-request-changes: true
           on-failed-regex-comment:
-            "PR title does not conform to '[\\<Project\\>] Title'.
+            "The PR title does not conform to the '[\\<Project\\>] Title' format.
             Please update the PR title.
             \n\n
             Typical [\\<Project\\>] values include:
@@ -34,12 +34,16 @@ jobs:
             \n\n
             It is uncommon but permitted to include multiple labels on a PR that
             affect multiple areas of work.
-
             \n\n
+            Thank you for contributing to Mojo🔥
+            \n\n
+            <small>
             You can also use a tool like www.regex101.com to see why your PR
             title fails to conform. Use
             ```
             %regex%
             ```
             as the regex to test and ```${{ github.event.pull_request.title }}```
-            as the test string."
+            as the test string.</small>"
+          on-succeeded-regex-dismiss-review-comment:
+            "All good now, thanks!🫸🫷"
