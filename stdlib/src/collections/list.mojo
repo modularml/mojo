@@ -61,7 +61,9 @@ struct _ListIter[
         inout self,
     ) -> Reference[T, list_mutability, list_lifetime]:
         self.index += 1
-        return self.src[].__get_ref[list_mutability, list_lifetime](self.index - 1)
+        return self.src[].__get_ref[list_mutability, list_lifetime](
+            self.index - 1
+        )
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index
@@ -436,9 +438,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
     ](
         self: Reference[Self, mutability, self_life].mlir_ref_type,
         i: Int,
-    ) -> Reference[
-        T, mutability, self_life
-    ]:
+    ) -> Reference[T, mutability, self_life]:
         """Gets a reference to the list element at the given index.
 
         Args:

@@ -84,6 +84,9 @@ def test_list():
     assert_equal(0, len(list))
     assert_equal(2, list.capacity)
 
+
+def test_list_pop():
+    var list = List[Int]()
     # Test pop with index
     for i in range(6):
         list.append(i)
@@ -481,6 +484,7 @@ def test_list_span():
 def main():
     test_mojo_issue_698()
     test_list()
+    test_list_pop()
     test_list_variadic_constructor()
     test_list_reverse()
     test_list_reverse_move_count()
