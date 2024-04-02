@@ -453,6 +453,11 @@ struct CPython:
             )
         )
 
+    fn PyObject_Hash(inout self, obj: PyObjectPtr) -> Int:
+        return int(
+            self.lib.get_function[fn (PyObjectPtr) -> Int]("PyObject_Hash")(obj)
+        )
+
     fn PyTuple_New(inout self, count: Int) -> PyObjectPtr:
         var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             StringRef("PyTuple_New")
