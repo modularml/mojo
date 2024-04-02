@@ -1,0 +1,20 @@
+n$ame: Check PR target branch
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-pr:
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Fail if not targeting nightly branch
+      if: ${{ github.base_ref != 'refs/heads/nightly' }}
+      run: echo "PRs must be targeted to merge to the nightly branch!" && exit 1

@@ -1,0 +1,41 @@
+name: Check PR title
+
+on:
+  pull_request:
+    # By default, a workflow only runs when a pull_request's activity type is opened, synchronize, or reopened. We
+    # explicitly override here so that PR titles are re-linted when the PR text content is edited.
+    #
+    # Possible values: https://help.github.com/en/actions/reference/events-that-trigger-workflows#pull-request-event-pull_request
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+jobs:
+  pr-lint:
+    permissions: read-all
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: morrisoncole/pr-lint-action@51f3cfabaf5d46f94e54524214e45685f0401b2a
+        if: github.actor != 'dependabot[bot]'
+        with:
+          title-regex: "^(Revert \")?(\\[\\S.*\\]\\s?)+\\s+[a-zA-Z`].*"
+          on-failed-regex-fail-action: true
+          on-failed-regex-comment:
+            "PR title does not conform to '[<Project>] Title'.
+            Please update the PR title.
+
+            Typical [<Project>] values include:
+
+            * [stdlib] — indicates a change to the Mojo standard library code
+            * [docs] — indicates a change to the documentation
+
+            It is uncommon but permitted to include multiple labels on a PR that
+            affect multiple areas of work.
+
+            \n\n
+            You can also use a tool like www.regex101.com to see why your PR
+            title fails to conform. Use
+            ```
+            %regex%
+            ```
+            as the regex to test and ```${{ github.event.pull_request.title }}```
+            as the test string."
