@@ -76,24 +76,9 @@ struct _ImmutableString:
             return 0
         return -1 if self.length < rhs.length else 1
 
-
-struct _RefCountedList:
-    """Python objects have the behaviour that bool, int, float, and str are
-    passed by value but lists and dictionaries are passed by reference. In order
-    to model this behaviour, lists and dictionaries are implemented as
-    ref-counted data types.
-    """
-
-    fn __init__(inout self):
-        self.refcount = 1
-        self.impl = List[_ObjectImpl]()
-
-    var refcount: Atomic[DType.index]
-    """The number of live references to the list."""
-    var impl: List[_ObjectImpl]
-    """The list value."""
-
 struct _List(Movable):
+    """Arc accepts only movable types. This is a list of `_ObjectImpl` values"""
+
     var impl: List[_ObjectImpl]
     """The list value."""
 
@@ -108,8 +93,15 @@ struct _List(Movable):
         for i in range(len(self.impl)):
             self.impl[i].destroy()
 
-struct _RCList:
+struct _RefCountedList:
+    """Python objects have the behaviour that bool, int, float, and str are
+    passed by value but lists and dictionaries are passed by reference. In order
+    to model this behaviour, lists and dictionaries are implemented as
+    ref-counted data types.
+    """
+
     var impl: Arc[_List]
+    """The list value."""
 
     fn __init__(inout self):
         self.impl = Arc[_List](_List())
@@ -122,17 +114,17 @@ struct _RefCountedListRef:
 
     @always_inline
     fn __init__() -> Self:
-        var ptr = Pointer[_RCList].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RCList()
+        var ptr = Pointer[_RefCountedList].alloc(1)
+        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         return Self {lst: ptr.bitcast[NoneType]()}
 
     @always_inline
     fn copy(self) -> Self:
-        _ = self.lst.bitcast[_RCList]()[].impl
+        _ = self.lst.bitcast[_RefCountedList]()[].impl
         return Self {lst: self.lst}
 
     fn release(self):
-        var ptr = self.lst.bitcast[_RCList]()[].impl
+        var ptr = self.lst.bitcast[_RefCountedList]()[].impl
 
 
 struct _RefCountedAttrsDict:
@@ -661,7 +653,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
     # Get inner _List
     @always_inline
     fn get_list_ptr(self) -> Arc[_List]:
-        return self.get_as_list().lst.bitcast[_RCList]()[].impl
+        return self.get_as_list().lst.bitcast[_RefCountedList]()[].impl
 
     @always_inline
     fn list_append(self, value: Self):
