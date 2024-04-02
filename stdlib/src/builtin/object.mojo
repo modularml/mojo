@@ -76,6 +76,7 @@ struct _ImmutableString:
             return 0
         return -1 if self.length < rhs.length else 1
 
+
 struct _List(Movable):
     """Arc accepts only movable types. This is a list of `_ObjectImpl` values"""
 
@@ -93,6 +94,7 @@ struct _List(Movable):
         for i in range(len(self.impl)):
             self.impl[i].destroy()
 
+
 struct _RefCountedList:
     """Python objects have the behaviour that bool, int, float, and str are
     passed by value but lists and dictionaries are passed by reference. In order
@@ -105,6 +107,7 @@ struct _RefCountedList:
 
     fn __init__(inout self):
         self.impl = Arc[_List](_List())
+
 
 @register_passable("trivial")
 struct _RefCountedListRef:
@@ -151,9 +154,7 @@ struct _RefCountedAttrsDict:
             self.impl[key] = value
             return
         raise Error(
-            "AttributeError: Object does not have an attribute of name '"
-            + key
-            + "'"
+            "AttributeError: Object does not have an attribute of name '" + key + "'"
         )
 
     @always_inline
@@ -162,9 +163,7 @@ struct _RefCountedAttrsDict:
         if iter:
             return iter.value()
         raise Error(
-            "AttributeError: Object does not have an attribute of name '"
-            + key
-            + "'"
+            "AttributeError: Object does not have an attribute of name '" + key + "'"
         )
 
 
@@ -249,20 +248,12 @@ struct _Function:
 
     @always_inline
     fn invoke(owned self) raises -> object:
-        return (
-            Reference(self.value)
-            .get_unsafe_pointer()
-            .bitcast[Self.fn0]()
-            .load()()
-        )
+        return Reference(self.value).get_unsafe_pointer().bitcast[Self.fn0]().load()()
 
     @always_inline
     fn invoke(owned self, arg0: object) raises -> object:
         return (
-            Reference(self.value)
-            .get_unsafe_pointer()
-            .bitcast[Self.fn1]()
-            .load()(arg0)
+            Reference(self.value).get_unsafe_pointer().bitcast[Self.fn1]().load()(arg0)
         )
 
     @always_inline
@@ -275,9 +266,7 @@ struct _Function:
         )
 
     @always_inline
-    fn invoke(
-        owned self, arg0: object, arg1: object, arg2: object
-    ) raises -> object:
+    fn invoke(owned self, arg0: object, arg1: object, arg2: object) raises -> object:
         return (
             Reference(self.value)
             .get_unsafe_pointer()
@@ -403,9 +392,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
     fn copy(self) -> Self:
         if self.is_str():
             var str = self.get_as_string()
-            var impl = _ImmutableString(
-                Pointer[Int8].alloc(str.length), str.length
-            )
+            var impl = _ImmutableString(Pointer[Int8].alloc(str.length), str.length)
             memcpy(impl.data, DTypePointer[DType.int8](str.data), str.length)
             return impl
         if self.is_list():
@@ -457,9 +444,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
 
     @always_inline
     fn is_func(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Self.function.value](
-            self.value
-        )
+        return __mlir_op.`kgen.variant.is`[index = Self.function.value](self.value)
 
     @always_inline
     fn is_obj(self) -> Bool:
@@ -467,9 +452,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
 
     @always_inline
     fn get_as_bool(self) -> Bool:
-        return __mlir_op.`kgen.variant.take`[index = Self.bool.value](
-            self.value
-        )
+        return __mlir_op.`kgen.variant.take`[index = Self.bool.value](self.value)
 
     @always_inline
     fn get_as_int(self) -> Int64:
@@ -477,9 +460,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
 
     @always_inline
     fn get_as_float(self) -> Float64:
-        return __mlir_op.`kgen.variant.take`[index = Self.float.value](
-            self.value
-        )
+        return __mlir_op.`kgen.variant.take`[index = Self.float.value](self.value)
 
     @always_inline
     fn get_as_string(self) -> _ImmutableString:
@@ -487,15 +468,11 @@ struct _ObjectImpl(CollectionElement, Stringable):
 
     @always_inline
     fn get_as_list(self) -> _RefCountedListRef:
-        return __mlir_op.`kgen.variant.take`[index = Self.list.value](
-            self.value
-        )
+        return __mlir_op.`kgen.variant.take`[index = Self.list.value](self.value)
 
     @always_inline
     fn get_as_func(self) -> _Function:
-        return __mlir_op.`kgen.variant.take`[index = Self.function.value](
-            self.value
-        )
+        return __mlir_op.`kgen.variant.take`[index = Self.function.value](self.value)
 
     @always_inline
     fn get_obj_attrs(self) -> _RefCountedAttrsDictRef:
@@ -612,11 +589,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
         if self.is_str():
             return (
                 "'"
-                + str(
-                    StringRef(
-                        self.get_as_string().data, self.get_as_string().length
-                    )
-                )
+                + str(StringRef(self.get_as_string().data, self.get_as_string().length))
                 + "'"
             )
         if self.is_func():
@@ -636,12 +609,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
         for entry in ptr[].impl.items():
             if print_sep:
                 res += ", "
-            res += (
-                "'"
-                + str(entry[].key)
-                + "' = "
-                + str(object(entry[].value.copy()))
-            )
+            res += "'" + str(entry[].key) + "' = " + str(object(entry[].value.copy()))
             print_sep = True
         res += "}"
         return res
@@ -804,9 +772,7 @@ struct object(IntableRaising, Boolable, Stringable):
         Args:
             value: The string value.
         """
-        var impl = _ImmutableString(
-            Pointer[Int8].alloc(value.length), value.length
-        )
+        var impl = _ImmutableString(Pointer[Int8].alloc(value.length), value.length)
         memcpy(impl.data, value.data, value.length)
         self._value = impl
 
@@ -842,9 +808,7 @@ struct object(IntableRaising, Boolable, Stringable):
             elif _mlirtype_is_eq[T, StringLiteral]():
                 self._append(value.get[i, StringLiteral]())
             else:
-                constrained[
-                    False, "cannot convert nested list element to object"
-                ]()
+                constrained[False, "cannot convert nested list element to object"]()
 
         unroll[append, len(types)]()
 
@@ -979,9 +943,7 @@ struct object(IntableRaising, Boolable, Stringable):
     fn _comparison_type_check(self) raises:
         """Throws an error if the object cannot be arithmetically compared."""
         if not (
-            self._value.is_bool()
-            or self._value.is_int()
-            or self._value.is_float()
+            self._value.is_bool() or self._value.is_int() or self._value.is_float()
         ):
             raise Error("TypeError: not a valid comparison type")
 
@@ -1020,9 +982,7 @@ struct object(IntableRaising, Boolable, Stringable):
 
     @always_inline
     fn _string_compare(self, rhs: object) -> Int:
-        return self._value.get_as_string().string_compare(
-            rhs._value.get_as_string()
-        )
+        return self._value.get_as_string().string_compare(rhs._value.get_as_string())
 
     @always_inline
     fn _list_compare(self, rhs: object) raises -> Int:
@@ -1061,9 +1021,7 @@ struct object(IntableRaising, Boolable, Stringable):
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return not lhs and rhs
 
-        return Self._comparison_op[Float64.__lt__, Int64.__lt__, bool_fn](
-            self, rhs
-        )
+        return Self._comparison_op[Float64.__lt__, Int64.__lt__, bool_fn](self, rhs)
 
     fn __le__(self, rhs: object) raises -> object:
         """Less-than-or-equal to comparator. This lexicographically
@@ -1084,9 +1042,7 @@ struct object(IntableRaising, Boolable, Stringable):
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs == rhs or not lhs
 
-        return Self._comparison_op[Float64.__le__, Int64.__le__, bool_fn](
-            self, rhs
-        )
+        return Self._comparison_op[Float64.__le__, Int64.__le__, bool_fn](self, rhs)
 
     fn __eq__(self, rhs: object) raises -> object:
         """Equality comparator. This compares the elements of strings
@@ -1107,9 +1063,7 @@ struct object(IntableRaising, Boolable, Stringable):
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs == rhs
 
-        return Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](
-            self, rhs
-        )
+        return Self._comparison_op[Float64.__eq__, Int64.__eq__, bool_fn](self, rhs)
 
     fn __ne__(self, rhs: object) raises -> object:
         """Inequality comparator. This compares the elements of strings
@@ -1130,9 +1084,7 @@ struct object(IntableRaising, Boolable, Stringable):
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs != rhs
 
-        return Self._comparison_op[Float64.__ne__, Int64.__ne__, bool_fn](
-            self, rhs
-        )
+        return Self._comparison_op[Float64.__ne__, Int64.__ne__, bool_fn](self, rhs)
 
     fn __gt__(self, rhs: object) raises -> object:
         """Greater-than comparator. This lexicographically compares the
@@ -1153,9 +1105,7 @@ struct object(IntableRaising, Boolable, Stringable):
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs and not rhs
 
-        return Self._comparison_op[Float64.__gt__, Int64.__gt__, bool_fn](
-            self, rhs
-        )
+        return Self._comparison_op[Float64.__gt__, Int64.__gt__, bool_fn](self, rhs)
 
     fn __ge__(self, rhs: object) raises -> object:
         """Greater-than-or-equal-to comparator. This lexicographically
@@ -1177,9 +1127,7 @@ struct object(IntableRaising, Boolable, Stringable):
         fn bool_fn(lhs: Bool, rhs: Bool) -> Bool:
             return lhs == rhs or lhs
 
-        return Self._comparison_op[Float64.__ge__, Int64.__ge__, bool_fn](
-            self, rhs
-        )
+        return Self._comparison_op[Float64.__ge__, Int64.__ge__, bool_fn](self, rhs)
 
     # ===------------------------------------------------------------------=== #
     # Arithmetic Operators
@@ -1189,9 +1137,7 @@ struct object(IntableRaising, Boolable, Stringable):
     fn _arithmetic_type_check(self) raises:
         """Throws an error if the object is not arithmetic."""
         if not (
-            self._value.is_bool()
-            or self._value.is_int()
-            or self._value.is_float()
+            self._value.is_bool() or self._value.is_int() or self._value.is_float()
         ):
             raise Error("TypeError: not a valid arithmetic type")
 
@@ -1280,9 +1226,7 @@ struct object(IntableRaising, Boolable, Stringable):
                 result2.append(rhs[j])
             return result2
 
-        return Self._arithmetic_binary_op[Float64.__add__, Int64.__add__](
-            self, rhs
-        )
+        return Self._arithmetic_binary_op[Float64.__add__, Int64.__add__](self, rhs)
 
     @always_inline
     fn __sub__(self, rhs: object) raises -> object:
@@ -1294,9 +1238,7 @@ struct object(IntableRaising, Boolable, Stringable):
         Returns:
             The difference.
         """
-        return Self._arithmetic_binary_op[Float64.__sub__, Int64.__sub__](
-            self, rhs
-        )
+        return Self._arithmetic_binary_op[Float64.__sub__, Int64.__sub__](self, rhs)
 
     @always_inline
     fn __mul__(self, rhs: object) raises -> object:
@@ -1308,9 +1250,7 @@ struct object(IntableRaising, Boolable, Stringable):
         Returns:
             The product.
         """
-        return Self._arithmetic_binary_op[Float64.__mul__, Int64.__mul__](
-            self, rhs
-        )
+        return Self._arithmetic_binary_op[Float64.__mul__, Int64.__mul__](self, rhs)
 
     @always_inline
     fn __pow__(self, rhs: object) raises -> object:
@@ -1322,9 +1262,7 @@ struct object(IntableRaising, Boolable, Stringable):
         Returns:
             The left hand value raised to the power of the right hand value.
         """
-        return Self._arithmetic_binary_op[Float64.__pow__, Int64.__pow__](
-            self, rhs
-        )
+        return Self._arithmetic_binary_op[Float64.__pow__, Int64.__pow__](self, rhs)
 
     # TODO: __mod__
     # TODO: __truediv__
@@ -1585,9 +1523,7 @@ struct object(IntableRaising, Boolable, Stringable):
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             var impl = _ImmutableString(Pointer[Int8].alloc(1), 1)
-            impl.data.store(
-                self._value.get_as_string().data.offset(index).load()
-            )
+            impl.data.store(self._value.get_as_string().data.offset(index).load())
             return _ObjectImpl(impl)
         return self._value.get_list_element(i._value.get_as_int().value)
 
@@ -1619,9 +1555,7 @@ struct object(IntableRaising, Boolable, Stringable):
             _ = object(self._value.get_obj_attr("__setitem__"))(self, i, value)
             return
         if self._value.is_str():
-            raise Error(
-                "TypeError: 'str' object does not support item assignment"
-            )
+            raise Error("TypeError: 'str' object does not support item assignment")
         if not self._value.is_list():
             raise Error("TypeError: can only assign items in lists")
         var index = Self._convert_index_to_int(i)
@@ -1685,9 +1619,7 @@ struct object(IntableRaising, Boolable, Stringable):
         return self._value.get_as_func().invoke(arg0, arg1)
 
     @always_inline
-    fn __call__(
-        self, arg0: object, arg1: object, arg2: object
-    ) raises -> object:
+    fn __call__(self, arg0: object, arg1: object, arg2: object) raises -> object:
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1, arg2)
