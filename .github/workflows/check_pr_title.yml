@@ -29,8 +29,8 @@ jobs:
             \n\n
             Typical [\\<Project\\>] values include:
             \n\n
-            * [stdlib] — indicates a change to the Mojo standard library code\n
-            * [docs] — indicates a change to the documentation
+            * `[stdlib]` — indicates a change to the Mojo standard library code\n
+            * `[docs]` — indicates a change to the documentation
             \n\n
             It's okay to include multiple labels on a PR that
             affect multiple areas of work.
