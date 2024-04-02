@@ -972,6 +972,97 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self.__pow__(rhs)
 
     # ===-------------------------------------------------------------------===#
+    # Checked operations
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn add_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+        """Computes `self + rhs` and a mask of which indices overflowed.
+
+        Args:
+            rhs: The rhs value.
+
+        Returns:
+            A tuple with the results of the operation and a mask for overflows. The first is a new vector whose element at position `i` is computed as
+            `self[i] + rhs[i]`. The second item is a vector of booleans where a `1` at position `i` represents `self[i] + rhs[i]` overflowed.
+        """
+        constrained[type.is_integral()]()
+
+        @parameter
+        if type.is_signed():
+            return llvm_intrinsic[
+                "llvm.sadd.with.overflow",
+                (Self, SIMD[DType.bool, size]),
+                Self,
+                Self,
+            ](self, rhs)
+        else:
+            return llvm_intrinsic[
+                "llvm.uadd.with.overflow",
+                (Self, SIMD[DType.bool, size]),
+                Self,
+                Self,
+            ](self, rhs)
+
+    @always_inline
+    fn sub_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+        """Computes `self - rhs` and a mask of which indices overflowed.
+
+        Args:
+            rhs: The rhs value.
+
+        Returns:
+            A tuple with the results of the operation and a mask for overflows. The first is a new vector whose element at position `i` is computed as
+            `self[i] - rhs[i]`. The second item is a vector of booleans where a `1` at position `i` represents `self[i] - rhs[i]` overflowed.
+        """
+        constrained[type.is_integral()]()
+
+        @parameter
+        if type.is_signed():
+            return llvm_intrinsic[
+                "llvm.ssub.with.overflow",
+                (Self, SIMD[DType.bool, size]),
+                Self,
+                Self,
+            ](self, rhs)
+        else:
+            return llvm_intrinsic[
+                "llvm.usub.with.overflow",
+                (Self, SIMD[DType.bool, size]),
+                Self,
+                Self,
+            ](self, rhs)
+
+    @always_inline
+    fn mul_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+        """Computes `self * rhs` and a mask of which indices overflowed.
+
+        Args:
+            rhs: The rhs value.
+
+        Returns:
+            A tuple with the results of the operation and a mask for overflows. The first is a new vector whose element at position `i` is computed as
+            `self[i] * rhs[i]`. The second item is a vector of booleans where a `1` at position `i` represents `self[i] * rhs[i]` overflowed.
+        """
+        constrained[type.is_integral()]()
+
+        @parameter
+        if type.is_signed():
+            return llvm_intrinsic[
+                "llvm.smul.with.overflow",
+                (Self, SIMD[DType.bool, size]),
+                Self,
+                Self,
+            ](self, rhs)
+        else:
+            return llvm_intrinsic[
+                "llvm.umul.with.overflow",
+                (Self, SIMD[DType.bool, size]),
+                Self,
+                Self,
+            ](self, rhs)
+
+    # ===-------------------------------------------------------------------===#
     # Reversed operations
     # ===-------------------------------------------------------------------===#
 
