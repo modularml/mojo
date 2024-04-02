@@ -243,5 +243,5 @@ struct InlinedFixedVector[
             An iterator to the start of the vector.
         """
         return Self._iterator(
-            0, self.current_size, __get_lvalue_as_address(self)
+            0, self.current_size, Reference(self).get_unsafe_pointer()
         )

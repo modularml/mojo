@@ -224,6 +224,25 @@ modular update mojo
 
 #### 🦋 Changed
 
+- The `simd_load()`, `simd_store()`, `aligned_simd_load()`, and
+  `aligned_simd_store()` methods on
+  [`DTypePointer`](/mojo/stdlib/memory/unsafe#dtypepointer),
+  [`Buffer`](/mojo/stdlib/buffer/buffer#buffer), and
+  [`NDBuffer`](/mojo/stdlib/buffer/buffer#ndbuffer) have been merged into
+  a more expressive set of `load()` and `store()` methods with keyword-only
+  `width` and `alignment` parameters:
+
+  ```mojo
+  # Doesn't work
+  my_simd = my_buffer.simd_load[simd_width](index)
+  # Works
+  my_simd = my_buffer.load[width=simd_width](index)
+  # Doesn't work
+  my_buffer.aligned_simd_store[width, alignment](my_simd)
+  # Works
+  my_buffer.store[width=width, alignment=alignment](my_simd)
+  ```
+
 - The
   [`EqualityComparable`](/mojo/stdlib/builtin/equality_comparable#equalitycomparable)
   trait now requires the `__ne__()` method for conformance in addition to the
@@ -377,19 +396,6 @@ modular update mojo
   memcpy(destBuffer, srcBuffer, count)
   # Works
   memcpy(destBuffer.data, srcBuffer.data, count)
-  ```
-
-- The `simd_load()` and `simd_store()` methods on
-  [`DTypePointer`](/mojo/stdlib/memory/unsafe#dtypepointer),
-  [`Buffer`](/mojo/stdlib/buffer/buffer#buffer), and
-  [`NDBuffer`](/mojo/stdlib/buffer/buffer#ndbuffer) have been removed in favor
-  of `load()` and `store()`:
-
-  ```mojo
-  # Doesn't work
-  my_simd = my_buffer.simd_load[simd_width](index)
-  # Works
-  my_simd = my_buffer.load[simd_width, alignment](index)
   ```
 
 - The functions `max_or_inf()`, `min_or_neginf()` have been removed from

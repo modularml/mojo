@@ -27,8 +27,27 @@ and tools. Please add any significant user-visible changes here.
   `2x2` tensor which is initialized with all zeros. This provides an easy way
   to fill the data of a tensor.
 
+- The `mojo build` and `mojo run` commands now support a `-g` option. This
+  shorter alias is equivalent to writing `--debug-level full`. This option is
+  also available in the `mojo debug` command, but is already the default.
+
 ### 🦋 Changed
+
+- The behavior of `mojo build` when invoked without an output `-o` argument has
+  changed slightly: `mojo build ./test-dir/program.mojo` now outputs an
+  executable to the path `./program`, whereas before it would output to the path
+  `./test-dir/program`.
+- The REPL no longer allows type level variable declarations to be
+  uninitialized, e.g. it will reject `var s: String`.  This is because it does
+  not do proper lifetime tracking (yet!) across cells, and so such code would
+  lead to a crash.  You can work around this by initializing to a dummy value
+  and overwriting later.  This limitation only applies to top level variables,
+  variables in functions work as they always have.
 
 ### ❌ Removed
 
 ### 🛠️ Fixed
+
+- [#1987](https://github.com/modularml/mojo/issues/1987) Defining `main`
+  in a Mojo package is an error, for now. This is not intended to work yet,
+  erroring for now will help to prevent accidental undefined behavior.

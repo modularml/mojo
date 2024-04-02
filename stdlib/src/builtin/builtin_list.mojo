@@ -36,14 +36,11 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
     """The underlying storage for the list."""
 
     @always_inline("nodebug")
-    fn __init__(*args: *Ts) -> Self:
+    fn __init__(inout self, *args: *Ts):
         """Construct the list literal from the given values.
 
         Args:
             args: The init values.
-
-        Returns:
-            The constructed ListLiteral.
         """
         self.storage = args
 
@@ -113,29 +110,23 @@ struct VariadicList[type: AnyRegType](Sized):
     alias IterType = _VariadicListIter[type]
 
     @always_inline
-    fn __init__(*value: type) -> Self:
+    fn __init__(inout self, *value: type):
         """Constructs a VariadicList from a variadic list of arguments.
 
         Args:
             value: The variadic argument list to construct the variadic list
               with.
-
-        Returns:
-            The VariadicList constructed.
         """
-        return value
+        self = value
 
     @always_inline
-    fn __init__(value: Self.storage_type) -> Self:
+    fn __init__(inout self, value: Self.storage_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
             value: The variadic argument to construct the list with.
-
-        Returns:
-            The VariadicList constructed.
         """
-        return Self {value: value}
+        self.value = value
 
     @always_inline
     fn __len__(self) -> Int:
@@ -419,15 +410,16 @@ struct VariadicListMem[
 # VariadicPack
 # ===----------------------------------------------------------------------===#
 
+alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
 
-# TODO: We need to genericize VariadicPack over the kinds of types it holds,
-# instead of erasing them to AnyType. This would allow packs of values known to
-# be Stringable for example.
+
 @register_passable
 struct VariadicPack[
     elt_is_mutable: __mlir_type.i1,
     lifetime: AnyLifetime[elt_is_mutable].type,
-    *element_types: AnyType,
+    element_trait: _AnyTypeMetaType,
+    *element_types: element_trait,
+    # TODO: Add address_space when Reference supports it.
 ](Sized):
     """A utility class to access variadic pack  arguments and provide an API for
     doing things with them.
@@ -436,12 +428,13 @@ struct VariadicPack[
         elt_is_mutable: True if the elements of the list are mutable for an
                         inout or owned argument pack.
         lifetime: The reference lifetime of the underlying elements.
+        element_trait: The trait that each element of the pack conforms to.
         element_types: The list of types held by the argument pack.
     """
 
     alias _mlir_pack_type = __mlir_type[
         `!lit.ref.pack<:variadic<`,
-        AnyType,
+        element_trait,
         `> `,
         element_types,
         `, `,
@@ -511,7 +504,15 @@ struct VariadicPack[
     fn get_element[
         index: Int
     ](self) -> Reference[
-        element_types[index.value], Self.elt_is_mutable, Self.lifetime
+        # FIXME: Shouldn't need a rebind here.
+        __mlir_attr[
+            `#kgen.param.expr<rebind, `,
+            element_types[index.value],
+            `>: `,
+            AnyType,
+        ],
+        Self.elt_is_mutable,
+        Self.lifetime,
     ]:
         """Return a reference to an element of the pack.
 
@@ -523,8 +524,22 @@ struct VariadicPack[
             mutability of the pack argument convention.
         """
 
-        return __mlir_op.`lit.ref.pack.get`[index = index.value](self._value)
+        return rebind[
+            Reference[
+                # FIXME: Shouldn't need a rebind here.
+                __mlir_attr[
+                    `#kgen.param.expr<rebind, `,
+                    element_types[index.value],
+                    `>: `,
+                    AnyType,
+                ],
+                Self.elt_is_mutable,
+                Self.lifetime,
+            ]
+        ](__mlir_op.`lit.ref.pack.get`[index = index.value](self._value))
 
+    # FIXME!: the T in the function should be element_trait bound not AnyType
+    # bound.
     @always_inline
     fn each[func: fn[T: AnyType] (T) -> None](self):
         """Apply a function to each element of the pack in order.  This applies

@@ -247,7 +247,8 @@ struct _Function:
     @always_inline
     fn invoke(owned self) raises -> object:
         return (
-            Pointer(__get_lvalue_as_address(self.value))
+            Reference(self.value)
+            .get_unsafe_pointer()
             .bitcast[Self.fn0]()
             .load()()
         )
@@ -255,7 +256,8 @@ struct _Function:
     @always_inline
     fn invoke(owned self, arg0: object) raises -> object:
         return (
-            Pointer(__get_lvalue_as_address(self.value))
+            Reference(self.value)
+            .get_unsafe_pointer()
             .bitcast[Self.fn1]()
             .load()(arg0)
         )
@@ -263,7 +265,8 @@ struct _Function:
     @always_inline
     fn invoke(owned self, arg0: object, arg1: object) raises -> object:
         return (
-            Pointer(__get_lvalue_as_address(self.value))
+            Reference(self.value)
+            .get_unsafe_pointer()
             .bitcast[Self.fn2]()
             .load()(arg0, arg1)
         )
@@ -273,7 +276,8 @@ struct _Function:
         owned self, arg0: object, arg1: object, arg2: object
     ) raises -> object:
         return (
-            Pointer(__get_lvalue_as_address(self.value))
+            Reference(self.value)
+            .get_unsafe_pointer()
             .bitcast[Self.fn3]()
             .load()(arg0, arg1, arg2)
         )
