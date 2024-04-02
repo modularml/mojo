@@ -51,3 +51,8 @@ and tools. Please add any significant user-visible changes here.
 - [#1987](https://github.com/modularml/mojo/issues/1987) Defining `main`
   in a Mojo package is an error, for now. This is not intended to work yet,
   erroring for now will help to prevent accidental undefined behavior.
+
+- [#1215](https://github.com/modularml/mojo/issues/1215) and
+  [#1949](https://github.com/modularml/mojo/issues/1949) The Mojo LSP server no
+  longer cuts off hover previews for functions with functional arguments,
+  parameters, or results.
