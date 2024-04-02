@@ -430,14 +430,14 @@ def test_is():
 
 
 # CHECK-LABEL: test_iter
-fn test_iter() raises -> None:
+fn test_iter() raises:
     print("=== test_iter ===")
 
-    var list: PythonObject = ["apple", "orange", "banana"]
+    var list_obj: PythonObject = ["apple", "orange", "banana"]
     # CHECK: I like to eat apple
     # CHECK: I like to eat orange
     # CHECK: I like to eat banana
-    for fruit in list:
+    for fruit in list_obj:
         print("I like to eat", fruit)
 
     var list2: PythonObject = []
@@ -453,6 +453,16 @@ fn test_iter() raises -> None:
             assert_false(True)
 
 
+fn test_dict() raises:
+    var d = Dict[PythonObject, PythonObject]()
+    d["food"] = 123
+    d["fries"] = "yes"
+
+    var dd = PythonObject(d)
+    # CHECK: {'food': 123, 'fries': 'yes'}
+    print(dd)
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -463,3 +473,4 @@ def main():
     test_len()
     test_is()
     test_iter()
+    test_dict()
