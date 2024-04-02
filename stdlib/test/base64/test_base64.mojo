@@ -15,6 +15,7 @@
 from base64 import b64encode
 from testing import assert_equal
 
+
 def test_b64encode():
     assert_equal(b64encode("a"), "YQ==")
 
@@ -27,7 +28,7 @@ def test_b64encode():
     assert_equal(
         b64encode("the quick brown fox jumps over the lazy dog"),
         "dGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==",
-    ) 
+    )
 
     assert_equal(b64encode("ABCDEFabcdef"), "QUJDREVGYWJjZGVm")
 

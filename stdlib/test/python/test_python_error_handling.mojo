@@ -51,7 +51,9 @@ fn test_python_exception_getitem() raises:
 
 
 fn test_python_exception_call() raises:
-    with assert_raises(contains="Can't instantiate abstract class AbstractPerson"):
+    with assert_raises(
+        contains="Can't instantiate abstract class AbstractPerson"
+    ):
         Python.add_to_path(TEST_DIR)
         var my_module: PythonObject = Python.import_module("my_module")
         if my_module:

@@ -69,7 +69,10 @@ def main():
 
     assert_equal(
         test_call(python),
-        "carrot ('bread', 'rice') fruit=pear {'protein': 'fish', 'cake': 'yes'}",
+        (
+            "carrot ('bread', 'rice') fruit=pear {'protein': 'fish', 'cake':"
+            " 'yes'}"
+        ),
     )
 
     var obj: PythonObject = [1, 2.4, True, "False"]
