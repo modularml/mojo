@@ -18,6 +18,7 @@ jobs:
         if: github.actor != 'dependabot[bot]'
         with:
           title-regex: "^(Revert \")?(\\[\\S.*\\]\\s?)+\\s+[a-zA-Z`].*"
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
           on-failed-regex-fail-action: true
           on-failed-regex-comment:
             "PR title does not conform to '[<Project>] Title'.
