@@ -279,6 +279,34 @@ def test_list_reverse_move_count():
     # Keep vec alive until after we've done the last `vec.data + N` read.
     _ = vec^
 
+def test_list_insert():
+    #
+    # Test the list [1, 2, 3] created with insert
+    #
+
+    vec = List[Int]()
+    vec.insert(len(vec), 1)
+    vec.insert(len(vec), 3)
+    vec.insert(1, 2)
+
+    assert_equal(len(vec), 3)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 2)
+    assert_equal(vec[2], 3)
+
+    vec.clear()
+    
+    # 
+    # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
+    #
+ 
+    for i in range(4):
+        vec.insert(0, 4 - i)
+        vec.insert(len(vec), 4 + i + 1)
+
+    for i in range(len(vec)):
+        assert_equal(vec[i], i + 1)
+
 
 def test_list_extend():
     #
@@ -480,6 +508,7 @@ def main():
     test_list_resize()
     test_list_reverse()
     test_list_reverse_move_count()
+    test_list_insert()
     test_list_extend()
     test_list_extend_non_trivial()
     test_list_explicit_copy()
