@@ -40,28 +40,22 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         self = Self._zero
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!kgen.int_literal`) -> Self:
+    fn __init__(inout self, value: __mlir_type.`!kgen.int_literal`):
         """Construct IntLiteral from the given mlir !kgen.int_literal value.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed IntLiteral object.
         """
-        return Self {value: value}
+        self.value = value
 
     @always_inline("nodebug")
-    fn __init__(value: IntLiteral) -> Self:
+    fn __init__(inout self, value: IntLiteral):
         """Construct IntLiteral from another one.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed IntLiteral object.
         """
-        return Self {value: value.value}
+        self.value = value.value
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -109,7 +103,8 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
             rhs: The other IntLiteral to compare against.
 
         Returns:
-            True if this IntLiteral is less-than the RHS IntLiteral and False otherwise.
+            True if this IntLiteral is less-than the RHS IntLiteral and False
+            otherwise.
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred lt>`
@@ -123,8 +118,8 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
             rhs: The other IntLiteral to compare against.
 
         Returns:
-            True if this IntLiteral is less-or-equal than the RHS IntLiteral and False
-            otherwise.
+            True if this IntLiteral is less-or-equal than the RHS IntLiteral and
+            False otherwise.
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred le>`
@@ -138,7 +133,8 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
             rhs: The other IntLiteral to compare against.
 
         Returns:
-            True if this IntLiteral is equal to the RHS IntLiteral and False otherwise.
+            True if this IntLiteral is equal to the RHS IntLiteral and False
+            otherwise.
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred eq>`
@@ -152,7 +148,8 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
             rhs: The other IntLiteral to compare against.
 
         Returns:
-            True if this IntLiteral is non-equal to the RHS IntLiteral and False otherwise.
+            True if this IntLiteral is non-equal to the RHS IntLiteral and
+            False otherwise.
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred ne>`
@@ -166,7 +163,8 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
             rhs: The other IntLiteral to compare against.
 
         Returns:
-            True if this IntLiteral is greater-than the RHS IntLiteral and False otherwise.
+            True if this IntLiteral is greater-than the RHS IntLiteral and
+            False otherwise.
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred gt>`
@@ -180,8 +178,8 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
             rhs: The other IntLiteral to compare against.
 
         Returns:
-            True if this IntLiteral is greater-or-equal than the RHS IntLiteral and False
-            otherwise.
+            True if this IntLiteral is greater-or-equal than the RHS IntLiteral
+            and False otherwise.
         """
         return __mlir_op.`kgen.int_literal.cmp`[
             pred = __mlir_attr.`#kgen<int_literal.cmp_pred ge>`
@@ -405,9 +403,9 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
             ](self.value, rhs.value)
         )
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # In place operations.
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __iadd__(inout self, rhs: Self):
@@ -490,9 +488,9 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         """
         self = self | rhs
 
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
     # Reversed operations
-    # ===----------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __radd__(self, value: Self) -> Self:
