@@ -56,3 +56,6 @@ and tools. Please add any significant user-visible changes here.
   [#1949](https://github.com/modularml/mojo/issues/1949) The Mojo LSP server no
   longer cuts off hover previews for functions with functional arguments,
   parameters, or results.
+
+- [#1901](https://github.com/modularml/mojo/issues/1901) Fixed Mojo LSP and
+  documentation generation handling of inout arguments.
