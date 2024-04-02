@@ -999,6 +999,48 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             return self._endswith_impl(suffix, start)
         return self[start:end]._endswith_impl(suffix)
 
+    fn removeprefix(self, prefix: String, /) -> String:
+        """If the string starts with the prefix string, return `string[len(prefix):]`.
+        Otherwise, return a copy of the original string.
+
+        ```mojo
+        print(String('TestHook').removeprefix('Test'))
+        # 'Hook'
+        print(String('BaseTestCase').removeprefix('Test'))
+        # 'BaseTestCase'
+        ```
+
+        Args:
+          prefix: The prefix to remove from the string.
+
+        Returns:
+          A new string with the prefix removed if it was present.
+        """
+        if self.startswith(prefix):
+            return self[len(prefix) :]
+        return self
+
+    fn removesuffix(self, suffix: String, /) -> String:
+        """If the string ends with the suffix string, return `string[:-len(suffix)]`.
+        Otherwise, return a copy of the original string.
+
+        ```mojo
+        print(String('TestHook').removesuffix('Hook'))
+        # 'Test'
+        print(String('BaseTestCase').removesuffix('Test'))
+        # 'BaseTestCase'
+        ```
+
+        Args:
+          suffix: The suffix to remove from the string.
+
+        Returns:
+          A new string with the suffix removed if it was present.
+        """
+        if self.endswith(suffix):
+            return self[: -len(suffix)]
+        return self
+
     @always_inline
     fn _endswith_impl(self, suffix: String, start: Int = 0) -> Bool:
         return self.rfind(suffix, start) + len(suffix) == len(self)
