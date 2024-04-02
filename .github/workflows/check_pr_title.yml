@@ -32,7 +32,7 @@ jobs:
             * [stdlib] — indicates a change to the Mojo standard library code\n
             * [docs] — indicates a change to the documentation
             \n\n
-            It is uncommon but permitted to include multiple labels on a PR that
+            It's okay to include multiple labels on a PR that
             affect multiple areas of work.
             \n\n
             Thank you for contributing to Mojo🔥
