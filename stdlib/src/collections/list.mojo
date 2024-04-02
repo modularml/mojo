@@ -185,6 +185,36 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size += 1
 
     @always_inline
+    fn insert(inout self, i: Int, owned value :T):
+        """Insert a value to the list at the given index.
+        `a.insert(len(a), value)` is equivalent to `a.append(value)`.
+
+        Args:
+            i: The index for the value.
+            value: The value to insert.
+        """
+        debug_assert(-self.size <= i <= self.size, "insert index out of range")
+        
+        var normalized_idx = i
+        if i < 0:
+            normalized_idx += len(self)
+
+        var earlier_idx = len(self)
+        var later_idx = len(self) - 1
+        self.append(value^)
+        
+        for _ in range(i, len(self) - 1): 
+            var earlier_ptr = self.data + earlier_idx
+            var later_ptr = self.data + later_idx
+
+            var tmp = earlier_ptr.take_value()
+            later_ptr.move_into(earlier_ptr)
+            later_ptr.emplace_value(tmp^)
+
+            earlier_idx -= 1
+            later_idx -= 1
+
+    @always_inline
     fn extend(inout self, owned other: List[T]):
         """Extends this list by consuming the elements of `other`.
 
