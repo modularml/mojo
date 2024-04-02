@@ -24,14 +24,14 @@ jobs:
           on-failed-regex-create-review: true
           on-failed-regex-request-changes: true
           on-failed-regex-comment:
-            "PR title does not conform to '[<Project>] Title'.
+            "PR title does not conform to '[\\<Project\\>] Title'.
             Please update the PR title.
-            \n
-            Typical [<Project>] values include:
-            \n
+            \n\n
+            Typical [\\<Project\\>] values include:
+            \n\n
             * [stdlib] — indicates a change to the Mojo standard library code\n
             * [docs] — indicates a change to the documentation
-
+            \n\n
             It is uncommon but permitted to include multiple labels on a PR that
             affect multiple areas of work.
 
