@@ -10,7 +10,8 @@ on:
 
 jobs:
   pr-lint:
-    permissions: read-all
+    permissions:
+      pull-requests: write
 
     runs-on: ubuntu-latest
     steps:
@@ -25,10 +26,10 @@ jobs:
           on-failed-regex-comment:
             "PR title does not conform to '[<Project>] Title'.
             Please update the PR title.
-
+            \n
             Typical [<Project>] values include:
-
-            * [stdlib] — indicates a change to the Mojo standard library code
+            \n
+            * [stdlib] — indicates a change to the Mojo standard library code\n
             * [docs] — indicates a change to the documentation
 
             It is uncommon but permitted to include multiple labels on a PR that
