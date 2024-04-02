@@ -1,4 +1,4 @@
-n$ame: Check PR target branch
+name: Check PR target branch
 
 on:
   pull_request:
