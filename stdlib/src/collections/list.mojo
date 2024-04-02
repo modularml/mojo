@@ -265,12 +265,37 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             new_size: The new size.
             value: The value to use to populate new elements.
         """
-        self.reserve(new_size)
+        if new_size <= self.size:
+            self.resize(new_size)
+        else:
+            self.reserve(new_size)
+            for i in range(new_size, self.size):
+                _ = (self.data + i).take_value()
+            for i in range(self.size, new_size):
+                (self.data + i).emplace_value(value)
+            self.size = new_size
+
+    @always_inline
+    fn resize(inout self, new_size: Int):
+        """Resizes the list to the given new size.
+
+        With no new value provided, the new size must be smaller than the current one. Elements at the end
+        are discarded.
+
+        Args:
+            new_size: The new size.
+        """
+        debug_assert(
+            new_size <= self.size,
+            (
+                "New size must be smaller than or equal to current size when no new"
+                " value is provided."
+            ),
+        )
         for i in range(new_size, self.size):
             _ = (self.data + i).take_value()
-        for i in range(self.size, new_size):
-            (self.data + i).emplace_value(value)
         self.size = new_size
+        self.reserve(new_size)
 
     fn reverse(inout self):
         """Reverses the elements of the list."""
