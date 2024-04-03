@@ -47,16 +47,13 @@ struct AnyPointer[T: Movable](
         self.value = __mlir_attr[`#interp.pointer<0> : `, self.pointer_type]
 
     @always_inline
-    fn __init__(value: Self.pointer_type) -> Self:
+    fn __init__(inout self, value: Self.pointer_type):
         """Create a pointer with the input value.
 
         Args:
             value: The input pointer to construct with.
-
-        Returns:
-            A null pointer.
         """
-        return Self {value: value}
+        self.value = value
 
     @staticmethod
     @always_inline
