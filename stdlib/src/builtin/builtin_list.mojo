@@ -550,6 +550,6 @@ struct VariadicPack[
 
         @parameter
         fn unrolled[i: Int]():
-            func[element_types[i.value]](self.get_element[i]()[])
+            func(self.get_element[i]()[])
 
         unroll[unrolled, Self.__len__()]()
