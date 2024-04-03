@@ -68,7 +68,9 @@ struct Atomic[type: DType]:
 
     @staticmethod
     @always_inline
-    fn _fetch_add(ptr: Pointer[Scalar[type]], rhs: Scalar[type]) -> Scalar[type]:
+    fn _fetch_add(
+        ptr: Pointer[Scalar[type]], rhs: Scalar[type]
+    ) -> Scalar[type]:
         """Performs atomic in-place add.
 
         Atomically replaces the current value with the result of arithmetic
@@ -186,9 +188,9 @@ struct Atomic[type: DType]:
                 expected.value,
                 desired.value,
             )
-            return __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
-                cmpxchg_res
-            )
+            return __mlir_op.`kgen.struct.extract`[
+                index = __mlir_attr.`1:index`
+            ](cmpxchg_res)
 
         # For the floating point case, we need to bitcast the floating point
         # values to their integral representation and perform the atomic
