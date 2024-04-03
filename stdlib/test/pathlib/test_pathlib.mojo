@@ -35,7 +35,9 @@ def test_path():
 
     assert_equal(str(Path("/foo") / "bar" / "jar"), "/foo/bar/jar")
 
-    assert_equal(str(Path("/foo" + DIR_SEPARATOR) / "bar" / "jar"), "/foo/bar/jar")
+    assert_equal(
+        str(Path("/foo" + DIR_SEPARATOR) / "bar" / "jar"), "/foo/bar/jar"
+    )
 
     assert_not_equal(Path().stat().st_mode, 0)
 

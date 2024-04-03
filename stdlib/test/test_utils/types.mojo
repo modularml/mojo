@@ -54,7 +54,8 @@ struct MoveCounter[T: CollectionElement](CollectionElement):
     var move_count: Int
 
     fn __init__(inout self, owned value: T):
-        """Construct a new instance of this type. This initial move is not counted."""
+        """Construct a new instance of this type. This initial move is not counted.
+        """
         self.value = value^
         self.move_count = 0
 

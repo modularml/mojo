@@ -214,10 +214,13 @@ fn test_atol() raises:
     try:
         _ = atol(String("9223372036854775832"))
         raise Error(
-            "Failed to raise when converting an integer too large to store in Int."
+            "Failed to raise when converting an integer too large to store in"
+            " Int."
         )
     except e:
-        assert_equal(str(e), "String expresses an integer too large to store in Int.")
+        assert_equal(
+            str(e), "String expresses an integer too large to store in Int."
+        )
 
 
 fn test_calc_initial_buffer_size_int32() raises:
@@ -347,7 +350,9 @@ fn test_split() raises:
         _ = String("hello").split("")
         raise Error("failed to reject empty delimiter")
     except e:
-        assert_equal("empty delimiter not allowed to be passed to split.", str(e))
+        assert_equal(
+            "empty delimiter not allowed to be passed to split.", str(e)
+        )
 
     # Split in middle
     var d1 = String("n")

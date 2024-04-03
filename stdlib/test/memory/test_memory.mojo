@@ -128,7 +128,9 @@ def test_memcmp():
     assert_equal(errors2, 0)
 
 
-def test_memcmp_extensive[type: DType, extermes: StringLiteral = ""](count: Int):
+def test_memcmp_extensive[
+    type: DType, extermes: StringLiteral = ""
+](count: Int):
     var ptr1 = Pointer[Scalar[type]].alloc(count)
     var ptr2 = Pointer[Scalar[type]].alloc(count)
 

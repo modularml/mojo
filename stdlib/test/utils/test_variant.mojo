@@ -38,7 +38,9 @@ struct TestCounter(CollectionElement):
 
 
 fn _poison_ptr() -> Pointer[Bool]:
-    var ptr = _get_global["TEST_VARIANT_POISON", _initialize_poison, _destroy_poison]()
+    var ptr = _get_global[
+        "TEST_VARIANT_POISON", _initialize_poison, _destroy_poison
+    ]()
     return ptr.bitcast[Bool]()
 
 

@@ -83,7 +83,9 @@ def test_intersection():
 
     assert_equal(Set[Int]().intersection(Set[Int]()), Set[Int]())
     assert_equal(Set[Int]().intersection(Set[Int](1, 2, 3)), Set[Int]())
-    assert_equal(Set[Int](1, 2, 3).intersection(Set[Int](1, 2, 3)), Set[Int](1, 2, 3))
+    assert_equal(
+        Set[Int](1, 2, 3).intersection(Set[Int](1, 2, 3)), Set[Int](1, 2, 3)
+    )
     assert_equal(Set[Int](1, 2, 3).intersection(Set[Int]()), Set[Int]())
     assert_equal(Set[Int](1, 2, 3).intersection(Set[Int](3, 4)), Set[Int](3))
 
