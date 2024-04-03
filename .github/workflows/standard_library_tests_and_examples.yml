@@ -111,7 +111,7 @@ jobs:
           mojo format ${{ steps.filter.outputs.mojo_files }} -l 80
           # Check if any lines were formatted.  If any were, fail this step.
           if [ $(git diff | wc -l) -gt 0 ]; then
-            echo -e "\nError! Mojo code not formatted. Run `mojo format` ...\n"
+            echo -e "\nError! Mojo code not formatted. Run `mojo format -l 80` ...\n"
             echo -e "\nFiles that don't match the proper formatting:\n"
             git diff --name-only
             echo -e "\nFull diff:\n"
