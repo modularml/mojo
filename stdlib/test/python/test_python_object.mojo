@@ -394,7 +394,7 @@ fn test_string_conversions() -> None:
 # CHECK-LABEL: test_len
 def test_len():
     print("=== test_len ===")
-    var empty_list = Python.evaluate("[]")
+    var empty_list = Python.list()
     # CHECK: 0
     print(len(empty_list))
 
