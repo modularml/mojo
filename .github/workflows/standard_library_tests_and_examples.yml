@@ -41,6 +41,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v2
 
+      - name: Checking Modular cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.modular
+          key: ${{ github.head_ref || github.ref_name }}-modular
+
       - name: Download Modular installer
         run: |
           curl -s https://get.modular.com | sh -
