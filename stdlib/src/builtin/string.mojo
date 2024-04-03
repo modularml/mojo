@@ -73,18 +73,20 @@ fn ord(s: String) -> Int:
     Returns:
         An integer representing the code point of the given character.
     """
-    # UTF-8 to Unicode conversion:              (represented as UInt32 BE) 
+    # UTF-8 to Unicode conversion:              (represented as UInt32 BE)
     # 1: 0aaaaaaa                            -> 00000000 00000000 00000000 0aaaaaaa     a
     # 2: 110aaaaa 10bbbbbb                   -> 00000000 00000000 00000aaa aabbbbbb     a << 6  | b
     # 3: 1110aaaa 10bbbbbb 10cccccc          -> 00000000 00000000 aaaabbbb bbcccccc     a << 12 | b << 6  | c
     # 4: 11110aaa 10bbbbbb 10cccccc 10dddddd -> 00000000 000aaabb bbbbcccc ccdddddd     a << 18 | b << 12 | c << 6 | d
     var p = s._as_ptr().bitcast[DType.uint8]()
     var b1 = p.load()
-    if (b1 >> 7) == 0: # This is 1 byte ASCII char
+    if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
         return b1.to_int()
     var num_bytes = _ctlz(~b1)
-    debug_assert(len(s) == num_bytes.to_int(), "input string must be one character")
+    debug_assert(
+        len(s) == num_bytes.to_int(), "input string must be one character"
+    )
     var shift = (6 * (num_bytes - 1)).to_int()
     var b1_mask = 0b11111111 >> (num_bytes + 1)
     var result = (b1 & b1_mask).to_int() << shift
@@ -103,7 +105,7 @@ fn ord(s: String) -> Int:
 fn chr(c: Int) -> String:
     """Returns a string based on the given Unicode code point.
 
-    Returns the string representing a character whose code point is the integer `c`. 
+    Returns the string representing a character whose code point is the integer `c`.
     For example, `chr(97)` returns the string `"a"`. This is the inverse of the `ord()`
     function.
 
@@ -113,13 +115,13 @@ fn chr(c: Int) -> String:
     Returns:
         A string containing a single character based on the given code point.
     """
-    # Unicode (represented as UInt32 BE) to UTF-8 conversion : 
+    # Unicode (represented as UInt32 BE) to UTF-8 conversion :
     # 1: 00000000 00000000 00000000 0aaaaaaa -> 0aaaaaaa                                a
     # 2: 00000000 00000000 00000aaa aabbbbbb -> 110aaaaa 10bbbbbb                       a >> 6  | 0b11000000, b       | 0b10000000
     # 3: 00000000 00000000 aaaabbbb bbcccccc -> 1110aaaa 10bbbbbb 10cccccc              a >> 12 | 0b11100000, b >> 6  | 0b10000000, c      | 0b10000000
     # 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc 10dddddd     a >> 18 | 0b11110000, b >> 12 | 0b10000000, c >> 6 | 0b10000000, d | 0b10000000
 
-    if (c >> 7) == 0: # This is 1 byte ASCII char
+    if (c >> 7) == 0:  # This is 1 byte ASCII char
         var p = DTypePointer[DType.int8].alloc(2)
         p.store(c)
         p.store(1, 0)
