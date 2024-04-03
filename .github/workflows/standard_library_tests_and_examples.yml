@@ -42,12 +42,14 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Checking Modular installer cache
+        id: cache-modular
         uses: actions/cache@v3
         with:
           path: ~/.modular
-          key: ${{ github.head_ref || github.ref_name }}-modular
+          key: ${{ github.head_ref || github.ref_name }}-modular-test
 
       - name: Download Modular installer
+        if: steps.cache-modular.outputs.cache-hit != 'true'
         run: |
           curl -s https://get.modular.com | sh -
 
@@ -62,12 +64,6 @@ jobs:
           echo "MODULAR_HOME=$HOME/.modular" >> $GITHUB_ENV
 
           echo "$HOME/.modular/pkg/packages.modular.com_nightly_mojo/bin" >> $GITHUB_PATH
-
-      - name: Checking build tools (Linux) cache
-        uses: actions/cache@v3
-        with:
-          path: /usr/bin
-          key: ${{ github.head_ref || github.ref_name }}-buildtools-${{env.LLVM_VERSION}}
 
       - name: Install build tools (Linux)
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -88,12 +84,14 @@ jobs:
 
 
       - name: Checking python cache
+        id: cache-pip
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
           key: ${{ github.head_ref || github.ref_name }}-pip    
 
       - name: Install python3
+        if: steps.cache-pip.outputs.cache-hit != 'true'
         run: python3 -m pip install lit
 
       - name: Filter files changed
