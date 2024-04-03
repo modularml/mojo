@@ -269,13 +269,9 @@ struct OptionalReg[T: AnyRegType](Boolable):
     alias _type = __mlir_type[`!kgen.variant<`, T, `, i1>`]
     var _value: Self._type
 
-    fn __init__() -> Self:
-        """Create an optional without a value.
-
-        Returns:
-            The optional.
-        """
-        return Self(None)
+    fn __init__(inout self):
+        """Create an optional with a value of None."""
+        self = Self(None)
 
     fn __init__(value: T) -> Self:
         """Create an optional with a value.
