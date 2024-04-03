@@ -170,6 +170,15 @@ struct Python:
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(module_maybe)
 
+    @staticmethod
+    fn dict() -> PythonObject:
+        """Construct an empty Python dictionary.
+
+        Returns:
+            The constructed empty Python dictionary.
+        """
+        return PythonObject(Dict[PythonObject, PythonObject]())
+
     fn __str__(inout self, str_obj: PythonObject) -> StringRef:
         """Return a string representing the given Python object.
 
