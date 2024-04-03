@@ -28,6 +28,9 @@ fn test_b64encode():
     # CHECK: SGVsbG8gTW9qbyEhIQ==
     print(b64encode("Hello Mojo!!!"))
 
+    # CHECK: SGVsbG8g8J+UpSEhIQ==
+    print(b64encode("Hello 🔥!!!"))
+
     # CHECK: dGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==
     print(b64encode("the quick brown fox jumps over the lazy dog"))
 
