@@ -537,10 +537,8 @@ struct VariadicPack[
         ]
         return rebind[result_ref.mlir_ref_type](ref_elt)
 
-    # FIXME!: the T in the function should be element_trait bound not AnyType
-    # bound.
     @always_inline
-    fn each[func: fn[T: AnyType] (T) -> None](self):
+    fn each[func: fn[T: element_trait] (T) -> None](self):
         """Apply a function to each element of the pack in order.  This applies
         the specified function (which must be parametric on the element type) to
         each element of the pack, from the first element to the last, passing
@@ -552,6 +550,6 @@ struct VariadicPack[
 
         @parameter
         fn unrolled[i: Int]():
-            func(self.get_element[i]()[])
+            func[element_types[i.value]](self.get_element[i]()[])
 
         unroll[unrolled, Self.__len__()]()
