@@ -315,7 +315,7 @@ fn test_string_conversions() raises -> None:
 
 
 def test_len():
-    var empty_list = Python.evaluate("[]")
+    var empty_list = Python.list()
     assert_equal(len(empty_list), 0)
 
     var l1 = Python.evaluate("[1,2,3]")
