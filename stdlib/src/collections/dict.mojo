@@ -957,3 +957,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     @always_inline("nodebug")
     fn _insert(inout self, owned key: Self.key_type, owned value: V):
         self._dict._insert(key^, value^)
+
+    @always_inline("nodebug")
+    fn _insert(inout self, key: StringLiteral, owned value: V):
+        self._insert(String(key), value^)
