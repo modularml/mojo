@@ -31,9 +31,9 @@ from .dtype import _integral_type_of
 from .io import _snprintf_scalar
 from .string import _calc_initial_buffer_size, _vec_fmt
 
-# ===------------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Type Aliases
-# ===------------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 alias Scalar = SIMD[size=1]
 """Represents a scalar dtype."""
@@ -64,9 +64,9 @@ alias Float32 = Scalar[DType.float32]
 alias Float64 = Scalar[DType.float64]
 """Represents a 64-bit floating point value."""
 
-# ===------------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 # Utilities
-# ===------------------------------------------------------------------------===#
+# ===-----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
@@ -117,7 +117,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
-    SIMD allows a single instruction to be executed across the multiple data elements of the vector.
+    SIMD allows a single instruction to be executed across the multiple data 
+    elements of the vector.
 
     Constraints:
         The size of the SIMD vector to be positive and a power of 2.
@@ -144,19 +145,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     """Returns the minimum (lowest) finite value of SIMD value."""
 
     @always_inline("nodebug")
-    fn __init__() -> Self:
+    fn __init__(inout self):
         """Default initializer of the SIMD vector.
 
         By default the SIMD vectors are initialized to all zeros.
-
-        Returns:
-            SIMD vector whose elements are 0.
         """
         _simd_construction_checks[type, size]()
-        return _unchecked_zero[type, size]()
+        self = _unchecked_zero[type, size]()
 
     @always_inline("nodebug")
-    fn __init__(value: SIMD[DType.float64, 1]) -> Self:
+    fn __init__(inout self, value: SIMD[DType.float64, 1]):
         """Initializes the SIMD vector with a float.
 
         The value is splatted across all the elements of the SIMD
@@ -164,9 +162,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         Args:
             value: The input value.
-
-        Returns:
-            SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[type, size]()
 
@@ -176,10 +171,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
-        return Self {value: vec}
+        self.value = vec
 
     @always_inline("nodebug")
-    fn __init__(value: Int) -> Self:
+    fn __init__(inout self, value: Int):
         """Initializes the SIMD vector with an integer.
 
         The integer value is splatted across all the elements of the SIMD
@@ -202,10 +197,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
-        return Self {value: vec}
+        self.value = vec
 
     @always_inline("nodebug")
-    fn __init__(value: IntLiteral) -> Self:
+    fn __init__(inout self, value: IntLiteral):
         """Initializes the SIMD vector with an integer.
 
         The integer value is splatted across all the elements of the SIMD
@@ -231,19 +226,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
-        return Self {value: vec}
+        self.value = vec
 
     @always_inline("nodebug")
-    fn __init__(value: Bool) -> Self:
+    fn __init__(inout self, value: Bool):
         """Initializes the SIMD vector with a bool value.
 
         The bool value is splatted across all elements of the SIMD vector.
 
         Args:
             value: The bool value.
-
-        Returns:
-            SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[type, size]()
 
@@ -253,27 +245,25 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
-        return Self {value: vec}
+        self.value = vec
 
     @always_inline("nodebug")
     fn __init__(
+        inout self, 
         value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
-    ) -> Self:
+    ):
         """Initializes the SIMD vector with the underlying mlir value.
 
         Args:
             value: The input value.
-
-        Returns:
-            SIMD vector using the specified value.
         """
         _simd_construction_checks[type, size]()
-        return Self {value: value}
+        self.value = value
 
     # Construct via a variadic type which has the same number of elements as
     # the SIMD value.
     @always_inline("nodebug")
-    fn __init__(*elems: Scalar[type]) -> Self:
+    fn __init__(inout self, *elems: Scalar[type]):
         """Constructs a SIMD vector via a variadic list of elements.
 
         If there is just one input value, then it is splatted to all elements
@@ -287,25 +277,20 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Args:
             elems: The variadic list of elements from which the SIMD vector is
                    constructed.
-
-        Returns:
-            The constructed SIMD vector.
         """
         _simd_construction_checks[type, size]()
         var num_elements: Int = len(elems)
         if num_elements == 1:
             # Construct by broadcasting a scalar.
-            return Self {
-                value: __mlir_op.`pop.simd.splat`[
-                    _type = __mlir_type[
-                        `!pop.simd<`,
-                        size.value,
-                        `, `,
-                        type.value,
-                        `>`,
-                    ]
-                ](elems[0].value)
-            }
+            self.value = __mlir_op.`pop.simd.splat`[
+                _type = __mlir_type[
+                    `!pop.simd<`,
+                    size.value,
+                    `, `,
+                    type.value,
+                    `>`,
+                ]
+            ](elems[0].value)
 
         debug_assert(size == num_elements, "mismatch in the number of elements")
         var result = Self()
@@ -317,7 +302,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return result
 
     @always_inline("nodebug")
-    fn __init__(value: FloatLiteral) -> Self:
+    fn __init__(inout self, value: FloatLiteral):
         """Initializes the SIMD vector with a float.
 
         The value is splatted across all the elements of the SIMD
@@ -325,9 +310,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         Args:
             value: The input value.
-
-        Returns:
-            SIMD vector whose elements have the specified value.
         """
         _simd_construction_checks[type, size]()
 
@@ -343,7 +325,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         var vec = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
-        return Self {value: vec}
+        self.value = vec
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -1959,8 +1941,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         true_case: SIMD[result_type, size],
         false_case: SIMD[result_type, size],
     ) -> SIMD[result_type, size]:
-        """Selects the values of the `true_case` or the `false_case` based on the
-        current boolean values of the SIMD vector.
+        """Selects the values of the `true_case` or the `false_case` based on 
+        the current boolean values of the SIMD vector.
 
         Parameters:
             result_type: The element type of the input and output SIMD vectors.
@@ -1971,7 +1953,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         Returns:
             A new vector of the form
-            `[true_case[i] if elem else false_case[i] for i, elem in enumerate(self)]`.
+            `[true_case[i] if elem else false_case[i] for i, 
+            elem in enumerate(self)]`.
         """
         constrained[type.is_bool(), "the simd dtype must be bool"]()
         return __mlir_op.`pop.simd.select`(
@@ -2473,8 +2456,8 @@ fn _max_finite[type: DType]() -> Scalar[type]:
         type: The value dtype.
 
     Returns:
-        The maximum representable value of the type. Does not include infinity for
-        floating-point types.
+        The maximum representable value of the type. Does not include infinity 
+        for floating-point types.
     """
 
     @parameter
