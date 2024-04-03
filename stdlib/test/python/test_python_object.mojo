@@ -477,6 +477,11 @@ fn test_dict() raises:
     # CHECK: {'food': 'salad', 'fries': 'yes', 42: [4, 2]}
     print(dd)
 
+    # Also test that Python.dict() creates the right object.
+    var empty = Python.dict()
+    # CHECK: empty: {}
+    print("empty:", empty)
+
 
 def main():
     # initializing Python instance calls init_python
