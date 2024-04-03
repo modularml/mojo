@@ -9,7 +9,9 @@ permissions:
   pull-requests: read
 
 jobs:
-  check-pr:
+  check-pr-target:
+    name: Check PR target branch
+
     runs-on: ubuntu-latest
 
     defaults:

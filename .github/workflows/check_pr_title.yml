@@ -9,11 +9,14 @@ on:
     types: [opened, edited, reopened, synchronize, ready_for_review]
 
 jobs:
-  pr-lint:
+  check-pr-title:
+    name: Check PR title format
+
     permissions:
       pull-requests: write
 
     runs-on: ubuntu-latest
+
     steps:
       - uses: morrisoncole/pr-lint-action@51f3cfabaf5d46f94e54524214e45685f0401b2a
         if: github.actor != 'dependabot[bot]'
