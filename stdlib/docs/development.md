@@ -112,14 +112,14 @@ Otherwise, CI will fail in its lint and formatting checks.  The `mojo` compiler
 provides a `format` command.  So, you can format your changes like so:
 
 ```bash
-mojo format <file1> <file2> ...
+mojo format -l 80 <file1> <file2> ...
 ```
 
 You can also do this before submitting a pull request by running it on the
 relevant files changed compared to the remote:
 
 ```bash
-git diff origin/main --name-only -- '*.mojo' | xargs mojo format
+git diff origin/main --name-only -- '*.mojo' | xargs mojo format -l 80
 ```
 
 You can also consider setting up your editor to automatically format
@@ -327,7 +327,7 @@ Total Discovered Tests: 1
 
 Success! Now we have a test for our new function.
 
-The last step is to [run mojo format](#formatting-changes) on all the files.
+The last step is to [run `mojo format -l 80`](#formatting-changes) on all the files.
 
 ### Raising a PR
 
