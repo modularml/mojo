@@ -483,6 +483,13 @@ fn test_dict() raises:
     print("empty:", empty)
 
 
+fn test_none() raises:
+    var n = Python.none()
+    # CHECK: None from Python: None
+    print("None from Python: ", n)
+    assert_true(n is None)
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -495,3 +502,4 @@ def main():
     test_iter()
     test_setitem()
     test_dict()
+    test_none()
