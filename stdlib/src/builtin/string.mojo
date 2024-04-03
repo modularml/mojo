@@ -681,7 +681,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 
         # TODO(lifetimes): Return a reference rather than a copy
         var copy = self._buffer
-        var last = copy.pop_back()
+        var last = copy.pop()
         debug_assert(
             last == 0,
             "expected last element of String buffer to be null terminator",
