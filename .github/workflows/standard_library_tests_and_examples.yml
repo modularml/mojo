@@ -83,15 +83,7 @@ jobs:
           sudo update-alternatives --install /usr/bin/FileCheck FileCheck /usr/bin/FileCheck-${{env.LLVM_VERSION}} 100
 
 
-      - name: Checking python cache
-        id: cache-pip
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ github.head_ref || github.ref_name }}-pip    
-
       - name: Install python3
-        if: steps.cache-pip.outputs.cache-hit != 'true'
         run: python3 -m pip install lit
 
       - name: Filter files changed
