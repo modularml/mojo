@@ -179,6 +179,15 @@ struct Python:
         """
         return PythonObject(Dict[PythonObject, PythonObject]())
 
+    @staticmethod
+    fn list() -> PythonObject:
+        """Construct an empty Python list.
+
+        Returns:
+            The constructed empty Python list.
+        """
+        return PythonObject([])
+
     fn __str__(inout self, str_obj: PythonObject) -> StringRef:
         """Return a string representing the given Python object.
 
