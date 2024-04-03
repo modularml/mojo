@@ -31,6 +31,19 @@ and tools. Please add any significant user-visible changes here.
   shorter alias is equivalent to writing `--debug-level full`. This option is
   also available in the `mojo debug` command, but is already the default.
 
+- `PythonObject` now conforms to the `KeyElement` trait, meaning that it can be
+  used as key type for `Dict`. This allows on to easily build and interact with
+  Python dictionaries in mojo:
+
+  ```mojo
+  def main():
+      d = PythonObject(Dict[PythonObject, PythonObject]())
+      d["foo"] = 12
+      d[7] = "bar"
+      d["foo"] = [1, 2, "something else"]
+      print(d)  # prints `{'foo': [1, 2, 'something else'], 7: 'bar'}`
+  ```
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
