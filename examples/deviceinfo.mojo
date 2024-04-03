@@ -14,8 +14,26 @@
 
 # This sample prints the current host system information using APIs from the
 # sys module.
-from sys.info import *
-from sys.info import _current_cpu, _current_target, _triple_attr
+from sys.info import (
+    _current_cpu,
+    _current_target,
+    _triple_attr,
+    os_is_linux,
+    os_is_macos,
+    os_is_windows,
+    has_sse4,
+    has_avx,
+    has_avx2,
+    has_avx512f,
+    has_vnni,
+    has_intel_amx,
+    has_neon,
+    is_apple_m1,
+    is_apple_m2,
+    is_apple_m3,
+    num_physical_cores,
+    num_logical_cores,
+)
 
 
 def main():
