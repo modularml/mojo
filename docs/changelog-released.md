@@ -1161,7 +1161,6 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
       fn __copyinit__(inout self: Self, existing: Self):
           self.vec = existing.vec
 
-
   fn main():
       var foo = Foo()
       print(len(foo.vec))
