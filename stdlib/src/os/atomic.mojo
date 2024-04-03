@@ -55,7 +55,16 @@ struct Atomic[type: DType]:
         Args:
             value: Initial value represented as `mlir.index` type.
         """
-        self.__init__(Scalar[type](value))
+        self.value = value
+
+    @always_inline
+    fn load(inout self) -> Scalar[type]:
+        """Loads the current value from the atomic.
+
+        Returns:
+            The current value of the atomic.
+        """
+        return self.fetch_add(0)
 
     @staticmethod
     @always_inline

@@ -22,6 +22,9 @@ fn test_atomic():
     var atom: Atomic[DType.index] = 3
 
     # CHECK: 3
+    print(atom.load())
+
+    # CHECK: 3
     print(atom.value)
 
     atom += 4
@@ -52,7 +55,7 @@ fn test_atomic():
 
 
 # CHECK-LABEL: test_atomic_floating_point
-fn test_atomic_floating_poInt__():
+fn test_atomic_floating_point():
     print("== test_atomic_floating_point")
 
     var atom: Atomic[DType.float32] = Float32(3.0)
@@ -89,4 +92,4 @@ fn test_atomic_floating_poInt__():
 
 fn main():
     test_atomic()
-    test_atomic_floating_poInt__()
+    test_atomic_floating_point()
