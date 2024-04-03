@@ -44,7 +44,7 @@ struct AnyPointer[T: Movable](
     @always_inline
     fn __init__(inout self):
         """Create a null pointer."""
-        self.value = __mlir_attr[`#interp.pointer<0> : `, self.pointer_type]
+        self.value = __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
 
     @always_inline
     fn __init__(inout self, value: Self.pointer_type):
