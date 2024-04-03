@@ -132,30 +132,24 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
         self.array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
-    fn __init__(*elems: Self.element_type) -> Self:
+    fn __init__(inout self, *elems: Self.element_type):
         """Constructs a static tuple given a set of arguments.
 
         Args:
             elems: The element types.
-
-        Returns:
-            The tuple.
         """
         _static_tuple_construction_checks[size]()
-        return Self {array: _create_array[size](elems)}
+        self.array = _create_array[size](elems)
 
     @always_inline
-    fn __init__(values: VariadicList[Self.element_type]) -> Self:
+    fn __init__(inout self, values: VariadicList[Self.element_type]):
         """Creates a tuple constant using the specified values.
 
         Args:
             values: The list of values.
-
-        Returns:
-            A tuple with the values filled in.
         """
         _static_tuple_construction_checks[size]()
-        return Self {array: _create_array[size, Self.element_type](values)}
+        self.array = _create_array[size, Self.element_type](values)
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
