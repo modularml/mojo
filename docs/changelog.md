@@ -60,5 +60,8 @@ and tools. Please add any significant user-visible changes here.
 - [#1901](https://github.com/modularml/mojo/issues/1901) Fixed Mojo LSP and
   documentation generation handling of inout arguments.
 
+- [#1913](https://github.com/modularml/mojo/issues/1913) - `0__` no longer
+  crashes the Mojo parser.
+
 - [#1924](https://github.com/modularml/mojo/issues/1924) JIT debugging on Mac
   has been fixed.
