@@ -44,6 +44,10 @@ and tools. Please add any significant user-visible changes here.
       print(d)  # prints `{'foo': [1, 2, 'something else'], 7: 'bar'}`
   ```
 
+- `List` collection now has a `pop(index)` API for removing an element
+  at a particular index.  By default, `List.pop()` removes the last element
+  in the list.
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
@@ -58,6 +62,9 @@ and tools. Please add any significant user-visible changes here.
   variables in functions work as they always have.
 
 ### ❌ Removed
+
+- `List.pop_back()` has been removed.  Use `List.pop()` instead which defaults
+  to popping the last element in the list.
 
 ### 🛠️ Fixed
 
