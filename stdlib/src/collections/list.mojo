@@ -240,6 +240,31 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         return ret_val^
 
     @always_inline
+    fn pop(inout self, i: Int = -1) -> T:
+        """Pops a value from the list at the given index.
+
+        Args:
+            i: The index of the value to pop.
+
+        Returns:
+            The popped value.
+        """
+        debug_assert(-self.size <= i < self.size, "pop index out of range")
+
+        var normalized_idx = i
+        if i < 0:
+            normalized_idx += len(self)
+
+        var ret_val = (self.data + normalized_idx).take_value()
+        for j in range(normalized_idx + 1, self.size):
+            (self.data + j).move_into(self.data + j - 1)
+        self.size -= 1
+        if self.size * 4 < self.capacity:
+            if self.capacity > 1:
+                self._realloc(self.capacity // 2)
+        return ret_val^
+
+    @always_inline
     fn reserve(inout self, new_capacity: Int):
         """Reserves the requested capacity.
 
