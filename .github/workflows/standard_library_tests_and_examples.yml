@@ -53,6 +53,14 @@ jobs:
         run: |
           curl -s https://get.modular.com | sh -
 
+      - name: Cache Modular
+        if: steps.cache-modular.outputs.cache-hit != 'true'
+        uses: actions/cache@v3
+        with:
+          path: ~/.modular
+          key: ${{ github.head_ref || github.ref_name }}-modular-test
+          restore-keys: ${{ github.head_ref || github.ref_name }}=modular
+
       - name: Install nightly Mojo compiler
         run: |
           # The <auth_token> of "examples" is arbitrary but something
