@@ -57,32 +57,15 @@ def test_list():
     list[-1] = 7
     assert_equal(7, list[-1])
 
-    # pop_back shall return the last element
-    # and adjust the size
-    assert_equal(7, list.pop_back())
-    assert_equal(4, len(list))
 
-    # Verify that capacity shrinks as the list goes smaller
-    while list.size > 1:
-        _ = list.pop_back()
-
-    assert_equal(1, len(list))
-    assert_equal(
-        1, list.size
-    )  # pedantically ensure len and size refer to the same thing
-    assert_equal(4, list.capacity)
-
-    # Verify that capacity doesn't become 0 when the list gets empty.
-    _ = list.pop_back()
-    assert_equal(0, len(list))
-
-    # FIXME: revisit that pop_back is actually doing shrink_to_fit behavior
-    # under the hood which will be surprising to users
-    assert_equal(2, list.capacity)
-
+def test_list_clear():
+    var list = List[Int](1, 2, 3)
+    assert_equal(len(list), 3)
+    assert_equal(list.capacity, 3)
     list.clear()
-    assert_equal(0, len(list))
-    assert_equal(2, list.capacity)
+
+    assert_equal(len(list), 0)
+    assert_equal(list.capacity, 3)
 
 
 def test_list_pop():
@@ -481,6 +464,7 @@ def test_list_span():
 def main():
     test_mojo_issue_698()
     test_list()
+    test_list_clear()
     test_list_pop()
     test_list_variadic_constructor()
     test_list_reverse()

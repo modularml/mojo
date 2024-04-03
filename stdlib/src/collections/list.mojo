@@ -226,20 +226,6 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size = final_size
 
     @always_inline
-    fn pop_back(inout self) -> T:
-        """Pops a value from the back of this list.
-
-        Returns:
-            The popped value.
-        """
-        var ret_val = (self.data + (self.size - 1)).take_value()
-        self.size -= 1
-        if self.size * 4 < self.capacity:
-            if self.capacity > 1:
-                self._realloc(self.capacity // 2)
-        return ret_val^
-
-    @always_inline
     fn pop(inout self, i: Int = -1) -> T:
         """Pops a value from the list at the given index.
 
@@ -249,7 +235,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         Returns:
             The popped value.
         """
-        debug_assert(-self.size <= i < self.size, "pop index out of range")
+        debug_assert(-len(self) <= i < len(self), "pop index out of range")
 
         var normalized_idx = i
         if i < 0:
