@@ -33,7 +33,7 @@ struct AnyPointer[T: Movable](
     movable.
 
     Parameters:
-        T: The pointer element type, which must be movable.
+        T: The pointer element type, which must be movable.-test
     """
 
     alias pointer_type = __mlir_type[`!kgen.pointer<`, T, `>`]
