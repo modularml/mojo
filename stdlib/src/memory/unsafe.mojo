@@ -756,7 +756,7 @@ struct Pointer[
         """Loads the value the Pointer object points to.
 
         Constraints:
-            The alignment must be a non-negative integer value.
+            The alignment must be a positive integer value.
 
         Parameters:
             alignment: The minimal alignment of the address.
@@ -773,7 +773,7 @@ struct Pointer[
         """Loads the value the Pointer object points to with the given offset.
 
         Constraints:
-            The alignment must be a non-negative integer value.
+            The alignment must be a positive integer value.
 
         Parameters:
             T: The Intable type of the offset.
@@ -786,7 +786,7 @@ struct Pointer[
             The loaded value.
         """
         constrained[
-            alignment >= 0, "alignment must be a non-negative integer value"
+            alignment > 0, "alignment must be a positive integer value"
         ]()
         return __mlir_op.`pop.load`[alignment = alignment.value](
             self.offset(offset).address
@@ -800,7 +800,7 @@ struct Pointer[
         to with the given offset.
 
         Constraints:
-            The alignment must be a non-negative integer value.
+            The alignment must be a positive integer value.
 
         Parameters:
             T: The Intable type of the offset.
@@ -818,7 +818,7 @@ struct Pointer[
         to.
 
         Constraints:
-            The alignment value must be a non-negative integer.
+            The alignment value must be a positive integer.
 
         Parameters:
             alignment: The minimal alignment of the address.
@@ -827,7 +827,7 @@ struct Pointer[
             value: The value to store.
         """
         constrained[
-            alignment >= 0, "alignment must be a non-negative integer value"
+            alignment > 0, "alignment must be a positive integer value"
         ]()
         __mlir_op.`pop.store`[alignment = alignment.value](value, self.address)
 
@@ -1333,7 +1333,7 @@ struct DTypePointer[
         """Loads the value the Pointer object points to.
 
         Constraints:
-            The width and alignment must be non-negative integer values.
+            The width and alignment must be positive integer values.
 
         Parameters:
             width: The SIMD width.
@@ -1351,7 +1351,7 @@ struct DTypePointer[
         """Loads the value the Pointer object points to with the given offset.
 
         Constraints:
-            The width and alignment must be non-negative integer values.
+            The width and alignment must be positive integer values.
 
         Parameters:
             T: The Intable type of the offset.
@@ -1382,7 +1382,7 @@ struct DTypePointer[
         """Stores a single element value at the given offset.
 
         Constraints:
-            The width and alignment must be non-negative integer values.
+            The width and alignment must be positive integer values.
 
         Parameters:
             T: The Intable type of the offset.
@@ -1402,7 +1402,7 @@ struct DTypePointer[
         """Stores a single element value.
 
         Constraints:
-            The width and alignment must be non-negative integer values.
+            The width and alignment must be positive integer values.
 
         Parameters:
             width: The SIMD width.
@@ -1411,9 +1411,9 @@ struct DTypePointer[
         Args:
             val: The value to store.
         """
-        constrained[width >= 0, "width must be a non-negative integer value"]()
+        constrained[width > 0, "width must be a positive integer value"]()
         constrained[
-            alignment >= 0, "alignment must be a non-negative integer value"
+            alignment > 0, "alignment must be a positive integer value"
         ]()
         self.address.bitcast[SIMD[type, width]]().store[alignment=alignment](
             val
