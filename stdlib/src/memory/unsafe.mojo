@@ -785,7 +785,9 @@ struct Pointer[
         Returns:
             The loaded value.
         """
-        constrained[alignment >= 0, "alignment must be a non-negative integer value"]()
+        constrained[
+            alignment >= 0, "alignment must be a non-negative integer value"
+        ]()
         return __mlir_op.`pop.load`[alignment = alignment.value](
             self.offset(offset).address
         )
@@ -824,7 +826,9 @@ struct Pointer[
         Args:
             value: The value to store.
         """
-        constrained[alignment >= 0, "alignment must be a non-negative integer value"]()
+        constrained[
+            alignment >= 0, "alignment must be a non-negative integer value"
+        ]()
         __mlir_op.`pop.store`[alignment = alignment.value](value, self.address)
 
     @always_inline("nodebug")
@@ -1408,7 +1412,9 @@ struct DTypePointer[
             val: The value to store.
         """
         constrained[width >= 0, "width must be a non-negative integer value"]()
-        constrained[alignment >= 0, "alignment must be a non-negative integer value"]()
+        constrained[
+            alignment >= 0, "alignment must be a non-negative integer value"
+        ]()
         self.address.bitcast[SIMD[type, width]]().store[alignment=alignment](
             val
         )
