@@ -87,8 +87,26 @@ def test_optional_isnot():
     assert_false(a is not None)
 
 
+def test_optional_reg_is():
+    a = OptionalReg(1)
+    assert_false(a is None)
+
+    a = OptionalReg[Int](None)
+    assert_true(a is None)
+
+
+def test_optional_reg_isnot():
+    a = OptionalReg(1)
+    assert_true(a is not None)
+
+    a = OptionalReg[Int](None)
+    assert_false(a is not None)
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
     test_optional_is()
     test_optional_isnot()
+    test_optional_reg_is()
+    test_optional_reg_isnot()
