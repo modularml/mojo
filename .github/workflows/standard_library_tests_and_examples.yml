@@ -41,7 +41,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v2
 
-      - name: Checking Modular cache
+      - name: Checking Modular installer cache
         uses: actions/cache@v3
         with:
           path: ~/.modular
@@ -63,6 +63,12 @@ jobs:
 
           echo "$HOME/.modular/pkg/packages.modular.com_nightly_mojo/bin" >> $GITHUB_PATH
 
+      - name: Checking build tools (Linux) cache
+        uses: actions/cache@v3
+        with:
+          path: /usr/bin
+          key: ${{ github.head_ref || github.ref_name }}-buildtools-${{env.LLVM_VERSION}}
+
       - name: Install build tools (Linux)
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
@@ -81,7 +87,14 @@ jobs:
           sudo update-alternatives --install /usr/bin/FileCheck FileCheck /usr/bin/FileCheck-${{env.LLVM_VERSION}} 100
 
 
-          python3 -m pip install lit
+      - name: Checking python cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ github.head_ref || github.ref_name }}-pip    
+
+      - name: Install python3
+        run: python3 -m pip install lit
 
       - name: Filter files changed
         uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
