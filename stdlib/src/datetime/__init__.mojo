@@ -11,4 +11,4 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from ._timedetla import timedelta
+from ._timedelta import timedelta

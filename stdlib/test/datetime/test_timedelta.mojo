@@ -36,3 +36,12 @@ def test_timedelta_fast_constructor_not_normalized():
     assert_equal(x.seconds, 0)
     assert_equal(x.microseconds, 2)
 
+    x = dt.timedelta(microseconds=-1, are_normalized=False)
+    assert_equal(x.days, -1)
+    assert_equal(x.seconds, 86399)
+    assert_equal(x.microseconds, 999999)
+
+
+def main():
+    test_timedelta_fast_constructor_already_normalised()
+    test_timedelta_fast_constructor_not_normalized()

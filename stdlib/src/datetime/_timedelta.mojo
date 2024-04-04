@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from builtins.divmod import divmod
+
 
 struct timedelta(CollectionElement):
     """Represents a time difference. Is accurate to the microsecond.
@@ -146,15 +148,15 @@ struct timedelta(CollectionElement):
             extra_days, seconds = divmod(seconds, 24 * 60 * 60)
             days += extra_days
 
-        custom_debug_assert(
+        debug_assert(
             0 <= microseconds < 1000000,
             "microseconds should be in the range [0, 1000000[",
         )
-        custom_debug_assert(
+        debug_assert(
             0 <= seconds < 24 * 60 * 60,
             "seconds should be in the range [0, 24 * 60 * 60[",
         )
-        custom_debug_assert(
+        debug_assert(
             -99999999 <= days <= 999999999,
             "days should be in the range -999999999 to 999999999",
         )
