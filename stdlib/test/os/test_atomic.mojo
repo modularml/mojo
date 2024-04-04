@@ -13,6 +13,7 @@
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
 from os.atomic import Atomic
+from testing import assert_equal
 
 
 # CHECK-LABEL: test_atomic
@@ -90,6 +91,25 @@ fn test_atomic_floating_point():
     print(atom.value)
 
 
-fn main():
+def test_atomic_move_constructor():
+    var atom: Atomic[DType.index] = 3
+    var atom2 = atom^
+    assert_equal(atom2.value, 3)
+    atom2 += 4
+    assert_equal(atom2.value, 7)
+    atom2 -= 4
+    assert_equal(atom2.value, 3)
+    atom2.max(0)
+    assert_equal(atom2.value, 3)
+    atom2.max(42)
+    assert_equal(atom2.value, 42)
+    atom2.min(3)
+    assert_equal(atom2.value, 3)
+    atom2.min(0)
+    assert_equal(atom2.value, 0)
+
+
+def main():
     test_atomic()
     test_atomic_floating_point()
+    test_atomic_move_constructor()

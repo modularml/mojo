@@ -58,6 +58,15 @@ struct Atomic[type: DType]:
         self.value = value
 
     @always_inline
+    fn __moveinit__(inout self, owned existing: Self):
+        """Moves Constructor.
+
+        Args:
+            existing: The existing Atomic.
+        """
+        self.value = existing.value
+
+    @always_inline
     fn load(inout self) -> Scalar[type]:
         """Loads the current value from the atomic.
 
