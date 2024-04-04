@@ -1333,7 +1333,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         *mask: Int, output_size: Int = size
     ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
-        the `other` value using the specified mask (permutation).
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
 
         Parameters:
             mask: The permutation to use in the shuffle.
@@ -1368,6 +1369,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             @parameter
             fn fill[idx: Int]():
                 alias val = mask[idx]
+                constrained[
+                    0 <= val < 2 * size,
+                    "invalid index in the shuffle operation",
+                ]()
                 var ptr = __mlir_op.`pop.array.gep`(
                     Pointer.address_of(array).address, idx.value
                 )
@@ -1391,7 +1396,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
-        the `other` value using the specified mask (permutation).
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
 
         Parameters:
             mask: The permutation to use in the shuffle.
@@ -1405,7 +1411,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self, other: Self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
-        the `other` value using the specified mask (permutation).
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
 
         Parameters:
             mask: The permutation to use in the shuffle.
