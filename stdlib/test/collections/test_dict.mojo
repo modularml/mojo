@@ -192,6 +192,48 @@ def test_dict_copy_calls_copy_constructor():
     assert_equal(6, copy["a"].copy_count)
 
 
+def test_dict_update_nominal():
+    var orig = Dict[String, Int]()
+    orig["a"] = 1
+    orig["b"] = 2
+
+    var new = Dict[String, Int]()
+    new["b"] = 3
+    new["c"] = 4
+
+    orig.update(new)
+
+    assert_equal(orig["a"], 1)
+    assert_equal(orig["b"], 3)
+    assert_equal(orig["c"], 4)
+
+
+def test_dict_update_empty_origin():
+    var orig = Dict[String, Int]()
+    var new = Dict[String, Int]()
+    new["b"] = 3
+    new["c"] = 4
+
+    orig.update(new)
+
+    assert_equal(orig["b"], 3)
+    assert_equal(orig["c"], 4)
+
+
+def test_dict_update_empty_new():
+    var orig = Dict[String, Int]()
+    orig["a"] = 1
+    orig["b"] = 2
+
+    var new = Dict[String, Int]()
+
+    orig.update(new)
+
+    assert_equal(orig["a"], 1)
+    assert_equal(orig["b"], 2)
+    assert_equal(len(orig), 2)
+
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print("Test", name_val, "...", end="")
@@ -223,6 +265,9 @@ def test_dict():
         "test_dict_copy_calls_copy_constructor",
         test_dict_copy_calls_copy_constructor,
     ]()
+    test["test_dict_update_nominal", test_dict_update_nominal]()
+    test["test_dict_update_empty_origin", test_dict_update_empty_origin]()
+    test["test_dict_update_empty_new", test_dict_update_empty_new]()
 
 
 def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
