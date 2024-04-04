@@ -14,7 +14,7 @@
 
 from memory.anypointer import AnyPointer
 from test_utils import MoveCounter
-from testing import *
+from testing import assert_equal, assert_not_equal, assert_true
 
 
 struct MoveOnlyType(Movable):

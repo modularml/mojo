@@ -16,7 +16,7 @@ from collections import Optional
 from collections.dict import Dict, KeyElement, OwnedKwargsDict
 
 from test_utils import CopyCounter
-from testing import *
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_dict_construction():

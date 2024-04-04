@@ -12,10 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from os import *
+from os import listdir
 from pathlib import Path
 
-from testing import *
+from testing import assert_true
 
 
 def test_listdir():

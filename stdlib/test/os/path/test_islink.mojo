@@ -20,7 +20,7 @@ from os.path import isdir, islink
 from pathlib import Path
 from sys.param_env import env_get_string
 
-from testing import *
+from testing import assert_true, assert_false
 
 alias TEMP_DIR = env_get_string["TEMP_DIR"]()
 
