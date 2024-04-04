@@ -88,7 +88,7 @@ fn test_atomic_floating_point():
     print(atom.value)
 
 
-fn test_atomic_move_constructor():
+def test_atomic_move_constructor():
     var atom: Atomic[DType.index] = 3
     var atom2 = atom^
     assert_equal(atom2.value, 3)
@@ -106,7 +106,7 @@ fn test_atomic_move_constructor():
     assert_equal(atom2.value, 0)
 
 
-fn main():
+def main():
     test_atomic()
     test_atomic_floating_point()
     test_atomic_move_constructor()
