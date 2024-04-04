@@ -51,27 +51,25 @@ struct _c_stat(Stringable):
     var st_lspare: Int32  # RESERVED: DO NOT USE!
     var st_qspare: StaticTuple[Int64, 2]  # RESERVED: DO NOT USE!
 
-    fn __init__() -> Self:
-        return Self {
-            st_dev: 0,
-            st_mode: 0,
-            st_nlink: 0,
-            st_ino: 0,
-            st_uid: 0,
-            st_gid: 0,
-            st_rdev: 0,
-            st_atimespec: _CTimeSpec(),
-            st_mtimespec: _CTimeSpec(),
-            st_ctimespec: _CTimeSpec(),
-            st_birthtimespec: _CTimeSpec(),
-            st_size: 0,
-            st_blocks: 0,
-            st_blksize: 0,
-            st_flags: 0,
-            st_gen: 0,
-            st_lspare: 0,
-            st_qspare: StaticTuple[Int64, 2](0, 0),
-        }
+    fn __init__(inout self):
+        self.st_dev = 0
+        self.st_mode = 0
+        self.st_nlink = 0
+        self.st_ino = 0
+        self.st_uid = 0
+        self.st_gid = 0
+        self.st_rdev = 0
+        self.st_atimespec = _CTimeSpec()
+        self.st_mtimespec = _CTimeSpec()
+        self.st_ctimespec = _CTimeSpec()
+        self.st_birthtimespec = _CTimeSpec()
+        self.st_size = 0
+        self.st_blocks = 0
+        self.st_blksize = 0
+        self.st_flags = 0
+        self.st_gen = 0
+        self.st_lspare = 0
+        self.st_qspare = StaticTuple[Int64, 2](0, 0)
 
     fn __str__(self) -> String:
         var res = String("{\n")
