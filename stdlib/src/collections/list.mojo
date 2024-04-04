@@ -61,7 +61,9 @@ struct _ListIter[
         inout self,
     ) -> Reference[T, list_mutability, list_lifetime]:
         self.index += 1
-        return self.src[].__get_ref[list_mutability, list_lifetime](self.index - 1)
+        return self.src[].__get_ref[list_mutability, list_lifetime](
+            self.index - 1
+        )
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.index
@@ -122,7 +124,9 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         for value in values:
             self.append(value[])
 
-    fn __init__(inout self: Self, owned ptr: AnyPointer[T], length: Int, capacity: Int):
+    fn __init__(
+        inout self: Self, owned ptr: AnyPointer[T], length: Int, capacity: Int
+    ):
         """Constructs a list from a pointer and its length.
 
         Args:
@@ -448,9 +452,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
     ](
         self: Reference[Self, mutability, self_life].mlir_ref_type,
         i: Int,
-    ) -> Reference[
-        T, mutability, self_life
-    ]:
+    ) -> Reference[T, mutability, self_life]:
         """Gets a reference to the list element at the given index.
 
         Args:
