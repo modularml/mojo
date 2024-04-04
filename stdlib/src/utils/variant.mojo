@@ -160,9 +160,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     fn _get_state[
         is_mut: __mlir_type.i1, lt: __mlir_type[`!lit.lifetime<`, is_mut, `>`]
-    ](self: _LITRef[Self, is_mut, lt, Int(0).value].type) -> Reference[
-        Int8, is_mut, lt
-    ]:
+    ](self: _LITRef[Self, is_mut, lt].type) -> Reference[Int8, is_mut, lt]:
         return (
             Reference(self)
             .bitcast_element[Int8]()
