@@ -337,70 +337,6 @@ fn _put(x: DType):
 # ===----------------------------------------------------------------------=== #
 
 
-struct _StringableTuple[*Ts: Stringable](Sized):
-    alias _type = __mlir_type[
-        `!kgen.pack<:variadic<`, Stringable, `> `, Ts, `>`
-    ]
-    var storage: Self._type
-
-    fn __init__(inout self, value: Self._type):
-        self.storage = value
-
-    @staticmethod
-    fn _offset[i: Int]() -> Int:
-        constrained[i >= 0, "index must be positive"]()
-
-        @parameter
-        if i == 0:
-            return 0
-        else:
-            return _align_up(
-                Self._offset[i - 1]()
-                + _align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
-                alignof[Ts[i]](),
-            )
-
-    @always_inline
-    fn _print[i: Int](inout self, /, *, sep: StringLiteral = " "):
-        _put(sep)
-        _put(self._at[i]())
-
-    fn _at[i: Int](inout self) -> String:
-        alias offset = Self._offset[i]()
-        var i8ptr = Pointer.address_of(self).bitcast[Int8]().offset(offset)
-        return str(Reference(i8ptr[]).bitcast_element[Ts[i]]()[])
-
-    fn __len__(self) -> Int:
-        return len(VariadicList(Ts))
-
-
-@always_inline
-fn _print_elements[
-    T: Stringable, *Ts: Stringable
-](
-    first: T,
-    inout rest: _StringableTuple[Ts],
-    sep: StringLiteral = " ",
-    end: StringLiteral = "\n",
-    flush: Bool = False,
-):
-    _put(str(first))
-
-    @parameter
-    fn each[i: Int]():
-        rest._print[i](sep=sep)
-
-    unroll[each, len(VariadicList(Ts))]()
-    _put(end)
-    if flush:
-        _flush()
-
-
-# ===----------------------------------------------------------------------=== #
-#  print
-# ===----------------------------------------------------------------------=== #
-
-
 @no_inline
 fn print(
     *, sep: StringLiteral = " ", end: StringLiteral = "\n", flush: Bool = False
@@ -441,7 +377,15 @@ fn print[
         end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
     """
-    var vals = _StringableTuple[Ts](rest)
-    _print_elements(first, vals, sep=sep, end=end)
+    _put(str(first))
+
+    @parameter
+    fn print_elt[T: Stringable](a: T):
+        _put(sep)
+        _put(a)
+
+    rest.each[print_elt]()
+
+    _put(end)
     if flush:
         _flush()
