@@ -445,14 +445,14 @@ fn stack_allocation[
             count = count.value,
             _type = Pointer[type, address_space].pointer_type,
             alignment = alignment.value,
-            address_space = address_space.value().value,
+            address_space = address_space._value.value,
         ]()
     else:
         return __mlir_op.`pop.stack_allocation`[
             count = count.value,
             _type = Pointer[type, address_space].pointer_type,
             alignment = alignment.value,
-            address_space = address_space.value().value,
+            address_space = address_space._value.value,
         ]()
 
 
