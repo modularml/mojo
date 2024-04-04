@@ -15,6 +15,21 @@ and tools. Please add any significant user-visible changes here.
 
 ### ⭐️ New
 
+- Heterogenous variadic pack arguments now work reliably even with memory types,
+  and have a more convenient API to use, as defined on the `VariadicPack` type.
+  For example, a simplified version of `print` can be implemented as:
+
+  ```mojo
+  fn print[T: Stringable, *Ts: Stringable](first: T, *rest: *Ts):
+      print_string(str(first))
+
+      @parameter
+      fn print_elt[T: Stringable](a: T):
+          print_string(" ")
+          print_string(a)
+      rest.each[print_elt]()
+  ```
+
 - The `sys` module now contains an `exit` function that would exit a Mojo
   program with the specified error code.
 
