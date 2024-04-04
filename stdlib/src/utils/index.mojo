@@ -203,7 +203,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
             value: The initial value.
         """
         constrained[size == 1]()
-        self = Int(value)
+        self = value
 
     @always_inline
     fn __init__(inout self, elems: Tuple[Int, Int]):
