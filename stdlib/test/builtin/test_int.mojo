@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from testing import assert_equal
+from testing import assert_equal, assert_true
+from builtin.divmod import divmod
 
 
 def test_constructors():
@@ -63,6 +64,37 @@ def test_mod():
     assert_equal(1, Int(-3) % Int(2))
 
 
+def test_divmod():
+    var a: Int
+    var b: Int
+    a, b = divmod(7, 3)
+    assert_equal(a, 2)
+    assert_equal(b, 1)
+
+    a, b = divmod(-7, 3)
+    assert_equal(a, -3)
+    assert_equal(b, 2)
+
+    a, b = divmod(-7, -3)
+    assert_equal(a, 2)
+    assert_equal(b, -1)
+
+    a, b = divmod(7, -3)
+    assert_equal(a, -3)
+    assert_equal(b, -2)
+
+    a, b = divmod(0, 5)
+    assert_equal(a, 0)
+    assert_equal(b, 0)
+
+    try:
+        a, b = divmod(5, 0)
+    except e:
+        assert_true(str(e).startswith("ZeroDivisionError"))
+    else:
+        raise Error("divmod(5, 0) should raise an exception, but it did not.")
+
+
 def main():
     test_constructors()
     test_add()
@@ -71,3 +103,4 @@ def main():
     test_pow()
     test_floordiv()
     test_mod()
+    test_divmod()

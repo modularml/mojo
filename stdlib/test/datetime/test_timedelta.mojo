@@ -10,8 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: mojo --debug-level full %s
 
 import datetime as dt
+from testing import assert_equal, assert_true
 
 
 def test_timedelta_fast_constructor_already_normalised():
@@ -25,14 +27,17 @@ def test_timedelta_fast_constructor_already_normalised():
     assert_equal(x.seconds, 2)
     assert_equal(x.microseconds, 3)
 
+
 def test_timedelta_fast_constructor_not_normalized():
     x = dt.timedelta(microseconds=3_000_000, are_normalized=False)
     assert_equal(x.days, 0)
     assert_equal(x.seconds, 3)
     assert_equal(x.microseconds, 0)
 
-    x = dt.timedelta(microseconds=(2 * 24 * 60 * 60 * 1_000_000) + 2, are_normalized=False)
-    assert_equal(x.days, 1)
+    x = dt.timedelta(
+        microseconds=(2 * 24 * 60 * 60 * 1_000_000) + 2, are_normalized=False
+    )
+    assert_equal(x.days, 2)
     assert_equal(x.seconds, 0)
     assert_equal(x.microseconds, 2)
 

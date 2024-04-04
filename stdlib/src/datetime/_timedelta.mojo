@@ -11,7 +11,16 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from builtins.divmod import divmod
+from builtin.divmod import divmod
+
+
+fn _divmod_no_raise(a: Int, b: Int) -> Tuple[Int, Int]:
+    debug_assert(b!=0, "We should never try to divide by 0")
+    try:
+        return divmod(a, b)
+    except:
+        # this should never happen
+        return Tuple(0, 0)
 
 
 struct timedelta(CollectionElement):
@@ -23,7 +32,7 @@ struct timedelta(CollectionElement):
     ```mojo
     import datetime as dt
 
-    dt.timedelta.min 
+    dt.timedelta.min
     # timedelta(-999999999)
     # The lowest value which can be represented by dt.timedelta
 
@@ -41,15 +50,15 @@ struct timedelta(CollectionElement):
     import datetime as dt
 
     duration = dt.timedelta(milliseconds=123456789)
-    print(duration.days)          
+    print(duration.days)
     # 1
-    print(duration.seconds)       
+    print(duration.seconds)
     # 37056
-    print(durations.microseconds) 
+    print(durations.microseconds)
     # 789000
     ```
 
-    Those attributes must NOT be set manually. 
+    Those attributes must NOT be set manually.
     You can consider a `dt.timedelta` object to be immutable.
 
     The internal representation ensures that:
@@ -89,7 +98,7 @@ struct timedelta(CollectionElement):
 
         ```mojo
         import datetime as dt
-    
+
         print(dt.timedelta(minutes=2, seconds=5))
         # datetime.timedelta(seconds=125)
         ```
@@ -111,14 +120,14 @@ struct timedelta(CollectionElement):
 
     fn __init__(
         inout self,
-        owned days: Int,
-        owned seconds: Int,
-        owned microseconds: Int,
+        owned days: Int = 0,
+        owned seconds: Int = 0,
+        owned microseconds: Int = 0,
         *,
         are_normalized: Bool,
     ):
         """This constructor is similar to the constructor described above, but is faster.
-        
+
         1) Becase there is no need to convert all quantities to (days, seconds, microseconds)
         2) Because if you know the values are normalized, you can also skip the normalization.
 
@@ -141,11 +150,13 @@ struct timedelta(CollectionElement):
 
         if not are_normalized:
             var extra_seconds: Int
-            extra_seconds, microseconds = divmod(microseconds, 1000000)
+            extra_seconds, microseconds = _divmod_no_raise(
+                microseconds, 1000000
+            )
             seconds += extra_seconds
 
             var extra_days: Int
-            extra_days, seconds = divmod(seconds, 24 * 60 * 60)
+            extra_days, seconds = _divmod_no_raise(seconds, 24 * 60 * 60)
             days += extra_days
 
         debug_assert(
