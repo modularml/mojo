@@ -418,6 +418,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @always_inline
     fn index(self, owned value: T, start: Int = 0) raises -> Int:
+        """Returns the index of the first occurrence of a value in a list; raises ValueError if not found."""
         var normalized_start = self.size + start if start < 0 else start
         var normalized_end = self.size
     
@@ -444,6 +445,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @always_inline
     fn index(self, owned value: T, start: Int, end: Int) raises -> Int:
+        """Returns the index of the first occurrence of a value in a list; raises ValueError if not found."""
         var normalized_start = (self.size + start) if start < 0 else start
         var normalized_end = (self.size + end) if end < 0 else end
     
