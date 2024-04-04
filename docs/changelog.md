@@ -102,3 +102,6 @@ and tools. Please add any significant user-visible changes here.
 
 - [#1924](https://github.com/modularml/mojo/issues/1924) JIT debugging on Mac
   has been fixed.
+
+- [#1963](https://github.com/modularml/mojo/issues/1963) `a!=0` is now parsed
+  and formatted correctly by `mojo format`.

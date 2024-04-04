@@ -2225,7 +2225,7 @@ fn _pow[
                 var x = lhs[i]
                 var n = rhs[i]
                 while n > 0:
-                    if n&1 != 0:
+                    if n & 1 != 0:
                         res *= x
                     x *= x
                     n >>= 1
