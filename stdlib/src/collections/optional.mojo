@@ -147,6 +147,32 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             return self._value.get[T]()[]
         return default
 
+    fn __is__(self, other: NoneType) -> Bool:
+        """Return `True` if the Optional has no value.
+
+        It allows you to use the following syntax: `if my_optional is None:`
+
+        Args:
+            other: The value to compare to (None).
+
+        Returns:
+            True if the Optional has no value and False otherwise.
+        """
+        return not self.__bool__()
+
+    fn __isnot__(self, other: NoneType) -> Bool:
+        """Return `True` if the Optional has a value.
+
+        It allows you to use the following syntax: `if my_optional is not None:`.
+
+        Args:
+            other: The value to compare to (None).
+
+        Returns:
+            True if the Optional has a value and False otherwise.
+        """
+        return self.__bool__()
+
     fn __bool__(self) -> Bool:
         """Return true if the Optional has a value.
 
