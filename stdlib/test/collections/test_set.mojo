@@ -14,7 +14,7 @@
 
 from collections.set import Set
 
-from testing import *
+from testing import assert_raises, assert_true, assert_false
 
 
 fn assert_equal[T: EqualityComparable](lhs: T, rhs: T) raises:

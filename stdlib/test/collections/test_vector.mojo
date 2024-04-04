@@ -15,7 +15,7 @@
 from collections.vector import InlinedFixedVector
 
 from test_utils import MoveCounter
-from testing import *
+from testing import assert_equal
 
 
 def test_inlined_fixed_vector():

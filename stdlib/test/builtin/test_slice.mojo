@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from testing import *
+from testing import assert_equal, assert_false
 
 
 # CHECK-LABEL: test_none_end_folds

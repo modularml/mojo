@@ -15,7 +15,7 @@
 from os.path import isdir
 from pathlib import Path, cwd
 
-from testing import *
+from testing import assert_true, assert_false
 
 
 def main():

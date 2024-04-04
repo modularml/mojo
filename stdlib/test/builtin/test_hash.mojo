@@ -19,7 +19,7 @@
 # specific. But for now they test behavior and reproducibility.
 
 from builtin.hash import _hash_simd
-from testing import *
+from testing import assert_equal, assert_not_equal, assert_true
 
 
 def same_low_bits(i1: Int, i2: Int, bits: Int = 4) -> Int:
