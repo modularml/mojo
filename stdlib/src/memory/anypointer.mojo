@@ -178,6 +178,19 @@ struct AnyPointer[T: Movable](
             dest.value
         ) = __get_address_as_owned_value(self.value)
 
+    @always_inline("nodebug")
+    fn offset(self, idx: Int) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Args:
+            idx: The offset.
+
+        Returns:
+            The new Pointer shifted by the offset.
+        """
+        # Returns a new pointer shifted by the specified offset.
+        return Self.__from_index(int(self) + int(idx) * sizeof[T]())
+
     @always_inline
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
