@@ -638,6 +638,16 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
             0, 0, Reference(self)
         )
 
+    fn update(inout self, other: Self, /):
+        """Update the dictionary with the key/value pairs from other, overwriting existing keys.
+        The argument must be positional only.
+
+        Args:
+            other: The dictionary to update from.
+        """
+        for entry in other.items():
+            self[entry[].key] = entry[].value
+
     @staticmethod
     @always_inline
     fn _new_entries(reserved: Int) -> List[Optional[DictEntry[K, V]]]:
