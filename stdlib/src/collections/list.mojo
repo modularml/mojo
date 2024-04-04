@@ -416,6 +416,59 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             earlier_idx += 1
             later_idx -= 1
 
+    @always_inline
+    fn index(self, owned value: T, start: Int = 0) raises -> Int:
+        var normalized_start = self.size + start if start < 0 else start
+        var normalized_end = self.size
+    
+        if normalized_start >= self.size: raise "Given 'start' parameter is out of range"
+    
+        var ret_val: Int = -1
+        for i in range(normalized_start, normalized_end):
+            # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
+            # could degrade the performance of the List.index method if it were to replace the current implementation,
+            # as it would essentially perform the same loop twice.
+            if ((self.data + i).bitcast[T]()[]) == value:
+                ret_val = i
+                break
+        else:
+            pass
+            # TODO: Currently, attempting to raise a message, leads to a compiler error (#issue2188)
+            # TODO: Once this issue is resolved, the commented-out code below should be uncommented.
+            # TODO: And then the if statement below should get removed completely.
+            # Code:
+            # raise "Value does not exist in list"
+        if ret_val == -1:
+            raise "Value does not exist in list"
+        return ret_val
+
+    @always_inline
+    fn index(self, owned value: T, start: Int, end: Int) raises -> Int:
+        var normalized_start = (self.size + start) if start < 0 else start
+        var normalized_end = (self.size + end) if end < 0 else end
+    
+        if normalized_end > self.size: raise "Given 'end' parameter is out of range"
+        if normalized_start >= self.size: raise "Given 'start' parameter is out of range"
+    
+        var ret_val: Int = -1
+        for i in range(normalized_start, normalized_end):
+            # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
+            # could degrade the performance of the List.index method if it were to replace the current implementation,
+            # as it would essentially perform the same loop twice.
+            if ((self.data + i).bitcast[T]()[]) == value:
+                ret_val = i
+                break
+        else:
+            pass
+            # TODO: Currently, attempting to raise a message, leads to a compiler error (#issue2188)
+            # TODO: Once this issue is resolved, the commented-out code below should be uncommented.
+            # TODO: And then the if statement below should get removed completely.
+            # Code:
+            # raise "Value does not exist in list"
+        if ret_val == -1:
+            raise "Value does not exist in list"
+        return ret_val
+
     fn clear(inout self):
         """Clears the elements in the list."""
         for i in range(self.size):
