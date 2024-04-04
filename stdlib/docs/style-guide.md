@@ -49,17 +49,21 @@ Unless otherwise noted, Mojo standard library code should follow the formatting
 produced by `mojo format -l 80`. Note that the default `mojo format` command is not enough.
 You need to specify that there is a limit of 80 characters per line with `-l 80`.
 
+It is advised, to avoid forgetting, to set-up `pre-commit`, which will format
+your changes automatically at each commit, and will also ensure that you
+always have the latest linting tools applied.
+
+To do so, install pre-commit:
+```bash
+pip install pre-commit
+pre-commit install
+```
+and that's it!
+
+
 #### Whitespace
 
-- Use 4-space indentation.
-- Do NOT use Tab characters.
 - Use vertical whitespace only as needed to organize code into logical sections.
-
-*We encourage updating your editor settings to be consistent with the above.*
-
-#### Column limit
-
-Mojo code has a column limit (line length) of 80 characters.
 
 #### File license header
 

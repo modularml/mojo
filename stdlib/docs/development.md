@@ -112,15 +112,23 @@ Otherwise, CI will fail in its lint and formatting checks.  The `mojo` compiler
 provides a `format` command.  So, you can format your changes like so:
 
 ```bash
-mojo format -l 80 <file1> <file2> ...
+mojo format -l 80 ./
 ```
 
-You can also do this before submitting a pull request by running it on the
-relevant files changed compared to the remote:
+It is advised, to avoid forgetting, to set-up `pre-commit`, which will format
+your changes automatically at each commit, and will also ensure that you
+always have the latest linting tools applied.
 
+To do so, install pre-commit:
 ```bash
-git diff origin/main --name-only -- '*.mojo' | xargs mojo format -l 80
+pip install pre-commit
+pre-commit install
 ```
+and that's it!
+
+If you need to manually apply the `pre-commit`, for example, if you
+made a commit with the github UI, you can do `pre-commit run --all-files`,
+and it will apply the formatting to all Mojo files.
 
 You can also consider setting up your editor to automatically format
 Mojo files upon saving.
@@ -327,7 +335,8 @@ Total Discovered Tests: 1
 
 Success! Now we have a test for our new function.
 
-The last step is to [run `mojo format -l 80`](#formatting-changes) on all the files.
+The last step is to [run `mojo format -l 80`](#formatting-changes) on all the files. 
+This can be skipped if `pre-commit` is installed.
 
 ### Raising a PR
 

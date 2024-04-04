@@ -76,48 +76,14 @@ jobs:
 
 
           python3 -m pip install lit
-
-      - name: Filter files changed
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
-        id: filter
-        with:
-          # Enable listing of files matching each filter.
-          # Paths to files will be available in `${FILTER_NAME}_files` output variable.
-          # Paths will be escaped and space-delimited.
-          # Output is usable as command-line argument list in Linux shell.
-          list-files: shell
-
-          filters: |
-            mojo:
-              - added|modified: '**/*.mojo'
-              - added|modified: '**/*.🔥'
-
-      # While this may seem like debugging, it's useful to see what's going on
-      # at a glance in this workflow.
-      - name: Print file changes
+      
+      - name: Install pre-commit
         run: |
-          echo "Mojo files changed below:"
-          echo ${{ steps.filter.outputs.mojo_files }}
-
-      - name: mojo-formatting
-        if: ${{ steps.filter.outputs.mojo == 'true' }}
-        run: |
-          # Make sure `mojo` is in the PATH.
-          # TODO: Refactor after https://github.com/modularml/mojo/pull/2032 lands
-          export PATH="/home/runner/.modular/pkg/packages.modular.com_nightly_mojo/bin:$PATH"
-          # The list of files from the filter step is relative to the checkout
-          # root.
-          cd $GITHUB_WORKSPACE
-          mojo format ${{ steps.filter.outputs.mojo_files }} -l 80
-          # Check if any lines were formatted.  If any were, fail this step.
-          if [ $(git diff | wc -l) -gt 0 ]; then
-            echo -e "\nError! Mojo code not formatted. Run `mojo format -l 80` ...\n"
-            echo -e "\nFiles that don't match the proper formatting:\n"
-            git diff --name-only
-            echo -e "\nFull diff:\n"
-            git diff
-            exit 1
-          fi
+          pip install pre-commit
+          pre-commit install
+      
+      - name: Run pre-commit
+        run: pre-commit run --all-files
 
       - name: Install build tools (macOS)
         if: ${{ matrix.os == 'macos-14' }}
