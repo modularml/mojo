@@ -13,10 +13,10 @@
 # REQUIRES: !windows
 # RUN: %mojo -debug-level full -D TEMP_FILE=%t %s
 
-from pathlib import *
+from pathlib import cwd, Path, DIR_SEPARATOR
 from sys.param_env import env_get_string
 
-from testing import *
+from testing import assert_true, assert_false, assert_equal, assert_not_equal
 
 alias TEMP_FILE = env_get_string["TEMP_FILE"]()
 

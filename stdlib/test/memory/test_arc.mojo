@@ -15,7 +15,7 @@
 from collections import List
 
 from memory._arc import Arc
-from testing import *
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_basic():

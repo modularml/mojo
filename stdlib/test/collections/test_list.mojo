@@ -15,7 +15,7 @@
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
-from testing import *
+from testing import assert_equal
 
 
 def test_mojo_issue_698():

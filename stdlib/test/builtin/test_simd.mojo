@@ -14,7 +14,7 @@
 
 from sys.info import has_neon, simdwidthof
 
-from testing import *
+from testing import assert_equal, assert_not_equal, assert_true
 
 
 # CHECK-LABEL: test_cast

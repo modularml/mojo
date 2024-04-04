@@ -15,7 +15,7 @@
 from os.path import isfile
 from pathlib import Path
 
-from testing import *
+from testing import assert_true, assert_false
 
 
 def main():

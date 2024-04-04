@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from testing import *
+from testing import assert_equal
 
 
 def test_constructors():

@@ -12,10 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from os import *
+from os import stat
 from stat import S_ISREG
 
-from testing import *
+from testing import assert_not_equal, assert_true
 
 
 def main():

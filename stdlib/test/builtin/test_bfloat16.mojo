@@ -15,7 +15,7 @@
 from random import randn_float64
 from sys.info import has_neon
 
-from testing import *
+from testing import assert_equal, assert_almost_equal
 
 
 def test_methods():

@@ -14,7 +14,7 @@
 
 from collections import Set
 
-from testing import *
+from testing import assert_equal, assert_false, assert_true
 
 
 fn test_stringable() raises:
