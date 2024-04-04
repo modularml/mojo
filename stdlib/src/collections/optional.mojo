@@ -163,7 +163,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     fn __isnot__(self, other: NoneType) -> Bool:
         """Return `True` if the Optional has a value.
 
-        It allows you to use the following syntax: `if my_optional is not None:`
+        It allows you to use the following syntax: `if my_optional is not None:`.
 
         Args:
             other: The value to compare to (None).
