@@ -40,10 +40,9 @@ fn test_anypointer_of_move_only_type():
     ptr.emplace_value(MoveOnlyType(42))
     # CHECK: moved 42
     var value = ptr.take_value()
-    # NOTE: Destructor is called before `print`.
-    # CHECK: deleted 42
     # CHECK: value 42
     print("value", value.value)
+    # CHECK: deleted 42
     ptr.free()
 
 
