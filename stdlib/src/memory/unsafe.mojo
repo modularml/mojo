@@ -432,7 +432,7 @@ struct _LITRef[
     element_type: AnyType,
     elt_is_mutable: __mlir_type.i1,
     lifetime: AnyLifetime[elt_is_mutable].type,
-    addr_space: __mlir_type.index = Int(0).__mlir_index__(),
+    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     alias type = __mlir_type[
         `!lit.ref<`,
@@ -440,7 +440,7 @@ struct _LITRef[
         `, `,
         lifetime,
         `, `,
-        addr_space,
+        address_space._value.value,
         `>`,
     ]
 
@@ -451,6 +451,7 @@ struct Reference[
     type: AnyType,
     is_mutable: __mlir_type.i1,
     lifetime: AnyLifetime[is_mutable].type,
+    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Defines a non-nullable safe reference.
 
@@ -458,9 +459,12 @@ struct Reference[
         type: Type of the underlying data.
         is_mutable: Whether the referenced data may be mutated through this.
         lifetime: The lifetime of the reference.
+        address_space: The address space of the referenced data.
     """
 
-    alias mlir_ref_type = _LITRef[type, is_mutable, lifetime].type
+    alias mlir_ref_type = _LITRef[
+        type, is_mutable, lifetime, address_space
+    ].type
 
     var value: Self.mlir_ref_type
     """The underlying MLIR reference."""
@@ -495,7 +499,7 @@ struct Reference[
     # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
     # disagreement.
     @always_inline("nodebug")
-    fn get_unsafe_pointer(self) -> Pointer[type]:
+    fn get_unsafe_pointer(self) -> Pointer[type, address_space]:
         """Constructs a Pointer from a safe reference.
 
         Returns:
@@ -504,7 +508,7 @@ struct Reference[
         var ptr_with_trait = __mlir_op.`lit.ref.to_pointer`(self.value)
         # Work around AnyRefType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = Pointer[type].pointer_type
+            _type = Pointer[type, address_space].pointer_type
         ](ptr_with_trait)
 
     @always_inline("nodebug")
@@ -522,7 +526,7 @@ struct Reference[
     @always_inline("nodebug")
     fn bitcast_element[
         new_element_type: AnyType
-    ](self) -> Reference[new_element_type, is_mutable, lifetime]:
+    ](self) -> Reference[new_element_type, is_mutable, lifetime, address_space]:
         """Cast the reference to one of another element type, but the same
         lifetime, mutability, and address space.
 
@@ -536,10 +540,18 @@ struct Reference[
         # to KGEN pointer.
         var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
         var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[`!kgen.pointer<`, new_element_type, `>`]
+            _type = __mlir_type[
+                `!kgen.pointer<`,
+                new_element_type,
+                `,`,
+                address_space._value.value,
+                `>`,
+            ]
         ](kgen_ptr)
         return __mlir_op.`lit.ref.from_pointer`[
-            _type = _LITRef[new_element_type, is_mutable, lifetime].type
+            _type = _LITRef[
+                new_element_type, is_mutable, lifetime, address_space
+            ].type
         ](dest_ptr)
 
     fn destroy_element_unsafe(self):
@@ -554,11 +566,30 @@ struct Reference[
             is_mutable,
             "cannot use 'unsafe_destroy_element' on immutable references",
         ]()
+
+        # This method can only work on address space 0, because the __del__
+        # method that we need to invoke will take 'self' in address space zero.
+        constrained[
+            address_space == AddressSpace.GENERIC,
+            "cannot use 'destroy_element_unsafe' on arbitrary address spaces",
+        ]()
+
         # Project to an owned raw pointer, allowing the compiler to know it is to
         # be destroyed.
-        # TODO: Use AnyPointer, but it requires a Movable element.
         var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
-        _ = __get_address_as_owned_value(kgen_ptr)
+
+        # Bitcast to address space zero since the inserted __del__ call will only
+        # work with address space zero.
+        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
+            _type = __mlir_type[
+                `!kgen.pointer<`,
+                type,
+                `>`,
+            ]
+        ](kgen_ptr)
+
+        # TODO: Use AnyPointer, but it requires a Movable element.
+        _ = __get_address_as_owned_value(dest_ptr)
 
 
 # FIXME: This should be a method on Reference, it is placed here because we need
@@ -601,7 +632,7 @@ struct Pointer[
     """
 
     alias pointer_type = __mlir_type[
-        `!kgen.pointer<`, type, `,`, address_space.value().value, `>`
+        `!kgen.pointer<`, type, `,`, address_space._value.value, `>`
     ]
 
     var address: Self.pointer_type
@@ -611,7 +642,7 @@ struct Pointer[
         type,
         __mlir_attr.`1: i1`,
         __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
-        address_space.value().value,
+        address_space,
     ].type
 
     @always_inline("nodebug")
@@ -1073,7 +1104,7 @@ struct DTypePointer[
             `!kgen.pointer<scalar<`,
             type.value,
             `>,`,
-            address_space.value().value,
+            address_space._value.value,
             `>`,
         ],
     ):
