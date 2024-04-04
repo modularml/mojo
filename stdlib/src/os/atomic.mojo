@@ -57,6 +57,15 @@ struct Atomic[type: DType]:
         """
         self.__init__(Scalar[type](value))
 
+    @always_inline
+    fn __moveinit__(inout self, owned existing: Self):
+        """Moves Constructor.
+
+        Args:
+            existing: The existing Atomic.
+        """
+        self.value = existing.value
+
     @staticmethod
     @always_inline
     fn _fetch_add(
