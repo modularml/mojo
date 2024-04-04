@@ -314,7 +314,7 @@ fn isspace(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 # String
 # ===----------------------------------------------------------------------===#
-struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
+struct String(Sized, IntableRaising, KeyElement, Boolable):
     """Represents a mutable string."""
 
     alias _buffer_type = List[Int8]
