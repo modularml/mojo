@@ -419,7 +419,6 @@ struct VariadicPack[
     lifetime: AnyLifetime[elt_is_mutable].type,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
-    # TODO: Add address_space when Reference supports it.
 ](Sized):
     """A utility class to access variadic pack  arguments and provide an API for
     doing things with them.
