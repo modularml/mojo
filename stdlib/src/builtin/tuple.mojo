@@ -37,7 +37,7 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
-    fn __init__(*args: *Ts) -> Self:
+    fn __init__(borrowed *args: *Ts) -> Self:
         """Construct the tuple.
 
         Args:
