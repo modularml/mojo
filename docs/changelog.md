@@ -80,6 +80,17 @@ and tools. Please add any significant user-visible changes here.
 
 ### ❌ Removed
 
+- Support for "register only" variadic packs has been removed. Instead of
+  `AnyRegType`, please upgrade your code to `AnyType` in examples like this:
+
+  ```mojo
+  fn [*Types: AnyRegType](*args: *Ts): ...
+  ```
+
+  This move gives you access to nicer API and has the benefit of being memory
+  safe and correct for non-trivial types.  If you need specific APIs on the
+  types, please use the correct trait bound instead of `AnyType`.
+
 - `List.pop_back()` has been removed.  Use `List.pop()` instead which defaults
   to popping the last element in the list.
 
