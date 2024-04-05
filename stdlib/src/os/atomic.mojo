@@ -75,15 +75,6 @@ struct Atomic[type: DType]:
         """
         return self.fetch_add(0)
 
-    @always_inline
-    fn __moveinit__(inout self, owned existing: Self):
-        """Moves Constructor.
-
-        Args:
-            existing: The existing Atomic.
-        """
-        self.value = existing.value
-
     @staticmethod
     @always_inline
     fn _fetch_add(
