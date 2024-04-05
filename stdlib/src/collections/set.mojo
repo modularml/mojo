@@ -171,9 +171,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         Args:
             other: Another Set instance to intersect with this one.
         """
-        # Possible to do this without an extra allocation, but need to be
-        # careful about concurrent iteration + mutation
-        self.remove_all(self - other)
+        self.intersection_update(other)
 
     fn __or__(self, other: Self) -> Self:
         """The set union operator.
@@ -191,13 +189,12 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """In-place set union.
 
         Updates the set to contain all elements in the `other` set
-        as well as all elements it already contained.
+        as well as keeping all elements it already contained.
 
         Args:
             other: Another Set instance to union with this one.
         """
-        for e in other:
-            self.add(e[])
+        self.update(other)
 
     fn __sub__(self, other: Self) -> Self:
         """Set subtraction.
@@ -209,11 +206,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             A new set containing elements of this set, but not containing
             any elements which were in the `other` set.
         """
-        var result = Set[T]()
-        for e in self:
-            if e[] not in other:
-                result.add(e[])
-        return result^
+        return self.difference(other)
 
     fn __isub__(inout self, other: Self):
         """In-place set subtraction.
@@ -223,7 +216,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         Args:
             other: Another Set instance to subtract from this one.
         """
-        self.remove_all(other)
+        self.difference_update(other)
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
@@ -317,6 +310,58 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
                 result.add(v[])
 
         return result^
+    
+    fn difference(self, other: Self) -> Self:
+        """Set difference.
+
+        Args:
+            other: Another Set instance to find the difference with this one.
+
+        Returns:
+            A new set containing elements that are in this set but not in
+            the `other` set.
+        """
+        var result = Set[T]()
+        for e in self:
+            if e[] not in other:
+                result.add(e[])
+        return result^
+    
+    fn update(inout self, other: Self):
+        """In-place set update.
+
+        Updates the set to contain all elements in the `other` set
+        as well as keeping all elements it already contained.
+
+        Args:
+            other: Another Set instance to union with this one.
+        """
+        for e in other:
+            self.add(e[])
+    
+    fn difference_update(inout self, other: Self):
+        """In-place set difference update.
+
+        Updates the set by removing all elements found in the `other` set,
+        effectively keeping only elements that are unique to this set.
+
+        Args:
+            other: Another Set instance to compare with this one.
+        """
+        self.remove_all(other)
+    
+    fn intersection_update(inout self, other: Self):
+        """In-place set intersection update.
+
+        Updates the set by retaining only elements found in both this set and the `other` set,
+        removing all other elements. The result is the intersection of this set with `other`.
+
+        Args:
+            other: Another Set instance to intersect with this one.
+        """
+        # Possible to do this without an extra allocation, but need to be
+        # careful about concurrent iteration + mutation
+        self.remove_all(self - other)
 
     fn remove_all(inout self, other: Self):
         """In-place set subtraction.
