@@ -99,7 +99,7 @@ fn _flush():
 
 
 @no_inline
-fn _printf[*types: AnyRegType](fmt: StringLiteral, *arguments: *types):
+fn _printf[*types: AnyRegType](fmt: StringLiteral, borrowed *arguments: *types):
     with _fdopen(_fdopen.STDOUT) as fd:
         _ = __mlir_op.`pop.external_call`[
             func = "KGEN_CompilerRT_fprintf".value,
@@ -121,7 +121,12 @@ fn _printf[*types: AnyRegType](fmt: StringLiteral, *arguments: *types):
 @no_inline
 fn _snprintf[
     *types: AnyRegType
-](str: Pointer[Int8], size: Int, fmt: StringLiteral, *arguments: *types) -> Int:
+](
+    str: Pointer[Int8],
+    size: Int,
+    fmt: StringLiteral,
+    borrowed *arguments: *types,
+) -> Int:
     """Writes a format string into an output pointer.
 
     Args:
