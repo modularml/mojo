@@ -122,6 +122,13 @@ struct MyStruct(Sized, Stringable):
 
 ## Code conventions
 
+### Python Standard Library
+
+We want to be a good member of the Python family and aim to become a full
+superset, so we inherit naming from the Python standard library, including any
+inconsistencies. These naming inconsistencies are the only exceptions to the
+naming conventions outlined below.
+
 ### Identifier naming conventions
 
 There are several ways to capitalize and separate words, known as "case
