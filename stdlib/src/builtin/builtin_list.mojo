@@ -36,7 +36,7 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
     """The underlying storage for the list."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, *args: *Ts):
+    fn __init__(inout self, borrowed *args: *Ts):
         """Construct the list literal from the given values.
 
         Args:

@@ -1088,7 +1088,10 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 fn _vec_fmt[
     *types: AnyRegType
 ](
-    str: AnyPointer[Int8], size: Int, fmt: StringLiteral, *arguments: *types
+    str: AnyPointer[Int8],
+    size: Int,
+    fmt: StringLiteral,
+    borrowed *arguments: *types,
 ) -> Int:
     return _snprintf(rebind[Pointer[Int8]](str), size, fmt, arguments)
 
