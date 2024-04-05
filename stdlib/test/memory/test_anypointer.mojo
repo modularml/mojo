@@ -135,6 +135,14 @@ def test_comparisons():
     p1.free()
 
 
+def test_anypointer_address_space():
+    var p1 = AnyPointer[Int, AddressSpace(0)].alloc(1)
+    p1.free()
+
+    var p2 = AnyPointer[Int, AddressSpace.GENERIC].alloc(1)
+    p2.free()
+
+
 def main():
     test_address_of()
 
@@ -148,3 +156,5 @@ def main():
     test_anypointer_string()
     test_eq()
     test_comparisons()
+
+    test_anypointer_address_space()

@@ -23,20 +23,24 @@ from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
 from memory.memory import _free, _malloc
+from memory.unsafe import _LITRef
 
 
 @register_passable("trivial")
-struct AnyPointer[T: Movable](
-    Boolable, CollectionElement, Stringable, Intable, EqualityComparable
-):
+struct AnyPointer[
+    T: Movable, address_space: AddressSpace = AddressSpace.GENERIC
+](Boolable, CollectionElement, Stringable, Intable, EqualityComparable):
     """This is a pointer type that can point to any generic value that is
     movable.
 
     Parameters:
         T: The pointer element type, which must be movable.
+        address_space: The address space associated with the AnyPointer allocated memory.
     """
 
-    alias pointer_type = __mlir_type[`!kgen.pointer<`, T, `>`]
+    alias pointer_type = __mlir_type[
+        `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
+    ]
     """The underlying pointer type."""
     var value: Self.pointer_type
     """The underlying pointer."""
@@ -76,7 +80,11 @@ struct AnyPointer[T: Movable](
             The pointer to the newly allocated array.
         """
         return Self.__from_index(
-            int(_malloc[Int8](sizeof[T]() * count, alignment=alignof[T]()))
+            int(
+                _malloc[Int8, address_space=address_space](
+                    sizeof[T]() * count, alignment=alignof[T]()
+                )
+            )
         )
 
     @staticmethod
@@ -97,10 +105,12 @@ struct AnyPointer[T: Movable](
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
-        Pointer[Int8].__from_index(int(self)).free()
+        Pointer[Int8, address_space=address_space].__from_index(
+            int(self)
+        ).free()
 
     @always_inline
-    fn bitcast[new_type: Movable](self) -> AnyPointer[new_type]:
+    fn bitcast[new_type: Movable](self) -> AnyPointer[new_type, address_space]:
         """Bitcasts the pointer to a different type.
 
         Parameters:
@@ -113,10 +123,10 @@ struct AnyPointer[T: Movable](
 
         @parameter
         if _mlirtype_is_eq[T, new_type]():
-            return rebind[AnyPointer[new_type]](self)
+            return rebind[AnyPointer[new_type, address_space]](self)
 
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = AnyPointer[new_type].pointer_type
+            _type = AnyPointer[new_type, address_space].pointer_type
         ](self.value)
 
     @always_inline
@@ -312,7 +322,10 @@ struct AnyPointer[T: Movable](
     # an immortal mutable lifetime, since we can't come up with a meaningful
     # lifetime for them anyway.
     alias mlir_ref_type = Reference[
-        T, __mlir_attr.`1: i1`, __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`
+        T,
+        __mlir_attr.`1: i1`,
+        __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
+        address_space,
     ].mlir_ref_type
 
     @always_inline

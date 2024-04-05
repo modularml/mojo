@@ -51,6 +51,7 @@ struct _DictEntryIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
+    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Iterator over immutable DictEntry references.
 
@@ -59,6 +60,7 @@ struct _DictEntryIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the dictionary is mutable.
         dict_lifetime: The lifetime of the List
+        address_space: the address_space of the list
     """
 
     alias imm_dict_lifetime = __mlir_attr[
@@ -101,6 +103,7 @@ struct _DictKeyIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
+    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Iterator over immutable Dict key references.
 
@@ -109,14 +112,21 @@ struct _DictKeyIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
+        address_space: The address space of the List
     """
 
     alias imm_dict_lifetime = __mlir_attr[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
-    alias ref_type = Reference[K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime]
+    alias ref_type = Reference[
+        K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime, address_space
+    ]
 
-    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
+    alias dict_entry_iter = _DictEntryIter[
+        K, V, dict_mutability, dict_lifetime, address_space
+    ]
+
+    var iter: Self.dict_entry_iter
 
     fn __iter__(self) -> Self:
         return self
@@ -126,9 +136,13 @@ struct _DictKeyIter[
         var mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
             Reference(entry_ref[].key).value
         )
-        var key_ptr = AnyPointer[K] {
+        var key_ptr = AnyPointer[
+            K, address_space = Self.dict_entry_iter.address_space
+        ] {
             value: __mlir_op.`pop.pointer.bitcast`[
-                _type = AnyPointer[K].pointer_type
+                _type = AnyPointer[
+                    K, address_space = Self.dict_entry_iter.address_space
+                ].pointer_type
             ](mlir_ptr)
         }
         return __mlir_op.`lit.ref.from_pointer`[
@@ -145,6 +159,7 @@ struct _DictValueIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
+    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Iterator over Dict value references. These are mutable if the dict
     is mutable.
@@ -154,11 +169,14 @@ struct _DictValueIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
+        address_space: The address space of the List
     """
 
-    alias ref_type = Reference[V, dict_mutability, dict_lifetime]
+    alias ref_type = Reference[V, dict_mutability, dict_lifetime, address_space]
 
-    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
+    var iter: _DictEntryIter[
+        K, V, dict_mutability, dict_lifetime, address_space
+    ]
 
     fn __iter__(self) -> Self:
         return self
@@ -168,9 +186,9 @@ struct _DictValueIter[
         var mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
             Reference(entry_ref[].value).value
         )
-        var value_ptr = AnyPointer[V] {
+        var value_ptr = AnyPointer[V, address_space] {
             value: __mlir_op.`pop.pointer.bitcast`[
-                _type = AnyPointer[V].pointer_type
+                _type = AnyPointer[V, address_space].pointer_type
             ](mlir_ptr)
         }
         return __mlir_op.`lit.ref.from_pointer`[
