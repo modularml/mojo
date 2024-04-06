@@ -157,7 +157,7 @@ fn chr(c: Int) -> String:
 
 # TODO: this is hard coded for decimal base
 @always_inline
-fn _atol(str: StringRef) raises -> Int:
+fn _atol(str_ref: StringRef) raises -> Int:
     """Parses the given string as a base-10 integer and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
@@ -165,37 +165,53 @@ fn _atol(str: StringRef) raises -> Int:
     error.
 
     Args:
-        str: A string to be parsed as a base-10 integer.
+        str_ref: A string to be parsed as a base-10 integer.
 
     Returns:
         An integer value that represents the string, or otherwise raises.
     """
-    if not str:
+    if not str_ref:
         raise Error("Empty String cannot be converted to integer.")
     var result = 0
     var is_negative: Bool = False
     var start: Int = 0
-    if str[0] == "-":
-        is_negative = True
-        start = 1
+    var str_len = len(str_ref)
+    var buff = str_ref._as_ptr()
+    for pos in range(start, str_len):
+        if isspace(buff[pos]):
+            continue
+
+        if str_ref[pos] == "-":
+            is_negative = True
+            start = pos + 1
+        else:
+            start = pos
+        break
 
     alias ord_0 = ord("0")
     alias ord_9 = ord("9")
-    var buff = str._as_ptr()
-    var str_len = len(str)
+    var has_space_after_number = False
     for pos in range(start, str_len):
         var digit = int(buff[pos])
         if ord_0 <= digit <= ord_9:
             result += digit - ord_0
+        elif isspace(digit):
+            has_space_after_number = True
+            start = pos + 1
+            break
         else:
             raise Error("String is not convertible to integer.")
-        if pos + 1 < str_len:
+        if pos + 1 < str_len and not isspace(buff[pos + 1]):
             var nextresult = result * 10
             if nextresult < result:
                 raise Error(
                     "String expresses an integer too large to store in Int."
                 )
             result = nextresult
+    if has_space_after_number:
+        for pos in range(start, str_len):
+            if not isspace(buff[pos]):
+                raise Error("String is not convertible to integer.")
     if is_negative:
         result = -result
     return result
