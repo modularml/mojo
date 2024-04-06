@@ -15,7 +15,7 @@
 
 from memory import Pointer
 from python._cpython import CPython, PyObjectPtr
-from python.object import PythonObject, Python
+from python import PythonObject, Python
 from testing import assert_false, assert_raises, assert_true
 
 from utils import StringRef
