@@ -37,7 +37,7 @@ def test_basic():
     assert_true(b or True)
     assert_false(b or False)
 
-    assert_equal(1, a.value())
+    assert_equal(1, a.value()[])
 
     # Test invert operator
     assert_false(~a)
@@ -50,7 +50,11 @@ def test_basic():
     assert_equal(1, a1)
     assert_equal(2, b1)
 
-    assert_equal(1, (a^).take())
+    assert_equal(1, (a ^).take())
+
+    var a2 = Optional(1)
+    a2.value()[] = 2
+    assert_equal(a2.value()[], 2)
 
 
 def test_optional_reg_basic():

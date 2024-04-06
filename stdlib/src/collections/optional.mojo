@@ -21,9 +21,9 @@ from collections.optional import Optional
 var a = Optional(1)
 var b = Optional[Int](None)
 if a:
-    print(a.value())  # prints 1
+    print(a.value()[])  # prints 1
 if b:  # bool(b) is False, so no print
-    print(b.value())
+    print(b.value()[])
 var c = a.or_else(2)
 var d = b.or_else(2)
 print(c)  # prints 1
@@ -61,9 +61,9 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     var a = Optional(1)
     var b = Optional[Int](None)
     if a:
-        print(a.value())  # prints 1
+        print(a.value()[])  # prints 1
     if b:  # bool(b) is False, so no print
-        print(b.value())
+        print(b.value()[])
     var c = a.or_else(2)
     var d = b.or_else(2)
     print(c)  # prints 1
@@ -89,7 +89,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         Args:
             value: The value to store in the optional.
         """
-        self._value = Self._type(value^)
+        self._value = Self._type(value ^)
 
     fn __init__(inout self, value: NoneType):
         """Construct an empty Optional.
@@ -100,7 +100,11 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         self = Self()
 
     @always_inline
-    fn value(self) -> T:
+    fn value[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](self: Reference[Self, mutability, self_life].mlir_ref_type) -> Reference[
+        T, mutability, self_life
+    ]:
         """Unsafely retrieve the value out of the Optional.
 
         This function currently creates a copy. Once we have lifetimes
@@ -114,8 +118,10 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         Returns:
             The contained data of the option as a T value.
         """
-        debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value.get[T]()[]
+        debug_assert(Reference(self)[].__bool__(), ".value() on empty Optional")
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Reference[T, mutability, self_life].mlir_ref_type
+        ](Reference(self)[]._value._get_ptr[T]().value)
 
     fn take(owned self) -> T:
         """Unsafely move the value out of the Optional.
