@@ -310,7 +310,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
                 result.add(v[])
 
         return result^
-    
+
     fn difference(self, other: Self) -> Self:
         """Set difference.
 
@@ -326,7 +326,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             if e[] not in other:
                 result.add(e[])
         return result^
-    
+
     fn update(inout self, other: Self):
         """In-place set update.
 
@@ -338,7 +338,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         for e in other:
             self.add(e[])
-    
+
     fn difference_update(inout self, other: Self):
         """In-place set difference update.
 
@@ -349,7 +349,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             other: Another Set instance to compare with this one.
         """
         self.remove_all(other)
-    
+
     fn intersection_update(inout self, other: Self):
         """In-place set intersection update.
 
