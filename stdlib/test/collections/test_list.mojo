@@ -128,6 +128,16 @@ def test_list_variadic_constructor():
     assert_equal(8, l[3])
 
 
+def test_list_resize():
+    var l = List[Int](1)
+    assert_equal(1, len(l))
+    l.resize(2, 0)
+    assert_equal(2, len(l))
+    assert_equal(l[1], 0)
+    l.resize(0)
+    assert_equal(len(l), 0)
+
+
 def test_list_reverse():
     #
     # Test reversing the list []
@@ -483,6 +493,7 @@ def main():
     test_list()
     test_list_pop()
     test_list_variadic_constructor()
+    test_list_resize()
     test_list_reverse()
     test_list_reverse_move_count()
     test_list_extend()
