@@ -1761,11 +1761,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if size == size_out:
             return rebind[SIMD[type, size_out]](self)
-        else:
-            alias half_size = size // 2
-            var lhs = self.slice[half_size, offset=0]()
-            var rhs = self.slice[half_size, offset=half_size]()
-            return func[type, half_size](lhs, rhs).reduce[func, size_out]()
+        alias half_size = size // 2
+        var lhs = self.slice[half_size, offset=0]()
+        var rhs = self.slice[half_size, offset=half_size]()
+        return func[type, half_size](lhs, rhs).reduce[func, size_out]()
 
     @always_inline("nodebug")
     fn reduce_max[size_out: Int = 1](self) -> SIMD[type, size_out]:
