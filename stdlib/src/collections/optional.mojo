@@ -89,7 +89,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         Args:
             value: The value to store in the optional.
         """
-        self._value = Self._type(value ^)
+        self._value = Self._type(value^)
 
     fn __init__(inout self, value: NoneType):
         """Construct an empty Optional.

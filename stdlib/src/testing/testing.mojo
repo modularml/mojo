@@ -91,7 +91,8 @@ fn assert_false[
 
 
 trait Testable(EqualityComparable, Stringable):
-    """A trait that a struct should conform to if we do equality testing on it."""
+    """A trait that a struct should conform to if we do equality testing on it.
+    """
 
     pass
 
@@ -250,14 +251,18 @@ fn assert_almost_equal[
         raise err
 
 
-fn _assert_equal_error(lhs: String, rhs: String, msg: String = "") raises -> Error:
+fn _assert_equal_error(
+    lhs: String, rhs: String, msg: String = ""
+) raises -> Error:
     var err = "AssertionError: `left == right` comparison failed:\n   left: " + lhs + "\n  right: " + rhs
     if msg:
         err += "\n  reason: " + msg
     raise err
 
 
-fn _assert_not_equal_error(lhs: String, rhs: String, msg: String = "") raises -> Error:
+fn _assert_not_equal_error(
+    lhs: String, rhs: String, msg: String = ""
+) raises -> Error:
     var err = "AssertionError: `left != right` comparison failed:\n   left: " + lhs + "\n  right: " + rhs
     if msg:
         err += "\n  reason: " + msg

@@ -50,7 +50,7 @@ def test_basic():
     assert_equal(1, a1)
     assert_equal(2, b1)
 
-    assert_equal(1, (a ^).take())
+    assert_equal(1, (a^).take())
 
     var a2 = Optional(1)
     a2.value()[] = 2
