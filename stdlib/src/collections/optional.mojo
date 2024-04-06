@@ -17,7 +17,7 @@ Your value can take on a value or `None`, and you need to check
 and explicitly extract the value to get it out.
 
 ```mojo
-from collections.optional import Optional
+from collections import Optional
 var a = Optional(1)
 var b = Optional[Int](None)
 if a:
@@ -31,7 +31,7 @@ print(d)  # prints 2
 ```
 """
 
-from utils.variant import Variant
+from utils import Variant
 
 
 # TODO(27780): NoneType can't currently conform to traits
@@ -57,7 +57,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     copy/move for Optional and allow it to be used in collections itself.
 
     ```mojo
-    from collections.optional import Optional
+    from collections import Optional
     var a = Optional(1)
     var b = Optional[Int](None)
     if a:

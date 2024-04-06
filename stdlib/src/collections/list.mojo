@@ -20,8 +20,7 @@ from collections import List
 """
 
 
-from memory.anypointer import AnyPointer
-from memory.unsafe import Reference
+from memory import AnyPointer, Reference
 
 # ===----------------------------------------------------------------------===#
 # Utilties

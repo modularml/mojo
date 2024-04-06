@@ -16,7 +16,7 @@ indices.
 You can import these APIs from the `utils` package. For example:
 
 ```mojo
-from utils.index import StaticIntTuple
+from utils import StaticIntTuple
 ```
 """
 

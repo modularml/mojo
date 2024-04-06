@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from sys.intrinsics import (
+from sys import (
     compressed_store,
     masked_load,
     masked_store,
@@ -20,7 +20,7 @@ from sys.intrinsics import (
     strided_store,
 )
 
-from memory.unsafe import DTypePointer
+from memory import DTypePointer
 
 
 # CHECK-LABEL: test_strided_load

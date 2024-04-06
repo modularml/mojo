@@ -19,7 +19,7 @@
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
 
-from sys.info import has_intel_amx, os_is_linux
+from sys import has_intel_amx, os_is_linux
 
 from IntelAMX import init_intel_amx
 

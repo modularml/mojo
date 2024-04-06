@@ -15,13 +15,13 @@
 You can import these APIs from the `complex` package. For example:
 
 ```mojo
-from sys.intrinsics import PrefetchLocality
+from sys import PrefetchLocality
 ```
 """
 
-from sys.info import sizeof
+from sys import sizeof
 
-from memory.unsafe import AddressSpace, DTypePointer
+from memory import AddressSpace, DTypePointer
 
 # ===----------------------------------------------------------------------===#
 # llvm_intrinsic

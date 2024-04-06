@@ -13,10 +13,9 @@
 # XFAIL: asan && !system-darwin
 # RUN: %mojo %s | FileCheck %s
 
-from memory.unsafe import Pointer
+from memory import Pointer
 from python._cpython import CPython, PyObjectPtr
-from python.object import PythonObject
-from python.python import Python
+from python.object import PythonObject, Python
 from testing import assert_false, assert_raises, assert_true
 
 from utils import StringRef

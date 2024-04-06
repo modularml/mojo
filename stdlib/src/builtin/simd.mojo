@@ -15,17 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import llvm_intrinsic
-from sys.info import has_neon, is_x86, simdwidthof
+from sys import llvm_intrinsic, has_neon, is_x86, simdwidthof
 
 from builtin.hash import _hash_simd
-from memory.unsafe import bitcast
+from memory import bitcast
 
 from utils._numerics import FPUtils
 from utils._numerics import isnan as _isnan
 from utils._numerics import nan as _nan
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils.static_tuple import StaticTuple
+from utils import StaticTuple
 
 from .dtype import _integral_type_of
 from .io import _snprintf_scalar

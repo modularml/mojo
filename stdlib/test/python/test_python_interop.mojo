@@ -13,11 +13,10 @@
 # XFAIL: asan && !system-darwin
 # RUN: %mojo -D TEST_DIR=%S %s | FileCheck %s
 
-from sys.param_env import env_get_string
+from sys import env_get_string
 
 from python._cpython import CPython, PyObjectPtr
-from python.object import PythonObject
-from python.python import Python, _get_global_python_itf
+from python.python import Python, _get_global_python_itf, PythonObject
 
 alias TEST_DIR = env_get_string["TEST_DIR"]()
 

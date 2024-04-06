@@ -13,7 +13,7 @@
 # RUN: %mojo -debug-level full %s
 
 from collections import Optional
-from collections.dict import Dict, KeyElement
+from collections import Dict, KeyElement
 
 from test_utils import CopyCounter
 from testing import assert_equal, assert_false, assert_raises

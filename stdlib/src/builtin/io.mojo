@@ -15,11 +15,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import external_call
-from sys.info import bitwidthof, os_is_windows, triple_is_nvidia_cuda
+from sys import bitwidthof, os_is_windows, triple_is_nvidia_cuda, external_call
 
 from builtin.dtype import _get_dtype_printf_format
-from memory.unsafe import Pointer
+from memory import Pointer
 
 from utils import StringRef, unroll
 

@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from sys.info import has_neon, simdwidthof
+from sys import has_neon, simdwidthof
 
 from testing import assert_equal, assert_not_equal, assert_true
 

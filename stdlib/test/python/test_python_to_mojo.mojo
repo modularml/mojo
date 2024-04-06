@@ -12,8 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
 # RUN: %mojo %s | FileCheck %s
-from python.object import PythonObject
-from python.python import Python
+from python import Python, PythonObject
 
 
 fn test_string_to_python_to_mojo(inout python: Python) raises:
@@ -23,6 +22,7 @@ fn test_string_to_python_to_mojo(inout python: Python) raises:
     # CHECK: Mojo
     var cap_mojo_string = str(py_string_capitalized)
     print(cap_mojo_string)
+
 
 fn test_range() raises:
     var array_size: PythonObject = 2
