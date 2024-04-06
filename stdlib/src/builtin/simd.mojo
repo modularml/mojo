@@ -1473,7 +1473,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         return _hash_simd(self)
 
-    @always_inline("nodebug")
+    @always_inline
     fn slice[
         output_width: Int, /, *, offset: Int = 0
     ](self) -> SIMD[type, output_width]:
