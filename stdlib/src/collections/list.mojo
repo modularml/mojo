@@ -279,8 +279,8 @@ struct List[T: CollectionElement](CollectionElement, Sized):
     fn resize(inout self, new_size: Int):
         """Resizes the list to the given new size.
 
-        With no new value provided, the new size must be smaller than the current one. Elements at the end
-        are discarded.
+        With no new value provided, the new size must be smaller than or equal
+        to the current one. Elements at the end are discarded.
 
         Args:
             new_size: The new size.
