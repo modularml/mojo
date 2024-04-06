@@ -15,7 +15,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: darwin
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo -debug-level full %s
 
 
 from sys import (
@@ -25,30 +25,23 @@ from sys import (
     os_is_macos,
     os_is_windows,
 )
+from testing import assert_true, assert_false
 
 
-# CHECK-LABEL: test_os_query
-fn test_os_query():
-    print("== test_os_query")
+fn test_os_query() raises:
+    assert_true(os_is_macos())
 
-    # CHECK: True
-    print(os_is_macos())
+    assert_false(os_is_linux())
 
-    # CHECK: False
-    print(os_is_linux())
-
-    # CHECK: False
-    print(os_is_windows())
+    assert_false(os_is_windows())
 
     # The mac systems are either arm64 or intel, so they are always little
     # endian at the moment.
 
-    # CHECK: True
-    print(is_little_endian())
+    assert_true(is_little_endian())
 
-    # CHECK: False
-    print(is_big_endian())
+    assert_false(is_big_endian())
 
 
-fn main():
+def main():
     test_os_query()

@@ -10,82 +10,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo -debug-level full %s
 
 from os import Atomic
 from testing import assert_equal
 
 
-# CHECK-LABEL: test_atomic
-fn test_atomic():
-    print("== test_atomic")
-
+fn test_atomic() raises:
     var atom: Atomic[DType.index] = 3
 
-    # CHECK: 3
-    print(atom.value)
+    assert_equal(atom.value, 3)
 
     atom += 4
-
-    # CHECK: 7
-    print(atom.value)
+    assert_equal(atom.value, 7)
 
     atom -= 4
+    assert_equal(atom.value, 3)
 
-    # CHECK: 3
-    print(atom.value)
-
-    # CHECK: 3
     atom.max(0)
-    print(atom.value)
+    assert_equal(atom.value, 3)
 
-    # CHECK: 42
     atom.max(42)
-    print(atom.value)
+    assert_equal(atom.value, 42)
 
-    # CHECK: 3
     atom.min(3)
-    print(atom.value)
+    assert_equal(atom.value, 3)
 
-    # CHECK: 0
     atom.min(0)
-    print(atom.value)
+    assert_equal(atom.value, 0)
 
 
-# CHECK-LABEL: test_atomic_floating_point
-fn test_atomic_floating_point():
-    print("== test_atomic_floating_point")
-
+fn test_atomic_floating_point() raises:
     var atom: Atomic[DType.float32] = Float32(3.0)
 
-    # CHECK: 3.0
-    print(atom.value)
+    assert_equal(atom.value, 3.0)
 
     atom += 4
-
-    # CHECK: 7.0
-    print(atom.value)
+    assert_equal(atom.value, 7.0)
 
     atom -= 4
+    assert_equal(atom.value, 3.0)
 
-    # CHECK: 3.0
-    print(atom.value)
-
-    # CHECK: 3.0
     atom.max(0)
-    print(atom.value)
+    assert_equal(atom.value, 3.0)
 
-    # CHECK: 42.0
     atom.max(42)
-    print(atom.value)
+    assert_equal(atom.value, 42.0)
 
-    # CHECK: 3.0
     atom.min(3)
-    print(atom.value)
+    assert_equal(atom.value, 3.0)
 
-    # CHECK: 0.0
     atom.min(0)
-    print(atom.value)
+    assert_equal(atom.value, 0.0)
 
 
 def test_atomic_move_constructor():

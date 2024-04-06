@@ -14,14 +14,16 @@
 # RUN: %mojo %s | FileCheck %s
 from python import Python, PythonObject
 
+from testing import assert_equal
+
 
 fn test_string_to_python_to_mojo(inout python: Python) raises:
     var py_string = PythonObject("mojo")
     var py_string_capitalized = py_string.capitalize()
 
-    # CHECK: Mojo
     var cap_mojo_string = str(py_string_capitalized)
-    print(cap_mojo_string)
+    assert_equal(cap_mojo_string, "Mojo")
+
 
 
 fn test_range() raises:
