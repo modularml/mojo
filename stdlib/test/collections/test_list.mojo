@@ -296,6 +296,43 @@ def test_list_insert():
 
     vec.clear()
     
+    #
+    # Test the list [1, 2, 3, 4, 5] created with negative and positive index
+    #
+
+    vec.insert(-1729, 2)
+    vec.insert(len(vec), 3)
+    vec.insert(len(vec), 5)
+    vec.insert(-1, 4)
+    vec.insert(-len(vec), 1)
+
+    assert_equal(len(vec), 5)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 2)
+    assert_equal(vec[2], 3)
+    assert_equal(vec[3], 4)
+    assert_equal(vec[4], 5) 
+
+    vec.clear()
+
+
+    #
+    # Test the list [1, 2, 3, 4] created with negative index
+    #
+
+    vec.insert(-11, 4)
+    vec.insert(-13, 3)
+    vec.insert(-17, 2)
+    vec.insert(-19, 1)
+
+    assert_equal(len(vec), 4)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 2)
+    assert_equal(vec[2], 3)
+    assert_equal(vec[3], 4)
+    
+    vec.clear()
+    
     # 
     # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
     #
