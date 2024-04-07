@@ -62,6 +62,7 @@ from .intrinsics import (
     compressed_store,
     strided_load,
     strided_store,
+    _RegisterPackType,
 )
 from .param_env import (
     is_defined,
