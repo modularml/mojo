@@ -136,7 +136,9 @@ struct _RefCountedAttrsDict:
     """The implementation of the map."""
 
     fn __init__(inout self):
-        self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](Dict[StringLiteral, _ObjectImpl]())
+        self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](
+            Dict[StringLiteral, _ObjectImpl]()
+        )
 
     @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
@@ -208,7 +210,7 @@ struct _RefCountedAttrsDictRef:
         return Self {attrs: self.attrs}
 
     fn release(self):
-        var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl 
+        var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
 
 
 @register_passable("trivial")
