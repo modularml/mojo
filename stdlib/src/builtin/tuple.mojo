@@ -73,7 +73,7 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
 
     @always_inline("nodebug")
     fn get[i: Int, T: AnyRegType](self) -> T:
-        """Get a tuple element.
+        """Get a tuple element and rebind to the specified type.
 
         Parameters:
             i: The element index.
@@ -82,9 +82,19 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         Returns:
             The tuple element at the requested index.
         """
-        return rebind[T](
-            __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
-        )
+        return rebind[T](self.get[i]())
+
+    @always_inline("nodebug")
+    fn get[i: Int](self) -> Ts[i.value]:
+        """Get a tuple element.
+
+        Parameters:
+            i: The element index.
+
+        Returns:
+            The tuple element at the requested index.
+        """
+        return __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
 
     @staticmethod
     fn _offset[i: Int]() -> Int:
