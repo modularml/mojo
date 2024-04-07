@@ -1271,3 +1271,28 @@ fn _mlirtype_is_eq[t1: AnyRegType, t2: AnyRegType]() -> Bool:
         `> : !kgen.type`,
         `> : i1`,
     ]
+
+
+# ===----------------------------------------------------------------------=== #
+# Transitional type used for llvm_intrinsic
+# ===----------------------------------------------------------------------=== #
+
+
+@register_passable
+struct _RegisterPackType[*a: AnyRegType]:
+    var storage: __mlir_type[`!kgen.pack<`, a, `>`]
+
+    @always_inline("nodebug")
+    fn get[i: Int, T: AnyRegType](self) -> T:
+        """Get the element.
+
+        Parameters:
+            i: The element index.
+            T: The element type.
+
+        Returns:
+            The tuple element at the requested index.
+        """
+        return rebind[T](
+            __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
+        )
