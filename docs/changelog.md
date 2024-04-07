@@ -84,7 +84,7 @@ and tools. Please add any significant user-visible changes here.
   `AnyRegType`, please upgrade your code to `AnyType` in examples like this:
 
   ```mojo
-  fn [*Types: AnyRegType](*args: *Ts): ...
+  fn your_function[*Types: AnyRegType](*args: *Ts): ...
   ```
 
   This move gives you access to nicer API and has the benefit of being memory
