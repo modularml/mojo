@@ -65,7 +65,7 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
             The element at the given index.
         """
         return rebind[T](
-            __mlir_op.`kgen.pack.get`[index = i.value](self.storage)
+            __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
         )
 
 
@@ -522,7 +522,7 @@ struct VariadicPack[
             A reference to the element.  The Reference's mutability follows the
             mutability of the pack argument convention.
         """
-        var ref_elt = __mlir_op.`lit.ref.pack.get`[index = index.value](
+        var ref_elt = __mlir_op.`lit.ref.pack.extract`[index = index.value](
             self._value
         )
 
