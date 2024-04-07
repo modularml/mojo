@@ -65,6 +65,10 @@ and tools. Please add any significant user-visible changes here.
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
 
+- `Tuple.get` now supports a form that just takes an element index but does not
+  require you to specify the result type.  Instead of `tup.get[1, Int]()` you
+  can now just use `tup.get[1]()`.
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
