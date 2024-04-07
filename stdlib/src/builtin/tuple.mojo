@@ -37,25 +37,22 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
-    fn __init__(borrowed *args: *Ts) -> Self:
+    fn __init__(inout self, borrowed *args: *Ts):
         """Construct the tuple.
 
         Args:
             args: Initial values.
-
-        Returns:
-            Constructed tuple.
         """
-        return Self {storage: args}
+        self.storage = args
 
     @always_inline("nodebug")
-    fn __copyinit__(existing: Self) -> Self:
+    fn __copyinit__(inout self, existing: Self):
         """Copy construct the tuple.
 
-        Returns:
-            Constructed tuple.
+        Args:
+            existing: The value to copy from.
         """
-        return Self {storage: existing.storage}
+        self.storage = existing.storage
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
