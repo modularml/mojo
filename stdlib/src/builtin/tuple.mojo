@@ -23,11 +23,93 @@ from utils._visualizers import lldb_formatter_wrapping_type
 
 
 @lldb_formatter_wrapping_type
-@register_passable
 struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
     """The type of a literal tuple expression.
 
     A tuple consists of zero or more values, separated by commas.
+
+    Parameters:
+        Ts: The elements type.
+    """
+
+    var storage: __mlir_type[`!kgen.pack<`, Ts, `>`]
+    """The underlying storage for the tuple."""
+
+    @always_inline("nodebug")
+    fn __init__(inout self, borrowed *args: *Ts):
+        """Construct the tuple.
+
+        Args:
+            args: Initial values.
+        """
+        self.storage = args
+
+    @always_inline("nodebug")
+    fn __copyinit__(inout self, existing: Self):
+        """Copy construct the tuple.
+
+        Args:
+            existing: The value to copy from.
+        """
+        self.storage = existing.storage
+
+    @always_inline("nodebug")
+    fn __moveinit__(inout self, owned existing: Self):
+        """Move construct the tuple.
+
+        Args:
+            existing: The value to move from.
+        """
+        self.storage = existing.storage
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        """Get the number of elements in the tuple.
+
+        Returns:
+            The tuple length.
+        """
+        return __mlir_op.`pop.variadic.size`(Ts)
+
+    @always_inline("nodebug")
+    fn get[i: Int, T: AnyRegType](self) -> T:
+        """Get a tuple element.
+
+        Parameters:
+            i: The element index.
+            T: The element type.
+
+        Returns:
+            The tuple element at the requested index.
+        """
+        return rebind[T](
+            __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
+        )
+
+    @staticmethod
+    fn _offset[i: Int]() -> Int:
+        constrained[i >= 0, "index must be positive"]()
+
+        @parameter
+        if i == 0:
+            return 0
+        else:
+            return _align_up(
+                Self._offset[i - 1]()
+                + _align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
+                alignof[Ts[i]](),
+            )
+
+
+# ===----------------------------------------------------------------------===#
+# _DeprecatedRegisterTuple
+# ===----------------------------------------------------------------------===#
+
+
+@register_passable
+struct _DeprecatedRegisterTuple[*Ts: AnyRegType](Sized, CollectionElement):
+    """This is a deprecated register-passable tuple type, maintained to keep
+    compatibility with older code that can't handle memory-only tuple type yet.
 
     Parameters:
         Ts: The elements type.
