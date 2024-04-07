@@ -1318,6 +1318,18 @@ struct object(IntableRaising, Boolable, Stringable):
     # TODO: __rshift__
 
     @always_inline
+    fn __truediv__(self, rhs: object) raises -> object:
+        return Self._arithmetic_binary_op[Float64.__truediv__, Int64.__truediv__](
+            self, rhs
+        )
+
+    @always_inline
+    fn __floordiv__(self, rhs: object) raises -> object:
+        return Self._arithmetic_binary_op[Float64.__floordiv__, Int64.__floordiv__](
+            self, rhs
+        )
+
+    @always_inline
     fn __and__(self, rhs: object) raises -> object:
         """Bool AND operator. If the left hand value is False, return the
         left-hand value.
