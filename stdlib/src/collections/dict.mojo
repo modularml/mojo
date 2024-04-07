@@ -133,21 +133,8 @@ struct _DictKeyIter[
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
-        var mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
-            Reference(entry_ref[].key).value
-        )
-        var key_ptr = AnyPointer[
-            K, address_space = Self.dict_entry_iter.address_space
-        ] {
-            value: __mlir_op.`pop.pointer.bitcast`[
-                _type = AnyPointer[
-                    K, address_space = Self.dict_entry_iter.address_space
-                ].pointer_type
-            ](mlir_ptr)
-        }
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Self.ref_type.mlir_ref_type
-        ](key_ptr.value)
+        var anyptr = AnyPointer(Reference(entry_ref[].key))
+        return anyptr.address_space_cast[Self.dict_entry_iter.address_space]()[]
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
@@ -183,17 +170,10 @@ struct _DictValueIter[
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
-        var mlir_ptr = __mlir_op.`lit.ref.to_pointer`(
-            Reference(entry_ref[].value).value
-        )
-        var value_ptr = AnyPointer[V, address_space] {
-            value: __mlir_op.`pop.pointer.bitcast`[
-                _type = AnyPointer[V, address_space].pointer_type
-            ](mlir_ptr)
-        }
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Self.ref_type.mlir_ref_type
-        ](value_ptr.value)
+        # Cast through a pointer to grant additional mutability and switch
+        # address spaces out.
+        var anyptr = AnyPointer(Reference(entry_ref[].value))
+        return anyptr.address_space_cast[address_space]()[]
 
     fn __len__(self) -> Int:
         return self.iter.__len__()

@@ -497,7 +497,7 @@ struct Reference[
         return self.value
 
     # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
-    # disagreement.
+    # disagreement.  Use AnyPointer instead!
     @always_inline("nodebug")
     fn get_unsafe_pointer(self) -> Pointer[type, address_space]:
         """Constructs a Pointer from a safe reference.
@@ -538,6 +538,7 @@ struct Reference[
         """
         # We don't have a generalized lit.ref.cast operation, so convert through
         # to KGEN pointer.
+        # FIXME: We can't use AnyPointer here, because it requires T <- Movable.
         var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
         var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
             _type = __mlir_type[
@@ -552,6 +553,36 @@ struct Reference[
             _type = _LITRef[
                 new_element_type, is_mutable, lifetime, address_space
             ].type
+        ](dest_ptr)
+
+    @always_inline
+    fn address_space_cast[
+        new_address_space: AddressSpace
+    ](self) -> Reference[type, is_mutable, lifetime, new_address_space]:
+        """Cast the reference to one of another address space, but the same
+        element type, lifetime, and mutability.
+
+        Parameters:
+            new_address_space: The address space of the result.
+
+        Returns:
+            The new reference.
+        """
+        # We don't have a generalized lit.ref.cast operation, so convert through
+        # to KGEN pointer.
+        # FIXME: We can't use AnyPointer here, because it requires T <- Movable.
+        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
+        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
+            _type = __mlir_type[
+                `!kgen.pointer<`,
+                type,
+                `,`,
+                new_address_space._value.value,
+                `>`,
+            ]
+        ](kgen_ptr)
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = _LITRef[type, is_mutable, lifetime, new_address_space].type
         ](dest_ptr)
 
     fn destroy_element_unsafe(self):

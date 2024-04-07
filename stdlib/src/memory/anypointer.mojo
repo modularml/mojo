@@ -68,6 +68,18 @@ struct AnyPointer[
         """
         return Self {value: value}
 
+    @always_inline
+    fn __init__(value: Reference[T, _, _, address_space]) -> Self:
+        """Create an unsafe AnyPointer from a safe Reference.
+
+        Args:
+            value: The input pointer to construct with.
+
+        Returns:
+            A null pointer.
+        """
+        return Self {value: __mlir_op.`lit.ref.to_pointer`(value.value)}
+
     @staticmethod
     @always_inline
     fn alloc(count: Int) -> Self:
@@ -127,6 +139,24 @@ struct AnyPointer[
 
         return __mlir_op.`pop.pointer.bitcast`[
             _type = AnyPointer[new_type, address_space].pointer_type
+        ](self.value)
+
+    @always_inline
+    fn address_space_cast[
+        new_address_space: AddressSpace
+    ](self) -> AnyPointer[T, new_address_space]:
+        """Bitcasts the pointer to a different address space.
+
+        Parameters:
+            new_address_space: The address space of the result.
+
+        Returns:
+            A new pointer with the same type and address, but a new address
+            space.
+        """
+
+        return __mlir_op.`pop.pointer.bitcast`[
+            _type = AnyPointer[T, new_address_space].pointer_type
         ](self.value)
 
     @always_inline

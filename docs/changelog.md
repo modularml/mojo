@@ -69,6 +69,12 @@ and tools. Please add any significant user-visible changes here.
   require you to specify the result type.  Instead of `tup.get[1, Int]()` you
   can now just use `tup.get[1]()`.
 
+- `Reference` interoperates with unsafe code better: `AnyPointer` now has a
+  constructor that forms it from `Reference` directly (inferring element type
+  and address space). `AnyPointer` can convert to an immortal mutable
+  `Reference` with `yourptr[]`.  Both `Reference` and `AnyPointer` now have an
+  `address_space_cast` method like `Pointer`.
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
