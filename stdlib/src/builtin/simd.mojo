@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import llvm_intrinsic
+from sys import llvm_intrinsic, _RegisterPackType
 from sys.info import has_neon, is_x86, simdwidthof
 
 from builtin.hash import _hash_simd
@@ -1701,7 +1701,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         var res = llvm_intrinsic[
             "llvm.experimental.vector.deinterleave2",
-            (SIMD[type, size // 2], SIMD[type, size // 2]),
+            _RegisterPackType[SIMD[type, size // 2], SIMD[type, size // 2]],
         ](self)
         return StaticTuple[SIMD[type, size // 2], 2](
             res.get[0, SIMD[type, size // 2]](),
