@@ -77,24 +77,6 @@ struct _ImmutableString:
         return -1 if self.length < rhs.length else 1
 
 
-struct _List(Movable):
-    """Arc accepts only movable types. This is a list of `_ObjectImpl` values"""
-
-    var impl: List[_ObjectImpl]
-    """The list value."""
-
-    fn __init__(inout self):
-        self.impl = List[_ObjectImpl]()
-
-    fn __moveinit__(inout self, owned existing: Self):
-        self.impl = existing.impl
-        existing.impl = List[_ObjectImpl]()
-
-    fn __del__(owned self):
-        for i in range(len(self.impl)):
-            self.impl[i].destroy()
-
-
 struct _RefCountedList:
     """Python objects have the behaviour that bool, int, float, and str are
     passed by value but lists and dictionaries are passed by reference. In order
@@ -102,11 +84,11 @@ struct _RefCountedList:
     ref-counted data types.
     """
 
-    var impl: Arc[_List]
+    var impl: Arc[List[_ObjectImpl]]
     """The list value."""
 
     fn __init__(inout self):
-        self.impl = Arc[_List](_List())
+        self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
 
 
 @register_passable("trivial")
@@ -654,25 +636,25 @@ struct _ObjectImpl(CollectionElement, Stringable):
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_list_ptr(self) -> Arc[_List]:
+    fn get_list_ptr(self) -> Arc[List[_ObjectImpl]]:
         return self.get_as_list().lst.bitcast[_RefCountedList]()[].impl
 
     @always_inline
     fn list_append(self, value: Self):
-        self.get_list_ptr()[].impl.append(value.value)
+        self.get_list_ptr()[].append(value.value)
 
     @always_inline
     fn get_list_length(self) -> Int:
-        return len(self.get_list_ptr()[].impl)
+        return len(self.get_list_ptr()[])
 
     @always_inline
     fn get_list_element(self, i: Int) -> _ObjectImpl:
-        return self.get_list_ptr()[].impl[i].copy()
+        return self.get_list_ptr()[][i].copy()
 
     @always_inline
     fn set_list_element(self, i: Int, value: _ObjectImpl):
-        self.get_list_ptr()[].impl[i].destroy()
-        self.get_list_ptr()[].impl[i] = value
+        self.get_list_ptr()[][i].destroy()
+        self.get_list_ptr()[][i] = value
 
     # ===------------------------------------------------------------------=== #
     # Object Attribute Functions
