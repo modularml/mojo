@@ -75,6 +75,12 @@ and tools. Please add any significant user-visible changes here.
   `Reference` with `yourptr[]`.  Both `Reference` and `AnyPointer` now have an
   `address_space_cast` method like `Pointer`.
 
+- A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
+  the underlying memory representation as a `!lit.ref` value without checking
+  initialization status of the underlying value.  This is useful in very
+  low-level logic but isn't designed for general usability and will likely
+  change in the future.
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
