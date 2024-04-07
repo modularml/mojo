@@ -78,7 +78,7 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
             The tuple element at the requested index.
         """
         return rebind[T](
-            __mlir_op.`kgen.pack.get`[index = i.value](self.storage)
+            __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
         )
 
     @staticmethod
