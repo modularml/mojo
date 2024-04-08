@@ -20,6 +20,7 @@ from collections import List
 """
 
 
+from memory.anypointer import *
 from memory import AnyPointer, Reference
 
 # ===----------------------------------------------------------------------===#
@@ -161,7 +162,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
-            _ = (self.data + i).take_value()
+            destroy_pointee(self.data + i)
         if self.data:
             self.data.free()
 
@@ -186,7 +187,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         var new_data = AnyPointer[T].alloc(new_capacity)
 
         for i in range(self.size):
-            (new_data + i).emplace_value((self.data + i).take_value())
+            move_pointee(src=self.data + i, dst=new_data + i)
 
         if self.data:
             self.data.free()
@@ -202,7 +203,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         if self.size >= self.capacity:
             self._realloc(_max(1, self.capacity * 2))
-        (self.data + self.size).emplace_value(value^)
+        initialize_pointee(self.data + self.size, value^)
         self.size += 1
 
     @always_inline
@@ -228,9 +229,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             var earlier_ptr = self.data + earlier_idx
             var later_ptr = self.data + later_idx
 
-            var tmp = earlier_ptr.take_value()
-            later_ptr.move_into(earlier_ptr)
-            later_ptr.emplace_value(tmp^)
+            var tmp = __get_address_as_owned_value(earlier_ptr.value)
+            move_pointee(src=later_ptr, dst=earlier_ptr)
+            initialize_pointee(later_ptr, tmp^)
 
             earlier_idx -= 1
             later_idx -= 1
@@ -268,7 +269,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             # `other` list into this list using a single `T.__moveinit()__`
             # call, without moving into an intermediate temporary value
             # (avoiding an extra redundant move constructor call).
-            src_ptr.move_into(dest_ptr)
+            move_pointee(src=src_ptr, dst=dest_ptr)
 
             dest_ptr = dest_ptr + 1
 
@@ -292,9 +293,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if i < 0:
             normalized_idx += len(self)
 
-        var ret_val = (self.data + normalized_idx).take_value()
+        var ret_val = move_from_pointee(self.data + normalized_idx)
         for j in range(normalized_idx + 1, self.size):
-            (self.data + j).move_into(self.data + j - 1)
+            move_pointee(src=self.data + j, dst=self.data + j - 1)
         self.size -= 1
         if self.size * 4 < self.capacity:
             if self.capacity > 1:
@@ -332,9 +333,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         else:
             self.reserve(new_size)
             for i in range(new_size, self.size):
-                _ = (self.data + i).take_value()
+                destroy_pointee(self.data + i)
             for i in range(self.size, new_size):
-                (self.data + i).emplace_value(value)
+                initialize_pointee(self.data + i, value)
             self.size = new_size
 
     @always_inline
@@ -355,7 +356,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             ),
         )
         for i in range(new_size, self.size):
-            _ = (self.data + i).take_value()
+            destroy_pointee(self.data + i)
         self.size = new_size
         self.reserve(new_size)
 
@@ -390,9 +391,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             var earlier_ptr = self.data + earlier_idx
             var later_ptr = self.data + later_idx
 
-            var tmp = earlier_ptr.take_value()
-            later_ptr.move_into(earlier_ptr)
-            later_ptr.emplace_value(tmp^)
+            var tmp = move_from_pointee(earlier_ptr)
+            move_pointee(src=later_ptr, dst=earlier_ptr)
+            initialize_pointee(later_ptr, tmp^)
 
             earlier_idx += 1
             later_idx -= 1
@@ -400,7 +401,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn clear(inout self):
         """Clears the elements in the list."""
         for i in range(self.size):
-            _ = (self.data + i).take_value()
+            destroy_pointee(self.data + i)
         self.size = 0
 
     fn steal_data(inout self) -> AnyPointer[T]:
@@ -428,8 +429,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if i < 0:
             normalized_idx += len(self)
 
-        _ = (self.data + normalized_idx).take_value()
-        (self.data + normalized_idx).emplace_value(value^)
+        destroy_pointee(self.data + normalized_idx)
+        initialize_pointee(self.data + normalized_idx, value^)
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:

@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s --dump-input=always
 
+from memory.unsafe_pointer import move_from_pointee, move_pointee
 from memory import AnyPointer
 from test_utils import MoveCounter
 from testing import assert_equal, assert_not_equal, assert_true
@@ -37,31 +38,31 @@ fn test_anypointer_of_move_only_type():
 
     var ptr = AnyPointer[MoveOnlyType].alloc(1)
     # CHECK: moved 42
-    ptr.emplace_value(MoveOnlyType(42))
+    initialize_pointee(ptr, MoveOnlyType(42))
     # CHECK: moved 42
-    var value = ptr.take_value()
+    var value = move_from_pointee(ptr)
     # CHECK: value 42
     print("value", value.value)
     # CHECK: deleted 42
     ptr.free()
 
 
-def test_anypointer_move_into_move_count():
+def test_anypointer_move_pointee_move_count():
     var ptr = AnyPointer[MoveCounter[Int]].alloc(1)
 
     var value = MoveCounter(5)
     assert_equal(0, value.move_count)
-    ptr.emplace_value(value^)
+    initialize_pointee(ptr, value^)
 
     # -----
-    # Test that `AnyPointer.move_into` performs exactly one move.
+    # Test that `AnyPointer.move_pointee` performs exactly one move.
     # -----
 
     assert_equal(1, ptr[].move_count)
 
     var ptr_2 = AnyPointer[MoveCounter[Int]].alloc(1)
 
-    ptr.move_into(ptr_2)
+    move_pointee(src=ptr, dst=ptr_2)
 
     assert_equal(2, ptr_2[].move_count)
 
@@ -150,7 +151,7 @@ def main():
     test_refitem_offset()
 
     test_anypointer_of_move_only_type()
-    test_anypointer_move_into_move_count()
+    test_anypointer_move_pointee_move_count()
 
     test_bitcast()
     test_anypointer_string()
