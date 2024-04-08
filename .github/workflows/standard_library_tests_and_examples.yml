@@ -131,5 +131,4 @@ jobs:
       - name: Run standard library tests and examples
         run: |
           ./stdlib/scripts/run-tests.sh
-          # TODO: Examples are currently broken with latest nightly
-          # ./examples/run-examples.sh
+          ./examples/run-examples.sh
