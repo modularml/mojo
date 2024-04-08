@@ -93,6 +93,13 @@ and tools. Please add any significant user-visible changes here.
   lead to a crash.  You can work around this by initializing to a dummy value
   and overwriting later.  This limitation only applies to top level variables,
   variables in functions work as they always have.
+- The `AnyPointer` type has several changes, including:
+  1) The element type can now be `AnyType`, it doesn't require `Movable`.
+  2) Because of this, the `take_value`, `emplace_value`, and `move_into` methods
+     have been changed to be top-level functions, and were renamed to
+     `move_from_pointee`, `initialize_pointee` and `move_pointee` respectively.
+  3) A new `destroy_pointee` function runs the destructor on the pointee.
+  4) `AnyPointer` can be initialized from a `Reference` as mentioned above.
 
 ### ❌ Removed
 

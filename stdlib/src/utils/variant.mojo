@@ -41,8 +41,9 @@ print(to_string(who_knows))
 from sys import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
+from memory.anypointer import *
 from memory.unsafe import _LITRef
-from memory import emplace_ref_unsafe
+from memory import emplace_ref_unsafe, AnyPointer
 from utils import unroll, StaticTuple
 
 # ===----------------------------------------------------------------------=== #
@@ -173,7 +174,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
         self._get_state()[] = Self._check[T]()
-        self._get_ptr[T]().emplace_value(value^)
+        initialize_pointee(self._get_ptr[T](), value^)
 
     @always_inline
     fn __copyinit__(inout self, other: Self):
@@ -211,9 +212,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             if self._get_state()[] == i:
                 alias T = Ts[i]
                 # Calls the correct __moveinit__
-                self._get_ptr[T]().emplace_value(
-                    other._get_ptr[T]().take_value()
-                )
+                move_pointee(src=other._get_ptr[T](), dst=self._get_ptr[T]())
 
         unroll[each, len(VariadicList(Ts))]()
 
@@ -254,7 +253,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         self._get_state()[] = (
             Self._sentinel
         )  # don't call the variant's deleter later
-        return self._get_ptr[T]().take_value()
+        return move_from_pointee(self._get_ptr[T]())
 
     fn set[T: CollectionElement](inout self, owned value: T):
         """Set the variant value.
@@ -270,7 +269,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._call_correct_deleter()
         self._get_state()[] = Self._check[T]()
-        self._get_ptr[T]().emplace_value(value^)
+        initialize_pointee(self._get_ptr[T](), value^)
 
     fn isa[T: CollectionElement](self) -> Bool:
         """Check if the variant contains the required type.
