@@ -28,13 +28,13 @@ from memory.unsafe import _LITRef
 
 @register_passable("trivial")
 struct AnyPointer[
-    T: Movable, address_space: AddressSpace = AddressSpace.GENERIC
+    T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC
 ](Boolable, CollectionElement, Stringable, Intable, EqualityComparable):
     """This is a pointer type that can point to any generic value that is
     movable.
 
     Parameters:
-        T: The pointer element type, which must be movable.
+        T: The type the pointer points to.
         address_space: The address space associated with the AnyPointer allocated memory.
     """
 
@@ -61,10 +61,10 @@ struct AnyPointer[
         """Create a pointer with the input value.
 
         Args:
-            value: The input pointer to construct with.
+            value: The MLIR value of the pointer to construct with.
 
         Returns:
-            A null pointer.
+            The pointer.
         """
         return Self {value: value}
 
@@ -73,10 +73,10 @@ struct AnyPointer[
         """Create an unsafe AnyPointer from a safe Reference.
 
         Args:
-            value: The input pointer to construct with.
+            value: The input reference to construct with.
 
         Returns:
-            A null pointer.
+            The pointer.
         """
         return Self {value: __mlir_op.`lit.ref.to_pointer`(value.value)}
 
@@ -158,65 +158,6 @@ struct AnyPointer[
         return __mlir_op.`pop.pointer.bitcast`[
             _type = AnyPointer[T, new_address_space].pointer_type
         ](self.value)
-
-    @always_inline
-    fn take_value(self) -> T:
-        """Move the value at the pointer out.
-
-        The pointer must not be null, and the pointer memory location is assumed
-        to contain a valid initialized instance of `T`.
-
-        This performs a _consuming_ move, ending the lifetime of the value stored
-        in this pointer memory location. Subsequent reads of this pointer are
-        not valid. If a new valid value is stored using `emplace_value()`, then
-        reading from this pointer becomes valid again.
-
-        Returns:
-            The value at the pointer.
-        """
-        return __get_address_as_owned_value(self.value)
-
-    @always_inline
-    fn emplace_value(self, owned value: T):
-        """Emplace a new value into the pointer location.
-
-        The pointer memory location is assumed to contain uninitialized data,
-        and consequently the current contents of this pointer are not destructed
-        before writing `value`. Similarly, ownership of `value` is logically
-        transfered into the pointer location.
-
-        Args:
-            value: The value to emplace.
-        """
-        __get_address_as_uninit_lvalue(self.value) = value^
-
-    @always_inline
-    fn move_into(self, dest: AnyPointer[T]):
-        """Moves the value contained in this pointer into the memory location
-        pointed to by `dest`.
-
-        This performs a consuming move (using `__moveinit__()`) out of the
-        memory location pointed to by this pointer. Subsequent reads of this
-        pointer are not valid unless and until a new, valid value has been
-        moved into this pointer's memory location using `emplace_value()`.
-
-        This transfers the value out of `self` and into `dest` using at most one
-        `__moveinit__()` call.
-
-        Safety:
-            * `self` must not be null
-            * `self` must contain a valid, initialized instance of `T`
-            * `dest` must not be null
-            * The contents of `dest` should be uninitialized. If `dest` was
-              previously written with a valid value, that value will be be
-              overwritten and its destructor will NOT be run.
-
-        Args:
-            dest: Destination pointer that the value will be moved into.
-        """
-        __get_address_as_uninit_lvalue(
-            dest.value
-        ) = __get_address_as_owned_value(self.value)
 
     @always_inline
     fn __int__(self) -> Int:
@@ -382,3 +323,100 @@ struct AnyPointer[
             An offset reference.
         """
         return (self + offset).__refitem__()
+
+
+# ===----------------------------------------------------------------------=== #
+# AnyPointer extensions
+# ===----------------------------------------------------------------------=== #
+# TODO: These should be methods when we have conditional conformance.
+
+
+# This isn't a method because destructors only work in the default address
+# space.
+@always_inline
+fn destroy_pointee(ptr: AnyPointer[_, AddressSpace.GENERIC]):
+    """Destroy the pointed-to value.
+
+    The pointer must not be null, and the pointer memory location is assumed
+    to contain a valid initialized instance of `T`.
+
+    Args:
+        ptr: The pointer whose pointee this destroys.
+    """
+    _ = __get_address_as_owned_value(ptr.value)
+
+
+@always_inline
+fn move_from_pointee[T: Movable](ptr: AnyPointer[T, _]) -> T:
+    """Move the value at the pointer out.
+
+    The pointer must not be null, and the pointer memory location is assumed
+    to contain a valid initialized instance of `T`.
+
+    This performs a _consuming_ move, ending the lifetime of the value stored
+    in this pointer memory location. Subsequent reads of this pointer are
+    not valid. If a new valid value is stored using `initialize_pointee()`, then
+    reading from this pointer becomes valid again.
+
+    Parameters:
+        T: The type the pointer points to, which must be `Movable`.
+
+    Args:
+        ptr: The pointer whose pointee this moves from.
+
+    Returns:
+        The value at the pointer.
+    """
+    return __get_address_as_owned_value(ptr.value)
+
+
+@always_inline
+fn initialize_pointee[T: Movable](ptr: AnyPointer[T, _], owned value: T):
+    """Emplace a new value into the pointer location.
+
+    The pointer memory location is assumed to contain uninitialized data,
+    and consequently the current contents of this pointer are not destructed
+    before writing `value`. Similarly, ownership of `value` is logically
+    transfered into the pointer location.
+
+    Parameters:
+        T: The type the pointer points to, which must be `Movable`.
+
+    Args:
+        ptr: The pointer to initialize through.
+        value: The value to emplace.
+    """
+    __get_address_as_uninit_lvalue(ptr.value) = value^
+
+
+@always_inline
+fn move_pointee[T: Movable](*, src: AnyPointer[T, _], dst: AnyPointer[T]):
+    """Moves the value `src` points to into the memory location pointed to by
+    `dest`.
+
+    This performs a consuming move (using `__moveinit__()`) out of the
+    memory location pointed to by `src`. Subsequent reads of this
+    pointer are not valid unless and until a new, valid value has been
+    moved into this pointer's memory location using `initialize_pointee()`.
+
+    This transfers the value out of `self` and into `dest` using at most one
+    `__moveinit__()` call.
+
+    Safety:
+        * `src` must not be null
+        * `src` must contain a valid, initialized instance of `T`
+        * `dst` must not be null
+        * The contents of `dst` should be uninitialized. If `dst` was
+            previously written with a valid value, that value will be be
+            overwritten and its destructor will NOT be run.
+
+    Parameters:
+        T: The type the pointer points to, which must be `Movable`.
+
+    Args:
+        src: Source pointer that the value will be moved from.
+        dst: Destination pointer that the value will be moved into.
+    """
+    __get_address_as_uninit_lvalue(dst.value) = __get_address_as_owned_value(
+        src.value
+    )
