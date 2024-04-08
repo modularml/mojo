@@ -1655,7 +1655,7 @@ struct DTypePointer[
         """Scatters values to memory based on offsets from the current pointer.
 
         This method performs a store operation, scattering each element from
-        the `val` SIMD vector at the memory address calculated by adding the
+        the `val` SIMD vector to the memory address calculated by adding the
         corresponding element from `offset` SIMD vector to the current pointer.
 
         If the same offset is targeted multiple times, the values are stored in
@@ -1695,7 +1695,7 @@ struct DTypePointer[
         """Scatters values to memory based on offsets from the current pointer.
 
         This method performs a conditional store operation, scattering each
-        element from the `val` SIMD vector at the memory address calculated by
+        element from the `val` SIMD vector to the memory address calculated by
         adding the corresponding element from `offset` SIMD vector to the
         current pointer. Storing is done according to the provided `mask` SIMD
         vector, which is used to prevent memory accesses to the masked-off
