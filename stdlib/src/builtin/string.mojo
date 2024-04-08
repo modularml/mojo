@@ -28,7 +28,7 @@ from utils import StringRef
 from utils.index import StaticIntTuple
 from utils.static_tuple import StaticTuple
 
-from .io import _snprintf, _snprintf_scalar, _StringableTuple
+from .io import _snprintf, _snprintf_scalar
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -660,11 +660,11 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             curr += self + String(elems[i])
         return curr
 
-    fn join[*Stringables: Stringable](self, *elems: *Stringables) -> String:
+    fn join[*Types: Stringable](self, *elems: *Types) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
-            Stringables: The Stringable types.
+            Types: The types of the elements.
 
         Args:
             elems: The input values.
@@ -672,21 +672,19 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         Returns:
             The joined string.
         """
-        alias types = VariadicList(Stringables)
-        alias count = len(types)
 
-        var args = _StringableTuple(elems)
-
-        if count == 0:
-            return ""
-
-        var result = args._at[0]()
+        var result: String = ""
+        var is_first = True
 
         @parameter
-        fn each[i: Int]():
-            result += self + args._at[i + 1]()
+        fn add_elt[T: Stringable](a: T):
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(a)
 
-        unroll[each, count - 1]()
+        elems.each[add_elt]()
         return result
 
     fn _strref_dangerous(self) -> StringRef:
@@ -726,7 +724,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 
         # TODO(lifetimes): Return a reference rather than a copy
         var copy = self._buffer
-        var last = copy.pop_back()
+        var last = copy.pop()
         debug_assert(
             last == 0,
             "expected last element of String buffer to be null terminator",
@@ -1054,6 +1052,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         print(String('BaseTestCase').removeprefix('Test'))
         # 'BaseTestCase'
         ```
+
         Args:
           prefix: The prefix to remove from the string.
 
@@ -1134,7 +1133,10 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 fn _vec_fmt[
     *types: AnyRegType
 ](
-    str: AnyPointer[Int8], size: Int, fmt: StringLiteral, *arguments: *types
+    str: AnyPointer[Int8],
+    size: Int,
+    fmt: StringLiteral,
+    borrowed *arguments: *types,
 ) -> Int:
     return _snprintf(rebind[Pointer[Int8]](str), size, fmt, arguments)
 

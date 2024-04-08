@@ -21,6 +21,8 @@ fn test_atomic() raises:
 
     assert_equal(atom.value, 3)
 
+    assert_equal(atom.load(), 3)
+
     atom += 4
     assert_equal(atom.value, 7)
 

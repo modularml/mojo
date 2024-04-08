@@ -188,13 +188,6 @@ brew upgrade modular
 Instead of downloading the Mojo SDK, you can also experiment with Mojo in our
 online [Playground](/mojo/playground).
 
-:::note
-
-The older [JupyterLab-based Playground](https://playground.modular.com) is still
-available until March 20th.
-
-:::
-
 ### What to expect
 
 The Mojo Playground is a simple online editor where you can test out Mojo
