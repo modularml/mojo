@@ -1318,16 +1318,46 @@ struct object(IntableRaising, Boolable, Stringable):
     # TODO: __rshift__
 
     @always_inline
-    fn __truediv__(self, rhs: object) raises -> object:
-        return Self._arithmetic_binary_op[Float64.__truediv__, Int64.__truediv__](
+    fn __mod__(self, rhs: object) raises -> object:
+        """Modulo operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value mod the right hand value.
+        """
+        return Self._arithmetic_binary_op[Float64.__mod__, Int64.__mod__](
             self, rhs
         )
 
     @always_inline
+    fn __truediv__(self, rhs: object) raises -> object:
+        """True division operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value true divide the right hand value.
+        """
+        return Self._arithmetic_binary_op[
+            Float64.__truediv__, Int64.__truediv__
+        ](self, rhs)
+
+    @always_inline
     fn __floordiv__(self, rhs: object) raises -> object:
-        return Self._arithmetic_binary_op[Float64.__floordiv__, Int64.__floordiv__](
-            self, rhs
-        )
+        """Floor division operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value floor divide the right hand value.
+        """
+        return Self._arithmetic_binary_op[
+            Float64.__floordiv__, Int64.__floordiv__
+        ](self, rhs)
 
     @always_inline
     fn __and__(self, rhs: object) raises -> object:
