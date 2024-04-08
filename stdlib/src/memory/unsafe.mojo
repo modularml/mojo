@@ -29,7 +29,7 @@ from sys.info import (
 )
 from sys.intrinsics import PrefetchOptions, _mlirtype_is_eq
 from sys.intrinsics import prefetch as _prefetch
-from sys.intrinsics import strided_load, strided_store
+from sys.intrinsics import gather, scatter, strided_load, strided_store
 
 from .memory import _free, _malloc
 
@@ -1549,6 +1549,189 @@ struct DTypePointer[
         # Store a simd value into the pointer. The address must be properly
         # aligned, 64B for avx512, 32B for avx2, and 16B for avx.
         self.address.bitcast[SIMD[type, width]]().nt_store(val)
+
+    # ===------------------------------------------------------------------=== #
+    # Gather/Scatter
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline("nodebug")
+    fn gather[
+        offset_type: DType,
+        /,
+        *,
+        width: Int = 1,
+        alignment: Int = Self._default_alignment,
+    ](self, offset: SIMD[offset_type, width]) -> SIMD[type, width]:
+        """Gathers values based on offsets from the current pointer.
+
+        This method performs a load operation, gathering values from addresses
+        calculated by adding the specified `offset` SIMD vector to the current
+        pointer.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be 0 or a power of two integer value.
+
+        Parameters:
+            offset_type: The type of the `offset` SIMD vector.
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: A SIMD vector of offsets to be added to the current pointer
+                for the gather operation.
+
+        Returns:
+            A SIMD vector containing the gathered values.
+        """
+        var mask = SIMD[DType.bool, width](True)
+        var default = SIMD[type, width]()
+        return self.gather[width=width, alignment=alignment](
+            offset, mask, default
+        )
+
+    @always_inline("nodebug")
+    fn gather[
+        offset_type: DType,
+        /,
+        *,
+        width: Int = 1,
+        alignment: Int = Self._default_alignment,
+    ](
+        self,
+        offset: SIMD[offset_type, width],
+        mask: SIMD[DType.bool, width],
+        default: SIMD[type, width],
+    ) -> SIMD[type, width]:
+        """Gathers values based on offsets from the current pointer.
+
+        This method performs a conditional load operation, gathering values
+        from addresses calculated by adding the specified `offset` SIMD vector
+        to the current pointer. For each element, if the corresponding mask
+        value is `True`, the method loads the value from memory; otherwise, it
+        uses the respective value from the `default` SIMD vector instead.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be 0 or a power of two integer value.
+
+        Parameters:
+            offset_type: The type of the `offset` SIMD vector.
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: A SIMD vector of offsets to be added to the current pointer
+                for the gather operation.
+            mask: A SIMD vector of boolean values, indicating for each element
+                whether to load from memory or use the `default` SIMD vector.
+            default: A SIMD vector providing default values to be used where
+                the `mask` SIMD vector is `False`.
+
+        Returns:
+            A SIMD vector containing the gathered values or default values for
+            masked-off positions.
+        """
+        constrained[
+            offset_type.is_integral(),
+            "offset type must be an integral type",
+        ]()
+        constrained[
+            (alignment == 0) | _is_power_of_2(alignment),
+            "alignment must be 0 or a power of two integer value",
+        ]()
+
+        var pointer = offset.cast[DType.index]().fma(sizeof[type](), int(self))
+        return gather(pointer.cast[DType.address](), mask, default, alignment)
+
+    @always_inline("nodebug")
+    fn scatter[
+        offset_type: DType,
+        /,
+        *,
+        width: Int = 1,
+        alignment: Int = Self._default_alignment,
+    ](self, offset: SIMD[offset_type, width], val: SIMD[type, width]):
+        """Scatters values to memory based on offsets from the current pointer.
+
+        This method performs a store operation, scattering each element from
+        the `val` SIMD vector at the memory address calculated by adding the
+        corresponding element from `offset` SIMD vector to the current pointer.
+
+        If the same offset is targeted multiple times, the values are stored in
+        the order they appear in the `val` SIMD vector, from the first to the
+        last element.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be 0 or a power of two integer value.
+
+        Parameters:
+            offset_type: The type of the `offset` SIMD vector.
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: A SIMD vector of offsets to be added to the current pointer
+                for the scatter operation.
+            val: A SIMD vector containing the values to be scattered.
+        """
+        var mask = SIMD[DType.bool, width](True)
+        self.scatter[width=width, alignment=alignment](offset, val, mask)
+
+    @always_inline("nodebug")
+    fn scatter[
+        offset_type: DType,
+        /,
+        *,
+        width: Int = 1,
+        alignment: Int = Self._default_alignment,
+    ](
+        self,
+        offset: SIMD[offset_type, width],
+        val: SIMD[type, width],
+        mask: SIMD[DType.bool, width],
+    ):
+        """Scatters values to memory based on offsets from the current pointer.
+
+        This method performs a conditional store operation, scattering each
+        element from the `val` SIMD vector at the memory address calculated by
+        adding the corresponding element from `offset` SIMD vector to the
+        current pointer. Storing is done according to the provided `mask` SIMD
+        vector, which is used to prevent memory accesses to the masked-off
+        positions.
+
+        If the same offset is targeted multiple times, the values are stored in
+        the order they appear in the `val` SIMD vector, from the first to the
+        last element, conditional on the `mask` SIMD vector.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be 0 or a power of two integer value.
+
+        Parameters:
+            offset_type: The type of the `offset` SIMD vector.
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: A SIMD vector of offsets to be added to the current pointer
+                for the scatter operation.
+            val: A SIMD vector containing the values to be scattered.
+            mask: A SIMD vector of boolean values, indicating for each element
+                whether to scatter the value to memory or not.
+        """
+        constrained[
+            offset_type.is_integral(),
+            "offset type must be an integral type",
+        ]()
+        constrained[
+            (alignment == 0) | _is_power_of_2(alignment),
+            "alignment must be 0 or a power of two integer value",
+        ]()
+
+        var pointer = offset.cast[DType.index]().fma(sizeof[type](), int(self))
+        scatter(val, pointer.cast[DType.address](), mask, alignment)
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
