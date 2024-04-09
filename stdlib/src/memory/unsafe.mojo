@@ -514,18 +514,6 @@ struct Reference[
         ](AnyPointer(self).value)
 
     @always_inline("nodebug")
-    fn offset(self, offset: Int) -> Self:
-        """Offset the reference like an array.
-
-        Args:
-            offset: The integer offset.
-
-        Returns:
-            A new reference.
-        """
-        return __mlir_op.`lit.ref.offset`(self.value, offset.value)
-
-    @always_inline("nodebug")
     fn bitcast_element[
         new_element_type: AnyType
     ](self) -> Reference[new_element_type, is_mutable, lifetime, address_space]:
