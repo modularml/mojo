@@ -100,10 +100,10 @@ fn bitcast[
 @always_inline("nodebug")
 fn bitcast[
     new_type: AnyType, src_type: AnyType, address_space: AddressSpace
-](ptr: AnyPointer[src_type, address_space]) -> AnyPointer[
+](ptr: UnsafePointer[src_type, address_space]) -> UnsafePointer[
     new_type, address_space
 ]:
-    """Bitcasts an AnyPointer to a different type.
+    """Bitcasts an UnsafePointer to a different type.
 
     Parameters:
         new_type: The target type.

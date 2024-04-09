@@ -23,7 +23,7 @@ print(3 == p.get())
 ```
 """
 
-from memory.anypointer import UnsafePointer
+from memory.unsafepointer import UnsafePointer
 from memory.memory import stack_allocation
 
 
