@@ -2263,9 +2263,9 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
 
   ```mojo
   # Old syntax, now fails.
-  __mlir_op.`index.bool.constant`[value : __mlir_attr.`false`]()
+  __mlir_op.`index.bool.constant`[value : __mlir_attr.false]()
   # New syntax.
-  __mlir_op.`index.bool.constant`[value=__mlir_attr.`false`]()
+  __mlir_op.`index.bool.constant`[value=__mlir_attr.false]()
   ```
 
 - You can now print the `Error` object directly. The `message()` method
