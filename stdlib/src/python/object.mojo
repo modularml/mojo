@@ -19,7 +19,7 @@ from python import PythonObject
 ```
 """
 
-from sys.intrinsics import _mlirtype_is_eq
+from sys.intrinsics import _mlirtype_is_eq, _type_is_eq
 
 from utils import StringRef, unroll
 
@@ -252,7 +252,7 @@ struct PythonObject(
 
         unroll[fill, len(types)]()
 
-    fn __init__[*Ts: AnyRegType](inout self, value: Tuple[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[Ts]):
         """Initialize the object from a tuple literal.
 
         Parameters:
@@ -262,28 +262,27 @@ struct PythonObject(
             value: The tuple value.
         """
         var cpython = _get_global_python_itf().cpython()
-        alias types = VariadicList(Ts)
-        alias length = len(types)
+        alias length = len(VariadicList(Ts))
         self.py_object = cpython.PyTuple_New(length)
 
         @parameter
         fn fill[i: Int]():
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
-            alias T = types[i]
+            alias T = Ts[i]
 
             var obj: PythonObject
 
             @parameter
-            if _mlirtype_is_eq[T, Int]():
+            if _type_is_eq[T, Int]():
                 obj = value.get[i, Int]()
-            elif _mlirtype_is_eq[T, Float64]():
+            elif _type_is_eq[T, Float64]():
                 obj = value.get[i, Float64]()
-            elif _mlirtype_is_eq[T, Bool]():
+            elif _type_is_eq[T, Bool]():
                 obj = value.get[i, Bool]()
-            elif _mlirtype_is_eq[T, StringRef]():
+            elif _type_is_eq[T, StringRef]():
                 obj = value.get[i, StringRef]()
-            elif _mlirtype_is_eq[T, StringLiteral]():
+            elif _type_is_eq[T, StringLiteral]():
                 obj = value.get[i, StringLiteral]()
             else:
                 obj = PythonObject(0)
@@ -293,7 +292,7 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
-        unroll[fill, len(types)]()
+        unroll[fill, length]()
 
     fn __init__(inout self, value: Dict[Self, Self]):
         """Initialize the object from a dictionary of PythonObjects.
