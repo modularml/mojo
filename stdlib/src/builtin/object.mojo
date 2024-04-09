@@ -1356,6 +1356,34 @@ struct object(IntableRaising, Boolable, Stringable):
     # TODO __rshift__
 
     @always_inline
+    fn __lshift__(self, rhs: object) raises -> object:
+        """Left shift operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value left shifted by the right hand value.
+        """
+        return Self._arithmetic_binary_op[Float64.__lshift__, Int64.__lshift__](
+            self, rhs
+        )
+
+    @always_inline
+    fn __rshift__(self, rhs: object) raises -> object:
+        """Right shift operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value right shifted by the right hand value.
+        """
+        return Self._arithmetic_binary_op[Float64.__rshift__, Int64.__rshift__](
+            self, rhs
+        )
+
+    @always_inline
     fn __and__(self, rhs: object) raises -> object:
         """Bool AND operator. If the left hand value is False, return the
         left-hand value.
