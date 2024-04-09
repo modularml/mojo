@@ -260,16 +260,18 @@ fn bitcast[
 
 
 # ===----------------------------------------------------------------------===#
-# Pointer
+# LegacyPointer
 # ===----------------------------------------------------------------------===#
+
+alias Pointer = LegacyPointer
 
 
 @value
 @register_passable("trivial")
-struct Pointer[
+struct LegacyPointer[
     type: AnyRegType, address_space: AddressSpace = AddressSpace.GENERIC
 ](Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
-    """Defines a Pointer struct that contains the address of a register passable
+    """Defines a LegacyPointer struct that contains the address of a register passable
     type.
 
     Parameters:
@@ -304,46 +306,46 @@ struct Pointer[
 
     @always_inline("nodebug")
     fn __init__() -> Self:
-        """Constructs a null Pointer from the value of pop.pointer type.
+        """Constructs a null LegacyPointer from the value of pop.pointer type.
 
         Returns:
-            Constructed Pointer object.
+            Constructed LegacyPointer object.
         """
         return Self.get_null()
 
     @always_inline("nodebug")
     fn __init__(address: Self) -> Self:
-        """Constructs a Pointer from the address.
+        """Constructs a LegacyPointer from the address.
 
         Args:
             address: The input pointer.
 
         Returns:
-            Constructed Pointer object.
+            Constructed LegacyPointer object.
         """
         return address
 
     @always_inline("nodebug")
     fn __init__(address: Self.pointer_type) -> Self:
-        """Constructs a Pointer from the address.
+        """Constructs a LegacyPointer from the address.
 
         Args:
             address: The input pointer address.
 
         Returns:
-            Constructed Pointer object.
+            Constructed LegacyPointer object.
         """
         return Self {address: address}
 
     @always_inline("nodebug")
     fn __init__(value: Scalar[DType.address]) -> Self:
-        """Constructs a Pointer from the value of scalar address.
+        """Constructs a LegacyPointer from the value of scalar address.
 
         Args:
             value: The input pointer index.
 
         Returns:
-            Constructed Pointer object.
+            Constructed LegacyPointer object.
         """
         var address = __mlir_op.`pop.index_to_pointer`[
             _type = Self.pointer_type
@@ -353,10 +355,10 @@ struct Pointer[
     @staticmethod
     @always_inline("nodebug")
     fn get_null() -> Self:
-        """Constructs a Pointer representing nullptr.
+        """Constructs a LegacyPointer representing nullptr.
 
         Returns:
-            Constructed nullptr Pointer object.
+            Constructed nullptr LegacyPointer object.
         """
         return __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
 
@@ -371,10 +373,10 @@ struct Pointer[
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
-        """Checks if the Pointer is null.
+        """Checks if the LegacyPointer is null.
 
         Returns:
-            Returns False if the Pointer is null and True otherwise.
+            Returns False if the LegacyPointer is null and True otherwise.
         """
         return self != Self.get_null()
 
@@ -387,7 +389,7 @@ struct Pointer[
             arg: The value to get the address of.
 
         Returns:
-            A Pointer struct which contains the address of the argument.
+            A LegacyPointer struct which contains the address of the argument.
         """
         return __mlir_op.`pop.pointer.bitcast`[_type = Self.pointer_type](
             __get_lvalue_as_address(arg)
@@ -395,7 +397,7 @@ struct Pointer[
 
     @always_inline("nodebug")
     fn __getitem__[T: Intable](self, offset: T) -> type:
-        """Loads the value the Pointer object points to with the given offset.
+        """Loads the value the LegacyPointer object points to with the given offset.
 
         Parameters:
             T: The Intable type of the offset.
@@ -410,7 +412,7 @@ struct Pointer[
 
     @always_inline("nodebug")
     fn __setitem__[T: Intable](self, offset: T, val: type):
-        """Stores the specified value to the location the Pointer object points
+        """Stores the specified value to the location the LegacyPointer object points
         to with the given offset.
 
         Parameters:
@@ -430,7 +432,7 @@ struct Pointer[
 
     @always_inline("nodebug")
     fn load[*, alignment: Int = Self._default_alignment](self) -> type:
-        """Loads the value the Pointer object points to.
+        """Loads the value the LegacyPointer object points to.
 
         Constraints:
             The alignment must be a positive integer value.
@@ -447,7 +449,7 @@ struct Pointer[
     fn load[
         T: Intable, *, alignment: Int = Self._default_alignment
     ](self, offset: T) -> type:
-        """Loads the value the Pointer object points to with the given offset.
+        """Loads the value the LegacyPointer object points to with the given offset.
 
         Constraints:
             The alignment must be a positive integer value.
@@ -473,7 +475,7 @@ struct Pointer[
     fn store[
         T: Intable, /, *, alignment: Int = Self._default_alignment
     ](self, offset: T, value: type):
-        """Stores the specified value to the location the Pointer object points
+        """Stores the specified value to the location the LegacyPointer object points
         to with the given offset.
 
         Constraints:
@@ -491,7 +493,7 @@ struct Pointer[
 
     @always_inline("nodebug")
     fn store[*, alignment: Int = Self._default_alignment](self, value: type):
-        """Stores the specified value to the location the Pointer object points
+        """Stores the specified value to the location the LegacyPointer object points
         to.
 
         Constraints:
@@ -559,7 +561,7 @@ struct Pointer[
             alignment: The alignment used for the allocation.
 
         Returns:
-            A new Pointer object which has been allocated on the heap.
+            A new LegacyPointer object which has been allocated on the heap.
         """
         return _malloc[type, address_space=address_space](
             count * sizeof[type](), alignment=alignment
@@ -575,45 +577,47 @@ struct Pointer[
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
-    fn bitcast[new_type: AnyRegType](self) -> Pointer[new_type, address_space]:
-        """Bitcasts a Pointer to a different type.
+    fn bitcast[
+        new_type: AnyRegType
+    ](self) -> LegacyPointer[new_type, address_space]:
+        """Bitcasts a LegacyPointer to a different type.
 
         Parameters:
             new_type: The target type.
 
         Returns:
-            A new Pointer object with the specified type and the same address,
-            as the original Pointer.
+            A new LegacyPointer object with the specified type and the same address,
+            as the original LegacyPointer.
         """
 
         @parameter
         if _mlirtype_is_eq[type, new_type]():
-            return rebind[Pointer[new_type, address_space]](self)
+            return rebind[LegacyPointer[new_type, address_space]](self)
 
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = Pointer[new_type, address_space].pointer_type,
+            _type = LegacyPointer[new_type, address_space].pointer_type,
         ](self.address)
 
     @always_inline("nodebug")
     fn address_space_cast[
         new_address_space: AddressSpace
-    ](self) -> Pointer[type, new_address_space]:
-        """Casts a Pointer to a different address space.
+    ](self) -> LegacyPointer[type, new_address_space]:
+        """Casts a LegacyPointer to a different address space.
 
         Parameters:
             new_address_space: The address space.
 
         Returns:
-            A new Pointer object with the specified type and the same address,
-            as the original Pointer but located in a different address space.
+            A new LegacyPointer object with the specified type and the same address,
+            as the original LegacyPointer but located in a different address space.
         """
 
         @parameter
         if address_space == new_address_space:
-            return rebind[Pointer[type, new_address_space]](self)
+            return rebind[LegacyPointer[type, new_address_space]](self)
 
         return __mlir_op.`pop.pointer.addrspacecast`[
-            _type = Pointer[type, new_address_space].pointer_type,
+            _type = LegacyPointer[type, new_address_space].pointer_type,
         ](self.address)
 
     # ===------------------------------------------------------------------=== #
@@ -658,7 +662,7 @@ struct Pointer[
         return int(self) < int(rhs)
 
     # ===------------------------------------------------------------------=== #
-    # Pointer Arithmetic
+    # LegacyPointer Arithmetic
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
@@ -672,7 +676,7 @@ struct Pointer[
             idx: The offset.
 
         Returns:
-            The new Pointer shifted by the offset.
+            The new LegacyPointer shifted by the offset.
         """
         # Returns a new pointer shifted by the specified offset.
         return __mlir_op.`pop.offset`(self.address, int(idx).value)
@@ -688,7 +692,7 @@ struct Pointer[
             rhs: The offset.
 
         Returns:
-            The new Pointer shifted by the offset.
+            The new LegacyPointer shifted by the offset.
         """
         return self.offset(rhs)
 
@@ -703,7 +707,7 @@ struct Pointer[
             rhs: The offset.
 
         Returns:
-            The new Pointer shifted back by the offset.
+            The new LegacyPointer shifted back by the offset.
         """
         return self.offset(-int(rhs))
 
