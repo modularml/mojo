@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
-from memory import AnyPointer, DTypePointer, Pointer, memcmp, memcpy
+from memory import DTypePointer, Pointer, UnsafePointer, memcmp, memcpy
 
 
 from utils import StringRef, StaticIntTuple, StaticTuple
@@ -409,7 +409,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             len: The length of the buffer, including the null terminator.
         """
         self._buffer = Self._buffer_type()
-        self._buffer.data = rebind[AnyPointer[Int8]](ptr)
+        self._buffer.data = rebind[UnsafePointer[Int8]](ptr)
         self._buffer.size = len
 
     @always_inline
@@ -752,7 +752,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             The pointer to the underlying memory.
         """
         var ptr = self._as_ptr()
-        self._buffer.data = AnyPointer[Int8]()
+        self._buffer.data = UnsafePointer[Int8]()
         self._buffer.size = 0
         self._buffer.capacity = 0
         return ptr
@@ -1145,7 +1145,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 fn _vec_fmt[
     *types: AnyRegType
 ](
-    str: AnyPointer[Int8],
+    str: UnsafePointer[Int8],
     size: Int,
     fmt: StringLiteral,
     borrowed *arguments: *types,

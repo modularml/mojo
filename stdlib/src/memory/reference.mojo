@@ -261,7 +261,7 @@ struct Reference[
         return self.value
 
     # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
-    # disagreement.  Use AnyPointer instead!
+    # disagreement.  Use UnsafePointer instead!
     @always_inline("nodebug")
     fn get_unsafe_pointer(self) -> Pointer[type, address_space]:
         """Constructs a Pointer from a safe reference.
@@ -272,7 +272,7 @@ struct Reference[
         # Work around AnyRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[
             _type = Pointer[type, address_space].pointer_type
-        ](AnyPointer(self).value)
+        ](UnsafePointer(self).value)
 
     @always_inline("nodebug")
     fn bitcast_element[
@@ -289,7 +289,7 @@ struct Reference[
         """
         # We don't have a `lit.ref.cast`` operation, so convert through a KGEN
         # pointer.
-        return AnyPointer(self).bitcast_element[new_element_type]()[]
+        return UnsafePointer(self).bitcast_element[new_element_type]()[]
 
     @always_inline
     fn address_space_cast[
@@ -306,4 +306,4 @@ struct Reference[
         """
         # We don't have a `lit.ref.cast`` operation, so convert through a KGEN
         # pointer.
-        return AnyPointer(self).address_space_cast[new_address_space]()[]
+        return UnsafePointer(self).address_space_cast[new_address_space]()[]

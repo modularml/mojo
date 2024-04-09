@@ -31,7 +31,7 @@ value types must always be Movable so we can resize the dictionary as it grows.
 
 See the `Dict` docs for more details.
 """
-from memory import AnyPointer
+from memory import UnsafePointer
 
 from .optional import Optional
 
@@ -133,7 +133,7 @@ struct _DictKeyIter[
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
-        var anyptr = AnyPointer(Reference(entry_ref[].key))
+        var anyptr = UnsafePointer(Reference(entry_ref[].key))
         return anyptr.address_space_cast[Self.dict_entry_iter.address_space]()[]
 
     fn __len__(self) -> Int:
@@ -172,7 +172,7 @@ struct _DictValueIter[
         var entry_ref = self.iter.__next__()
         # Cast through a pointer to grant additional mutability and switch
         # address spaces out.
-        var anyptr = AnyPointer(Reference(entry_ref[].value))
+        var anyptr = UnsafePointer(Reference(entry_ref[].value))
         return anyptr.address_space_cast[address_space]()[]
 
     fn __len__(self) -> Int:
