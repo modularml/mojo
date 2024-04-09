@@ -25,6 +25,8 @@ from sys.intrinsics import _mlirtype_is_eq
 from memory.memory import _free, _malloc
 from memory.reference import _LITRef
 
+alias UnsafePointer = AnyPointer
+
 
 @register_passable("trivial")
 struct AnyPointer[

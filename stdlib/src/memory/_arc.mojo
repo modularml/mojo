@@ -23,7 +23,7 @@ print(3 == p.get())
 ```
 """
 
-from memory import AnyPointer, stack_allocation
+from memory import UnsafePointer, stack_allocation
 
 
 struct _ArcInner[T: Movable]:
@@ -154,8 +154,8 @@ struct Arc[T: Movable](CollectionElement):
             )
         )
 
-    fn _data_ptr(self) -> AnyPointer[T]:
-        return AnyPointer.address_of(self._inner[].data)
+    fn _data_ptr(self) -> UnsafePointer[T]:
+        return UnsafePointer.address_of(self._inner[].data)
 
     fn _bitcast[T2: Movable](self) -> Arc[T2]:
         constrained[

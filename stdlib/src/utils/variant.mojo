@@ -147,7 +147,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     ]
     var _impl: Self._type
 
-    fn _get_ptr[T: CollectionElement](self) -> AnyPointer[T]:
+    fn _get_ptr[T: CollectionElement](self) -> UnsafePointer[T]:
         constrained[
             Self._check[T]() != Self._sentinel, "not a union element type"
         ]()
@@ -156,7 +156,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     fn _get_state[
         is_mut: __mlir_type.i1, lt: __mlir_type[`!lit.lifetime<`, is_mut, `>`]
     ](self: _LITRef[Self, is_mut, lt].type) -> Reference[Int8, is_mut, lt]:
-        var int8_self = AnyPointer(Reference(self).bitcast_element[Int8]())
+        var int8_self = UnsafePointer(Reference(self).bitcast_element[Int8]())
         return (int8_self + _UnionSize[Ts].compute())[]
 
     fn __init__[T: CollectionElement](inout self, owned value: T):
@@ -188,7 +188,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             if self._get_state()[] == i:
                 alias T = Ts[i]
                 initialize_pointee[T](
-                    AnyPointer(Reference(self._impl).bitcast_element[T]()),
+                    UnsafePointer(Reference(self._impl).bitcast_element[T]()),
                     Reference(other._impl).bitcast_element[T]()[],
                 )
 

@@ -79,7 +79,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         T: The type of the elements.
     """
 
-    var data: AnyPointer[T]
+    var data: UnsafePointer[T]
     """The underlying storage for the list."""
     var size: Int
     """The number of elements in the list."""
@@ -88,7 +88,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     fn __init__(inout self):
         """Constructs an empty list."""
-        self.data = AnyPointer[T]()
+        self.data = UnsafePointer[T]()
         self.size = 0
         self.capacity = 0
 
@@ -108,7 +108,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Args:
             capacity: The requested capacity of the list.
         """
-        self.data = AnyPointer[T].alloc(capacity)
+        self.data = UnsafePointer[T].alloc(capacity)
         self.size = 0
         self.capacity = capacity
 
@@ -184,7 +184,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @always_inline
     fn _realloc(inout self, new_capacity: Int):
-        var new_data = AnyPointer[T].alloc(new_capacity)
+        var new_data = UnsafePointer[T].alloc(new_capacity)
 
         for i in range(self.size):
             move_pointee(src=self.data + i, dst=new_data + i)
@@ -404,14 +404,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             destroy_pointee(self.data + i)
         self.size = 0
 
-    fn steal_data(inout self) -> AnyPointer[T]:
+    fn steal_data(inout self) -> UnsafePointer[T]:
         """Take ownership of the underlying pointer from the list.
 
         Returns:
             The underlying data.
         """
         var ptr = self.data
-        self.data = AnyPointer[T]()
+        self.data = UnsafePointer[T]()
         self.size = 0
         self.capacity = 0
         return ptr
@@ -517,7 +517,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # Mutability gets set to the local mutability of this
         # pointer value, ie. because we defined it with `let` it's now an
         # "immutable" reference regardless of the mutability of `self`.
-        # This means we can't just use `AnyPointer.__refitem__` here
+        # This means we can't just use `UnsafePointer.__refitem__` here
         # because the mutability won't match.
         var base_ptr = Reference(self)[].data
         return __mlir_op.`lit.ref.from_pointer`[

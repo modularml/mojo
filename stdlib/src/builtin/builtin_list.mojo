@@ -333,7 +333,7 @@ struct VariadicListMem[
             # destroy in backwards order to match how arguments are normally torn
             # down when CheckLifetimes is left to its own devices.
             for i in range(len(self), 0, -1):
-                destroy_pointee(AnyPointer(Reference(self[i - 1])))
+                destroy_pointee(UnsafePointer(Reference(self[i - 1])))
 
     @always_inline
     fn __len__(self) -> Int:
@@ -472,7 +472,7 @@ struct VariadicPack[
             @parameter
             fn destroy_elt[i: Int]():
                 # destroy the elements in reverse order.
-                destroy_pointee(AnyPointer(self.get_element[len - i - 1]()))
+                destroy_pointee(UnsafePointer(self.get_element[len - i - 1]()))
 
             unroll[destroy_elt, len]()
 
