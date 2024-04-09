@@ -200,11 +200,21 @@ fn test_string_indexing() raises:
 fn test_atol() raises:
     assert_equal(375, atol(String("375")))
     assert_equal(1, atol(String("001")))
+    assert_equal(5, atol(String(" 005")))
+    assert_equal(13, atol(String(" 013  ")))
     assert_equal(-89, atol(String("-89")))
+    assert_equal(-52, atol(String(" -52")))
+    assert_equal(-69, atol(String(" -69  ")))
 
     # Negative cases
     try:
         _ = atol(String("9.03"))
+        raise Error("Failed to raise when converting string to integer.")
+    except e:
+        assert_equal(str(e), "String is not convertible to integer.")
+
+    try:
+        _ = atol(String(" 10 1"))
         raise Error("Failed to raise when converting string to integer.")
     except e:
         assert_equal(str(e), "String is not convertible to integer.")
