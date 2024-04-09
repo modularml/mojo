@@ -162,3 +162,6 @@ and tools. Please add any significant user-visible changes here.
 
 - [#1963](https://github.com/modularml/mojo/issues/1963) `a!=0` is now parsed
   and formatted correctly by `mojo format`.
+
+- [#1676](https://github.com/modularml/mojo/issues/1676) Fix a crash related to
+  `@value` decorator and structs with empty body.
