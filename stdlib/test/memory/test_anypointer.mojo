@@ -91,9 +91,9 @@ def test_address_of():
 def test_bitcast():
     var local = 1
     var ptr = AnyPointer[Int].address_of(local)
-    var aliased_ptr = ptr.bitcast[SIMD[DType.uint8, 4]]()
+    var aliased_ptr = ptr.bitcast_element[SIMD[DType.uint8, 4]]()
 
-    assert_equal(int(ptr), int(ptr.bitcast[Int]()))
+    assert_equal(int(ptr), int(ptr.bitcast_element[Int]()))
 
     assert_equal(int(ptr), int(aliased_ptr))
 

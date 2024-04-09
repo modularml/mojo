@@ -98,13 +98,16 @@ fn bitcast[
 
 @always_inline("nodebug")
 fn bitcast[
-    new_type: Movable, src_type: Movable
-](ptr: AnyPointer[src_type]) -> AnyPointer[new_type]:
+    new_type: AnyType, src_type: AnyType, address_space: AddressSpace
+](ptr: AnyPointer[src_type, address_space]) -> AnyPointer[
+    new_type, address_space
+]:
     """Bitcasts an AnyPointer to a different type.
 
     Parameters:
         new_type: The target type.
         src_type: The source type.
+        address_space: The shared address space.
 
     Args:
         ptr: The source pointer.
@@ -113,7 +116,7 @@ fn bitcast[
         A new Pointer with the specified type and the same address, as the
         original Pointer.
     """
-    return ptr.bitcast[new_type]()
+    return ptr.bitcast_element[new_type]()
 
 
 @always_inline("nodebug")
@@ -505,11 +508,10 @@ struct Reference[
         Returns:
             Constructed Pointer object.
         """
-        var ptr_with_trait = __mlir_op.`lit.ref.to_pointer`(self.value)
         # Work around AnyRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[
             _type = Pointer[type, address_space].pointer_type
-        ](ptr_with_trait)
+        ](AnyPointer(self).value)
 
     @always_inline("nodebug")
     fn offset(self, offset: Int) -> Self:
@@ -536,24 +538,9 @@ struct Reference[
         Returns:
             The new reference.
         """
-        # We don't have a generalized lit.ref.cast operation, so convert through
-        # to KGEN pointer.
-        # FIXME: We can't use AnyPointer here, because it requires T <- Movable.
-        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
-        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[
-                `!kgen.pointer<`,
-                new_element_type,
-                `,`,
-                address_space._value.value,
-                `>`,
-            ]
-        ](kgen_ptr)
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = _LITRef[
-                new_element_type, is_mutable, lifetime, address_space
-            ].type
-        ](dest_ptr)
+        # We don't have a `lit.ref.cast`` operation, so convert through a KGEN
+        # pointer.
+        return AnyPointer(self).bitcast_element[new_element_type]()[]
 
     @always_inline
     fn address_space_cast[
@@ -568,80 +555,9 @@ struct Reference[
         Returns:
             The new reference.
         """
-        # We don't have a generalized lit.ref.cast operation, so convert through
-        # to KGEN pointer.
-        # FIXME: We can't use AnyPointer here, because it requires T <- Movable.
-        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
-        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[
-                `!kgen.pointer<`,
-                type,
-                `,`,
-                new_address_space._value.value,
-                `>`,
-            ]
-        ](kgen_ptr)
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = _LITRef[type, is_mutable, lifetime, new_address_space].type
-        ](dest_ptr)
-
-    fn destroy_element_unsafe(self):
-        """This unsafe operation runs the destructor of the element addressed by
-        this reference.  This is equivalent to `x->~Type()` syntax in C++.
-        """
-
-        # This should only work with mutable references.
-        # FIXME: This should be a precondition checked by the Mojo type checker,
-        # not delayed to elaboration!
-        constrained[
-            is_mutable,
-            "cannot use 'unsafe_destroy_element' on immutable references",
-        ]()
-
-        # This method can only work on address space 0, because the __del__
-        # method that we need to invoke will take 'self' in address space zero.
-        constrained[
-            address_space == AddressSpace.GENERIC,
-            "cannot use 'destroy_element_unsafe' on arbitrary address spaces",
-        ]()
-
-        # Project to an owned raw pointer, allowing the compiler to know it is to
-        # be destroyed.
-        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
-
-        # Bitcast to address space zero since the inserted __del__ call will only
-        # work with address space zero.
-        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[
-                `!kgen.pointer<`,
-                type,
-                `>`,
-            ]
-        ](kgen_ptr)
-
-        # TODO: Use AnyPointer, but it requires a Movable element.
-        _ = __get_address_as_owned_value(dest_ptr)
-
-
-# FIXME: This should be a method on Reference, it is placed here because we need
-# it constrained on mutability and copyability of value.
-fn emplace_ref_unsafe[
-    type: Movable, lifetime: MutLifetime
-](dest: Reference[type, __mlir_attr.`1: i1`, lifetime], owned value: type):
-    """This unsafe operation assumes the memory pointed to by the reference
-    is uninitialized and overwrites it with an owned version of the
-    specified value.  This is equivalent to `new(ptr) Type(v)` syntax in C++.
-
-    Parameters:
-        type: Type of the underlying data.
-        lifetime: The lifetime of the reference.
-
-    Args:
-        dest: The reference to uninitialized memory to overwrite.
-        value: The value to write into it.
-    """
-    var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(dest.value)
-    __get_address_as_uninit_lvalue(kgen_ptr) = value^
+        # We don't have a `lit.ref.cast`` operation, so convert through a KGEN
+        # pointer.
+        return AnyPointer(self).address_space_cast[new_address_space]()[]
 
 
 # ===----------------------------------------------------------------------===#
