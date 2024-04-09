@@ -42,7 +42,7 @@ from sys import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
 from memory.unsafe import _LITRef
-from memory.unsafepointer import initialize_pointee, move_from_pointee, move_pointee
+from memory.unsafe_pointer import initialize_pointee, move_from_pointee, move_pointee
 from memory import AnyPointer, UnsafePointer
 from utils import unroll, StaticTuple
 
