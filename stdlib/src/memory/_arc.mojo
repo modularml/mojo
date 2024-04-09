@@ -137,7 +137,7 @@ struct Arc[T: Movable](CollectionElement):
         self._inner[].data = new_value^
 
     fn __refitem__[
-        mutability: __mlir_type.`i1`,
+        mutability: __mlir_type.i1,
         lifetime: AnyLifetime[mutability].type,
     ](self: Reference[Self, mutability, lifetime].mlir_ref_type) -> Reference[
         T, mutability, lifetime

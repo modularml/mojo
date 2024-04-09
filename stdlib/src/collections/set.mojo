@@ -219,7 +219,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         self.difference_update(other)
 
     fn __iter__[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+        mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
         self: Reference[Self, mutability, self_life].mlir_ref_type,
     ) -> _DictKeyIter[T, NoneType, mutability, self_life]:

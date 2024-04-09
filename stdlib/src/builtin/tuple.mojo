@@ -150,7 +150,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     @always_inline("nodebug")
     fn _refitem__[
         idx: Int,
-        mutability: __mlir_type.`i1`,
+        mutability: __mlir_type.i1,
         self_life: AnyLifetime[mutability].type,
     ](
         self_lit: Reference[Self, mutability, self_life].mlir_ref_type
