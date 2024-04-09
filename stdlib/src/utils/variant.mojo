@@ -286,7 +286,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     fn get[
         T: CollectionElement,
-        mutability: __mlir_type.`i1`,
+        mutability: __mlir_type.i1,
         self_life: AnyLifetime[mutability].type,
     ](self: Reference[Self, mutability, self_life].mlir_ref_type) -> Reference[
         T, mutability, self_life
