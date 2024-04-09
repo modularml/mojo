@@ -23,7 +23,7 @@ from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
 from memory.memory import _free, _malloc
-from memory.unsafe import _LITRef
+from memory.reference import _LITRef
 
 
 @register_passable("trivial")
