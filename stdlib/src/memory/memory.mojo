@@ -23,7 +23,8 @@ from memory import memcmp
 from sys import llvm_intrinsic, sizeof, triple_is_nvidia_cuda
 from builtin.dtype import _integral_type_of
 
-from .unsafe import AddressSpace, DTypePointer, Pointer, _GPUAddressSpace
+from memory.reference import AddressSpace, _GPUAddressSpace
+from .unsafe import DTypePointer, Pointer
 
 # ===----------------------------------------------------------------------=== #
 # Utilities

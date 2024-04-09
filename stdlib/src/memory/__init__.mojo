@@ -26,10 +26,13 @@ from .anypointer import (
 
 from .unsafe import (
     bitcast,
-    AddressSpace,
-    Reference,
     Pointer,
     DTypePointer,
+)
+
+from .reference import (
+    AddressSpace,
+    Reference,
 )
 
 # TODO: consider making Arc public and import it here
