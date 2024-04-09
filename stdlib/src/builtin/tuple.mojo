@@ -58,7 +58,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             # TODO: We could be fancier and take the values out of an owned
             # pack. For now just keep everything simple and copy the element.
             initialize_pointee(
-                AnyPointer(self._refitem__[idx]()), args.get_element[idx]()[]
+                UnsafePointer(self._refitem__[idx]()), args.get_element[idx]()[]
             )
 
         unroll[initialize_elt, Self.__len__()]()
@@ -70,7 +70,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         # trivial and won't do anything.
         @parameter
         fn destroy_elt[idx: Int]():
-            destroy_pointee(AnyPointer(self._refitem__[idx]()))
+            destroy_pointee(UnsafePointer(self._refitem__[idx]()))
 
         unroll[destroy_elt, Self.__len__()]()
 
@@ -88,10 +88,10 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            var existing_elt_ptr = AnyPointer(existing._refitem__[idx]())
+            var existing_elt_ptr = UnsafePointer(existing._refitem__[idx]())
 
             initialize_pointee(
-                AnyPointer(self._refitem__[idx]()),
+                UnsafePointer(self._refitem__[idx]()),
                 __get_address_as_owned_value(existing_elt_ptr.value),
             )
 
@@ -112,7 +112,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         @parameter
         fn initialize_elt[idx: Int]():
             initialize_pointee(
-                AnyPointer(self._refitem__[idx]()),
+                UnsafePointer(self._refitem__[idx]()),
                 existing._refitem__[idx]()[],
             )
 
@@ -165,7 +165,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             storage_kgen_ptr
         )
         # Convert to an immortal mut reference, which conforms to self_life.
-        return AnyPointer(elt_kgen_ptr)[]
+        return UnsafePointer(elt_kgen_ptr)[]
 
     # TODO: Remove the get methods in favor of __refitem__ some day.  This will
     # be annoying if we don't have autoderef though.
