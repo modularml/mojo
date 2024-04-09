@@ -16,6 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from utils._visualizers import lldb_formatter_wrapping_type
+from memory.unsafe import emplace_ref_unsafe
 
 # ===----------------------------------------------------------------------===#
 # Tuple
@@ -23,26 +24,56 @@ from utils._visualizers import lldb_formatter_wrapping_type
 
 
 @lldb_formatter_wrapping_type
-struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
+struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     """The type of a literal tuple expression.
 
     A tuple consists of zero or more values, separated by commas.
 
     Parameters:
-        Ts: The elements type.
+        element_types: The elements type.
     """
 
-    var storage: __mlir_type[`!kgen.pack<`, Ts, `>`]
+    var storage: __mlir_type[
+        `!kgen.pack<:!kgen.variadic<`,
+        CollectionElement,
+        `> `,
+        +element_types,
+        `>`,
+    ]
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, borrowed *args: *Ts):
+    fn __init__(inout self, *args: *element_types):
         """Construct the tuple.
 
         Args:
             args: Initial values.
         """
-        self.storage = args
+        # Mark 'storage' as being initialized so we can work on it.
+        __mlir_op.`lit.ownership.mark_initialized`(
+            __get_mvalue_as_litref(self.storage)
+        )
+
+        @parameter
+        fn initialize_elt[idx: Int]():
+            # TODO: We could be fancier and take the values out of an owned
+            # pack. For now just keep everything simple and copy the element.
+            emplace_ref_unsafe(
+                self._refitem__[idx](), args.get_element[idx]()[]
+            )
+
+        unroll[initialize_elt, Self.__len__()]()
+
+    fn __del__(owned self):
+        """Destructor that destroyes all of the elements."""
+
+        # Run the destructor on each member, the destructor of !kgen.pack is
+        # trivial and won't do anything.
+        @parameter
+        fn destroy_elt[idx: Int]():
+            self._refitem__[idx]().destroy_element_unsafe()
+
+        unroll[destroy_elt, Self.__len__()]()
 
     @always_inline("nodebug")
     fn __copyinit__(inout self, existing: Self):
@@ -51,7 +82,21 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         Args:
             existing: The value to copy from.
         """
-        self.storage = existing.storage
+        # Mark 'storage' as being initialized so we can work on it.
+        __mlir_op.`lit.ownership.mark_initialized`(
+            __get_mvalue_as_litref(self.storage)
+        )
+
+        @parameter
+        fn initialize_elt[idx: Int]():
+            var existing_elt_ptr = AnyPointer(existing._refitem__[idx]())
+
+            emplace_ref_unsafe(
+                self._refitem__[idx](),
+                __get_address_as_owned_value(existing_elt_ptr.value),
+            )
+
+        unroll[initialize_elt, Self.__len__()]()
 
     @always_inline("nodebug")
     fn __moveinit__(inout self, owned existing: Self):
@@ -60,7 +105,37 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         Args:
             existing: The value to move from.
         """
-        self.storage = existing.storage
+        # Mark 'storage' as being initialized so we can work on it.
+        __mlir_op.`lit.ownership.mark_initialized`(
+            __get_mvalue_as_litref(self.storage)
+        )
+
+        @parameter
+        fn initialize_elt[idx: Int]():
+            emplace_ref_unsafe(
+                self._refitem__[idx](),
+                existing._refitem__[idx]()[],
+            )
+
+        unroll[initialize_elt, Self.__len__()]()
+
+    @always_inline
+    @staticmethod
+    fn __len__() -> Int:
+        """Return the number of elements in the tuple.
+
+        Returns:
+            The tuple length.
+        """
+
+        @parameter
+        fn variadic_size(
+            x: __mlir_type[`!kgen.variadic<`, CollectionElement, `>`]
+        ) -> Int:
+            return __mlir_op.`pop.variadic.size`(x)
+
+        alias result = variadic_size(element_types)
+        return result
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -69,10 +144,34 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         Returns:
             The tuple length.
         """
-        return __mlir_op.`pop.variadic.size`(Ts)
+        return Self.__len__()
 
+    # TODO: Mojo's small brain can't handle a __refitem__ like this yet.
     @always_inline("nodebug")
-    fn get[i: Int, T: AnyRegType](self) -> T:
+    fn _refitem__[
+        idx: Int,
+        mutability: __mlir_type.`i1`,
+        self_life: AnyLifetime[mutability].type,
+    ](
+        self_lit: Reference[Self, mutability, self_life].mlir_ref_type
+    ) -> Reference[element_types[idx.value], mutability, self_life]:
+        # Return a reference to an element at the specified index, propagating
+        # mutability of self.
+        var storage_kgen_ptr = Reference(
+            Reference(self_lit)[].storage
+        ).get_unsafe_pointer().address
+
+        # Pointer to the element.
+        var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](
+            storage_kgen_ptr
+        )
+        # Convert to an immortal mut reference, which conforms to self_life.
+        return AnyPointer(elt_kgen_ptr)[]
+
+    # TODO: Remove the get methods in favor of __refitem__ some day.  This will
+    # be annoying if we don't have autoderef though.
+    @always_inline("nodebug")
+    fn get[i: Int, T: CollectionElement](self) -> T:
         """Get a tuple element and rebind to the specified type.
 
         Parameters:
@@ -85,7 +184,7 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         return rebind[T](self.get[i]())
 
     @always_inline("nodebug")
-    fn get[i: Int](self) -> Ts[i.value]:
+    fn get[i: Int](self) -> element_types[i.value]:
         """Get a tuple element.
 
         Parameters:
@@ -94,7 +193,7 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         Returns:
             The tuple element at the requested index.
         """
-        return __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
+        return self._refitem__[i]()[]
 
     @staticmethod
     fn _offset[i: Int]() -> Int:
@@ -106,8 +205,11 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         else:
             return _align_up(
                 Self._offset[i - 1]()
-                + _align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
-                alignof[Ts[i]](),
+                + _align_up(
+                    sizeof[element_types[i - 1]](),
+                    alignof[element_types[i - 1]](),
+                ),
+                alignof[element_types[i]](),
             )
 
 
