@@ -506,6 +506,8 @@ struct VariadicPack[
         """
         return Self.__len__()
 
+    # TODO: This should be __getitem__ but Mojo doesn't know how to invoke that,
+    # we need this for tuple as well.
     @always_inline
     fn get_element[
         index: Int
@@ -551,5 +553,24 @@ struct VariadicPack[
         @parameter
         fn unrolled[i: Int]():
             func(self.get_element[i]()[])
+
+        unroll[unrolled, Self.__len__()]()
+
+    @always_inline
+    fn each_idx[
+        func: fn[idx: Int, T: element_trait] (T) capturing -> None
+    ](self):
+        """Apply a function to each element of the pack in order.  This applies
+        the specified function (which must be parametric on the element type) to
+        each element of the pack, from the first element to the last, passing
+        in each element as a borrowed argument.
+
+        Parameters:
+            func: The function to apply to each element.
+        """
+
+        @parameter
+        fn unrolled[i: Int]():
+            func[i, element_types[i.value]](self.get_element[i]()[])
 
         unroll[unrolled, Self.__len__()]()
