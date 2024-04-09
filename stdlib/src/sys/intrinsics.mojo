@@ -1273,6 +1273,29 @@ fn _mlirtype_is_eq[t1: AnyRegType, t2: AnyRegType]() -> Bool:
     ]
 
 
+fn _type_is_eq[t1: AnyType, t2: AnyType]() -> Bool:
+    """Compares the two type for equality.
+
+    Parameters:
+        t1: The LHS of the type comparison.
+        t2: The RHS of the type comparison.
+
+    Returns:
+        Returns True if t1 and t2 are the same type and False otherwise.
+    """
+    return __mlir_attr[
+        `#kgen.param.expr<eq,`,
+        `#kgen.parameterizedtype.constant<`,
+        +t1,
+        `> : !kgen.type`,
+        `,`,
+        `#kgen.parameterizedtype.constant<`,
+        +t2,
+        `> : !kgen.type`,
+        `> : i1`,
+    ]
+
+
 # ===----------------------------------------------------------------------=== #
 # Transitional type used for llvm_intrinsic
 # ===----------------------------------------------------------------------=== #
