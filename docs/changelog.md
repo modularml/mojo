@@ -111,6 +111,10 @@ and tools. Please add any significant user-visible changes here.
   5) The `offset` method has been removed, it was unsafe and belongs on
     `AnyPointer`.
 
+- The `mojo package` command no longer supports the `-D` flag. All compilation
+  environment flags should be provided at the point of package use
+  (e.g. `mojo run` or `mojo build`).
+
 ### ❌ Removed
 
 - Support for "register only" variadic packs has been removed. Instead of
