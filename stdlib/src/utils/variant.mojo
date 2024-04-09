@@ -41,7 +41,7 @@ print(to_string(who_knows))
 from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
-from memory.unsafe import _LITRef
+from memory.reference import _LITRef
 from memory.anypointer import *
 
 from utils.loop import unroll

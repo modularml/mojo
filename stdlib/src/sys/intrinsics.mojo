@@ -21,7 +21,8 @@ from sys.intrinsics import PrefetchLocality
 
 from sys.info import sizeof
 
-from memory.unsafe import AddressSpace, DTypePointer
+from memory.reference import AddressSpace
+from memory.unsafe import DTypePointer
 
 # ===----------------------------------------------------------------------===#
 # llvm_intrinsic
