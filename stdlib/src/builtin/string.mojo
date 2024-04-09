@@ -20,7 +20,7 @@ from collections.dict import KeyElement
 from sys import llvm_intrinsic
 from sys.info import bitwidthof
 
-from memory.unsafepointer import UnsafePointer
+from memory.unsafe_pointer import UnsafePointer
 from memory.memory import memcmp, memcpy
 from memory.unsafe import DTypePointer, Pointer
 

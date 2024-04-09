@@ -20,7 +20,7 @@ from collections import List
 """
 
 
-from memory.unsafepointer import *
+from memory.unsafe_pointer import *
 from memory.unsafe import Reference
 
 # ===----------------------------------------------------------------------===#

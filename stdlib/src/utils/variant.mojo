@@ -42,7 +42,7 @@ from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
 from memory.reference import _LITRef
-from memory.unsafepointer import *
+from memory.unsafe_pointer import *
 
 from utils.loop import unroll
 from utils.static_tuple import StaticTuple
