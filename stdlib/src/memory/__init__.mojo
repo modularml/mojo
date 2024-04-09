@@ -20,7 +20,7 @@ from .memory import (
     stack_allocation,
 )
 
-from .anypointer import (
+from .unsafepointer import (
     AnyPointer,
     UnsafePointer,
 )

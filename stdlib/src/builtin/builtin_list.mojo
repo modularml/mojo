@@ -16,7 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from memory.reference import Reference, _LITRef
-from memory.anypointer import *
+from memory.unsafepointer import *
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
