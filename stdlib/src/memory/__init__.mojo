@@ -30,6 +30,7 @@ from .unsafe import (
     AddressSpace,
     Reference,
     Pointer,
+    LegacyPointer,
     DTypePointer,
 )
 
