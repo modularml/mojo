@@ -143,12 +143,10 @@ struct Arc[T: Movable](CollectionElement):
     ](self: Reference[Self, mutability, lifetime].mlir_ref_type) -> Reference[
         T, mutability, lifetime
     ]:
-        """Get a copy of the managed value.
-
-        When we have lifetimes this will not have to copy.
+        """Returns a Reference to the managed value.
 
         Returns:
-            A copy of the managed value.
+            A Reference to the managed value.
         """
         alias RefType = Reference[T, mutability, lifetime]
         return RefType(
