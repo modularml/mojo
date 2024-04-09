@@ -23,7 +23,7 @@ from collections import List
 from sys.info import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 
 from memory.unsafe import DTypePointer, Pointer
-from memory.unsafepointer import move_from_pointee
+from memory.unsafe_pointer import move_from_pointee
 
 from utils import StringRef
 

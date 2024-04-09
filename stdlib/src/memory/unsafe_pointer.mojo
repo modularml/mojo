@@ -15,7 +15,7 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory.unsafepointer import UnsafePointer
+from memory.unsafe_pointer import UnsafePointer
 ```
 """
 
