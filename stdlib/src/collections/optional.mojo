@@ -305,7 +305,7 @@ struct OptionalReg[T: AnyRegType](Boolable):
         return Self {
             _value: __mlir_op.`kgen.variant.create`[
                 _type = Self._type, index = Int(1).value
-            ](__mlir_attr.`false`)
+            ](__mlir_attr.false)
         }
 
     @always_inline
