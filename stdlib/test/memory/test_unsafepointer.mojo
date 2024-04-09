@@ -31,11 +31,11 @@ struct MoveOnlyType(Movable):
         print("deleted", self.value)
 
 
-fn test_anypointer_of_move_only_type():
-    # CHECK-LABEL: === test_anypointer
-    print("=== test_anypointer")
+fn test_unsafepointer_of_move_only_type():
+    # CHECK-LABEL: === test_unsafepointer
+    print("=== test_unsafepointer")
 
-    var ptr = AnyPointer[MoveOnlyType].alloc(1)
+    var ptr = UnsafePointer[MoveOnlyType].alloc(1)
     # CHECK: moved 42
     initialize_pointee(ptr, MoveOnlyType(42))
     # CHECK: moved 42
@@ -46,20 +46,20 @@ fn test_anypointer_of_move_only_type():
     ptr.free()
 
 
-def test_anypointer_move_pointee_move_count():
-    var ptr = AnyPointer[MoveCounter[Int]].alloc(1)
+def test_unsafepointer_move_pointee_move_count():
+    var ptr = UnsafePointer[MoveCounter[Int]].alloc(1)
 
     var value = MoveCounter(5)
     assert_equal(0, value.move_count)
     initialize_pointee(ptr, value^)
 
     # -----
-    # Test that `AnyPointer.move_pointee` performs exactly one move.
+    # Test that `UnsafePointer.move_pointee` performs exactly one move.
     # -----
 
     assert_equal(1, ptr[].move_count)
 
-    var ptr_2 = AnyPointer[MoveCounter[Int]].alloc(1)
+    var ptr_2 = UnsafePointer[MoveCounter[Int]].alloc(1)
 
     move_pointee(src=ptr, dst=ptr_2)
 
@@ -67,7 +67,7 @@ def test_anypointer_move_pointee_move_count():
 
 
 def test_refitem():
-    var ptr = AnyPointer[Int].alloc(1)
+    var ptr = UnsafePointer[Int].alloc(1)
     ptr[0] = 0
     ptr[] += 1
     assert_equal(ptr[], 1)
@@ -75,7 +75,7 @@ def test_refitem():
 
 
 def test_refitem_offset():
-    var ptr = AnyPointer[Int].alloc(5)
+    var ptr = UnsafePointer[Int].alloc(5)
     for i in range(5):
         ptr[i] = i
     for i in range(5):
@@ -85,7 +85,7 @@ def test_refitem_offset():
 
 def test_address_of():
     var local = 1
-    assert_not_equal(0, int(AnyPointer[Int].address_of(local)))
+    assert_not_equal(0, int(UnsafePointer[Int].address_of(local)))
 
 
 def test_bitcast():
@@ -98,11 +98,11 @@ def test_bitcast():
     assert_equal(int(ptr), int(aliased_ptr))
 
 
-def test_anypointer_string():
-    var nullptr = AnyPointer[Int]()
+def test_unsafepointer_string():
+    var nullptr = UnsafePointer[Int]()
     assert_equal(str(nullptr), "0x0")
 
-    var ptr = AnyPointer[Int].alloc(1)
+    var ptr = UnsafePointer[Int].alloc(1)
     assert_true(str(ptr).startswith("0x"))
     assert_not_equal(str(ptr), "0x0")
     ptr.free()
@@ -110,20 +110,20 @@ def test_anypointer_string():
 
 def test_eq():
     var local = 1
-    var p1 = AnyPointer[Int].address_of(local)
+    var p1 = UnsafePointer[Int].address_of(local)
     var p2 = p1
     assert_equal(p1, p2)
 
     var other_local = 2
-    var p3 = AnyPointer[Int].address_of(other_local)
+    var p3 = UnsafePointer[Int].address_of(other_local)
     assert_not_equal(p1, p3)
 
-    var p4 = AnyPointer[Int].address_of(local)
+    var p4 = UnsafePointer[Int].address_of(local)
     assert_equal(p1, p4)
 
 
 def test_comparisons():
-    var p1 = AnyPointer[Int].alloc(1)
+    var p1 = UnsafePointer[Int].alloc(1)
 
     assert_true((p1 - 1) < p1)
     assert_true((p1 - 1) <= p1)
@@ -135,11 +135,11 @@ def test_comparisons():
     p1.free()
 
 
-def test_anypointer_address_space():
-    var p1 = AnyPointer[Int, AddressSpace(0)].alloc(1)
+def test_unsafepointer_address_space():
+    var p1 = UnsafePointer[Int, AddressSpace(0)].alloc(1)
     p1.free()
 
-    var p2 = AnyPointer[Int, AddressSpace.GENERIC].alloc(1)
+    var p2 = UnsafePointer[Int, AddressSpace.GENERIC].alloc(1)
     p2.free()
 
 
@@ -149,12 +149,12 @@ def main():
     test_refitem()
     test_refitem_offset()
 
-    test_anypointer_of_move_only_type()
-    test_anypointer_move_pointee_move_count()
+    test_unsafepointer_of_move_only_type()
+    test_unsafepointer_move_pointee_move_count()
 
     test_bitcast()
-    test_anypointer_string()
+    test_unsafepointer_string()
     test_eq()
     test_comparisons()
 
-    test_anypointer_address_space()
+    test_unsafepointer_address_space()
