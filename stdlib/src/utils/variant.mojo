@@ -43,7 +43,7 @@ from sys.intrinsics import _mlirtype_is_eq
 
 from memory.anypointer import *
 from memory.unsafe import _LITRef
-from memory import emplace_ref_unsafe, AnyPointer
+from memory import AnyPointer
 from utils import unroll, StaticTuple
 
 # ===----------------------------------------------------------------------=== #
@@ -190,8 +190,8 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias T = Ts[i]
-                emplace_ref_unsafe[T](
-                    Reference(self._impl).bitcast_element[T](),
+                initialize_pointee[T](
+                    AnyPointer(Reference(self._impl).bitcast_element[T]()),
                     Reference(other._impl).bitcast_element[T]()[],
                 )
 

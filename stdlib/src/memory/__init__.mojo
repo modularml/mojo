@@ -28,7 +28,6 @@ from .unsafe import (
     bitcast,
     AddressSpace,
     Reference,
-    emplace_ref_unsafe,
     Pointer,
     DTypePointer,
 )
