@@ -168,3 +168,6 @@ what we publish.
 
 - [#1676](https://github.com/modularml/mojo/issues/1676) Fix a crash related to
   `@value` decorator and structs with empty body.
+
+- [#1917](https://github.com/modularml/mojo/issues/1917) Fix a crash after
+  syntax error during tuple creation
