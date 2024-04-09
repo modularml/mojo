@@ -20,8 +20,8 @@ from collections import List
 """
 
 
-from memory.anypointer import *
-from memory import AnyPointer, Reference
+from memory.unsafepointer import *
+from memory import Reference, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -125,7 +125,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             self.append(value[])
 
     fn __init__(
-        inout self: Self, data: AnyPointer[T], size: Int, capacity: Int
+        inout self: Self, data: UnsafePointer[T], size: Int, capacity: Int
     ):
         """Constructs a list from a pointer and its size.
 
