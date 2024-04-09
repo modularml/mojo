@@ -15,8 +15,9 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from memory.anypointer import destroy_pointee
 from memory.unsafe import _LITRef
-from memory import Reference
+from memory import AnyPointer, Reference
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
@@ -332,11 +333,7 @@ struct VariadicListMem[
             # destroy in backwards order to match how arguments are normally torn
             # down when CheckLifetimes is left to its own devices.
             for i in range(len(self), 0, -1):
-                # This cannot use Reference(self[i - 1]) because the subscript
-                # will return a BValue, not an LValue.  We need to maintain the
-                # parametric mutability by keeping the Reference returned by
-                # refitem exposed.
-                self.__refitem__(i - 1).destroy_element_unsafe()
+                destroy_pointee(AnyPointer(Reference(self[i - 1])))
 
     @always_inline
     fn __len__(self) -> Int:
@@ -475,7 +472,7 @@ struct VariadicPack[
             @parameter
             fn destroy_elt[i: Int]():
                 # destroy the elements in reverse order.
-                self.get_element[len - i - 1]().destroy_element_unsafe()
+                destroy_pointee(AnyPointer(self.get_element[len - i - 1]()))
 
             unroll[destroy_elt, len]()
 
