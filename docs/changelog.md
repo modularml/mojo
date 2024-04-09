@@ -72,8 +72,7 @@ and tools. Please add any significant user-visible changes here.
 - `Reference` interoperates with unsafe code better: `AnyPointer` now has a
   constructor that forms it from `Reference` directly (inferring element type
   and address space). `AnyPointer` can convert to an immortal mutable
-  `Reference` with `yourptr[]`.  Both `Reference` and `AnyPointer` now have an
-  `address_space_cast` method like `Pointer`.
+  `Reference` with `yourptr[]`.
 
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
@@ -100,6 +99,13 @@ and tools. Please add any significant user-visible changes here.
      `move_from_pointee`, `initialize_pointee` and `move_pointee` respectively.
   3) A new `destroy_pointee` function runs the destructor on the pointee.
   4) `AnyPointer` can be initialized from a `Reference` as mentioned above.
+  5) It has some new methods like `address_space_cast`.
+- The `Reference` type has several changes, including:
+  1) `Reference` now has an unsafe `address_space_cast` method like `Pointer`.
+  2) The `destroy_element_unsafe` method has been remove, do this with
+    `AnyPointer/destroy_pointee`, which is more obviously unsafe.
+  3) The `emplace_ref_unsafe` function has been removed in favor of
+    `AnyPointer/initialize_pointee`.
 
 ### ❌ Removed
 

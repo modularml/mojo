@@ -41,7 +41,7 @@ print(to_string(who_knows))
 from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
-from memory.unsafe import _LITRef, emplace_ref_unsafe
+from memory.unsafe import _LITRef
 from memory.anypointer import *
 
 from utils.loop import unroll
@@ -191,8 +191,8 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias T = Ts[i]
-                emplace_ref_unsafe[T](
-                    Reference(self._impl).bitcast_element[T](),
+                initialize_pointee[T](
+                    AnyPointer(Reference(self._impl).bitcast_element[T]()),
                     Reference(other._impl).bitcast_element[T]()[],
                 )
 
