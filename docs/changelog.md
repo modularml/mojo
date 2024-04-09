@@ -102,12 +102,13 @@ and tools. Please add any significant user-visible changes here.
   4) `AnyPointer` can be initialized from a `Reference` as mentioned above.
   5) It has some new methods like `address_space_cast`.
 - The `Reference` type has several changes, including:
-  1) `Reference` now has an unsafe `address_space_cast` method like `Pointer`.
-  2) The `destroy_element_unsafe` method has been removed, do this with
+  1) It is now located in `memory.reference` instead of `memory.unsafe`.
+  2) `Reference` now has an unsafe `address_space_cast` method like `Pointer`.
+  3) The `destroy_element_unsafe` method has been removed, do this with
     `AnyPointer/destroy_pointee`, which is more obviously unsafe.
-  3) The `emplace_ref_unsafe` function has been removed in favor of
+  4) The `emplace_ref_unsafe` function has been removed in favor of
     `AnyPointer/initialize_pointee`.
-  4) The `offset` method has been removed, it was unsafe and belongs on
+  5) The `offset` method has been removed, it was unsafe and belongs on
     `AnyPointer`.
 
 ### ❌ Removed
