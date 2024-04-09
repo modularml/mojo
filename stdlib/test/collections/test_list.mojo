@@ -279,70 +279,67 @@ def test_list_reverse_move_count():
     # Keep vec alive until after we've done the last `vec.data + N` read.
     _ = vec^
 
+
 def test_list_insert():
     #
     # Test the list [1, 2, 3] created with insert
     #
 
-    vec = List[Int]()
-    vec.insert(len(vec), 1)
-    vec.insert(len(vec), 3)
-    vec.insert(1, 2)
+    v1 = List[Int]()
+    v1.insert(len(v1), 1)
+    v1.insert(len(v1), 3)
+    v1.insert(1, 2)
 
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
+    assert_equal(len(v1), 3)
+    assert_equal(v1[0], 1)
+    assert_equal(v1[1], 2)
+    assert_equal(v1[2], 3)
 
-    vec.clear()
-    
     #
     # Test the list [1, 2, 3, 4, 5] created with negative and positive index
     #
 
-    vec.insert(-1729, 2)
-    vec.insert(len(vec), 3)
-    vec.insert(len(vec), 5)
-    vec.insert(-1, 4)
-    vec.insert(-len(vec), 1)
+    v2 = List[Int]()
+    v2.insert(-1729, 2)
+    v2.insert(len(v2), 3)
+    v2.insert(len(v2), 5)
+    v2.insert(-1, 4)
+    v2.insert(-len(v2), 1)
 
-    assert_equal(len(vec), 5)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 4)
-    assert_equal(vec[4], 5) 
-
-    vec.clear()
-
+    assert_equal(len(v2), 5)
+    assert_equal(v2[0], 1)
+    assert_equal(v2[1], 2)
+    assert_equal(v2[2], 3)
+    assert_equal(v2[3], 4)
+    assert_equal(v2[4], 5)
 
     #
     # Test the list [1, 2, 3, 4] created with negative index
     #
 
-    vec.insert(-11, 4)
-    vec.insert(-13, 3)
-    vec.insert(-17, 2)
-    vec.insert(-19, 1)
+    v3 = List[Int]()
+    v3.insert(-11, 4)
+    v3.insert(-13, 3)
+    v3.insert(-17, 2)
+    v3.insert(-19, 1)
 
-    assert_equal(len(vec), 4)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 4)
-    
-    vec.clear()
-    
-    # 
+    assert_equal(len(v3), 4)
+    assert_equal(v3[0], 1)
+    assert_equal(v3[1], 2)
+    assert_equal(v3[2], 3)
+    assert_equal(v3[3], 4)
+
+    #
     # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
     #
- 
-    for i in range(4):
-        vec.insert(0, 4 - i)
-        vec.insert(len(vec), 4 + i + 1)
 
-    for i in range(len(vec)):
-        assert_equal(vec[i], i + 1)
+    v4 = List[Int]()
+    for i in range(4):
+        v4.insert(0, 4 - i)
+        v4.insert(len(v4), 4 + i + 1)
+
+    for i in range(len(v4)):
+        assert_equal(v4[i], i + 1)
 
 
 def test_list_extend():

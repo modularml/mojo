@@ -185,7 +185,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size += 1
 
     @always_inline
-    fn insert(inout self, i: Int, owned value :T):
+    fn insert(inout self, i: Int, owned value: T):
         """Inserts a value to the list at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
 
@@ -194,7 +194,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             value: The value to insert.
         """
         debug_assert(i <= self.size, "insert index out of range")
-        
+
         var normalized_idx = i
         if i < 0:
             normalized_idx = _max(0, len(self) + i)
@@ -202,8 +202,8 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         var earlier_idx = len(self)
         var later_idx = len(self) - 1
         self.append(value^)
-        
-        for _ in range(normalized_idx, len(self) - 1): 
+
+        for _ in range(normalized_idx, len(self) - 1):
             var earlier_ptr = self.data + earlier_idx
             var later_ptr = self.data + later_idx
 
