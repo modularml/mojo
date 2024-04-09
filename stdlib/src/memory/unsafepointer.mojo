@@ -15,7 +15,7 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory import AnyPointer
+from memory import UnsafePointer
 ```
 """
 
@@ -25,11 +25,11 @@ from sys.intrinsics import _mlirtype_is_eq
 from memory.memory import _free, _malloc
 from memory.reference import _LITRef
 
-alias UnsafePointer = AnyPointer
+alias AnyPointer = UnsafePointer
 
 
 @register_passable("trivial")
-struct AnyPointer[
+struct UnsafePointer[
     T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC
 ](Boolable, CollectionElement, Stringable, Intable, EqualityComparable):
     """This is a pointer type that can point to any generic value that is
@@ -37,7 +37,7 @@ struct AnyPointer[
 
     Parameters:
         T: The type the pointer points to.
-        address_space: The address space associated with the AnyPointer allocated memory.
+        address_space: The address space associated with the UnsafePointer allocated memory.
     """
 
     alias pointer_type = __mlir_type[
@@ -72,7 +72,7 @@ struct AnyPointer[
 
     @always_inline
     fn __init__(value: Reference[T, _, _, address_space]) -> Self:
-        """Create an unsafe AnyPointer from a safe Reference.
+        """Create an unsafe UnsafePointer from a safe Reference.
 
         Args:
             value: The input reference to construct with.
@@ -110,7 +110,7 @@ struct AnyPointer[
             arg: The value to get the address of.
 
         Returns:
-            An AnyPointer which contains the address of the argument.
+            An UnsafePointer which contains the address of the argument.
         """
         return __mlir_op.`pop.pointer.bitcast`[_type = Self.pointer_type](
             __get_lvalue_as_address(arg)
@@ -126,7 +126,7 @@ struct AnyPointer[
     @always_inline
     fn bitcast_element[
         new_type: AnyType
-    ](self) -> AnyPointer[new_type, address_space]:
+    ](self) -> UnsafePointer[new_type, address_space]:
         """Bitcasts the pointer to a different type.
 
         Parameters:
@@ -138,13 +138,13 @@ struct AnyPointer[
         """
 
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = AnyPointer[new_type, address_space].pointer_type
+            _type = UnsafePointer[new_type, address_space].pointer_type
         ](self.value)
 
     @always_inline
     fn address_space_cast[
         new_address_space: AddressSpace
-    ](self) -> AnyPointer[T, new_address_space]:
+    ](self) -> UnsafePointer[T, new_address_space]:
         """Bitcasts the pointer to a different address space.
 
         Parameters:
@@ -156,7 +156,7 @@ struct AnyPointer[
         """
 
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = AnyPointer[T, new_address_space].pointer_type
+            _type = UnsafePointer[T, new_address_space].pointer_type
         ](self.value)
 
     @always_inline
@@ -326,7 +326,7 @@ struct AnyPointer[
 
 
 # ===----------------------------------------------------------------------=== #
-# AnyPointer extensions
+# UnsafePointer extensions
 # ===----------------------------------------------------------------------=== #
 # TODO: These should be methods when we have conditional conformance.
 
@@ -334,7 +334,7 @@ struct AnyPointer[
 # This isn't a method because destructors only work in the default address
 # space.
 @always_inline
-fn destroy_pointee(ptr: AnyPointer[_, AddressSpace.GENERIC]):
+fn destroy_pointee(ptr: UnsafePointer[_, AddressSpace.GENERIC]):
     """Destroy the pointed-to value.
 
     The pointer must not be null, and the pointer memory location is assumed
@@ -347,7 +347,7 @@ fn destroy_pointee(ptr: AnyPointer[_, AddressSpace.GENERIC]):
 
 
 @always_inline
-fn move_from_pointee[T: Movable](ptr: AnyPointer[T, _]) -> T:
+fn move_from_pointee[T: Movable](ptr: UnsafePointer[T, _]) -> T:
     """Move the value at the pointer out.
 
     The pointer must not be null, and the pointer memory location is assumed
@@ -371,7 +371,7 @@ fn move_from_pointee[T: Movable](ptr: AnyPointer[T, _]) -> T:
 
 
 @always_inline
-fn initialize_pointee[T: Movable](ptr: AnyPointer[T, _], owned value: T):
+fn initialize_pointee[T: Movable](ptr: UnsafePointer[T, _], owned value: T):
     """Emplace a new value into the pointer location.
 
     The pointer memory location is assumed to contain uninitialized data,
@@ -390,7 +390,7 @@ fn initialize_pointee[T: Movable](ptr: AnyPointer[T, _], owned value: T):
 
 
 @always_inline
-fn move_pointee[T: Movable](*, src: AnyPointer[T, _], dst: AnyPointer[T]):
+fn move_pointee[T: Movable](*, src: UnsafePointer[T, _], dst: UnsafePointer[T]):
     """Moves the value `src` points to into the memory location pointed to by
     `dest`.
 
