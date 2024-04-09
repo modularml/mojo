@@ -506,7 +506,7 @@ struct Reference[
             Constructed Pointer object.
         """
         var ptr_with_trait = __mlir_op.`lit.ref.to_pointer`(self.value)
-        # Work around AnyRefType vs AnyType.
+        # Work around AnyRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[
             _type = Pointer[type, address_space].pointer_type
         ](ptr_with_trait)
