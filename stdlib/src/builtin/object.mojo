@@ -1310,13 +1310,6 @@ struct object(IntableRaising, Boolable, Stringable):
             self, rhs
         )
 
-    # TODO: __mod__
-    # TODO: __truediv__
-    # TODO: __floordiv__
-
-    # TODO: __lshift__
-    # TODO: __rshift__
-
     @always_inline
     fn __mod__(self, rhs: object) raises -> object:
         """Modulo operator. Valid only for arithmetic types.
@@ -1358,6 +1351,9 @@ struct object(IntableRaising, Boolable, Stringable):
         return Self._arithmetic_binary_op[
             Float64.__floordiv__, Int64.__floordiv__
         ](self, rhs)
+
+    # TODO __lshift__
+    # TODO __rshift__
 
     @always_inline
     fn __and__(self, rhs: object) raises -> object:

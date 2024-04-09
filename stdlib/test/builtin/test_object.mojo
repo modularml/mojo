@@ -98,8 +98,35 @@ def test_arithmetic_ops():
     assert_true(lhs == concatted)
 
 
-# These are all marked borrowed because 'object' doesn't support function
-# types with owned arguments.
+def test_arithmetic_ops_div():
+    # test mod
+    lhs = object(5.5)
+    rhs = object(2.0)
+    assert_true((lhs % rhs) == 1.5)
+
+    lhs = object(5)
+    rhs = object(2)
+    assert_true((lhs % rhs) == 1)
+
+    # truediv
+    lhs = object(5.5)
+    rhs = object(2.0)
+    assert_true(lhs / rhs == 2.75)
+
+    lhs = object(5)
+    rhs = object(2)
+    assert_true(lhs / rhs == 2)
+
+    # floor div
+    lhs = object(5.5)
+    rhs = object(2.0)
+    assert_true(lhs // rhs == 2)
+
+    lhs = object(5)
+    rhs = object(2)
+    assert_true(lhs // rhs == 2)
+
+
 def test_function(borrowed lhs, borrowed rhs) -> object:
     return lhs + rhs
 
@@ -197,6 +224,7 @@ def main():
         test_object_ctors()
         test_comparison_ops()
         test_arithmetic_ops()
+        test_arithmetic_ops_div()
         # CHECK: Function at address 0x{{[a-float0-9]+}}
         # CHECK-NEXT: 3
         # CHECK-NEXT: Error from function type
