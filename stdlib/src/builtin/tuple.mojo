@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory.unsafepointer import initialize_pointee
+from memory.unsafe_pointer import initialize_pointee
 from utils._visualizers import lldb_formatter_wrapping_type
 
 # ===----------------------------------------------------------------------===#
