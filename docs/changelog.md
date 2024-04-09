@@ -13,6 +13,11 @@ and tools. Please add any significant user-visible changes here.
 
 ### 🔥 Legendary
 
+- Tuple now works with memory-only element types like String.  Also, `Tuple.get`
+  now supports a form that just takes an element index but does not
+  require you to specify the result type.  Instead of `tup.get[1, Int]()` you
+  can now just use `tup.get[1]()`.
+
 ### ⭐️ New
 
 - Heterogenous variadic pack arguments now work reliably even with memory types,
@@ -65,10 +70,6 @@ and tools. Please add any significant user-visible changes here.
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
 
-- `Tuple.get` now supports a form that just takes an element index but does not
-  require you to specify the result type.  Instead of `tup.get[1, Int]()` you
-  can now just use `tup.get[1]()`.
-
 - `Reference` interoperates with unsafe code better: `AnyPointer` now has a
   constructor that forms it from `Reference` directly (inferring element type
   and address space). `AnyPointer` can convert to an immortal mutable
@@ -102,7 +103,7 @@ and tools. Please add any significant user-visible changes here.
   5) It has some new methods like `address_space_cast`.
 - The `Reference` type has several changes, including:
   1) `Reference` now has an unsafe `address_space_cast` method like `Pointer`.
-  2) The `destroy_element_unsafe` method has been remove, do this with
+  2) The `destroy_element_unsafe` method has been removed, do this with
     `AnyPointer/destroy_pointee`, which is more obviously unsafe.
   3) The `emplace_ref_unsafe` function has been removed in favor of
     `AnyPointer/initialize_pointee`.
@@ -124,6 +125,15 @@ and tools. Please add any significant user-visible changes here.
   to popping the last element in the list.
 
 ### 🛠️ Fixed
+
+- [#516](https://github.com/modularml/mojo/issues/516) and
+  [#1817](https://github.com/modularml/mojo/issues/1817) and many others, e.g.
+  "Can't create a function that returns two strings"
+
+- [#1178](https://github.com/modularml/mojo/issues/1178) (os/kern) failure (5)
+
+- [#1609](https://github.com/modularml/mojo/issues/1609) alias with
+  `DynamicVector[Tuple[Int]]` fails.
 
 - [#1987](https://github.com/modularml/mojo/issues/1987) Defining `main`
   in a Mojo package is an error, for now. This is not intended to work yet,
