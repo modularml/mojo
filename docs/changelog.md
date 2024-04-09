@@ -107,6 +107,8 @@ and tools. Please add any significant user-visible changes here.
     `AnyPointer/destroy_pointee`, which is more obviously unsafe.
   3) The `emplace_ref_unsafe` function has been removed in favor of
     `AnyPointer/initialize_pointee`.
+  4) The `offset` method has been removed, it was unsafe and belongs on
+    `AnyPointer`.
 
 ### ❌ Removed
 
