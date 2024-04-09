@@ -15,7 +15,7 @@
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
-from testing import assert_equal
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_mojo_issue_698():
@@ -461,6 +461,11 @@ def test_list_span():
     assert_equal(len(es), 3)
 
 
+def test_list_boolable():
+    assert_true(List[Int](1))
+    assert_false(List[Int]())
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -477,3 +482,4 @@ def main():
     test_list_iter()
     test_list_iter_mutable()
     test_list_span()
+    test_list_boolable()
