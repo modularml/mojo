@@ -122,7 +122,9 @@ struct AnyPointer[
         ).free()
 
     @always_inline
-    fn bitcast[new_type: Movable](self) -> AnyPointer[new_type, address_space]:
+    fn bitcast_element[
+        new_type: AnyType
+    ](self) -> AnyPointer[new_type, address_space]:
         """Bitcasts the pointer to a different type.
 
         Parameters:
@@ -132,10 +134,6 @@ struct AnyPointer[
             A new pointer with the specified type and the same address, as
             the original pointer.
         """
-
-        @parameter
-        if _mlirtype_is_eq[T, new_type]():
-            return rebind[AnyPointer[new_type, address_space]](self)
 
         return __mlir_op.`pop.pointer.bitcast`[
             _type = AnyPointer[new_type, address_space].pointer_type

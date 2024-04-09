@@ -16,7 +16,6 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from utils._visualizers import lldb_formatter_wrapping_type
-from memory.unsafe import emplace_ref_unsafe
 
 # ===----------------------------------------------------------------------===#
 # Tuple
@@ -58,20 +57,20 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         fn initialize_elt[idx: Int]():
             # TODO: We could be fancier and take the values out of an owned
             # pack. For now just keep everything simple and copy the element.
-            emplace_ref_unsafe(
-                self._refitem__[idx](), args.get_element[idx]()[]
+            initialize_pointee(
+                AnyPointer(self._refitem__[idx]()), args.get_element[idx]()[]
             )
 
         unroll[initialize_elt, Self.__len__()]()
 
     fn __del__(owned self):
-        """Destructor that destroyes all of the elements."""
+        """Destructor that destroys all of the elements."""
 
         # Run the destructor on each member, the destructor of !kgen.pack is
         # trivial and won't do anything.
         @parameter
         fn destroy_elt[idx: Int]():
-            self._refitem__[idx]().destroy_element_unsafe()
+            destroy_pointee(AnyPointer(self._refitem__[idx]()))
 
         unroll[destroy_elt, Self.__len__()]()
 
@@ -91,8 +90,8 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         fn initialize_elt[idx: Int]():
             var existing_elt_ptr = AnyPointer(existing._refitem__[idx]())
 
-            emplace_ref_unsafe(
-                self._refitem__[idx](),
+            initialize_pointee(
+                AnyPointer(self._refitem__[idx]()),
                 __get_address_as_owned_value(existing_elt_ptr.value),
             )
 
@@ -112,8 +111,8 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            emplace_ref_unsafe(
-                self._refitem__[idx](),
+            initialize_pointee(
+                AnyPointer(self._refitem__[idx]()),
                 existing._refitem__[idx]()[],
             )
 
