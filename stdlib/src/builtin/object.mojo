@@ -21,6 +21,7 @@ from sys.intrinsics import _mlirtype_is_eq
 
 from memory import memcmp, memcpy
 from memory.unsafe import DTypePointer, Pointer
+from memory._arc import Arc
 
 from utils import StringRef
 from utils.loop import unroll
@@ -83,14 +84,11 @@ struct _RefCountedList:
     ref-counted data types.
     """
 
-    fn __init__(inout self):
-        self.refcount = 1
-        self.impl = List[_ObjectImpl]()
-
-    var refcount: Atomic[DType.index]
-    """The number of live references to the list."""
-    var impl: List[_ObjectImpl]
+    var impl: Arc[List[_ObjectImpl]]
     """The list value."""
+
+    fn __init__(inout self):
+        self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
 
 
 @register_passable("trivial")
@@ -107,20 +105,11 @@ struct _RefCountedListRef:
 
     @always_inline
     fn copy(self) -> Self:
-        _ = self.lst.bitcast[_RefCountedList]()[].refcount.fetch_add(1)
+        _ = self.lst.bitcast[_RefCountedList]()[].impl
         return Self {lst: self.lst}
 
     fn release(self):
-        var ptr = self.lst.bitcast[_RefCountedList]()
-        var prev = ptr[].refcount.fetch_sub(1)
-        if prev != 1:
-            return
-
-        # Run the destructor on the list elements and then destroy the list.
-        var list = __get_address_as_owned_value(ptr.address).impl
-        for i in range(len(list)):
-            list[i].destroy()
-        ptr.free()
+        var ptr = self.lst.bitcast[_RefCountedList]()[].impl
 
 
 struct _RefCountedAttrsDict:
@@ -647,25 +636,25 @@ struct _ObjectImpl(CollectionElement, Stringable):
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_list_ptr(self) -> Pointer[_RefCountedList]:
-        return self.get_as_list().lst.bitcast[_RefCountedList]()
+    fn get_list_ptr(self) -> Arc[List[_ObjectImpl]]:
+        return self.get_as_list().lst.bitcast[_RefCountedList]()[].impl
 
     @always_inline
     fn list_append(self, value: Self):
-        self.get_list_ptr()[].impl.append(value.value)
+        self.get_list_ptr()[].append(value.value)
 
     @always_inline
     fn get_list_length(self) -> Int:
-        return len(self.get_list_ptr()[].impl)
+        return len(self.get_list_ptr()[])
 
     @always_inline
     fn get_list_element(self, i: Int) -> _ObjectImpl:
-        return self.get_list_ptr()[].impl[i].copy()
+        return self.get_list_ptr()[][i].copy()
 
     @always_inline
     fn set_list_element(self, i: Int, value: _ObjectImpl):
-        self.get_list_ptr()[].impl[i].destroy()
-        self.get_list_ptr()[].impl[i] = value
+        self.get_list_ptr()[][i].destroy()
+        self.get_list_ptr()[][i] = value
 
     # ===------------------------------------------------------------------=== #
     # Object Attribute Functions
