@@ -43,6 +43,7 @@ struct _ListIter[
     T: CollectionElement,
     list_mutability: __mlir_type.`i1`,
     list_lifetime: AnyLifetime[list_mutability].type,
+    forward: Bool = True,
 ]:
     """Iterator for List.
 
@@ -50,6 +51,7 @@ struct _ListIter[
         T: The type of the elements in the list.
         list_mutability: Whether the reference to the list is mutable.
         list_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = List[T]
@@ -57,16 +59,30 @@ struct _ListIter[
     var index: Int
     var src: Reference[Self.list_type, list_mutability, list_lifetime]
 
+    fn __iter__(self) -> Self:
+        return self
+
     fn __next__(
         inout self,
     ) -> Reference[T, list_mutability, list_lifetime]:
-        self.index += 1
-        return self.src[].__get_ref[list_mutability, list_lifetime](
-            self.index - 1
-        )
+        @parameter
+        if forward:
+            self.index += 1
+            return self.src[].__get_ref[list_mutability, list_lifetime](
+                self.index - 1
+            )
+        else:
+            self.index -= 1
+            return self.src[].__get_ref[list_mutability, list_lifetime](
+                self.index
+            )
 
     fn __len__(self) -> Int:
-        return len(self.src[]) - self.index
+        @parameter
+        if forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
 
 
 struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
@@ -537,3 +553,18 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             An iterator of immutable references to the list elements.
         """
         return _ListIter[T, mutability, self_life](0, Reference(self))
+
+    fn __reversed__[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _ListIter[
+        T, mutability, self_life, False
+    ]:
+        """Iterate backwards over the list, returning immutable references.
+
+        Returns:
+            A reversed iterator of immutable references to the list elements.
+        """
+        var ref = Reference(self)
+        return _ListIter[T, mutability, self_life, False](len(ref[]), ref)
