@@ -198,7 +198,12 @@ fn _get_dylib_function[
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
-        return func_ptr.bitcast[result_type]().load()
+        return (
+            Reference(func_ptr)
+            .get_unsafe_pointer()
+            .bitcast[result_type]()
+            .load()
+        )
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
     var new_func = dylib._get_function[func_name, result_type]()
