@@ -187,8 +187,7 @@ struct FileHandle:
             raise (err_msg^).consume_as_error()
 
         var list = List[Int8](capacity=int(size_copy))
-
-        var list_ptr = Pointer[Int8].__from_index(int(list.data))
+        var list_ptr = Pointer[Int8](address=int(list.data))
 
         # Initialize the List elements and set the initialized size
         memcpy(list_ptr, buf, int(size_copy))
