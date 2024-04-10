@@ -82,6 +82,22 @@ struct UnsafePointer[
         """
         return Self {value: __mlir_op.`lit.ref.to_pointer`(value.value)}
 
+    @always_inline
+    fn __init__(*, address: Int) -> Self:
+        """Create an unsafe AnyPointer from an address in an integer.
+
+        Args:
+            address: The address to construct the pointer with.
+
+        Returns:
+            The pointer.
+        """
+        return Self {
+            value: __mlir_op.`pop.index_to_pointer`[_type = Self.pointer_type](
+                Scalar[DType.index](address).value
+            )
+        }
+
     @staticmethod
     @always_inline
     fn alloc(count: Int) -> Self:
@@ -93,8 +109,8 @@ struct UnsafePointer[
         Returns:
             The pointer to the newly allocated array.
         """
-        return Self.__from_index(
-            int(
+        return Self(
+            address=int(
                 _malloc[Int8, address_space=address_space](
                     sizeof[T]() * count, alignment=alignof[T]()
                 )
@@ -119,9 +135,7 @@ struct UnsafePointer[
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
-        Pointer[Int8, address_space=address_space].__from_index(
-            int(self)
-        ).free()
+        Pointer[Int8, address_space=address_space](address=int(self)).free()
 
     @always_inline
     fn bitcast_element[
@@ -170,15 +184,6 @@ struct UnsafePointer[
             _type = __mlir_type.`!pop.scalar<index>`
         ](self.value)
 
-    @staticmethod
-    @always_inline
-    fn __from_index(value: Int) -> Self:
-        return Self {
-            value: __mlir_op.`pop.index_to_pointer`[_type = Self.pointer_type](
-                Scalar[DType.index](value).value
-            )
-        }
-
     fn __str__(self) -> String:
         return hex(self)
 
@@ -201,7 +206,7 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return Self.__from_index(int(self) + offset * sizeof[T]())
+        return Self(address=int(self) + offset * sizeof[T]())
 
     @always_inline
     fn __sub__(self, offset: Int) -> Self:
