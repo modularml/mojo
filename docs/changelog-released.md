@@ -30,6 +30,10 @@ To update Mojo, first [update `modular`](/cli/#description), and then run this:
 modular update mojo
 ```
 
+## v24.2.1 (2024-04-11)
+
+This release doesn't include any changes to Mojo.
+
 ## v24.2 (2024-03-28)
 
 ### 🔥 Legendary
