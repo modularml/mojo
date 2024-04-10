@@ -126,7 +126,8 @@ struct DLHandle(CollectionElement):
                 "dlsym", DTypePointer[DType.int8]
             ](self.handle.address, name)
             return (
-                Pointer(__get_lvalue_as_address(opaque_function_ptr))
+                Reference(opaque_function_ptr)
+                .get_unsafe_pointer()
                 .bitcast[result_type]()
                 .load()
             )
@@ -198,7 +199,8 @@ fn _get_dylib_function[
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
         return (
-            Pointer(__get_lvalue_as_address(func_ptr))
+            Reference(func_ptr)
+            .get_unsafe_pointer()
             .bitcast[result_type]()
             .load()
         )
@@ -207,7 +209,8 @@ fn _get_dylib_function[
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        Pointer(__get_lvalue_as_address(new_func))
+        Reference(new_func)
+        .get_unsafe_pointer()
         .bitcast[Pointer[NoneType]]()
         .load(),
     )
