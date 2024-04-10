@@ -121,6 +121,37 @@ def test_list_resize():
     assert_equal(len(l), 0)
 
 
+def test_constructor_from_pointer():
+    new_pointer = AnyPointer[Int8].alloc(5)
+    new_pointer[0] = 0
+    new_pointer[1] = 1
+    new_pointer[2] = 2
+    # rest is not initialized
+
+    var some_list = List[Int8](new_pointer, size=3, capacity=5)
+    assert_equal(some_list[0], 0)
+    assert_equal(some_list[1], 1)
+    assert_equal(some_list[2], 2)
+    assert_equal(len(some_list), 3)
+    assert_equal(some_list.capacity, 5)
+
+
+def test_constructor_from_other_list_through_pointer():
+    initial_list = List[Int8](0, 1, 2)
+    # we do a backup of the size and capacity because
+    # the list attributes will be invalid after the steal_data call
+    var size = len(initial_list)
+    var capacity = initial_list.capacity
+    var some_list = List[Int8](
+        initial_list.steal_data(), size=size, capacity=capacity
+    )
+    assert_equal(some_list[0], 0)
+    assert_equal(some_list[1], 1)
+    assert_equal(some_list[2], 2)
+    assert_equal(len(some_list), size)
+    assert_equal(some_list.capacity, capacity)
+
+
 def test_list_reverse():
     #
     # Test reversing the list []
@@ -477,6 +508,8 @@ def main():
     test_list_clear()
     test_list_pop()
     test_list_variadic_constructor()
+    test_constructor_from_pointer()
+    test_constructor_from_other_list_through_pointer()
     test_list_resize()
     test_list_reverse()
     test_list_reverse_move_count()
