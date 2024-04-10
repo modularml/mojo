@@ -40,10 +40,9 @@ fn test_anypointer_of_move_only_type():
     ptr.emplace_value(MoveOnlyType(42))
     # CHECK: moved 42
     var value = ptr.take_value()
-    # NOTE: Destructor is called before `print`.
-    # CHECK: deleted 42
     # CHECK: value 42
     print("value", value.value)
+    # CHECK: deleted 42
     ptr.free()
 
 
@@ -136,6 +135,14 @@ def test_comparisons():
     p1.free()
 
 
+def test_anypointer_address_space():
+    var p1 = AnyPointer[Int, AddressSpace(0)].alloc(1)
+    p1.free()
+
+    var p2 = AnyPointer[Int, AddressSpace.GENERIC].alloc(1)
+    p2.free()
+
+
 def main():
     test_address_of()
 
@@ -149,3 +156,5 @@ def main():
     test_anypointer_string()
     test_eq()
     test_comparisons()
+
+    test_anypointer_address_space()

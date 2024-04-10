@@ -151,18 +151,11 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         constrained[
             Self._check[T]() != Self._sentinel, "not a union element type"
         ]()
-        var ptr = Reference(self._impl).get_unsafe_pointer().address
-        var result = AnyPointer[T]()
-        result.value = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[`!kgen.pointer<`, T, `>`]
-        ](ptr)
-        return result
+        return Reference(self._impl).bitcast_element[T]()
 
     fn _get_state[
         is_mut: __mlir_type.i1, lt: __mlir_type[`!lit.lifetime<`, is_mut, `>`]
-    ](self: _LITRef[Self, is_mut, lt, Int(0).value].type) -> Reference[
-        Int8, is_mut, lt
-    ]:
+    ](self: _LITRef[Self, is_mut, lt].type) -> Reference[Int8, is_mut, lt]:
         return (
             Reference(self)
             .bitcast_element[Int8]()

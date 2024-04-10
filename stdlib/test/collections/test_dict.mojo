@@ -13,10 +13,10 @@
 # RUN: %mojo -debug-level full %s
 
 from collections import Optional
-from collections.dict import Dict, KeyElement
+from collections.dict import Dict, KeyElement, OwnedKwargsDict
 
 from test_utils import CopyCounter
-from testing import assert_equal, assert_false, assert_raises
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_dict_construction():
@@ -53,7 +53,7 @@ def test_compact():
     for i in range(20):
         var key = "key" + str(i)
         dict[key] = i + 1
-        dict.pop(key)
+        _ = dict.pop(key)
     assert_equal(0, len(dict))
 
 
@@ -182,7 +182,7 @@ def test_dict_copy_add_new_item():
 
 def test_dict_copy_calls_copy_constructor():
     var orig = Dict[String, CopyCounter]()
-    orig["a"] = CopyCounter()^
+    orig["a"] = CopyCounter()
 
     # test values copied to new Dict
     var copy = Dict(orig)
@@ -245,7 +245,7 @@ fn test[name: String, test_fn: fn () raises -> object]() raises:
     print("PASS")
 
 
-def main():
+def test_dict():
     test_dict_construction()
     test["test_basic", test_basic]()
     test["test_multiple_resizes", test_multiple_resizes]()
@@ -268,3 +268,57 @@ def main():
     test["test_dict_update_nominal", test_dict_update_nominal]()
     test["test_dict_update_empty_origin", test_dict_update_empty_origin]()
     test["test_dict_update_empty_new", test_dict_update_empty_new]()
+
+
+def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
+    assert_equal(len(kwargs), 2)
+
+    assert_true("fruit" in kwargs)
+    assert_equal(kwargs["fruit"], 8)
+    assert_equal(kwargs["fruit"], 8)
+
+    assert_true("dessert" in kwargs)
+    assert_equal(kwargs["dessert"], 9)
+    assert_equal(kwargs["dessert"], 9)
+
+    var keys = String("")
+    for key in kwargs.keys():
+        keys += key[]
+    assert_equal(keys, "fruitdessert")
+
+    var sum = 0
+    for val in kwargs.values():
+        sum += val[]
+    assert_equal(sum, 17)
+
+    assert_false(kwargs.find("salad").__bool__())
+    with assert_raises(contains="KeyError"):
+        _ = kwargs["salad"]
+
+    kwargs["salad"] = 10
+    assert_equal(kwargs["salad"], 10)
+
+    assert_equal(kwargs.pop("fruit"), 8)
+    assert_equal(kwargs.pop("fruit", 2), 2)
+    with assert_raises(contains="KeyError"):
+        _ = kwargs.pop("fruit")
+
+    keys = String("")
+    sum = 0
+    for entry in kwargs.items():
+        keys += entry[].key
+        sum += entry[].value
+    assert_equal(keys, "dessertsalad")
+    assert_equal(sum, 19)
+
+
+def test_owned_kwargs_dict():
+    var owned_kwargs = OwnedKwargsDict[Int]()
+    owned_kwargs._insert("fruit", 8)
+    owned_kwargs._insert("dessert", 9)
+    test_taking_owned_kwargs_dict(owned_kwargs^)
+
+
+def main():
+    test_dict()
+    test_owned_kwargs_dict()

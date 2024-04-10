@@ -36,7 +36,7 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
     """The underlying storage for the list."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, *args: *Ts):
+    fn __init__(inout self, borrowed *args: *Ts):
         """Construct the list literal from the given values.
 
         Args:
@@ -65,7 +65,7 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
             The element at the given index.
         """
         return rebind[T](
-            __mlir_op.`kgen.pack.get`[index = i.value](self.storage)
+            __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
         )
 
 
@@ -419,7 +419,6 @@ struct VariadicPack[
     lifetime: AnyLifetime[elt_is_mutable].type,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
-    # TODO: Add address_space when Reference supports it.
 ](Sized):
     """A utility class to access variadic pack  arguments and provide an API for
     doing things with them.
@@ -487,9 +486,15 @@ struct VariadicPack[
         Returns:
             The number of elements in the variadic pack.
         """
-        return __mlir_attr[
-            `#kgen.param.expr<variadic_size,`, element_types, `> : index`
-        ]
+
+        @parameter
+        fn variadic_size(
+            x: __mlir_type[`!kgen.variadic<`, element_trait, `>`]
+        ) -> Int:
+            return __mlir_op.`pop.variadic.size`(x)
+
+        alias result = variadic_size(element_types)
+        return result
 
     @always_inline
     fn __len__(self) -> Int:
@@ -504,13 +509,7 @@ struct VariadicPack[
     fn get_element[
         index: Int
     ](self) -> Reference[
-        # FIXME: Shouldn't need a rebind here.
-        __mlir_attr[
-            `#kgen.param.expr<rebind, `,
-            element_types[index.value],
-            `>: `,
-            AnyType,
-        ],
+        element_types[index.value],
         Self.elt_is_mutable,
         Self.lifetime,
     ]:
@@ -523,25 +522,22 @@ struct VariadicPack[
             A reference to the element.  The Reference's mutability follows the
             mutability of the pack argument convention.
         """
+        var ref_elt = __mlir_op.`lit.ref.pack.extract`[index = index.value](
+            self._value
+        )
 
-        return rebind[
-            Reference[
-                # FIXME: Shouldn't need a rebind here.
-                __mlir_attr[
-                    `#kgen.param.expr<rebind, `,
-                    element_types[index.value],
-                    `>: `,
-                    AnyType,
-                ],
-                Self.elt_is_mutable,
-                Self.lifetime,
-            ]
-        ](__mlir_op.`lit.ref.pack.get`[index = index.value](self._value))
+        # Rebind the !lit.ref to agree on the element type.  This is needed
+        # because we're getting a low level rebind to AnyType when the
+        # element_types[index] expression is erased to AnyType for Reference.
+        alias result_ref = Reference[
+            element_types[index.value],
+            Self.elt_is_mutable,
+            Self.lifetime,
+        ]
+        return rebind[result_ref.mlir_ref_type](ref_elt)
 
-    # FIXME!: the T in the function should be element_trait bound not AnyType
-    # bound.
     @always_inline
-    fn each[func: fn[T: AnyType] (T) -> None](self):
+    fn each[func: fn[T: element_trait] (T) capturing -> None](self):
         """Apply a function to each element of the pack in order.  This applies
         the specified function (which must be parametric on the element type) to
         each element of the pack, from the first element to the last, passing

@@ -240,20 +240,6 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size = final_size
 
     @always_inline
-    fn pop_back(inout self) -> T:
-        """Pops a value from the back of this list.
-
-        Returns:
-            The popped value.
-        """
-        var ret_val = (self.data + (self.size - 1)).take_value()
-        self.size -= 1
-        if self.size * 4 < self.capacity:
-            if self.capacity > 1:
-                self._realloc(self.capacity // 2)
-        return ret_val^
-
-    @always_inline
     fn pop(inout self, i: Int = -1) -> T:
         """Pops a value from the list at the given index.
 
@@ -263,7 +249,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         Returns:
             The popped value.
         """
-        debug_assert(-self.size <= i < self.size, "pop index out of range")
+        debug_assert(-len(self) <= i < len(self), "pop index out of range")
 
         var normalized_idx = i
         if i < 0:
@@ -304,12 +290,37 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             new_size: The new size.
             value: The value to use to populate new elements.
         """
-        self.reserve(new_size)
+        if new_size <= self.size:
+            self.resize(new_size)
+        else:
+            self.reserve(new_size)
+            for i in range(new_size, self.size):
+                _ = (self.data + i).take_value()
+            for i in range(self.size, new_size):
+                (self.data + i).emplace_value(value)
+            self.size = new_size
+
+    @always_inline
+    fn resize(inout self, new_size: Int):
+        """Resizes the list to the given new size.
+
+        With no new value provided, the new size must be smaller than or equal
+        to the current one. Elements at the end are discarded.
+
+        Args:
+            new_size: The new size.
+        """
+        debug_assert(
+            new_size <= self.size,
+            (
+                "New size must be smaller than or equal to current size when no"
+                " new value is provided."
+            ),
+        )
         for i in range(new_size, self.size):
             _ = (self.data + i).take_value()
-        for i in range(self.size, new_size):
-            (self.data + i).emplace_value(value)
         self.size = new_size
+        self.reserve(new_size)
 
     fn reverse(inout self):
         """Reverses the elements of the list."""

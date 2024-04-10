@@ -28,7 +28,7 @@ from utils import StringRef
 from utils.index import StaticIntTuple
 from utils.static_tuple import StaticTuple
 
-from .io import _snprintf, _snprintf_scalar, _StringableTuple
+from .io import _snprintf, _snprintf_scalar
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -157,7 +157,7 @@ fn chr(c: Int) -> String:
 
 # TODO: this is hard coded for decimal base
 @always_inline
-fn _atol(str: StringRef) raises -> Int:
+fn _atol(str_ref: StringRef) raises -> Int:
     """Parses the given string as a base-10 integer and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
@@ -165,37 +165,53 @@ fn _atol(str: StringRef) raises -> Int:
     error.
 
     Args:
-        str: A string to be parsed as a base-10 integer.
+        str_ref: A string to be parsed as a base-10 integer.
 
     Returns:
         An integer value that represents the string, or otherwise raises.
     """
-    if not str:
+    if not str_ref:
         raise Error("Empty String cannot be converted to integer.")
     var result = 0
     var is_negative: Bool = False
     var start: Int = 0
-    if str[0] == "-":
-        is_negative = True
-        start = 1
+    var str_len = len(str_ref)
+    var buff = str_ref._as_ptr()
+    for pos in range(start, str_len):
+        if isspace(buff[pos]):
+            continue
+
+        if str_ref[pos] == "-":
+            is_negative = True
+            start = pos + 1
+        else:
+            start = pos
+        break
 
     alias ord_0 = ord("0")
     alias ord_9 = ord("9")
-    var buff = str._as_ptr()
-    var str_len = len(str)
+    var has_space_after_number = False
     for pos in range(start, str_len):
         var digit = int(buff[pos])
         if ord_0 <= digit <= ord_9:
             result += digit - ord_0
+        elif isspace(digit):
+            has_space_after_number = True
+            start = pos + 1
+            break
         else:
             raise Error("String is not convertible to integer.")
-        if pos + 1 < str_len:
+        if pos + 1 < str_len and not isspace(buff[pos + 1]):
             var nextresult = result * 10
             if nextresult < result:
                 raise Error(
                     "String expresses an integer too large to store in Int."
                 )
             result = nextresult
+    if has_space_after_number:
+        for pos in range(start, str_len):
+            if not isspace(buff[pos]):
+                raise Error("String is not convertible to integer.")
     if is_negative:
         result = -result
     return result
@@ -660,11 +676,11 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             curr += self + String(elems[i])
         return curr
 
-    fn join[*Stringables: Stringable](self, *elems: *Stringables) -> String:
+    fn join[*Types: Stringable](self, *elems: *Types) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
-            Stringables: The Stringable types.
+            Types: The types of the elements.
 
         Args:
             elems: The input values.
@@ -672,21 +688,19 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         Returns:
             The joined string.
         """
-        alias types = VariadicList(Stringables)
-        alias count = len(types)
 
-        var args = _StringableTuple(elems)
-
-        if count == 0:
-            return ""
-
-        var result = args._at[0]()
+        var result: String = ""
+        var is_first = True
 
         @parameter
-        fn each[i: Int]():
-            result += self + args._at[i + 1]()
+        fn add_elt[T: Stringable](a: T):
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(a)
 
-        unroll[each, count - 1]()
+        elems.each[add_elt]()
         return result
 
     fn _strref_dangerous(self) -> StringRef:
@@ -726,7 +740,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 
         # TODO(lifetimes): Return a reference rather than a copy
         var copy = self._buffer
-        var last = copy.pop_back()
+        var last = copy.pop()
         debug_assert(
             last == 0,
             "expected last element of String buffer to be null terminator",
@@ -1054,6 +1068,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         print(String('BaseTestCase').removeprefix('Test'))
         # 'BaseTestCase'
         ```
+
         Args:
           prefix: The prefix to remove from the string.
 
@@ -1134,7 +1149,10 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 fn _vec_fmt[
     *types: AnyRegType
 ](
-    str: AnyPointer[Int8], size: Int, fmt: StringLiteral, *arguments: *types
+    str: AnyPointer[Int8],
+    size: Int,
+    fmt: StringLiteral,
+    borrowed *arguments: *types,
 ) -> Int:
     return _snprintf(rebind[Pointer[Int8]](str), size, fmt, arguments)
 

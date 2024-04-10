@@ -40,14 +40,13 @@ It adjusts indentation, spacing, and line breaks, making code more readable and
 consistent.
 
 ```bash
-> mojo format -l 80 example.mojo
+> mojo format example.mojo
 All done! ✨ 🍰 ✨
 1 file left unchanged.
 ```
 
 Unless otherwise noted, Mojo standard library code should follow the formatting
-produced by `mojo format -l 80`. Note that the default `mojo format` command is not enough.
-You need to specify that there is a limit of 80 characters per line with `-l 80`.
+produced by `mojo format`.
 
 #### Whitespace
 
@@ -121,6 +120,13 @@ struct MyStruct(Sized, Stringable):
 ```
 
 ## Code conventions
+
+### Python Standard Library
+
+We want to be a good member of the Python family and aim to become a full
+superset, so we inherit naming from the Python standard library, including any
+inconsistencies. These naming inconsistencies are the only exceptions to the
+naming conventions outlined below.
 
 ### Identifier naming conventions
 

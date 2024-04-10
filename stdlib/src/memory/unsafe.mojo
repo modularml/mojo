@@ -432,7 +432,7 @@ struct _LITRef[
     element_type: AnyType,
     elt_is_mutable: __mlir_type.i1,
     lifetime: AnyLifetime[elt_is_mutable].type,
-    addr_space: __mlir_type.index = Int(0).__mlir_index__(),
+    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     alias type = __mlir_type[
         `!lit.ref<`,
@@ -440,7 +440,7 @@ struct _LITRef[
         `, `,
         lifetime,
         `, `,
-        addr_space,
+        address_space._value.value,
         `>`,
     ]
 
@@ -451,6 +451,7 @@ struct Reference[
     type: AnyType,
     is_mutable: __mlir_type.i1,
     lifetime: AnyLifetime[is_mutable].type,
+    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Defines a non-nullable safe reference.
 
@@ -458,9 +459,12 @@ struct Reference[
         type: Type of the underlying data.
         is_mutable: Whether the referenced data may be mutated through this.
         lifetime: The lifetime of the reference.
+        address_space: The address space of the referenced data.
     """
 
-    alias mlir_ref_type = _LITRef[type, is_mutable, lifetime].type
+    alias mlir_ref_type = _LITRef[
+        type, is_mutable, lifetime, address_space
+    ].type
 
     var value: Self.mlir_ref_type
     """The underlying MLIR reference."""
@@ -493,9 +497,9 @@ struct Reference[
         return self.value
 
     # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
-    # disagreement.
+    # disagreement.  Use AnyPointer instead!
     @always_inline("nodebug")
-    fn get_unsafe_pointer(self) -> Pointer[type]:
+    fn get_unsafe_pointer(self) -> Pointer[type, address_space]:
         """Constructs a Pointer from a safe reference.
 
         Returns:
@@ -504,7 +508,7 @@ struct Reference[
         var ptr_with_trait = __mlir_op.`lit.ref.to_pointer`(self.value)
         # Work around AnyRefType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = Pointer[type].pointer_type
+            _type = Pointer[type, address_space].pointer_type
         ](ptr_with_trait)
 
     @always_inline("nodebug")
@@ -522,7 +526,7 @@ struct Reference[
     @always_inline("nodebug")
     fn bitcast_element[
         new_element_type: AnyType
-    ](self) -> Reference[new_element_type, is_mutable, lifetime]:
+    ](self) -> Reference[new_element_type, is_mutable, lifetime, address_space]:
         """Cast the reference to one of another element type, but the same
         lifetime, mutability, and address space.
 
@@ -534,12 +538,51 @@ struct Reference[
         """
         # We don't have a generalized lit.ref.cast operation, so convert through
         # to KGEN pointer.
+        # FIXME: We can't use AnyPointer here, because it requires T <- Movable.
         var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
         var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[`!kgen.pointer<`, new_element_type, `>`]
+            _type = __mlir_type[
+                `!kgen.pointer<`,
+                new_element_type,
+                `,`,
+                address_space._value.value,
+                `>`,
+            ]
         ](kgen_ptr)
         return __mlir_op.`lit.ref.from_pointer`[
-            _type = _LITRef[new_element_type, is_mutable, lifetime].type
+            _type = _LITRef[
+                new_element_type, is_mutable, lifetime, address_space
+            ].type
+        ](dest_ptr)
+
+    @always_inline
+    fn address_space_cast[
+        new_address_space: AddressSpace
+    ](self) -> Reference[type, is_mutable, lifetime, new_address_space]:
+        """Cast the reference to one of another address space, but the same
+        element type, lifetime, and mutability.
+
+        Parameters:
+            new_address_space: The address space of the result.
+
+        Returns:
+            The new reference.
+        """
+        # We don't have a generalized lit.ref.cast operation, so convert through
+        # to KGEN pointer.
+        # FIXME: We can't use AnyPointer here, because it requires T <- Movable.
+        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
+        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
+            _type = __mlir_type[
+                `!kgen.pointer<`,
+                type,
+                `,`,
+                new_address_space._value.value,
+                `>`,
+            ]
+        ](kgen_ptr)
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = _LITRef[type, is_mutable, lifetime, new_address_space].type
         ](dest_ptr)
 
     fn destroy_element_unsafe(self):
@@ -554,11 +597,30 @@ struct Reference[
             is_mutable,
             "cannot use 'unsafe_destroy_element' on immutable references",
         ]()
+
+        # This method can only work on address space 0, because the __del__
+        # method that we need to invoke will take 'self' in address space zero.
+        constrained[
+            address_space == AddressSpace.GENERIC,
+            "cannot use 'destroy_element_unsafe' on arbitrary address spaces",
+        ]()
+
         # Project to an owned raw pointer, allowing the compiler to know it is to
         # be destroyed.
-        # TODO: Use AnyPointer, but it requires a Movable element.
         var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
-        _ = __get_address_as_owned_value(kgen_ptr)
+
+        # Bitcast to address space zero since the inserted __del__ call will only
+        # work with address space zero.
+        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
+            _type = __mlir_type[
+                `!kgen.pointer<`,
+                type,
+                `>`,
+            ]
+        ](kgen_ptr)
+
+        # TODO: Use AnyPointer, but it requires a Movable element.
+        _ = __get_address_as_owned_value(dest_ptr)
 
 
 # FIXME: This should be a method on Reference, it is placed here because we need
@@ -601,7 +663,7 @@ struct Pointer[
     """
 
     alias pointer_type = __mlir_type[
-        `!kgen.pointer<`, type, `,`, address_space.value().value, `>`
+        `!kgen.pointer<`, type, `,`, address_space._value.value, `>`
     ]
 
     var address: Self.pointer_type
@@ -611,7 +673,7 @@ struct Pointer[
         type,
         __mlir_attr.`1: i1`,
         __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
-        address_space.value().value,
+        address_space,
     ].type
 
     @always_inline("nodebug")
@@ -755,6 +817,9 @@ struct Pointer[
     fn load[*, alignment: Int = Self._default_alignment](self) -> type:
         """Loads the value the Pointer object points to.
 
+        Constraints:
+            The alignment must be a positive integer value.
+
         Parameters:
             alignment: The minimal alignment of the address.
 
@@ -769,6 +834,9 @@ struct Pointer[
     ](self, offset: T) -> type:
         """Loads the value the Pointer object points to with the given offset.
 
+        Constraints:
+            The alignment must be a positive integer value.
+
         Parameters:
             T: The Intable type of the offset.
             alignment: The minimal alignment of the address.
@@ -779,6 +847,9 @@ struct Pointer[
         Returns:
             The loaded value.
         """
+        constrained[
+            alignment > 0, "alignment must be a positive integer value"
+        ]()
         return __mlir_op.`pop.load`[alignment = alignment.value](
             self.offset(offset).address
         )
@@ -789,6 +860,9 @@ struct Pointer[
     ](self, offset: T, value: type):
         """Stores the specified value to the location the Pointer object points
         to with the given offset.
+
+        Constraints:
+            The alignment must be a positive integer value.
 
         Parameters:
             T: The Intable type of the offset.
@@ -805,12 +879,18 @@ struct Pointer[
         """Stores the specified value to the location the Pointer object points
         to.
 
+        Constraints:
+            The alignment value must be a positive integer.
+
         Parameters:
             alignment: The minimal alignment of the address.
 
         Args:
             value: The value to store.
         """
+        constrained[
+            alignment > 0, "alignment must be a positive integer value"
+        ]()
         __mlir_op.`pop.store`[alignment = alignment.value](value, self.address)
 
     @always_inline("nodebug")
@@ -1073,7 +1153,7 @@ struct DTypePointer[
             `!kgen.pointer<scalar<`,
             type.value,
             `>,`,
-            address_space.value().value,
+            address_space._value.value,
             `>`,
         ],
     ):
@@ -1314,6 +1394,9 @@ struct DTypePointer[
     ](self) -> SIMD[type, width]:
         """Loads the value the Pointer object points to.
 
+        Constraints:
+            The width and alignment must be positive integer values.
+
         Parameters:
             width: The SIMD width.
             alignment: The minimal alignment of the address.
@@ -1328,6 +1411,9 @@ struct DTypePointer[
         T: Intable, *, width: Int = 1, alignment: Int = Self._default_alignment
     ](self, offset: T) -> SIMD[type, width]:
         """Loads the value the Pointer object points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
 
         Parameters:
             T: The Intable type of the offset.
@@ -1357,6 +1443,9 @@ struct DTypePointer[
     ](self, offset: T, val: SIMD[type, width]):
         """Stores a single element value at the given offset.
 
+        Constraints:
+            The width and alignment must be positive integer values.
+
         Parameters:
             T: The Intable type of the offset.
             width: The SIMD width.
@@ -1374,6 +1463,9 @@ struct DTypePointer[
     ](self, val: SIMD[type, width]):
         """Stores a single element value.
 
+        Constraints:
+            The width and alignment must be positive integer values.
+
         Parameters:
             width: The SIMD width.
             alignment: The minimal alignment of the address.
@@ -1381,6 +1473,10 @@ struct DTypePointer[
         Args:
             val: The value to store.
         """
+        constrained[width > 0, "width must be a positive integer value"]()
+        constrained[
+            alignment > 0, "alignment must be a positive integer value"
+        ]()
         self.address.bitcast[SIMD[type, width]]().store[alignment=alignment](
             val
         )

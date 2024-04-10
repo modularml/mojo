@@ -21,7 +21,7 @@
 
 from sys.info import has_intel_amx, os_is_linux
 
-from IntelAMX import init_intel_amx
+from LinAlg.intel_amx import init_intel_amx
 
 
 # CHECK-LABEL: test_has_intel_amx
