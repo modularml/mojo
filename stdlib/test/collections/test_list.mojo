@@ -541,7 +541,7 @@ def test_list_span():
 
 
 def test_constructor_from_pointer():
-    new_pointer = AnyPointer[Int8].alloc(5)
+    new_pointer = UnsafePointer[Int8].alloc(5)
     new_pointer[0] = 0
     new_pointer[1] = 1
     new_pointer[2] = 2

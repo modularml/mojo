@@ -43,7 +43,7 @@ from sys.intrinsics import _mlirtype_is_eq
 
 from memory.unsafe import _LITRef
 from memory.unsafe_pointer import initialize_pointee, move_from_pointee, move_pointee
-from memory import AnyPointer, UnsafePointer
+from memory import UnsafePointer
 from utils import unroll, StaticTuple
 
 # ===----------------------------------------------------------------------=== #

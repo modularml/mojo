@@ -13,7 +13,7 @@
 # RUN: %mojo -debug-level full %s | FileCheck %s --dump-input=always
 
 from memory.unsafe_pointer import move_from_pointee, move_pointee
-from memory import AnyPointer
+from memory import UnsafePointer
 from test_utils import MoveCounter
 from testing import assert_equal, assert_not_equal, assert_true
 
@@ -91,7 +91,7 @@ def test_address_of():
 
 def test_bitcast():
     var local = 1
-    var ptr = AnyPointer[Int].address_of(local)
+    var ptr = UnsafePointer[Int].address_of(local)
     var aliased_ptr = ptr.bitcast_element[SIMD[DType.uint8, 4]]()
 
     assert_equal(int(ptr), int(ptr.bitcast_element[Int]()))

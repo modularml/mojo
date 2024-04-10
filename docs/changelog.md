@@ -113,6 +113,8 @@ what we publish.
     `AnyPointer/initialize_pointee`.
   5) The `offset` method has been removed, it was unsafe and belongs on
     `AnyPointer`.
+- `AnyPointer` was renamed to `UnsafePointer`. This is part of our continuing
+  effort to unify our pointer types in the Standard Library.
 
 - The `mojo package` command no longer supports the `-D` flag. All compilation
   environment flags should be provided at the point of package use
