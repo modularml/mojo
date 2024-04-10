@@ -191,36 +191,26 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
     """The underlying storage of the tuple value."""
 
     @always_inline
-    fn __init__() -> Self:
-        """Constructs a static int tuple of the given size.
-
-        Returns:
-            The constructed tuple.
-        """
-        return 0
+    fn __init__(inout self):
+        """Constructs a static int tuple of the given size."""
+        self = 0
 
     @always_inline
-    fn __init__(value: __mlir_type.index) -> Self:
+    fn __init__(inout self, value: __mlir_type.index):
         """Constructs a sized 1 static int tuple of given the element value.
 
         Args:
             value: The initial value.
-
-        Returns:
-            The constructed tuple.
         """
         constrained[size == 1]()
-        return Int(value)
+        self = Int(value)
 
     @always_inline
-    fn __init__(elems: Tuple[Int, Int]) -> Self:
+    fn __init__(inout self, elems: Tuple[Int, Int]):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
             elems: The tuple to copy from.
-
-        Returns:
-            The constructed tuple.
         """
 
         var num_elements = len(elems)
@@ -238,17 +228,14 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         unroll[fill, 2]()
 
-        return tup
+        self = tup
 
     @always_inline
-    fn __init__(elems: Tuple[Int, Int, Int]) -> Self:
+    fn __init__(inout self, elems: Tuple[Int, Int, Int]):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
             elems: The tuple to copy from.
-
-        Returns:
-            The constructed tuple.
         """
 
         var num_elements = len(elems)
@@ -266,17 +253,14 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         unroll[fill, 3]()
 
-        return tup
+        self = tup
 
     @always_inline
-    fn __init__(elems: Tuple[Int, Int, Int, Int]) -> Self:
+    fn __init__(inout self, elems: Tuple[Int, Int, Int, Int]):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
             elems: The tuple to copy from.
-
-        Returns:
-            The constructed tuple.
         """
 
         var num_elements = len(elems)
@@ -294,17 +278,14 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         unroll[fill, 4]()
 
-        return tup
+        self = tup
 
     @always_inline
-    fn __init__(*elems: Int) -> Self:
+    fn __init__(inout self, *elems: Int):
         """Constructs a static int tuple given a set of arguments.
 
         Args:
             elems: The elements to construct the tuple.
-
-        Returns:
-            The constructed tuple.
         """
 
         var num_elements = len(elems)
@@ -320,37 +301,29 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         for idx in range(size):
             tup[idx] = elems[idx]
 
-        return tup
+        self = tup
 
     @always_inline
-    fn __init__(elem: Int) -> Self:
+    fn __init__(inout self, elem: Int):
         """Constructs a static int tuple given a set of arguments.
 
         Args:
             elem: The elem to splat into the tuple.
-
-        Returns:
-            The constructed tuple.
         """
 
-        return StaticIntTuple[size] {
-            data: __mlir_op.`pop.array.repeat`[
-                _type = __mlir_type[`!pop.array<`, size.value, `, `, Int, `>`]
-            ](elem)
-        }
+        self.data = __mlir_op.`pop.array.repeat`[
+            _type = __mlir_type[`!pop.array<`, size.value, `, `, Int, `>`]
+        ](elem)
 
     @always_inline
-    fn __init__(values: VariadicList[Int]) -> Self:
+    fn __init__(inout self, values: VariadicList[Int]):
         """Creates a tuple constant using the specified values.
 
         Args:
             values: The list of values.
-
-        Returns:
-            A tuple with the values filled in.
         """
         constrained[size > 0]()
-        return Self {data: values}
+        self.data = values
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
