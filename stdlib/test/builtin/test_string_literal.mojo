@@ -91,7 +91,7 @@ def test_intable():
     assert_equal(int("123"), 123)
 
     with assert_raises():
-        int("hi")
+        _ = int("hi")
 
 
 def main():
