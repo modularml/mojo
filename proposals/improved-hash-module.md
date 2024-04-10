@@ -36,7 +36,7 @@ struct Person(Hashable):
         
         # How to combine a hash of hashes ???
 ```
-As you can see above we, computed hashes for all of the struct fields, but we are uncertain how to combine those values in a way which produces a good (non compromised) hash value.
+As you can see above we, computed hashes for all of the struct fields, but we are uncertain how to combine those values in a way which produces a good (non compromised) hash value. Python (docs)[https://docs.python.org/3/reference/datamodel.html#object.__hash__] suggest to pack fileds into a tuple and hash the tuple, but this is not possible at this point in time in Mojo.
 
 # Proposal
 
