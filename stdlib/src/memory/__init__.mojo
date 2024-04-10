@@ -21,7 +21,6 @@ from .memory import (
 )
 
 from .unsafe_pointer import (
-    AnyPointer,
     UnsafePointer,
 )
 

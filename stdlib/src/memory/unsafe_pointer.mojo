@@ -25,15 +25,15 @@ from sys.intrinsics import _mlirtype_is_eq
 from memory.memory import _free, _malloc
 from memory.reference import _LITRef
 
-alias AnyPointer = UnsafePointer
 
-
+# ===----------------------------------------------------------------------=== #
+# UnsafePointer
+# ===----------------------------------------------------------------------=== #
 @register_passable("trivial")
 struct UnsafePointer[
     T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC
 ](Boolable, CollectionElement, Stringable, Intable, EqualityComparable):
-    """This is a pointer type that can point to any generic value that is
-    movable.
+    """This is a pointer type that can point to any generic value that is movable.
 
     Parameters:
         T: The type the pointer points to.
@@ -84,7 +84,7 @@ struct UnsafePointer[
 
     @always_inline
     fn __init__(*, address: Int) -> Self:
-        """Create an unsafe AnyPointer from an address in an integer.
+        """Create an unsafe UnsafePointer from an address in an integer.
 
         Args:
             address: The address to construct the pointer with.
