@@ -103,28 +103,46 @@ def test_arithmetic_ops_div():
     lhs = object(5.5)
     rhs = object(2.0)
     assert_true((lhs % rhs) == 1.5)
+    lhs %= rhs
+    assert_true(lhs == 1.5)
+    assert_true(5.5 % object(2.0) == 1.5)
 
     lhs = object(5)
     rhs = object(2)
     assert_true((lhs % rhs) == 1)
+    lhs %= rhs
+    assert_true(lhs == 1)
+    assert_true(5 % object(2) == 1)
 
     # truediv
     lhs = object(5.5)
     rhs = object(2.0)
     assert_true(lhs / rhs == 2.75)
+    lhs /= rhs
+    assert_true(lhs == 2.75)
+    assert_true(5.5 / object(2.0) == 2.75)
 
     lhs = object(5)
     rhs = object(2)
     assert_true(lhs / rhs == 2)
+    lhs /= rhs
+    assert_true(lhs == 2)
+    assert_true(5 / object(2) == 2)
 
     # floor div
     lhs = object(5.5)
     rhs = object(2.0)
     assert_true(lhs // rhs == 2)
+    lhs //= rhs
+    assert_true(lhs == 2)
+    assert_true(5.5 // object(2.0) == 2)
 
     lhs = object(5)
     rhs = object(2)
     assert_true(lhs // rhs == 2)
+    lhs //= rhs
+    assert_true(lhs == 2)
+    assert_true(5 // object(2) == 2)
 
 
 def test_function(borrowed lhs, borrowed rhs) -> object:
