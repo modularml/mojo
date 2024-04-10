@@ -99,29 +99,6 @@ fn bitcast[
 
 @always_inline("nodebug")
 fn bitcast[
-    new_type: AnyType, src_type: AnyType, address_space: AddressSpace
-](ptr: UnsafePointer[src_type, address_space]) -> UnsafePointer[
-    new_type, address_space
-]:
-    """Bitcasts an UnsafePointer to a different type.
-
-    Parameters:
-        new_type: The target type.
-        src_type: The source type.
-        address_space: The shared address space.
-
-    Args:
-        ptr: The source pointer.
-
-    Returns:
-        A new Pointer with the specified type and the same address, as the
-        original Pointer.
-    """
-    return ptr.bitcast_element[new_type]()
-
-
-@always_inline("nodebug")
-fn bitcast[
     new_type: AnyRegType, src_type: AnyRegType, address_space: AddressSpace
 ](ptr: Pointer[src_type, address_space]) -> Pointer[new_type, address_space]:
     """Bitcasts a Pointer to a different type.
@@ -137,29 +114,6 @@ fn bitcast[
     Returns:
         A new Pointer with the specified type and the same address, as the
         original Pointer.
-    """
-    return ptr.bitcast[new_type]()
-
-
-@always_inline("nodebug")
-fn bitcast[
-    new_type: DType, src_type: DType, address_space: AddressSpace
-](ptr: DTypePointer[src_type, address_space]) -> DTypePointer[
-    new_type, address_space
-]:
-    """Bitcasts a DTypePointer to a different type.
-
-    Parameters:
-        new_type: The target type.
-        src_type: The source type.
-        address_space: The address space the pointer is in.
-
-    Args:
-        ptr: The source pointer.
-
-    Returns:
-        A new DTypePointer with the specified type and the same address, as
-        the original DTypePointer.
     """
     return ptr.bitcast[new_type]()
 
@@ -313,6 +267,7 @@ struct LegacyPointer[
         """
         return Self.get_null()
 
+    # FIXME: Why do we have an identity constructor?
     @always_inline("nodebug")
     fn __init__(address: Self) -> Self:
         """Constructs a LegacyPointer from the address.
@@ -351,6 +306,20 @@ struct LegacyPointer[
             _type = Self.pointer_type
         ](value.cast[DType.index]().value)
         return Self {address: address}
+
+    @always_inline("nodebug")
+    fn __init__(*, address: Int) -> Self:
+        """Constructs a Pointer from an address in an integer.
+
+        Args:
+            address: The input address.
+
+        Returns:
+            Constructed Pointer object.
+        """
+        return __mlir_op.`pop.index_to_pointer`[_type = Self.pointer_type](
+            Scalar[DType.index](address).value
+        )
 
     @staticmethod
     @always_inline("nodebug")
@@ -519,13 +488,6 @@ struct LegacyPointer[
         return __mlir_op.`pop.pointer_to_index`[
             _type = __mlir_type.`!pop.scalar<index>`
         ](self.address)
-
-    @staticmethod
-    @always_inline
-    fn __from_index(value: Int) -> Self:
-        return __mlir_op.`pop.index_to_pointer`[_type = Self.pointer_type](
-            Scalar[DType.index](value).value
-        )
 
     # ===------------------------------------------------------------------=== #
     # Allocate/Free
@@ -787,6 +749,15 @@ struct DTypePointer[
             _type = Self.pointer_type.pointer_type
         ](value.cast[DType.index]().value)
         self.address = address
+
+    @always_inline
+    fn __init__(inout self, *, address: Int):
+        """Constructs a `DTypePointer` from an integer address.
+
+        Args:
+            address: The input address.
+        """
+        self.address = Self.pointer_type(address=address)
 
     @staticmethod
     @always_inline("nodebug")
@@ -1143,11 +1114,6 @@ struct DTypePointer[
           The address of the pointer as an Int.
         """
         return int(self.address)
-
-    @staticmethod
-    @always_inline
-    fn __from_index(value: Int) -> Self:
-        return Self.pointer_type.__from_index(value)
 
     @always_inline
     fn is_aligned[alignment: Int](self) -> Bool:
