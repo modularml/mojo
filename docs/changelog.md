@@ -123,6 +123,9 @@ what we publish.
   environment flags should be provided at the point of package use
   (e.g. `mojo run` or `mojo build`).
 
+- `parallel_memcpy` function has moved from the `buffer` package to the `algorithm`
+  package.  Please update your imports accordingly.
+
 ### ❌ Removed
 
 - Support for "register only" variadic packs has been removed. Instead of
