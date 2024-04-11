@@ -85,7 +85,7 @@ fn ord(s: String) -> Int:
     )
     var shift = (6 * (num_bytes - 1)).to_int()
     var b1_mask = 0b11111111 >> (num_bytes + 1)
-    var result = (b1 & b1_mask).to_int() << shift
+    var result = int(b1 & b1_mask) << shift
     for i in range(1, num_bytes):
         p += 1
         shift -= 6
