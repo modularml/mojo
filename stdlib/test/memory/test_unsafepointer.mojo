@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s --dump-input=always
+# RUN: %mojo %s | FileCheck %s --dump-input=always
 
 from memory.unsafe_pointer import *
 from test_utils import MoveCounter
