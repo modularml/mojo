@@ -274,16 +274,16 @@ struct _DictIndex:
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return data.load(slot % reserved).to_int()
+            return int(data.load(slot % reserved))
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return data.load(slot % reserved).to_int()
+            return int(data.load(slot % reserved))
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return data.load(slot % reserved).to_int()
+            return int(data.load(slot % reserved))
         else:
             var data = self.data.bitcast[DType.int64]()
-            return data.load(slot % reserved).to_int()
+            return int(data.load(slot % reserved))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
