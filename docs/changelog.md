@@ -142,6 +142,8 @@ what we publish.
 - `List.pop_back()` has been removed.  Use `List.pop()` instead which defaults
   to popping the last element in the list.
 
+- `SIMD.to_int(value)` has been removed.  Use `int(value)` instead.
+
 ### 🛠️ Fixed
 
 - [#516](https://github.com/modularml/mojo/issues/516) and
