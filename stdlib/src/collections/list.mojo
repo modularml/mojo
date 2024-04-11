@@ -69,7 +69,7 @@ struct _ListIter[
         return len(self.src[]) - self.index
 
 
-struct List[T: CollectionElement](CollectionElement, Sized):
+struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -173,6 +173,14 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             The number of elements in the list.
         """
         return self.size
+
+    fn __bool__(self) -> Bool:
+        """Checks if the list is empty.
+
+        Returns:
+            `False` if the list is empty, `True` if there is at least one element.
+        """
+        return len(self).__bool__()
 
     @always_inline
     fn _realloc(inout self, new_capacity: Int):

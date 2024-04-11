@@ -15,7 +15,7 @@
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
-from testing import assert_equal
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_mojo_issue_698():
@@ -66,6 +66,13 @@ def test_list_clear():
 
     assert_equal(len(list), 0)
     assert_equal(list.capacity, 3)
+
+
+def test_list_to_bool_conversion():
+    assert_false(List[String]())
+    assert_true(List[String]("a"))
+    assert_true(List[String]("", "a"))
+    assert_true(List[String](""))
 
 
 def test_list_pop():
@@ -568,6 +575,7 @@ def main():
     test_mojo_issue_698()
     test_list()
     test_list_clear()
+    test_list_to_bool_conversion()
     test_list_pop()
     test_list_variadic_constructor()
     test_list_resize()
