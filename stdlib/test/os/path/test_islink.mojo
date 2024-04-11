@@ -14,7 +14,7 @@
 # REQUIRES: DISABLED
 # RUN: rm -rf %t && mkdir -p %t
 # RUN: ln -s %S %t/tmp
-# RUN: %mojo -debug-level full -D TEMP_DIR=%t/tmp %s
+# RUN: %mojo  -D TEMP_DIR=%t/tmp %s
 
 from os.path import isdir, islink
 from pathlib import Path

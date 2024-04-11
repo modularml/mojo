@@ -15,7 +15,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: linux
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s | FileCheck %s
 
 
 from sys.info import os_is_linux, os_is_macos

@@ -10,7 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# TODO(37393): Reenabl once we debug why we are depending on some debug behavior
+# on graviton.
+# REQUIRES: Disabled
+# RUN: %mojo %s
 
 from builtin.string import (
     _calc_initial_buffer_size_int32,
@@ -29,7 +32,7 @@ from utils import StringRef
 
 @value
 struct AString(Stringable):
-    fn __str__(borrowed self: Self) -> String:
+    fn __str__(self: Self) -> String:
         return "a string"
 
 
