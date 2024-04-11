@@ -23,7 +23,6 @@ from utils._visualizers import lldb_formatter_wrapping_type
 
 
 @lldb_formatter_wrapping_type
-@register_passable
 struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
     """The type of a literal tuple expression.
 
@@ -37,25 +36,31 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
-    fn __init__(*args: *Ts) -> Self:
+    fn __init__(inout self, borrowed *args: *Ts):
         """Construct the tuple.
 
         Args:
             args: Initial values.
-
-        Returns:
-            Constructed tuple.
         """
-        return Self {storage: args}
+        self.storage = args
 
     @always_inline("nodebug")
-    fn __copyinit__(existing: Self) -> Self:
+    fn __copyinit__(inout self, existing: Self):
         """Copy construct the tuple.
 
-        Returns:
-            Constructed tuple.
+        Args:
+            existing: The value to copy from.
         """
-        return Self {storage: existing.storage}
+        self.storage = existing.storage
+
+    @always_inline("nodebug")
+    fn __moveinit__(inout self, owned existing: Self):
+        """Move construct the tuple.
+
+        Args:
+            existing: The value to move from.
+        """
+        self.storage = existing.storage
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -68,7 +73,7 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
 
     @always_inline("nodebug")
     fn get[i: Int, T: AnyRegType](self) -> T:
-        """Get a tuple element.
+        """Get a tuple element and rebind to the specified type.
 
         Parameters:
             i: The element index.
@@ -77,9 +82,19 @@ struct Tuple[*Ts: AnyRegType](Sized, CollectionElement):
         Returns:
             The tuple element at the requested index.
         """
-        return rebind[T](
-            __mlir_op.`kgen.pack.get`[index = i.value](self.storage)
-        )
+        return rebind[T](self.get[i]())
+
+    @always_inline("nodebug")
+    fn get[i: Int](self) -> Ts[i.value]:
+        """Get a tuple element.
+
+        Parameters:
+            i: The element index.
+
+        Returns:
+            The tuple element at the requested index.
+        """
+        return __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
 
     @staticmethod
     fn _offset[i: Int]() -> Int:

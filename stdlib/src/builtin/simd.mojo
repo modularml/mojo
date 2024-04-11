@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import llvm_intrinsic
+from sys import llvm_intrinsic, _RegisterPackType
 from sys.info import has_neon, is_x86, simdwidthof
 
 from builtin.hash import _hash_simd
@@ -692,6 +692,19 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return mod + mask.select(rhs, Self(0))
 
     @always_inline("nodebug")
+    fn __rmod__(self, value: Self) -> Self:
+        """Returns `value mod self`.
+
+        Args:
+            value: The other value.
+
+        Returns:
+            `value mod self`.
+        """
+        constrained[type.is_numeric(), "the type must be numeric"]()
+        return value % self
+
+    @always_inline("nodebug")
     fn __pow__(self, rhs: Int) -> Self:
         """Computes the vector raised to the power of the input integer value.
 
@@ -1333,7 +1346,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         *mask: Int, output_size: Int = size
     ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
-        the `other` value using the specified mask (permutation).
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
 
         Parameters:
             mask: The permutation to use in the shuffle.
@@ -1368,6 +1382,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             @parameter
             fn fill[idx: Int]():
                 alias val = mask[idx]
+                constrained[
+                    0 <= val < 2 * size,
+                    "invalid index in the shuffle operation",
+                ]()
                 var ptr = __mlir_op.`pop.array.gep`(
                     Pointer.address_of(array).address, idx.value
                 )
@@ -1391,7 +1409,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
-        the `other` value using the specified mask (permutation).
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
 
         Parameters:
             mask: The permutation to use in the shuffle.
@@ -1405,7 +1424,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self, other: Self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
-        the `other` value using the specified mask (permutation).
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
 
         Parameters:
             mask: The permutation to use in the shuffle.
@@ -1694,7 +1714,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         var res = llvm_intrinsic[
             "llvm.experimental.vector.deinterleave2",
-            (SIMD[type, size // 2], SIMD[type, size // 2]),
+            _RegisterPackType[SIMD[type, size // 2], SIMD[type, size // 2]],
         ](self)
         return StaticTuple[SIMD[type, size // 2], 2](
             res.get[0, SIMD[type, size // 2]](),
@@ -1750,29 +1770,22 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             func: The reduce function to apply to elements in this SIMD.
             size_out: The width of the reduction.
 
+        Constraints:
+            `size_out` must not exceed width of the vector.
+
         Returns:
             A new scalar which is the reduction of all vector elements.
         """
-        constrained[
-            size_out <= Self.size, "simd reduction cannot increase simd width"
-        ]()
+        constrained[size_out <= size, "reduction cannot increase simd width"]()
 
         @parameter
-        if size == 1:
-            return self[0]
-        elif size == 2:
-            return func[type, 1](self[0], self[1])
-        elif size == size_out:
-            return rebind[SIMD[Self.type, size_out]](self)
+        if size == size_out:
+            return rebind[SIMD[type, size_out]](self)
         else:
-            alias half_size: Int = size // 2
+            alias half_size = size // 2
             var lhs = self.slice[half_size, offset=0]()
             var rhs = self.slice[half_size, offset=half_size]()
-
-            @parameter
-            if half_size != size_out:
-                return func[type, half_size](lhs, rhs).reduce[func, size_out]()
-            return rebind[SIMD[type, size_out]](func[type, half_size](lhs, rhs))
+            return func[type, half_size](lhs, rhs).reduce[func, size_out]()
 
     @always_inline("nodebug")
     fn reduce_max[size_out: Int = 1](self) -> SIMD[type, size_out]:
@@ -2218,7 +2231,7 @@ fn _pow[
                 var x = lhs[i]
                 var n = rhs[i]
                 while n > 0:
-                    if n&1 != 0:
+                    if n & 1 != 0:
                         res *= x
                     x *= x
                     n >>= 1

@@ -22,12 +22,12 @@ var a = Optional(1)
 var b = Optional[Int](None)
 if a:
     print(a.value())  # prints 1
-if b:  # b is False, so no print
+if b:  # bool(b) is False, so no print
     print(b.value())
 var c = a.or_else(2)
 var d = b.or_else(2)
-print(c.value())  # prints 1
-print(d.value())  # prints 2
+print(c)  # prints 1
+print(d)  # prints 2
 ```
 """
 
@@ -62,12 +62,12 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     var b = Optional[Int](None)
     if a:
         print(a.value())  # prints 1
-    if b:  # b is False, so no print
+    if b:  # bool(b) is False, so no print
         print(b.value())
     var c = a.or_else(2)
     var d = b.or_else(2)
-    print(c.value())  # prints 1
-    print(d.value())  # prints 2
+    print(c)  # prints 1
+    print(d)  # prints 2
     ```
 
     Parameters:
@@ -163,7 +163,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     fn __isnot__(self, other: NoneType) -> Bool:
         """Return `True` if the Optional has a value.
 
-        It allows you to use the following syntax: `if my_optional is not None:`
+        It allows you to use the following syntax: `if my_optional is not None:`.
 
         Args:
             other: The value to compare to (None).
@@ -311,6 +311,32 @@ struct OptionalReg[T: AnyRegType](Boolable):
             The contained value.
         """
         return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
+
+    fn __is__(self, other: NoneType) -> Bool:
+        """Return `True` if the Optional has no value.
+
+        It allows you to use the following syntax: `if my_optional is None:`
+
+        Args:
+            other: The value to compare to (None).
+
+        Returns:
+            True if the Optional has no value and False otherwise.
+        """
+        return not self.__bool__()
+
+    fn __isnot__(self, other: NoneType) -> Bool:
+        """Return `True` if the Optional has a value.
+
+        It allows you to use the following syntax: `if my_optional is not None:`
+
+        Args:
+            other: The value to compare to (None).
+
+        Returns:
+            True if the Optional has a value and False otherwise.
+        """
+        return self.__bool__()
 
     fn __bool__(self) -> Bool:
         """Return true if the optional has a value.

@@ -15,16 +15,13 @@
 from testing import assert_equal
 
 
-def raise_an_error():
-    raise Error("MojoError: This is an error!")
+def test_bool_cast_to_int():
+    assert_equal(False.__int__(), 0)
+    assert_equal(True.__int__(), 1)
+
+    assert_equal(int(False), 0)
+    assert_equal(int(True), 1)
 
 
 def main():
-    try:
-        _ = raise_an_error()
-    except e:
-        assert_equal(str(e), "MojoError: This is an error!")
-
-    var myString: String = "FOO"
-    var error = Error(myString)
-    assert_equal(error, "FOO")
+    test_bool_cast_to_int()

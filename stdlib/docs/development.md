@@ -112,7 +112,7 @@ Otherwise, CI will fail in its lint and formatting checks.  The `mojo` compiler
 provides a `format` command.  So, you can format your changes like so:
 
 ```bash
-mojo format -l 80 ./
+mojo format ./
 ```
 
 It is advised, to avoid forgetting, to set-up `pre-commit`, which will format
@@ -335,7 +335,7 @@ Total Discovered Tests: 1
 
 Success! Now we have a test for our new function.
 
-The last step is to [run `mojo format -l 80`](#formatting-changes) on all the files. 
+The last step is to [run `mojo format`](#formatting-changes) on all the files. 
 This can be skipped if `pre-commit` is installed.
 
 ### Raising a PR

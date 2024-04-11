@@ -11,24 +11,23 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo %s | FileCheck %s
+# RUN: %mojo %s
 
 
 from python._cpython import PythonVersion
 from python import Python
 
+from testing import assert_equal
 
-fn test_python_version(inout python: Python):
+
+fn test_python_version(inout python: Python) raises:
     var version = "3.10.8 (main, Nov 24 2022, 08:08:27) [Clang 14.0.6 ]"
     var pythonVersion = PythonVersion(version)
-    # CHECK: 3
-    print(pythonVersion.major)
-    # CHECK: 10
-    print(pythonVersion.minor)
-    # CHECK: 8
-    print(pythonVersion.patch)
+    assert_equal(pythonVersion.major, 3)
+    assert_equal(pythonVersion.minor, 10)
+    assert_equal(pythonVersion.patch, 8)
 
 
-fn main():
+def main():
     var python = Python()
     test_python_version(python)

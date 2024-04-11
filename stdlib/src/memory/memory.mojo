@@ -445,14 +445,14 @@ fn stack_allocation[
             count = count.value,
             _type = Pointer[type, address_space].pointer_type,
             alignment = alignment.value,
-            address_space = address_space.value().value,
+            address_space = address_space._value.value,
         ]()
     else:
         return __mlir_op.`pop.stack_allocation`[
             count = count.value,
             _type = Pointer[type, address_space].pointer_type,
             alignment = alignment.value,
-            address_space = address_space.value().value,
+            address_space = address_space._value.value,
         ]()
 
 
@@ -470,6 +470,10 @@ fn _malloc[
 ](size: Int, /, *, alignment: Int = -1) -> Pointer[type, address_space]:
     @parameter
     if triple_is_nvidia_cuda():
+        constrained[
+            address_space == AddressSpace.GENERIC,
+            "address space must be generic",
+        ]()
         return external_call["malloc", Pointer[NoneType, address_space]](
             size
         ).bitcast[type]()
@@ -488,6 +492,10 @@ fn _malloc[
 fn _free(ptr: Pointer):
     @parameter
     if triple_is_nvidia_cuda():
+        constrained[
+            ptr.address_space == AddressSpace.GENERIC,
+            "address space must be generic",
+        ]()
         external_call["free", NoneType](ptr.bitcast[NoneType]())
     else:
         __mlir_op.`pop.aligned_free`(ptr.address)

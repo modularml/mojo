@@ -131,6 +131,14 @@ def test_mod():
     assert_equal(UInt32(99) % UInt32(1), 0)
     assert_equal(UInt32(99) % UInt32(3), 0)
 
+    assert_equal(Int(4) % Int32(3), 1)
+    assert_equal(
+        Int(78) % SIMD[DType.int32, 2](78, 78), SIMD[DType.int32, 2](0, 0)
+    )
+    assert_equal(
+        SIMD[DType.int32, 2](7, 7) % Int(4), SIMD[DType.int32, 2](3, 3)
+    )
+
     var a = SIMD[DType.float32, 16](
         3.1,
         3.1,

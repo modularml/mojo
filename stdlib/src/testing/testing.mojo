@@ -90,10 +90,15 @@ fn assert_false[
         raise Error("AssertionError: " + msg)
 
 
-# TODO: Collapse these two overloads for generic T that has the
-# Equality Comparable trait.
+trait Testable(EqualityComparable, Stringable):
+    """A trait that a struct should conform to if we do equality testing on it.
+    """
+
+    pass
+
+
 @always_inline
-fn assert_equal(lhs: Int, rhs: Int, msg: String = "") raises:
+fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
 
@@ -109,6 +114,7 @@ fn assert_equal(lhs: Int, rhs: Int, msg: String = "") raises:
         raise _assert_equal_error(str(lhs), str(rhs), msg=msg)
 
 
+# TODO: Remove the String and SIMD overloads once we have more powerful traits.
 @always_inline
 fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
@@ -150,7 +156,7 @@ fn assert_equal[
 
 
 @always_inline
-fn assert_not_equal(lhs: Int, rhs: Int, msg: String = "") raises:
+fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
     """Asserts that the input values are not equal. If it is not then an
     Error is raised.
 
