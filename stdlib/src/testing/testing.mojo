@@ -19,6 +19,7 @@ from testing import assert_true
 ```
 """
 from collections import Optional
+from utils._numerics import isnan
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -32,15 +33,28 @@ fn _abs(x: SIMD) -> __type_of(x):
 
 @always_inline
 fn _isclose(
-    a: SIMD, b: __type_of(a), *, atol: Scalar[a.type], rtol: Scalar[a.type]
+    a: SIMD,
+    b: __type_of(a),
+    *,
+    atol: Scalar[a.type],
+    rtol: Scalar[a.type],
+    equal_nan: Bool,
 ) -> SIMD[DType.bool, a.size]:
     @parameter
     if a.type.is_bool() or a.type.is_integral():
         return a == b
 
+    if equal_nan and isnan(a) and isnan(b):
+        return True
+
     var atol_vec = SIMD[a.type, a.size](atol)
     var rtol_vec = SIMD[a.type, a.size](rtol)
-    return _abs(a - b) <= (atol_vec.max(rtol_vec * _abs(a).max(_abs(b))))
+    var res = _abs(a - b) <= (atol_vec.max(rtol_vec * _abs(a).max(_abs(b))))
+
+    if not equal_nan:
+        return res
+
+    return res.select(res, isnan(a) and isnan(b))
 
 
 # ===----------------------------------------------------------------------=== #
@@ -217,6 +231,7 @@ fn assert_almost_equal[
     msg: String = "",
     atol: Scalar[type] = 1e-08,
     rtol: Scalar[type] = 1e-05,
+    equal_nan: Bool = False,
 ) raises:
     """Asserts that the input values are equal up to a tolerance. If it is
     not then an Error is raised.
@@ -231,11 +246,14 @@ fn assert_almost_equal[
         msg: The message to print.
         atol: The _absolute tolerance.
         rtol: The relative tolerance.
+        equal_nan: Whether to treat nans as equal.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    var almost_equal = _isclose(lhs, rhs, atol=atol, rtol=rtol)
+    var almost_equal = _isclose(
+        lhs, rhs, atol=atol, rtol=rtol, equal_nan=equal_nan
+    )
     if not almost_equal:
         var err = "AssertionError: " + str(lhs) + " is not close to " + str(
             rhs
