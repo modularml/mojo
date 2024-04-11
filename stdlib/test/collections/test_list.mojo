@@ -499,7 +499,9 @@ def test_constructor_from_other_list_through_pointer():
     # the list attributes will be invalid after the steal_data call
     var size = len(initial_list)
     var capacity = initial_list.capacity
-    var some_list = List[Int8](initial_list.steal_data(), size=size, capacity=capacity)
+    var some_list = List[Int8](
+        initial_list.steal_data(), size=size, capacity=capacity
+    )
     assert_equal(some_list[0], 0)
     assert_equal(some_list[1], 1)
     assert_equal(some_list[2], 2)
