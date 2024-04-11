@@ -124,15 +124,17 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         for value in values:
             self.append(value[])
 
-    fn __init__(inout self: Self, ptr: AnyPointer[T], size: Int, capacity: Int):
+    fn __init__(
+        inout self: Self, data: AnyPointer[T], size: Int, capacity: Int
+    ):
         """Constructs a list from a pointer and its size.
 
         Args:
-            ptr: The pointer to the data.
+            data: The pointer to the data.
             size: The number of elements in the list.
             capacity: The capacity of the list.
         """
-        self.data = ptr
+        self.data = data
         self.size = size
         self.capacity = capacity
 
