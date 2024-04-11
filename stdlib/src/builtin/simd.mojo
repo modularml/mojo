@@ -550,19 +550,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return String(buf^)
 
     @always_inline("nodebug")
-    fn to_int(self) -> Int:
-        """Casts to the value to an Int. If there is a fractional component,
-        then the value is truncated towards zero.
-
-        Constraints:
-            The size of the SIMD vector must be 1.
-
-        Returns:
-            The value of the single integer element in the SIMD vector.
-        """
-        return self.__int__()
-
-    @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
         """Computes `self + rhs`.
 
