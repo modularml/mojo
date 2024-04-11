@@ -41,6 +41,19 @@ def test_multiple_resizes():
     assert_equal(20, dict["key19"])
 
 
+def test_bool_conversion():
+    var dict = Dict[String, Int]()
+    assert_false(dict)
+    dict["a"] = 1
+    assert_true(dict)
+    dict["b"] = 2
+    assert_true(dict)
+    dict.pop("a")
+    assert_true(dict)
+    dict.pop("b")
+    assert_false(dict)
+
+
 def test_big_dict():
     var dict = Dict[String, Int]()
     for i in range(2000):
@@ -322,3 +335,4 @@ def test_owned_kwargs_dict():
 def main():
     test_dict()
     test_owned_kwargs_dict()
+    test_bool_conversion()
