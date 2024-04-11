@@ -280,6 +280,68 @@ def test_list_reverse_move_count():
     _ = vec^
 
 
+def test_list_insert():
+    #
+    # Test the list [1, 2, 3] created with insert
+    #
+
+    v1 = List[Int]()
+    v1.insert(len(v1), 1)
+    v1.insert(len(v1), 3)
+    v1.insert(1, 2)
+
+    assert_equal(len(v1), 3)
+    assert_equal(v1[0], 1)
+    assert_equal(v1[1], 2)
+    assert_equal(v1[2], 3)
+
+    #
+    # Test the list [1, 2, 3, 4, 5] created with negative and positive index
+    #
+
+    v2 = List[Int]()
+    v2.insert(-1729, 2)
+    v2.insert(len(v2), 3)
+    v2.insert(len(v2), 5)
+    v2.insert(-1, 4)
+    v2.insert(-len(v2), 1)
+
+    assert_equal(len(v2), 5)
+    assert_equal(v2[0], 1)
+    assert_equal(v2[1], 2)
+    assert_equal(v2[2], 3)
+    assert_equal(v2[3], 4)
+    assert_equal(v2[4], 5)
+
+    #
+    # Test the list [1, 2, 3, 4] created with negative index
+    #
+
+    v3 = List[Int]()
+    v3.insert(-11, 4)
+    v3.insert(-13, 3)
+    v3.insert(-17, 2)
+    v3.insert(-19, 1)
+
+    assert_equal(len(v3), 4)
+    assert_equal(v3[0], 1)
+    assert_equal(v3[1], 2)
+    assert_equal(v3[2], 3)
+    assert_equal(v3[3], 4)
+
+    #
+    # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
+    #
+
+    v4 = List[Int]()
+    for i in range(4):
+        v4.insert(0, 4 - i)
+        v4.insert(len(v4), 4 + i + 1)
+
+    for i in range(len(v4)):
+        assert_equal(v4[i], i + 1)
+
+
 def test_list_extend():
     #
     # Test extending the list [1, 2, 3] with itself
@@ -480,6 +542,7 @@ def main():
     test_list_resize()
     test_list_reverse()
     test_list_reverse_move_count()
+    test_list_insert()
     test_list_extend()
     test_list_extend_non_trivial()
     test_list_explicit_copy()
