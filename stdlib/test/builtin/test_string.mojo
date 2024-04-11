@@ -166,15 +166,32 @@ fn test_ord() raises:
     assert_equal(ord("z"), 122)
     assert_equal(ord("!"), 33)
 
-    # FIXME(#26881): Extended ASCII is not yet supported
-    # This should be `assert_equal` when extended ASCII is supported
-    assert_not_equal(ord("α"), 224)
+    # Multi byte character
+    assert_equal(ord("α"), 945)
+    assert_equal(ord("➿"), 10175)
+    assert_equal(ord("🔥"), 128293)
+
+    # Make sure they work in the parameter domain too
+    alias single_byte = ord("A")
+    assert_equal(single_byte, 65)
+    alias single_byte2 = ord("!")
+    assert_equal(single_byte2, 33)
+
+    alias multi_byte = ord("α")
+    assert_equal(multi_byte, 945)
+    alias multi_byte2 = ord("➿")
+    assert_equal(multi_byte2, 10175)
+    alias multi_byte3 = ord("🔥")
+    assert_equal(multi_byte3, 128293)
 
 
 fn test_chr() raises:
     assert_equal("A", chr(65))
     assert_equal("a", chr(97))
     assert_equal("!", chr(33))
+    assert_equal("α", chr(945))
+    assert_equal("➿", chr(10175))
+    assert_equal("🔥", chr(128293))
 
 
 fn test_string_indexing() raises:
