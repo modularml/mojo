@@ -29,7 +29,7 @@ def main():
     if len(target_paths) < 2:
         raise Error("A file path must be given as a command line argument.")
 
-    one_file_failed = False
+    files_without_license = List[Path]()
     for i in range(len(target_paths)):
         if i == 0:
             # this is the current file
@@ -41,8 +41,11 @@ def main():
                 + str(file_path)
                 + "`, please add it before commiting. "
             )
-            one_file_failed = True
+            files_without_license.append(file_path)
 
-    if one_file_failed:
-        print("At least one file is missing the license 💥 💔 💥")
+    if len(files_without_license) > 0:
+        print("The following files have missing licences 💥 💔 💥")
+        for file in files_without_license:
+            print(file[])
+        print("Please add the license to each file before commiting.")
         sys.exit(1)

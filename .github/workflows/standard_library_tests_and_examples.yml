@@ -83,6 +83,9 @@ jobs:
           pre-commit install
       
       - name: Run pre-commit
+        # If this step ever gets too slow, we can move the 
+        # pre-commit run to a separate job so that it runs at the
+        # same time as the unit tests.
         run: pre-commit run --all-files
 
       - name: Install build tools (macOS)
