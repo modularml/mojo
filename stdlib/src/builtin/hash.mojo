@@ -194,8 +194,8 @@ fn _hash_int8[size: Int](data: SIMD[DType.uint8, size]) -> Int:
     for i in range(size):
         hash_data = _HASH_UPDATE(hash_data, data[i].cast[DType.int64]())
     # TODO(27659): 'lit.globalvar.ref' error
-    # return hash_data.to_int() ^ HASH_SECRET
-    return hash_data.to_int() ^ _HASH_SECRET()
+    # return int(hash_data) ^ HASH_SECRET
+    return int(hash_data) ^ _HASH_SECRET()
 
 
 fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:

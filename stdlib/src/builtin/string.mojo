@@ -78,18 +78,16 @@ fn ord(s: String) -> Int:
     var b1 = p.load()
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
-        return b1.to_int()
+        return int(b1)
     var num_bytes = _ctlz(~b1)
-    debug_assert(
-        len(s) == num_bytes.to_int(), "input string must be one character"
-    )
-    var shift = (6 * (num_bytes - 1)).to_int()
+    debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
     var result = int(b1 & b1_mask) << shift
     for i in range(1, num_bytes):
         p += 1
         shift -= 6
-        result |= (p.load() & 0b00111111).to_int() << shift
+        result |= int(p.load() & 0b00111111) << shift
     return result
 
 
@@ -131,7 +129,7 @@ fn chr(c: Int) -> String:
         )
         var values = SIMD[DType.int32, 4](val)
         var mask = values > sizes
-        return mask.cast[DType.uint8]().reduce_add().to_int()
+        return int(mask.cast[DType.uint8]().reduce_add())
 
     var num_bytes = _utf8_len(c)
     var p = DTypePointer[DType.uint8].alloc(num_bytes + 1)
