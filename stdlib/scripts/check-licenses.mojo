@@ -36,11 +36,6 @@ def main():
             continue
         file_path = Path(target_paths[i])
         if not file_path.read_text().startswith(LICENSE):
-            print(
-                "The license has been forgotten at the top of the file `"
-                + str(file_path)
-                + "`, please add it before commiting. "
-            )
             files_without_license.append(file_path)
 
     if len(files_without_license) > 0:
