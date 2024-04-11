@@ -84,6 +84,9 @@ what we publish.
   low-level logic but isn't designed for general usability and will likely
   change in the future.
 
+- The `testing.assert_almost_equal` and `math.isclose` functions now have an
+  `equal_nan` flag. When set to True, then NaNs are considered equal.
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
