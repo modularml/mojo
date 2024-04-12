@@ -208,8 +208,8 @@ fn bench[
 
     var py = Python.import_module("builtins")
     _ = py.print(
-        py.str("{:<13}{:>8.3f} GFLOPS {:>9.2f}x Python {:>5.2f}x Numpy").format(
-            name, gflops, speedup, numpy_speedup
+        py.str("{:<13}{:>8.3f} GFLOPS {:>9.2f}x Python").format(
+            name, gflops, speedup
         )
     )
 
