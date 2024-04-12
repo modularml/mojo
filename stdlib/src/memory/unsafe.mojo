@@ -1556,12 +1556,8 @@ struct DTypePointer[
 
     @always_inline("nodebug")
     fn gather[
-        offset_type: DType,
-        /,
-        *,
-        width: Int = 1,
-        alignment: Int = Self._default_alignment,
-    ](self, offset: SIMD[offset_type, width]) -> SIMD[type, width]:
+        *, width: Int = 1, alignment: Int = Self._default_alignment
+    ](self, offset: SIMD[_, width]) -> SIMD[type, width]:
         """Gathers a SIMD vector from offsets of the current pointer.
 
         This method loads from memory addresses calculated by appropriately
@@ -1569,10 +1565,9 @@ struct DTypePointer[
 
         Constraints:
             The offset type must be an integral type.
-            The alignment must be 0 or a power of two integer value.
+            The alignment must be a power of two integer value.
 
         Parameters:
-            offset_type: The type of the `offset` SIMD vector.
             width: The SIMD width.
             alignment: The minimal alignment of the address.
 
@@ -1590,14 +1585,10 @@ struct DTypePointer[
 
     @always_inline("nodebug")
     fn gather[
-        offset_type: DType,
-        /,
-        *,
-        width: Int = 1,
-        alignment: Int = Self._default_alignment,
+        *, width: Int = 1, alignment: Int = Self._default_alignment
     ](
         self,
-        offset: SIMD[offset_type, width],
+        offset: SIMD[_, width],
         mask: SIMD[DType.bool, width],
         default: SIMD[type, width],
     ) -> SIMD[type, width]:
@@ -1614,10 +1605,9 @@ struct DTypePointer[
 
         Constraints:
             The offset type must be an integral type.
-            The alignment must be 0 or a power of two integer value.
+            The alignment must be a power of two integer value.
 
         Parameters:
-            offset_type: The type of the `offset` SIMD vector.
             width: The SIMD width.
             alignment: The minimal alignment of the address.
 
@@ -1633,12 +1623,12 @@ struct DTypePointer[
             The SIMD vector containing the gathered values.
         """
         constrained[
-            offset_type.is_integral(),
+            offset.type.is_integral(),
             "offset type must be an integral type",
         ]()
         constrained[
-            (alignment == 0) | _is_power_of_2(alignment),
-            "alignment must be 0 or a power of two integer value",
+            _is_power_of_2(alignment),
+            "alignment must be a power of two integer value",
         ]()
 
         var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
@@ -1646,12 +1636,8 @@ struct DTypePointer[
 
     @always_inline("nodebug")
     fn scatter[
-        offset_type: DType,
-        /,
-        *,
-        width: Int = 1,
-        alignment: Int = Self._default_alignment,
-    ](self, offset: SIMD[offset_type, width], val: SIMD[type, width]):
+        *, width: Int = 1, alignment: Int = Self._default_alignment
+    ](self, offset: SIMD[_, width], val: SIMD[type, width]):
         """Scatters a SIMD vector into offsets of the current pointer.
 
         This method stores at memory addresses calculated by appropriately
@@ -1663,10 +1649,9 @@ struct DTypePointer[
 
         Constraints:
             The offset type must be an integral type.
-            The alignment must be 0 or a power of two integer value.
+            The alignment must be a power of two integer value.
 
         Parameters:
-            offset_type: The type of the `offset` SIMD vector.
             width: The SIMD width.
             alignment: The minimal alignment of the address.
 
@@ -1679,14 +1664,10 @@ struct DTypePointer[
 
     @always_inline("nodebug")
     fn scatter[
-        offset_type: DType,
-        /,
-        *,
-        width: Int = 1,
-        alignment: Int = Self._default_alignment,
+        *, width: Int = 1, alignment: Int = Self._default_alignment
     ](
         self,
-        offset: SIMD[offset_type, width],
+        offset: SIMD[_, width],
         val: SIMD[type, width],
         mask: SIMD[DType.bool, width],
     ):
@@ -1707,10 +1688,9 @@ struct DTypePointer[
 
         Constraints:
             The offset type must be an integral type.
-            The alignment must be 0 or a power of two integer value.
+            The alignment must be a power of two integer value.
 
         Parameters:
-            offset_type: The type of the `offset` SIMD vector.
             width: The SIMD width.
             alignment: The minimal alignment of the address.
 
@@ -1721,12 +1701,12 @@ struct DTypePointer[
                 element whether to store at memory or not.
         """
         constrained[
-            offset_type.is_integral(),
+            offset.type.is_integral(),
             "offset type must be an integral type",
         ]()
         constrained[
-            (alignment == 0) | _is_power_of_2(alignment),
-            "alignment must be 0 or a power of two integer value",
+            _is_power_of_2(alignment),
+            "alignment must be a power of two integer value",
         ]()
 
         var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
