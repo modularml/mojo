@@ -181,3 +181,10 @@ what we publish.
 
 - [#1917](https://github.com/modularml/mojo/issues/1917) Fix a crash after
   syntax error during tuple creation
+
+- [#2006](https://github.com/modularml/mojo/issues/2006) The Mojo LSP now
+  properly supports signature types with named arguments and parameters.
+
+- [#2007](https://github.com/modularml/mojo/issues/2007) and
+  [#1997](https://github.com/modularml/mojo/issues/1997) The Mojo LSP no longer
+  crashes on certain types of closures.
