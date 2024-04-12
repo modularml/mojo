@@ -54,9 +54,7 @@ struct UnsafePointer[
         Returns:
             A null pointer.
         """
-        return Self {
-            value: __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
-        }
+        return Self.get_null()
 
     @always_inline
     fn __init__(value: Self.pointer_type) -> Self:
@@ -99,6 +97,18 @@ struct UnsafePointer[
         }
 
     @staticmethod
+    @always_inline("nodebug")
+    fn get_null() -> Self:
+        """Constructs a UnsafePointer representing nullptr.
+
+        Returns:
+            Constructed nullptr UnsafePointer object.
+        """
+        return Self {
+            value: __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
+        }
+
+    @staticmethod
     @always_inline
     fn alloc(count: Int) -> Self:
         """Allocate an array with default alignment.
@@ -136,6 +146,28 @@ struct UnsafePointer[
     fn free(self):
         """Free the memory referenced by the pointer."""
         Pointer[Int8, address_space=address_space](address=int(self)).free()
+
+    @always_inline("nodebug")
+    fn bitcast[
+        new_type: AnyType
+    ](self) -> UnsafePointer[new_type, address_space]:
+        """Bitcasts a UnsafePointer to a different type.
+
+        Parameters:
+            new_type: The target type.
+
+        Returns:
+            A new UnsafePointer object with the specified type and the same address,
+            as the original UnsafePointer.
+        """
+
+        @parameter
+        if _mlirtype_is_eq[T, new_type]():
+            return rebind[UnsafePointer[new_type, address_space]](self)
+
+        return __mlir_op.`pop.pointer.bitcast`[
+            _type = UnsafePointer[new_type, address_space].pointer_type,
+        ](self.value)
 
     @always_inline
     fn bitcast_element[
