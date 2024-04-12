@@ -33,8 +33,7 @@ with open("my_file.txt", "r") as f:
 
 from os import PathLike
 from sys import external_call
-
-from memory import AddressSpace, DTypePointer, Pointer
+from memory.unsafe import AddressSpace, DTypePointer, Pointer
 
 
 @register_passable
@@ -176,7 +175,7 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
 
         var buf = external_call[
-            "KGEN_CompilerRT_IO_FileReadBytes", Pointer[Int8]
+            "KGEN_CompilerRT_IO_FileReadBytes", AnyPointer[Int8]
         ](
             self.handle,
             Pointer.address_of(size_copy),
@@ -186,13 +185,8 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[Int8](capacity=int(size_copy))
-
-        var list_ptr = Pointer[Int8].__from_index(int(list.data))
-
-        # Initialize the List elements and set the initialized size
-        memcpy(list_ptr, buf, int(size_copy))
-        list.size = int(size_copy)
+        # No-copy list initialization
+        var list = List[Int8](buf, int(size_copy), int(size_copy))
 
         return list
 
