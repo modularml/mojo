@@ -1562,11 +1562,10 @@ struct DTypePointer[
         width: Int = 1,
         alignment: Int = Self._default_alignment,
     ](self, offset: SIMD[offset_type, width]) -> SIMD[type, width]:
-        """Gathers values based on offsets from the current pointer.
+        """Gathers a SIMD vector from offsets of the current pointer.
 
-        This method performs a load operation, gathering values from addresses
-        calculated by adding the specified `offset` SIMD vector to the current
-        pointer.
+        This method loads from memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector.
 
         Constraints:
             The offset type must be an integral type.
@@ -1578,11 +1577,10 @@ struct DTypePointer[
             alignment: The minimal alignment of the address.
 
         Args:
-            offset: A SIMD vector of offsets to be added to the current pointer
-                for the gather operation.
+            offset: The SIMD vector of offsets to gather from.
 
         Returns:
-            A SIMD vector containing the gathered values.
+            The SIMD vector containing the gathered values.
         """
         var mask = SIMD[DType.bool, width](True)
         var default = SIMD[type, width]()
@@ -1603,13 +1601,16 @@ struct DTypePointer[
         mask: SIMD[DType.bool, width],
         default: SIMD[type, width],
     ) -> SIMD[type, width]:
-        """Gathers values based on offsets from the current pointer.
+        """Gathers a SIMD vector from offsets of the current pointer.
 
-        This method performs a conditional load operation, gathering values
-        from addresses calculated by adding the specified `offset` SIMD vector
-        to the current pointer. For each element, if the corresponding mask
-        value is `True`, the method loads the value from memory; otherwise, it
-        uses the respective value from the `default` SIMD vector instead.
+        This method loads from memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector,
+        or takes from the `default` SIMD vector, depending on the values of
+        the `mask` SIMD vector.
+
+        If a mask element is `True`, the respective result element is given
+        by the current pointer and the `offset` SIMD vector; otherwise, the
+        result element is taken from the `default` SIMD vector.
 
         Constraints:
             The offset type must be an integral type.
@@ -1621,16 +1622,15 @@ struct DTypePointer[
             alignment: The minimal alignment of the address.
 
         Args:
-            offset: A SIMD vector of offsets to be added to the current pointer
-                for the gather operation.
-            mask: A SIMD vector of boolean values, indicating for each element
-                whether to load from memory or use the `default` SIMD vector.
-            default: A SIMD vector providing default values to be used where
-                the `mask` SIMD vector is `False`.
+            offset: The SIMD vector of offsets to gather from.
+            mask: The SIMD vector of boolean values, indicating for each
+                element whether to load from memory or to take from the
+                `default` SIMD vector.
+            default: The SIMD vector providing default values to be taken
+                where the `mask` SIMD vector is `False`.
 
         Returns:
-            A SIMD vector containing the gathered values or default values for
-            masked-off positions.
+            The SIMD vector containing the gathered values.
         """
         constrained[
             offset_type.is_integral(),
@@ -1652,15 +1652,14 @@ struct DTypePointer[
         width: Int = 1,
         alignment: Int = Self._default_alignment,
     ](self, offset: SIMD[offset_type, width], val: SIMD[type, width]):
-        """Scatters values to memory based on offsets from the current pointer.
+        """Scatters a SIMD vector into offsets of the current pointer.
 
-        This method performs a store operation, scattering each element from
-        the `val` SIMD vector to the memory address calculated by adding the
-        corresponding element from `offset` SIMD vector to the current pointer.
+        This method stores at memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector.
 
-        If the same offset is targeted multiple times, the values are stored in
-        the order they appear in the `val` SIMD vector, from the first to the
-        last element.
+        If the same offset is targeted multiple times, the values are stored
+        in the order they appear in the `val` SIMD vector, from the first to
+        the last element.
 
         Constraints:
             The offset type must be an integral type.
@@ -1672,9 +1671,8 @@ struct DTypePointer[
             alignment: The minimal alignment of the address.
 
         Args:
-            offset: A SIMD vector of offsets to be added to the current pointer
-                for the scatter operation.
-            val: A SIMD vector containing the values to be scattered.
+            offset: The SIMD vector of offsets to scatter into.
+            val: The SIMD vector containing the values to be scattered.
         """
         var mask = SIMD[DType.bool, width](True)
         self.scatter[width=width, alignment=alignment](offset, val, mask)
@@ -1692,18 +1690,20 @@ struct DTypePointer[
         val: SIMD[type, width],
         mask: SIMD[DType.bool, width],
     ):
-        """Scatters values to memory based on offsets from the current pointer.
+        """Scatters a SIMD vector into offsets of the current pointer.
 
-        This method performs a conditional store operation, scattering each
-        element from the `val` SIMD vector to the memory address calculated by
-        adding the corresponding element from `offset` SIMD vector to the
-        current pointer. Storing is done according to the provided `mask` SIMD
-        vector, which is used to prevent memory accesses to the masked-off
-        positions.
+        This method stores at memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector,
+        depending on the values of the `mask` SIMD vector.
 
-        If the same offset is targeted multiple times, the values are stored in
-        the order they appear in the `val` SIMD vector, from the first to the
-        last element, conditional on the `mask` SIMD vector.
+        If a mask element is `True`, the respective element in the `val` SIMD
+        vector is stored at the memory address defined by the current pointer
+        and the `offset` SIMD vector; otherwise, no action is taken for that
+        element in `val`.
+
+        If the same offset is targeted multiple times, the values are stored
+        in the order they appear in the `val` SIMD vector, from the first to
+        the last element.
 
         Constraints:
             The offset type must be an integral type.
@@ -1715,11 +1715,10 @@ struct DTypePointer[
             alignment: The minimal alignment of the address.
 
         Args:
-            offset: A SIMD vector of offsets to be added to the current pointer
-                for the scatter operation.
-            val: A SIMD vector containing the values to be scattered.
-            mask: A SIMD vector of boolean values, indicating for each element
-                whether to scatter the value to memory or not.
+            offset: The SIMD vector of offsets to scatter into.
+            val: The SIMD vector containing the values to be scattered.
+            mask: The SIMD vector of boolean values, indicating for each
+                element whether to store at memory or not.
         """
         constrained[
             offset_type.is_integral(),
