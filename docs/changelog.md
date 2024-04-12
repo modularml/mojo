@@ -188,3 +188,6 @@ what we publish.
 - [#2007](https://github.com/modularml/mojo/issues/2007) and
   [#1997](https://github.com/modularml/mojo/issues/1997) The Mojo LSP no longer
   crashes on certain types of closures.
+
+- [#1675](https://github.com/modularml/mojo/issues/1675) Ensure `@value`
+  decorator fails gracefully after duplicate field error.
