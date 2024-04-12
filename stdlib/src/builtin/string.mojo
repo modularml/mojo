@@ -152,14 +152,14 @@ fn chr(c: Int) -> String:
 
 @always_inline
 fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
-    """Parses the given string as a base-10 integer and returns that value.
+    """Parses the given string as an integer in the given base and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
     as an integer value, an error is raised. For example, `atol("hi")` raises an
     error.
 
     Args:
-        str_ref: A string to be parsed as a base-10 integer.
+        str_ref: A string to be parsed as an integer in the given base.
         base: Base used for conversion, value must be between 2 and 36.
 
     Returns:
@@ -232,14 +232,14 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
 
 fn atol(str: String, base: Int = 10) raises -> Int:
-    """Parses the given string as a base-10 integer and returns that value.
+    """Parses the given string as an integer in the given base and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
     as an integer value, an error is raised. For example, `atol("hi")` raises an
     error.
 
     Args:
-        str: A string to be parsed as a base-10 integer.
+        str: A string to be parsed as an integer in the given base.
         base: Base used for conversion, value must be between 2 and 36.
 
     Returns:

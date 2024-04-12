@@ -240,19 +240,17 @@ fn test_atol() raises:
     assert_equal(35, atol("Z", 36))
 
     # Negative cases
-    try:
+    with assert_raises(
+        contains="String is not convertible to integer with base 10."
+    ):
         _ = atol(String("9.03"))
-        raise Error("Failed to raise when converting string to integer.")
-    except e:
-        assert_equal(str(e), "String is not convertible to integer with base 10.")
 
-    try:
+    with assert_raises(contains="String is not convertible to integer."):
         _ = atol(String(" 10 1"))
-        raise Error("Failed to raise when converting string to integer.")
-    except e:
-        assert_equal(str(e), "String is not convertible to integer.")
 
-    with assert_raises(contains="String is not convertible to integer with base 5."):
+    with assert_raises(
+        contains="String is not convertible to integer with base 5."
+    ):
         _ = atol("5", 5)
 
     with assert_raises(contains="Base must be between 2 and 36 included."):
@@ -261,22 +259,13 @@ fn test_atol() raises:
     with assert_raises(contains="Base must be between 2 and 36 included."):
         _ = atol("0", 37)
 
-    try:
+    with assert_raises(contains="Empty String cannot be converted to integer."):
         _ = atol(String(""))
-        raise Error("Failed to raise when converting empty string to integer.")
-    except e:
-        assert_equal(str(e), "Empty String cannot be converted to integer.")
 
-    try:
+    with assert_raises(
+        contains="String expresses an integer too large to store in Int."
+    ):
         _ = atol(String("9223372036854775832"))
-        raise Error(
-            "Failed to raise when converting an integer too large to store in"
-            " Int."
-        )
-    except e:
-        assert_equal(
-            str(e), "String expresses an integer too large to store in Int."
-        )
 
 
 fn test_calc_initial_buffer_size_int32() raises:
@@ -402,15 +391,10 @@ fn test_rfind() raises:
 
 fn test_split() raises:
     # Reject empty delimiters
-    with assert_raises(contains="empty delimiter not allowed to be passed to split."):
+    with assert_raises(
+        contains="empty delimiter not allowed to be passed to split."
+    ):
         _ = String("hello").split("")
-    try:
-        _ = String("hello").split("")
-        raise Error("failed to reject empty delimiter")
-    except e:
-        assert_equal(
-            "empty delimiter not allowed to be passed to split.", str(e)
-        )
 
     # Split in middle
     var d1 = String("n")
