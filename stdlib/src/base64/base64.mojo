@@ -22,8 +22,6 @@ from base64 import b64encode
 from collections import List
 from sys.info import simdwidthof
 
-from memory.unsafe import DTypePointer
-
 # ===----------------------------------------------------------------------===#
 # b64encode
 # ===----------------------------------------------------------------------===#

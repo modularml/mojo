@@ -80,7 +80,7 @@ struct Arc[T: Movable](CollectionElement):
     """
 
     alias _type = _ArcInner[T]
-    var _inner: Pointer[Self._type]
+    var _inner: UnsafePointer[Self._type]
 
     fn __init__(inout self, owned value: T):
         """Construct a new thread-safe, reference-counted smart pointer,
@@ -89,11 +89,11 @@ struct Arc[T: Movable](CollectionElement):
         Args:
             value: The value to manage.
         """
-        self._inner = Pointer[Self._type].alloc(1)
-        __get_address_as_uninit_lvalue(self._inner.address) = Self._type(value^)
+        self._inner = UnsafePointer[Self._type].alloc(1)
+        __get_address_as_uninit_lvalue(self._inner.value) = Self._type(value^)
         _ = self._inner[].increment()
 
-    fn __init__(inout self, *, owned inner: Pointer[Self._type]):
+    fn __init__(inout self, *, owned inner: UnsafePointer[Self._type]):
         """Copy an existing reference. Increment the refcount to the object."""
         _ = inner[].increment()
         self._inner = inner
@@ -117,7 +117,7 @@ struct Arc[T: Movable](CollectionElement):
         var rc = self._inner[].decrement()
         if rc < 1:
             # Call inner destructor, then free the memory
-            _ = __get_address_as_owned_value(self._inner.address)
+            _ = __get_address_as_owned_value(self._inner.value)
             self._inner.free()
 
     fn set(self, owned new_value: T):
@@ -175,7 +175,7 @@ struct Arc[T: Movable](CollectionElement):
             ),
         ]()
 
-        var ptr: Pointer[_ArcInner[T]] = self._inner
+        var ptr: UnsafePointer[_ArcInner[T]] = self._inner
 
         # Add a +1 to the ref count, since we're creating a new `Arc` instance
         # pointing at the same data.
