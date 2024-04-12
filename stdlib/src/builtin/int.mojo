@@ -32,8 +32,8 @@ trait Intable:
     """The `Intable` trait describes a type that can be converted to an Int.
 
     Any type that conforms to `Intable` or
-    [`IntableRaising`](/mojo/stdlib/builtin/int.html#intableraising) works with
-    the built-in [`int()`](/mojo/stdlib/builtin/int.html#int-1) function.
+    [`IntableRaising`](/mojo/stdlib/builtin/int/intableraising) works with
+    the built-in [`int()`](/mojo/stdlib/builtin/int/int-function) function.
 
     This trait requires the type to implement the `__int__()` method. For
     example:
@@ -60,7 +60,7 @@ trait Intable:
     ```
 
     **Note:** If the `__int__()` method can raise an error, use the
-    [`IntableRaising`](/mojo/stdlib/builtin/int.html#intableraising) trait
+    [`IntableRaising`](/mojo/stdlib/builtin/int/intableraising) trait
     instead.
     """
 
@@ -78,9 +78,9 @@ trait IntableRaising:
     The `IntableRaising` trait describes a type can be converted to an Int, but
     the conversion might raise an error.
 
-    Any type that conforms to [`Intable`](/mojo/stdlib/builtin/int.html#intable)
+    Any type that conforms to [`Intable`](/mojo/stdlib/builtin/int/intable)
     or `IntableRaising` works with the built-in
-    [`int()`](/mojo/stdlib/builtin/int.html#int-1) function.
+    [`int()`](/mojo/stdlib/builtin/int/int-function) function.
 
     This trait requires the type to implement the `__int__()` method, which can
     raise an error. For example:
