@@ -55,25 +55,16 @@ def test_file_read_bytes_multi():
     )
 
     var bytes1 = f.read_bytes(12)
-    assert_equal(len(bytes1), 12, "12 bytes")
-    # we add the null terminator
-    bytes1.append(0)
-    var string1 = String(bytes1)
-    assert_equal(len(string1), 12, "12 chars")
-    assert_equal(string1, String("Lorem ipsum "))
+    assert_equal(bytes1, "Lorem ipsum")
 
     var bytes2 = f.read_bytes(6)
-    assert_equal(len(bytes2), 6, "6 bytes")
-    # we add the null terminator
-    bytes2.append(0)
-    var string2 = String(bytes2)
-    assert_equal(len(string2), 6, "6 chars")
-    assert_equal(string2, "dolor ")
+    assert_equal(String(bytes2).strip(), "dolor")
 
     # Read where N is greater than the number of bytes in the file.
     var s: String = f.read(1e9)
 
     assert_equal(len(s), 936)
+
     assert_true(s.startswith("sit amet, consectetur adipiscing elit."))
 
     f.close()
