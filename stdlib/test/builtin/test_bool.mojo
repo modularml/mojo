@@ -23,8 +23,6 @@ def test_bool_cast_to_int():
     assert_equal(int(True), 1)
 
 
-def main():
-    test_bool_cast_to_int()
 def test_bool_none():
     var test = None
     assert_equal(bool(None), False)
@@ -32,4 +30,5 @@ def test_bool_none():
 
 
 def main():
+    test_bool_cast_to_int()
     test_bool_none()
