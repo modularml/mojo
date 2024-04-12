@@ -226,7 +226,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
 
     - Interpret those bytes as a SIMD vector.
     - Apply a vectorized hash: _v_ = 33 * _v_ + _bytes_as_simd_value_
-    - Call [`reduce_add()`](/mojo/stdlib/builtin/simd.html#reduce_add) on the
+    - Call [`reduce_add()`](/mojo/stdlib/builtin/simd/SIMD#reduce_add) on the
       final result to get a single hash value.
     - Use this value in fallback for the remaining suffix bytes
       with standard DJBX33A.
