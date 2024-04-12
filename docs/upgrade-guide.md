@@ -64,7 +64,7 @@ vectorize[$3, $1, $2]
 
 ### `DynamicVector` constructor  `capacity` now keyword-only
 
-The [`DynamicVector`](/mojo/stdlib/collections/list#list) struct had
+The [`DynamicVector`](/mojo/stdlib/collections/list/List) struct had
 a constructor that took a single integer value for the vector's capacity. This
 had the effect of allowing an implicit conversion from `Int` to `DynamicVector`.
 This was not intended to support implicit conversion, so `capacity` is now a
@@ -82,7 +82,7 @@ Which in VS Code looks like this:
 ### `NDBuffer` signature change
 
 The shape of an
-[`NDBuffer`](/mojo/stdlib/buffer/buffer#ndbuffer) can
+[`NDBuffer`](/mojo/stdlib/buffer/buffer/NDBuffer) can
 now default to being unknown, so the parameter list has been rearranged to
 accommodate this:
 
@@ -113,7 +113,7 @@ NDBuffer[$3, $1, $2]
 
 ### Dereference `Variant` with `[]`
 
-Previously, using [`Variant`](/mojo/stdlib/utils/variant#variant)
+Previously, using [`Variant`](/mojo/stdlib/utils/variant/Variant)
 was unsafe with heap allocated objects, it now
 returns a reference. If you had code that looks like this:
 
