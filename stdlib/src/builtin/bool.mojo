@@ -260,3 +260,16 @@ struct Bool(
                 self.value
             )
         )
+
+
+@always_inline
+fn bool(value: None) -> Bool:
+    """Get the bool representation of the `None` type.
+
+    Args:
+        value: The object to get the bool representation of.
+
+    Returns:
+        The bool representation of the object.
+    """
+    return False
