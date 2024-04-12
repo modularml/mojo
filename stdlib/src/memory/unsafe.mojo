@@ -1641,8 +1641,8 @@ struct DTypePointer[
             "alignment must be 0 or a power of two integer value",
         ]()
 
-        var pointer = offset.cast[DType.index]().fma(sizeof[type](), int(self))
-        return gather(pointer.cast[DType.address](), mask, default, alignment)
+        var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
+        return gather(base.cast[DType.address](), mask, default, alignment)
 
     @always_inline("nodebug")
     fn scatter[
@@ -1730,8 +1730,8 @@ struct DTypePointer[
             "alignment must be 0 or a power of two integer value",
         ]()
 
-        var pointer = offset.cast[DType.index]().fma(sizeof[type](), int(self))
-        scatter(val, pointer.cast[DType.address](), mask, alignment)
+        var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
+        scatter(val, base.cast[DType.address](), mask, alignment)
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
