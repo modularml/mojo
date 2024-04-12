@@ -1299,7 +1299,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   [#1587](https://github.com/modularml/mojo/issues/1587), the
   `polynomial_evaluate` function has also been extended so that the
   `coefficients` parameter can take either a either a
-  [`StaticTuple`](/mojo/stdlib/utils/static_tuple/statictuple) or a
+  [`StaticTuple`](/mojo/stdlib/utils/static_tuple/StaticTuple) or a
   [`VariadicList`](/mojo/stdlib/builtin/builtin_list/VariadicList).
 
 - As a tiny step towards removing `let` declarations, this release removes the
@@ -1680,7 +1680,7 @@ the previous "read to EOF" behavior when size is negative.
       data2 = f.read_bytes(256)
   ```
 
-- [`Path`](/mojo/stdlib/pathlib/path/path) now has `read_bytes()` and
+- [`Path`](/mojo/stdlib/pathlib/path/Path) now has `read_bytes()` and
   `read_text()` methods to read file contents from a path:
 
   ```mojo
@@ -1722,7 +1722,7 @@ the previous "read to EOF" behavior when size is negative.
 - `String` now has an [`split()`](/mojo/stdlib/builtin/string/String#split)
   method analogous to Python's `str.split()`.
 
-- [`Path`](/mojo/stdlib/pathlib/path/path) now has a
+- [`Path`](/mojo/stdlib/pathlib/path/Path) now has a
   [`suffix()`](/mojo/stdlib/pathlib/path/Path#suffix) method analogous to
   Python's `pathlib.Path.suffix`.
 
@@ -1754,7 +1754,7 @@ the previous "read to EOF" behavior when size is negative.
 
 - Variadic list types
   [`VariadicList`](/mojo/stdlib/builtin/builtin_list/VariadicList) and
-  [`VariadicListMem`](/mojo/stdlib/builtin/builtin_list/VariadicListmem)
+  [`VariadicListMem`](/mojo/stdlib/builtin/builtin_list/VariadicListMem)
   are now iterable. Variadic arguments are automatically projected into one of
   these types inside the function body, so var args can be iterated:
 
@@ -1789,7 +1789,7 @@ the previous "read to EOF" behavior when size is negative.
   ```
 
 - The `to_string()` function has been removed from
-  [`PythonObject`](/mojo/stdlib/python/object/pythonobject) in favor of
+  [`PythonObject`](/mojo/stdlib/python/object/PythonObject) in favor of
   the new `__str__()` function.  This composes better with traits so it can be
   used with the generic `str()` function.
 
@@ -2037,7 +2037,7 @@ the previous "read to EOF" behavior when size is negative.
 ### 🦋 Changed
 
 - [`VariadicList`](/mojo/stdlib/builtin/builtin_list/VariadicList) and
-  [`VariadicListMem`](/mojo/stdlib/builtin/builtin_list/VariadicListmem)
+  [`VariadicListMem`](/mojo/stdlib/builtin/builtin_list/VariadicListMem)
   moved under builtins, and no longer need to be imported.
 
 - Variadic arguments are now automatically projected into a `VariadicList` or
