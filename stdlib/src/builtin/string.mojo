@@ -150,9 +150,8 @@ fn chr(c: Int) -> String:
 # ===----------------------------------------------------------------------===#
 
 
-# TODO: this is hard coded for decimal base
 @always_inline
-fn _atol(str_ref: StringRef) raises -> Int:
+fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     """Parses the given string as a base-10 integer and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
@@ -161,12 +160,18 @@ fn _atol(str_ref: StringRef) raises -> Int:
 
     Args:
         str_ref: A string to be parsed as a base-10 integer.
+        base: Base used for conversion, value must be between 2 and 36.
 
     Returns:
         An integer value that represents the string, or otherwise raises.
     """
     if not str_ref:
         raise Error("Empty String cannot be converted to integer.")
+    if base < 2 or base > 36:
+        raise Error("Base must be between 2 and 36 included.")
+
+    var ord_num_max: Int
+    var ord_letter_max = (-1, -1)
     var result = 0
     var is_negative: Bool = False
     var start: Int = 0
@@ -184,20 +189,34 @@ fn _atol(str_ref: StringRef) raises -> Int:
         break
 
     alias ord_0 = ord("0")
-    alias ord_9 = ord("9")
+    alias ord_letter_min = (ord("a"), ord("A"))
+    if base <= 10:
+        ord_num_max = ord(str(base - 1))
+    else:
+        ord_num_max = ord("9")
+        ord_letter_max = (ord("a") + (base - 11), ord("A") + (base - 11))
+
     var has_space_after_number = False
     for pos in range(start, str_len):
-        var digit = int(buff[pos])
-        if ord_0 <= digit <= ord_9:
-            result += digit - ord_0
-        elif isspace(digit):
+        var ord_current = int(buff[pos])
+        if ord_0 <= ord_current <= ord_num_max:
+            result += ord_current - ord_0
+        elif ord_letter_min.get[0]() <= ord_current <= ord_letter_max.get[0]():
+            result += ord_current - ord_letter_min.get[0]() + 10
+        elif ord_letter_min.get[1]() <= ord_current <= ord_letter_max.get[1]():
+            result += ord_current - ord_letter_min.get[1]() + 10
+        elif isspace(ord_current):
             has_space_after_number = True
             start = pos + 1
             break
         else:
-            raise Error("String is not convertible to integer.")
+            raise Error(
+                "String is not convertible to integer with base "
+                + str(base)
+                + "."
+            )
         if pos + 1 < str_len and not isspace(buff[pos + 1]):
-            var nextresult = result * 10
+            var nextresult = result * base
             if nextresult < result:
                 raise Error(
                     "String expresses an integer too large to store in Int."
@@ -212,7 +231,7 @@ fn _atol(str_ref: StringRef) raises -> Int:
     return result
 
 
-fn atol(str: String) raises -> Int:
+fn atol(str: String, base: Int = 10) raises -> Int:
     """Parses the given string as a base-10 integer and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
@@ -221,11 +240,12 @@ fn atol(str: String) raises -> Int:
 
     Args:
         str: A string to be parsed as a base-10 integer.
+        base: Base used for conversion, value must be between 2 and 36.
 
     Returns:
         An integer value that represents the string, or otherwise raises.
     """
-    return _atol(str._strref_dangerous())
+    return _atol(str._strref_dangerous(), base)
 
 
 # ===----------------------------------------------------------------------===#

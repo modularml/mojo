@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 
 from builtin.hash import _hash_simd
-from builtin.string import _calc_initial_buffer_size
+from builtin.string import _calc_initial_buffer_size, atol
 from builtin.io import _snprintf
 from builtin.hex import _try_write_int
 
@@ -162,6 +162,22 @@ fn int[T: IntableRaising](value: T) raises -> Int:
         If the type does not have an integral representation.
     """
     return value.__int__()
+
+
+fn int(value: String, base: Int = 10) raises -> Int:
+    """Get the Int representation of the string.
+
+    Args:
+        value: The string to get the integral representation of.
+        base: Base used for conversion, value must be between 2 and 36.
+
+    Returns:
+        The integral representation of the value.
+
+    Raises:
+        If the type does not have an integral representation.
+    """
+    return atol(value, base)
 
 
 # ===----------------------------------------------------------------------=== #

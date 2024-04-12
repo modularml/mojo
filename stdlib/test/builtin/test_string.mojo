@@ -223,6 +223,7 @@ fn test_string_indexing() raises:
 
 
 fn test_atol() raises:
+    # base 10
     assert_equal(375, atol(String("375")))
     assert_equal(1, atol(String("001")))
     assert_equal(5, atol(String(" 005")))
@@ -231,18 +232,34 @@ fn test_atol() raises:
     assert_equal(-52, atol(String(" -52")))
     assert_equal(-69, atol(String(" -69  ")))
 
+    # other bases
+    assert_equal(10, atol("A", 16))
+    assert_equal(15, atol("f ", 16))
+    assert_equal(255, atol(" FF", 16))
+    assert_equal(18, atol("10010", 2))
+    assert_equal(35, atol("Z", 36))
+
     # Negative cases
     try:
         _ = atol(String("9.03"))
         raise Error("Failed to raise when converting string to integer.")
     except e:
-        assert_equal(str(e), "String is not convertible to integer.")
+        assert_equal(str(e), "String is not convertible to integer with base 10.")
 
     try:
         _ = atol(String(" 10 1"))
         raise Error("Failed to raise when converting string to integer.")
     except e:
         assert_equal(str(e), "String is not convertible to integer.")
+
+    with assert_raises(contains="String is not convertible to integer with base 5."):
+        _ = atol("5", 5)
+
+    with assert_raises(contains="Base must be between 2 and 36 included."):
+        _ = atol("0", 1)
+
+    with assert_raises(contains="Base must be between 2 and 36 included."):
+        _ = atol("0", 37)
 
     try:
         _ = atol(String(""))
@@ -385,6 +402,8 @@ fn test_rfind() raises:
 
 fn test_split() raises:
     # Reject empty delimiters
+    with assert_raises(contains="empty delimiter not allowed to be passed to split."):
+        _ = String("hello").split("")
     try:
         _ = String("hello").split("")
         raise Error("failed to reject empty delimiter")
@@ -606,6 +625,7 @@ def test_removesuffix():
 
 def test_intable():
     assert_equal(int(String("123")), 123)
+    assert_equal(int(String("10"), base=8), 8)
 
     with assert_raises():
         _ = int(String("hi"))
