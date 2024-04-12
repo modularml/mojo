@@ -107,7 +107,9 @@ struct Bool(
         Returns:
             The underlying value for the Bool.
         """
-        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i1](self.value)
+        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i1](
+            self.value
+        )
 
     fn __str__(self) -> String:
         """Get the bool as a string.
@@ -258,6 +260,7 @@ struct Bool(
                 self.value
             )
         )
+
 
 @always_inline
 fn bool(value: None) -> Bool:
