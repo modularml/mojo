@@ -159,7 +159,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         # mutability of self.
         var storage_kgen_ptr = Reference(
             Reference(self_lit)[].storage
-        ).get_unsafe_pointer().address
+        ).get_legacy_pointer().address
 
         # Pointer to the element.
         var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](

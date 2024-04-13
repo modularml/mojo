@@ -263,7 +263,7 @@ struct Reference[
     # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
     # disagreement.  Use UnsafePointer instead!
     @always_inline("nodebug")
-    fn get_unsafe_pointer(self) -> Pointer[type, address_space]:
+    fn get_legacy_pointer(self) -> Pointer[type, address_space]:
         """Constructs a Pointer from a safe reference.
 
         Returns:
@@ -273,6 +273,15 @@ struct Reference[
         return __mlir_op.`pop.pointer.bitcast`[
             _type = Pointer[type, address_space].pointer_type
         ](UnsafePointer(self).value)
+
+    @always_inline("nodebug")
+    fn get_unsafe_pointer(self) -> UnsafePointer[type, address_space]:
+        """Constructs a UnsafePointer from a safe reference.
+
+        Returns:
+            Constructed UnsafePointer object.
+        """
+        return UnsafePointer(self).value
 
     @always_inline("nodebug")
     fn bitcast_element[
