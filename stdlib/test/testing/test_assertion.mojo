@@ -43,6 +43,14 @@ def test_assert_not_equal_is_generic():
         assert_not_equal(DummyStruct(1), DummyStruct(1))
 
 
+def test_assert_equal_with_simd():
+    assert_equal(SIMD[DType.uint8, 2](1, 1), SIMD[DType.uint8, 2](1, 1))
+    
+    with assert_raises():
+        assert_equal(SIMD[DType.uint8, 2](1, 1), SIMD[DType.uint8, 2](1, 2))
+
+
 def main():
     test_assert_equal_is_generic()
     test_assert_not_equal_is_generic()
+    test_assert_equal_with_simd()
