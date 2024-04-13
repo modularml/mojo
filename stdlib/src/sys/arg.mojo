@@ -36,6 +36,6 @@ fn argv() -> VariadicList[StringRef]:
     """
     var result = VariadicList[StringRef]("")
     external_call["KGEN_CompilerRT_GetArgV", NoneType](
-        Reference(result).get_unsafe_pointer()
+        UnsafePointer(Reference(result))
     )
     return result
