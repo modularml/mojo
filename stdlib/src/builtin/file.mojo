@@ -186,7 +186,7 @@ struct FileHandle:
 
         if err_msg:
             raise (err_msg^).consume_as_error()
-
+        # No-copy list initialization
         var list = List[Int8](buf, int(size_copy), int(size_copy))
 
         return list
