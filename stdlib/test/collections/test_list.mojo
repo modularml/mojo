@@ -355,31 +355,32 @@ def test_list_index():
     assert_equal(test_list_a.index(10), 0)  # Verify finding the first element's index.
     assert_equal(test_list_a.index(30), 2)  # Verify finding the index of a middle element.
     assert_equal(test_list_a.index(50), 4)  # Verify finding the last element's index.
-    with assert_raises():  # Verify error for a non-existent element.
+    with assert_raises(contains="Value does not exist in the list."):  # Verify error for a non-existent element.
         _ = test_list_a.index(60)
 
     # Tests With Start Parameter
     assert_equal(test_list_a.index(30, start=1), 2)  # Verify search beginning from a specific start index.
     assert_equal(test_list_a.index(30, start=-4), 2)  # Verify element search with a negative start index.
-    with assert_raises():  # Verify error when start is after element's index.
+    with assert_raises(contains="Value does not exist in the list."):  # Verify error when start is after element's index.
         _ = test_list_a.index(30, start=3)
 
     # Tests With Start and End Parameters
     assert_equal(test_list_a.index(30, start=1, end=3), 2)  # Verify finding an element within a specified range.
     assert_equal(test_list_a.index(30, start=-4, end=-2), 2)  # Verify search with negative start and end indices.
-    with assert_raises():  # Verify error when element is outside the range.
+    with assert_raises(contains="Value does not exist in the list."):  # Verify error when element is outside the range.
         _ = test_list_a.index(30, start=1, end=2)
-    with assert_raises():  # Verify error with an invalid range (start > end).
+    with assert_raises(contains="Value does not exist in the list."):  # Verify error with an invalid range (start > end).
         _ = test_list_a.index(30, start=3, end=1)
 
     # Edge Cases and Special Conditions
     assert_equal(test_list_a.index(10, start=-5, end=-1), 0)  # Verify search covers the entire list with negative indices.
-    with assert_raises():  # Verify error when last element is excluded by end index.
+    assert_equal(test_list_a.index(10, start=0, end=50), 0)  # Verify acceptable out-of-range end value.
+    with assert_raises(contains="Value does not exist in the list."):  # Verify error when last element is excluded by end index.
         _ = test_list_a.index(50, start=-5, end=-1)
-    with assert_raises():  # Verify error when search excludes the last item with -1 as end index.
+    with assert_raises(contains="Value does not exist in the list."):  # Verify error when search excludes the last item with -1 as end index.
         _ = test_list_a.index(50, start=0, end=-1)
-    with assert_raises():  # Verify error when element is not within the negative indexed range.
-        _ = test_list_a.index(10, start=-4, end=-1) 
+    with assert_raises(contains="Value does not exist in the list."):  # Verify error when element is not within the negative indexed range.
+        _ = test_list_a.index(10, start=-4, end=-1)
 
 
     var test_list_b = List[Int](10, 20, 30, 20, 10)
@@ -392,14 +393,14 @@ def test_list_index():
     assert_equal(test_list_b.index(20, start=2), 3)  # Skip first '20', find second.
 
     # Test constraining search with start and end, excluding last occurrence
-    with assert_raises():  # '10' at end is excluded, expecting an error.
+    with assert_raises(contains="Value does not exist in the list."):  # '10' at end is excluded, expecting an error.
         _ = test_list_b.index(10, start=1, end=4)
 
     # Test search within a range that includes multiple occurrences
     assert_equal(test_list_b.index(20, start=1, end=4), 1)  # Range includes two '20's, finds first in range.
 
     # Verify error when constrained range excludes occurrences
-    with assert_raises():  # No '20' in the given range.
+    with assert_raises(contains="Value does not exist in the list."):  # No '20' in the given range.
         _ = test_list_b.index(20, start=4, end=5)
 
 
