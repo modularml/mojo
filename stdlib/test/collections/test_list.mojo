@@ -363,6 +363,8 @@ def test_list_index():
     assert_equal(test_list_a.index(30, start=-4), 2)  # Verify element search with a negative start index.
     with assert_raises(contains="Value does not exist in the list."):  # Verify error when start is after element's index.
         _ = test_list_a.index(30, start=3)
+    with assert_raises(contains="Given 'start' parameter (5) is out of range. List only have 5 elements."):  # Verify error when start is out of range.
+        _ = test_list_a.index(30, start=5)
 
     # Tests With Start and End Parameters
     assert_equal(test_list_a.index(30, start=1, end=3), 2)  # Verify finding an element within a specified range.
@@ -381,6 +383,12 @@ def test_list_index():
         _ = test_list_a.index(50, start=0, end=-1)
     with assert_raises(contains="Value does not exist in the list."):  # Verify error when element is not within the negative indexed range.
         _ = test_list_a.index(10, start=-4, end=-1)
+    with assert_raises(contains="Given 'start' parameter (5) is out of range. List only have 5 elements."):  # Verify error when start value is out-of-range.
+        _ = test_list_a.index(10, start=5, end=50)
+    
+    # Verify error when list is empty.
+    with assert_raises(contains="Cannot find index of a value in an empty list."):
+        _ = List[Int]().index(10)
 
 
     var test_list_b = List[Int](10, 20, 30, 20, 10)
