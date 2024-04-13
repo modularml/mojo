@@ -338,7 +338,7 @@ struct LegacyPointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(inout arg: type) -> Self:
+    fn address_of(arg: Reference[type, _, _, address_space]) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -347,9 +347,7 @@ struct LegacyPointer[
         Returns:
             A LegacyPointer struct which contains the address of the argument.
         """
-        return __mlir_op.`pop.pointer.bitcast`[_type = Self.pointer_type](
-            __get_lvalue_as_address(arg)
-        )
+        return arg.get_legacy_pointer()
 
     @always_inline("nodebug")
     fn __getitem__[T: Intable](self, offset: T) -> type:
@@ -776,7 +774,7 @@ struct DTypePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(inout arg: Scalar[type]) -> Self:
+    fn address_of(arg: Reference[Scalar[type], _, _, address_space]) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -785,7 +783,7 @@ struct DTypePointer[
         Returns:
             A DTypePointer struct which contains the address of the argument.
         """
-        return Self.pointer_type.address_of(arg)
+        return arg.get_legacy_pointer()
 
     @always_inline("nodebug")
     fn __getitem__[T: Intable](self, offset: T) -> Scalar[type]:
