@@ -418,13 +418,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @always_inline
     fn index(self, owned value: T, start: Int = 0) raises -> Int:
-        """Returns the index of the first occurrence of a value in a list; raises ValueError if not found."""
+        """Returns the index of the first occurrence of a value in a list; raises Error if not found."""
         var normalized_start = self.size + start if start < 0 else start
         var normalized_end = self.size
-    
-        if normalized_start >= self.size: raise "Given 'start' parameter is out of range"
-    
-        var ret_val: Int = -1
+
+        if not self.size: raise "Cannot find index of a value in an empty list."
+        if normalized_start >= self.size: raise "Given 'start' parameter (" + String(normalized_start) + ") is out of range. List only has " + String(self.size) + " elements."
+
+        var ret_val: Int
         for i in range(normalized_start, normalized_end):
             # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
             # could degrade the performance of the List.index method if it were to replace the current implementation,
@@ -433,26 +434,19 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 ret_val = i
                 break
         else:
-            pass
-            # TODO: Currently, attempting to raise a message, leads to a compiler error (#issue2188)
-            # TODO: Once this issue is resolved, the commented-out code below should be uncommented.
-            # TODO: And then the if statement below should get removed completely.
-            # Code:
-            # raise "Value does not exist in list"
-        if ret_val == -1:
-            raise "Value does not exist in list"
+            raise "Value does not exist in the list."
         return ret_val
 
     @always_inline
     fn index(self, owned value: T, start: Int, end: Int) raises -> Int:
-        """Returns the index of the first occurrence of a value in a list; raises ValueError if not found."""
+        """Returns the index of the first occurrence of a value in a list; raises Error if not found."""
         var normalized_start = (self.size + start) if start < 0 else start
-        var normalized_end = (self.size + end) if end < 0 else end
-    
-        if normalized_end > self.size: raise "Given 'end' parameter is out of range"
-        if normalized_start >= self.size: raise "Given 'start' parameter is out of range"
-    
-        var ret_val: Int = -1
+        var normalized_end = (self.size + end) if end < 0 else (self.size if end > self.size else end)
+
+        if not self.size: raise "Cannot find index of a value in an empty list."
+        if normalized_start >= self.size: raise "Given 'start' parameter (" + String(normalized_start) + ") is out of range. List only has " + String(self.size) + " elements."
+
+        var ret_val: Int
         for i in range(normalized_start, normalized_end):
             # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
             # could degrade the performance of the List.index method if it were to replace the current implementation,
@@ -461,14 +455,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 ret_val = i
                 break
         else:
-            pass
-            # TODO: Currently, attempting to raise a message, leads to a compiler error (#issue2188)
-            # TODO: Once this issue is resolved, the commented-out code below should be uncommented.
-            # TODO: And then the if statement below should get removed completely.
-            # Code:
-            # raise "Value does not exist in list"
-        if ret_val == -1:
-            raise "Value does not exist in list"
+            raise "Value does not exist in the list."
         return ret_val
 
     fn clear(inout self):
