@@ -97,6 +97,70 @@ fn _create_array[
         return array
 
 
+@always_inline
+fn _set_array_elem_mem[
+    index: Int,
+    size: Int,
+    type: CollectionElement,
+](
+    val: type,
+    array: Reference[
+        __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+        __mlir_attr.`1 : i1`,
+        _,
+    ],
+):
+    """Sets the array element at position `index` with the value `val`.
+
+    Parameters:
+        index: the position to replace the value at.
+        size: the size of the array.
+        type: the element type of the array
+
+    Args:
+        val: the value to set.
+        array: the array which is captured by reference.
+    """
+    var ptr = __mlir_op.`pop.array.gep`(
+        array.get_legacy_pointer().address, index.value
+    )
+    var p = UnsafePointer(ptr)
+    initialize_pointee(p, val)
+
+
+@always_inline
+fn _create_array_mem[
+    size: Int, type: CollectionElement
+](lst: VariadicList[type]) -> __mlir_type[
+    `!pop.array<`, size.value, `, `, type, `>`
+]:
+    """Sets the array element at position `index` with the value `val`.
+
+    Parameters:
+        size: the size of the array.
+        type: the element type of the array
+
+    Args:
+        lst: the list of values to set.
+
+    Returns:
+        The array with values filled from the input list.
+    """
+    debug_assert(size == len(lst), "mismatch in the number of elements")
+
+    var array = __mlir_op.`kgen.undef`[
+        _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
+    ]()
+
+    @always_inline
+    @parameter
+    fn fill[idx: Int]():
+        _set_array_elem_mem[idx, size, type](lst[idx], array)
+
+    unroll[fill, size]()
+    return array
+
+
 # ===----------------------------------------------------------------------===#
 # StaticTuple
 # ===----------------------------------------------------------------------===#
@@ -240,3 +304,89 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
         )
         Pointer(ptr).store(val)
         self = tmp
+
+
+@value
+struct Array[ElementType: CollectionElement, size: Int](Sized):
+    """A statically sized array type which contains elements of homogeneous types.
+
+    Parameters:
+        ElementType: The type of the elements in the array.
+        size: The size of the array.
+    """
+
+    alias type = __mlir_type[
+        `!pop.array<`, size.value, `, `, Self.ElementType, `>`
+    ]
+    var array: Self.type
+    """The underlying storage for the array."""
+
+    @always_inline
+    fn __init__(inout self):
+        """Constructs an empty (undefined) array."""
+        _static_tuple_construction_checks[size]()
+        self.array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
+    fn __init__(inout self, *elems: Self.ElementType):
+        """Constructs an array given a set of arguments.
+
+        Args:
+            elems: The element types.
+        """
+        self = Self()
+        var i = 0
+        for elem in elems:
+            var ptr = __mlir_op.`pop.array.gep`(
+                Reference(Reference(self)[].array).get_legacy_pointer().address,
+                i.value,
+            )
+            initialize_pointee(UnsafePointer[Self.ElementType](ptr), elem[])
+            i += 1
+
+    @always_inline
+    fn __init__(inout self, values: VariadicList[Self.ElementType]):
+        """Creates an array constant using the specified values.
+
+        Args:
+            values: The list of values.
+        """
+        _static_tuple_construction_checks[size]()
+        self.array = _create_array_mem[size, Self.ElementType](values)
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        """Returns the length of the array. This is a known constant value.
+
+        Returns:
+            The size of the list.
+        """
+        return size
+
+    fn __refitem__[
+        mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life]._mlir_type, index: Int
+    ) -> Reference[Self.ElementType, mutability, self_life]:
+        var ptr = __mlir_op.`pop.array.gep`(
+            Reference(Reference(self)[].array).get_legacy_pointer().address,
+            index.value,
+        )
+        return Reference[Self.ElementType, mutability, self_life](
+            UnsafePointer(ptr)[]
+        )
+
+    fn __refitem__[
+        mutability: __mlir_type.i1,
+        self_life: AnyLifetime[mutability].type,
+        index: Int,
+    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
+        Self.ElementType, mutability, self_life
+    ]:
+        var ptr = __mlir_op.`pop.array.gep`(
+            Reference(Reference(self)[].array).get_legacy_pointer().address,
+            index.value,
+        )
+        return Reference[Self.ElementType, mutability, self_life](
+            UnsafePointer(ptr)[]
+        )

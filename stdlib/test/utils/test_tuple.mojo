@@ -15,6 +15,7 @@
 from testing import assert_equal, assert_false, assert_true
 
 from utils import StaticTuple, StaticIntTuple
+from utils.static_tuple import Array
 
 
 def test_static_tuple():
@@ -80,7 +81,64 @@ def test_tuple_literal():
     assert_equal(len(()), 0)
 
 
+def test_array_int():
+    var arr = Array[Int, 3](0, 0, 0)
+    for i in range(len(arr)):
+        print(arr[i])
+
+    assert_equal(arr[0], 0)
+    assert_equal(arr[1], 0)
+    assert_equal(arr[2], 0)
+
+    arr[0] = 1
+    arr[1] = 2
+    arr[2] = 3
+
+    assert_equal(arr[0], 1)
+    assert_equal(arr[1], 2)
+    assert_equal(arr[2], 3)
+
+    var copy = arr
+    assert_equal(arr[0], copy[0])
+    assert_equal(arr[1], copy[1])
+    assert_equal(arr[2], copy[2])
+
+    var move = arr^
+    assert_equal(copy[0], move[0])
+    assert_equal(copy[1], move[1])
+    assert_equal(copy[2], move[2])
+
+
+def test_array_str():
+    var arr = Array[String, 3]("hi", "hello", "hey")
+
+    assert_equal(arr[0], "hi")
+    assert_equal(arr[1], "hello")
+    assert_equal(arr[2], "hey")
+
+    # Test mutating a tuple through its __setitem__
+    arr[0] = "howdy"
+    arr[1] = "morning"
+    arr[2] = "wazzup"
+
+    assert_equal(arr[0], "howdy")
+    assert_equal(arr[1], "morning")
+    assert_equal(arr[2], "wazzup")
+
+    var copy = arr
+    assert_equal(arr[0], copy[0])
+    assert_equal(arr[1], copy[1])
+    assert_equal(arr[2], copy[2])
+
+    var move = arr^
+    assert_equal(copy[0], move[0])
+    assert_equal(copy[1], move[1])
+    assert_equal(copy[2], move[2])
+
+
 def main():
     test_static_tuple()
     test_static_int_tuple()
     test_tuple_literal()
+    test_array_int()
+    test_array_str()
