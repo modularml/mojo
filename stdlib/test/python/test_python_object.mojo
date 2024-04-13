@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo %s | FileCheck %s
+# RUN: %mojo %s
 
 from memory.unsafe import Pointer
 from python._cpython import CPython, PyObjectPtr
@@ -325,9 +325,7 @@ def test_len():
     assert_equal(len(l2), 2)
 
 
-# CHECK-LABEL: test_is
 def test_is():
-    print("=== test_is ===")
     var x = PythonObject(500)
     var y = PythonObject(500)
     assert_false(x is y)
@@ -347,37 +345,36 @@ def test_is():
     assert_true(l1 is not l2)
 
 
-# CHECK-LABEL: test_iter
 fn test_iter() raises:
-    print("=== test_iter ===")
-
     var list_obj: PythonObject = ["apple", "orange", "banana"]
-    # CHECK: I like to eat apple
-    # CHECK: I like to eat orange
-    # CHECK: I like to eat banana
+    var i = 0
     for fruit in list_obj:
-        print("I like to eat", fruit)
+        if i == 0:
+            assert_equal(fruit, "apple")
+        elif i == 1:
+            assert_equal(fruit, "orange")
+        elif i == 2:
+            assert_equal(fruit, "banana")
+        i += 1
 
     var list2: PythonObject = []
-    # CHECK-NOT: I have eaten
     for fruit in list2:
-        print("I have eaten", fruit)
+        raise Error("This should not be reachable as the list is empty.")
 
     var not_iterable: PythonObject = 3
     with assert_raises():
         for x in not_iterable:
-            # CHECK-NOT: I should not exist
-            print("I should not exist", x)
-            assert_false(True)
+            assert_false(
+                True,
+                "This should not be reachable as the object is not iterable.",
+            )
 
 
 fn test_setitem() raises:
     var ll = PythonObject([1, 2, 3, "food"])
-    # CHECK: [1, 2, 3, 'food']
-    print(ll)
+    assert_equal(str(ll), "[1, 2, 3, 'food']")
     ll[1] = "nomnomnom"
-    # CHECK: [1, 'nomnomnom', 3, 'food']
-    print(ll)
+    assert_equal(str(ll), "[1, 'nomnomnom', 3, 'food']")
 
 
 fn test_dict() raises:
@@ -387,24 +384,20 @@ fn test_dict() raises:
     d["food"] = 123  # intentionally replace to ensure keys stay in order
 
     var dd = PythonObject(d)
-    # CHECK: {'food': 123, 'fries': 'yes'}
-    print(dd)
+    assert_equal(str(dd), "{'food': 123, 'fries': 'yes'}")
 
     dd["food"] = "salad"
     dd[42] = Python.evaluate("[4, 2]")
-    # CHECK: {'food': 'salad', 'fries': 'yes', 42: [4, 2]}
-    print(dd)
+    assert_equal(str(dd), "{'food': 'salad', 'fries': 'yes', 42: [4, 2]}")
 
     # Also test that Python.dict() creates the right object.
     var empty = Python.dict()
-    # CHECK: empty: {}
-    print("empty:", empty)
+    assert_equal(str(empty), "{}")
 
 
 fn test_none() raises:
     var n = Python.none()
-    # CHECK: None from Python: None
-    print("None from Python: ", n)
+    assert_equal(str(n), "None")
     assert_true(n is None)
 
 
