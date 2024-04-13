@@ -73,11 +73,6 @@ what we publish.
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
 
-- `Reference` interoperates with unsafe code better: `AnyPointer` now has a
-  constructor that forms it from `Reference` directly (inferring element type
-  and address space). `AnyPointer` can convert to an immortal mutable
-  `Reference` with `yourptr[]`.
-
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
   initialization status of the underlying value.  This is useful in very
@@ -99,25 +94,25 @@ what we publish.
   lead to a crash.  You can work around this by initializing to a dummy value
   and overwriting later.  This limitation only applies to top level variables,
   variables in functions work as they always have.
-- The `AnyPointer` type has several changes, including:
-  1) The element type can now be `AnyType`, it doesn't require `Movable`.
+- `AnyPointer` got renamed to `UnsafePointer` and is now Mojo's preferred unsafe
+  pointer type.  It has several enhancements, including:
+  1) The element type can now be `AnyType`: it doesn't require `Movable`.
   2) Because of this, the `take_value`, `emplace_value`, and `move_into` methods
      have been changed to be top-level functions, and were renamed to
      `move_from_pointee`, `initialize_pointee` and `move_pointee` respectively.
   3) A new `destroy_pointee` function runs the destructor on the pointee.
-  4) `AnyPointer` can be initialized from a `Reference` as mentioned above.
-  5) It has some new methods like `address_space_bitcast`.
+  4) `UnsafePointer` can be initialized directly from a `Reference` with
+     `UnsafePointer(someRef)` and can convert to an immortal reference with
+     `yourPointer[]`.  Both infer element type and address space.
+- All of the pointers got a pass of cleanup to make them more consistent, for
+  example the `unsafe.bitcast` global function is now a consistent `bitcast`
+  method on the pointers, which can convert element type and address space.
 - The `Reference` type has several changes, including:
   1) It is now located in `memory.reference` instead of `memory.unsafe`.
-  2) `Reference` now has an unsafe `address_space_bitcast` method like `Pointer`.
-  3) The `destroy_element_unsafe` method has been removed, do this with
-    `AnyPointer/destroy_pointee`, which is more obviously unsafe.
-  4) The `emplace_ref_unsafe` function has been removed in favor of
-    `AnyPointer/initialize_pointee`.
-  5) The `offset` method has been removed, it was unsafe and belongs on
-    `AnyPointer`.
-- `AnyPointer` was renamed to `UnsafePointer`. This is part of our continuing
-  effort to unify our pointer types in the Standard Library.
+  2) `Reference` now has an unsafe `unsafe_bitcast` method like `UnsafePointer`.
+  3) Several unsafe methods were removed, including `offset`,
+     `destroy_element_unsafe` and `emplace_ref_unsafe`. This is because
+     `Reference` is a safe type - use `UnsafePointer` to do unsafe operations.
 
 - The `mojo package` command no longer supports the `-D` flag. All compilation
   environment flags should be provided at the point of package use
