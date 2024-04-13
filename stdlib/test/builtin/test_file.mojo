@@ -65,22 +65,16 @@ def test_file_read_bytes_multi():
         "r",
     )
 
-    # CHECK: Lorem ipsum
     var bytes1 = f.read_bytes(12)
     assert_equal(bytes1, "Lorem ipsum")
-    print(String(bytes1))
 
-    # CHECK: dolor
     var bytes2 = f.read_bytes(6)
     assert_equal(String(bytes2).strip(), "dolor")
-    print(String(bytes2))
 
     # Read where N is greater than the number of bytes in the file.
     var s: String = f.read(1e9)
 
-    # CHECK: 936
     assert_equal(len(s), 936)
-    print(len(s))
 
     # CHECK: sit amet, consectetur adipiscing elit.
     print(s)
