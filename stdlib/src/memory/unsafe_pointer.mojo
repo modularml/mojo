@@ -157,36 +157,23 @@ struct UnsafePointer[
 
     @always_inline("nodebug")
     fn bitcast[
-        new_type: AnyType, new_address_space: AddressSpace = address_space
-    ](self) -> UnsafePointer[new_type, new_address_space]:
+        new_type: AnyType = T,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> UnsafePointer[new_type, address_space]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
             new_type: The target type.
-            new_address_space: The address space of the result.
+            address_space: The address space of the result.
 
         Returns:
             A new UnsafePointer object with the specified type and the same address,
             as the original UnsafePointer.
         """
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[new_type, new_address_space]._mlir_type,
+            _type = UnsafePointer[new_type, address_space]._mlir_type,
         ](self.value)
-
-    @always_inline
-    fn address_space_bitcast[
-        new_address_space: AddressSpace
-    ](self) -> UnsafePointer[T, new_address_space]:
-        """Bitcasts the pointer to a different address space.
-
-        Parameters:
-            new_address_space: The address space of the result.
-
-        Returns:
-            A new pointer with the same type and address, but a new address
-            space.
-        """
-        return self.bitcast[T, new_address_space]()
 
     @always_inline
     fn __int__(self) -> Int:
