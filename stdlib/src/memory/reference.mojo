@@ -281,24 +281,30 @@ struct Reference[
         ](UnsafePointer(self).value)
 
     @always_inline("nodebug")
-    fn bitcast_element[
-        new_element_type: AnyType
-    ](self) -> Reference[new_element_type, is_mutable, lifetime, address_space]:
+    fn unsafe_bitcast[
+        new_element_type: AnyType,
+        new_address_space: AddressSpace = address_space,
+    ](self) -> Reference[
+        new_element_type, is_mutable, lifetime, new_address_space
+    ]:
         """Cast the reference to one of another element type, but the same
         lifetime, mutability, and address space.
 
         Parameters:
             new_element_type: The result type.
+            new_address_space: The address space of the result.
 
         Returns:
             The new reference.
         """
         # We don't have a `lit.ref.cast`` operation, so convert through a KGEN
         # pointer.
-        return UnsafePointer(self).bitcast_element[new_element_type]()[]
+        return UnsafePointer(self).bitcast[
+            new_element_type, new_address_space
+        ]()[]
 
     @always_inline
-    fn address_space_cast[
+    fn unsafe_address_space_bitcast[
         new_address_space: AddressSpace
     ](self) -> Reference[type, is_mutable, lifetime, new_address_space]:
         """Cast the reference to one of another address space, but the same
@@ -310,6 +316,4 @@ struct Reference[
         Returns:
             The new reference.
         """
-        # We don't have a `lit.ref.cast`` operation, so convert through a KGEN
-        # pointer.
-        return UnsafePointer(self).address_space_cast[new_address_space]()[]
+        return self.unsafe_bitcast[type, new_address_space]()
