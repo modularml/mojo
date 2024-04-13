@@ -238,7 +238,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
                 NoneType,
                 mutability,
                 self_life,
-            ](0, 0, Reference(self).bitcast_element[Dict[T, NoneType]]())
+            ](0, 0, Reference(self).unsafe_bitcast[Dict[T, NoneType]]())
         )
 
     fn add(inout self, t: T):
