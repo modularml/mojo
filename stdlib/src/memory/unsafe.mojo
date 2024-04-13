@@ -58,67 +58,6 @@ fn _is_power_of_2(val: Int) -> Bool:
 
 @always_inline("nodebug")
 fn bitcast[
-    type: AnyRegType, address_space: AddressSpace = AddressSpace.GENERIC
-](val: Int) -> Pointer[type, address_space]:
-    """Bitcasts an integer to a pointer.
-
-    Parameters:
-        type: The target type.
-        address_space: The address space the pointer is in.
-
-    Args:
-        val: The pointer address.
-
-    Returns:
-        A new Pointer with the specified address.
-    """
-    return __mlir_op.`pop.index_to_pointer`[
-        _type = Pointer[type, address_space]._mlir_type
-    ](Scalar[DType.index](val).value)
-
-
-@always_inline("nodebug")
-fn bitcast[
-    type: DType, address_space: AddressSpace = AddressSpace.GENERIC
-](val: Int) -> DTypePointer[type, address_space]:
-    """Bitcasts an integer to a pointer.
-
-    Parameters:
-        type: The target type.
-        address_space: The address space the pointer is in.
-
-    Args:
-        val: The pointer address.
-
-    Returns:
-        A new Pointer with the specified address.
-    """
-    return bitcast[Scalar[type], address_space](val)
-
-
-@always_inline("nodebug")
-fn bitcast[
-    new_type: AnyRegType, src_type: AnyRegType, address_space: AddressSpace
-](ptr: Pointer[src_type, address_space]) -> Pointer[new_type, address_space]:
-    """Bitcasts a Pointer to a different type.
-
-    Parameters:
-        new_type: The target type.
-        src_type: The source type.
-        address_space: The address space the pointer is in.
-
-    Args:
-        ptr: The source pointer.
-
-    Returns:
-        A new Pointer with the specified type and the same address, as the
-        original Pointer.
-    """
-    return ptr.bitcast[new_type]()
-
-
-@always_inline("nodebug")
-fn bitcast[
     new_type: DType, new_width: Int, src_type: DType, src_width: Int
 ](val: SIMD[src_type, src_width]) -> SIMD[new_type, new_width]:
     """Bitcasts a SIMD value to another SIMD value.
