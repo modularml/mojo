@@ -21,9 +21,7 @@ from testing import assert_false, assert_true, assert_equal
 
 
 # CHECK-LABEL: test_arch_query
-fn test_arch_query():
-    print("== test_arch_query")
-
+def test_arch_query():
     # CHECK: True
     assert_true(has_neon())
 
@@ -34,5 +32,5 @@ fn test_arch_query():
     assert_false(has_avx512f())
 
 
-fn main():
+def main():
     test_arch_query()
