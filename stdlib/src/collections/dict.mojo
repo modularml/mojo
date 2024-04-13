@@ -51,7 +51,6 @@ struct _DictEntryIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Iterator over immutable DictEntry references.
 
@@ -60,7 +59,6 @@ struct _DictEntryIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the dictionary is mutable.
         dict_lifetime: The lifetime of the List
-        address_space: the address_space of the list
     """
 
     alias imm_dict_lifetime = __mlir_attr[
@@ -103,7 +101,6 @@ struct _DictKeyIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Iterator over immutable Dict key references.
 
@@ -112,19 +109,14 @@ struct _DictKeyIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
-        address_space: The address space of the List
     """
 
     alias imm_dict_lifetime = __mlir_attr[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
-    alias ref_type = Reference[
-        K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime, address_space
-    ]
+    alias ref_type = Reference[K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime]
 
-    alias dict_entry_iter = _DictEntryIter[
-        K, V, dict_mutability, dict_lifetime, address_space
-    ]
+    alias dict_entry_iter = _DictEntryIter[K, V, dict_mutability, dict_lifetime]
 
     var iter: Self.dict_entry_iter
 
@@ -132,11 +124,7 @@ struct _DictKeyIter[
         return self
 
     fn __next__(inout self) -> Self.ref_type:
-        var entry_ref = self.iter.__next__()
-        var anyptr = UnsafePointer.address_of(entry_ref[].key)
-        return anyptr.bitcast[
-            address_space = Self.dict_entry_iter.address_space
-        ]()[]
+        return self.iter.__next__()[].key
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
@@ -148,7 +136,6 @@ struct _DictValueIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Iterator over Dict value references. These are mutable if the dict
     is mutable.
@@ -158,24 +145,19 @@ struct _DictValueIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
-        address_space: The address space of the List
     """
 
-    alias ref_type = Reference[V, dict_mutability, dict_lifetime, address_space]
+    alias ref_type = Reference[V, dict_mutability, dict_lifetime]
 
-    var iter: _DictEntryIter[
-        K, V, dict_mutability, dict_lifetime, address_space
-    ]
+    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
-        # Cast through a pointer to grant additional mutability and switch
-        # address spaces out.
-        var anyptr = UnsafePointer.address_of(entry_ref[].value)
-        return anyptr.bitcast[address_space=address_space]()[]
+        # Cast through a pointer to grant additional mutability.
+        return UnsafePointer.address_of(entry_ref[].value)[]
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
