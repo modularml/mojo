@@ -105,10 +105,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     ](self: Reference[Self, mutability, self_life].mlir_ref_type) -> Reference[
         T, mutability, self_life
     ]:
-        """Unsafely retrieve the value out of the Optional.
-
-        This function currently creates a copy. Once we have lifetimes
-        we'll be able to have it return a reference.
+        """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
         If you call this without first verifying the optional with __bool__()
@@ -116,12 +113,14 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
         Returns:
-            The contained data of the option as a T value.
+            A reference to the contained data of the option as a Reference[T].
         """
         debug_assert(Reference(self)[].__bool__(), ".value() on empty Optional")
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life].mlir_ref_type
-        ](Reference(self)[]._value._get_ptr[T]().value)
+        alias RefType = Reference[T, mutability, self_life]
+        var ptr = Reference(self)[]._value._get_ptr[T]().value
+        return __mlir_op.`lit.ref.from_pointer`[_type = RefType.mlir_ref_type](
+            ptr
+        )
 
     fn take(owned self) -> T:
         """Unsafely move the value out of the Optional.
