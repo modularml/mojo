@@ -32,7 +32,6 @@ from sys.intrinsics import prefetch as _prefetch
 from sys.intrinsics import strided_load, strided_store
 
 from .memory import _free, _malloc
-from memory.reference import _LITRef
 
 # ===----------------------------------------------------------------------===#
 # Utilities
@@ -74,7 +73,7 @@ fn bitcast[
         A new Pointer with the specified address.
     """
     return __mlir_op.`pop.index_to_pointer`[
-        _type = Pointer[type, address_space].pointer_type
+        _type = Pointer[type, address_space]._mlir_type
     ](Scalar[DType.index](val).value)
 
 
@@ -233,30 +232,19 @@ struct LegacyPointer[
         address_space: The address space the pointer is in.
     """
 
-    alias pointer_type = __mlir_type[
+    alias _mlir_type = __mlir_type[
         `!kgen.pointer<`, type, `,`, address_space._value.value, `>`
     ]
 
-    var address: Self.pointer_type
+    var address: Self._mlir_type
     """The pointed-to address."""
 
-    alias _mlir_ref_type = _LITRef[
+    alias _mlir_ref_type = Reference[
         type,
         __mlir_attr.`1: i1`,
         __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
         address_space,
-    ].type
-
-    @always_inline("nodebug")
-    fn __refitem__(self) -> Self._mlir_ref_type:
-        """Enable subscript syntax `ref[]` to access the element.
-
-        Returns:
-            The MLIR reference for the Mojo compiler to use.
-        """
-        return __mlir_op.`lit.ref.from_pointer`[_type = Self._mlir_ref_type](
-            self.address
-        )
+    ]._mlir_type
 
     @always_inline("nodebug")
     fn __init__() -> Self:
@@ -268,7 +256,7 @@ struct LegacyPointer[
         return Self.get_null()
 
     @always_inline("nodebug")
-    fn __init__(address: Self.pointer_type) -> Self:
+    fn __init__(address: Self._mlir_type) -> Self:
         """Constructs a LegacyPointer from the address.
 
         Args:
@@ -289,9 +277,9 @@ struct LegacyPointer[
         Returns:
             Constructed LegacyPointer object.
         """
-        var address = __mlir_op.`pop.index_to_pointer`[
-            _type = Self.pointer_type
-        ](value.cast[DType.index]().value)
+        var address = __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
+            value.cast[DType.index]().value
+        )
         return Self {address: address}
 
     @always_inline("nodebug")
@@ -304,7 +292,7 @@ struct LegacyPointer[
         Returns:
             Constructed Pointer object.
         """
-        return __mlir_op.`pop.index_to_pointer`[_type = Self.pointer_type](
+        return __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
             Scalar[DType.index](address).value
         )
 
@@ -316,7 +304,7 @@ struct LegacyPointer[
         Returns:
             Constructed nullptr LegacyPointer object.
         """
-        return __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
+        return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
@@ -348,6 +336,17 @@ struct LegacyPointer[
             A LegacyPointer struct which contains the address of the argument.
         """
         return arg.get_legacy_pointer()
+
+    @always_inline("nodebug")
+    fn __refitem__(self) -> Self._mlir_ref_type:
+        """Enable subscript syntax `ref[]` to access the element.
+
+        Returns:
+            The MLIR reference for the Mojo compiler to use.
+        """
+        return __mlir_op.`lit.ref.from_pointer`[_type = Self._mlir_ref_type](
+            self.address
+        )
 
     @always_inline("nodebug")
     fn __getitem__[T: Intable](self, offset: T) -> type:
@@ -524,7 +523,7 @@ struct LegacyPointer[
             return rebind[LegacyPointer[new_type, address_space]](self)
 
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = LegacyPointer[new_type, address_space].pointer_type,
+            _type = LegacyPointer[new_type, address_space]._mlir_type,
         ](self.address)
 
     @always_inline("nodebug")
@@ -546,7 +545,7 @@ struct LegacyPointer[
             return rebind[LegacyPointer[type, new_address_space]](self)
 
         return __mlir_op.`pop.pointer.addrspacecast`[
-            _type = LegacyPointer[type, new_address_space].pointer_type,
+            _type = LegacyPointer[type, new_address_space]._mlir_type,
         ](self.address)
 
     # ===------------------------------------------------------------------=== #
@@ -591,7 +590,7 @@ struct LegacyPointer[
         return int(self) < int(rhs)
 
     # ===------------------------------------------------------------------=== #
-    # LegacyPointer Arithmetic
+    # Pointer Arithmetic
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
@@ -684,15 +683,15 @@ struct DTypePointer[
     """
 
     alias element_type = Scalar[type]
-    alias pointer_type = Pointer[Scalar[type], address_space]
-    var address: Self.pointer_type
+    alias _mlir_type = Pointer[Scalar[type], address_space]
+    var address: Self._mlir_type
     """The pointed-to address."""
 
     @always_inline("nodebug")
     fn __init__(inout self):
         """Constructs a null `DTypePointer` from the given type."""
 
-        self.address = Self.pointer_type()
+        self.address = Self._mlir_type()
 
     @always_inline("nodebug")
     fn __init__(
@@ -731,7 +730,7 @@ struct DTypePointer[
             value: The input pointer index.
         """
         var address = __mlir_op.`pop.index_to_pointer`[
-            _type = Self.pointer_type.pointer_type
+            _type = Self._mlir_type._mlir_type
         ](value.cast[DType.index]().value)
         self.address = address
 
@@ -742,7 +741,7 @@ struct DTypePointer[
         Args:
             address: The input address.
         """
-        self.address = Self.pointer_type(address=address)
+        self.address = Self._mlir_type(address=address)
 
     @staticmethod
     @always_inline("nodebug")
@@ -752,7 +751,7 @@ struct DTypePointer[
         Returns:
             Constructed *nullptr* `DTypePointer` object.
         """
-        return Self.pointer_type()
+        return Self._mlir_type()
 
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.

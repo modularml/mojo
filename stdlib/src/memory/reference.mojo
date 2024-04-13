@@ -226,15 +226,21 @@ struct Reference[
         address_space: The address space of the referenced data.
     """
 
-    alias mlir_ref_type = _LITRef[
-        type, is_mutable, lifetime, address_space
-    ].type
+    alias _mlir_type = __mlir_type[
+        `!lit.ref<`,
+        type,
+        `, `,
+        lifetime,
+        `, `,
+        address_space._value.value,
+        `>`,
+    ]
 
-    var value: Self.mlir_ref_type
+    var value: Self._mlir_type
     """The underlying MLIR reference."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Self.mlir_ref_type):
+    fn __init__(inout self, value: Self._mlir_type):
         """Constructs a Reference from the MLIR reference.
 
         Args:
@@ -243,7 +249,7 @@ struct Reference[
         self.value = value
 
     @always_inline("nodebug")
-    fn __refitem__(self) -> Self.mlir_ref_type:
+    fn __refitem__(self) -> Self._mlir_type:
         """Enable subscript syntax `ref[]` to access the element.
 
         Returns:
@@ -252,7 +258,7 @@ struct Reference[
         return self.value
 
     @always_inline("nodebug")
-    fn __mlir_ref__(self) -> Self.mlir_ref_type:
+    fn __mlir_ref__(self) -> Self._mlir_type:
         """Enable the Mojo compiler to see into `Reference`.
 
         Returns:
@@ -271,7 +277,7 @@ struct Reference[
         """
         # Work around AnyRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = Pointer[type, address_space].pointer_type
+            _type = Pointer[type, address_space]._mlir_type
         ](UnsafePointer(self).value)
 
     @always_inline("nodebug")

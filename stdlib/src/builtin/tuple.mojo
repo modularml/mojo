@@ -151,9 +151,9 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         idx: Int,
         mutability: __mlir_type.i1,
         self_life: AnyLifetime[mutability].type,
-    ](
-        self_lit: Reference[Self, mutability, self_life].mlir_ref_type
-    ) -> Reference[element_types[idx.value], mutability, self_life]:
+    ](self_lit: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
+        element_types[idx.value], mutability, self_life
+    ]:
         # Return a reference to an element at the specified index, propagating
         # mutability of self.
         var storage_kgen_ptr = Reference(

@@ -444,14 +444,14 @@ fn stack_allocation[
     if triple_is_nvidia_cuda() and address_space == _GPUAddressSpace.SHARED:
         return __mlir_op.`pop.global_alloc`[
             count = count.value,
-            _type = Pointer[type, address_space].pointer_type,
+            _type = Pointer[type, address_space]._mlir_type,
             alignment = alignment.value,
             address_space = address_space._value.value,
         ]()
     else:
         return __mlir_op.`pop.stack_allocation`[
             count = count.value,
-            _type = Pointer[type, address_space].pointer_type,
+            _type = Pointer[type, address_space]._mlir_type,
             alignment = alignment.value,
             address_space = address_space._value.value,
         ]()
@@ -480,7 +480,7 @@ fn _malloc[
         ).bitcast[type]()
     else:
         return __mlir_op.`pop.aligned_alloc`[
-            _type = Pointer[type, address_space].pointer_type
+            _type = Pointer[type, address_space]._mlir_type
         ](alignment.value, size.value)
 
 
