@@ -524,36 +524,23 @@ struct LegacyPointer[
 
     @always_inline("nodebug")
     fn bitcast[
-        new_type: AnyRegType, new_address_space: AddressSpace = address_space
-    ](self) -> LegacyPointer[new_type, new_address_space]:
+        new_type: AnyRegType = type,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> LegacyPointer[new_type, address_space]:
         """Bitcasts a LegacyPointer to a different type.
 
         Parameters:
             new_type: The target type.
-            new_address_space: The address space of the result.
+            address_space: The address space of the result.
 
         Returns:
             A new LegacyPointer object with the specified type and the same address,
             as the original LegacyPointer.
         """
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = LegacyPointer[new_type, new_address_space]._mlir_type,
+            _type = LegacyPointer[new_type, address_space]._mlir_type,
         ](self.address)
-
-    @always_inline("nodebug")
-    fn address_space_bitcast[
-        new_address_space: AddressSpace
-    ](self) -> LegacyPointer[type, new_address_space]:
-        """Casts a LegacyPointer to a different address space.
-
-        Parameters:
-            new_address_space: The address space.
-
-        Returns:
-            A new LegacyPointer object with the specified type and the same address,
-            as the original LegacyPointer but located in a different address space.
-        """
-        return self.bitcast[type, new_address_space]()
 
     # ===------------------------------------------------------------------=== #
     # Comparisons
@@ -893,34 +880,21 @@ struct DTypePointer[
 
     @always_inline("nodebug")
     fn bitcast[
-        new_type: DType, new_address_space: AddressSpace = address_space
-    ](self) -> DTypePointer[new_type, new_address_space]:
+        new_type: DType = type,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> DTypePointer[new_type, address_space]:
         """Bitcasts `DTypePointer` to a different dtype.
 
         Parameters:
             new_type: The target dtype.
-            new_address_space: The address space of the result.
+            address_space: The address space of the result.
 
         Returns:
             A new `DTypePointer` object with the specified dtype and the same
             address, as the original `DTypePointer`.
         """
-        return self.address.bitcast[SIMD[new_type, 1], new_address_space]()
-
-    @always_inline("nodebug")
-    fn address_space_bitcast[
-        new_address_space: AddressSpace
-    ](self) -> DTypePointer[type, new_address_space]:
-        """Casts a Pointer to a different address space.
-
-        Parameters:
-            new_address_space: The address space.
-
-        Returns:
-            A new Pointer object with the specified type and the same address,
-            as the original Pointer but located in a different address space.
-        """
-        return self.bitcast[type, new_address_space]()
+        return self.address.bitcast[SIMD[new_type, 1], address_space]()
 
     @always_inline("nodebug")
     fn _as_scalar_pointer(self) -> Pointer[Scalar[type], address_space]:
