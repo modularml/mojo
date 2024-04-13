@@ -90,7 +90,7 @@ struct _DictEntryIter[
                 self.seen += 1
                 # Super unsafe, but otherwise we have to do a bunch of super
                 # unsafe reference lifetime casting.
-                return opt_entry_ref.bitcast_element[DictEntry[K, V]]()
+                return opt_entry_ref.unsafe_bitcast[DictEntry[K, V]]()
             self.index += 1
 
     fn __len__(self) -> Int:
@@ -133,8 +133,10 @@ struct _DictKeyIter[
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
-        var anyptr = UnsafePointer(Reference(entry_ref[].key))
-        return anyptr.address_space_cast[Self.dict_entry_iter.address_space]()[]
+        var anyptr = UnsafePointer.address_of(entry_ref[].key)
+        return anyptr.address_space_bitcast[
+            Self.dict_entry_iter.address_space
+        ]()[]
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
@@ -172,8 +174,8 @@ struct _DictValueIter[
         var entry_ref = self.iter.__next__()
         # Cast through a pointer to grant additional mutability and switch
         # address spaces out.
-        var anyptr = UnsafePointer(Reference(entry_ref[].value))
-        return anyptr.address_space_cast[address_space]()[]
+        var anyptr = UnsafePointer.address_of(entry_ref[].value)
+        return anyptr.address_space_bitcast[address_space]()[]
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
