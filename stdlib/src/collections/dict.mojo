@@ -561,8 +561,10 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DictKeyIter[K, V, mutability, self_life]:
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        K, V, mutability, self_life
+    ]:
         """Iterate over the dict's keys as immutable references.
 
         Parameters:
@@ -579,8 +581,10 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     fn keys[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DictKeyIter[K, V, mutability, self_life]:
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        K, V, mutability, self_life
+    ]:
         """Iterate over the dict's keys as immutable references.
 
         Parameters:
@@ -595,7 +599,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     fn values[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _DictValueIter[K, V, mutability, self_life]:
         """Iterate over the dict's values as references.
 
@@ -613,7 +617,7 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     fn items[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _DictEntryIter[K, V, mutability, self_life]:
         """Iterate over the dict's entries as immutable references.
 
@@ -874,8 +878,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DictKeyIter[Self.key_type, V, mutability, self_life]:
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        Self.key_type, V, mutability, self_life
+    ]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Parameters:
@@ -896,8 +902,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn keys[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DictKeyIter[Self.key_type, V, mutability, self_life]:
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        Self.key_type, V, mutability, self_life
+    ]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Parameters:
@@ -914,7 +922,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn values[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _DictValueIter[Self.key_type, V, mutability, self_life]:
         """Iterate over the keyword dict's values as references.
 
@@ -936,7 +944,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn items[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _DictEntryIter[Self.key_type, V, mutability, self_life]:
         """Iterate over the keyword dictionary's entries as immutable references.
 

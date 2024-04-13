@@ -228,8 +228,10 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
     fn __iter__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DictKeyIter[T, NoneType, mutability, self_life]:
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        T, NoneType, mutability, self_life
+    ]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
