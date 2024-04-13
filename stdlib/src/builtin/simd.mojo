@@ -990,19 +990,27 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter
         if type.is_signed():
-            return llvm_intrinsic[
+            var result = llvm_intrinsic[
                 "llvm.sadd.with.overflow",
-                (Self, SIMD[DType.bool, size]),
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
                 Self,
                 Self,
             ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
         else:
-            return llvm_intrinsic[
+            var result = llvm_intrinsic[
                 "llvm.uadd.with.overflow",
-                (Self, SIMD[DType.bool, size]),
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
                 Self,
                 Self,
             ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
 
     @always_inline
     fn sub_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
@@ -1019,19 +1027,27 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter
         if type.is_signed():
-            return llvm_intrinsic[
+            var result = llvm_intrinsic[
                 "llvm.ssub.with.overflow",
-                (Self, SIMD[DType.bool, size]),
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
                 Self,
                 Self,
             ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
         else:
-            return llvm_intrinsic[
+            var result = llvm_intrinsic[
                 "llvm.usub.with.overflow",
-                (Self, SIMD[DType.bool, size]),
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
                 Self,
                 Self,
             ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
 
     @always_inline
     fn mul_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
@@ -1048,19 +1064,27 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter
         if type.is_signed():
-            return llvm_intrinsic[
+            var result = llvm_intrinsic[
                 "llvm.smul.with.overflow",
-                (Self, SIMD[DType.bool, size]),
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
                 Self,
                 Self,
             ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
         else:
-            return llvm_intrinsic[
+            var result = llvm_intrinsic[
                 "llvm.umul.with.overflow",
-                (Self, SIMD[DType.bool, size]),
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
                 Self,
                 Self,
             ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
 
     # ===-------------------------------------------------------------------===#
     # Reversed operations
