@@ -100,7 +100,7 @@ struct Atomic[type: DType]:
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
         ](
-            bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]](ptr).address,
+            ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]().address,
             rhs.value,
         )
 
