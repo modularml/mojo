@@ -267,19 +267,6 @@ struct LegacyPointer[
         """
         return Self.get_null()
 
-    # FIXME: Why do we have an identity constructor?
-    @always_inline("nodebug")
-    fn __init__(address: Self) -> Self:
-        """Constructs a LegacyPointer from the address.
-
-        Args:
-            address: The input pointer.
-
-        Returns:
-            Constructed LegacyPointer object.
-        """
-        return address
-
     @always_inline("nodebug")
     fn __init__(address: Self.pointer_type) -> Self:
         """Constructs a LegacyPointer from the address.
