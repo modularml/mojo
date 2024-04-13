@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo -debug-level full %s
 
 from sys.intrinsics import (
     compressed_store,
@@ -37,8 +37,7 @@ fn test_strided_load() raises:
     vector.free()
 
 
-# CHECK-LABEL: test_strided_store
-fn test_strided_store():
+fn test_strided_store() raises:
     print("== test_strided_store")
 
     alias size = 8
@@ -46,16 +45,15 @@ fn test_strided_store():
     memset_zero(vector, size)
 
     strided_store(SIMD[DType.float32, 4](99, 12, 23, 56), vector, 2)
-    # CHECK: 99.0
-    # CHECK: 0.0
-    # CHECK: 12.0
-    # CHECK: 0.0
-    # CHECK: 23.0
-    # CHECK: 0.0
-    # CHECK: 56.0
-    # CHECK: 0.0
-    for i in range(size):
-        print(vector[i])
+    assert_equal(vector[0], 99.0)
+    assert_equal(vector[1], 0.0)
+    assert_equal(vector[2], 12.0)
+    assert_equal(vector[3], 0.0)
+    assert_equal(vector[4], 23.0)
+    assert_equal(vector[5], 0.0)
+    assert_equal(vector[6], 56.0)
+    assert_equal(vector[7], 0.0)
+
     vector.free()
 
 
