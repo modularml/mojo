@@ -213,7 +213,7 @@ struct _Function:
     fn __init__[FnT: AnyRegType](value: FnT) -> Self:
         # FIXME: No "pointer bitcast" for signature function pointers.
         var f = Pointer[Int16]()
-        Reference(f).get_unsafe_pointer().bitcast[FnT]().store(value)
+        Reference(f).get_legacy_pointer().bitcast[FnT]().store(value)
         return Self {value: f}
 
     alias fn0 = fn () raises -> object
@@ -229,7 +229,7 @@ struct _Function:
     fn invoke(owned self) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn0]()
             .load()()
         )
@@ -238,7 +238,7 @@ struct _Function:
     fn invoke(owned self, arg0: object) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn1]()
             .load()(arg0)
         )
@@ -247,7 +247,7 @@ struct _Function:
     fn invoke(owned self, arg0: object, arg1: object) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn2]()
             .load()(arg0, arg1)
         )
@@ -258,7 +258,7 @@ struct _Function:
     ) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn3]()
             .load()(arg0, arg1, arg2)
         )

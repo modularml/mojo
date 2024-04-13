@@ -127,7 +127,7 @@ struct DLHandle(CollectionElement):
             ](self.handle.address, name)
             return (
                 Reference(opaque_function_ptr)
-                .get_unsafe_pointer()
+                .get_legacy_pointer()
                 .bitcast[result_type]()
                 .load()
             )
@@ -200,7 +200,7 @@ fn _get_dylib_function[
     if func_ptr:
         return (
             Reference(func_ptr)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[result_type]()
             .load()
         )
@@ -210,7 +210,7 @@ fn _get_dylib_function[
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
         Reference(new_func)
-        .get_unsafe_pointer()
+        .get_legacy_pointer()
         .bitcast[Pointer[NoneType]]()
         .load(),
     )
