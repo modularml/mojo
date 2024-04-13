@@ -144,6 +144,10 @@ what we publish.
 
 - `SIMD.to_int(value)` has been removed.  Use `int(value)` instead.
 
+- The `__get_lvalue_as_address(x)` magic function has been removed.  To get a
+  reference to a value use `Reference(x)` and if you need an unsafe pointer, you
+  can use `UnsafePointer.address_of(x)`.
+
 ### 🛠️ Fixed
 
 - [#516](https://github.com/modularml/mojo/issues/516) and
