@@ -10,30 +10,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-#
-# This file is only run on linux targets with amx_tile
-#
-# ===----------------------------------------------------------------------=== #
-# REQUIRES: linux
-# REQUIRES: amx_tile
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo -debug-level full %s
+
+from testing import assert_equal
 
 
-from sys import has_intel_amx, os_is_linux
+def test_bool_cast_to_int():
+    assert_equal(False.__int__(), 0)
+    assert_equal(True.__int__(), 1)
 
-from LinAlg.intel_amx import init_intel_amx
-
-
-# CHECK-LABEL: test_has_intel_amx
-fn test_has_intel_amx():
-    print("== test_intel_amx_amx")
-    # CHECK: True
-    print(os_is_linux())
-    # CHECK: True
-    print(has_intel_amx())
-    # CHECK: True
-    print(init_intel_amx())
+    assert_equal(int(False), 0)
+    assert_equal(int(True), 1)
 
 
-fn main():
-    test_has_intel_amx()
+def test_bool_none():
+    var test = None
+    assert_equal(bool(None), False)
+    assert_equal(bool(test), False)
+
+
+def main():
+    test_bool_cast_to_int()
+    test_bool_none()

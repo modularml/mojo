@@ -68,7 +68,7 @@ struct _ListIter[
         return len(self.src[]) - self.index
 
 
-struct List[T: CollectionElement](CollectionElement, Sized):
+struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -123,6 +123,20 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         for value in values:
             self.append(value[])
 
+    fn __init__(
+        inout self: Self, data: AnyPointer[T], size: Int, capacity: Int
+    ):
+        """Constructs a list from a pointer and its size.
+
+        Args:
+            data: The pointer to the data.
+            size: The number of elements in the list.
+            capacity: The capacity of the list.
+        """
+        self.data = data
+        self.size = size
+        self.capacity = capacity
+
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing list into a new one.
 
@@ -159,6 +173,14 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         """
         return self.size
 
+    fn __bool__(self) -> Bool:
+        """Checks if the list is empty.
+
+        Returns:
+            `False` if the list is empty, `True` if there is at least one element.
+        """
+        return len(self).__bool__()
+
     @always_inline
     fn _realloc(inout self, new_capacity: Int):
         var new_data = AnyPointer[T].alloc(new_capacity)
@@ -182,6 +204,36 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             self._realloc(_max(1, self.capacity * 2))
         (self.data + self.size).emplace_value(value^)
         self.size += 1
+
+    @always_inline
+    fn insert(inout self, i: Int, owned value: T):
+        """Inserts a value to the list at the given index.
+        `a.insert(len(a), value)` is equivalent to `a.append(value)`.
+
+        Args:
+            i: The index for the value.
+            value: The value to insert.
+        """
+        debug_assert(i <= self.size, "insert index out of range")
+
+        var normalized_idx = i
+        if i < 0:
+            normalized_idx = _max(0, len(self) + i)
+
+        var earlier_idx = len(self)
+        var later_idx = len(self) - 1
+        self.append(value^)
+
+        for _ in range(normalized_idx, len(self) - 1):
+            var earlier_ptr = self.data + earlier_idx
+            var later_ptr = self.data + later_idx
+
+            var tmp = earlier_ptr.take_value()
+            later_ptr.move_into(earlier_ptr)
+            later_ptr.emplace_value(tmp^)
+
+            earlier_idx -= 1
+            later_idx -= 1
 
     @always_inline
     fn extend(inout self, owned other: List[T]):
@@ -225,20 +277,6 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size = final_size
 
     @always_inline
-    fn pop_back(inout self) -> T:
-        """Pops a value from the back of this list.
-
-        Returns:
-            The popped value.
-        """
-        var ret_val = (self.data + (self.size - 1)).take_value()
-        self.size -= 1
-        if self.size * 4 < self.capacity:
-            if self.capacity > 1:
-                self._realloc(self.capacity // 2)
-        return ret_val^
-
-    @always_inline
     fn pop(inout self, i: Int = -1) -> T:
         """Pops a value from the list at the given index.
 
@@ -248,7 +286,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         Returns:
             The popped value.
         """
-        debug_assert(-self.size <= i < self.size, "pop index out of range")
+        debug_assert(-len(self) <= i < len(self), "pop index out of range")
 
         var normalized_idx = i
         if i < 0:
@@ -289,12 +327,37 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             new_size: The new size.
             value: The value to use to populate new elements.
         """
-        self.reserve(new_size)
+        if new_size <= self.size:
+            self.resize(new_size)
+        else:
+            self.reserve(new_size)
+            for i in range(new_size, self.size):
+                _ = (self.data + i).take_value()
+            for i in range(self.size, new_size):
+                (self.data + i).emplace_value(value)
+            self.size = new_size
+
+    @always_inline
+    fn resize(inout self, new_size: Int):
+        """Resizes the list to the given new size.
+
+        With no new value provided, the new size must be smaller than or equal
+        to the current one. Elements at the end are discarded.
+
+        Args:
+            new_size: The new size.
+        """
+        debug_assert(
+            new_size <= self.size,
+            (
+                "New size must be smaller than or equal to current size when no"
+                " new value is provided."
+            ),
+        )
         for i in range(new_size, self.size):
             _ = (self.data + i).take_value()
-        for i in range(self.size, new_size):
-            (self.data + i).emplace_value(value)
         self.size = new_size
+        self.reserve(new_size)
 
     fn reverse(inout self):
         """Reverses the elements of the list."""

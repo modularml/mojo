@@ -163,7 +163,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     fn __isnot__(self, other: NoneType) -> Bool:
         """Return `True` if the Optional has a value.
 
-        It allows you to use the following syntax: `if my_optional is not None:`
+        It allows you to use the following syntax: `if my_optional is not None:`.
 
         Args:
             other: The value to compare to (None).
@@ -311,6 +311,32 @@ struct OptionalReg[T: AnyRegType](Boolable):
             The contained value.
         """
         return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
+
+    fn __is__(self, other: NoneType) -> Bool:
+        """Return `True` if the Optional has no value.
+
+        It allows you to use the following syntax: `if my_optional is None:`
+
+        Args:
+            other: The value to compare to (None).
+
+        Returns:
+            True if the Optional has no value and False otherwise.
+        """
+        return not self.__bool__()
+
+    fn __isnot__(self, other: NoneType) -> Bool:
+        """Return `True` if the Optional has a value.
+
+        It allows you to use the following syntax: `if my_optional is not None:`
+
+        Args:
+            other: The value to compare to (None).
+
+        Returns:
+            True if the Optional has a value and False otherwise.
+        """
+        return self.__bool__()
 
     fn __bool__(self) -> Bool:
         """Return true if the optional has a value.

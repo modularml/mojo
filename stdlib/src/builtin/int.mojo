@@ -616,7 +616,7 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
         var x = self
         var n = rhs
         while n > 0:
-            if n&1 != 0:
+            if n & 1 != 0:
                 res *= x
             x *= x
             n >>= 1

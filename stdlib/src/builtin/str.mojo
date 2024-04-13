@@ -136,7 +136,7 @@ fn str[T: Stringable](value: T) -> String:
     Returns:
         The string representation of the object.
     """
-     return value.__str__()
+    return value.__str__()
 
 
 @always_inline
