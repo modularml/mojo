@@ -164,6 +164,9 @@ what we publish.
   longer cuts off hover previews for functions with functional arguments,
   parameters, or results.
 
+- [#1245](https://github.com/modularml/mojo/issues/1245) [Feature Request]
+  Parameter Inference from Other Parameters.
+
 - [#1901](https://github.com/modularml/mojo/issues/1901) Fixed Mojo LSP and
   documentation generation handling of inout arguments.
 
