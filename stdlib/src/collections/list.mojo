@@ -499,7 +499,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn __get_ref[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
         i: Int,
     ) -> Reference[T, mutability, self_life]:
         """Gets a reference to the list element at the given index.
@@ -521,13 +521,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # because the mutability won't match.
         var base_ptr = Reference(self)[].data
         return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life].mlir_ref_type
+            _type = Reference[T, mutability, self_life]._mlir_type
         ]((base_ptr + normalized_idx).value)
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _ListIter[
         T, mutability, self_life
     ]:
