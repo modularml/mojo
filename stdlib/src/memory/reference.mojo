@@ -275,15 +275,6 @@ struct Reference[
         ](UnsafePointer(self).value)
 
     @always_inline("nodebug")
-    fn get_unsafe_pointer(self) -> UnsafePointer[type, address_space]:
-        """Constructs a UnsafePointer from a safe reference.
-
-        Returns:
-            Constructed UnsafePointer object.
-        """
-        return UnsafePointer(self).value
-
-    @always_inline("nodebug")
     fn bitcast_element[
         new_element_type: AnyType
     ](self) -> Reference[new_element_type, is_mutable, lifetime, address_space]:
