@@ -134,8 +134,8 @@ struct _DictKeyIter[
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
         var anyptr = UnsafePointer.address_of(entry_ref[].key)
-        return anyptr.address_space_bitcast[
-            Self.dict_entry_iter.address_space
+        return anyptr.bitcast[
+            address_space = Self.dict_entry_iter.address_space
         ]()[]
 
     fn __len__(self) -> Int:
@@ -175,7 +175,7 @@ struct _DictValueIter[
         # Cast through a pointer to grant additional mutability and switch
         # address spaces out.
         var anyptr = UnsafePointer.address_of(entry_ref[].value)
-        return anyptr.address_space_bitcast[address_space]()[]
+        return anyptr.bitcast[address_space=address_space]()[]
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
