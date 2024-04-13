@@ -139,7 +139,7 @@ struct Arc[T: Movable](CollectionElement):
     fn __refitem__[
         mutability: __mlir_type.i1,
         lifetime: AnyLifetime[mutability].type,
-    ](self: Reference[Self, mutability, lifetime].mlir_ref_type) -> Reference[
+    ](self: Reference[Self, mutability, lifetime]._mlir_type) -> Reference[
         T, mutability, lifetime
     ]:
         """Returns a Reference to the managed value.
@@ -149,7 +149,7 @@ struct Arc[T: Movable](CollectionElement):
         """
         alias RefType = Reference[T, mutability, lifetime]
         return RefType(
-            __mlir_op.`lit.ref.from_pointer`[_type = RefType.mlir_ref_type](
+            __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](
                 Reference(self)[]._data_ptr().value
             )
         )

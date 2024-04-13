@@ -16,7 +16,6 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from memory.unsafe_pointer import destroy_pointee
-from memory.unsafe import _LITRef
 from memory import Reference, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
@@ -105,8 +104,8 @@ struct VariadicList[type: AnyRegType](Sized):
         type: The type of the elements in the list.
     """
 
-    alias storage_type = __mlir_type[`!kgen.variadic<`, type, `>`]
-    var value: Self.storage_type
+    alias _mlir_type = __mlir_type[`!kgen.variadic<`, type, `>`]
+    var value: Self._mlir_type
     """The underlying storage for the variadic list."""
 
     alias IterType = _VariadicListIter[type]
@@ -122,7 +121,7 @@ struct VariadicList[type: AnyRegType](Sized):
         self = value
 
     @always_inline
-    fn __init__(inout self, value: Self.storage_type):
+    fn __init__(inout self, value: Self._mlir_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -240,12 +239,12 @@ struct VariadicListMem[
     """
 
     alias reference_type = Reference[element_type, elt_is_mutable, lifetime]
-    alias mlir_ref_type = _LITRef[element_type, elt_is_mutable, lifetime].type
-    alias storage_type = __mlir_type[
-        `!kgen.variadic<`, Self.mlir_ref_type, `, borrow_in_mem>`
+    alias _mlir_ref_type = Self.reference_type._mlir_type
+    alias _mlir_type = __mlir_type[
+        `!kgen.variadic<`, Self._mlir_ref_type, `, borrow_in_mem>`
     ]
 
-    var value: Self.storage_type
+    var value: Self._mlir_type
     """The underlying storage, a variadic list of references to elements of the
     given type."""
 
@@ -255,7 +254,7 @@ struct VariadicListMem[
 
     # Provide support for borrowed variadic arguments.
     @always_inline
-    fn __init__(inout self, value: Self.storage_type):
+    fn __init__(inout self, value: Self._mlir_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -267,12 +266,12 @@ struct VariadicListMem[
     # Provide support for variadics of *inout* arguments.  The reference will
     # automatically be inferred to be mutable, and the !kgen.variadic will have
     # convention=byref.
-    alias inout_storage_type = __mlir_type[
-        `!kgen.variadic<`, Self.mlir_ref_type, `, byref>`
+    alias _inout_variadic_type = __mlir_type[
+        `!kgen.variadic<`, Self._mlir_ref_type, `, byref>`
     ]
 
     @always_inline
-    fn __init__(inout self, value: Self.inout_storage_type):
+    fn __init__(inout self, value: Self._inout_variadic_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -281,18 +280,18 @@ struct VariadicListMem[
         var tmp = value
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
-        self.value = Pointer.address_of(tmp).bitcast[Self.storage_type]().load()
+        self.value = Pointer.address_of(tmp).bitcast[Self._mlir_type]().load()
         self._is_owned = False
 
     # Provide support for variadics of *owned* arguments.  The reference will
     # automatically be inferred to be mutable, and the !kgen.variadic will have
     # convention=owned_in_mem.
-    alias owned_storage_type = __mlir_type[
-        `!kgen.variadic<`, Self.mlir_ref_type, `, owned_in_mem>`
+    alias _owned_variadic_type = __mlir_type[
+        `!kgen.variadic<`, Self._mlir_ref_type, `, owned_in_mem>`
     ]
 
     @always_inline
-    fn __init__(inout self, value: Self.owned_storage_type):
+    fn __init__(inout self, value: Self._owned_variadic_type):
         """Constructs a VariadicList from a variadic argument type.
 
         Args:
@@ -301,7 +300,7 @@ struct VariadicListMem[
         var tmp = value
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
-        self.value = Pointer.address_of(tmp).bitcast[Self.storage_type]().load()
+        self.value = Pointer.address_of(tmp).bitcast[Self._mlir_type]().load()
         self._is_owned = True
 
     @always_inline
@@ -429,7 +428,7 @@ struct VariadicPack[
         element_types: The list of types held by the argument pack.
     """
 
-    alias _mlir_pack_type = __mlir_type[
+    alias _mlir_type = __mlir_type[
         `!lit.ref.pack<:variadic<`,
         element_trait,
         `> `,
@@ -439,11 +438,11 @@ struct VariadicPack[
         `>`,
     ]
 
-    var _value: Self._mlir_pack_type
+    var _value: Self._mlir_type
     var _is_owned: Bool
 
     @always_inline
-    fn __init__(inout self, value: Self._mlir_pack_type, is_owned: Bool):
+    fn __init__(inout self, value: Self._mlir_type, is_owned: Bool):
         """Constructs a VariadicPack from the internal representation.
 
         Args:
@@ -534,7 +533,7 @@ struct VariadicPack[
             Self.elt_is_mutable,
             Self.lifetime,
         ]
-        return rebind[result_ref.mlir_ref_type](ref_elt)
+        return rebind[result_ref._mlir_type](ref_elt)
 
     @always_inline
     fn each[func: fn[T: element_trait] (T) capturing -> None](self):

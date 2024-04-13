@@ -102,7 +102,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     @always_inline
     fn value[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](self: Reference[Self, mutability, self_life].mlir_ref_type) -> Reference[
+    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
         T, mutability, self_life
     ]:
         """Unsafely retrieve a reference to the value of the Optional.
@@ -118,7 +118,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         debug_assert(Reference(self)[].__bool__(), ".value() on empty Optional")
         alias RefType = Reference[T, mutability, self_life]
         var ptr = Reference(self)[]._value._get_ptr[T]().value
-        return __mlir_op.`lit.ref.from_pointer`[_type = RefType.mlir_ref_type](
+        return __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](
             ptr
         )
 

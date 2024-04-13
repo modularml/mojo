@@ -41,7 +41,6 @@ print(to_string(who_knows))
 from sys import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
-from memory.unsafe import _LITRef
 from memory.unsafe_pointer import initialize_pointee, move_from_pointee, move_pointee
 from memory import UnsafePointer
 from utils import unroll, StaticTuple
@@ -155,7 +154,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     fn _get_state[
         is_mut: __mlir_type.i1, lt: __mlir_type[`!lit.lifetime<`, is_mut, `>`]
-    ](self: _LITRef[Self, is_mut, lt].type) -> Reference[Int8, is_mut, lt]:
+    ](self: Reference[Self, is_mut, lt]._mlir_type) -> Reference[
+        Int8, is_mut, lt
+    ]:
         var int8_self = UnsafePointer(Reference(self).bitcast_element[Int8]())
         return (int8_self + _UnionSize[Ts].compute())[]
 
@@ -284,7 +285,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         T: CollectionElement,
         mutability: __mlir_type.i1,
         self_life: AnyLifetime[mutability].type,
-    ](self: Reference[Self, mutability, self_life].mlir_ref_type) -> Reference[
+    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
         T, mutability, self_life
     ]:
         """Get the value out of the variant as a type-checked type.
@@ -307,7 +308,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         debug_assert(Reference(self)[].isa[T](), "get: wrong variant type")
         return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life].mlir_ref_type
+            _type = Reference[T, mutability, self_life]._mlir_type
         ](Reference(self)[]._get_ptr[T]().value)
 
     @staticmethod
