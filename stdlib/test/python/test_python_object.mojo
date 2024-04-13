@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo %s
+# RUN: %mojo -debug-level full %s
 
 from memory.unsafe import Pointer
 from python._cpython import CPython, PyObjectPtr
