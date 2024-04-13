@@ -129,7 +129,7 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(inout arg: T) -> Self:
+    fn address_of(arg: Reference[T, _, _, address_space]) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -138,9 +138,7 @@ struct UnsafePointer[
         Returns:
             An UnsafePointer which contains the address of the argument.
         """
-        return __mlir_op.`pop.pointer.bitcast`[_type = Self.pointer_type](
-            __get_lvalue_as_address(arg)
-        )
+        return Self(arg)
 
     @always_inline
     fn free(self):
