@@ -62,6 +62,9 @@ fn bitcast[
 ](val: Int) -> Pointer[type, address_space]:
     """Bitcasts an integer to a pointer.
 
+    Constraints:
+        The bitwidth of the two types must be the same.
+
     Parameters:
         type: The target type.
         address_space: The address space the pointer is in.
@@ -83,6 +86,9 @@ fn bitcast[
 ](val: Int) -> DTypePointer[type, address_space]:
     """Bitcasts an integer to a pointer.
 
+    Constraints:
+        The bitwidth of the two types must be the same.
+
     Parameters:
         type: The target type.
         address_space: The address space the pointer is in.
@@ -101,6 +107,9 @@ fn bitcast[
     new_type: Movable, src_type: Movable
 ](ptr: AnyPointer[src_type]) -> AnyPointer[new_type]:
     """Bitcasts an AnyPointer to a different type.
+
+    Constraints:
+        The bitwidth of the two types must be the same.
 
     Parameters:
         new_type: The target type.
@@ -121,6 +130,9 @@ fn bitcast[
     new_type: AnyRegType, src_type: AnyRegType, address_space: AddressSpace
 ](ptr: Pointer[src_type, address_space]) -> Pointer[new_type, address_space]:
     """Bitcasts a Pointer to a different type.
+
+    Constraints:
+        The bitwidth of the two types must be the same.
 
     Parameters:
         new_type: The target type.
@@ -144,6 +156,9 @@ fn bitcast[
     new_type, address_space
 ]:
     """Bitcasts a DTypePointer to a different type.
+
+    Constraints:
+        The bitwidth of the two types must be the same.
 
     Parameters:
         new_type: The target type.
