@@ -125,6 +125,13 @@ def test_array_str():
     assert_equal(arr[1], "morning")
     assert_equal(arr[2], "wazzup")
 
+    var ptr = arr.as_ptr()
+    ptr[0] = "good morning"
+    ptr[1] = "good evening"
+
+    assert_equal(arr[0], "good morning")
+    assert_equal(arr[1], "good evening")
+
     var copy = arr
     assert_equal(arr[0], copy[0])
     assert_equal(arr[1], copy[1])
