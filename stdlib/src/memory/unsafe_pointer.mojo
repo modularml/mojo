@@ -23,7 +23,6 @@ from sys.info import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
 from memory.memory import _free, _malloc
-from memory.reference import _LITRef
 
 
 # ===----------------------------------------------------------------------=== #
@@ -40,11 +39,22 @@ struct UnsafePointer[
         address_space: The address space associated with the UnsafePointer allocated memory.
     """
 
-    alias pointer_type = __mlir_type[
+    alias _mlir_type = __mlir_type[
         `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
     ]
+
+    # We're unsafe, so we can have unsafe things. References we make have
+    # an immortal mutable lifetime, since we can't come up with a meaningful
+    # lifetime for them anyway.
+    alias _mlir_ref_type = Reference[
+        T,
+        __mlir_attr.`1: i1`,
+        __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
+        address_space,
+    ]._mlir_type
+
     """The underlying pointer type."""
-    var value: Self.pointer_type
+    var value: Self._mlir_type
     """The underlying pointer."""
 
     @always_inline
@@ -57,7 +67,7 @@ struct UnsafePointer[
         return Self.get_null()
 
     @always_inline
-    fn __init__(value: Self.pointer_type) -> Self:
+    fn __init__(value: Self._mlir_type) -> Self:
         """Create a pointer with the input value.
 
         Args:
@@ -91,7 +101,7 @@ struct UnsafePointer[
             The pointer.
         """
         return Self {
-            value: __mlir_op.`pop.index_to_pointer`[_type = Self.pointer_type](
+            value: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
                 Scalar[DType.index](address).value
             )
         }
@@ -105,7 +115,7 @@ struct UnsafePointer[
             Constructed nullptr UnsafePointer object.
         """
         return Self {
-            value: __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
+            value: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
         }
 
     @staticmethod
@@ -158,13 +168,8 @@ struct UnsafePointer[
             A new UnsafePointer object with the specified type and the same address,
             as the original UnsafePointer.
         """
-
-        @parameter
-        if _mlirtype_is_eq[T, new_type]():
-            return rebind[UnsafePointer[new_type, address_space]](self)
-
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[new_type, address_space].pointer_type,
+            _type = UnsafePointer[new_type, address_space]._mlir_type,
         ](self.value)
 
     @always_inline
@@ -182,7 +187,7 @@ struct UnsafePointer[
         """
 
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[new_type, address_space].pointer_type
+            _type = UnsafePointer[new_type, address_space]._mlir_type
         ](self.value)
 
     @always_inline
@@ -200,7 +205,7 @@ struct UnsafePointer[
         """
 
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[T, new_address_space].pointer_type
+            _type = UnsafePointer[T, new_address_space]._mlir_type
         ](self.value)
 
     @always_inline
@@ -324,31 +329,21 @@ struct UnsafePointer[
         """
         return int(self) >= int(rhs)
 
-    # We're unsafe, so we can have unsafe things. References we make have
-    # an immortal mutable lifetime, since we can't come up with a meaningful
-    # lifetime for them anyway.
-    alias mlir_ref_type = Reference[
-        T,
-        __mlir_attr.`1: i1`,
-        __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
-        address_space,
-    ].mlir_ref_type
-
     @always_inline
     fn __refitem__(
         self,
-    ) -> Self.mlir_ref_type:
+    ) -> Self._mlir_ref_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Returns:
             A reference to the value.
         """
-        return __mlir_op.`lit.ref.from_pointer`[_type = Self.mlir_ref_type](
+        return __mlir_op.`lit.ref.from_pointer`[_type = Self._mlir_ref_type](
             self.value
         )
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self.mlir_ref_type:
+    fn __refitem__(self, offset: Int) -> Self._mlir_ref_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Args:
