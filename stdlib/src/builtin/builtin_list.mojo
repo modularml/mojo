@@ -24,7 +24,7 @@ from memory.unsafe import Reference, _LITRef
 
 @register_passable
 struct ListLiteral[*Ts: AnyRegType](Sized):
-    """The type of a literal heterogenous list expression.
+    """The type of a literal heterogeneous list expression.
 
     A list consists of zero or more values, separated by commas.
 

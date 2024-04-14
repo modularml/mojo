@@ -31,7 +31,7 @@ from utils.static_tuple import StaticTuple
 from .io import _snprintf, _snprintf_scalar
 
 # ===----------------------------------------------------------------------===#
-# Utilties
+# Utilities
 # ===----------------------------------------------------------------------===#
 
 
@@ -875,7 +875,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
           new: The substring to replace with.
 
         Returns:
-          The string where all occurences of `old` are replaced with `new`.
+          The string where all occurrences of `old` are replaced with `new`.
         """
         if not old:
             return self._interleave(new)
@@ -991,7 +991,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         converted to lowercase.
 
         Returns:
-            A new string where cased letters have been convered to lowercase.
+            A new string where cased letters have been converted to lowercase.
         """
 
         # TODO(#26444):
@@ -1123,7 +1123,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             n : The number of times to concatenate the string.
 
         Returns:
-            The string concantenated `n` times.
+            The string concatenated `n` times.
         """
         if n <= 0:
             return ""

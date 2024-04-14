@@ -91,7 +91,7 @@ This solution would alter the name resolution rules inside parameter lists, allo
 fn scalar_param[x: Scalar[dt], dt: DType](): pass
 ```
 
-Where any parameter is inferrable from any previous parameter. The benefits of this approach are that the order of parameters at the callsite match the order in the declaration: `scalar_param[Int32()]()`
+Where any parameter is inferable from any previous parameter. The benefits of this approach are that the order of parameters at the callsite match the order in the declaration: `scalar_param[Int32()]()`
 
 This alternative was rejected because:
 

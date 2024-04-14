@@ -221,7 +221,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
     fn _is_small(self) -> Bool:
         """Returns True if this string is currently in the small-string
-        opimization layout."""
+        optimization layout."""
         var res: Bool = self._storage.isa[_FixedString[Self.SMALL_CAP]]()
 
         return res
@@ -395,7 +395,7 @@ struct _FixedString[CAP: Int](Sized, Stringable, CollectionElement):
 
 @value
 struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
-    """A fixed-sized, homogenous, contiguous, inline collection type.
+    """A fixed-sized, homogeneous, contiguous, inline collection type.
 
     Parameters:
         ElementType: The type of the elements in the array.

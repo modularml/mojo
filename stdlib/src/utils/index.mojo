@@ -739,7 +739,7 @@ fn Index[
     Args:
         x: The 1st initial value.
         y: The 2nd initial value.
-        z: The 3nd initial value.
+        z: The 3rd initial value.
 
     Returns:
         The constructed StaticIntTuple.
@@ -762,7 +762,7 @@ fn Index[
     Args:
         x: The 1st initial value.
         y: The 2nd initial value.
-        z: The 3nd initial value.
+        z: The 3rd initial value.
         w: The 4th initial value.
 
     Returns:
@@ -787,7 +787,7 @@ fn Index[
     Args:
         x: The 1st initial value.
         y: The 2nd initial value.
-        z: The 3nd initial value.
+        z: The 3rd initial value.
         w: The 4th initial value.
         v: The 5th initial value.
 

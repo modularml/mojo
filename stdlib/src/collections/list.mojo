@@ -24,7 +24,7 @@ from memory.anypointer import AnyPointer
 from memory.unsafe import Reference
 
 # ===----------------------------------------------------------------------===#
-# Utilties
+# Utilities
 # ===----------------------------------------------------------------------===#
 
 
