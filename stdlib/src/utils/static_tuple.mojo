@@ -392,6 +392,26 @@ struct Array[ElementType: CollectionElement, size: Int](Sized):
             Reference(Reference(self)[].array).get_legacy_pointer().address,
             index.value,
         )
+<<<<<<< HEAD
         return Reference[Self.ElementType, mutability, self_life](
             UnsafePointer(ptr)[]
+=======
+        return AnyPointer(ptr).__refitem__()
+
+    # TODO: make generic over mutability
+    fn __refitem__[
+        self_life: MutLifetime, index: Int
+    ](
+        self: Reference[Self, __mlir_attr.`1: i1`, self_life].mlir_ref_type,
+    ) -> Reference[Self.ElementType, __mlir_attr.`1: i1`, self_life]:
+        constrained[-index < index < size, "index must be within bounds"]()
+        var normalized_idx = index
+
+        if index < 0:
+            normalized_idx += Reference(self)[].size
+
+        var ptr = __mlir_op.`pop.array.gep`(
+            Pointer.address_of(Reference(self)[].array).address,
+            normalized_idx.value,
+>>>>>>> eb7c04c (debug_assert -> constrained)
         )
