@@ -306,6 +306,11 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
         self = tmp
 
 
+# ===----------------------------------------------------------------------===#
+# Array
+# ===----------------------------------------------------------------------===#
+
+
 @value
 struct Array[ElementType: CollectionElement, size: Int](Sized):
     """A statically sized array type which contains elements of homogeneous types.
