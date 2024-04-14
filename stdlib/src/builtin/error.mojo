@@ -78,7 +78,7 @@ struct Error(Stringable, Boolable):
         return Error {data: dest, loaded_length: -length}
 
     @always_inline("nodebug")
-    fn __init__(borrowed src: StringRef) -> Error:
+    fn __init__(src: StringRef) -> Error:
         """Construct an Error object with a given string ref.
 
         Args:
