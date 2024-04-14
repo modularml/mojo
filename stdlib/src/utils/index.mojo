@@ -20,8 +20,8 @@ from utils import StaticIntTuple
 ```
 """
 
-from builtin.io import _get_dtype_printf_format
-from builtin.string import _calc_initial_buffer_size, _vec_fmt
+from builtin.io import _get_dtype_printf_format, _snprintf
+from builtin.string import _calc_initial_buffer_size
 
 from . import unroll
 from .static_tuple import StaticTuple
@@ -640,12 +640,12 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         buf.reserve(initial_buffer_size)
 
         # Print an opening `(`.
-        buf.size += _vec_fmt(buf.data, 2, "(")
+        buf.size += _snprintf(buf.data, 2, "(")
         for i in range(size):
             # Print separators between each element.
             if i != 0:
-                buf.size += _vec_fmt(buf.data + buf.size, 3, ", ")
-            buf.size += _vec_fmt(
+                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
+            buf.size += _snprintf(
                 buf.data + buf.size,
                 _calc_initial_buffer_size(self[i]),
                 _get_dtype_printf_format[DType.index](),
@@ -653,9 +653,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
             )
         # Single element tuples should be printed with a trailing comma.
         if size == 1:
-            buf.size += _vec_fmt(buf.data + buf.size, 2, ",")
+            buf.size += _snprintf(buf.data + buf.size, 2, ",")
         # Print a closing `)`.
-        buf.size += _vec_fmt(buf.data + buf.size, 2, ")")
+        buf.size += _snprintf(buf.data + buf.size, 2, ")")
 
         buf.size += 1  # for the null terminator.
         return buf^

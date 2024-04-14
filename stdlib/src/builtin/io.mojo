@@ -119,12 +119,12 @@ fn _printf[*types: AnyRegType](fmt: StringLiteral, borrowed *arguments: *types):
 
 @no_inline
 fn _snprintf[
-    *types: AnyRegType
+    *types: AnyType
 ](
-    str: Pointer[Int8],
+    str: UnsafePointer[Int8],
     size: Int,
     fmt: StringLiteral,
-    borrowed *arguments: *types,
+    *arguments: *types,
 ) -> Int:
     """Writes a format string into an output pointer.
 
@@ -137,6 +137,24 @@ fn _snprintf[
     Returns:
         The number of bytes written into the output string.
     """
+
+    alias NoAnyType = rebind[__mlir_type.`!kgen.variadic<!kgen.type>`](types)
+    alias VariadicType = __mlir_attr[
+        `#kgen.param.expr<variadic_ptr_map, `,
+        NoAnyType,
+        `, 0: index>: !kgen.variadic<!kgen.type>`,
+    ]
+    # This is the !lit.ref.pack<:variadic<types>> in memory.
+    var packInMemory = arguments._value
+
+    # Cast the !lit.ref.pack<Ts> to a !kgen.pack<pointer<Ts>>
+    var ptrPack = UnsafePointer.address_of(packInMemory).bitcast[
+        __mlir_type[
+            `!kgen.pack<:variadic<`, AnyRegType, `> `, VariadicType, `>`
+        ]
+    ]()[]
+    var regPack = __mlir_op.`kgen.pack.load`(ptrPack)
+
     return int(
         __mlir_op.`pop.external_call`[
             func = "snprintf".value,
@@ -148,25 +166,14 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.data(), arguments)
-    )
-
-
-@no_inline
-fn _snprintf_int(
-    buffer: Pointer[Int8],
-    size: Int,
-    x: Int,
-) -> Int:
-    return _snprintf(
-        buffer, size, _get_dtype_printf_format[DType.index](), x.value
+        ](str, size, fmt.data(), regPack)
     )
 
 
 @no_inline
 fn _snprintf_scalar[
     type: DType
-](buffer: Pointer[Int8], size: Int, x: Scalar[type],) -> Int:
+](buffer: UnsafePointer[Int8], size: Int, x: Scalar[type],) -> Int:
     alias format = _get_dtype_printf_format[type]()
 
     @parameter
@@ -193,7 +200,7 @@ fn _snprintf_scalar[
 
 
 @no_inline
-fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
+fn _float_repr(buffer: UnsafePointer[Int8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
@@ -206,17 +213,17 @@ fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
     var p = buffer
     alias minus = ord("-")
     alias dot = ord(".")
-    if p.load() == minus:
+    if p[] == minus:
         p += 1
-    while p.load() != 0 and isdigit(p.load()):
+    while p[] != 0 and isdigit(p[]):
         p += 1
-    if p.load():
+    if p[]:
         return n
-    p.store(dot)
+    p[] = dot
     p += 1
-    p.store(ord("0"))
+    p[] = ord("0")
     p += 1
-    p.store(0)
+    p[] = 0
     return n + 2
 
 
