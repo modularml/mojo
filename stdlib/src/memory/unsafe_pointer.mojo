@@ -222,6 +222,24 @@ struct UnsafePointer[
         """
         return self + (-offset)
 
+    @always_inline
+    fn __iadd__(inout self, offset: Int):
+        """Add an offset to this pointer.
+
+        Args:
+            offset: The offset index.
+        """
+        self = Self(address=int(self) + offset * sizeof[T]())
+
+    @always_inline
+    fn __isub__(inout self, offset: Int):
+        """Subtract an offset from this pointer.
+
+        Args:
+            offset: The offset index.
+        """
+        self.__iadd__(-offset)
+
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are equal.

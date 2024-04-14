@@ -18,7 +18,8 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 
 from builtin.hash import _hash_simd
-from builtin.string import _calc_initial_buffer_size, _vec_fmt
+from builtin.string import _calc_initial_buffer_size
+from builtin.io import _snprintf
 
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils import StaticIntTuple
@@ -309,7 +310,7 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
         var buf = String._buffer_type()
         var initial_buffer_size = _calc_initial_buffer_size(self)
         buf.reserve(initial_buffer_size)
-        buf.size += _vec_fmt(buf.data, initial_buffer_size, "%li", self.value)
+        buf.size += _snprintf(buf.data, initial_buffer_size, "%li", self.value)
         buf.size += 1  # for the null terminator.
         return buf^
 
