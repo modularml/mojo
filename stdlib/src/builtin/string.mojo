@@ -28,7 +28,7 @@ from utils import StringRef
 from utils.index import StaticIntTuple
 from utils.static_tuple import StaticTuple
 
-from .io import _snprintf, _snprintf_scalar
+from .io import _snprintf
 
 # ===----------------------------------------------------------------------===#
 # Utilties
