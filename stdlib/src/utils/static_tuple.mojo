@@ -368,6 +368,11 @@ struct Array[ElementType: CollectionElement, size: Int](Sized):
         """
         return size
 
+<<<<<<< HEAD
+=======
+    # TODO: make generic over mutability
+    @always_inline
+>>>>>>> 5f73890 (always_inline)
     fn __refitem__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
@@ -399,6 +404,7 @@ struct Array[ElementType: CollectionElement, size: Int](Sized):
         return AnyPointer(ptr).__refitem__()
 
     # TODO: make generic over mutability
+    @always_inline
     fn __refitem__[
         self_life: MutLifetime, index: Int
     ](
