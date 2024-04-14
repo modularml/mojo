@@ -1129,14 +1129,14 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 
 @always_inline
 fn _vec_fmt[
-    *types: AnyRegType
+    *types: AnyType
 ](
     str: UnsafePointer[Int8],
     size: Int,
     fmt: StringLiteral,
-    borrowed *arguments: *types,
+    *arguments: *types,
 ) -> Int:
-    return _snprintf(rebind[Pointer[Int8]](str), size, fmt, arguments)
+    return _snprintf(str, size, fmt, arguments)
 
 
 fn _toggle_ascii_case(char: Int8) -> Int8:
