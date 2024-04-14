@@ -28,8 +28,8 @@ from utils._visualizers import lldb_formatter_wrapping_type
 from utils.static_tuple import StaticTuple
 
 from .dtype import _integral_type_of
-from .io import _snprintf_scalar
-from .string import _calc_initial_buffer_size, _vec_fmt
+from .io import _snprintf_scalar, _snprintf
+from .string import _calc_initial_buffer_size
 
 # ===------------------------------------------------------------------------===#
 # Type Aliases
@@ -527,16 +527,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Print an opening `[`.
         @parameter
         if size > 1:
-            buf.size += _vec_fmt(buf.data, 2, "[")
+            buf.size += _snprintf(buf.data, 2, "[")
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                buf.size += _vec_fmt(buf.data + buf.size, 3, ", ")
+                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
 
             buf.size += _snprintf_scalar[type](
-                rebind[Pointer[Int8]](buf.data + buf.size),
+                buf.data + buf.size,
                 _calc_initial_buffer_size(element),
                 element,
             )
@@ -544,7 +544,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Print a closing `]`.
         @parameter
         if size > 1:
-            buf.size += _vec_fmt(buf.data + buf.size, 2, "]")
+            buf.size += _snprintf(buf.data + buf.size, 2, "]")
 
         buf.size += 1  # for the null terminator.
         return String(buf^)
