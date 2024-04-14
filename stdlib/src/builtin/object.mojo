@@ -1698,7 +1698,7 @@ struct object(IntableRaising, Boolable, Stringable):
                 object(self._value.get_list_element(j)).print()
             _put("]")
         elif self._value.is_func():
-            _printf("function at %p", self._value.get_as_func().value.address)
+            _printf("function at %p", self._value.get_as_func().value)
         else:
             _put("{")
             var ptr = self._value.get_obj_attrs_ptr()

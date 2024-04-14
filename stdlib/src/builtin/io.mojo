@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from sys import bitwidthof, os_is_windows, triple_is_nvidia_cuda, external_call
 
 from builtin.dtype import _get_dtype_printf_format
+from builtin.builtin_list import _LITRefPackHelper
 from memory import Pointer
 
 from utils import StringRef, unroll
@@ -98,7 +99,16 @@ fn _flush():
 
 
 @no_inline
-fn _printf[*types: AnyRegType](fmt: StringLiteral, borrowed *arguments: *types):
+fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
+    # The argument pack will contain references for each value in the pack,
+    # but we want to pass their values directly into the C snprintf call. Load
+    # all the members of the pack.
+    var kgen_pack = _LITRefPackHelper(arguments._value).get_as_kgen_pack()
+
+    # FIXME(37129): Cannot use get_loaded_kgen_pack because vtables on types
+    # aren't stripped off correctly.
+    var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
+
     with _fdopen(_fdopen.STDOUT) as fd:
         _ = __mlir_op.`pop.external_call`[
             func = "KGEN_CompilerRT_fprintf".value,
@@ -109,7 +119,7 @@ fn _printf[*types: AnyRegType](fmt: StringLiteral, borrowed *arguments: *types):
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](fd, fmt.data(), arguments)
+        ](fd, fmt.data(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -137,23 +147,14 @@ fn _snprintf[
     Returns:
         The number of bytes written into the output string.
     """
+    # The argument pack will contain references for each value in the pack,
+    # but we want to pass their values directly into the C snprintf call. Load
+    # all the members of the pack.
+    var kgen_pack = _LITRefPackHelper(arguments._value).get_as_kgen_pack()
 
-    alias NoAnyType = rebind[__mlir_type.`!kgen.variadic<!kgen.type>`](types)
-    alias VariadicType = __mlir_attr[
-        `#kgen.param.expr<variadic_ptr_map, `,
-        NoAnyType,
-        `, 0: index>: !kgen.variadic<!kgen.type>`,
-    ]
-    # This is the !lit.ref.pack<:variadic<types>> in memory.
-    var packInMemory = arguments._value
-
-    # Cast the !lit.ref.pack<Ts> to a !kgen.pack<pointer<Ts>>
-    var ptrPack = UnsafePointer.address_of(packInMemory).bitcast[
-        __mlir_type[
-            `!kgen.pack<:variadic<`, AnyRegType, `> `, VariadicType, `>`
-        ]
-    ]()[]
-    var regPack = __mlir_op.`kgen.pack.load`(ptrPack)
+    # FIXME(37129): Cannot use get_loaded_kgen_pack because vtables on types
+    # aren't stripped off correctly.
+    var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
 
     return int(
         __mlir_op.`pop.external_call`[
@@ -166,7 +167,7 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.data(), regPack)
+        ](str, size, fmt.data(), loaded_pack)
     )
 
 
