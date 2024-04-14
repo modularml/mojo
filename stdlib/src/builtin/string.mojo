@@ -24,7 +24,7 @@ from memory import DTypePointer, Pointer, UnsafePointer, memcmp, memcpy
 from utils import StringRef, StaticIntTuple, StaticTuple
 
 
-from .io import _snprintf, _snprintf_scalar
+from .io import _snprintf
 
 # ===----------------------------------------------------------------------===#
 # Utilties
