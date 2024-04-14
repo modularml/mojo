@@ -116,7 +116,7 @@ def test_array_str():
     assert_equal(arr[1], "hello")
     assert_equal(arr[2], "hey")
 
-    # Test mutating a tuple through its __setitem__
+    # Test mutating a tuple through its __refitem__
     arr[0] = "howdy"
     arr[1] = "morning"
     arr[2] = "wazzup"
