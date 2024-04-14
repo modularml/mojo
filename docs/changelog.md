@@ -175,6 +175,9 @@ what we publish.
 - [#1924](https://github.com/modularml/mojo/issues/1924) JIT debugging on Mac
   has been fixed.
 
+- [#1941](https://github.com/modularml/mojo/issues/1941) Mojo variadics don't
+  work with non-trivial register-only types.
+
 - [#1963](https://github.com/modularml/mojo/issues/1963) `a!=0` is now parsed
   and formatted correctly by `mojo format`.
 
