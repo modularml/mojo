@@ -190,25 +190,6 @@ struct AddressSpace(EqualityComparable):
 # ===----------------------------------------------------------------------===#
 
 
-# Helper to build !lit.ref types.
-# TODO: parametric aliases would be nice.
-struct _LITRef[
-    element_type: AnyType,
-    elt_is_mutable: __mlir_type.i1,
-    lifetime: AnyLifetime[elt_is_mutable].type,
-    address_space: AddressSpace = AddressSpace.GENERIC,
-]:
-    alias type = __mlir_type[
-        `!lit.ref<`,
-        element_type,
-        `, `,
-        lifetime,
-        `, `,
-        address_space._value.value,
-        `>`,
-    ]
-
-
 @value
 @register_passable("trivial")
 struct Reference[
