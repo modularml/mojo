@@ -13,11 +13,17 @@
 # RUN: %mojo %s
 
 from testing import assert_equal
+from sys.info import bitwidthof
 
 
 def test_constructors():
     var i1 = Int(3)  # Constructible from IntLiteral
     var i2 = Int(Int(5))  # Constructible from Int
+
+
+def test_properties():
+    assert_equal(Int.MAX, (1 << bitwidthof[DType.index]() - 1) - 1)
+    assert_equal(Int.MIN, -(1 << bitwidthof[DType.index]() - 1))
 
 
 def test_add():
@@ -65,6 +71,7 @@ def test_mod():
 
 def main():
     test_constructors()
+    test_properties()
     test_add()
     test_sub()
     test_div()

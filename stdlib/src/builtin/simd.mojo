@@ -2465,6 +2465,11 @@ fn _neginf[type: DType]() -> Scalar[type]:
 # ===----------------------------------------------------------------------===#
 
 
+@always_inline("nodebug")
+fn _is_32_bit_system() -> Bool:
+    return sizeof[DType.index]() == sizeof[DType.int32]()
+
+
 @always_inline
 fn _max_finite[type: DType]() -> Scalar[type]:
     """Returns the maximum finite value of type.
@@ -2486,16 +2491,14 @@ fn _max_finite[type: DType]() -> Scalar[type]:
         return 32767
     elif type == DType.uint16:
         return 65535
-    elif type == DType.int32 or (
-        type == DType.index and sizeof[DType.index]() == sizeof[DType.int32]()
-    ):
+    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
         return 2147483647
     elif type == DType.uint32:
         return 4294967295
     elif type == DType.float32:
         return 3.40282346638528859812e38
     elif type == DType.int64 or (
-        type == DType.index and sizeof[DType.index]() == sizeof[DType.int64]()
+        type == DType.index and not _is_32_bit_system()
     ):
         return 9223372036854775807
     elif type == DType.uint64:
@@ -2533,11 +2536,13 @@ fn _min_finite[type: DType]() -> Scalar[type]:
         return -128
     elif type == DType.int16:
         return -32768
-    elif type == DType.int32:
+    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
         return -2147483648
     elif type == DType.float32:
         return -_max_finite[type]()
-    elif type == DType.int64:
+    elif type == DType.int64 or (
+        type == DType.index and not _is_32_bit_system()
+    ):
         return -9223372036854775808
     elif type == DType.float64:
         return -_max_finite[type]()
