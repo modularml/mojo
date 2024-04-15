@@ -16,6 +16,9 @@ repos:
       - id: spellcheck-notebook
         name: Spellcheck Jupyter Notebook
         entry: ./trying_stuff.sh
-        language: system
-        types: [jupyter]
+        language: python
         files: \.ipynb$
+        additional_dependencies:
+          - jupyter==1.0.0
+          - codespell==2.2.6
+          - nbformat==5.10.4
