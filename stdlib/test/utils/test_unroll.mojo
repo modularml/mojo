@@ -12,8 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from utils.index import StaticIntTuple
-from utils.loop import unroll
+from utils import StaticIntTuple, unroll
 from testing import assert_equal, assert_raises
 
 
