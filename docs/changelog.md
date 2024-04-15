@@ -115,11 +115,28 @@ what we publish.
      `Reference` is a safe type - use `UnsafePointer` to do unsafe operations.
 
 - The `mojo package` command no longer supports the `-D` flag. All compilation
-  environment flags should be provided at the point of package use
-  (e.g. `mojo run` or `mojo build`).
+  environment flags should be provided at the point of package use (e.g.
+  `mojo run` or `mojo build`).
 
-- `parallel_memcpy` function has moved from the `buffer` package to the `algorithm`
-  package.  Please update your imports accordingly.
+- `parallel_memcpy` function has moved from the `buffer` package to the
+  `algorithm` package. Please update your imports accordingly.
+
+- `FileHandle.seek()` now has a whence argument that defaults to `os.SEEK_SET`
+  to seek from the beginning of the file. You can now set to `os.SEEK_CUR` to
+  offset by the current `FileHandle` seek position:
+
+  ```mojo
+  var f = open("/tmp/example.txt")
+  # Skip 32 bytes
+  f.seek(os.SEEK_CUR, 32)
+  ```
+
+  Or `os.SEEK_END` to offset from the end of file:
+
+  ```mojo
+  # Start from 32 bytes before the end of the file
+  f.seek(os.SEEK_END, -32)
+  ```
 
 ### ❌ Removed
 
