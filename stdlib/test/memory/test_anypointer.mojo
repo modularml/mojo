@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s --dump-input=always
+# RUN: %mojo -debug-level full %s
 
 from memory import AnyPointer
 from test_utils import MoveCounter
@@ -18,32 +18,46 @@ from testing import assert_equal, assert_not_equal, assert_true
 
 
 struct MoveOnlyType(Movable):
+    # It's a weak reference, we don't want to delete the actions
+    # after the struct is deleted, otherwise we can't observe the __del__.
+    var actions: AnyPointer[List[String]]
     var value: Int
 
-    fn __init__(inout self, value: Int):
+    fn __init__(inout self, value: Int, actions: AnyPointer[List[String]]):
+        self.actions = actions
         self.value = value
+        self.actions[0].append("__init__")
 
     fn __moveinit__(inout self, owned existing: Self):
+        self.actions = existing.actions
         self.value = existing.value
-        print("moved", self.value)
+        self.actions[0].append("__moveinit__")
 
     fn __del__(owned self):
-        print("deleted", self.value)
+        self.actions[0].append("__del__")
 
 
-fn test_anypointer_of_move_only_type():
-    # CHECK-LABEL: === test_anypointer
-    print("=== test_anypointer")
+def test_anypointer_of_move_only_type():
+    var actions_ptr = AnyPointer[List[String]].alloc(1)
+    actions_ptr.emplace_value(List[String]())
 
     var ptr = AnyPointer[MoveOnlyType].alloc(1)
-    # CHECK: moved 42
-    ptr.emplace_value(MoveOnlyType(42))
-    # CHECK: moved 42
+    ptr.emplace_value(MoveOnlyType(42, actions_ptr))
+    assert_equal(len(actions_ptr[0]), 2)
+    assert_equal(actions_ptr[0][0], "__init__")
+    assert_equal(actions_ptr[0][1], "__moveinit__", msg="emplace_value")
+    assert_equal(ptr[0].value, 42)
+
     var value = ptr.take_value()
-    # CHECK: value 42
-    print("value", value.value)
-    # CHECK: deleted 42
+    assert_equal(len(actions_ptr[0]), 3)
+    assert_equal(actions_ptr[0][2], "__moveinit__")
+    assert_equal(value.value, 42)
+
     ptr.free()
+    assert_equal(len(actions_ptr[0]), 4)
+    assert_equal(actions_ptr[0][3], "__del__")
+
+    actions_ptr.free()
 
 
 def test_anypointer_move_into_move_count():
