@@ -23,8 +23,8 @@ from memory import Reference, UnsafePointer
 # ===----------------------------------------------------------------------===#
 
 
-@register_passable
-struct ListLiteral[*Ts: AnyRegType](Sized):
+@value
+struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     """The type of a literal heterogenous list expression.
 
     A list consists of zero or more values, separated by commas.
@@ -33,17 +33,17 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
         Ts: The type of the elements.
     """
 
-    var storage: __mlir_type[`!kgen.pack<`, Ts, `>`]
+    var storage: Tuple[Ts]
     """The underlying storage for the list."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, borrowed *args: *Ts):
+    fn __init__(inout self, *args: *Ts):
         """Construct the list literal from the given values.
 
         Args:
             args: The init values.
         """
-        self.storage = args
+        self.storage = Tuple(storage=args)
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -52,10 +52,10 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
         Returns:
             The length of this ListLiteral.
         """
-        return __mlir_op.`pop.variadic.size`(Ts)
+        return len(self.storage)
 
     @always_inline("nodebug")
-    fn get[i: Int, T: AnyRegType](self) -> T:
+    fn get[i: Int, T: CollectionElement](self) -> T:
         """Get a list element at the given index.
 
         Parameters:
@@ -65,9 +65,7 @@ struct ListLiteral[*Ts: AnyRegType](Sized):
         Returns:
             The element at the given index.
         """
-        return rebind[T](
-            __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
-        )
+        return self.storage.get[i, T]()
 
 
 # ===----------------------------------------------------------------------===#
@@ -413,11 +411,11 @@ alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
 
 @value
 struct _LITRefPackHelper[
-    element_trait: _AnyTypeMetaType,
-    *element_types: element_trait,
     is_mutable: __mlir_type.i1,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: __mlir_type.index,
+    element_trait: _AnyTypeMetaType,
+    *element_types: element_trait,
 ]:
     """This struct mirrors the !lit.ref.pack type, and provides aliases and
     methods that are useful for working with it."""

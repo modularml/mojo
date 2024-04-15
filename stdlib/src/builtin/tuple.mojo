@@ -33,13 +33,15 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         element_types: The elements type.
     """
 
-    var storage: __mlir_type[
+    alias _mlir_type = __mlir_type[
         `!kgen.pack<:!kgen.variadic<`,
         CollectionElement,
         `> `,
         +element_types,
         `>`,
     ]
+
+    var storage: Self._mlir_type
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
@@ -48,6 +50,19 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         Args:
             args: Initial values.
+        """
+        self = Self(storage=args)
+
+    @always_inline("nodebug")
+    fn __init__(
+        inout self,
+        *,
+        storage: VariadicPack[_, _, CollectionElement, element_types],
+    ):
+        """Construct the tuple from a low-level internal representation.
+
+        Args:
+            storage: The variadic pack storage to construct from.
         """
         # Mark 'storage' as being initialized so we can work on it.
         __mlir_op.`lit.ownership.mark_initialized`(
@@ -59,7 +74,8 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             # TODO: We could be fancier and take the values out of an owned
             # pack. For now just keep everything simple and copy the element.
             initialize_pointee(
-                UnsafePointer(self._refitem__[idx]()), args.get_element[idx]()[]
+                UnsafePointer(self._refitem__[idx]()),
+                storage.get_element[idx]()[],
             )
 
         unroll[initialize_elt, Self.__len__()]()
