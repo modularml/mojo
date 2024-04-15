@@ -192,11 +192,15 @@ struct FileHandle:
 
         return list
 
-    fn seek(self, offset: UInt64) raises -> UInt64:
+    fn seek(self, offset: UInt64, whence: UInt8 = os.SEEK_SET) raises -> UInt64:
         """Seeks to the given offset in the file.
 
         Args:
-            offset: The byte offset to seek to from the start of the file.
+            offset: The byte offset to seek to.
+            whence: The reference point for the offset:
+                os.SEEK_SET = 0: start of file (Default).
+                os.SEEK_CUR = 1: current position.
+                os.SEEK_END = 2: end of file.
 
         Raises:
             An error if this file handle is invalid, or if file seek returned a
@@ -204,13 +208,36 @@ struct FileHandle:
 
         Returns:
             The resulting byte offset from the start of the file.
+
+        Examples:
+
+        Skip 32 bytes from the current read position:
+
+        ```mojo
+        import os
+        var f = open("/tmp/example.txt", "r")
+        f.seek(os.SEEK_CUR, 32)
+        ```
+
+        Start from 32 bytes from the end of the file:
+
+        ```mojo
+        import os
+        var f = open("/tmp/example.txt", "r")
+        f.seek(os.SEEK_END, -32)
+        ```
+        .
         """
         if not self.handle:
             raise "invalid file handle"
 
+        debug_assert(
+            whence >= 0 and whence < 3,
+            "Second argument to `seek` must be between 0 and 2.",
+        )
         var err_msg = _OwnedStringRef()
         var pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
-            self.handle, offset, UnsafePointer.address_of(err_msg)
+            self.handle, offset, whence, UnsafePointer.address_of(err_msg)
         )
 
         if err_msg:

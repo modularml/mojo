@@ -30,6 +30,20 @@ from utils import StringRef
 from .path import isdir
 from .pathlike import PathLike
 
+
+# ===----------------------------------------------------------------------=== #
+# SEEK Constants
+# ===----------------------------------------------------------------------=== #
+
+
+alias SEEK_SET: UInt8 = 0
+"""Seek from the beginning of the file."""
+alias SEEK_CUR: UInt8 = 1
+"""Seek from the current position."""
+alias SEEK_END: UInt8 = 2
+"""Seek from the end of the file."""
+
+
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
