@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from collections.set import Set
+from collections import Set
 
 from testing import assert_raises, assert_true, assert_false
 

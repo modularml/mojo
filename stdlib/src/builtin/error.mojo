@@ -15,10 +15,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.info import alignof, sizeof
+from sys import alignof, sizeof
 
-from memory.memory import _free, memcmp, memcpy
-from memory.unsafe import DTypePointer
+from memory.memory import _free
+from memory import memcmp, memcpy, DTypePointer
 
 # ===----------------------------------------------------------------------===#
 # Error
