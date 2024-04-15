@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import Dict, List
 from os import Atomic
-from sys.intrinsics import _mlirtype_is_eq
+from sys.intrinsics import _type_is_eq
 
 
 from memory import memcmp, memcpy, DTypePointer, Pointer
@@ -789,7 +789,7 @@ struct object(IntableRaising, Boolable, Stringable):
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: AnyRegType](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
         """Initializes the object from a list literal.
 
         Parameters:
@@ -799,32 +799,31 @@ struct object(IntableRaising, Boolable, Stringable):
             value: The list value.
         """
         self._value = _RefCountedListRef()
-        alias types = VariadicList(Ts)
 
         @parameter
         @always_inline
         fn append[i: Int]():
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
-            alias T = types[i]
+            alias T = Ts[i]
 
             @parameter
-            if _mlirtype_is_eq[T, Int]():
+            if _type_is_eq[T, Int]():
                 self._append(value.get[i, Int]())
-            elif _mlirtype_is_eq[T, Float64]():
+            elif _type_is_eq[T, Float64]():
                 self._append(value.get[i, Float64]())
-            elif _mlirtype_is_eq[T, Bool]():
+            elif _type_is_eq[T, Bool]():
                 self._append(value.get[i, Bool]())
-            elif _mlirtype_is_eq[T, StringRef]():
+            elif _type_is_eq[T, StringRef]():
                 self._append(value.get[i, StringRef]())
-            elif _mlirtype_is_eq[T, StringLiteral]():
+            elif _type_is_eq[T, StringLiteral]():
                 self._append(value.get[i, StringLiteral]())
             else:
                 constrained[
                     False, "cannot convert nested list element to object"
                 ]()
 
-        unroll[append, len(types)]()
+        unroll[append, len(VariadicList(Ts))]()
 
     @always_inline
     fn __init__(inout self, func: Self.nullary_function):
