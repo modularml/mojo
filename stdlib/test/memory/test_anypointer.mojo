@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s --dump-input=always
 
-from memory.anypointer import AnyPointer
+from memory import AnyPointer
 from test_utils import MoveCounter
 from testing import assert_equal, assert_not_equal, assert_true
 

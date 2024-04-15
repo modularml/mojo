@@ -18,7 +18,7 @@
 
 from os.path import isdir, islink
 from pathlib import Path
-from sys.param_env import env_get_string
+from sys import env_get_string
 
 from testing import assert_true, assert_false
 

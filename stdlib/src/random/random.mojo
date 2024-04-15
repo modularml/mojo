@@ -19,11 +19,10 @@ from random import seed
 ```
 """
 
-from sys import external_call
-from sys.info import bitwidthof
+from sys import external_call, bitwidthof
 from time import now
 
-from memory.unsafe import DTypePointer
+from memory import DTypePointer
 
 
 fn _get_random_state() -> DTypePointer[DType.invalid]:
