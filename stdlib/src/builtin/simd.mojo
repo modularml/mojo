@@ -2495,18 +2495,20 @@ fn _max_finite[type: DType]() -> Scalar[type]:
         return 2147483647
     elif type == DType.uint32:
         return 4294967295
-    elif type == DType.float32:
-        return 3.40282346638528859812e38
     elif type == DType.int64 or (
         type == DType.index and not _is_32_bit_system()
     ):
         return 9223372036854775807
     elif type == DType.uint64:
         return 18446744073709551615
-    elif type == DType.float64:
-        return 1.79769313486231570815e308
+    elif type == DType.float16:
+        return 65504
     elif type == DType.bfloat16:
         return 3.38953139e38
+    elif type == DType.float32:
+        return 3.40282346638528859812e38
+    elif type == DType.float64:
+        return 1.79769313486231570815e308
     else:
         constrained[False, "max_finite() called on unsupported type"]()
         return 0
@@ -2538,15 +2540,11 @@ fn _min_finite[type: DType]() -> Scalar[type]:
         return -32768
     elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
         return -2147483648
-    elif type == DType.float32:
-        return -_max_finite[type]()
     elif type == DType.int64 or (
         type == DType.index and not _is_32_bit_system()
     ):
         return -9223372036854775808
-    elif type == DType.float64:
-        return -_max_finite[type]()
-    elif type == DType.bfloat16:
+    elif type.is_floating_point():
         return -_max_finite[type]()
     else:
         constrained[False, "min_finite() called on unsupported type"]()
