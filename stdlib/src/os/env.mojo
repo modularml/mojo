@@ -19,10 +19,9 @@ from os import setenv
 ```
 """
 
-from sys import external_call
-from sys.info import os_is_linux, os_is_macos
+from sys import external_call, os_is_linux, os_is_macos
 
-from memory.unsafe import DTypePointer
+from memory import DTypePointer
 
 from utils import StringRef
 

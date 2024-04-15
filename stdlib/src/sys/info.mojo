@@ -15,7 +15,7 @@
 You can import these APIs from the `sys` package. For example:
 
 ```mojo
-from sys.info import is_x86
+from sys import is_x86
 ```
 """
 

@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from memory.unsafe import bitcast
+from memory import bitcast
 from testing import assert_equal
 
 
