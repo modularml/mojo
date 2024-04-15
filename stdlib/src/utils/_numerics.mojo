@@ -24,7 +24,8 @@ from sys._assembly import inlined_assembly
 from sys.info import bitwidthof, has_neon, has_sse4
 
 from builtin.dtype import _integral_type_of
-from memory.unsafe import Pointer, bitcast
+from memory.unsafe import bitcast
+from memory.unsafe_pointer import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # _digits
@@ -501,7 +502,7 @@ struct FlushDenormals:
                 mxcsr |= 0x8000  # flush to zero
                 mxcsr |= 0x40  # denormals are zero
             llvm_intrinsic["llvm.x86.sse.ldmxcsr", NoneType](
-                Pointer[Int32].address_of(mxcsr)
+                UnsafePointer[Int32].address_of(mxcsr)
             )
             return
 
@@ -539,7 +540,7 @@ struct FlushDenormals:
         if has_sse4():
             var mxcsr = Int32()
             llvm_intrinsic["llvm.x86.sse.stmxcsr", NoneType](
-                Pointer[Int32].address_of(mxcsr)
+                UnsafePointer[Int32].address_of(mxcsr)
             )
             return mxcsr
 
