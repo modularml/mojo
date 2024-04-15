@@ -19,9 +19,9 @@ from collections.vector import InlinedFixedVector
 ```
 """
 
-from memory.unsafe import Pointer, Reference
+from memory import Pointer, Reference
 
-from utils.static_tuple import StaticTuple
+from utils import StaticTuple
 
 # ===----------------------------------------------------------------------===#
 # _VecIter
