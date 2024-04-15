@@ -123,18 +123,26 @@ def test_file_read_context():
 def test_file_seek():
     print("== test_file_seek")
 
-    with open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
-        "r",
-    ) as f:
+    with open(Path(CURRENT_DIR) / "test_file_dummy_input.txt", "r") as f:
         var pos = f.seek(6)
         assert_equal(pos, 6)
 
         alias expected_msg1 = "ipsum dolor sit amet, consectetur adipiscing elit."
         assert_equal(f.read(len(expected_msg1)), expected_msg1)
 
+        # Seek from the end of the file
+        pos = f.seek(-16, 2)
+        assert_equal(pos, 938)
+
+        print(f.read(6))
+
+        # Seek from current possition, skip the space
+        pos = f.seek(1, 1)
+        assert_equal(pos, 945)
+        assert_equal(f.read(7), "rhoncus")
+
         try:
-            f.seek(-12)
+            _ = f.seek(-12)
         except e:
             alias expected_msg = "seek error"
             assert_equal(str(e)[: len(expected_msg)], expected_msg)
