@@ -23,8 +23,7 @@ print(3 == p.get())
 ```
 """
 
-from memory.anypointer import AnyPointer
-from memory.memory import stack_allocation
+from memory import AnyPointer, stack_allocation
 
 
 struct _ArcInner[T: Movable]:

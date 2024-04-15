@@ -23,10 +23,9 @@ from os._windows import (
     last_operation_succeeded,
     reset_last_error,
 )
-from sys import external_call
-from sys.info import os_is_linux, os_is_macos, os_is_windows
+from sys import external_call, os_is_linux, os_is_macos, os_is_windows
 
-from memory.unsafe import Pointer
+from memory import Pointer
 from testing import assert_false, assert_true, assert_equal
 
 

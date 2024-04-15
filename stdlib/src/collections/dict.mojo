@@ -31,7 +31,7 @@ value types must always be Movable so we can resize the dictionary as it grows.
 
 See the `Dict` docs for more details.
 """
-from memory.anypointer import AnyPointer
+from memory import AnyPointer
 
 from .optional import Optional
 
