@@ -16,7 +16,7 @@
 
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol
-from memory.unsafe import DTypePointer
+from memory.unsafe import LegacyPointer, DTypePointer
 from memory.unsafe_pointer import UnsafePointer
 
 # ===----------------------------------------------------------------------=== #
@@ -92,7 +92,7 @@ struct StringRef(
         return self
 
     @always_inline
-    fn __init__(ptr: Pointer[Int8], len: Int) -> StringRef:
+    fn __init__(ptr: LegacyPointer[Int8], len: Int) -> StringRef:
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -116,7 +116,7 @@ struct StringRef(
         The constructor takes a raw pointer and a length.
 
         Args:
-            ptr: Pointer to the string.
+            ptr: DTypePointer to the string.
             len: The length of the string.
 
         Returns:
@@ -136,14 +136,14 @@ struct StringRef(
             Constructed `StringRef` object.
         """
 
-        return DTypePointer[DType.int8](ptr.value)
+        return DTypePointer[DType.int8](ptr)
 
     @always_inline
     fn __init__(ptr: DTypePointer[DType.int8]) -> StringRef:
         """Construct a StringRef value given a null-terminated string.
 
         Args:
-            ptr: Pointer to the string.
+            ptr: DTypePointer to the string.
 
         Returns:
             Constructed `StringRef` object.
@@ -160,7 +160,7 @@ struct StringRef(
         """Retrieves a pointer to the underlying memory.
 
         Returns:
-            The pointer to the underlying memory.
+            The DTypePointer to the underlying memory.
         """
         return self.data
 
