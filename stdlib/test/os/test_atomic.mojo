@@ -13,7 +13,7 @@
 # RUN: %mojo %s
 
 from os import Atomic
-from testing import assert_equal
+from testing import assert_equal, assert_true, assert_false
 
 
 fn test_atomic() raises:
@@ -84,7 +84,31 @@ def test_atomic_move_constructor():
     assert_equal(atom2.value, 0)
 
 
+def test_compare_exchange_weak():
+    var atom: Atomic[DType.int64] = 3
+    var expected = Int64(3)
+    var desired = Int64(3)
+    var ok = atom.compare_exchange_weak(expected, desired)
+
+    assert_equal(expected, 3)
+    assert_true(ok)
+
+    expected = Int64(4)
+    ok = atom.compare_exchange_weak(expected, desired)
+
+    assert_equal(expected, 3)
+    assert_false(ok)
+
+    expected = Int64(4)
+    desired = Int64(6)
+    ok = atom.compare_exchange_weak(expected, desired)
+
+    assert_equal(expected, 3)
+    assert_false(ok)
+
+
 def main():
     test_atomic()
     test_atomic_floating_point()
     test_atomic_move_constructor()
+    test_compare_exchange_weak()
