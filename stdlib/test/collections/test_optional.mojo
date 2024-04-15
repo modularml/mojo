@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from collections.optional import Optional, OptionalReg
+from collections import Optional, OptionalReg
 
 from testing import assert_true, assert_false, assert_equal
 

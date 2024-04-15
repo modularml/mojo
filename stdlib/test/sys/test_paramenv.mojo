@@ -13,7 +13,7 @@
 # RUN: %mojo -D bar=99 -D baz=hello %s | FileCheck %s
 # RUN: %mojo -D bar=99 -D baz=hello -D foo=11 %s | FileCheck %s --check-prefix=FOO
 
-from sys.param_env import env_get_int, env_get_string, is_defined
+from sys import env_get_int, env_get_string, is_defined
 
 
 fn main():
