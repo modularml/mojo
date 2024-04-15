@@ -15,5 +15,5 @@
 from .atomic import Atomic
 from .env import setenv, getenv
 from .fstat import lstat, stat, stat_result
-from .os import abort, listdir
+from .os import abort, listdir, remove, unlink
 from .pathlike import PathLike
