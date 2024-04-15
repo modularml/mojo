@@ -33,7 +33,7 @@ with open("my_file.txt", "r") as f:
 
 from os import PathLike
 from sys import external_call
-from memory import AddressSpace, DTypePointer
+from memory import AddressSpace, DTypePointer, Pointer
 
 
 @register_passable
@@ -95,7 +95,7 @@ struct FileHandle:
 
         if err_msg:
             self.handle = DTypePointer[DType.invalid]()
-            raise (err_msg ^).consume_as_error()
+            raise (err_msg^).consume_as_error()
 
         self.handle = handle
 
@@ -118,7 +118,7 @@ struct FileHandle:
         )
 
         if err_msg:
-            raise (err_msg ^).consume_as_error()
+            raise (err_msg^).consume_as_error()
 
         self.handle = DTypePointer[DType.invalid]()
 
@@ -156,7 +156,7 @@ struct FileHandle:
         )
 
         if err_msg:
-            raise (err_msg ^).consume_as_error()
+            raise (err_msg^).consume_as_error()
 
         return String(buf, int(size_copy) + 1)
 
@@ -185,7 +185,7 @@ struct FileHandle:
         )
 
         if err_msg:
-            raise (err_msg ^).consume_as_error()
+            raise (err_msg^).consume_as_error()
 
         # No-copy list initialization
         var list = List[Int8](buf, int(size_copy), int(size_copy))
@@ -214,7 +214,7 @@ struct FileHandle:
         )
 
         if err_msg:
-            raise (err_msg ^).consume_as_error()
+            raise (err_msg^).consume_as_error()
 
         return pos
 
@@ -268,11 +268,11 @@ struct FileHandle:
         )
 
         if err_msg:
-            raise (err_msg ^).consume_as_error()
+            raise (err_msg^).consume_as_error()
 
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
-        return self ^
+        return self^
 
 
 fn open(path: String, mode: String) raises -> FileHandle:
