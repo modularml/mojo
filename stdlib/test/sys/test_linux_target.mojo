@@ -17,8 +17,7 @@
 # REQUIRES: linux
 # RUN: %mojo -debug-level full %s
 
-
-from sys.info import os_is_linux, os_is_macos
+from sys import os_is_linux, os_is_macos
 from testing import assert_false, assert_true
 
 

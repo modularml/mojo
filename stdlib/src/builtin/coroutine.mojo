@@ -15,9 +15,9 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.info import sizeof
+from sys import sizeof
 
-from memory.unsafe import Pointer
+from memory import Pointer
 
 # ===----------------------------------------------------------------------=== #
 # _CoroutineContext

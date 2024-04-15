@@ -15,18 +15,14 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import List
-from collections.dict import KeyElement
-from sys import llvm_intrinsic
-from sys.info import bitwidthof
+from collections import List, KeyElement
+from sys import llvm_intrinsic, bitwidthof
 
-from memory.anypointer import AnyPointer
-from memory.memory import memcmp, memcpy
-from memory.unsafe import DTypePointer, Pointer
+from memory import AnyPointer, DTypePointer, Pointer, memcmp, memcpy
 
-from utils import StringRef
-from utils.index import StaticIntTuple
-from utils.static_tuple import StaticTuple
+
+from utils import StringRef, StaticIntTuple, StaticTuple
+
 
 from .io import _snprintf, _snprintf_scalar
 

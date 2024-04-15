@@ -16,7 +16,7 @@
 You can import these APIs from the `utils.loop` module. For example:
 
 ```mojo
-from utils.loop import unroll
+from utils import unroll
 ```
 """
 
