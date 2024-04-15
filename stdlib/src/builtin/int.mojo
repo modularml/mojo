@@ -193,18 +193,6 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
         }
 
     @always_inline("nodebug")
-    fn __init__(value: Int) -> Int:
-        """Construct Int from another Int value.
-
-        Args:
-            value: The init value.
-
-        Returns:
-            The constructed Int object.
-        """
-        return Self {value: value.value}
-
-    @always_inline("nodebug")
     fn __init__(value: __mlir_type.index) -> Int:
         """Construct Int from the given index value.
 

@@ -18,7 +18,6 @@ from sys.info import bitwidthof
 
 def test_constructors():
     var i1 = Int(3)  # Constructible from IntLiteral
-    var i2 = Int(Int(5))  # Constructible from Int
 
 
 def test_properties():
