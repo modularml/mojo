@@ -13,3 +13,9 @@ repos:
         language: system
         files: '\.(mojo|🔥|py)$'
         stages: [commit]
+      - id: spellcheck-notebook
+        name: Spellcheck Jupyter Notebook
+        entry: ./trying_stuff.sh
+        language: system
+        types: [jupyter]
+        files: \.ipynb$

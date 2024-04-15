@@ -17,5 +17,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# This is where we put the notebooks converted as markdown
+# before running spellcheck on them
+/notebooks-converted-to-markdown
+
 # MacOS
 .DS_Store
