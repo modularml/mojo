@@ -33,6 +33,7 @@ with open("my_file.txt", "r") as f:
 
 from os import PathLike
 from sys import external_call
+
 from memory import AddressSpace, DTypePointer, Pointer
 
 
@@ -91,7 +92,7 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
         var handle = external_call[
             "KGEN_CompilerRT_IO_FileOpen", DTypePointer[DType.invalid]
-        ](path, mode, Pointer.address_of(err_msg))
+        ](path, mode, UnsafePointer.address_of(err_msg))
 
         if err_msg:
             self.handle = DTypePointer[DType.invalid]()
@@ -114,7 +115,7 @@ struct FileHandle:
 
         var err_msg = _OwnedStringRef()
         external_call["KGEN_CompilerRT_IO_FileClose", NoneType](
-            self.handle, Pointer.address_of(err_msg)
+            self.handle, UnsafePointer.address_of(err_msg)
         )
 
         if err_msg:
@@ -147,10 +148,12 @@ struct FileHandle:
         var size_copy: Int64 = size
         var err_msg = _OwnedStringRef()
 
-        var buf = external_call["KGEN_CompilerRT_IO_FileRead", Pointer[Int8]](
+        var buf = external_call[
+            "KGEN_CompilerRT_IO_FileRead", UnsafePointer[Int8]
+        ](
             self.handle,
-            Pointer.address_of(size_copy),
-            Pointer.address_of(err_msg),
+            UnsafePointer.address_of(size_copy),
+            UnsafePointer.address_of(err_msg),
         )
 
         if err_msg:
@@ -175,18 +178,22 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
 
         var buf = external_call[
-            "KGEN_CompilerRT_IO_FileReadBytes", AnyPointer[Int8]
+            "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[Int8]
         ](
             self.handle,
-            Pointer.address_of(size_copy),
-            Pointer.address_of(err_msg),
+            UnsafePointer.address_of(size_copy),
+            UnsafePointer.address_of(err_msg),
         )
 
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        # No-copy list initialization
-        var list = List[Int8](buf, int(size_copy), int(size_copy))
+        var list = List[Int8](capacity=int(size_copy))
+        var list_ptr = UnsafePointer[Int8](address=int(list.data))
+
+        # Initialize the List elements and set the initialized size
+        memcpy(list_ptr, buf, int(size_copy))
+        list.size = int(size_copy)
 
         return list
 
@@ -208,7 +215,7 @@ struct FileHandle:
 
         var err_msg = _OwnedStringRef()
         var pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
-            self.handle, offset, Pointer.address_of(err_msg)
+            self.handle, offset, UnsafePointer.address_of(err_msg)
         )
 
         if err_msg:
@@ -262,7 +269,7 @@ struct FileHandle:
             self.handle,
             ptr.address,
             len,
-            Pointer.address_of(err_msg),
+            UnsafePointer.address_of(err_msg),
         )
 
         if err_msg:

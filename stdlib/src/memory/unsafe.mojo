@@ -656,6 +656,15 @@ struct DTypePointer[
         self.address = value
 
     @always_inline("nodebug")
+    fn __init__(inout self, value: UnsafePointer[Scalar[type], address_space]):
+        """Constructs a `DTypePointer` from a scalar pointer of the same type.
+
+        Args:
+            value: The scalar pointer.
+        """
+        self.address = value.value
+
+    @always_inline("nodebug")
     fn __init__(inout self, value: Scalar[DType.address]):
         """Constructs a `DTypePointer` from the value of scalar address.
 
