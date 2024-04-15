@@ -12,8 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
 # RUN: %mojo %s | FileCheck %s
-from python.object import PythonObject
-from python.python import Python
+from python import Python, PythonObject
 
 from testing import assert_equal
 

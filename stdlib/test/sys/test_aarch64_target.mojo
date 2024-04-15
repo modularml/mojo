@@ -16,7 +16,7 @@
 # REQUIRES: apple-silicon
 # RUN: %mojo -debug-level %s | FileCheck %s
 
-from sys.info import alignof, has_avx512f, has_neon, simdbitwidth
+from sys import alignof, has_avx512f, has_neon, simdbitwidth
 
 
 # CHECK-LABEL: test_arch_query
