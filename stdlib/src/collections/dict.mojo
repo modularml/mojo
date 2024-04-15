@@ -480,7 +480,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         var value = self.find(key)
         if value:
-            return value.value()
+            return value.value()[]
         raise "KeyError"
 
     fn __setitem__(inout self, key: K, value: V):
@@ -533,7 +533,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         if found:
             var ev = self._entries.__get_ref(index)[]
             debug_assert(ev.__bool__(), "entry in index must be full")
-            return ev.value().value
+            return ev.value()[].value
         return None
 
     fn pop(inout self, key: K, owned default: Optional[V] = None) raises -> V:
@@ -563,9 +563,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self._entries[index] = None
             self.size -= 1
             debug_assert(entry.__bool__(), "entry in index must be full")
-            return entry.value().value
+            return entry.value()[].value
         elif default:
-            return default.value()
+            return default.value()[]
         raise "KeyError"
 
     fn __iter__[
@@ -720,14 +720,14 @@ struct Dict[K: KeyElement, V: CollectionElement](
             else:
                 var ev = self._entries.__get_ref(index)[]
                 debug_assert(ev.__bool__(), "entry in index must be full")
-                var entry = ev.value()
+                var entry = ev.value()[]
                 if hash == entry.hash and key == entry.key:
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
 
         debug_assert(insert_slot.__bool__(), "never found a slot")
         debug_assert(insert_index.__bool__(), "slot populated but not index!!")
-        return (False, insert_slot.value(), insert_index.value())
+        return (False, insert_slot.value()[], insert_index.value()[])
 
     fn _over_load_factor(self) -> Bool:
         return 3 * self.size > 2 * self._reserved
@@ -750,7 +750,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         for i in range(len(old_entries)):
             var entry = old_entries.__get_ref(i)[]
             if entry:
-                self._insert(entry.value())
+                self._insert(entry.value()[])
 
     fn _compact(inout self):
         self._index = _DictIndex(self._reserved)
@@ -761,7 +761,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 debug_assert(right < self._reserved, "Invalid dict state")
             var entry = self._entries.__get_ref(right)[]
             debug_assert(entry.__bool__(), "Logic error")
-            var slot = self._find_empty_index(entry.value().hash)
+            var slot = self._find_empty_index(entry.value()[].hash)
             self._set_index(slot, left)
             if left != right:
                 self._entries[left] = entry
