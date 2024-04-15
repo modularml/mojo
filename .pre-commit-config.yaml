@@ -15,7 +15,7 @@ repos:
         stages: [commit]
       - id: spellcheck-notebook
         name: Spellcheck Jupyter Notebook
-        entry: ./trying_stuff.sh
+        entry: ./stdlib/scripts/spellcheck-notebooks.sh
         language: python
         files: \.ipynb$
         additional_dependencies:
