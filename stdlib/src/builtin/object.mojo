@@ -16,15 +16,15 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict, List
-from os.atomic import Atomic
+from os import Atomic
 from sys.intrinsics import _mlirtype_is_eq
 
-from memory import memcmp, memcpy
-from memory.unsafe import DTypePointer, Pointer
+
+from memory import memcmp, memcpy, DTypePointer, Pointer
 from memory._arc import Arc
 
-from utils import StringRef
-from utils.loop import unroll
+
+from utils import StringRef, unroll
 
 from .io import _printf, _put
 

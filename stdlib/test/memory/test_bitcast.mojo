@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
-from memory.unsafe import bitcast
+from memory import bitcast
 
 
 # CHECK-LABEL: test_bitcast
