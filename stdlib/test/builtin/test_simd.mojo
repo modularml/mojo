@@ -383,6 +383,43 @@ def test_shift():
     )
 
 
+def test_shuffle():
+    print("== test_shuffle")
+
+    alias dtype = DType.int32
+    alias width = 4
+
+    vec = SIMD[dtype, width](100, 101, 102, 103)
+
+    assert_equal(
+        vec.shuffle[3, 2, 1, 0](), SIMD[dtype, width](103, 102, 101, 100)
+    )
+    assert_equal(
+        vec.shuffle[0, 2, 4, 6](vec), SIMD[dtype, width](100, 102, 100, 102)
+    )
+
+    assert_equal(
+        vec._shuffle_list[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](vec),
+        SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
+    )
+
+    assert_equal(
+        vec.shuffle[StaticIntTuple[width](3, 2, 1, 0)](),
+        SIMD[dtype, width](103, 102, 101, 100),
+    )
+    assert_equal(
+        vec.shuffle[StaticIntTuple[width](0, 2, 4, 6)](vec),
+        SIMD[dtype, width](100, 102, 100, 102),
+    )
+
+    assert_equal(
+        vec._shuffle_list[
+            2 * width, StaticIntTuple[2 * width](7, 6, 5, 4, 3, 2, 1, 0)
+        ](vec),
+        SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
+    )
+
+
 def test_insert():
     assert_equal(Int32(3).insert(Int32(4)), 4)
 
@@ -420,43 +457,6 @@ def test_join():
     assert_equal(
         vec.join(vec),
         SIMD[DType.int32, 8](100, 101, 102, 103, 100, 101, 102, 103),
-    )
-
-
-def test_shuffle():
-    print("== test_shuffle")
-
-    alias dtype = DType.int32
-    alias width = 4
-
-    vec = SIMD[dtype, width](100, 101, 102, 103)
-
-    assert_equal(
-        vec.shuffle[3, 2, 1, 0](), SIMD[dtype, width](103, 102, 101, 100)
-    )
-    assert_equal(
-        vec.shuffle[0, 2, 4, 6](vec), SIMD[dtype, width](100, 102, 100, 102)
-    )
-
-    assert_equal(
-        vec._shuffle_list[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](vec),
-        SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
-    )
-
-    assert_equal(
-        vec.shuffle[StaticIntTuple[width](3, 2, 1, 0)](),
-        SIMD[dtype, width](103, 102, 101, 100),
-    )
-    assert_equal(
-        vec.shuffle[StaticIntTuple[width](0, 2, 4, 6)](vec),
-        SIMD[dtype, width](100, 102, 100, 102),
-    )
-
-    assert_equal(
-        vec._shuffle_list[
-            2 * width, StaticIntTuple[2 * width](7, 6, 5, 4, 3, 2, 1, 0)
-        ](vec),
-        SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
     )
 
 
@@ -794,9 +794,9 @@ def main():
     test_mod()
     test_rotate()
     test_shift()
+    test_shuffle()
     test_insert()
     test_join()
-    test_shuffle()
     test_interleave()
     test_deinterleave()
     test_address()
