@@ -1468,13 +1468,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         fn _convert_variadic_to_pop_array[
             *mask: Int
-        ]() -> __mlir_type[
-            `!pop.array<`, variadic_len[mask]().value, `, `, Int, `>`
-        ]:
-            alias size = variadic_len[mask]()
+        ]() -> __mlir_type[`!pop.array<`, output_size.value, `, `, Int, `>`]:
             var array = __mlir_op.`kgen.undef`[
                 _type = __mlir_type[
-                    `!pop.array<`, variadic_len[mask]().value, `, `, Int, `>`
+                    `!pop.array<`, output_size.value, `, `, Int, `>`
                 ]
             ]()
 
@@ -1483,7 +1480,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             fn fill[idx: Int]():
                 alias val = mask[idx]
                 constrained[
-                    0 <= val < 2 * size,
+                    0 <= val < 2 * output_size,
                     "invalid index in the shuffle operation",
                 ]()
                 var ptr = __mlir_op.`pop.array.gep`(
@@ -1491,7 +1488,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 )
                 __mlir_op.`pop.store`(val, ptr)
 
-            unroll[fill, size]()
+            unroll[fill, output_size]()
             return array
 
         alias length = variadic_len[mask]()
