@@ -28,8 +28,8 @@ from utils._visualizers import lldb_formatter_wrapping_type
 from utils import StaticTuple
 
 from .dtype import _integral_type_of
-from .io import _snprintf_scalar
-from .string import _calc_initial_buffer_size, _vec_fmt
+from .io import _snprintf_scalar, _snprintf
+from .string import _calc_initial_buffer_size
 
 # ===------------------------------------------------------------------------===#
 # Type Aliases
@@ -527,16 +527,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Print an opening `[`.
         @parameter
         if size > 1:
-            buf.size += _vec_fmt(buf.data, 2, "[")
+            buf.size += _snprintf(buf.data, 2, "[")
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                buf.size += _vec_fmt(buf.data + buf.size, 3, ", ")
+                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
 
             buf.size += _snprintf_scalar[type](
-                rebind[Pointer[Int8]](buf.data + buf.size),
+                buf.data + buf.size,
                 _calc_initial_buffer_size(element),
                 element,
             )
@@ -544,23 +544,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Print a closing `]`.
         @parameter
         if size > 1:
-            buf.size += _vec_fmt(buf.data + buf.size, 2, "]")
+            buf.size += _snprintf(buf.data + buf.size, 2, "]")
 
         buf.size += 1  # for the null terminator.
         return String(buf^)
-
-    @always_inline("nodebug")
-    fn to_int(self) -> Int:
-        """Casts to the value to an Int. If there is a fractional component,
-        then the value is truncated towards zero.
-
-        Constraints:
-            The size of the SIMD vector must be 1.
-
-        Returns:
-            The value of the single integer element in the SIMD vector.
-        """
-        return self.__int__()
 
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
@@ -2478,6 +2465,11 @@ fn _neginf[type: DType]() -> Scalar[type]:
 # ===----------------------------------------------------------------------===#
 
 
+@always_inline("nodebug")
+fn _is_32_bit_system() -> Bool:
+    return sizeof[DType.index]() == sizeof[DType.int32]()
+
+
 @always_inline
 fn _max_finite[type: DType]() -> Scalar[type]:
     """Returns the maximum finite value of type.
@@ -2499,24 +2491,24 @@ fn _max_finite[type: DType]() -> Scalar[type]:
         return 32767
     elif type == DType.uint16:
         return 65535
-    elif type == DType.int32 or (
-        type == DType.index and sizeof[DType.index]() == sizeof[DType.int32]()
-    ):
+    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
         return 2147483647
     elif type == DType.uint32:
         return 4294967295
-    elif type == DType.float32:
-        return 3.40282346638528859812e38
     elif type == DType.int64 or (
-        type == DType.index and sizeof[DType.index]() == sizeof[DType.int64]()
+        type == DType.index and not _is_32_bit_system()
     ):
         return 9223372036854775807
     elif type == DType.uint64:
         return 18446744073709551615
-    elif type == DType.float64:
-        return 1.79769313486231570815e308
+    elif type == DType.float16:
+        return 65504
     elif type == DType.bfloat16:
         return 3.38953139e38
+    elif type == DType.float32:
+        return 3.40282346638528859812e38
+    elif type == DType.float64:
+        return 1.79769313486231570815e308
     else:
         constrained[False, "max_finite() called on unsupported type"]()
         return 0
@@ -2546,15 +2538,13 @@ fn _min_finite[type: DType]() -> Scalar[type]:
         return -128
     elif type == DType.int16:
         return -32768
-    elif type == DType.int32:
+    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
         return -2147483648
-    elif type == DType.float32:
-        return -_max_finite[type]()
-    elif type == DType.int64:
+    elif type == DType.int64 or (
+        type == DType.index and not _is_32_bit_system()
+    ):
         return -9223372036854775808
-    elif type == DType.float64:
-        return -_max_finite[type]()
-    elif type == DType.bfloat16:
+    elif type.is_floating_point():
         return -_max_finite[type]()
     else:
         constrained[False, "min_finite() called on unsupported type"]()
