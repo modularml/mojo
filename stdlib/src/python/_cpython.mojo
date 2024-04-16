@@ -15,10 +15,9 @@ from os import getenv
 from sys import external_call
 from sys.ffi import DLHandle
 
-from memory.unsafe import DTypePointer, Pointer
+from memory import DTypePointer
 
-from utils import StringRef
-from utils.index import StaticIntTuple
+from utils import StringRef, StaticIntTuple
 
 # https://github.com/python/cpython/blob/d45225bd66a8123e4a30314c627f2586293ba532/Include/compile.h#L7
 alias Py_single_input = 256
@@ -157,7 +156,7 @@ struct CPython:
     var dict_type: PyObjectPtr
     var logging_enabled: Bool
     var version: PythonVersion
-    var total_ref_count: Pointer[Int]
+    var total_ref_count: LegacyPointer[Int]
 
     fn __init__(inout self: CPython):
         var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
@@ -173,7 +172,7 @@ struct CPython:
         var null_pointer = DTypePointer[DType.int8].get_null()
 
         self.lib = DLHandle(python_lib)
-        self.total_ref_count = Pointer[Int].alloc(1)
+        self.total_ref_count = LegacyPointer[Int].alloc(1)
         self.none_value = PyObjectPtr(null_pointer)
         self.dict_type = PyObjectPtr(null_pointer)
         self.logging_enabled = logging_enabled
@@ -636,8 +635,8 @@ struct CPython:
 
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
         var result = self.lib.get_function[
-            fn (PyObjectPtr, Pointer[Int]) -> DTypePointer[DType.int8]
-        ]("PyUnicode_AsUTF8AndSize")(py_object, Pointer[Int]())
+            fn (PyObjectPtr, UnsafePointer[Int]) -> DTypePointer[DType.int8]
+        ]("PyUnicode_AsUTF8AndSize")(py_object, UnsafePointer[Int]())
         return StringRef(result)
 
     fn PyErr_Clear(inout self):
@@ -654,16 +653,18 @@ struct CPython:
         var value = DTypePointer[DType.int8]()
         var traceback = DTypePointer[DType.int8]()
 
-        var type_ptr = Pointer[DTypePointer[DType.int8]].address_of(type)
-        var value_ptr = Pointer[DTypePointer[DType.int8]].address_of(value)
-        var traceback_ptr = Pointer[DTypePointer[DType.int8]].address_of(
+        var type_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(type)
+        var value_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
+            value
+        )
+        var traceback_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
             traceback
         )
         var func = self.lib.get_function[
             fn (
-                Pointer[DTypePointer[DType.int8]],
-                Pointer[DTypePointer[DType.int8]],
-                Pointer[DTypePointer[DType.int8]],
+                UnsafePointer[DTypePointer[DType.int8]],
+                UnsafePointer[DTypePointer[DType.int8]],
+                UnsafePointer[DTypePointer[DType.int8]],
             ) -> None
         ]("PyErr_Fetch")(type_ptr, value_ptr, traceback_ptr)
         var r = PyObjectPtr {value: value}
@@ -771,15 +772,17 @@ struct CPython:
         var key = DTypePointer[DType.int8].get_null()
         var value = DTypePointer[DType.int8].get_null()
         var v = p
-        var position = Pointer[Int].address_of(v)
-        var value_ptr = Pointer[DTypePointer[DType.int8]].address_of(value)
-        var key_ptr = Pointer[DTypePointer[DType.int8]].address_of(key)
+        var position = LegacyPointer[Int].address_of(v)
+        var value_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
+            value
+        )
+        var key_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(key)
         var result = self.lib.get_function[
             fn (
                 PyObjectPtr,
-                Pointer[Int],
-                Pointer[DTypePointer[DType.int8]],
-                Pointer[DTypePointer[DType.int8]],
+                LegacyPointer[Int],
+                UnsafePointer[DTypePointer[DType.int8]],
+                UnsafePointer[DTypePointer[DType.int8]],
             ) -> Int
         ]("PyDict_Next")(
             dictionary,

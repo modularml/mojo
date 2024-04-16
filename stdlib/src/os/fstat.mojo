@@ -19,7 +19,7 @@ from os import stat
 ```
 """
 
-from sys.info import has_neon, os_is_linux, os_is_macos, os_is_windows
+from sys import has_neon, os_is_linux, os_is_macos, os_is_windows
 from time.time import _CTimeSpec
 
 from . import PathLike

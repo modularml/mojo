@@ -15,12 +15,12 @@
 You can import these APIs from the `os` package. For example:
 
 ```mojo
-from os.atomic import Atomic
+from os import Atomic
 ```
 """
 
 from builtin.dtype import _integral_type_of
-from memory.unsafe import Pointer, bitcast
+from memory import Pointer, bitcast
 
 
 struct Atomic[type: DType]:
@@ -100,7 +100,7 @@ struct Atomic[type: DType]:
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`],
         ](
-            bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]](ptr).address,
+            ptr.bitcast[__mlir_type[`!pop.scalar<`, type.value, `>`]]().address,
             rhs.value,
         )
 
@@ -177,13 +177,22 @@ struct Atomic[type: DType]:
         _ = self.fetch_sub(rhs)
 
     @always_inline
-    fn _compare_exchange_weak(
-        inout self, expected: Scalar[type], desired: Scalar[type]
+    fn compare_exchange_weak(
+        inout self, inout expected: Scalar[type], desired: Scalar[type]
     ) -> Bool:
-        constrained[
-            type.is_integral() or type.is_floating_point(),
-            "the input type must be arithmetic",
-        ]()
+        """Atomically compares the self value with that of the expected value.
+        If the values are equal, then the self value is replaced with the
+        desired value and True is returned. Otherwise, False is returned the
+        the expected value is rewritten with the self value.
+
+        Args:
+          expected: The expected value.
+          desired: The desired value.
+
+        Returns:
+          True if self == expected and False otherwise.
+        """
+        constrained[type.is_numeric(), "the input type must be arithmetic"]()
 
         @parameter
         if type.is_integral():
@@ -197,9 +206,14 @@ struct Atomic[type: DType]:
                 expected.value,
                 desired.value,
             )
-            return __mlir_op.`kgen.struct.extract`[
-                index = __mlir_attr.`1:index`
-            ](cmpxchg_res)
+            var ok = Bool(
+                __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
+                    cmpxchg_res
+                )
+            )
+            if not ok:
+                expected = self.load()
+            return ok
 
         # For the floating point case, we need to bitcast the floating point
         # values to their integral representation and perform the atomic
@@ -221,9 +235,14 @@ struct Atomic[type: DType]:
             expected_integral.value,
             desired_integral.value,
         )
-        return __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
-            cmpxchg_res
+        var ok = Bool(
+            __mlir_op.`kgen.struct.extract`[index = __mlir_attr.`1:index`](
+                cmpxchg_res
+            )
         )
+        if not ok:
+            expected = self.load()
+        return ok
 
     @always_inline
     fn max(inout self, rhs: Scalar[type]):
