@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s | FileCheck %s
 
 from random import random_float64
 
@@ -98,10 +98,14 @@ def test_arithmetic_ops():
     assert_true(lhs == concatted)
 
 
+# These are all marked borrowed because 'object' doesn't support function
+# types with owned arguments.
 def test_function(borrowed lhs, borrowed rhs) -> object:
     return lhs + rhs
 
 
+# These are all marked borrowed because 'object' doesn't support function
+# types with owned arguments.
 def test_function_raises(borrowed a) -> object:
     raise Error("Error from function type")
 
@@ -125,15 +129,21 @@ def test_non_object_getattr():
         print(e)
 
 
+# These are all marked borrowed because 'object' doesn't support function
+# types with owned arguments.
 def matrix_getitem(borrowed self, borrowed i) -> object:
     return self.value[i]
 
 
+# These are all marked borrowed because 'object' doesn't support function
+# types with owned arguments.
 def matrix_setitem(borrowed self, borrowed i, borrowed value) -> object:
     self.value[i] = value
     return None
 
 
+# These are all marked borrowed because 'object' doesn't support function
+# types with owned arguments.
 def matrix_append(borrowed self, borrowed value) -> object:
     var impl = self.value
     impl.append(value)

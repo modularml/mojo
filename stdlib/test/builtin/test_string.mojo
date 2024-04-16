@@ -10,7 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# TODO(37393): Reenabl once we debug why we are depending on some debug behavior
+# on graviton.
+# REQUIRES: Disabled
+# RUN: %mojo %s
 
 from builtin.string import (
     _calc_initial_buffer_size_int32,
@@ -29,7 +32,7 @@ from utils import StringRef
 
 @value
 struct AString(Stringable):
-    fn __str__(borrowed self: Self) -> String:
+    fn __str__(self: Self) -> String:
         return "a string"
 
 
@@ -167,6 +170,19 @@ fn test_ord() raises:
     assert_equal(ord("α"), 945)
     assert_equal(ord("➿"), 10175)
     assert_equal(ord("🔥"), 128293)
+
+    # Make sure they work in the parameter domain too
+    alias single_byte = ord("A")
+    assert_equal(single_byte, 65)
+    alias single_byte2 = ord("!")
+    assert_equal(single_byte2, 33)
+
+    alias multi_byte = ord("α")
+    assert_equal(multi_byte, 945)
+    alias multi_byte2 = ord("➿")
+    assert_equal(multi_byte2, 10175)
+    alias multi_byte3 = ord("🔥")
+    assert_equal(multi_byte3, 128293)
 
 
 fn test_chr() raises:

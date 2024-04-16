@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 from testing import assert_equal, assert_false, assert_true
 
@@ -80,26 +80,7 @@ def test_tuple_literal():
     assert_equal(len(()), 0)
 
 
-def test_tuple_pointer():
-    var tup = StaticTuple[Int, 3](0, 0, 0)
-
-    assert_equal(tup[0], 0)
-    assert_equal(tup[1], 0)
-    assert_equal(tup[2], 0)
-
-    # Test mutating a tuple through its `as_ptr()` pointer
-    var ptr = tup.as_ptr()
-    ptr[0] = 1
-    ptr[1] = 2
-    ptr[2] = 3
-
-    assert_equal(tup[0], 1)
-    assert_equal(tup[1], 2)
-    assert_equal(tup[2], 3)
-
-
 def main():
     test_static_tuple()
     test_static_int_tuple()
     test_tuple_literal()
-    test_tuple_pointer()
