@@ -1768,92 +1768,17 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         # Common cases will use shuffle which the compiler understands well.
         @parameter
-        if size == 1:
-            return self._shuffle_list[
-                0,
-                1,
-                output_size = 2 * size,
-            ](other)
-        elif size == 2:
-            return self._shuffle_list[
-                0,
-                1,
-                2,
-                3,
-                output_size = 2 * size,
-            ](other)
-        elif size == 4:
-            return self._shuffle_list[
-                0,
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                output_size = 2 * size,
-            ](other)
-        elif size == 8:
-            return self._shuffle_list[
-                0,
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                10,
-                11,
-                12,
-                13,
-                14,
-                15,
-                output_size = 2 * size,
-            ](other)
-        elif size == 16:
-            return self._shuffle_list[
-                0,
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                10,
-                11,
-                12,
-                13,
-                14,
-                15,
-                16,
-                17,
-                18,
-                19,
-                20,
-                21,
-                22,
-                23,
-                24,
-                25,
-                26,
-                27,
-                28,
-                29,
-                30,
-                31,
-                output_size = 2 * size,
-            ](other)
+        fn build_indices() -> StaticIntTuple[2 * size]:
+            var indices = StaticIntTuple[2 * size]()
 
-        var res = SIMD[type, 2 * size]()
-        res = res.insert(self)
-        return res.insert[offset=size](other)
+            @parameter
+            fn _fill[i: Int]():
+                indices[i] = i
+
+            unroll[_fill, 2 * size]()
+            return indices
+
+        return self._shuffle_list[2 * size, build_indices()](other)
 
     @always_inline("nodebug")
     fn interleave(self, other: Self) -> SIMD[type, 2 * size]:
