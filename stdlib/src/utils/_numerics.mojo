@@ -644,9 +644,9 @@ fn isnan[
 
     alias signaling_nan_test: UInt32 = 0x0001
     alias quiet_nan_test: UInt32 = 0x0002
-    return llvm_intrinsic["llvm.is.fpclass", SIMD[DType.bool, simd_width]](
-        val.value, (signaling_nan_test | quiet_nan_test).value
-    )
+    return llvm_intrinsic[
+        "llvm.is.fpclass", SIMD[DType.bool, simd_width], has_side_effect=False
+    ](val.value, (signaling_nan_test | quiet_nan_test).value)
 
 
 # ===----------------------------------------------------------------------===#
