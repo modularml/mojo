@@ -677,7 +677,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
             @parameter
             if type.is_floating_point():
-                div = llvm_intrinsic["llvm.trunc", Self](div)
+                div = llvm_intrinsic["llvm.trunc", Self, has_side_effect=False](
+                    div
+                )
 
             var mod = self - div * rhs
             var mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
@@ -1637,9 +1639,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 tmp[i] = self[i + offset]
             return tmp
 
-        return llvm_intrinsic["llvm.vector.extract", SIMD[type, output_width]](
-            self, offset
-        )
+        return llvm_intrinsic[
+            "llvm.vector.extract",
+            SIMD[type, output_width],
+            has_side_effect=False,
+        ](self, offset)
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
@@ -1683,7 +1687,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 tmp[i + offset] = value[i]
             return tmp
 
-        return llvm_intrinsic["llvm.vector.insert", Self](self, value, offset)
+        return llvm_intrinsic[
+            "llvm.vector.insert", Self, has_side_effect=False
+        ](self, value, offset)
 
     @always_inline("nodebug")
     fn join(self, other: Self) -> SIMD[type, 2 * size]:
@@ -1801,7 +1807,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return SIMD[type, 2 * size](self[0], other[0])
 
         return llvm_intrinsic[
-            "llvm.experimental.vector.interleave2", SIMD[type, 2 * size]
+            "llvm.experimental.vector.interleave2",
+            SIMD[type, 2 * size],
+            has_side_effect=False,
         ](self, other)
 
     @always_inline("nodebug")
@@ -1822,6 +1830,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         var res = llvm_intrinsic[
             "llvm.experimental.vector.deinterleave2",
             _RegisterPackType[SIMD[type, size // 2], SIMD[type, size // 2]],
+            has_side_effect=False,
         ](self)
         return StaticTuple[SIMD[type, size // 2], 2](
             res.get[0, SIMD[type, size // 2]](),
@@ -1929,16 +1938,26 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if type.is_floating_point():
             return rebind[SIMD[type, size_out]](
-                llvm_intrinsic["llvm.vector.reduce.fmax", Scalar[type]](self)
+                llvm_intrinsic[
+                    "llvm.vector.reduce.fmax",
+                    Scalar[type],
+                    has_side_effect=False,
+                ](self)
             )
 
         @parameter
         if type.is_unsigned():
             return rebind[SIMD[type, size_out]](
-                llvm_intrinsic["llvm.vector.reduce.umax", Scalar[type]](self)
+                llvm_intrinsic[
+                    "llvm.vector.reduce.umax",
+                    Scalar[type],
+                    has_side_effect=False,
+                ](self)
             )
         return rebind[SIMD[type, size_out]](
-            llvm_intrinsic["llvm.vector.reduce.smax", Scalar[type]](self)
+            llvm_intrinsic[
+                "llvm.vector.reduce.smax", Scalar[type], has_side_effect=False
+            ](self)
         )
 
     @always_inline("nodebug")
@@ -1976,16 +1995,26 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if type.is_floating_point():
             return rebind[SIMD[type, size_out]](
-                llvm_intrinsic["llvm.vector.reduce.fmin", Scalar[type]](self)
+                llvm_intrinsic[
+                    "llvm.vector.reduce.fmin",
+                    Scalar[type],
+                    has_side_effect=False,
+                ](self)
             )
 
         @parameter
         if type.is_unsigned():
             return rebind[SIMD[type, size_out]](
-                llvm_intrinsic["llvm.vector.reduce.umin", Scalar[type]](self)
+                llvm_intrinsic[
+                    "llvm.vector.reduce.umin",
+                    Scalar[type],
+                    has_side_effect=False,
+                ](self)
             )
         return rebind[SIMD[type, size_out]](
-            llvm_intrinsic["llvm.vector.reduce.smin", Scalar[type]](self)
+            llvm_intrinsic[
+                "llvm.vector.reduce.smin", Scalar[type], has_side_effect=False
+            ](self)
         )
 
     @always_inline
@@ -2046,9 +2075,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if size == 1:
             return self.cast[DType.bool]()[0].value
-        return llvm_intrinsic["llvm.vector.reduce.and", Scalar[DType.bool]](
-            self
-        )
+        return llvm_intrinsic[
+            "llvm.vector.reduce.and", Scalar[DType.bool], has_side_effect=False
+        ](self)
 
     @always_inline
     fn reduce_or(self) -> Bool:
@@ -2064,7 +2093,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if size == 1:
             return self.cast[DType.bool]()[0].value
-        return llvm_intrinsic["llvm.vector.reduce.or", Scalar[DType.bool]](self)
+        return llvm_intrinsic[
+            "llvm.vector.reduce.or", Scalar[DType.bool], has_side_effect=False
+        ](self)
 
     # ===-------------------------------------------------------------------===#
     # select
@@ -2130,9 +2161,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if size == 1:
             constrained[shift == 0, "for scalars the shift must be 0"]()
             return self
-        return llvm_intrinsic["llvm.experimental.vector.splice", Self](
-            self, self, Int32(shift)
-        )
+        return llvm_intrinsic[
+            "llvm.experimental.vector.splice", Self, has_side_effect=False
+        ](self, self, Int32(shift))
 
     @always_inline
     fn rotate_right[shift: Int](self) -> Self:
@@ -2199,9 +2230,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         alias zero_simd = Self()
 
-        return llvm_intrinsic["llvm.experimental.vector.splice", Self](
-            self, zero_simd, Int32(shift)
-        )
+        return llvm_intrinsic[
+            "llvm.experimental.vector.splice", Self, has_side_effect=False
+        ](self, zero_simd, Int32(shift))
 
     @always_inline
     fn shift_right[shift: Int](self) -> Self:
@@ -2239,9 +2270,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         alias zero_simd = Self()
 
-        return llvm_intrinsic["llvm.experimental.vector.splice", Self](
-            zero_simd, self, Int32(-shift)
-        )
+        return llvm_intrinsic[
+            "llvm.experimental.vector.splice", Self, has_side_effect=False
+        ](zero_simd, self, Int32(-shift))
 
 
 # ===-------------------------------------------------------------------===#
@@ -2302,9 +2333,9 @@ fn _pow[
 
         @unroll
         for i in range(simd_width):
-            result[i] = llvm_intrinsic["llvm.pow", Scalar[lhs_type]](
-                lhs[i], rhs[i]
-            )
+            result[i] = llvm_intrinsic[
+                "llvm.pow", Scalar[lhs_type], has_side_effect=False
+            ](lhs[i], rhs[i])
 
         return result
     elif rhs_type.is_integral():
@@ -2321,9 +2352,9 @@ fn _pow[
 
             @unroll
             for i in range(simd_width):
-                result[i] = llvm_intrinsic["llvm.powi", Scalar[lhs_type]](
-                    lhs[i], rhs[i].cast[DType.int32]()
-                )
+                result[i] = llvm_intrinsic[
+                    "llvm.powi", Scalar[lhs_type], has_side_effect=False
+                ](lhs[i], rhs[i].cast[DType.int32]())
         else:
             for i in range(simd_width):
                 if rhs[i] < 0:
@@ -2379,7 +2410,9 @@ fn _floor[
     if has_neon() and type == DType.bfloat16:
         return _floor(x.cast[DType.float32]()).cast[type]()
 
-    return llvm_intrinsic["llvm.floor", SIMD[type, simd_width]](x)
+    return llvm_intrinsic[
+        "llvm.floor", SIMD[type, simd_width], has_side_effect=False
+    ](x)
 
 
 # ===----------------------------------------------------------------------===#

@@ -43,12 +43,14 @@ fn _abs(x: SIMD) -> __type_of(x):
 
 @always_inline
 fn _ctlz(val: Int) -> Int:
-    return llvm_intrinsic["llvm.ctlz", Int](val, False)
+    return llvm_intrinsic["llvm.ctlz", Int, has_side_effect=False](val, False)
 
 
 @always_inline("nodebug")
 fn _ctlz(val: SIMD) -> __type_of(val):
-    return llvm_intrinsic["llvm.ctlz", __type_of(val)](val, False)
+    return llvm_intrinsic["llvm.ctlz", __type_of(val), has_side_effect=False](
+        val, False
+    )
 
 
 # ===----------------------------------------------------------------------===#
