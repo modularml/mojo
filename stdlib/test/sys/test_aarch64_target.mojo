@@ -20,7 +20,6 @@ from sys import alignof, has_avx512f, has_neon, simdbitwidth
 from testing import assert_false, assert_true, assert_equal
 
 
-# CHECK-LABEL: test_arch_query
 def test_arch_query():
     assert_true(has_neon())
 
