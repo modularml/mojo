@@ -41,7 +41,11 @@ print(to_string(who_knows))
 from sys import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
-from memory.unsafe_pointer import initialize_pointee, move_from_pointee, move_pointee
+from memory.unsafe_pointer import (
+    initialize_pointee,
+    move_from_pointee,
+    move_pointee,
+)
 from memory import UnsafePointer
 from utils import unroll, StaticTuple
 
