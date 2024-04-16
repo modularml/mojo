@@ -1480,7 +1480,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             fn fill[idx: Int]():
                 alias val = mask[idx]
                 constrained[
-                    0 <= val < 2 * output_size,
+                    0 <= val < 2 * size,
                     "invalid index in the shuffle operation",
                 ]()
                 var ptr = __mlir_op.`pop.array.gep`(
