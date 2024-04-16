@@ -22,13 +22,10 @@ from testing import assert_false, assert_true, assert_equal
 
 # CHECK-LABEL: test_arch_query
 def test_arch_query():
-    # CHECK: True
     assert_true(has_neon())
 
-    # CHECK: 128
     assert_equal(simdbitwidth(), 128)
 
-    # CHECK: False
     assert_false(has_avx512f())
 
 
