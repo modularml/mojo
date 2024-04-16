@@ -400,12 +400,14 @@ struct StringRef(
 
 @always_inline("nodebug")
 fn _cttz(val: Int) -> Int:
-    return llvm_intrinsic["llvm.cttz", Int](val, False)
+    return llvm_intrinsic["llvm.cttz", Int, has_side_effect=False](val, False)
 
 
 @always_inline("nodebug")
 fn _cttz(val: SIMD) -> __type_of(val):
-    return llvm_intrinsic["llvm.cttz", __type_of(val)](val, False)
+    return llvm_intrinsic["llvm.cttz", __type_of(val), has_side_effect=False](
+        val, False
+    )
 
 
 @always_inline
