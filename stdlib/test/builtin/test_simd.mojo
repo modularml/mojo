@@ -443,6 +443,22 @@ def test_shuffle():
         SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
     )
 
+    assert_equal(
+        vec.shuffle[StaticIntTuple[width](3, 2, 1, 0)](),
+        SIMD[dtype, width](103, 102, 101, 100),
+    )
+    assert_equal(
+        vec.shuffle[StaticIntTuple[width](0, 2, 4, 6)](vec),
+        SIMD[dtype, width](100, 102, 100, 102),
+    )
+
+    assert_equal(
+        vec._shuffle_list[
+            2 * width, StaticIntTuple[2 * width](7, 6, 5, 4, 3, 2, 1, 0)
+        ](vec),
+        SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
+    )
+
 
 def test_interleave():
     assert_equal(Int32(0).interleave(Int32(1)), SIMD[DType.index, 2](0, 1))

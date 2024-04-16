@@ -1457,7 +1457,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             other: The other vector to shuffle with.
 
         Returns:
-            A new vector of length `len` where the value at position `i` is
+            A new vector with the same length as the mask where the value at position `i` is
             `(self+other)[permutation[i]]`.
         """
 
@@ -1504,6 +1504,49 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](self.value, other.value)
 
     @always_inline("nodebug")
+    fn _shuffle_list[
+        output_size: Int, mask: StaticIntTuple[output_size]
+    ](self, other: Self) -> SIMD[type, output_size]:
+        """Shuffles (also called blend) the values of the current vector with
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
+
+        Parameters:
+            output_size: The size of the output vector.
+            mask: The permutation to use in the shuffle.
+
+        Args:
+            other: The other vector to shuffle with.
+
+        Returns:
+            A new vector with the same length as the mask where the value at position `i` is
+            `(self+other)[permutation[i]]`.
+        """
+
+        @parameter
+        fn _check_indices[mask: StaticIntTuple[output_size]]() -> Bool:
+            @parameter
+            fn _check[i: Int]():
+                constrained[
+                    0 <= mask[i] < 2 * size,
+                    "invalid index in the shuffle operation",
+                ]()
+
+            unroll[_check, output_size]()
+
+            return True
+
+        constrained[
+            _check_indices[mask](), "invalid index in the shuffle operation"
+        ]()
+        return __mlir_op.`pop.simd.shuffle`[
+            mask = mask.data.array,
+            _type = __mlir_type[
+                `!pop.simd<`, output_size.value, `, `, type.value, `>`
+            ],
+        ](self.value, other.value)
+
+    @always_inline("nodebug")
     fn shuffle[*mask: Int](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask values
@@ -1513,7 +1556,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             mask: The permutation to use in the shuffle.
 
         Returns:
-            A new vector of length `len` where the value at position `i` is
+            A new vector with the same length as the mask where the value at position `i` is
             `(self)[permutation[i]]`.
         """
         return self._shuffle_list[mask](self)
@@ -1531,10 +1574,43 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             other: The other vector to shuffle with.
 
         Returns:
-            A new vector of length `len` where the value at position `i` is
+            A new vector with the same length as the mask where the value at position `i` is
             `(self+other)[permutation[i]]`.
         """
         return self._shuffle_list[mask](other)
+
+    @always_inline("nodebug")
+    fn shuffle[mask: StaticIntTuple[size]](self) -> Self:
+        """Shuffles (also called blend) the values of the current vector with
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
+
+        Parameters:
+            mask: The permutation to use in the shuffle.
+
+        Returns:
+            A new vector with the same length as the mask where the value at position `i` is
+            `(self)[permutation[i]]`.
+        """
+        return self._shuffle_list[size, mask](self)
+
+    @always_inline("nodebug")
+    fn shuffle[mask: StaticIntTuple[size]](self, other: Self) -> Self:
+        """Shuffles (also called blend) the values of the current vector with
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
+
+        Parameters:
+            mask: The permutation to use in the shuffle.
+
+        Args:
+            other: The other vector to shuffle with.
+
+        Returns:
+            A new vector with the same length as the mask where the value at position `i` is
+            `(self+other)[permutation[i]]`.
+        """
+        return self._shuffle_list[size, mask](other)
 
     # ===-------------------------------------------------------------------===#
     # Indexing operations
