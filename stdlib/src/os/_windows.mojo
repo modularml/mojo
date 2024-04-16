@@ -12,8 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements support functions for working with Windows."""
 
-from sys import external_call
-from sys.info import os_is_windows
+from sys import external_call, os_is_windows
 
 
 @always_inline

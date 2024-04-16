@@ -31,7 +31,7 @@ value types must always be Movable so we can resize the dictionary as it grows.
 
 See the `Dict` docs for more details.
 """
-from memory.anypointer import AnyPointer
+from memory import UnsafePointer
 
 from .optional import Optional
 
@@ -51,7 +51,6 @@ struct _DictEntryIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Iterator over immutable DictEntry references.
 
@@ -60,7 +59,6 @@ struct _DictEntryIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the dictionary is mutable.
         dict_lifetime: The lifetime of the List
-        address_space: the address_space of the list
     """
 
     alias imm_dict_lifetime = __mlir_attr[
@@ -90,7 +88,7 @@ struct _DictEntryIter[
                 self.seen += 1
                 # Super unsafe, but otherwise we have to do a bunch of super
                 # unsafe reference lifetime casting.
-                return opt_entry_ref.bitcast_element[DictEntry[K, V]]()
+                return opt_entry_ref.unsafe_bitcast[DictEntry[K, V]]()
             self.index += 1
 
     fn __len__(self) -> Int:
@@ -103,7 +101,6 @@ struct _DictKeyIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Iterator over immutable Dict key references.
 
@@ -112,19 +109,14 @@ struct _DictKeyIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
-        address_space: The address space of the List
     """
 
     alias imm_dict_lifetime = __mlir_attr[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
-    alias ref_type = Reference[
-        K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime, address_space
-    ]
+    alias ref_type = Reference[K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime]
 
-    alias dict_entry_iter = _DictEntryIter[
-        K, V, dict_mutability, dict_lifetime, address_space
-    ]
+    alias dict_entry_iter = _DictEntryIter[K, V, dict_mutability, dict_lifetime]
 
     var iter: Self.dict_entry_iter
 
@@ -132,9 +124,7 @@ struct _DictKeyIter[
         return self
 
     fn __next__(inout self) -> Self.ref_type:
-        var entry_ref = self.iter.__next__()
-        var anyptr = AnyPointer(Reference(entry_ref[].key))
-        return anyptr.address_space_cast[Self.dict_entry_iter.address_space]()[]
+        return self.iter.__next__()[].key
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
@@ -146,7 +136,6 @@ struct _DictValueIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-    address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Iterator over Dict value references. These are mutable if the dict
     is mutable.
@@ -156,24 +145,19 @@ struct _DictValueIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
-        address_space: The address space of the List
     """
 
-    alias ref_type = Reference[V, dict_mutability, dict_lifetime, address_space]
+    alias ref_type = Reference[V, dict_mutability, dict_lifetime]
 
-    var iter: _DictEntryIter[
-        K, V, dict_mutability, dict_lifetime, address_space
-    ]
+    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
-        # Cast through a pointer to grant additional mutability and switch
-        # address spaces out.
-        var anyptr = AnyPointer(Reference(entry_ref[].value))
-        return anyptr.address_space_cast[address_space]()[]
+        # Cast through a pointer to grant additional mutability.
+        return UnsafePointer.address_of(entry_ref[].value)[]
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
@@ -274,16 +258,16 @@ struct _DictIndex:
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return data.load(slot % reserved).to_int()
+            return int(data.load(slot % reserved))
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return data.load(slot % reserved).to_int()
+            return int(data.load(slot % reserved))
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return data.load(slot % reserved).to_int()
+            return int(data.load(slot % reserved))
         else:
             var data = self.data.bitcast[DType.int64]()
-            return data.load(slot % reserved).to_int()
+            return int(data.load(slot % reserved))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
@@ -480,7 +464,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         var value = self.find(key)
         if value:
-            return value.value()
+            return value.value()[]
         raise "KeyError"
 
     fn __setitem__(inout self, key: K, value: V):
@@ -533,7 +517,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         if found:
             var ev = self._entries.__get_ref(index)[]
             debug_assert(ev.__bool__(), "entry in index must be full")
-            return ev.value().value
+            return ev.value()[].value
         return None
 
     fn pop(inout self, key: K, owned default: Optional[V] = None) raises -> V:
@@ -563,16 +547,18 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self._entries[index] = None
             self.size -= 1
             debug_assert(entry.__bool__(), "entry in index must be full")
-            return entry.value().value
+            return entry.value()[].value
         elif default:
-            return default.value()
+            return default.value()[]
         raise "KeyError"
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DictKeyIter[K, V, mutability, self_life]:
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        K, V, mutability, self_life
+    ]:
         """Iterate over the dict's keys as immutable references.
 
         Parameters:
@@ -589,8 +575,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn keys[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DictKeyIter[K, V, mutability, self_life]:
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        K, V, mutability, self_life
+    ]:
         """Iterate over the dict's keys as immutable references.
 
         Parameters:
@@ -605,7 +593,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn values[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _DictValueIter[K, V, mutability, self_life]:
         """Iterate over the dict's values as references.
 
@@ -623,7 +611,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn items[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _DictEntryIter[K, V, mutability, self_life]:
         """Iterate over the dict's entries as immutable references.
 
@@ -720,14 +708,14 @@ struct Dict[K: KeyElement, V: CollectionElement](
             else:
                 var ev = self._entries.__get_ref(index)[]
                 debug_assert(ev.__bool__(), "entry in index must be full")
-                var entry = ev.value()
+                var entry = ev.value()[]
                 if hash == entry.hash and key == entry.key:
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
 
         debug_assert(insert_slot.__bool__(), "never found a slot")
         debug_assert(insert_index.__bool__(), "slot populated but not index!!")
-        return (False, insert_slot.value(), insert_index.value())
+        return (False, insert_slot.value()[], insert_index.value()[])
 
     fn _over_load_factor(self) -> Bool:
         return 3 * self.size > 2 * self._reserved
@@ -750,7 +738,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         for i in range(len(old_entries)):
             var entry = old_entries.__get_ref(i)[]
             if entry:
-                self._insert(entry.value())
+                self._insert(entry.value()[])
 
     fn _compact(inout self):
         self._index = _DictIndex(self._reserved)
@@ -761,7 +749,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 debug_assert(right < self._reserved, "Invalid dict state")
             var entry = self._entries.__get_ref(right)[]
             debug_assert(entry.__bool__(), "Logic error")
-            var slot = self._find_empty_index(entry.value().hash)
+            var slot = self._find_empty_index(entry.value()[].hash)
             self._set_index(slot, left)
             if left != right:
                 self._entries[left] = entry
@@ -885,8 +873,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DictKeyIter[Self.key_type, V, mutability, self_life]:
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        Self.key_type, V, mutability, self_life
+    ]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Parameters:
@@ -907,8 +897,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn keys[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
-    ) -> _DictKeyIter[Self.key_type, V, mutability, self_life]:
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        Self.key_type, V, mutability, self_life
+    ]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Parameters:
@@ -925,7 +917,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn values[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _DictValueIter[Self.key_type, V, mutability, self_life]:
         """Iterate over the keyword dict's values as references.
 
@@ -947,7 +939,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn items[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _DictEntryIter[Self.key_type, V, mutability, self_life]:
         """Iterate over the keyword dictionary's entries as immutable references.
 

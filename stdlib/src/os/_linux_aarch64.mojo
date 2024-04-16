@@ -13,7 +13,7 @@
 
 from time.time import _CTimeSpec
 
-from utils.index import StaticIntTuple
+from utils import StaticIntTuple
 
 from .fstat import stat_result
 
@@ -110,7 +110,7 @@ struct _c_stat(Stringable):
 fn _stat(path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__xstat", Int32](
-        Int32(0), path._as_ptr(), Pointer.address_of(stat)
+        Int32(0), path._as_ptr(), UnsafePointer.address_of(stat)
     )
     if err == -1:
         raise "unable to stat '" + path + "'"
@@ -121,7 +121,7 @@ fn _stat(path: String) raises -> _c_stat:
 fn _lstat(path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__lxstat", Int32](
-        Int32(0), path._as_ptr(), Pointer.address_of(stat)
+        Int32(0), path._as_ptr(), UnsafePointer.address_of(stat)
     )
     if err == -1:
         raise "unable to lstat '" + path + "'"

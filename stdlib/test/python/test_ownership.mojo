@@ -13,12 +13,11 @@
 # XFAIL: asan && !system-darwin
 # RUN: %mojo -D TEST_DIR=%S %s
 
-from sys.param_env import env_get_string
+from sys import env_get_string
 
-from memory.unsafe import Pointer
+from memory import Pointer
 from python._cpython import CPython, PyObjectPtr
-from python.object import PythonObject
-from python.python import Python
+from python import PythonObject, Python
 
 from testing import assert_equal
 

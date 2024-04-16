@@ -1,6 +1,9 @@
+# Mojo unreleased changelog
 
-This is a running list of significant UNRELEASED changes for the Mojo language
-and tools. Please add any significant user-visible changes here.
+This is a list of UNRELEASED changes for the Mojo language and tools.
+
+When we cut a release, these notes move to `changelog-released.md` and that's
+what we publish.
 
 [//]: # Here's the template to use when starting a new batch of notes:
 [//]: ## UNRELEASED
@@ -12,6 +15,11 @@ and tools. Please add any significant user-visible changes here.
 ## UNRELEASED
 
 ### 🔥 Legendary
+
+- Tuple now works with memory-only element types like String.  Also, `Tuple.get`
+  now supports a form that just takes an element index but does not
+  require you to specify the result type.  Instead of `tup.get[1, Int]()` you
+  can now just use `tup.get[1]()`.
 
 ### ⭐️ New
 
@@ -65,21 +73,14 @@ and tools. Please add any significant user-visible changes here.
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
 
-- `Tuple.get` now supports a form that just takes an element index but does not
-  require you to specify the result type.  Instead of `tup.get[1, Int]()` you
-  can now just use `tup.get[1]()`.
-
-- `Reference` interoperates with unsafe code better: `AnyPointer` now has a
-  constructor that forms it from `Reference` directly (inferring element type
-  and address space). `AnyPointer` can convert to an immortal mutable
-  `Reference` with `yourptr[]`.  Both `Reference` and `AnyPointer` now have an
-  `address_space_cast` method like `Pointer`.
-
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
   initialization status of the underlying value.  This is useful in very
   low-level logic but isn't designed for general usability and will likely
   change in the future.
+
+- The `testing.assert_almost_equal` and `math.isclose` functions now have an
+  `equal_nan` flag. When set to True, then NaNs are considered equal.
 
 ### 🦋 Changed
 
@@ -93,6 +94,32 @@ and tools. Please add any significant user-visible changes here.
   lead to a crash.  You can work around this by initializing to a dummy value
   and overwriting later.  This limitation only applies to top level variables,
   variables in functions work as they always have.
+- `AnyPointer` got renamed to `UnsafePointer` and is now Mojo's preferred unsafe
+  pointer type.  It has several enhancements, including:
+  1) The element type can now be `AnyType`: it doesn't require `Movable`.
+  2) Because of this, the `take_value`, `emplace_value`, and `move_into` methods
+     have been changed to be top-level functions, and were renamed to
+     `move_from_pointee`, `initialize_pointee` and `move_pointee` respectively.
+  3) A new `destroy_pointee` function runs the destructor on the pointee.
+  4) `UnsafePointer` can be initialized directly from a `Reference` with
+     `UnsafePointer(someRef)` and can convert to an immortal reference with
+     `yourPointer[]`.  Both infer element type and address space.
+- All of the pointers got a pass of cleanup to make them more consistent, for
+  example the `unsafe.bitcast` global function is now a consistent `bitcast`
+  method on the pointers, which can convert element type and address space.
+- The `Reference` type has several changes, including:
+  1) It is now located in `memory.reference` instead of `memory.unsafe`.
+  2) `Reference` now has an unsafe `unsafe_bitcast` method like `UnsafePointer`.
+  3) Several unsafe methods were removed, including `offset`,
+     `destroy_element_unsafe` and `emplace_ref_unsafe`. This is because
+     `Reference` is a safe type - use `UnsafePointer` to do unsafe operations.
+
+- The `mojo package` command no longer supports the `-D` flag. All compilation
+  environment flags should be provided at the point of package use
+  (e.g. `mojo run` or `mojo build`).
+
+- `parallel_memcpy` function has moved from the `buffer` package to the `algorithm`
+  package.  Please update your imports accordingly.
 
 ### ❌ Removed
 
@@ -110,7 +137,22 @@ and tools. Please add any significant user-visible changes here.
 - `List.pop_back()` has been removed.  Use `List.pop()` instead which defaults
   to popping the last element in the list.
 
+- `SIMD.to_int(value)` has been removed.  Use `int(value)` instead.
+
+- The `__get_lvalue_as_address(x)` magic function has been removed.  To get a
+  reference to a value use `Reference(x)` and if you need an unsafe pointer, you
+  can use `UnsafePointer.address_of(x)`.
+
 ### 🛠️ Fixed
+
+- [#516](https://github.com/modularml/mojo/issues/516) and
+  [#1817](https://github.com/modularml/mojo/issues/1817) and many others, e.g.
+  "Can't create a function that returns two strings"
+
+- [#1178](https://github.com/modularml/mojo/issues/1178) (os/kern) failure (5)
+
+- [#1609](https://github.com/modularml/mojo/issues/1609) alias with
+  `DynamicVector[Tuple[Int]]` fails.
 
 - [#1987](https://github.com/modularml/mojo/issues/1987) Defining `main`
   in a Mojo package is an error, for now. This is not intended to work yet,
@@ -121,6 +163,9 @@ and tools. Please add any significant user-visible changes here.
   longer cuts off hover previews for functions with functional arguments,
   parameters, or results.
 
+- [#1245](https://github.com/modularml/mojo/issues/1245) [Feature Request]
+  Parameter Inference from Other Parameters.
+
 - [#1901](https://github.com/modularml/mojo/issues/1901) Fixed Mojo LSP and
   documentation generation handling of inout arguments.
 
@@ -130,5 +175,24 @@ and tools. Please add any significant user-visible changes here.
 - [#1924](https://github.com/modularml/mojo/issues/1924) JIT debugging on Mac
   has been fixed.
 
+- [#1941](https://github.com/modularml/mojo/issues/1941) Mojo variadics don't
+  work with non-trivial register-only types.
+
 - [#1963](https://github.com/modularml/mojo/issues/1963) `a!=0` is now parsed
   and formatted correctly by `mojo format`.
+
+- [#1676](https://github.com/modularml/mojo/issues/1676) Fix a crash related to
+  `@value` decorator and structs with empty body.
+
+- [#1917](https://github.com/modularml/mojo/issues/1917) Fix a crash after
+  syntax error during tuple creation
+
+- [#2006](https://github.com/modularml/mojo/issues/2006) The Mojo LSP now
+  properly supports signature types with named arguments and parameters.
+
+- [#2007](https://github.com/modularml/mojo/issues/2007) and
+  [#1997](https://github.com/modularml/mojo/issues/1997) The Mojo LSP no longer
+  crashes on certain types of closures.
+
+- [#1675](https://github.com/modularml/mojo/issues/1675) Ensure `@value`
+  decorator fails gracefully after duplicate field error.

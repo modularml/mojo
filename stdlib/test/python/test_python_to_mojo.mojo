@@ -11,9 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo %s | FileCheck %s
-from python.object import PythonObject
-from python.python import Python
+# RUN: %mojo-no-debug %s | FileCheck %s
+from python import Python, PythonObject
 
 from testing import assert_equal
 
