@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: disabled
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 # Test for https://github.com/modularml/mojo/issues/1505
 
 from random import random_ui64

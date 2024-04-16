@@ -22,6 +22,7 @@ from os import listdir
 from collections import List
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 
+from memory.unsafe_pointer import move_from_pointee
 from memory import DTypePointer, Pointer
 
 from utils import StringRef
@@ -207,7 +208,7 @@ fn listdir[pathlike: os.PathLike](path: pathlike) raises -> List[String]:
 
 
 @always_inline("nodebug")
-fn abort[result: Movable = NoneType]() -> result:
+fn abort[result: AnyType = NoneType]() -> result:
     """Calls a target dependent trap instruction if available.
 
     Parameters:
@@ -219,12 +220,14 @@ fn abort[result: Movable = NoneType]() -> result:
 
     __mlir_op.`llvm.intr.trap`()
 
-    return AnyPointer[result]().take_value()
+    # We need to satisfy the noreturn checker.
+    while True:
+        pass
 
 
 @always_inline("nodebug")
 fn abort[
-    result: Movable = NoneType, *, stringable: Stringable
+    result: AnyType = NoneType, *, stringable: Stringable
 ](message: stringable) -> result:
     """Calls a target dependent trap instruction if available.
 
