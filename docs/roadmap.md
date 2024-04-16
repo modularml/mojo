@@ -96,8 +96,8 @@ systems. Here are some of the notable issues that we plan to fix:
 
 - Missing native support for Windows, Intel Macs, and Linux distributions
   other than Ubuntu. Currently, we support Ubuntu systems with x86-64
-  processors only. Support for more Linux distributions (including Debian
-  and RHEL) and Windows is in progress.
+  processors and Apple Silicon macOS. Support for more Linux distributions
+  (including Debian and RHEL) and Windows is in progress.
 
 - Python interoperability might fail when running a compiled Mojo program, with
   the message
@@ -126,10 +126,6 @@ systems. Here are some of the notable issues that we plan to fix:
   If it asks you to perform auth, run `modular auth <MODULAR_AUTH>` and use the
   `MODULAR_AUTH` value shown for the `curl` command on [the download
   page](https://developer.modular.com/download).
-
-- `modular install mojo` is slow and might appear unresponsive (as the
-  installer is downloading packages in the background). We will add a progress
-  bar in a future release.
 
 - If you attempt to uninstall Mojo with `modular uninstall`, your subsequent
   attempt to install Mojo might fail with an HTTP 500 error code. If so, run
@@ -197,15 +193,11 @@ the language fully, but which don't depend strongly on other features.  These
 include things like:
 
 - Improved package management support.
-- Many standard library features, including canonical arrays and dictionary
-  types, copy-on-write data structures, etc.
+- Many standard library features, including copy-on-write data structures.
 - Support for "top level code" at file scope.
 - Algebraic data types like `enum` in Swift/Rust, and pattern matching.
-- Many standard library types, including `Optional[T]` and `Result[T, Error]`
-  types when we have algebraic datatypes and basic traits.
-- Support for keyword-only arguments and variadic keyword arguments
-  (`**kwargs`).
-- Support for passing keyword arguments when calling Python functions.
+- Many standard library types need refinement, including `Optional[T]` and
+  `Result[T, Error]`.
 
 ## Ownership and Lifetimes
 
@@ -216,10 +208,9 @@ like:
 - Capture declarations in closures.
 - Borrow checker: complain about invalid mutable references.
 
-The next step in this is to bring proper lifetime support in.  This will add the
-ability to return references and store references in structures safely.  In the
-immediate future, one can use the unsafe `Pointer` struct to do this like in
-C++.
+Mojo has support for a safe `Reference` type, and it is used in the standard
+library, but it is still under active development and not very pretty or nice
+to use right now.
 
 ## Traits support
 
@@ -240,13 +231,12 @@ already implemented in the standard library.
 
 We plan to expand traits support in future releases. Planned features include:
 
-- More traits built in to the standard library, and expanded use of traits
-  throughout the standard library.
-
 - Support for default implementations of required methods.
 
 - Support for a feature like Swift's extensions, allowing you to add a trait to
   a preexisting type.
+
+- Add support for conditional conformances.
 
 ## Classes
 
@@ -260,14 +250,12 @@ When we get here, we will discuss what the right default is: for example, is
 full Python hash-table dynamism the default? Or do we use a more efficient
 model by default (e.g. vtable-based dispatch and explicitly declared stored
 properties) and allow opt'ing into dynamism with a `@dynamic` decorator on the
-class. The latter approach worked well for Swift (its [`@objc`
-attribute](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/attributes/#objc)),
-but we'll have to prototype to better understand the tradeoffs.
+class. More discussion is [in this proposal](https://github.com/modularml/mojo/blob/main/proposals/mojo-and-dynamism.md).
 
 ## C/C++ Interop
 
 Integration to transparently import Clang C/C++ modules.  Mojo's type system
-and C++'s are pretty compatible, so we should be able to have something pretty
+and C++'s are very compatible, so we should be able to have something pretty
 nice here. Mojo can leverage Clang to transparently generate a foreign function
 interface between C/C++ and Mojo, with the ability to directly import functions:
 
@@ -549,64 +537,6 @@ Mojo currently supports this feature through the
 [`int()`](/mojo/stdlib/builtin/int/int-function) and
 [`len()`](/mojo/stdlib/builtin/len/len) functions. We'll continue to
 add traits support to the standard library to enable common use cases like this.
-
-### Lifetime tracking inside collections
-
-With traits, it is now possible to build collection types like lists, maps, and
-sets that invoke element destructors. However, most standard library collection
-types haven't yet been extended to use traits.
-
-For collections of trivial types, like `Int`, this is no problem, but for
-collections of types with lifetimes, like `String`, the elements have to be
-manually destructed. Doing so requires quite an ugly pattern, shown in the next
-section.
-
-The `List` type has been updated to use traits, and invokes destructors
-properly.
-
-### No safe value references
-
-Mojo does not have proper lifetime marker support yet, and that means it cannot
-reason about returned references, so Mojo doesn't support them. You can return
-or keep unsafe references by passing explicit pointers around.
-
-```mojo
-struct StringRef:
-    var ref: Pointer[SI8]
-    var size: Int
-    # ...
-
-fn bar(x: StringRef): pass
-
-fn foo():
-    var s: String = "1234"
-    var ref: StringRef = s # unsafe reference
-    bar(ref)
-    _ = s # keep the backing memory alive!
-```
-
-Mojo will destruct objects as soon as it thinks it can. That means the lifetime
-of objects to which there are unsafe references must be manually extended. See
-the [Death of a value](/mojo/manual/lifecycle/death.html)
-for more details. This disables the RAII pattern in Mojo.  Context managers and
-`with` statements are your friends in Mojo.
-
-No lvalue returns also mean that implementing certain patterns require magic
-keywords until proper lifetime support is built. One such pattern is retrieving
-an unsafe reference from an object.
-
-```mojo
-struct UnsafeIntRef:
-    var ptr: Pointer[Int]
-
-fn printIntRef(x: UnsafeIntRef):
-    # "deference" operator
-    print(__get_address_as_lvalue(x.ptr)) # Pointer[Int] -> &Int
-
-var c: Int = 10
-# "reference" operator
-var ref = UnsafeIntRef(__get_lvalue_as_address(c)) # &Int -> Pointer[Int]
-```
 
 ### Parameter closure captures are unsafe references
 
