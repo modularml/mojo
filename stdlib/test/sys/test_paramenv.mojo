@@ -10,27 +10,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -D bar=99 -D baz=hello %s | FileCheck %s
-# RUN: %mojo -D bar=99 -D baz=hello -D foo=11 %s | FileCheck %s --check-prefix=FOO
+# RUN: %mojo -D bar=99 -D baz=hello -D foo=11 %s
 
 from sys import env_get_int, env_get_string, is_defined
+from testing import assert_equal, assert_true, assert_false
 
 
-fn main():
-    # CHECK-LABEL: === test_env
-    print("=== test_env")
+def test_is_defined():
+    assert_true(is_defined["bar"]())
+    assert_true(is_defined["foo"]())
+    assert_true(is_defined["baz"]())
+    assert_false(is_defined["boo"]())
 
-    # CHECK: is_defined(foo) False
-    print("is_defined(foo)", is_defined["foo"]())
-    # CHECK: is_defined(bar) True
-    print("is_defined(bar)", is_defined["bar"]())
-    # CHECK: env_get_int(bar) 99
-    print("env_get_int(bar)", env_get_int["bar"]())
-    # CHECK: env_get_string(baz) hello
-    print("env_get_string(baz)", env_get_string["baz"]())
 
-    # CHECK: env_get_int_or(foo, 42) 42
-    # FOO: env_get_int_or(foo, 42) 11
-    print("env_get_int_or(foo, 42)", env_get_int["foo", 42]())
-    # CHECK: env_get_int_or(bar, 42) 99
-    print("env_get_int_or(bar, 42)", env_get_int["bar", 42]())
+def test_get_string():
+    assert_equal(env_get_string["baz"](), "hello")
+
+
+def test_env_get_int():
+    assert_equal(env_get_int["bar"](), 99)
+    assert_equal(env_get_int["foo", 42](), 11)
+    assert_equal(env_get_int["bar", 42](), 99)
+    assert_equal(env_get_int["boo", 42](), 42)
+
+
+def main():
+    test_is_defined()
+    test_get_string()
+    test_env_get_int()
