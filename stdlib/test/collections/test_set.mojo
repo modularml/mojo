@@ -10,9 +10,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
-from collections.set import Set
+from collections import Set
 
 from testing import assert_raises, assert_true, assert_false
 

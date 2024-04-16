@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
-# RUN: not %mojo -debug-level full %s
+# RUN: not %mojo %s
 
 import sys
 

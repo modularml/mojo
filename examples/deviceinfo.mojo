@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s | FileCheck %s
 
 # This sample prints the current host system information using APIs from the
 # sys module.
@@ -18,6 +18,10 @@ from sys.info import (
     _current_cpu,
     _current_target,
     _triple_attr,
+)
+
+
+from sys import (
     os_is_linux,
     os_is_macos,
     os_is_windows,
