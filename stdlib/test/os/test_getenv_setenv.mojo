@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: linux || darwin
-# RUN: TEST_MYVAR=MyValue %mojo -debug-level full %s
+# RUN: TEST_MYVAR=MyValue %mojo %s
 
 from os import getenv, setenv
 

@@ -16,7 +16,7 @@
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: linux
 # REQUIRES: amx_tile
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 from sys import has_intel_amx, os_is_linux
 from testing import assert_false, assert_true

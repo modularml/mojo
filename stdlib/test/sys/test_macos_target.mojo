@@ -15,7 +15,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: darwin
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 
 from sys import (
