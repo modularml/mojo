@@ -16,7 +16,7 @@
 # REQUIRES: apple-silicon
 # RUN: %mojo -debug-level %s
 
-from sys.info import alignof, has_avx512f, has_neon, simdbitwidth
+from sys import alignof, has_avx512f, has_neon, simdbitwidth
 from testing import assert_false, assert_true, assert_equal
 
 

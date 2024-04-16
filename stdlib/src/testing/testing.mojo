@@ -151,7 +151,9 @@ fn assert_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    if lhs != rhs:
+    # `if lhs != rhs:` is not enough. `reduce_or()` must be used here, otherwise, if any of the elements are
+    # equal, the error is not triggered.
+    if (lhs != rhs).reduce_or():
         raise _assert_equal_error(str(lhs), str(rhs), msg=msg)
 
 
@@ -331,5 +333,7 @@ struct assert_raises:
             Error: If the error raised doesn't match the expected error to raise.
         """
         if self.message_contains:
-            return self.message_contains.value() in str(error)
+            return self.message_contains.value[
+                __mlir_attr.`0: i1`, __lifetime_of(self)
+            ]()[] in str(error)
         return True

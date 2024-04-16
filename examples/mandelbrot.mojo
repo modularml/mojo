@@ -14,7 +14,7 @@
 # RUN: %mojo -debug-level full %s | FileCheck %s
 
 from math import iota
-from sys.info import num_logical_cores
+from sys import num_logical_cores
 
 import benchmark
 from algorithm import parallelize, vectorize
@@ -23,7 +23,7 @@ from python import Python
 from runtime.llcl import Runtime
 from tensor import Tensor
 
-from utils.index import Index
+from utils import Index
 
 alias float_type = DType.float64
 alias int_type = DType.int64

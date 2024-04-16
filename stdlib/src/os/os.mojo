@@ -20,9 +20,9 @@ from os import listdir
 """
 
 from collections import List
-from sys.info import os_is_linux, os_is_windows, triple_is_nvidia_cuda
+from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 
-from memory.unsafe import DTypePointer, Pointer
+from memory import DTypePointer, Pointer
 
 from utils import StringRef
 

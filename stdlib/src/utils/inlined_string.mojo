@@ -15,12 +15,11 @@
    avoids heap allocations for short strings.
 """
 
-from sys.info import sizeof
+from sys import sizeof
 
 from memory import memcpy
 
-from utils.static_tuple import StaticTuple
-from utils.variant import Variant
+from utils import StaticTuple, Variant
 
 # ===----------------------------------------------------------------------===#
 # InlinedString

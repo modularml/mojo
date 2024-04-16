@@ -15,12 +15,12 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory.unsafe import Pointer, AnyLifetime
+from memory import Pointer, AnyLifetime
 ```
 """
 
 
-from sys.info import (
+from sys import (
     alignof,
     bitwidthof,
     simdwidthof,
