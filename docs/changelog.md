@@ -138,6 +138,18 @@ what we publish.
   f.seek(os.SEEK_END, -32)
   ```
 
+  - `FileHandle.read()` can now read straight into a `DTypePointer`:
+
+    ```mojo
+    var file = open("/tmp/example.txt", "r")
+
+    # Allocate and load 8 elements
+    var ptr = DTypePointer[DType.float32].alloc(8)
+    var bytes = file.read(ptr, 8)
+    print("bytes read", bytes)
+    print(ptr.load[width=8]())
+    ```
+
 ### ❌ Removed
 
 - Support for "register only" variadic packs has been removed. Instead of
