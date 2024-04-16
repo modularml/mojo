@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from sys import bitwidthof, os_is_windows, triple_is_nvidia_cuda, external_call
 
 from builtin.dtype import _get_dtype_printf_format
+from builtin.builtin_list import _LITRefPackHelper
 from memory import Pointer
 
 from utils import StringRef, unroll
@@ -98,7 +99,16 @@ fn _flush():
 
 
 @no_inline
-fn _printf[*types: AnyRegType](fmt: StringLiteral, borrowed *arguments: *types):
+fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
+    # The argument pack will contain references for each value in the pack,
+    # but we want to pass their values directly into the C snprintf call. Load
+    # all the members of the pack.
+    var kgen_pack = _LITRefPackHelper(arguments._value).get_as_kgen_pack()
+
+    # FIXME(37129): Cannot use get_loaded_kgen_pack because vtables on types
+    # aren't stripped off correctly.
+    var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
+
     with _fdopen(_fdopen.STDOUT) as fd:
         _ = __mlir_op.`pop.external_call`[
             func = "KGEN_CompilerRT_fprintf".value,
@@ -109,7 +119,7 @@ fn _printf[*types: AnyRegType](fmt: StringLiteral, borrowed *arguments: *types):
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](fd, fmt.data(), arguments)
+        ](fd, fmt.data(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -119,12 +129,12 @@ fn _printf[*types: AnyRegType](fmt: StringLiteral, borrowed *arguments: *types):
 
 @no_inline
 fn _snprintf[
-    *types: AnyRegType
+    *types: AnyType
 ](
-    str: Pointer[Int8],
+    str: UnsafePointer[Int8],
     size: Int,
     fmt: StringLiteral,
-    borrowed *arguments: *types,
+    *arguments: *types,
 ) -> Int:
     """Writes a format string into an output pointer.
 
@@ -137,6 +147,15 @@ fn _snprintf[
     Returns:
         The number of bytes written into the output string.
     """
+    # The argument pack will contain references for each value in the pack,
+    # but we want to pass their values directly into the C snprintf call. Load
+    # all the members of the pack.
+    var kgen_pack = _LITRefPackHelper(arguments._value).get_as_kgen_pack()
+
+    # FIXME(37129): Cannot use get_loaded_kgen_pack because vtables on types
+    # aren't stripped off correctly.
+    var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
+
     return int(
         __mlir_op.`pop.external_call`[
             func = "snprintf".value,
@@ -148,25 +167,14 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.data(), arguments)
-    )
-
-
-@no_inline
-fn _snprintf_int(
-    buffer: Pointer[Int8],
-    size: Int,
-    x: Int,
-) -> Int:
-    return _snprintf(
-        buffer, size, _get_dtype_printf_format[DType.index](), x.value
+        ](str, size, fmt.data(), loaded_pack)
     )
 
 
 @no_inline
 fn _snprintf_scalar[
     type: DType
-](buffer: Pointer[Int8], size: Int, x: Scalar[type],) -> Int:
+](buffer: UnsafePointer[Int8], size: Int, x: Scalar[type],) -> Int:
     alias format = _get_dtype_printf_format[type]()
 
     @parameter
@@ -193,7 +201,7 @@ fn _snprintf_scalar[
 
 
 @no_inline
-fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
+fn _float_repr(buffer: UnsafePointer[Int8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
@@ -206,17 +214,17 @@ fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
     var p = buffer
     alias minus = ord("-")
     alias dot = ord(".")
-    if p.load() == minus:
+    if p[] == minus:
         p += 1
-    while p.load() != 0 and isdigit(p.load()):
+    while p[] != 0 and isdigit(p[]):
         p += 1
-    if p.load():
+    if p[]:
         return n
-    p.store(dot)
+    p[] = dot
     p += 1
-    p.store(ord("0"))
+    p[] = ord("0")
     p += 1
-    p.store(0)
+    p[] = 0
     return n + 2
 
 

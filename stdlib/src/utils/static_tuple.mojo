@@ -35,7 +35,11 @@ fn _set_array_elem[
     type: AnyRegType,
 ](
     val: type,
-    inout array: __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+    array: Reference[
+        __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
+        __mlir_attr.`1 : i1`,
+        _,
+    ],
 ):
     """Sets the array element at position `index` with the value `val`.
 
@@ -49,9 +53,9 @@ fn _set_array_elem[
         array: the array which is captured by reference.
     """
     var ptr = __mlir_op.`pop.array.gep`(
-        Pointer.address_of(array).address, index.value
+        array.get_legacy_pointer().address, index.value
     )
-    __mlir_op.`pop.store`(val, ptr)
+    Pointer(ptr).store(val)
 
 
 @always_inline
@@ -126,40 +130,30 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
     """The underlying storage for the static tuple."""
 
     @always_inline
-    fn __init__() -> Self:
-        """Constructs an empty (undefined) tuple.
-
-        Returns:
-            The tuple.
-        """
+    fn __init__(inout self):
+        """Constructs an empty (undefined) tuple."""
         _static_tuple_construction_checks[size]()
-        return Self {array: __mlir_op.`kgen.undef`[_type = Self.type]()}
+        self.array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
-    fn __init__(*elems: Self.element_type) -> Self:
+    fn __init__(inout self, *elems: Self.element_type):
         """Constructs a static tuple given a set of arguments.
 
         Args:
             elems: The element types.
-
-        Returns:
-            The tuple.
         """
         _static_tuple_construction_checks[size]()
-        return Self {array: _create_array[size](elems)}
+        self.array = _create_array[size](elems)
 
     @always_inline
-    fn __init__(values: VariadicList[Self.element_type]) -> Self:
+    fn __init__(inout self, values: VariadicList[Self.element_type]):
         """Creates a tuple constant using the specified values.
 
         Args:
             values: The list of values.
-
-        Returns:
-            A tuple with the values filled in.
         """
         _static_tuple_construction_checks[size]()
-        return Self {array: _create_array[size, Self.element_type](values)}
+        self.array = _create_array[size, Self.element_type](values)
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -198,7 +192,9 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
             val: The value to store.
         """
         constrained[index < size]()
-        _set_array_elem[index, size, Self.element_type](val, self.array)
+        var tmp = self
+        _set_array_elem[index, size, Self.element_type](val, tmp.array)
+        self = tmp
 
     @always_inline("nodebug")
     fn __getitem__[intable: Intable](self, index: intable) -> Self.element_type:
@@ -217,7 +213,6 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
         debug_assert(offset < size, "index must be within bounds")
         # Copy the array so we can get its address, because we can't take the
         # address of 'self' in a non-mutating method.
-        # TODO(Ownership): we should be able to get const references.
         var arrayCopy = self.array
         var ptr = __mlir_op.`pop.array.gep`(
             Pointer.address_of(arrayCopy).address, offset.value
@@ -239,18 +234,9 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
         """
         var offset = int(index)
         debug_assert(offset < size, "index must be within bounds")
+        var tmp = self
         var ptr = __mlir_op.`pop.array.gep`(
-            Pointer.address_of(self.array).address, offset.value
+            Pointer.address_of(tmp.array).address, offset.value
         )
         Pointer(ptr).store(val)
-
-    fn as_ptr(inout self) -> Pointer[Self.element_type]:
-        """Get a mutable pointer to the elements contained by this tuple.
-
-        Returns:
-            A pointer to the elements contained by this tuple.
-        """
-
-        var base_ptr = Pointer[Self.type].address_of(self.array).address
-        var ptr = __mlir_op.`pop.array.gep`(base_ptr, Int(0).value)
-        return Pointer(ptr)
+        self = tmp
