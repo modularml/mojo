@@ -113,6 +113,8 @@ def test_file_read_context():
 
 
 def test_file_seek():
+    import os
+
     with open(
         Path(CURRENT_DIR) / "test_file_dummy_input.txt",
         "r",
@@ -124,13 +126,13 @@ def test_file_seek():
         assert_equal(f.read(len(expected_msg1)), expected_msg1)
 
         # Seek from the end of the file
-        pos = f.seek(-16, 2)
+        pos = f.seek(-16, os.SEEK_END)
         assert_equal(pos, 938)
 
         print(f.read(6))
 
         # Seek from current possition, skip the space
-        pos = f.seek(1, 1)
+        pos = f.seek(1, os.SEEK_CUR)
         assert_equal(pos, 945)
         assert_equal(f.read(7), "rhoncus")
 
@@ -173,6 +175,43 @@ def test_file_write_again():
     read_file.close()
 
 
+@value
+@register_passable
+struct Word:
+    var first_letter: Int8
+    var second_letter: Int8
+    var third_letter: Int8
+    var fourth_letter: Int8
+    var fith_letter: Int8
+
+    fn __str__(self) -> String:
+        var word = List[Int8](capacity=6)
+        word.append(self.first_letter)
+        word.append(self.second_letter)
+        word.append(self.third_letter)
+        word.append(self.fourth_letter)
+        word.append(self.fith_letter)
+        word.append(0)
+        return word
+
+
+# CHECK-LABEL: test_file_read_to_dtype_pointer
+def test_file_read_to_dtype_pointer():
+    print("== test_file_read_to_dtype_pointer")
+
+    var f = open(Path(CURRENT_DIR) / "test_file_dummy_input.txt", "r")
+
+    var ptr = DTypePointer[DType.int8].alloc(8)
+    var data = f.read(ptr, 8)
+    assert_equal(ptr.load[width=8](0), "[76, 111, 114, 101, 109, 32, 105, 112]")
+
+    var ptr2 = DTypePointer[DType.int8].alloc(8)
+    var data2 = f.read(ptr2, 8)
+    assert_equal(
+        ptr2.load[width=8](0), "[115, 117, 109, 32, 100, 111, 108, 111]"
+    )
+
+
 def main():
     test_file_read()
     test_file_read_multi()
@@ -184,3 +223,4 @@ def main():
     test_file_open_nodir()
     test_file_write()
     test_file_write_again()
+    test_file_read_to_dtype_pointer()
