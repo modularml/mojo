@@ -368,6 +368,7 @@ struct Array[ElementType: CollectionElement, size: Int](Sized):
         """
         return size
 
+    @always_inline("nodebug")
     fn __refitem__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
@@ -381,6 +382,7 @@ struct Array[ElementType: CollectionElement, size: Int](Sized):
             UnsafePointer(ptr)[]
         )
 
+    @always_inline("nodebug")
     fn __refitem__[
         mutability: __mlir_type.i1,
         self_life: AnyLifetime[mutability].type,
