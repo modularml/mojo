@@ -29,6 +29,24 @@ def test_bool_none():
     assert_equal(bool(test), False)
 
 
+def test_bool_abs():
+    assert_equal(False.__abs__(), 0)
+    assert_equal(True.__abs__(), 1)
+
+
+def test_bool_add():
+    assert_equal(True.__add__(1), 2)
+    assert_equal(False.__add__(1), 1)
+
+
+def test_bool_float():
+    assert_equal(True.__float__(), 1.0)
+    assert_equal(False.__float__(), 0.0)
+
+
 def main():
     test_bool_cast_to_int()
     test_bool_none()
+    test_bool_abs()
+    test_bool_add()
+    test_bool_float()

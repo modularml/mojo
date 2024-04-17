@@ -249,6 +249,36 @@ struct Bool(
         return value ^ self
 
     @always_inline("nodebug")
+    fn __abs__(self) -> Int:
+        """Return the absolute value of the Bool.
+
+        Returns:
+            zeor or one
+        """
+        return 1 if self else 0
+
+    @always_inline("nodebug")
+    fn __float__(self) -> Float32:
+        """Return the float value of the Bool.
+
+        Returns:
+            0.0 or 1.0
+        """
+        return 1.0 if self else 0.0
+
+    @always_inline("nodebug")
+    fn __add__[T: Intable](self, value: T) -> Int:
+        """Return self plus value.
+
+        Args:
+            value: The other Intable value.
+
+        Returns:
+            `self` plus `value`.
+        """
+        return self.__int__() + value.__int__()
+
+    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Convert this Bool to an integer.
 
@@ -256,6 +286,7 @@ struct Bool(
             1 if the Bool is True, 0 otherwise.
         """
         return Int(
+
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 self.value
             )
