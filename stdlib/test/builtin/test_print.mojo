@@ -10,13 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s | FileCheck %s
 
 
-from memory.unsafe import DTypePointer
+from memory import DTypePointer
 
-from utils import StringRef
-from utils.index import StaticIntTuple
+from utils import StringRef, StaticIntTuple
 
 
 # CHECK-LABEL: test_print

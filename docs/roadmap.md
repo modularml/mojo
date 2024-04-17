@@ -544,10 +544,10 @@ print(One()) # prints '1'
 ```
 
 Mojo currently supports this feature through the
-[`Stringable`](/mojo/stdlib/builtin/str.html#stringable) trait, so that
+[`Stringable`](/mojo/stdlib/builtin/str/Stringable) trait, so that
 `print()` works on all `Stringable` types. Similar support exists for the
-[`int()`](/mojo/stdlib/builtin/int.html#int-1) and
-[`len()`](/mojo/stdlib/builtin/len.html#len) functions. We'll continue to
+[`int()`](/mojo/stdlib/builtin/int/int-function) and
+[`len()`](/mojo/stdlib/builtin/len/len) functions. We'll continue to
 add traits support to the standard library to enable common use cases like this.
 
 ### Lifetime tracking inside collections

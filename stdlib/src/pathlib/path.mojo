@@ -15,7 +15,7 @@
 
 import os
 from os import PathLike, listdir, stat_result
-from sys.info import os_is_windows
+from sys import os_is_windows
 
 from memory import stack_allocation
 

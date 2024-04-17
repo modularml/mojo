@@ -15,10 +15,10 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: darwin
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 
-from sys.info import (
+from sys import (
     is_big_endian,
     is_little_endian,
     os_is_linux,

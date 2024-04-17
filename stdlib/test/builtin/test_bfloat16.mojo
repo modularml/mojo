@@ -10,10 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s | FileCheck %s
 
 from random import randn_float64
-from sys.info import has_neon
+from sys import has_neon
 
 from testing import assert_equal, assert_almost_equal
 

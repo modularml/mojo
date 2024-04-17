@@ -14,7 +14,8 @@
 
 from testing import assert_equal, assert_true
 
-from utils.inlined_string import InlinedString, _FixedString
+from utils.inlined_string import _FixedString
+from utils import InlinedString
 
 
 def main():

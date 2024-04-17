@@ -10,17 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements classes for working with unsafe pointers.
+"""Implements types that work with unsafe pointers.
 
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory.unsafe import Pointer, AnyLifetime
+from memory import Pointer, AnyLifetime
 ```
 """
 
 
-from sys.info import (
+from sys import (
     alignof,
     bitwidthof,
     simdwidthof,
@@ -29,7 +29,7 @@ from sys.info import (
 )
 from sys.intrinsics import PrefetchOptions, _mlirtype_is_eq
 from sys.intrinsics import prefetch as _prefetch
-from sys.intrinsics import strided_load, strided_store
+from sys.intrinsics import gather, scatter, strided_load, strided_store
 
 from .memory import _free, _malloc
 
@@ -54,110 +54,6 @@ fn _is_power_of_2(val: Int) -> Bool:
 # ===----------------------------------------------------------------------===#
 # bitcast
 # ===----------------------------------------------------------------------===#
-
-
-@always_inline("nodebug")
-fn bitcast[
-    type: AnyRegType, address_space: AddressSpace = AddressSpace.GENERIC
-](val: Int) -> Pointer[type, address_space]:
-    """Bitcasts an integer to a pointer.
-
-    Parameters:
-        type: The target type.
-        address_space: The address space the pointer is in.
-
-    Args:
-        val: The pointer address.
-
-    Returns:
-        A new Pointer with the specified address.
-    """
-    return __mlir_op.`pop.index_to_pointer`[
-        _type = Pointer[type, address_space].pointer_type
-    ](Scalar[DType.index](val).value)
-
-
-@always_inline("nodebug")
-fn bitcast[
-    type: DType, address_space: AddressSpace = AddressSpace.GENERIC
-](val: Int) -> DTypePointer[type, address_space]:
-    """Bitcasts an integer to a pointer.
-
-    Parameters:
-        type: The target type.
-        address_space: The address space the pointer is in.
-
-    Args:
-        val: The pointer address.
-
-    Returns:
-        A new Pointer with the specified address.
-    """
-    return bitcast[Scalar[type], address_space](val)
-
-
-@always_inline("nodebug")
-fn bitcast[
-    new_type: Movable, src_type: Movable
-](ptr: AnyPointer[src_type]) -> AnyPointer[new_type]:
-    """Bitcasts an AnyPointer to a different type.
-
-    Parameters:
-        new_type: The target type.
-        src_type: The source type.
-
-    Args:
-        ptr: The source pointer.
-
-    Returns:
-        A new Pointer with the specified type and the same address, as the
-        original Pointer.
-    """
-    return ptr.bitcast[new_type]()
-
-
-@always_inline("nodebug")
-fn bitcast[
-    new_type: AnyRegType, src_type: AnyRegType, address_space: AddressSpace
-](ptr: Pointer[src_type, address_space]) -> Pointer[new_type, address_space]:
-    """Bitcasts a Pointer to a different type.
-
-    Parameters:
-        new_type: The target type.
-        src_type: The source type.
-        address_space: The address space the pointer is in.
-
-    Args:
-        ptr: The source pointer.
-
-    Returns:
-        A new Pointer with the specified type and the same address, as the
-        original Pointer.
-    """
-    return ptr.bitcast[new_type]()
-
-
-@always_inline("nodebug")
-fn bitcast[
-    new_type: DType, src_type: DType, address_space: AddressSpace
-](ptr: DTypePointer[src_type, address_space]) -> DTypePointer[
-    new_type, address_space
-]:
-    """Bitcasts a DTypePointer to a different type.
-
-    Parameters:
-        new_type: The target type.
-        src_type: The source type.
-        address_space: The address space the pointer is in.
-
-    Args:
-        ptr: The source pointer.
-
-    Returns:
-        A new DTypePointer with the specified type and the same address, as
-        the original DTypePointer.
-    """
-    return ptr.bitcast[new_type]()
 
 
 @always_inline("nodebug")
@@ -256,405 +152,18 @@ fn bitcast[
 
 
 # ===----------------------------------------------------------------------===#
-# AddressSpace
+# LegacyPointer
 # ===----------------------------------------------------------------------===#
+
+alias Pointer = LegacyPointer
 
 
 @value
 @register_passable("trivial")
-struct _GPUAddressSpace(EqualityComparable):
-    var _value: Int
-
-    # See https://docs.nvidia.com/cuda/nvvm-ir-spec/#address-space
-    alias GENERIC = AddressSpace(0)
-    """Generic address space."""
-    alias GLOBAL = AddressSpace(1)
-    """Global address space."""
-    alias CONSTANT = AddressSpace(2)
-    """Constant address space."""
-    alias SHARED = AddressSpace(3)
-    """Shared address space."""
-    alias PARAM = AddressSpace(4)
-    """Param address space."""
-    alias LOCAL = AddressSpace(5)
-    """Local address space."""
-
-    @always_inline("nodebug")
-    fn __init__(value: Int) -> Self:
-        return Self {_value: value}
-
-    @always_inline("nodebug")
-    fn value(self) -> Int:
-        """The integral value of the address space.
-
-        Returns:
-          The integral value of the address space.
-        """
-        return self._value
-
-    @always_inline("nodebug")
-    fn __int__(self) -> Int:
-        """The integral value of the address space.
-
-        Returns:
-          The integral value of the address space.
-        """
-        return self._value
-
-    @always_inline("nodebug")
-    fn __eq__(self, other: Self) -> Bool:
-        """The True if the two address spaces are equal and False otherwise.
-
-        Returns:
-          True if the two address spaces are equal and False otherwise.
-        """
-        return self.value() == other.value()
-
-    @always_inline("nodebug")
-    fn __eq__(self, other: AddressSpace) -> Bool:
-        """The True if the two address spaces are equal and False otherwise.
-
-        Returns:
-          True if the two address spaces are equal and False otherwise.
-        """
-        return self.value() == other.value()
-
-    @always_inline("nodebug")
-    fn __ne__(self, other: Self) -> Bool:
-        """True if the two address spaces are inequal and False otherwise.
-
-        Args:
-          other: The other address space value.
-
-        Returns:
-          True if the two address spaces are inequal and False otherwise.
-        """
-        return not self == other
-
-    @always_inline("nodebug")
-    fn __ne__(self, other: AddressSpace) -> Bool:
-        """True if the two address spaces are inequal and False otherwise.
-
-        Args:
-          other: The other address space value.
-
-        Returns:
-          True if the two address spaces are inequal and False otherwise.
-        """
-        return not self == other
-
-
-@value
-@register_passable("trivial")
-struct AddressSpace(EqualityComparable):
-    """Address space of the pointer."""
-
-    var _value: Int
-
-    alias GENERIC = AddressSpace(0)
-    """Generic address space."""
-
-    @always_inline("nodebug")
-    fn __init__(value: Int) -> Self:
-        """Initializes the address space from the underlying integral value.
-
-        Args:
-          value: The address space value.
-
-        Returns:
-          The address space.
-        """
-        return Self {_value: value}
-
-    @always_inline("nodebug")
-    fn __init__(value: _GPUAddressSpace) -> Self:
-        """Initializes the address space from the underlying integral value.
-
-        Args:
-          value: The address space value.
-
-        Returns:
-          The address space.
-        """
-        return Self {_value: int(value)}
-
-    @always_inline("nodebug")
-    fn value(self) -> Int:
-        """The integral value of the address space.
-
-        Returns:
-          The integral value of the address space.
-        """
-        return self._value
-
-    @always_inline("nodebug")
-    fn __int__(self) -> Int:
-        """The integral value of the address space.
-
-        Returns:
-          The integral value of the address space.
-        """
-        return self._value
-
-    @always_inline("nodebug")
-    fn __eq__(self, other: Self) -> Bool:
-        """True if the two address spaces are equal and False otherwise.
-
-        Args:
-          other: The other address space value.
-
-        Returns:
-          True if the two address spaces are equal and False otherwise.
-        """
-        return self.value() == other.value()
-
-    @always_inline("nodebug")
-    fn __ne__(self, other: Self) -> Bool:
-        """True if the two address spaces are inequal and False otherwise.
-
-        Args:
-          other: The other address space value.
-
-        Returns:
-          True if the two address spaces are inequal and False otherwise.
-        """
-        return not self == other
-
-
-# ===----------------------------------------------------------------------===#
-# Reference
-# ===----------------------------------------------------------------------===#
-
-
-# Helper to build !lit.ref types.
-# TODO: parametric aliases would be nice.
-struct _LITRef[
-    element_type: AnyType,
-    elt_is_mutable: __mlir_type.i1,
-    lifetime: AnyLifetime[elt_is_mutable].type,
-    address_space: AddressSpace = AddressSpace.GENERIC,
-]:
-    alias type = __mlir_type[
-        `!lit.ref<`,
-        element_type,
-        `, `,
-        lifetime,
-        `, `,
-        address_space._value.value,
-        `>`,
-    ]
-
-
-@value
-@register_passable("trivial")
-struct Reference[
-    type: AnyType,
-    is_mutable: __mlir_type.i1,
-    lifetime: AnyLifetime[is_mutable].type,
-    address_space: AddressSpace = AddressSpace.GENERIC,
-]:
-    """Defines a non-nullable safe reference.
-
-    Parameters:
-        type: Type of the underlying data.
-        is_mutable: Whether the referenced data may be mutated through this.
-        lifetime: The lifetime of the reference.
-        address_space: The address space of the referenced data.
-    """
-
-    alias mlir_ref_type = _LITRef[
-        type, is_mutable, lifetime, address_space
-    ].type
-
-    var value: Self.mlir_ref_type
-    """The underlying MLIR reference."""
-
-    @always_inline("nodebug")
-    fn __init__(inout self, value: Self.mlir_ref_type):
-        """Constructs a Reference from the MLIR reference.
-
-        Args:
-            value: The MLIR reference.
-        """
-        self.value = value
-
-    @always_inline("nodebug")
-    fn __refitem__(self) -> Self.mlir_ref_type:
-        """Enable subscript syntax `ref[]` to access the element.
-
-        Returns:
-            The MLIR reference for the Mojo compiler to use.
-        """
-        return self.value
-
-    @always_inline("nodebug")
-    fn __mlir_ref__(self) -> Self.mlir_ref_type:
-        """Enable the Mojo compiler to see into `Reference`.
-
-        Returns:
-            The MLIR reference for the Mojo compiler to use.
-        """
-        return self.value
-
-    # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
-    # disagreement.  Use AnyPointer instead!
-    @always_inline("nodebug")
-    fn get_unsafe_pointer(self) -> Pointer[type, address_space]:
-        """Constructs a Pointer from a safe reference.
-
-        Returns:
-            Constructed Pointer object.
-        """
-        var ptr_with_trait = __mlir_op.`lit.ref.to_pointer`(self.value)
-        # Work around AnyRefType vs AnyType.
-        return __mlir_op.`pop.pointer.bitcast`[
-            _type = Pointer[type, address_space].pointer_type
-        ](ptr_with_trait)
-
-    @always_inline("nodebug")
-    fn offset(self, offset: Int) -> Self:
-        """Offset the reference like an array.
-
-        Args:
-            offset: The integer offset.
-
-        Returns:
-            A new reference.
-        """
-        return __mlir_op.`lit.ref.offset`(self.value, offset.value)
-
-    @always_inline("nodebug")
-    fn bitcast_element[
-        new_element_type: AnyType
-    ](self) -> Reference[new_element_type, is_mutable, lifetime, address_space]:
-        """Cast the reference to one of another element type, but the same
-        lifetime, mutability, and address space.
-
-        Parameters:
-            new_element_type: The result type.
-
-        Returns:
-            The new reference.
-        """
-        # We don't have a generalized lit.ref.cast operation, so convert through
-        # to KGEN pointer.
-        # FIXME: We can't use AnyPointer here, because it requires T <- Movable.
-        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
-        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[
-                `!kgen.pointer<`,
-                new_element_type,
-                `,`,
-                address_space._value.value,
-                `>`,
-            ]
-        ](kgen_ptr)
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = _LITRef[
-                new_element_type, is_mutable, lifetime, address_space
-            ].type
-        ](dest_ptr)
-
-    @always_inline
-    fn address_space_cast[
-        new_address_space: AddressSpace
-    ](self) -> Reference[type, is_mutable, lifetime, new_address_space]:
-        """Cast the reference to one of another address space, but the same
-        element type, lifetime, and mutability.
-
-        Parameters:
-            new_address_space: The address space of the result.
-
-        Returns:
-            The new reference.
-        """
-        # We don't have a generalized lit.ref.cast operation, so convert through
-        # to KGEN pointer.
-        # FIXME: We can't use AnyPointer here, because it requires T <- Movable.
-        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
-        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[
-                `!kgen.pointer<`,
-                type,
-                `,`,
-                new_address_space._value.value,
-                `>`,
-            ]
-        ](kgen_ptr)
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = _LITRef[type, is_mutable, lifetime, new_address_space].type
-        ](dest_ptr)
-
-    fn destroy_element_unsafe(self):
-        """This unsafe operation runs the destructor of the element addressed by
-        this reference.  This is equivalent to `x->~Type()` syntax in C++.
-        """
-
-        # This should only work with mutable references.
-        # FIXME: This should be a precondition checked by the Mojo type checker,
-        # not delayed to elaboration!
-        constrained[
-            is_mutable,
-            "cannot use 'unsafe_destroy_element' on immutable references",
-        ]()
-
-        # This method can only work on address space 0, because the __del__
-        # method that we need to invoke will take 'self' in address space zero.
-        constrained[
-            address_space == AddressSpace.GENERIC,
-            "cannot use 'destroy_element_unsafe' on arbitrary address spaces",
-        ]()
-
-        # Project to an owned raw pointer, allowing the compiler to know it is to
-        # be destroyed.
-        var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(self.value)
-
-        # Bitcast to address space zero since the inserted __del__ call will only
-        # work with address space zero.
-        var dest_ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[
-                `!kgen.pointer<`,
-                type,
-                `>`,
-            ]
-        ](kgen_ptr)
-
-        # TODO: Use AnyPointer, but it requires a Movable element.
-        _ = __get_address_as_owned_value(dest_ptr)
-
-
-# FIXME: This should be a method on Reference, it is placed here because we need
-# it constrained on mutability and copyability of value.
-fn emplace_ref_unsafe[
-    type: Movable, lifetime: MutLifetime
-](dest: Reference[type, __mlir_attr.`1: i1`, lifetime], owned value: type):
-    """This unsafe operation assumes the memory pointed to by the reference
-    is uninitialized and overwrites it with an owned version of the
-    specified value.  This is equivalent to `new(ptr) Type(v)` syntax in C++.
-
-    Parameters:
-        type: Type of the underlying data.
-        lifetime: The lifetime of the reference.
-
-    Args:
-        dest: The reference to uninitialized memory to overwrite.
-        value: The value to write into it.
-    """
-    var kgen_ptr = __mlir_op.`lit.ref.to_pointer`(dest.value)
-    __get_address_as_uninit_lvalue(kgen_ptr) = value^
-
-
-# ===----------------------------------------------------------------------===#
-# Pointer
-# ===----------------------------------------------------------------------===#
-
-
-@value
-@register_passable("trivial")
-struct Pointer[
+struct LegacyPointer[
     type: AnyRegType, address_space: AddressSpace = AddressSpace.GENERIC
 ](Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
-    """Defines a Pointer struct that contains the address of a register passable
+    """Defines a LegacyPointer struct that contains the address of a register passable
     type.
 
     Parameters:
@@ -662,19 +171,110 @@ struct Pointer[
         address_space: The address space the pointer is in.
     """
 
-    alias pointer_type = __mlir_type[
+    alias _mlir_type = __mlir_type[
         `!kgen.pointer<`, type, `,`, address_space._value.value, `>`
     ]
 
-    var address: Self.pointer_type
+    var address: Self._mlir_type
     """The pointed-to address."""
 
-    alias _mlir_ref_type = _LITRef[
+    alias _mlir_ref_type = Reference[
         type,
         __mlir_attr.`1: i1`,
         __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
         address_space,
-    ].type
+    ]._mlir_type
+
+    @always_inline("nodebug")
+    fn __init__() -> Self:
+        """Constructs a null LegacyPointer from the value of pop.pointer type.
+
+        Returns:
+            Constructed LegacyPointer object.
+        """
+        return Self.get_null()
+
+    @always_inline("nodebug")
+    fn __init__(address: Self._mlir_type) -> Self:
+        """Constructs a LegacyPointer from the address.
+
+        Args:
+            address: The input pointer address.
+
+        Returns:
+            Constructed LegacyPointer object.
+        """
+        return Self {address: address}
+
+    @always_inline("nodebug")
+    fn __init__(value: Scalar[DType.address]) -> Self:
+        """Constructs a LegacyPointer from the value of scalar address.
+
+        Args:
+            value: The input pointer index.
+
+        Returns:
+            Constructed LegacyPointer object.
+        """
+        var address = __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
+            value.cast[DType.index]().value
+        )
+        return Self {address: address}
+
+    @always_inline("nodebug")
+    fn __init__(*, address: Int) -> Self:
+        """Constructs a Pointer from an address in an integer.
+
+        Args:
+            address: The input address.
+
+        Returns:
+            Constructed Pointer object.
+        """
+        return __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
+            Scalar[DType.index](address).value
+        )
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn get_null() -> Self:
+        """Constructs a LegacyPointer representing nullptr.
+
+        Returns:
+            Constructed nullptr LegacyPointer object.
+        """
+        return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
+
+    fn __str__(self) -> String:
+        """Format this pointer as a hexadecimal string.
+
+        Returns:
+            A String containing the hexadecimal representation of the memory
+            location destination of this pointer.
+        """
+        return hex(self)
+
+    @always_inline("nodebug")
+    fn __bool__(self) -> Bool:
+        """Checks if the LegacyPointer is null.
+
+        Returns:
+            Returns False if the LegacyPointer is null and True otherwise.
+        """
+        return self != Self.get_null()
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn address_of(arg: Reference[type, _, _, address_space]) -> Self:
+        """Gets the address of the argument.
+
+        Args:
+            arg: The value to get the address of.
+
+        Returns:
+            A LegacyPointer struct which contains the address of the argument.
+        """
+        return arg.get_legacy_pointer()
 
     @always_inline("nodebug")
     fn __refitem__(self) -> Self._mlir_ref_type:
@@ -688,99 +288,8 @@ struct Pointer[
         )
 
     @always_inline("nodebug")
-    fn __init__() -> Self:
-        """Constructs a null Pointer from the value of pop.pointer type.
-
-        Returns:
-            Constructed Pointer object.
-        """
-        return Self.get_null()
-
-    @always_inline("nodebug")
-    fn __init__(address: Self) -> Self:
-        """Constructs a Pointer from the address.
-
-        Args:
-            address: The input pointer.
-
-        Returns:
-            Constructed Pointer object.
-        """
-        return address
-
-    @always_inline("nodebug")
-    fn __init__(address: Self.pointer_type) -> Self:
-        """Constructs a Pointer from the address.
-
-        Args:
-            address: The input pointer address.
-
-        Returns:
-            Constructed Pointer object.
-        """
-        return Self {address: address}
-
-    @always_inline("nodebug")
-    fn __init__(value: Scalar[DType.address]) -> Self:
-        """Constructs a Pointer from the value of scalar address.
-
-        Args:
-            value: The input pointer index.
-
-        Returns:
-            Constructed Pointer object.
-        """
-        var address = __mlir_op.`pop.index_to_pointer`[
-            _type = Self.pointer_type
-        ](value.cast[DType.index]().value)
-        return Self {address: address}
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn get_null() -> Self:
-        """Constructs a Pointer representing nullptr.
-
-        Returns:
-            Constructed nullptr Pointer object.
-        """
-        return __mlir_attr[`#interp.pointer<0> : `, Self.pointer_type]
-
-    fn __str__(self) -> String:
-        """Format this pointer as a hexadecimal string.
-
-        Returns:
-            A String containing the hexadecimal representation of the memory
-            location destination of this pointer.
-        """
-        return hex(self)
-
-    @always_inline("nodebug")
-    fn __bool__(self) -> Bool:
-        """Checks if the Pointer is null.
-
-        Returns:
-            Returns False if the Pointer is null and True otherwise.
-        """
-        return self != Self.get_null()
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn address_of(inout arg: type) -> Self:
-        """Gets the address of the argument.
-
-        Args:
-            arg: The value to get the address of.
-
-        Returns:
-            A Pointer struct which contains the address of the argument.
-        """
-        return __mlir_op.`pop.pointer.bitcast`[_type = Self.pointer_type](
-            __get_lvalue_as_address(arg)
-        )
-
-    @always_inline("nodebug")
     fn __getitem__[T: Intable](self, offset: T) -> type:
-        """Loads the value the Pointer object points to with the given offset.
+        """Loads the value the LegacyPointer object points to with the given offset.
 
         Parameters:
             T: The Intable type of the offset.
@@ -795,7 +304,7 @@ struct Pointer[
 
     @always_inline("nodebug")
     fn __setitem__[T: Intable](self, offset: T, val: type):
-        """Stores the specified value to the location the Pointer object points
+        """Stores the specified value to the location the LegacyPointer object points
         to with the given offset.
 
         Parameters:
@@ -815,7 +324,7 @@ struct Pointer[
 
     @always_inline("nodebug")
     fn load[*, alignment: Int = Self._default_alignment](self) -> type:
-        """Loads the value the Pointer object points to.
+        """Loads the value the LegacyPointer object points to.
 
         Constraints:
             The alignment must be a positive integer value.
@@ -832,7 +341,7 @@ struct Pointer[
     fn load[
         T: Intable, *, alignment: Int = Self._default_alignment
     ](self, offset: T) -> type:
-        """Loads the value the Pointer object points to with the given offset.
+        """Loads the value the LegacyPointer object points to with the given offset.
 
         Constraints:
             The alignment must be a positive integer value.
@@ -858,7 +367,7 @@ struct Pointer[
     fn store[
         T: Intable, /, *, alignment: Int = Self._default_alignment
     ](self, offset: T, value: type):
-        """Stores the specified value to the location the Pointer object points
+        """Stores the specified value to the location the LegacyPointer object points
         to with the given offset.
 
         Constraints:
@@ -876,7 +385,7 @@ struct Pointer[
 
     @always_inline("nodebug")
     fn store[*, alignment: Int = Self._default_alignment](self, value: type):
-        """Stores the specified value to the location the Pointer object points
+        """Stores the specified value to the location the LegacyPointer object points
         to.
 
         Constraints:
@@ -921,13 +430,6 @@ struct Pointer[
             _type = __mlir_type.`!pop.scalar<index>`
         ](self.address)
 
-    @staticmethod
-    @always_inline
-    fn __from_index(value: Int) -> Self:
-        return __mlir_op.`pop.index_to_pointer`[_type = Self.pointer_type](
-            Scalar[DType.index](value).value
-        )
-
     # ===------------------------------------------------------------------=== #
     # Allocate/Free
     # ===------------------------------------------------------------------=== #
@@ -944,7 +446,7 @@ struct Pointer[
             alignment: The alignment used for the allocation.
 
         Returns:
-            A new Pointer object which has been allocated on the heap.
+            A new LegacyPointer object which has been allocated on the heap.
         """
         return _malloc[type, address_space=address_space](
             count * sizeof[type](), alignment=alignment
@@ -960,45 +462,23 @@ struct Pointer[
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
-    fn bitcast[new_type: AnyRegType](self) -> Pointer[new_type, address_space]:
-        """Bitcasts a Pointer to a different type.
+    fn bitcast[
+        new_type: AnyRegType = type,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> LegacyPointer[new_type, address_space]:
+        """Bitcasts a LegacyPointer to a different type.
 
         Parameters:
             new_type: The target type.
+            address_space: The address space of the result.
 
         Returns:
-            A new Pointer object with the specified type and the same address,
-            as the original Pointer.
+            A new LegacyPointer object with the specified type and the same address,
+            as the original LegacyPointer.
         """
-
-        @parameter
-        if _mlirtype_is_eq[type, new_type]():
-            return rebind[Pointer[new_type, address_space]](self)
-
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = Pointer[new_type, address_space].pointer_type,
-        ](self.address)
-
-    @always_inline("nodebug")
-    fn address_space_cast[
-        new_address_space: AddressSpace
-    ](self) -> Pointer[type, new_address_space]:
-        """Casts a Pointer to a different address space.
-
-        Parameters:
-            new_address_space: The address space.
-
-        Returns:
-            A new Pointer object with the specified type and the same address,
-            as the original Pointer but located in a different address space.
-        """
-
-        @parameter
-        if address_space == new_address_space:
-            return rebind[Pointer[type, new_address_space]](self)
-
-        return __mlir_op.`pop.pointer.addrspacecast`[
-            _type = Pointer[type, new_address_space].pointer_type,
+            _type = LegacyPointer[new_type, address_space]._mlir_type,
         ](self.address)
 
     # ===------------------------------------------------------------------=== #
@@ -1057,7 +537,7 @@ struct Pointer[
             idx: The offset.
 
         Returns:
-            The new Pointer shifted by the offset.
+            The new LegacyPointer shifted by the offset.
         """
         # Returns a new pointer shifted by the specified offset.
         return __mlir_op.`pop.offset`(self.address, int(idx).value)
@@ -1073,7 +553,7 @@ struct Pointer[
             rhs: The offset.
 
         Returns:
-            The new Pointer shifted by the offset.
+            The new LegacyPointer shifted by the offset.
         """
         return self.offset(rhs)
 
@@ -1088,7 +568,7 @@ struct Pointer[
             rhs: The offset.
 
         Returns:
-            The new Pointer shifted back by the offset.
+            The new LegacyPointer shifted back by the offset.
         """
         return self.offset(-int(rhs))
 
@@ -1136,15 +616,15 @@ struct DTypePointer[
     """
 
     alias element_type = Scalar[type]
-    alias pointer_type = Pointer[Scalar[type], address_space]
-    var address: Self.pointer_type
+    alias _mlir_type = Pointer[Scalar[type], address_space]
+    var address: Self._mlir_type
     """The pointed-to address."""
 
     @always_inline("nodebug")
     fn __init__(inout self):
         """Constructs a null `DTypePointer` from the given type."""
 
-        self.address = Self.pointer_type()
+        self.address = Self._mlir_type()
 
     @always_inline("nodebug")
     fn __init__(
@@ -1176,6 +656,15 @@ struct DTypePointer[
         self.address = value
 
     @always_inline("nodebug")
+    fn __init__(inout self, value: UnsafePointer[Scalar[type], address_space]):
+        """Constructs a `DTypePointer` from a scalar pointer of the same type.
+
+        Args:
+            value: The scalar pointer.
+        """
+        self.address = value.value
+
+    @always_inline("nodebug")
     fn __init__(inout self, value: Scalar[DType.address]):
         """Constructs a `DTypePointer` from the value of scalar address.
 
@@ -1183,9 +672,18 @@ struct DTypePointer[
             value: The input pointer index.
         """
         var address = __mlir_op.`pop.index_to_pointer`[
-            _type = Self.pointer_type.pointer_type
+            _type = Self._mlir_type._mlir_type
         ](value.cast[DType.index]().value)
         self.address = address
+
+    @always_inline
+    fn __init__(inout self, *, address: Int):
+        """Constructs a `DTypePointer` from an integer address.
+
+        Args:
+            address: The input address.
+        """
+        self.address = Self._mlir_type(address=address)
 
     @staticmethod
     @always_inline("nodebug")
@@ -1195,7 +693,7 @@ struct DTypePointer[
         Returns:
             Constructed *nullptr* `DTypePointer` object.
         """
-        return Self.pointer_type()
+        return Self._mlir_type()
 
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
@@ -1217,7 +715,7 @@ struct DTypePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(inout arg: Scalar[type]) -> Self:
+    fn address_of(arg: Reference[Scalar[type], _, _, address_space]) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -1226,7 +724,7 @@ struct DTypePointer[
         Returns:
             A DTypePointer struct which contains the address of the argument.
         """
-        return Self.pointer_type.address_of(arg)
+        return arg.get_legacy_pointer()
 
     @always_inline("nodebug")
     fn __getitem__[T: Intable](self, offset: T) -> Scalar[type]:
@@ -1329,37 +827,22 @@ struct DTypePointer[
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
-    fn bitcast[new_type: DType](self) -> DTypePointer[new_type, address_space]:
+    fn bitcast[
+        new_type: DType = type,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> DTypePointer[new_type, address_space]:
         """Bitcasts `DTypePointer` to a different dtype.
 
         Parameters:
             new_type: The target dtype.
+            address_space: The address space of the result.
 
         Returns:
             A new `DTypePointer` object with the specified dtype and the same
             address, as the original `DTypePointer`.
         """
-        return self.address.bitcast[SIMD[new_type, 1]]()
-
-    @always_inline("nodebug")
-    fn address_space_cast[
-        new_address_space: AddressSpace
-    ](self) -> DTypePointer[type, new_address_space]:
-        """Casts a Pointer to a different address space.
-
-        Parameters:
-            new_address_space: The address space.
-
-        Returns:
-            A new Pointer object with the specified type and the same address,
-            as the original Pointer but located in a different address space.
-        """
-
-        @parameter
-        if address_space == new_address_space:
-            return rebind[DTypePointer[type, new_address_space]](self)
-
-        return self.address.address_space_cast[new_address_space]()
+        return self.address.bitcast[SIMD[new_type, 1], address_space]()
 
     @always_inline("nodebug")
     fn _as_scalar_pointer(self) -> Pointer[Scalar[type], address_space]:
@@ -1550,6 +1033,168 @@ struct DTypePointer[
         # aligned, 64B for avx512, 32B for avx2, and 16B for avx.
         self.address.bitcast[SIMD[type, width]]().nt_store(val)
 
+    # ===------------------------------------------------------------------=== #
+    # Gather/Scatter
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline("nodebug")
+    fn gather[
+        *, width: Int = 1, alignment: Int = Self._default_alignment
+    ](self, offset: SIMD[_, width]) -> SIMD[type, width]:
+        """Gathers a SIMD vector from offsets of the current pointer.
+
+        This method loads from memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be a power of two integer value.
+
+        Parameters:
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The SIMD vector of offsets to gather from.
+
+        Returns:
+            The SIMD vector containing the gathered values.
+        """
+        var mask = SIMD[DType.bool, width](True)
+        var default = SIMD[type, width]()
+        return self.gather[width=width, alignment=alignment](
+            offset, mask, default
+        )
+
+    @always_inline("nodebug")
+    fn gather[
+        *, width: Int = 1, alignment: Int = Self._default_alignment
+    ](
+        self,
+        offset: SIMD[_, width],
+        mask: SIMD[DType.bool, width],
+        default: SIMD[type, width],
+    ) -> SIMD[type, width]:
+        """Gathers a SIMD vector from offsets of the current pointer.
+
+        This method loads from memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector,
+        or takes from the `default` SIMD vector, depending on the values of
+        the `mask` SIMD vector.
+
+        If a mask element is `True`, the respective result element is given
+        by the current pointer and the `offset` SIMD vector; otherwise, the
+        result element is taken from the `default` SIMD vector.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be a power of two integer value.
+
+        Parameters:
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The SIMD vector of offsets to gather from.
+            mask: The SIMD vector of boolean values, indicating for each
+                element whether to load from memory or to take from the
+                `default` SIMD vector.
+            default: The SIMD vector providing default values to be taken
+                where the `mask` SIMD vector is `False`.
+
+        Returns:
+            The SIMD vector containing the gathered values.
+        """
+        constrained[
+            offset.type.is_integral(),
+            "offset type must be an integral type",
+        ]()
+        constrained[
+            _is_power_of_2(alignment),
+            "alignment must be a power of two integer value",
+        ]()
+
+        var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
+        return gather(base.cast[DType.address](), mask, default, alignment)
+
+    @always_inline("nodebug")
+    fn scatter[
+        *, width: Int = 1, alignment: Int = Self._default_alignment
+    ](self, offset: SIMD[_, width], val: SIMD[type, width]):
+        """Scatters a SIMD vector into offsets of the current pointer.
+
+        This method stores at memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector.
+
+        If the same offset is targeted multiple times, the values are stored
+        in the order they appear in the `val` SIMD vector, from the first to
+        the last element.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be a power of two integer value.
+
+        Parameters:
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The SIMD vector of offsets to scatter into.
+            val: The SIMD vector containing the values to be scattered.
+        """
+        var mask = SIMD[DType.bool, width](True)
+        self.scatter[width=width, alignment=alignment](offset, val, mask)
+
+    @always_inline("nodebug")
+    fn scatter[
+        *, width: Int = 1, alignment: Int = Self._default_alignment
+    ](
+        self,
+        offset: SIMD[_, width],
+        val: SIMD[type, width],
+        mask: SIMD[DType.bool, width],
+    ):
+        """Scatters a SIMD vector into offsets of the current pointer.
+
+        This method stores at memory addresses calculated by appropriately
+        shifting the current pointer according to the `offset` SIMD vector,
+        depending on the values of the `mask` SIMD vector.
+
+        If a mask element is `True`, the respective element in the `val` SIMD
+        vector is stored at the memory address defined by the current pointer
+        and the `offset` SIMD vector; otherwise, no action is taken for that
+        element in `val`.
+
+        If the same offset is targeted multiple times, the values are stored
+        in the order they appear in the `val` SIMD vector, from the first to
+        the last element.
+
+        Constraints:
+            The offset type must be an integral type.
+            The alignment must be a power of two integer value.
+
+        Parameters:
+            width: The SIMD width.
+            alignment: The minimal alignment of the address.
+
+        Args:
+            offset: The SIMD vector of offsets to scatter into.
+            val: The SIMD vector containing the values to be scattered.
+            mask: The SIMD vector of boolean values, indicating for each
+                element whether to store at memory or not.
+        """
+        constrained[
+            offset.type.is_integral(),
+            "offset type must be an integral type",
+        ]()
+        constrained[
+            _is_power_of_2(alignment),
+            "alignment must be a power of two integer value",
+        ]()
+
+        var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
+        scatter(val, base.cast[DType.address](), mask, alignment)
+
     @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
@@ -1558,11 +1203,6 @@ struct DTypePointer[
           The address of the pointer as an Int.
         """
         return int(self.address)
-
-    @staticmethod
-    @always_inline
-    fn __from_index(value: Int) -> Self:
-        return Self.pointer_type.__from_index(value)
 
     @always_inline
     fn is_aligned[alignment: Int](self) -> Bool:

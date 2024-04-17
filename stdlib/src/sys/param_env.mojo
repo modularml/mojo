@@ -16,7 +16,7 @@ You can use these functions to set parameter values or runtime constants based o
 name-value pairs defined on the command line. For example:
 
 ```mojo
-  from sys.param_env import is_defined
+  from sys import is_defined
 
   alias float_type = DType.float32 if is_defined["FLOAT32"]() else DType.float64
 
@@ -36,7 +36,7 @@ The `mojo run` command also supports the `-D` option.
 You can import these APIs from the `sys` package. For example:
 
 ```mojo
-from sys.param_env import is_defined
+from sys import is_defined
 ```
 """
 

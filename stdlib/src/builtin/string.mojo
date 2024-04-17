@@ -15,20 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import List
-from collections.dict import KeyElement
-from sys import llvm_intrinsic
-from sys.info import bitwidthof
+from collections import List, KeyElement
+from sys import llvm_intrinsic, bitwidthof
 
-from memory.anypointer import AnyPointer
-from memory.memory import memcmp, memcpy
-from memory.unsafe import DTypePointer, Pointer
+from memory import DTypePointer, Pointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef
-from utils.index import StaticIntTuple
-from utils.static_tuple import StaticTuple
 
-from .io import _snprintf, _snprintf_scalar
+from utils import StringRef, StaticIntTuple, StaticTuple
+
+
+from .io import _snprintf
 
 # ===----------------------------------------------------------------------===#
 # Utilities
@@ -82,18 +78,16 @@ fn ord(s: String) -> Int:
     var b1 = p.load()
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
-        return b1.to_int()
+        return int(b1)
     var num_bytes = _ctlz(~b1)
-    debug_assert(
-        len(s) == num_bytes.to_int(), "input string must be one character"
-    )
-    var shift = (6 * (num_bytes - 1)).to_int()
+    debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
-    var result = (b1 & b1_mask).to_int() << shift
+    var result = int(b1 & b1_mask) << shift
     for i in range(1, num_bytes):
         p += 1
         shift -= 6
-        result |= (p.load() & 0b00111111).to_int() << shift
+        result |= int(p.load() & 0b00111111) << shift
     return result
 
 
@@ -135,7 +129,7 @@ fn chr(c: Int) -> String:
         )
         var values = SIMD[DType.int32, 4](val)
         var mask = values > sizes
-        return mask.cast[DType.uint8]().reduce_add().to_int()
+        return int(mask.cast[DType.uint8]().reduce_add())
 
     var num_bytes = _utf8_len(c)
     var p = DTypePointer[DType.uint8].alloc(num_bytes + 1)
@@ -413,7 +407,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             len: The length of the buffer, including the null terminator.
         """
         self._buffer = Self._buffer_type()
-        self._buffer.data = rebind[AnyPointer[Int8]](ptr)
+        self._buffer.data = rebind[UnsafePointer[Int8]](ptr)
         self._buffer.size = len
 
     @always_inline
@@ -756,7 +750,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             The pointer to the underlying memory.
         """
         var ptr = self._as_ptr()
-        self._buffer.data = AnyPointer[Int8]()
+        self._buffer.data = UnsafePointer[Int8]()
         self._buffer.size = 0
         self._buffer.capacity = 0
         return ptr
@@ -1147,14 +1141,14 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 
 @always_inline
 fn _vec_fmt[
-    *types: AnyRegType
+    *types: AnyType
 ](
-    str: AnyPointer[Int8],
+    str: UnsafePointer[Int8],
     size: Int,
     fmt: StringLiteral,
-    borrowed *arguments: *types,
+    *arguments: *types,
 ) -> Int:
-    return _snprintf(rebind[Pointer[Int8]](str), size, fmt, arguments)
+    return _snprintf(str, size, fmt, arguments)
 
 
 fn _toggle_ascii_case(char: Int8) -> Int8:

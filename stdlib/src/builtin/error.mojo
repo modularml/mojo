@@ -15,10 +15,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.info import alignof, sizeof
+from sys import alignof, sizeof
 
-from memory.memory import _free, memcmp, memcpy
-from memory.unsafe import DTypePointer
+from memory.memory import _free
+from memory import memcmp, memcpy, DTypePointer
 
 # ===----------------------------------------------------------------------===#
 # Error
@@ -72,13 +72,13 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         var length = len(src)
-        var dest = Pointer[Int8].alloc(length + 1)
+        var dest = UnsafePointer[Int8].alloc(length + 1)
         memcpy(dest, src._as_ptr(), length)
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
     @always_inline("nodebug")
-    fn __init__(borrowed src: StringRef) -> Error:
+    fn __init__(src: StringRef) -> Error:
         """Construct an Error object with a given string ref.
 
         Args:
@@ -107,7 +107,7 @@ struct Error(Stringable, Boolable):
         """
         if existing.loaded_length < 0:
             var length = -existing.loaded_length
-            var dest = Pointer[Int8].alloc(length + 1)
+            var dest = UnsafePointer[Int8].alloc(length + 1)
             memcpy(dest, existing.data, length)
             dest[length] = 0
             return Error {data: dest, loaded_length: existing.loaded_length}
