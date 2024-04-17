@@ -1016,7 +1016,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   `num_physical_cores()`, `num_logical_cores()`, and `num_performance_cores()`
   functions.
 
-- homogeneous variadic arguments consisting of memory-only types, such as
+- Homogeneous variadic arguments consisting of memory-only types, such as
   `String` are more powerful and easier to use. These arguments are projected
   into a
   [`VariadicListMem`](/mojo/stdlib/builtin/builtin_list/VariadicListMem).
@@ -1060,7 +1060,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
           i[] += " world"
   ```
 
-  heterogeneous variadic arguments have not yet been moved to the new model, but
+  Heterogeneous variadic arguments have not yet been moved to the new model, but
   will in future updates.
 
   Note that for variadic arguments of register-passable types like `Int`, the

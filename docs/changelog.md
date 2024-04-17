@@ -23,7 +23,7 @@ what we publish.
 
 ### ⭐️ New
 
-- heterogeneous variadic pack arguments now work reliably even with memory types,
+- Heterogeneous variadic pack arguments now work reliably even with memory types,
   and have a more convenient API to use, as defined on the `VariadicPack` type.
   For example, a simplified version of `print` can be implemented as:
 
