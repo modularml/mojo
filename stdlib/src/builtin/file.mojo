@@ -188,12 +188,7 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[Int8](capacity=int(size_copy))
-        var list_ptr = UnsafePointer[Int8](address=int(list.data))
-
-        # Initialize the List elements and set the initialized size
-        memcpy(list_ptr, buf, int(size_copy))
-        list.size = int(size_copy)
+        var list = List[Int8](buf, int(size_copy), int(size_copy))
 
         return list
 
