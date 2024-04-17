@@ -142,7 +142,7 @@ struct DType(Stringable, KeyElement):
     @staticmethod
     fn _from_ui8(ui8: __mlir_type.`!pop.scalar<ui8>`) -> DType:
         return DType._from_ui8(
-            __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.`ui8`](ui8)
+            __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.ui8](ui8)
         )
 
     @always_inline("nodebug")

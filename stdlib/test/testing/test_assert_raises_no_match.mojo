@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
-# RUN: not %mojo -debug-level full %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
+# RUN: not %mojo %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
 from testing import assert_raises
 

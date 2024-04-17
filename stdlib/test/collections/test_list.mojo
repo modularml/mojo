@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 from collections import List
 
@@ -541,7 +541,7 @@ def test_list_span():
 
 
 def test_constructor_from_pointer():
-    new_pointer = AnyPointer[Int8].alloc(5)
+    new_pointer = UnsafePointer[Int8].alloc(5)
     new_pointer[0] = 0
     new_pointer[1] = 1
     new_pointer[2] = 2

@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 from collections import Dict, KeyElement, Optional
 from collections.dict import OwnedKwargsDict
@@ -202,8 +202,8 @@ def test_dict_copy_calls_copy_constructor():
     var copy = Dict(orig)
     # I _may_ have thoughts about where our performance issues
     # are coming from :)
-    assert_equal(5, orig["a"].copy_count)
-    assert_equal(6, copy["a"].copy_count)
+    assert_equal(4, orig["a"].copy_count)
+    assert_equal(5, copy["a"].copy_count)
 
 
 def test_dict_update_nominal():

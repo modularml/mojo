@@ -10,12 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 from testing import assert_equal
 
 
 fn test_range_len() raises:
+    assert_equal(range(0).__len__(), 0)
+    assert_equal(range(-1).__len__(), 0)
     assert_equal(range(10).__len__(), 10)
     assert_equal(range(0, 10).__len__(), 10)
     assert_equal(range(5, 10).__len__(), 5)

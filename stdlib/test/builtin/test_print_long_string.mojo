@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s > %t
+# RUN: %mojo %s > %t
 # RUN: wc -c %t | FileCheck %s
 
 
