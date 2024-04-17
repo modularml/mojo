@@ -54,7 +54,7 @@ struct _OwnedStringRef(Boolable):
         # Don't free self.data in our dtor.
         self.data = DTypePointer[DType.int8]()
         var length = self.length
-        return Error {data: data, loaded_length: -length}
+        return Error {data: data.bitcast[DType.uint8](), loaded_length: -length}
 
     fn __bool__(self) -> Bool:
         return self.length != 0
