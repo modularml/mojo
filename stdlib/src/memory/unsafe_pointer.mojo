@@ -43,6 +43,8 @@ struct UnsafePointer[
         `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
     ]
 
+    alias type = T
+
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful
     # lifetime for them anyway.
@@ -54,7 +56,7 @@ struct UnsafePointer[
     ]._mlir_type
 
     """The underlying pointer type."""
-    var value: Self._mlir_type
+    var address: Self._mlir_type
     """The underlying pointer."""
 
     @always_inline
@@ -76,7 +78,7 @@ struct UnsafePointer[
         Returns:
             The pointer.
         """
-        return Self {value: value}
+        return Self {address: value}
 
     @always_inline
     fn __init__(value: Reference[T, _, _, address_space]) -> Self:
@@ -88,7 +90,7 @@ struct UnsafePointer[
         Returns:
             The pointer.
         """
-        return Self {value: __mlir_op.`lit.ref.to_pointer`(value.value)}
+        return Self {address: __mlir_op.`lit.ref.to_pointer`(value.value)}
 
     @always_inline
     fn __init__(*, address: Int) -> Self:
@@ -101,7 +103,7 @@ struct UnsafePointer[
             The pointer.
         """
         return Self {
-            value: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
+            address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
                 Scalar[DType.index](address).value
             )
         }
@@ -115,7 +117,7 @@ struct UnsafePointer[
             Constructed nullptr UnsafePointer object.
         """
         return Self {
-            value: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
+            address: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
         }
 
     @staticmethod
@@ -173,7 +175,7 @@ struct UnsafePointer[
         """
         return __mlir_op.`pop.pointer.bitcast`[
             _type = UnsafePointer[new_type, address_space]._mlir_type,
-        ](self.value)
+        ](self.address)
 
     @always_inline
     fn __int__(self) -> Int:
@@ -184,7 +186,7 @@ struct UnsafePointer[
         """
         return __mlir_op.`pop.pointer_to_index`[
             _type = __mlir_type.`!pop.scalar<index>`
-        ](self.value)
+        ](self.address)
 
     fn __str__(self) -> String:
         return hex(self)
@@ -324,7 +326,7 @@ struct UnsafePointer[
             A reference to the value.
         """
         return __mlir_op.`lit.ref.from_pointer`[_type = Self._mlir_ref_type](
-            self.value
+            self.address
         )
 
     @always_inline
@@ -358,7 +360,7 @@ fn destroy_pointee(ptr: UnsafePointer[_, AddressSpace.GENERIC]):
     Args:
         ptr: The pointer whose pointee this destroys.
     """
-    _ = __get_address_as_owned_value(ptr.value)
+    _ = __get_address_as_owned_value(ptr.address)
 
 
 @always_inline
@@ -382,7 +384,7 @@ fn move_from_pointee[T: Movable](ptr: UnsafePointer[T, _]) -> T:
     Returns:
         The value at the pointer.
     """
-    return __get_address_as_owned_value(ptr.value)
+    return __get_address_as_owned_value(ptr.address)
 
 
 @always_inline
@@ -401,7 +403,7 @@ fn initialize_pointee[T: Movable](ptr: UnsafePointer[T, _], owned value: T):
         ptr: The pointer to initialize through.
         value: The value to emplace.
     """
-    __get_address_as_uninit_lvalue(ptr.value) = value^
+    __get_address_as_uninit_lvalue(ptr.address) = value^
 
 
 @always_inline
@@ -432,6 +434,6 @@ fn move_pointee[T: Movable](*, src: UnsafePointer[T, _], dst: UnsafePointer[T]):
         src: Source pointer that the value will be moved from.
         dst: Destination pointer that the value will be moved into.
     """
-    __get_address_as_uninit_lvalue(dst.value) = __get_address_as_owned_value(
-        src.value
+    __get_address_as_uninit_lvalue(dst.address) = __get_address_as_owned_value(
+        src.address
     )
