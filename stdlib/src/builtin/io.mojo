@@ -15,11 +15,11 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import external_call
-from sys.info import bitwidthof, os_is_windows, triple_is_nvidia_cuda
+from sys import bitwidthof, os_is_windows, triple_is_nvidia_cuda, external_call
 
 from builtin.dtype import _get_dtype_printf_format
-from memory.unsafe import Pointer
+from builtin.builtin_list import _LITRefPackHelper
+from memory import Pointer
 
 from utils import StringRef, unroll
 
@@ -99,7 +99,16 @@ fn _flush():
 
 
 @no_inline
-fn _printf[*types: AnyRegType](fmt: StringLiteral, *arguments: *types):
+fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
+    # The argument pack will contain references for each value in the pack,
+    # but we want to pass their values directly into the C snprintf call. Load
+    # all the members of the pack.
+    var kgen_pack = _LITRefPackHelper(arguments._value).get_as_kgen_pack()
+
+    # FIXME(37129): Cannot use get_loaded_kgen_pack because vtables on types
+    # aren't stripped off correctly.
+    var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
+
     with _fdopen(_fdopen.STDOUT) as fd:
         _ = __mlir_op.`pop.external_call`[
             func = "KGEN_CompilerRT_fprintf".value,
@@ -110,7 +119,7 @@ fn _printf[*types: AnyRegType](fmt: StringLiteral, *arguments: *types):
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](fd, fmt.data(), arguments)
+        ](fd, fmt.data(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -120,8 +129,13 @@ fn _printf[*types: AnyRegType](fmt: StringLiteral, *arguments: *types):
 
 @no_inline
 fn _snprintf[
-    *types: AnyRegType
-](str: Pointer[Int8], size: Int, fmt: StringLiteral, *arguments: *types) -> Int:
+    *types: AnyType
+](
+    str: UnsafePointer[Int8],
+    size: Int,
+    fmt: StringLiteral,
+    *arguments: *types,
+) -> Int:
     """Writes a format string into an output pointer.
 
     Args:
@@ -133,6 +147,15 @@ fn _snprintf[
     Returns:
         The number of bytes written into the output string.
     """
+    # The argument pack will contain references for each value in the pack,
+    # but we want to pass their values directly into the C snprintf call. Load
+    # all the members of the pack.
+    var kgen_pack = _LITRefPackHelper(arguments._value).get_as_kgen_pack()
+
+    # FIXME(37129): Cannot use get_loaded_kgen_pack because vtables on types
+    # aren't stripped off correctly.
+    var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
+
     return int(
         __mlir_op.`pop.external_call`[
             func = "snprintf".value,
@@ -144,25 +167,14 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.data(), arguments)
-    )
-
-
-@no_inline
-fn _snprintf_int(
-    buffer: Pointer[Int8],
-    size: Int,
-    x: Int,
-) -> Int:
-    return _snprintf(
-        buffer, size, _get_dtype_printf_format[DType.index](), x.value
+        ](str, size, fmt.data(), loaded_pack)
     )
 
 
 @no_inline
 fn _snprintf_scalar[
     type: DType
-](buffer: Pointer[Int8], size: Int, x: Scalar[type],) -> Int:
+](buffer: UnsafePointer[Int8], size: Int, x: Scalar[type],) -> Int:
     alias format = _get_dtype_printf_format[type]()
 
     @parameter
@@ -189,7 +201,7 @@ fn _snprintf_scalar[
 
 
 @no_inline
-fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
+fn _float_repr(buffer: UnsafePointer[Int8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
@@ -202,17 +214,17 @@ fn _float_repr(buffer: Pointer[Int8], size: Int, x: Float64) -> Int:
     var p = buffer
     alias minus = ord("-")
     alias dot = ord(".")
-    if p.load() == minus:
+    if p[] == minus:
         p += 1
-    while p.load() != 0 and isdigit(p.load()):
+    while p[] != 0 and isdigit(p[]):
         p += 1
-    if p.load():
+    if p[]:
         return n
-    p.store(dot)
+    p[] = dot
     p += 1
-    p.store(ord("0"))
+    p[] = ord("0")
     p += 1
-    p.store(0)
+    p[] = 0
     return n + 2
 
 
@@ -337,70 +349,6 @@ fn _put(x: DType):
 # ===----------------------------------------------------------------------=== #
 
 
-struct _StringableTuple[*Ts: Stringable](Sized):
-    alias _type = __mlir_type[
-        `!kgen.pack<:variadic<`, Stringable, `> `, Ts, `>`
-    ]
-    var storage: Self._type
-
-    fn __init__(inout self, value: Self._type):
-        self.storage = value
-
-    @staticmethod
-    fn _offset[i: Int]() -> Int:
-        constrained[i >= 0, "index must be positive"]()
-
-        @parameter
-        if i == 0:
-            return 0
-        else:
-            return _align_up(
-                Self._offset[i - 1]()
-                + _align_up(sizeof[Ts[i - 1]](), alignof[Ts[i - 1]]()),
-                alignof[Ts[i]](),
-            )
-
-    @always_inline
-    fn _print[i: Int](inout self, /, *, sep: StringLiteral = " "):
-        _put(sep)
-        _put(self._at[i]())
-
-    fn _at[i: Int](inout self) -> String:
-        alias offset = Self._offset[i]()
-        var i8ptr = Pointer.address_of(self).bitcast[Int8]().offset(offset)
-        return str(Reference(i8ptr[]).bitcast_element[Ts[i]]()[])
-
-    fn __len__(self) -> Int:
-        return len(VariadicList(Ts))
-
-
-@always_inline
-fn _print_elements[
-    T: Stringable, *Ts: Stringable
-](
-    first: T,
-    inout rest: _StringableTuple[Ts],
-    sep: StringLiteral = " ",
-    end: StringLiteral = "\n",
-    flush: Bool = False,
-):
-    _put(str(first))
-
-    @parameter
-    fn each[i: Int]():
-        rest._print[i](sep=sep)
-
-    unroll[each, len(VariadicList(Ts))]()
-    _put(end)
-    if flush:
-        _flush()
-
-
-# ===----------------------------------------------------------------------=== #
-#  print
-# ===----------------------------------------------------------------------=== #
-
-
 @no_inline
 fn print(
     *, sep: StringLiteral = " ", end: StringLiteral = "\n", flush: Bool = False
@@ -441,7 +389,15 @@ fn print[
         end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
     """
-    var vals = _StringableTuple[Ts](rest)
-    _print_elements(first, vals, sep=sep, end=end)
+    _put(str(first))
+
+    @parameter
+    fn print_elt[T: Stringable](a: T):
+        _put(sep)
+        _put(a)
+
+    rest.each[print_elt]()
+
+    _put(end)
     if flush:
         _flush()

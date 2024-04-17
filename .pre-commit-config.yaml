@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: mojo-format
+        name: mojo-format
+        entry: mojo format
+        language: system
+        files: '\.(mojo|🔥)$'
+        stages: [commit]
+      - id: check-license
+        name: check-license
+        entry: mojo stdlib/scripts/check-licenses.mojo
+        language: system
+        files: '\.(mojo|🔥|py)$'
+        stages: [commit]

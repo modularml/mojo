@@ -19,11 +19,10 @@ from python import Python
 ```
 """
 
-from sys import external_call
+from sys import external_call, sizeof
 from sys.ffi import _get_global
-from sys.info import sizeof
 
-from memory.unsafe import Pointer
+from memory import Pointer
 
 from utils import StringRef
 
@@ -170,6 +169,24 @@ struct Python:
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(module_maybe)
 
+    @staticmethod
+    fn dict() -> PythonObject:
+        """Construct an empty Python dictionary.
+
+        Returns:
+            The constructed empty Python dictionary.
+        """
+        return PythonObject(Dict[PythonObject, PythonObject]())
+
+    @staticmethod
+    fn list() -> PythonObject:
+        """Construct an empty Python list.
+
+        Returns:
+            The constructed empty Python list.
+        """
+        return PythonObject([])
+
     fn __str__(inout self, str_obj: PythonObject) -> StringRef:
         """Return a string representing the given Python object.
 
@@ -231,7 +248,4 @@ struct Python:
         Returns:
             `PythonObject` representing `None`.
         """
-        var cpython = _get_global_python_itf().cpython()
-        var none = cpython.Py_None()
-        cpython.Py_IncRef(none)
-        return PythonObject(none)
+        return PythonObject(None)

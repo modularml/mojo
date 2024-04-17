@@ -10,9 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s
 
 from collections import List
+from testing import assert_equal
 
 
 fn sum_items(data: List[Int8]) -> Int:
@@ -26,7 +27,6 @@ fn make_abcd_vector() -> List[Int8]:
     return List[Int8](97, 98, 99, 100)
 
 
-fn main():
+def main():
     var vec = make_abcd_vector()
-    # CHECK: 394
-    print(sum_items(vec))
+    assert_equal(sum_items(vec), 394)

@@ -10,12 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
-from testing import assert_equal
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_mojo_issue_698():
@@ -57,32 +57,22 @@ def test_list():
     list[-1] = 7
     assert_equal(7, list[-1])
 
-    # pop_back shall return the last element
-    # and adjust the size
-    assert_equal(7, list.pop_back())
-    assert_equal(4, len(list))
 
-    # Verify that capacity shrinks as the list goes smaller
-    while list.size > 1:
-        _ = list.pop_back()
-
-    assert_equal(1, len(list))
-    assert_equal(
-        1, list.size
-    )  # pedantically ensure len and size refer to the same thing
-    assert_equal(4, list.capacity)
-
-    # Verify that capacity doesn't become 0 when the list gets empty.
-    _ = list.pop_back()
-    assert_equal(0, len(list))
-
-    # FIXME: revisit that pop_back is actually doing shrink_to_fit behavior
-    # under the hood which will be surprising to users
-    assert_equal(2, list.capacity)
-
+def test_list_clear():
+    var list = List[Int](1, 2, 3)
+    assert_equal(len(list), 3)
+    assert_equal(list.capacity, 3)
     list.clear()
-    assert_equal(0, len(list))
-    assert_equal(2, list.capacity)
+
+    assert_equal(len(list), 0)
+    assert_equal(list.capacity, 3)
+
+
+def test_list_to_bool_conversion():
+    assert_false(List[String]())
+    assert_true(List[String]("a"))
+    assert_true(List[String]("", "a"))
+    assert_true(List[String](""))
 
 
 def test_list_pop():
@@ -126,6 +116,16 @@ def test_list_variadic_constructor():
     l.append(8)
     assert_equal(4, len(l))
     assert_equal(8, l[3])
+
+
+def test_list_resize():
+    var l = List[Int](1)
+    assert_equal(1, len(l))
+    l.resize(2, 0)
+    assert_equal(2, len(l))
+    assert_equal(l[1], 0)
+    l.resize(0)
+    assert_equal(len(l), 0)
 
 
 def test_list_reverse():
@@ -285,6 +285,68 @@ def test_list_reverse_move_count():
 
     # Keep vec alive until after we've done the last `vec.data + N` read.
     _ = vec^
+
+
+def test_list_insert():
+    #
+    # Test the list [1, 2, 3] created with insert
+    #
+
+    v1 = List[Int]()
+    v1.insert(len(v1), 1)
+    v1.insert(len(v1), 3)
+    v1.insert(1, 2)
+
+    assert_equal(len(v1), 3)
+    assert_equal(v1[0], 1)
+    assert_equal(v1[1], 2)
+    assert_equal(v1[2], 3)
+
+    #
+    # Test the list [1, 2, 3, 4, 5] created with negative and positive index
+    #
+
+    v2 = List[Int]()
+    v2.insert(-1729, 2)
+    v2.insert(len(v2), 3)
+    v2.insert(len(v2), 5)
+    v2.insert(-1, 4)
+    v2.insert(-len(v2), 1)
+
+    assert_equal(len(v2), 5)
+    assert_equal(v2[0], 1)
+    assert_equal(v2[1], 2)
+    assert_equal(v2[2], 3)
+    assert_equal(v2[3], 4)
+    assert_equal(v2[4], 5)
+
+    #
+    # Test the list [1, 2, 3, 4] created with negative index
+    #
+
+    v3 = List[Int]()
+    v3.insert(-11, 4)
+    v3.insert(-13, 3)
+    v3.insert(-17, 2)
+    v3.insert(-19, 1)
+
+    assert_equal(len(v3), 4)
+    assert_equal(v3[0], 1)
+    assert_equal(v3[1], 2)
+    assert_equal(v3[2], 3)
+    assert_equal(v3[3], 4)
+
+    #
+    # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
+    #
+
+    v4 = List[Int]()
+    for i in range(4):
+        v4.insert(0, 4 - i)
+        v4.insert(len(v4), 4 + i + 1)
+
+    for i in range(len(v4)):
+        assert_equal(v4[i], i + 1)
 
 
 def test_list_extend():
@@ -478,13 +540,48 @@ def test_list_span():
     assert_equal(len(es), 3)
 
 
+def test_constructor_from_pointer():
+    new_pointer = UnsafePointer[Int8].alloc(5)
+    new_pointer[0] = 0
+    new_pointer[1] = 1
+    new_pointer[2] = 2
+    # rest is not initialized
+
+    var some_list = List[Int8](new_pointer, size=3, capacity=5)
+    assert_equal(some_list[0], 0)
+    assert_equal(some_list[1], 1)
+    assert_equal(some_list[2], 2)
+    assert_equal(len(some_list), 3)
+    assert_equal(some_list.capacity, 5)
+
+
+def test_constructor_from_other_list_through_pointer():
+    initial_list = List[Int8](0, 1, 2)
+    # we do a backup of the size and capacity because
+    # the list attributes will be invalid after the steal_data call
+    var size = len(initial_list)
+    var capacity = initial_list.capacity
+    var some_list = List[Int8](
+        initial_list.steal_data(), size=size, capacity=capacity
+    )
+    assert_equal(some_list[0], 0)
+    assert_equal(some_list[1], 1)
+    assert_equal(some_list[2], 2)
+    assert_equal(len(some_list), size)
+    assert_equal(some_list.capacity, capacity)
+
+
 def main():
     test_mojo_issue_698()
     test_list()
+    test_list_clear()
+    test_list_to_bool_conversion()
     test_list_pop()
     test_list_variadic_constructor()
+    test_list_resize()
     test_list_reverse()
     test_list_reverse_move_count()
+    test_list_insert()
     test_list_extend()
     test_list_extend_non_trivial()
     test_list_explicit_copy()
@@ -493,3 +590,5 @@ def main():
     test_list_iter()
     test_list_iter_mutable()
     test_list_span()
+    test_constructor_from_pointer()
+    test_constructor_from_other_list_through_pointer()

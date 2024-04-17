@@ -17,21 +17,21 @@ Your value can take on a value or `None`, and you need to check
 and explicitly extract the value to get it out.
 
 ```mojo
-from collections.optional import Optional
+from collections import Optional
 var a = Optional(1)
 var b = Optional[Int](None)
 if a:
-    print(a.value())  # prints 1
-if b:  # b is False, so no print
-    print(b.value())
+    print(a.value()[])  # prints 1
+if b:  # bool(b) is False, so no print
+    print(b.value()[])
 var c = a.or_else(2)
 var d = b.or_else(2)
-print(c.value())  # prints 1
-print(d.value())  # prints 2
+print(c)  # prints 1
+print(d)  # prints 2
 ```
 """
 
-from utils.variant import Variant
+from utils import Variant
 
 
 # TODO(27780): NoneType can't currently conform to traits
@@ -57,17 +57,17 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     copy/move for Optional and allow it to be used in collections itself.
 
     ```mojo
-    from collections.optional import Optional
+    from collections import Optional
     var a = Optional(1)
     var b = Optional[Int](None)
     if a:
-        print(a.value())  # prints 1
-    if b:  # b is False, so no print
-        print(b.value())
+        print(a.value()[])  # prints 1
+    if b:  # bool(b) is False, so no print
+        print(b.value()[])
     var c = a.or_else(2)
     var d = b.or_else(2)
-    print(c.value())  # prints 1
-    print(d.value())  # prints 2
+    print(c)  # prints 1
+    print(d)  # prints 2
     ```
 
     Parameters:
@@ -100,11 +100,12 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         self = Self()
 
     @always_inline
-    fn value(self) -> T:
-        """Unsafely retrieve the value out of the Optional.
-
-        This function currently creates a copy. Once we have lifetimes
-        we'll be able to have it return a reference.
+    fn value[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
+        T, mutability, self_life
+    ]:
+        """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
         If you call this without first verifying the optional with __bool__()
@@ -112,10 +113,12 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
         Returns:
-            The contained data of the option as a T value.
+            A reference to the contained data of the option as a Reference[T].
         """
-        debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value.get[T]()[]
+        debug_assert(Reference(self)[].__bool__(), ".value() on empty Optional")
+        alias RefType = Reference[T, mutability, self_life]
+        var ptr = Reference(self)[]._value._get_ptr[T]().value
+        return __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](ptr)
 
     fn take(owned self) -> T:
         """Unsafely move the value out of the Optional.
@@ -163,7 +166,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     fn __isnot__(self, other: NoneType) -> Bool:
         """Return `True` if the Optional has a value.
 
-        It allows you to use the following syntax: `if my_optional is not None:`
+        It allows you to use the following syntax: `if my_optional is not None:`.
 
         Args:
             other: The value to compare to (None).
@@ -300,7 +303,7 @@ struct OptionalReg[T: AnyRegType](Boolable):
         return Self {
             _value: __mlir_op.`kgen.variant.create`[
                 _type = Self._type, index = Int(1).value
-            ](__mlir_attr.`false`)
+            ](__mlir_attr.false)
         }
 
     @always_inline
@@ -311,6 +314,32 @@ struct OptionalReg[T: AnyRegType](Boolable):
             The contained value.
         """
         return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
+
+    fn __is__(self, other: NoneType) -> Bool:
+        """Return `True` if the Optional has no value.
+
+        It allows you to use the following syntax: `if my_optional is None:`
+
+        Args:
+            other: The value to compare to (None).
+
+        Returns:
+            True if the Optional has no value and False otherwise.
+        """
+        return not self.__bool__()
+
+    fn __isnot__(self, other: NoneType) -> Bool:
+        """Return `True` if the Optional has a value.
+
+        It allows you to use the following syntax: `if my_optional is not None:`
+
+        Args:
+            other: The value to compare to (None).
+
+        Returns:
+            True if the Optional has a value and False otherwise.
+        """
+        return self.__bool__()
 
     fn __bool__(self) -> Bool:
         """Return true if the optional has a value.

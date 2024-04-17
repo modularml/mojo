@@ -16,7 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
-from python.object import PythonObject
+from python import PythonObject
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -48,6 +48,11 @@ fn _abs(x: Int) -> Int:
     return x if x > 0 else -x
 
 
+@always_inline
+fn _max(a: Int, b: Int) -> Int:
+    return a if a > b else b
+
+
 # ===----------------------------------------------------------------------=== #
 # Range
 # ===----------------------------------------------------------------------=== #
@@ -60,8 +65,8 @@ struct _ZeroStartingRange(Sized):
 
     @always_inline("nodebug")
     fn __init__(inout self, end: Int):
-        self.curr = end
-        self.end = end
+        self.curr = _max(0, end)
+        self.end = self.curr
 
     @always_inline("nodebug")
     fn __iter__(self) -> Self:

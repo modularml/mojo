@@ -15,21 +15,21 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import llvm_intrinsic
-from sys.info import has_neon, is_x86, simdwidthof
+
+from sys import llvm_intrinsic, has_neon, is_x86, simdwidthof, _RegisterPackType
 
 from builtin.hash import _hash_simd
-from memory.unsafe import bitcast
+from memory import bitcast
 
 from utils._numerics import FPUtils
 from utils._numerics import isnan as _isnan
 from utils._numerics import nan as _nan
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils.static_tuple import StaticTuple
+from utils import StaticTuple
 
 from .dtype import _integral_type_of
-from .io import _snprintf_scalar
-from .string import _calc_initial_buffer_size, _vec_fmt
+from .io import _snprintf_scalar, _snprintf
+from .string import _calc_initial_buffer_size
 
 # ===------------------------------------------------------------------------===#
 # Type Aliases
@@ -527,16 +527,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Print an opening `[`.
         @parameter
         if size > 1:
-            buf.size += _vec_fmt(buf.data, 2, "[")
+            buf.size += _snprintf(buf.data, 2, "[")
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                buf.size += _vec_fmt(buf.data + buf.size, 3, ", ")
+                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
 
             buf.size += _snprintf_scalar[type](
-                rebind[Pointer[Int8]](buf.data + buf.size),
+                buf.data + buf.size,
                 _calc_initial_buffer_size(element),
                 element,
             )
@@ -544,23 +544,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Print a closing `]`.
         @parameter
         if size > 1:
-            buf.size += _vec_fmt(buf.data + buf.size, 2, "]")
+            buf.size += _snprintf(buf.data + buf.size, 2, "]")
 
         buf.size += 1  # for the null terminator.
         return String(buf^)
-
-    @always_inline("nodebug")
-    fn to_int(self) -> Int:
-        """Casts to the value to an Int. If there is a fractional component,
-        then the value is truncated towards zero.
-
-        Constraints:
-            The size of the SIMD vector must be 1.
-
-        Returns:
-            The value of the single integer element in the SIMD vector.
-        """
-        return self.__int__()
 
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
@@ -690,6 +677,19 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             var mod = self - div * rhs
             var mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
             return mod + mask.select(rhs, Self(0))
+
+    @always_inline("nodebug")
+    fn __rmod__(self, value: Self) -> Self:
+        """Returns `value mod self`.
+
+        Args:
+            value: The other value.
+
+        Returns:
+            `value mod self`.
+        """
+        constrained[type.is_numeric(), "the type must be numeric"]()
+        return value % self
 
     @always_inline("nodebug")
     fn __pow__(self, rhs: Int) -> Self:
@@ -1333,7 +1333,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         *mask: Int, output_size: Int = size
     ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
-        the `other` value using the specified mask (permutation).
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
 
         Parameters:
             mask: The permutation to use in the shuffle.
@@ -1368,6 +1369,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             @parameter
             fn fill[idx: Int]():
                 alias val = mask[idx]
+                constrained[
+                    0 <= val < 2 * size,
+                    "invalid index in the shuffle operation",
+                ]()
                 var ptr = __mlir_op.`pop.array.gep`(
                     Pointer.address_of(array).address, idx.value
                 )
@@ -1391,7 +1396,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
-        the `other` value using the specified mask (permutation).
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
 
         Parameters:
             mask: The permutation to use in the shuffle.
@@ -1405,7 +1411,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn shuffle[*mask: Int](self, other: Self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
-        the `other` value using the specified mask (permutation).
+        the `other` value using the specified mask (permutation). The mask values
+        must be within `2*len(self)`.
 
         Parameters:
             mask: The permutation to use in the shuffle.
@@ -1694,7 +1701,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         var res = llvm_intrinsic[
             "llvm.experimental.vector.deinterleave2",
-            (SIMD[type, size // 2], SIMD[type, size // 2]),
+            _RegisterPackType[SIMD[type, size // 2], SIMD[type, size // 2]],
         ](self)
         return StaticTuple[SIMD[type, size // 2], 2](
             res.get[0, SIMD[type, size // 2]](),
@@ -1750,29 +1757,22 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             func: The reduce function to apply to elements in this SIMD.
             size_out: The width of the reduction.
 
+        Constraints:
+            `size_out` must not exceed width of the vector.
+
         Returns:
             A new scalar which is the reduction of all vector elements.
         """
-        constrained[
-            size_out <= Self.size, "simd reduction cannot increase simd width"
-        ]()
+        constrained[size_out <= size, "reduction cannot increase simd width"]()
 
         @parameter
-        if size == 1:
-            return self[0]
-        elif size == 2:
-            return func[type, 1](self[0], self[1])
-        elif size == size_out:
-            return rebind[SIMD[Self.type, size_out]](self)
+        if size == size_out:
+            return rebind[SIMD[type, size_out]](self)
         else:
-            alias half_size: Int = size // 2
+            alias half_size = size // 2
             var lhs = self.slice[half_size, offset=0]()
             var rhs = self.slice[half_size, offset=half_size]()
-
-            @parameter
-            if half_size != size_out:
-                return func[type, half_size](lhs, rhs).reduce[func, size_out]()
-            return rebind[SIMD[type, size_out]](func[type, half_size](lhs, rhs))
+            return func[type, half_size](lhs, rhs).reduce[func, size_out]()
 
     @always_inline("nodebug")
     fn reduce_max[size_out: Int = 1](self) -> SIMD[type, size_out]:
@@ -2218,7 +2218,7 @@ fn _pow[
                 var x = lhs[i]
                 var n = rhs[i]
                 while n > 0:
-                    if n&1 != 0:
+                    if n & 1 != 0:
                         res *= x
                     x *= x
                     n >>= 1
@@ -2465,6 +2465,11 @@ fn _neginf[type: DType]() -> Scalar[type]:
 # ===----------------------------------------------------------------------===#
 
 
+@always_inline("nodebug")
+fn _is_32_bit_system() -> Bool:
+    return sizeof[DType.index]() == sizeof[DType.int32]()
+
+
 @always_inline
 fn _max_finite[type: DType]() -> Scalar[type]:
     """Returns the maximum finite value of type.
@@ -2486,24 +2491,24 @@ fn _max_finite[type: DType]() -> Scalar[type]:
         return 32767
     elif type == DType.uint16:
         return 65535
-    elif type == DType.int32 or (
-        type == DType.index and sizeof[DType.index]() == sizeof[DType.int32]()
-    ):
+    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
         return 2147483647
     elif type == DType.uint32:
         return 4294967295
-    elif type == DType.float32:
-        return 3.40282346638528859812e38
     elif type == DType.int64 or (
-        type == DType.index and sizeof[DType.index]() == sizeof[DType.int64]()
+        type == DType.index and not _is_32_bit_system()
     ):
         return 9223372036854775807
     elif type == DType.uint64:
         return 18446744073709551615
-    elif type == DType.float64:
-        return 1.79769313486231570815e308
+    elif type == DType.float16:
+        return 65504
     elif type == DType.bfloat16:
         return 3.38953139e38
+    elif type == DType.float32:
+        return 3.40282346638528859812e38
+    elif type == DType.float64:
+        return 1.79769313486231570815e308
     else:
         constrained[False, "max_finite() called on unsupported type"]()
         return 0
@@ -2533,15 +2538,13 @@ fn _min_finite[type: DType]() -> Scalar[type]:
         return -128
     elif type == DType.int16:
         return -32768
-    elif type == DType.int32:
+    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
         return -2147483648
-    elif type == DType.float32:
-        return -_max_finite[type]()
-    elif type == DType.int64:
+    elif type == DType.int64 or (
+        type == DType.index and not _is_32_bit_system()
+    ):
         return -9223372036854775808
-    elif type == DType.float64:
-        return -_max_finite[type]()
-    elif type == DType.bfloat16:
+    elif type.is_floating_point():
         return -_max_finite[type]()
     else:
         constrained[False, "min_finite() called on unsupported type"]()

@@ -10,9 +10,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
-from collections.optional import Optional, OptionalReg
+from collections import Optional, OptionalReg
 
 from testing import assert_true, assert_false, assert_equal
 
@@ -37,7 +37,7 @@ def test_basic():
     assert_true(b or True)
     assert_false(b or False)
 
-    assert_equal(1, a.value())
+    assert_equal(1, a.value()[])
 
     # Test invert operator
     assert_false(~a)
@@ -51,6 +51,13 @@ def test_basic():
     assert_equal(2, b1)
 
     assert_equal(1, (a^).take())
+
+    # TODO: this currently only checks for mutable references.
+    # We may want to come back and add an immutable test once
+    # there are the language features to do so.
+    var a2 = Optional(1)
+    a2.value()[] = 2
+    assert_equal(a2.value()[], 2)
 
 
 def test_optional_reg_basic():
@@ -87,8 +94,26 @@ def test_optional_isnot():
     assert_false(a is not None)
 
 
+def test_optional_reg_is():
+    a = OptionalReg(1)
+    assert_false(a is None)
+
+    a = OptionalReg[Int](None)
+    assert_true(a is None)
+
+
+def test_optional_reg_isnot():
+    a = OptionalReg(1)
+    assert_true(a is not None)
+
+    a = OptionalReg[Int](None)
+    assert_false(a is not None)
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
     test_optional_is()
     test_optional_isnot()
+    test_optional_reg_is()
+    test_optional_reg_isnot()

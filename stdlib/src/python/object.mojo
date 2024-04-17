@@ -15,11 +15,11 @@
 You can import these APIs from the `python` package. For example:
 
 ```mojo
-from python.object import PythonObject
+from python import PythonObject
 ```
 """
 
-from sys.intrinsics import _mlirtype_is_eq
+from sys.intrinsics import _type_is_eq
 
 from utils import StringRef, unroll
 
@@ -101,7 +101,7 @@ struct _PyIter(Sized):
 
 @register_passable
 struct PythonObject(
-    Intable, Stringable, SizedRaising, Boolable, CollectionElement
+    Intable, Stringable, SizedRaising, Boolable, CollectionElement, KeyElement
 ):
     """A Python object."""
 
@@ -209,7 +209,7 @@ struct PythonObject(
         self.py_object = cpython.toPython(string._strref_dangerous())
         string._strref_keepalive()
 
-    fn __init__[*Ts: AnyRegType](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
         """Initialize the object from a list literal.
 
         Parameters:
@@ -219,28 +219,26 @@ struct PythonObject(
             value: The list value.
         """
         var cpython = _get_global_python_itf().cpython()
-        alias types = VariadicList(Ts)
-        alias length = len(types)
-        self.py_object = cpython.PyList_New(length)
+        self.py_object = cpython.PyList_New(len(value))
 
         @parameter
         fn fill[i: Int]():
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
-            alias T = types[i]
+            alias T = Ts[i]
 
             var obj: PythonObject
 
             @parameter
-            if _mlirtype_is_eq[T, Int]():
+            if _type_is_eq[T, Int]():
                 obj = value.get[i, Int]()
-            elif _mlirtype_is_eq[T, Float64]():
+            elif _type_is_eq[T, Float64]():
                 obj = value.get[i, Float64]()
-            elif _mlirtype_is_eq[T, Bool]():
+            elif _type_is_eq[T, Bool]():
                 obj = value.get[i, Bool]()
-            elif _mlirtype_is_eq[T, StringRef]():
+            elif _type_is_eq[T, StringRef]():
                 obj = value.get[i, StringRef]()
-            elif _mlirtype_is_eq[T, StringLiteral]():
+            elif _type_is_eq[T, StringLiteral]():
                 obj = value.get[i, StringLiteral]()
             else:
                 obj = PythonObject(0)
@@ -250,9 +248,9 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
-        unroll[fill, len(types)]()
+        unroll[fill, len(VariadicList(Ts))]()
 
-    fn __init__[*Ts: AnyRegType](inout self, value: Tuple[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[Ts]):
         """Initialize the object from a tuple literal.
 
         Parameters:
@@ -262,28 +260,27 @@ struct PythonObject(
             value: The tuple value.
         """
         var cpython = _get_global_python_itf().cpython()
-        alias types = VariadicList(Ts)
-        alias length = len(types)
+        alias length = len(VariadicList(Ts))
         self.py_object = cpython.PyTuple_New(length)
 
         @parameter
         fn fill[i: Int]():
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
-            alias T = types[i]
+            alias T = Ts[i]
 
             var obj: PythonObject
 
             @parameter
-            if _mlirtype_is_eq[T, Int]():
+            if _type_is_eq[T, Int]():
                 obj = value.get[i, Int]()
-            elif _mlirtype_is_eq[T, Float64]():
+            elif _type_is_eq[T, Float64]():
                 obj = value.get[i, Float64]()
-            elif _mlirtype_is_eq[T, Bool]():
+            elif _type_is_eq[T, Bool]():
                 obj = value.get[i, Bool]()
-            elif _mlirtype_is_eq[T, StringRef]():
+            elif _type_is_eq[T, StringRef]():
                 obj = value.get[i, StringRef]()
-            elif _mlirtype_is_eq[T, StringLiteral]():
+            elif _type_is_eq[T, StringLiteral]():
                 obj = value.get[i, StringLiteral]()
             else:
                 obj = PythonObject(0)
@@ -293,7 +290,20 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
 
-        unroll[fill, len(types)]()
+        unroll[fill, length]()
+
+    fn __init__(inout self, value: Dict[Self, Self]):
+        """Initialize the object from a dictionary of PythonObjects.
+
+        Args:
+            value: The dictionary value.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        self.py_object = cpython.PyDict_New()
+        for entry in value.items():
+            var result = cpython.PyDict_SetItem(
+                self.py_object, entry[].key.py_object, entry[].value.py_object
+            )
 
     fn __copyinit__(inout self, existing: Self):
         """Copy the object.
@@ -413,6 +423,18 @@ struct PythonObject(
             raise Error("object has no len()")
         return result
 
+    fn __hash__(self) -> Int:
+        """Returns the length of the object.
+
+        Returns:
+            The length of the object.
+        """
+        var cpython = _get_global_python_itf().cpython()
+        var result = cpython.PyObject_Length(self.py_object)
+        # TODO: make this function raise when we can raise parametrically.
+        debug_assert(result != -1, "object is not hashable")
+        return result
+
     fn __getitem__(self, *args: PythonObject) raises -> PythonObject:
         """Return the value for the given key or keys.
 
@@ -440,6 +462,32 @@ struct PythonObject(
         cpython.Py_DecRef(tuple_obj)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
+
+    fn __setitem__(inout self, *args: PythonObject) raises:
+        """Set the value with the given key or keys.
+
+        Args:
+            args: The key or keys to set on this object, followed by the value.
+        """
+        var size = len(args)
+        debug_assert(size > 0, "must provide at least a value to __setitem__")
+
+        var cpython = _get_global_python_itf().cpython()
+        var tuple_obj = cpython.PyTuple_New(size)
+        for i in range(size):
+            var arg_value = args[i].py_object
+            cpython.Py_IncRef(arg_value)
+            var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
+            if result != 0:
+                raise Error("internal error: PyTuple_SetItem failed")
+
+        var callable_obj = cpython.PyObject_GetAttrString(
+            self.py_object, "__setitem__"
+        )
+        var result = cpython.PyObject_CallObject(callable_obj, tuple_obj)
+        cpython.Py_DecRef(callable_obj)
+        cpython.Py_DecRef(tuple_obj)
+        Python.throw_python_exception_if_error_state(cpython)
 
     fn _call_zero_arg_method(
         self, method_name: StringRef
@@ -953,7 +1001,7 @@ struct PythonObject(
         """
         return self._call_single_arg_method("__ge__", rhs)
 
-    fn __eq__(self, rhs: PythonObject) raises -> PythonObject:
+    fn __eq__(self, rhs: PythonObject) -> Bool:
         """Equality comparator. This compares the elements of strings and lists.
 
         Args:
@@ -962,9 +1010,14 @@ struct PythonObject(
         Returns:
             True if the objects are equal.
         """
-        return self._call_single_arg_method("__eq__", rhs)
+        # TODO: make this function raise when we can raise parametrically.
+        try:
+            return self._call_single_arg_method("__eq__", rhs).__bool__()
+        except e:
+            debug_assert(False, "object doesn't implement __eq__")
+            return False
 
-    fn __ne__(self, rhs: PythonObject) raises -> PythonObject:
+    fn __ne__(self, rhs: PythonObject) -> Bool:
         """Inequality comparator. This compares the elements of strings and
         lists.
 
@@ -974,7 +1027,12 @@ struct PythonObject(
         Returns:
             True if the objects are not equal.
         """
-        return self._call_single_arg_method("__ne__", rhs)
+        # TODO: make this function raise when we can raise parametrically.
+        try:
+            return self._call_single_arg_method("__ne__", rhs).__bool__()
+        except e:
+            debug_assert(False, "object doesn't implement __eq__")
+            return False
 
     fn __pos__(self) raises -> PythonObject:
         """Positive.

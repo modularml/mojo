@@ -16,14 +16,16 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict, List
-from os.atomic import Atomic
-from sys.intrinsics import _mlirtype_is_eq
+from os import Atomic
+from sys.intrinsics import _type_is_eq
 
-from memory import memcmp, memcpy
-from memory.unsafe import DTypePointer, Pointer
 
-from utils import StringRef
-from utils.loop import unroll
+from memory import memcmp, memcpy, DTypePointer, Pointer
+from memory._arc import Arc
+from memory.unsafe import LegacyPointer
+
+
+from utils import StringRef, unroll
 
 from .io import _printf, _put
 
@@ -56,15 +58,19 @@ struct _ImmutableString:
     pointer and integer pair. Memory will be dynamically allocated.
     """
 
-    var data: Pointer[Int8]
+    var data: LegacyPointer[Int8]
     """The pointer to the beginning of the string contents. It is not
     null-terminated."""
     var length: Int
     """The length of the string."""
 
     @always_inline
-    fn __init__(data: Pointer[Int8], length: Int) -> Self:
-        return Self {data: data, length: length}
+    fn __init__(data: LegacyPointer[Int8], length: Int) -> Self:
+        return Self {data: data.address, length: length}
+
+    @always_inline
+    fn __init__(data: UnsafePointer[Int8], length: Int) -> Self:
+        return Self {data: data.value, length: length}
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
@@ -83,44 +89,32 @@ struct _RefCountedList:
     ref-counted data types.
     """
 
-    fn __init__(inout self):
-        self.refcount = 1
-        self.impl = List[_ObjectImpl]()
-
-    var refcount: Atomic[DType.index]
-    """The number of live references to the list."""
-    var impl: List[_ObjectImpl]
+    var impl: Arc[List[_ObjectImpl]]
     """The list value."""
+
+    fn __init__(inout self):
+        self.impl = Arc[List[_ObjectImpl]](List[_ObjectImpl]())
 
 
 @register_passable("trivial")
 struct _RefCountedListRef:
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
-    var lst: Pointer[NoneType]
+    var lst: UnsafePointer[NoneType]
     """The reference to the list."""
 
     @always_inline
     fn __init__() -> Self:
-        var ptr = Pointer[_RefCountedList].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
+        var ptr = UnsafePointer[_RefCountedList].alloc(1)
+        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedList()
         return Self {lst: ptr.bitcast[NoneType]()}
 
     @always_inline
     fn copy(self) -> Self:
-        _ = self.lst.bitcast[_RefCountedList]()[].refcount.fetch_add(1)
+        _ = self.lst.bitcast[_RefCountedList]()[].impl
         return Self {lst: self.lst}
 
     fn release(self):
-        var ptr = self.lst.bitcast[_RefCountedList]()
-        var prev = ptr[].refcount.fetch_sub(1)
-        if prev != 1:
-            return
-
-        # Run the destructor on the list elements and then destroy the list.
-        var list = __get_address_as_owned_value(ptr.address).impl
-        for i in range(len(list)):
-            list[i].destroy()
-        ptr.free()
+        var ptr = self.lst.bitcast[_RefCountedList]()[].impl
 
 
 struct _RefCountedAttrsDict:
@@ -131,20 +125,19 @@ struct _RefCountedAttrsDict:
     directly with `x.attr`, the key will always be a `StringLiteral`.
     """
 
-    var refcount: Atomic[DType.index]
-    """The number of live references to the attribute dictionary."""
-    var impl: Dict[StringLiteral, _ObjectImpl]
+    var impl: Arc[Dict[StringLiteral, _ObjectImpl]]
     """The implementation of the map."""
 
     fn __init__(inout self):
-        self.refcount = 1
-        self.impl = Dict[StringLiteral, _ObjectImpl]()
+        self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](
+            Dict[StringLiteral, _ObjectImpl]()
+        )
 
     @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
-        if key in self.impl:
-            self.impl[key].destroy()
-            self.impl[key] = value
+        if key in self.impl[]:
+            self.impl[][key].destroy()
+            self.impl[][key] = value
             return
         raise Error(
             "AttributeError: Object does not have an attribute of name '"
@@ -154,9 +147,9 @@ struct _RefCountedAttrsDict:
 
     @always_inline
     fn get(self, key: StringLiteral) raises -> _ObjectImpl:
-        var iter = self.impl.find(key)
+        var iter = self.impl[].find(key)
         if iter:
-            return iter.value()
+            return iter.value()[]
         raise Error(
             "AttributeError: Object does not have an attribute of name '"
             + key
@@ -191,32 +184,26 @@ struct Attr:
 struct _RefCountedAttrsDictRef:
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     # FIXME(#12604): Distinguish this type from _RefCountedListRef.
-    var attrs: Pointer[Int8]
+    var attrs: UnsafePointer[Int8]
     """The reference to the dictionary."""
 
     @always_inline
     fn __init__(values: VariadicListMem[Attr, _, _]) -> Self:
-        var ptr = Pointer[_RefCountedAttrsDict].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
+        var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
+        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            ptr[].impl._insert(values[i].key, values[i].value._value.copy())
+            ptr[].impl[]._insert(values[i].key, values[i].value._value.copy())
 
         return Self {attrs: ptr.bitcast[Int8]()}
 
     @always_inline
     fn copy(self) -> Self:
-        _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].refcount.fetch_add(1)
+        _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
         return Self {attrs: self.attrs}
 
     fn release(self):
-        var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()
-        var prev = ptr[].refcount.fetch_sub(1)
-        if prev != 1:
-            return
-
-        # destroy the container.
-        ptr.free()
+        var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
 
 
 @register_passable("trivial")
@@ -224,14 +211,14 @@ struct _Function:
     # The MLIR function type has two arguments:
     # 1. The self value, or the single argument.
     # 2. None, or an additional argument.
-    var value: Pointer[Int16]
+    var value: UnsafePointer[Int16]
     """The function pointer."""
 
     @always_inline
     fn __init__[FnT: AnyRegType](value: FnT) -> Self:
         # FIXME: No "pointer bitcast" for signature function pointers.
-        var f = Pointer[Int16]()
-        Reference(f).get_unsafe_pointer().bitcast[FnT]().store(value)
+        var f = UnsafePointer[Int16]()
+        Reference(f).get_legacy_pointer().bitcast[FnT]().store(value)
         return Self {value: f}
 
     alias fn0 = fn () raises -> object
@@ -247,7 +234,7 @@ struct _Function:
     fn invoke(owned self) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn0]()
             .load()()
         )
@@ -256,7 +243,7 @@ struct _Function:
     fn invoke(owned self, arg0: object) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn1]()
             .load()(arg0)
         )
@@ -265,7 +252,7 @@ struct _Function:
     fn invoke(owned self, arg0: object, arg1: object) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn2]()
             .load()(arg0, arg1)
         )
@@ -276,7 +263,7 @@ struct _Function:
     ) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn3]()
             .load()(arg0, arg1, arg2)
         )
@@ -400,7 +387,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
         if self.is_str():
             var str = self.get_as_string()
             var impl = _ImmutableString(
-                Pointer[Int8].alloc(str.length), str.length
+                UnsafePointer[Int8].alloc(str.length), str.length
             )
             memcpy(impl.data, DTypePointer[DType.int8](str.data), str.length)
             return impl
@@ -629,7 +616,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
         var ptr = self.get_obj_attrs_ptr()
         var res = String("{")
         var print_sep = False
-        for entry in ptr[].impl.items():
+        for entry in ptr[].impl[].items():
             if print_sep:
                 res += ", "
             res += (
@@ -647,32 +634,32 @@ struct _ObjectImpl(CollectionElement, Stringable):
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_list_ptr(self) -> Pointer[_RefCountedList]:
-        return self.get_as_list().lst.bitcast[_RefCountedList]()
+    fn get_list_ptr(self) -> Arc[List[_ObjectImpl]]:
+        return self.get_as_list().lst.bitcast[_RefCountedList]()[].impl
 
     @always_inline
     fn list_append(self, value: Self):
-        self.get_list_ptr()[].impl.append(value.value)
+        self.get_list_ptr()[].append(value.value)
 
     @always_inline
     fn get_list_length(self) -> Int:
-        return len(self.get_list_ptr()[].impl)
+        return len(self.get_list_ptr()[])
 
     @always_inline
     fn get_list_element(self, i: Int) -> _ObjectImpl:
-        return self.get_list_ptr()[].impl[i].copy()
+        return self.get_list_ptr()[][i].copy()
 
     @always_inline
     fn set_list_element(self, i: Int, value: _ObjectImpl):
-        self.get_list_ptr()[].impl[i].destroy()
-        self.get_list_ptr()[].impl[i] = value
+        self.get_list_ptr()[][i].destroy()
+        self.get_list_ptr()[][i] = value
 
     # ===------------------------------------------------------------------=== #
     # Object Attribute Functions
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_obj_attrs_ptr(self) -> Pointer[_RefCountedAttrsDict]:
+    fn get_obj_attrs_ptr(self) -> UnsafePointer[_RefCountedAttrsDict]:
         return self.get_obj_attrs().attrs.bitcast[_RefCountedAttrsDict]()
 
     @always_inline
@@ -801,13 +788,13 @@ struct object(IntableRaising, Boolable, Stringable):
             value: The string value.
         """
         var impl = _ImmutableString(
-            Pointer[Int8].alloc(value.length), value.length
+            UnsafePointer[Int8].alloc(value.length), value.length
         )
         memcpy(impl.data, value.data, value.length)
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: AnyRegType](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
         """Initializes the object from a list literal.
 
         Parameters:
@@ -817,32 +804,31 @@ struct object(IntableRaising, Boolable, Stringable):
             value: The list value.
         """
         self._value = _RefCountedListRef()
-        alias types = VariadicList(Ts)
 
         @parameter
         @always_inline
         fn append[i: Int]():
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
-            alias T = types[i]
+            alias T = Ts[i]
 
             @parameter
-            if _mlirtype_is_eq[T, Int]():
+            if _type_is_eq[T, Int]():
                 self._append(value.get[i, Int]())
-            elif _mlirtype_is_eq[T, Float64]():
+            elif _type_is_eq[T, Float64]():
                 self._append(value.get[i, Float64]())
-            elif _mlirtype_is_eq[T, Bool]():
+            elif _type_is_eq[T, Bool]():
                 self._append(value.get[i, Bool]())
-            elif _mlirtype_is_eq[T, StringRef]():
+            elif _type_is_eq[T, StringRef]():
                 self._append(value.get[i, StringRef]())
-            elif _mlirtype_is_eq[T, StringLiteral]():
+            elif _type_is_eq[T, StringLiteral]():
                 self._append(value.get[i, StringLiteral]())
             else:
                 constrained[
                     False, "cannot convert nested list element to object"
                 ]()
 
-        unroll[append, len(types)]()
+        unroll[append, len(VariadicList(Ts))]()
 
     @always_inline
     fn __init__(inout self, func: Self.nullary_function):
@@ -1262,7 +1248,9 @@ struct object(IntableRaising, Boolable, Stringable):
             var lhsStr = self._value.get_as_string()
             var rhsStr = rhs._value.get_as_string()
             var length = lhsStr.length + rhsStr.length
-            var impl = _ImmutableString(Pointer[Int8].alloc(length), length)
+            var impl = _ImmutableString(
+                UnsafePointer[Int8].alloc(length), length
+            )
             memcpy(impl.data, lhsStr.data, lhsStr.length)
             memcpy(impl.data.offset(lhsStr.length), rhsStr.data, rhsStr.length)
             var result = object()
@@ -1580,7 +1568,7 @@ struct object(IntableRaising, Boolable, Stringable):
             raise Error("TypeError: can only index into lists and strings")
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
-            var impl = _ImmutableString(Pointer[Int8].alloc(1), 1)
+            var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
             impl.data.store(
                 self._value.get_as_string().data.offset(index).load()
             )
@@ -1716,12 +1704,12 @@ struct object(IntableRaising, Boolable, Stringable):
                 object(self._value.get_list_element(j)).print()
             _put("]")
         elif self._value.is_func():
-            _printf("function at %p", self._value.get_as_func().value.address)
+            _printf("function at %p", self._value.get_as_func().value)
         else:
             _put("{")
             var ptr = self._value.get_obj_attrs_ptr()
             var k = 0
-            for entry in ptr[].impl.items():
+            for entry in ptr[].impl[].items():
                 if k != 0:
                     _put(", ")
                 _printf("'%s' = ", entry[].key)

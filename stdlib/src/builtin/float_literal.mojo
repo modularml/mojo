@@ -94,7 +94,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
         fractional component, then the value is truncated towards zero.
 
         Eg. `(4.5).__int_literal__()` returns `4`, and `(-3.7).__int_literal__()`
-        returns `3`.
+        returns `-3`.
 
         Returns:
             The value as an integer.
@@ -108,7 +108,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
         """Converts the FloatLiteral value to an Int. If there is a fractional
         component, then the value is truncated towards zero.
 
-        Eg. `(4.5).__int__()` returns `4`, and `(-3.7).__int__()` returns `3`.
+        Eg. `(4.5).__int__()` returns `4`, and `(-3.7).__int__()` returns `-3`.
 
         Returns:
             The value as an integer.

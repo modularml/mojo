@@ -19,9 +19,9 @@ from collections.vector import InlinedFixedVector
 ```
 """
 
-from memory.unsafe import Pointer, Reference
+from memory import Pointer, Reference
 
-from utils.static_tuple import StaticTuple
+from utils import StaticTuple
 
 # ===----------------------------------------------------------------------===#
 # _VecIter
@@ -243,5 +243,5 @@ struct InlinedFixedVector[
             An iterator to the start of the vector.
         """
         return Self._iterator(
-            0, self.current_size, Reference(self).get_unsafe_pointer()
+            0, self.current_size, Reference(self).get_legacy_pointer()
         )

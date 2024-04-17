@@ -15,20 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import List
-from collections.dict import KeyElement
-from sys import llvm_intrinsic
-from sys.info import bitwidthof
+from collections import List, KeyElement
+from sys import llvm_intrinsic, bitwidthof
 
-from memory.anypointer import AnyPointer
-from memory.memory import memcmp, memcpy
-from memory.unsafe import DTypePointer, Pointer
+from memory import DTypePointer, Pointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef
-from utils.index import StaticIntTuple
-from utils.static_tuple import StaticTuple
 
-from .io import _snprintf, _snprintf_scalar, _StringableTuple
+from utils import StringRef, StaticIntTuple, StaticTuple
+
+
+from .io import _snprintf
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -82,18 +78,16 @@ fn ord(s: String) -> Int:
     var b1 = p.load()
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
-        return b1.to_int()
+        return int(b1)
     var num_bytes = _ctlz(~b1)
-    debug_assert(
-        len(s) == num_bytes.to_int(), "input string must be one character"
-    )
-    var shift = (6 * (num_bytes - 1)).to_int()
+    debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
-    var result = (b1 & b1_mask).to_int() << shift
+    var result = int(b1 & b1_mask) << shift
     for i in range(1, num_bytes):
         p += 1
         shift -= 6
-        result |= (p.load() & 0b00111111).to_int() << shift
+        result |= int(p.load() & 0b00111111) << shift
     return result
 
 
@@ -135,7 +129,7 @@ fn chr(c: Int) -> String:
         )
         var values = SIMD[DType.int32, 4](val)
         var mask = values > sizes
-        return mask.cast[DType.uint8]().reduce_add().to_int()
+        return int(mask.cast[DType.uint8]().reduce_add())
 
     var num_bytes = _utf8_len(c)
     var p = DTypePointer[DType.uint8].alloc(num_bytes + 1)
@@ -157,7 +151,7 @@ fn chr(c: Int) -> String:
 
 # TODO: this is hard coded for decimal base
 @always_inline
-fn _atol(str: StringRef) raises -> Int:
+fn _atol(str_ref: StringRef) raises -> Int:
     """Parses the given string as a base-10 integer and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
@@ -165,37 +159,53 @@ fn _atol(str: StringRef) raises -> Int:
     error.
 
     Args:
-        str: A string to be parsed as a base-10 integer.
+        str_ref: A string to be parsed as a base-10 integer.
 
     Returns:
         An integer value that represents the string, or otherwise raises.
     """
-    if not str:
+    if not str_ref:
         raise Error("Empty String cannot be converted to integer.")
     var result = 0
     var is_negative: Bool = False
     var start: Int = 0
-    if str[0] == "-":
-        is_negative = True
-        start = 1
+    var str_len = len(str_ref)
+    var buff = str_ref._as_ptr()
+    for pos in range(start, str_len):
+        if isspace(buff[pos]):
+            continue
+
+        if str_ref[pos] == "-":
+            is_negative = True
+            start = pos + 1
+        else:
+            start = pos
+        break
 
     alias ord_0 = ord("0")
     alias ord_9 = ord("9")
-    var buff = str._as_ptr()
-    var str_len = len(str)
+    var has_space_after_number = False
     for pos in range(start, str_len):
         var digit = int(buff[pos])
         if ord_0 <= digit <= ord_9:
             result += digit - ord_0
+        elif isspace(digit):
+            has_space_after_number = True
+            start = pos + 1
+            break
         else:
             raise Error("String is not convertible to integer.")
-        if pos + 1 < str_len:
+        if pos + 1 < str_len and not isspace(buff[pos + 1]):
             var nextresult = result * 10
             if nextresult < result:
                 raise Error(
                     "String expresses an integer too large to store in Int."
                 )
             result = nextresult
+    if has_space_after_number:
+        for pos in range(start, str_len):
+            if not isspace(buff[pos]):
+                raise Error("String is not convertible to integer.")
     if is_negative:
         result = -result
     return result
@@ -397,7 +407,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             len: The length of the buffer, including the null terminator.
         """
         self._buffer = Self._buffer_type()
-        self._buffer.data = rebind[AnyPointer[Int8]](ptr)
+        self._buffer.data = rebind[UnsafePointer[Int8]](ptr)
         self._buffer.size = len
 
     @always_inline
@@ -660,11 +670,11 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             curr += self + String(elems[i])
         return curr
 
-    fn join[*Stringables: Stringable](self, *elems: *Stringables) -> String:
+    fn join[*Types: Stringable](self, *elems: *Types) -> String:
         """Joins string elements using the current string as a delimiter.
 
         Parameters:
-            Stringables: The Stringable types.
+            Types: The types of the elements.
 
         Args:
             elems: The input values.
@@ -672,21 +682,19 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         Returns:
             The joined string.
         """
-        alias types = VariadicList(Stringables)
-        alias count = len(types)
 
-        var args = _StringableTuple(elems)
-
-        if count == 0:
-            return ""
-
-        var result = args._at[0]()
+        var result: String = ""
+        var is_first = True
 
         @parameter
-        fn each[i: Int]():
-            result += self + args._at[i + 1]()
+        fn add_elt[T: Stringable](a: T):
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(a)
 
-        unroll[each, count - 1]()
+        elems.each[add_elt]()
         return result
 
     fn _strref_dangerous(self) -> StringRef:
@@ -726,7 +734,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 
         # TODO(lifetimes): Return a reference rather than a copy
         var copy = self._buffer
-        var last = copy.pop_back()
+        var last = copy.pop()
         debug_assert(
             last == 0,
             "expected last element of String buffer to be null terminator",
@@ -742,7 +750,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
             The pointer to the underlying memory.
         """
         var ptr = self._as_ptr()
-        self._buffer.data = AnyPointer[Int8]()
+        self._buffer.data = UnsafePointer[Int8]()
         self._buffer.size = 0
         self._buffer.capacity = 0
         return ptr
@@ -1054,6 +1062,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         print(String('BaseTestCase').removeprefix('Test'))
         # 'BaseTestCase'
         ```
+
         Args:
           prefix: The prefix to remove from the string.
 
@@ -1132,11 +1141,14 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 
 @always_inline
 fn _vec_fmt[
-    *types: AnyRegType
+    *types: AnyType
 ](
-    str: AnyPointer[Int8], size: Int, fmt: StringLiteral, *arguments: *types
+    str: UnsafePointer[Int8],
+    size: Int,
+    fmt: StringLiteral,
+    *arguments: *types,
 ) -> Int:
-    return _snprintf(rebind[Pointer[Int8]](str), size, fmt, arguments)
+    return _snprintf(str, size, fmt, arguments)
 
 
 fn _toggle_ascii_case(char: Int8) -> Int8:

@@ -10,83 +10,105 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s
 
-from os.atomic import Atomic
+from os import Atomic
+from testing import assert_equal, assert_true, assert_false
 
 
-# CHECK-LABEL: test_atomic
-fn test_atomic():
-    print("== test_atomic")
-
+fn test_atomic() raises:
     var atom: Atomic[DType.index] = 3
 
-    # CHECK: 3
-    print(atom.value)
+    assert_equal(atom.value, 3)
+
+    assert_equal(atom.load(), 3)
 
     atom += 4
-
-    # CHECK: 7
-    print(atom.value)
+    assert_equal(atom.value, 7)
 
     atom -= 4
+    assert_equal(atom.value, 3)
 
-    # CHECK: 3
-    print(atom.value)
-
-    # CHECK: 3
     atom.max(0)
-    print(atom.value)
+    assert_equal(atom.value, 3)
 
-    # CHECK: 42
     atom.max(42)
-    print(atom.value)
+    assert_equal(atom.value, 42)
 
-    # CHECK: 3
     atom.min(3)
-    print(atom.value)
+    assert_equal(atom.value, 3)
 
-    # CHECK: 0
     atom.min(0)
-    print(atom.value)
+    assert_equal(atom.value, 0)
 
 
-# CHECK-LABEL: test_atomic_floating_point
-fn test_atomic_floating_poInt__():
-    print("== test_atomic_floating_point")
-
+fn test_atomic_floating_point() raises:
     var atom: Atomic[DType.float32] = Float32(3.0)
 
-    # CHECK: 3.0
-    print(atom.value)
+    assert_equal(atom.value, 3.0)
 
     atom += 4
-
-    # CHECK: 7.0
-    print(atom.value)
+    assert_equal(atom.value, 7.0)
 
     atom -= 4
+    assert_equal(atom.value, 3.0)
 
-    # CHECK: 3.0
-    print(atom.value)
-
-    # CHECK: 3.0
     atom.max(0)
-    print(atom.value)
+    assert_equal(atom.value, 3.0)
 
-    # CHECK: 42.0
     atom.max(42)
-    print(atom.value)
+    assert_equal(atom.value, 42.0)
 
-    # CHECK: 3.0
     atom.min(3)
-    print(atom.value)
+    assert_equal(atom.value, 3.0)
 
-    # CHECK: 0.0
     atom.min(0)
-    print(atom.value)
+    assert_equal(atom.value, 0.0)
 
 
-fn main():
+def test_atomic_move_constructor():
+    var atom: Atomic[DType.index] = 3
+    var atom2 = atom^
+    assert_equal(atom2.value, 3)
+    atom2 += 4
+    assert_equal(atom2.value, 7)
+    atom2 -= 4
+    assert_equal(atom2.value, 3)
+    atom2.max(0)
+    assert_equal(atom2.value, 3)
+    atom2.max(42)
+    assert_equal(atom2.value, 42)
+    atom2.min(3)
+    assert_equal(atom2.value, 3)
+    atom2.min(0)
+    assert_equal(atom2.value, 0)
+
+
+def test_compare_exchange_weak():
+    var atom: Atomic[DType.int64] = 3
+    var expected = Int64(3)
+    var desired = Int64(3)
+    var ok = atom.compare_exchange_weak(expected, desired)
+
+    assert_equal(expected, 3)
+    assert_true(ok)
+
+    expected = Int64(4)
+    ok = atom.compare_exchange_weak(expected, desired)
+
+    assert_equal(expected, 3)
+    assert_false(ok)
+
+    expected = Int64(4)
+    desired = Int64(6)
+    ok = atom.compare_exchange_weak(expected, desired)
+
+    assert_equal(expected, 3)
+    assert_false(ok)
+
+
+def main():
     test_atomic()
-    test_atomic_floating_poInt__()
+    test_atomic_floating_point()
+    test_atomic_move_constructor()
+    test_compare_exchange_weak()
