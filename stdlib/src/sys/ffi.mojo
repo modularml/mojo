@@ -41,7 +41,7 @@ alias DEFAULT_RTLD = RTLD.NOW | RTLD.GLOBAL
 
 @value
 @register_passable
-struct DLHandle(CollectionElement):
+struct DLHandle(CollectionElement, Boolable):
     """Represents a dynamically linked library that can be loaded and unloaded.
 
     The library is loaded on initialization and unloaded on deletion of the object.
@@ -84,6 +84,14 @@ struct DLHandle(CollectionElement):
         if not os_is_windows():
             _ = external_call["dlclose", Int](self.handle)
             self.handle = DTypePointer[DType.int8].get_null()
+
+    fn __bool__(self) -> Bool:
+        """Checks if the handle is valid.
+
+        Returns:
+          True if the DLHandle is not null and False otherwise.
+        """
+        return self.handle.__bool__()
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
