@@ -19,7 +19,7 @@ from sys.info import is_x86
 ```
 """
 
-from .ffi import _external_call_const
+from .ffi import external_call, _external_call_const
 
 
 @always_inline("nodebug")
@@ -672,3 +672,49 @@ fn num_performance_cores() -> Int:
         Int: The number of physical performance cores on the system.
     """
     return _external_call_const["KGEN_CompilerRT_NumPerformanceCores", Int]()
+
+
+@always_inline
+fn _macos_version() raises -> Tuple[Int, Int, Int]:
+    """Gets the macOS version.
+
+    Returns:
+        The version triple of macOS.
+    """
+
+    constrained[os_is_macos(), "the operating system must be macOS"]()
+
+    alias INITIAL_CAPACITY = 32
+
+    var buf = List[Int8](capacity=INITIAL_CAPACITY)
+    var buf_len = Int(INITIAL_CAPACITY)
+
+    var err = external_call["sysctlbyname", Int32](
+        "kern.osproductversion".data(),
+        buf.data,
+        Pointer.address_of(buf_len),
+        Pointer[NoneType](),
+        Int(0),
+    )
+
+    if err:
+        raise "Unable to query macOS version"
+
+    var osver = String(buf.steal_data(), buf_len)
+
+    var major = 0
+    var minor = 0
+    var patch = 0
+
+    if "." in osver:
+        major = int(osver[: osver.find(".")])
+        osver = osver[osver.find(".") + 1 :]
+
+    if "." in osver:
+        minor = int(osver[: osver.find(".")])
+        osver = osver[osver.find(".") + 1 :]
+
+    if "." in osver:
+        patch = int(osver[: osver.find(".")])
+
+    return (major, minor, patch)
