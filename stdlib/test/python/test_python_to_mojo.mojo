@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo-no-debug %s
 
 from python import Python, PythonObject
 
