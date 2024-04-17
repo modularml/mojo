@@ -1524,21 +1524,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @parameter
-        fn _check_indices[mask: StaticIntTuple[output_size]]() -> Bool:
-            @parameter
-            fn _check[i: Int]():
-                constrained[
-                    0 <= mask[i] < 2 * size,
-                    "invalid index in the shuffle operation",
-                ]()
+        fn _check[i: Int]():
+            constrained[
+                0 <= mask[i] < 2 * size,
+                "invalid index in the shuffle operation",
+            ]()
 
-            unroll[_check, output_size]()
+        unroll[_check, output_size]()
 
-            return True
-
-        constrained[
-            _check_indices[mask](), "invalid index in the shuffle operation"
-        ]()
         return __mlir_op.`pop.simd.shuffle`[
             mask = mask.data.array,
             _type = __mlir_type[
