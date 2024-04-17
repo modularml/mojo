@@ -334,6 +334,24 @@ struct DType(Stringable, KeyElement):
         return self.isa[DType.index]()
 
     @always_inline("nodebug")
+    fn is_index32(self) -> Bool:
+        """Checks if this DType is Index and 32 bit.
+
+        Returns:
+            True if this DType is Index and 32 bit, False otherwise.
+        """
+        return self.is_index() and (self.sizeof() == DType.int32.sizeof())
+
+    @always_inline("nodebug")
+    fn is_index64(self) -> Bool:
+        """Checks if this DType is Index and 64 bit.
+
+        Returns:
+            True if this DType is Index and 64 bit, False otherwise.
+        """
+        return self.is_index() and (self.sizeof() == DType.int64.sizeof())
+
+    @always_inline("nodebug")
     fn is_address(self) -> Bool:
         """Checks if this DType is Address.
 

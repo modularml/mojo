@@ -447,6 +447,32 @@ fn is_big_endian[
 
 
 @always_inline("nodebug")
+fn is_32bit[target: __mlir_type.`!kgen.target` = _current_target()]() -> Bool:
+    """Returns True if the maximum integral value is 32 bit.
+
+    Parameters:
+        target: The target architecture.
+
+    Returns:
+        True if the maximum integral value is 32 bit, False otherwise.
+    """
+    return sizeof[DType.index, target]() == sizeof[DType.int32, target]()
+
+
+@always_inline("nodebug")
+fn is_64bit[target: __mlir_type.`!kgen.target` = _current_target()]() -> Bool:
+    """Returns True if the maximum integral value is 64 bit.
+
+    Parameters:
+        target: The target architecture.
+
+    Returns:
+        True if the maximum integral value is 64 bit, False otherwise.
+    """
+    return sizeof[DType.index, target]() == sizeof[DType.int64, target]()
+
+
+@always_inline("nodebug")
 fn simdbitwidth[
     target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> Int:
