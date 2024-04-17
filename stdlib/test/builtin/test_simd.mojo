@@ -403,6 +403,24 @@ def test_extract():
     )
 
 
+def test_limits():
+    @parameter
+    fn test_integral_overflow[type: DType]() raises:
+        var max_value = Scalar[type].MAX
+        var min_value = Scalar[type].MIN
+        assert_equal(max_value + 1, min_value)
+
+    test_integral_overflow[DType.index]()
+    test_integral_overflow[DType.int8]()
+    test_integral_overflow[DType.uint8]()
+    test_integral_overflow[DType.int16]()
+    test_integral_overflow[DType.uint16]()
+    test_integral_overflow[DType.int32]()
+    test_integral_overflow[DType.uint32]()
+    test_integral_overflow[DType.int64]()
+    test_integral_overflow[DType.uint64]()
+
+
 def main():
     test_cast()
     test_simd_variadic()
@@ -416,3 +434,4 @@ def main():
     test_deinterleave()
     test_address()
     test_extract()
+    test_limits()
