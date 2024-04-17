@@ -1206,6 +1206,30 @@ struct object(IntableRaising, Boolable, Stringable):
             return fp_func(lhsValue.get_as_float(), rhsValue.get_as_float())
         return int_func(lhsValue.get_as_int(), rhsValue.get_as_int())
 
+    @staticmethod
+    @always_inline
+    fn _arithmetic_bitwise_op[
+        int_func: fn (Int64, Int64) -> Int64,
+        bool_func: fn (Bool, Bool) -> Bool,
+    ](lhs: object, rhs: object) raises -> object:
+        """Generic bitwise operator.
+
+        Parameters:
+            int_func: Integer operator.
+            bool_func: Boolean operator.
+
+        Returns:
+            The bitwise operation result.
+        """
+        lhs._arithmetic_integral_type_check()
+        rhs._arithmetic_integral_type_check()
+        var lhsValue = lhs._value
+        var rhsValue = rhs._value
+        _ObjectImpl.coerce_integral_type(lhsValue, rhsValue)
+        if lhsValue.is_int():
+            return int_func(lhsValue.get_as_int(), rhsValue.get_as_int())
+        return bool_func(lhsValue.get_as_bool(), rhsValue.get_as_bool())
+
     @always_inline
     fn __neg__(self) raises -> object:
         """Negation operator. Only valid for bool, int, and float
