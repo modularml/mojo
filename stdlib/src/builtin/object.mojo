@@ -66,7 +66,7 @@ struct _ImmutableString:
 
     @always_inline
     fn __init__(data: UnsafePointer[Int8], length: Int) -> Self:
-        return Self {data: data.value, length: length}
+        return Self {data: data.address, length: length}
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
@@ -101,7 +101,7 @@ struct _RefCountedListRef:
     @always_inline
     fn __init__() -> Self:
         var ptr = UnsafePointer[_RefCountedList].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedList()
+        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         return Self {lst: ptr.bitcast[NoneType]()}
 
     @always_inline
@@ -186,7 +186,7 @@ struct _RefCountedAttrsDictRef:
     @always_inline
     fn __init__(values: VariadicListMem[Attr, _, _]) -> Self:
         var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedAttrsDict()
+        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
             ptr[].impl[]._insert(values[i].key, values[i].value._value.copy())

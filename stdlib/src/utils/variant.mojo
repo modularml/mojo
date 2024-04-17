@@ -228,7 +228,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias q = Ts[i]
-                __get_address_as_owned_value(self._get_ptr[q]().value).__del__()
+                __get_address_as_owned_value(
+                    self._get_ptr[q]().address
+                ).__del__()
 
         unroll[each, len(VariadicList(Ts))]()
 
@@ -313,7 +315,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         debug_assert(Reference(self)[].isa[T](), "get: wrong variant type")
         return __mlir_op.`lit.ref.from_pointer`[
             _type = Reference[T, mutability, self_life]._mlir_type
-        ](Reference(self)[]._get_ptr[T]().value)
+        ](Reference(self)[]._get_ptr[T]().address)
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:

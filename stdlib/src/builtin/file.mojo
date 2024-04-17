@@ -264,8 +264,8 @@ struct FileHandle:
         external_call["KGEN_CompilerRT_IO_FileReadToAddress", NoneType](
             self.handle,
             ptr,
-            Pointer.address_of(size_copy),
-            Pointer.address_of(err_msg),
+            UnsafePointer.address_of(size_copy),
+            UnsafePointer.address_of(err_msg),
         )
 
         if err_msg:
