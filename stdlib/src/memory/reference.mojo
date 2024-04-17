@@ -259,7 +259,7 @@ struct Reference[
         # Work around AnyRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[
             _type = Pointer[type, address_space]._mlir_type
-        ](UnsafePointer(self).value)
+        ](UnsafePointer(self).address)
 
     @always_inline("nodebug")
     fn unsafe_bitcast[
