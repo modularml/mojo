@@ -497,15 +497,7 @@ fn external_call[
     T4: AnyRegType,
     T5: AnyRegType,
     T6: AnyRegType,
-](
-    arg0: T0,
-    arg1: T1,
-    arg2: T2,
-    arg3: T3,
-    arg4: T4,
-    arg5: T5,
-    arg6: T6,
-) -> type:
+](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5, arg6: T6) -> type:
     """Calls an external function.
 
     Parameters:
