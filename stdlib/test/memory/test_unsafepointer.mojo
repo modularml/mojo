@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo-no-debug %s
 
 from memory.unsafe_pointer import move_from_pointee, move_pointee
 from memory import UnsafePointer
