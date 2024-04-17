@@ -24,7 +24,10 @@ from sys.info import (
     os_is_linux,
     os_is_macos,
     os_is_windows,
+    _macos_version,
 )
+
+from testing import assert_true
 
 
 # CHECK-LABEL: test_os_query
@@ -50,5 +53,18 @@ fn test_os_query():
     print(is_big_endian())
 
 
-fn main():
+def test_os_version():
+    var major = 0
+    var minor = 0
+    var patch = 0
+
+    major, minor, patch = _macos_version()
+
+    assert_true(major >= 13)
+    assert_true(minor >= 0)
+    assert_true(patch >= 0)
+
+
+def main():
     test_os_query()
+    test_os_version()
