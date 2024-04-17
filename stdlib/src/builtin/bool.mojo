@@ -286,7 +286,6 @@ struct Bool(
             1 if the Bool is True, 0 otherwise.
         """
         return Int(
-
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 self.value
             )
