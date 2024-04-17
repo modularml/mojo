@@ -453,7 +453,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         var base_ptr = Reference(self)[].data
         return __mlir_op.`lit.ref.from_pointer`[
             _type = Reference[T, mutability, self_life]._mlir_type
-        ]((base_ptr + normalized_idx).value)
+        ]((base_ptr + normalized_idx).address)
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type

@@ -90,7 +90,7 @@ struct Arc[T: Movable](CollectionElement):
             value: The value to manage.
         """
         self._inner = UnsafePointer[Self._type].alloc(1)
-        __get_address_as_uninit_lvalue(self._inner.value) = Self._type(value^)
+        __get_address_as_uninit_lvalue(self._inner.address) = Self._type(value^)
         _ = self._inner[].increment()
 
     fn __init__(inout self, *, owned inner: UnsafePointer[Self._type]):
@@ -117,7 +117,7 @@ struct Arc[T: Movable](CollectionElement):
         var rc = self._inner[].decrement()
         if rc < 1:
             # Call inner destructor, then free the memory
-            _ = __get_address_as_owned_value(self._inner.value)
+            _ = __get_address_as_owned_value(self._inner.address)
             self._inner.free()
 
     fn set(self, owned new_value: T):
@@ -151,7 +151,7 @@ struct Arc[T: Movable](CollectionElement):
         alias RefType = Reference[T, mutability, lifetime]
         return RefType(
             __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](
-                Reference(self)[]._data_ptr().value
+                Reference(self)[]._data_ptr().address
             )
         )
 

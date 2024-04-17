@@ -108,7 +108,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
             initialize_pointee(
                 UnsafePointer(self._refitem__[idx]()),
-                __get_address_as_owned_value(existing_elt_ptr.value),
+                __get_address_as_owned_value(existing_elt_ptr.address),
             )
 
         unroll[initialize_elt, Self.__len__()]()
@@ -176,7 +176,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             Reference(self_lit)[].storage
         ).get_legacy_pointer().address
 
-        # Pointer to the element.
+        # KGenPointer to the element.
         var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](
             storage_kgen_ptr
         )
