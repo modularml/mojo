@@ -571,6 +571,19 @@ def test_constructor_from_other_list_through_pointer():
     assert_equal(some_list.capacity, capacity)
 
 
+def test_converting_list_to_string():
+    var my_list = List[Int](1, 2, 3)
+    assert_equal(str(my_list), "[1, 2, 3]")
+
+    var my_list2 = List[SIMD[DType.int8, 2]](
+        SIMD[DType.int8, 2](1, 2), SIMD[DType.int8, 2](3, 4)
+    )
+    assert_equal(str(my_list2), "[[1, 2], [3, 4]]")
+
+    var my_list3 = List[Float64](1.0, 2.0, 3.0)
+    assert_equal(str(my_list3), "[1.0, 2.0, 3.0]")
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -592,3 +605,4 @@ def main():
     test_list_span()
     test_constructor_from_pointer()
     test_constructor_from_other_list_through_pointer()
+    test_converting_list_to_string()

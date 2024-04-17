@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 # ===----------------------------------------------------------------------=== #
 # Stringable
 # ===----------------------------------------------------------------------=== #
+from ..collections.list import StringableCollectionElement
 
 
 trait Stringable:
@@ -169,3 +170,19 @@ fn str[T: StringableRaising](value: T) raises -> String:
         If there is an error when computing the string representation of the type.
     """
     return value.__str__()
+
+
+@always_inline
+fn str[T: StringableCollectionElement](value: List[T]) -> String:
+    """Get the string representation of a list of strings.
+
+    Parameters:
+        T: The type conforming to Stringable and a CollectionElement.
+
+    Args:
+        value: The object to get the string representation of.
+
+    Returns:
+        The string representation of the object.
+    """
+    return __type_of(value).__str__(value)

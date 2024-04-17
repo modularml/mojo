@@ -69,6 +69,10 @@ struct _ListIter[
         return len(self.src[]) - self.index
 
 
+trait StringableCollectionElement(Stringable, CollectionElement):
+    pass
+
+
 struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     """The `List` type is a dynamically-allocated list.
 
@@ -537,3 +541,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             An iterator of immutable references to the list elements.
         """
         return _ListIter[T, mutability, self_life](0, Reference(self))
+
+    @staticmethod
+    fn __str__[U: StringableCollectionElement](self: List[U]) -> String:
+        var result = String("[")
+        for i in range(len(self)):
+            result += str(self[i])
+            if i < len(self) - 1:
+                result += ", "
+        return result + "]"
