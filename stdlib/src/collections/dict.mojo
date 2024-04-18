@@ -287,7 +287,9 @@ struct _DictIndex:
         self.data.free()
 
 
-struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
+struct Dict[K: KeyElement, V: CollectionElement](
+    Sized, CollectionElement, Boolable
+):
     """A container that stores key-value pairs.
 
     The key type and value type must be specified statically, unlike a Python
@@ -488,6 +490,14 @@ struct Dict[K: KeyElement, V: CollectionElement](Sized, CollectionElement):
     fn __len__(self) -> Int:
         """The number of elements currenly stored in the dictionary."""
         return self.size
+
+    fn __bool__(self) -> Bool:
+        """Check if the dictionary is empty or not.
+
+        Returns:
+            `False` if the dictionary is empty, `True` if there is at least one element.
+        """
+        return len(self).__bool__()
 
     fn find(self, key: K) -> Optional[V]:
         """Find a value in the dictionary by key.
