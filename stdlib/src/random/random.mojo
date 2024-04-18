@@ -162,7 +162,7 @@ fn rand[type: DType](ptr: DTypePointer[type], size: Int):
 
 
 fn randn_float64(mean: Float64 = 0.0, variance: Float64 = 1.0) -> Float64:
-    """Returns a random double sampled from Normal(mean, variance) distribution.
+    """Returns a random double sampled from a Normal(mean, variance) distribution.
 
     Args:
         mean: Normal distribution mean.
