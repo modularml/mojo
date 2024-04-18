@@ -284,12 +284,37 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             new_size: The new size.
             value: The value to use to populate new elements.
         """
-        self.reserve(new_size)
+        if new_size <= self.size:
+            self.resize(new_size)
+        else:
+            self.reserve(new_size)
+            for i in range(new_size, self.size):
+                destroy_pointee(self.data + i)
+            for i in range(self.size, new_size):
+                initialize_pointee(self.data + i, value)
+            self.size = new_size
+
+    @always_inline
+    fn resize(inout self, new_size: Int):
+        """Resizes the list to the given new size.
+
+        With no new value provided, the new size must be smaller than or equal
+        to the current one. Elements at the end are discarded.
+
+        Args:
+            new_size: The new size.
+        """
+        debug_assert(
+            new_size <= self.size,
+            (
+                "New size must be smaller than or equal to current size when no"
+                " new value is provided."
+            ),
+        )
         for i in range(new_size, self.size):
             destroy_pointee(self.data + i)
-        for i in range(self.size, new_size):
-            initialize_pointee(self.data + i, value)
         self.size = new_size
+        self.reserve(new_size)
 
     fn reverse(inout self):
         """Reverses the elements of the list."""
