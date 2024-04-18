@@ -575,7 +575,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @staticmethod
     fn __str__[U: StringableCollectionElement](self: List[U]) -> String:
-        """Returns a string representation of a list.
+        """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below:
