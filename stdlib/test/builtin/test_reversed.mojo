@@ -24,5 +24,62 @@ def test_reversed_list():
         check -= 1
 
 
+def test_reversed_dict():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+    dict["c"] = 3
+    dict["d"] = 4
+    dict["a"] = 5
+
+    var keys = String("")
+    for key in reversed(dict):
+        keys += key[]
+
+    assert_equal(keys, "dcba")
+
+    # Order preserved
+
+    _ = dict.pop("a")
+    _ = dict.pop("c")
+
+    keys = String("")
+    for key in dict:
+        keys += key[]
+
+    assert_equal(keys, "bd")
+
+    keys = String("")
+    for key in reversed(dict):
+        keys += key[]
+
+    assert_equal(keys, "db")
+
+    # Empty dict is iterable
+
+    _ = dict.pop("b")
+    _ = dict.pop("d")
+
+    keys = String("")
+    for key in reversed(dict):
+        keys += key[]
+
+    assert_equal(keys, "")
+
+    # Refill dict
+
+    dict["d"] = 4
+    dict["a"] = 1
+    dict["b"] = 2
+    dict["e"] = 3
+
+    keys = String("")
+    for key in reversed(dict):
+        keys += key[]
+
+    assert_equal(keys, "ebad")
+
+
 def main():
+    test_reversed_dict()
     test_reversed_list()
