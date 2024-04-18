@@ -14,17 +14,12 @@
 # RUN: %mojo %s | FileCheck %s
 
 from sys._build import is_debug_build, is_release_build
+from testing import assert_true, assert_false
 
 
-# CHECK-OK-LABEL: test_is_debug
 fn test_is_debug():
-    print("== test_is_debug")
-
-    # CHECK: True
-    print(is_debug_build())
-
-    # CHECK: False
-    print(is_release_build())
+    assert_true(is_debug_build())
+    assert_false(is_release_build())
 
 
 fn main():
