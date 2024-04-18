@@ -138,7 +138,7 @@ struct Error(Stringable, Boolable):
         Returns:
             A printable representation of the error message.
         """
-        return self.__str__()
+        return str(self)
 
     @always_inline
     fn _message(self) -> String:
