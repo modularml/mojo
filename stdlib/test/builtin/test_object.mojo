@@ -248,11 +248,6 @@ def test_matrix():
 
 
 def test_convert_to_string():
-    # We don't test here the object.print() method because it's not compatible with
-    # the testing framework. We test the str() function instead.
-    # In the future, we can re-implement the object.print() to just do a print(str(self))
-    # and lower massively the risk of bugs.
-
     var a: object = True
     assert_equal(str(a), "True")
     a = 42
