@@ -106,14 +106,14 @@ fn reversed[
 ](
     value: Reference[Dict[K, V], mutability, self_life]._mlir_type,
 ) -> _DictKeyIter[K, V, mutability, self_life, False]:
-    """Get a reversed iterator of the input list.
+    """Get a reversed iterator of the input dict.
 
     **Note**: iterators are currently non-raising.
 
     Args:
-        value: The list to get the reversed iterator of.
+        value: The dict to get the reversed iterator of.
 
     Returns:
-        The reversed iterator of the list.
+        The reversed iterator of the dict.
     """
     return Reference(value)[].__reversed__[mutability, self_life]()

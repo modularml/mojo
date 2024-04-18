@@ -785,10 +785,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
     ) -> _DictKeyIter[
         K, V, mutability, self_life, False
     ]:
-        """Iterate backwards over the list, returning immutable references.
+        """Iterate backwards over the dict keys, returning immutable references.
 
         Returns:
-            A reversed iterator of immutable references to the list elements.
+            A reversed iterator of immutable references to the dict keys.
         """
         var ref = Reference(self)
         return _DictKeyIter(
