@@ -22,6 +22,7 @@ from builtin.builtin_list import _LITRefPackHelper
 from memory import UnsafePointer
 
 from utils import StringRef, unroll
+from utils._format import Formattable, Formatter, write_to
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -399,5 +400,56 @@ fn print[
     rest.each[print_elt]()
 
     _put(end)
+    if flush:
+        _flush()
+
+
+# ===----------------------------------------------------------------------=== #
+#  print_fmt
+# ===----------------------------------------------------------------------=== #
+
+
+# TODO:
+#   Finish transition to using non-allocating formatting abstractions by
+#   default, replace `print` with this function.
+@no_inline
+fn _print_fmt[
+    T: Formattable, *Ts: Formattable
+](
+    first: T,
+    *rest: *Ts,
+    sep: StringLiteral = " ",
+    end: StringLiteral = "\n",
+    flush: Bool = False,
+):
+    """Prints elements to the text stream. Each element is separated by `sep`
+    and followed by `end`.
+
+    This print function does not perform unnecessary intermediate String
+    allocations during formatting.
+
+    Parameters:
+        T: The first element type.
+        Ts: The remaining element types.
+
+    Args:
+        first: The first element.
+        rest: The remaining elements.
+        sep: The separator used between elements.
+        end: The String to write after printing the elements.
+        flush: If set to true, then the stream is forcibly flushed.
+    """
+    var writer = Formatter.stdout()
+
+    write_to(writer, first)
+
+    @parameter
+    fn print_elt[T: Formattable](a: T):
+        write_to(writer, sep, a)
+
+    rest.each[print_elt]()
+
+    write_to(writer, end)
+
     if flush:
         _flush()

@@ -23,6 +23,8 @@ from builtin.io import _snprintf
 
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils import StaticIntTuple
+from utils._format import Formattable, Formatter
+from utils.inlined_string import _ArrayMem
 
 # ===----------------------------------------------------------------------=== #
 #  Intable
@@ -169,7 +171,7 @@ fn int[T: IntableRaising](value: T) raises -> Int:
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct Int(Intable, Stringable, KeyElement, Boolable):
+struct Int(Intable, Stringable, KeyElement, Boolable, Formattable):
     """This type represents an integer value."""
 
     var value: __mlir_type.index
@@ -295,12 +297,41 @@ struct Int(Intable, Stringable, KeyElement, Boolable):
         Returns:
             A string representation.
         """
-        var buf = String._buffer_type()
-        var initial_buffer_size = _calc_initial_buffer_size(self)
-        buf.reserve(initial_buffer_size)
-        buf.size += _snprintf(buf.data, initial_buffer_size, "%li", self.value)
-        buf.size += 1  # for the null terminator.
-        return buf^
+
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this integer to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # Stack allocate enough bytes to store any formatted 64-bit integer
+        alias size: Int = 32
+
+        var buf = _ArrayMem[Int8, size]()
+
+        # Format the integer to the local byte array
+        var len = _snprintf(
+            rebind[UnsafePointer[Int8]](buf.as_ptr()),
+            size,
+            "%li",
+            self.value,
+        )
+
+        # Create a StringRef that does NOT include the NUL terminator written
+        # to the buffer.
+        #
+        # Write the formatted integer to the formatter.
+        #
+        # SAFETY:
+        #   `buf` is kept alive long enough for the use of this StringRef.
+        writer.write_str(StringRef(buf.as_ptr(), len))
+
+        # Keep buf alive until we've finished with the StringRef
+        _ = buf^
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:

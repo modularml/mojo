@@ -437,11 +437,4 @@ struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
             A pointer to the elements contained by this array.
         """
 
-        var base_ptr = Reference(
-            self.storage.array
-        ).get_legacy_pointer().address
-
-        # var base_ptr = Pointer[ElementType].address_of(self.array).address
-        # TODO: Is the `gep` here necessary, or could this be a bitcast?
-        var ptr = __mlir_op.`pop.array.gep`(base_ptr, Int(0).value)
-        return LegacyPointer(ptr)
+        return LegacyPointer.address_of(self.storage).bitcast[ElementType]()
