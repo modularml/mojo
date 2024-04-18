@@ -348,7 +348,7 @@ By making a contribution to this project, I certify that:
 ### Typos
 
 We have a tool to check for typos. It's included in the `pre-commit`.
-I also runs in the CI.
+It also runs in the CI.
 If you believe that the spellchecker flagged a word that's correct,
 you can add this word to the list of allowed extras in the `.pre-commit-config.yaml` file.
 
