@@ -164,7 +164,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """Checks whether the list has any elements or not.
 
         Returns:
-            False for an empty list, True otherwise.
+            `False` if the list is empty, `True` if there is at least one element.
         """
         return len(self) > 0
 
