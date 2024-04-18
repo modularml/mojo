@@ -168,7 +168,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         Returns:
           True if the paths are equal and False otherwise.
         """
-        return self.__str__() == other.__str__()
+        return str(self) == str(other)
 
     fn __ne__(self, other: Self) -> Bool:
         """Returns True if the two paths are not equal.
