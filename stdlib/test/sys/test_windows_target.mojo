@@ -25,6 +25,7 @@ from os._windows import (
 )
 from sys import external_call, os_is_linux, os_is_macos, os_is_windows
 
+from memory import Pointer
 from testing import assert_false, assert_true, assert_equal
 
 
