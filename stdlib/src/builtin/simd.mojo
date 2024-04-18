@@ -972,6 +972,121 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self = self.__pow__(rhs)
 
     # ===-------------------------------------------------------------------===#
+    # Checked operations
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn add_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+        """Computes `self + rhs` and a mask of which indices overflowed.
+
+        Args:
+            rhs: The rhs value.
+
+        Returns:
+            A tuple with the results of the operation and a mask for overflows. The first is a new vector whose element at position `i` is computed as
+            `self[i] + rhs[i]`. The second item is a vector of booleans where a `1` at position `i` represents `self[i] + rhs[i]` overflowed.
+        """
+        constrained[type.is_integral()]()
+
+        @parameter
+        if type.is_signed():
+            var result = llvm_intrinsic[
+                "llvm.sadd.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+        else:
+            var result = llvm_intrinsic[
+                "llvm.uadd.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+
+    @always_inline
+    fn sub_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+        """Computes `self - rhs` and a mask of which indices overflowed.
+
+        Args:
+            rhs: The rhs value.
+
+        Returns:
+            A tuple with the results of the operation and a mask for overflows. The first is a new vector whose element at position `i` is computed as
+            `self[i] - rhs[i]`. The second item is a vector of booleans where a `1` at position `i` represents `self[i] - rhs[i]` overflowed.
+        """
+        constrained[type.is_integral()]()
+
+        @parameter
+        if type.is_signed():
+            var result = llvm_intrinsic[
+                "llvm.ssub.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+        else:
+            var result = llvm_intrinsic[
+                "llvm.usub.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+
+    @always_inline
+    fn mul_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+        """Computes `self * rhs` and a mask of which indices overflowed.
+
+        Args:
+            rhs: The rhs value.
+
+        Returns:
+            A tuple with the results of the operation and a mask for overflows. The first is a new vector whose element at position `i` is computed as
+            `self[i] * rhs[i]`. The second item is a vector of booleans where a `1` at position `i` represents `self[i] * rhs[i]` overflowed.
+        """
+        constrained[type.is_integral()]()
+
+        @parameter
+        if type.is_signed():
+            var result = llvm_intrinsic[
+                "llvm.smul.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+        else:
+            var result = llvm_intrinsic[
+                "llvm.umul.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+
+    # ===-------------------------------------------------------------------===#
     # Reversed operations
     # ===-------------------------------------------------------------------===#
 
