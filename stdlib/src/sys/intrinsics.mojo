@@ -901,8 +901,8 @@ fn scatter[
     `mask` and the `value` operand must have the same number of vector
     elements.
 
-    The behavior of the _scatter is undefined if the op stores into
-    the same memory location more than once.
+    Scatter with overlapping addresses is guaranteed to be ordered from
+    least-significant to most-significant element.
 
     In general, for some vector %value, vector of pointers %base, and mask
     %mask instructions of the form:
