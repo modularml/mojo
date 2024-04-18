@@ -22,12 +22,12 @@ var a = Optional(1)
 var b = Optional[Int](None)
 if a:
     print(a.value())  # prints 1
-if b:  # b is False, so no print
+if b:  # bool(b) is False, so no print
     print(b.value())
 var c = a.or_else(2)
 var d = b.or_else(2)
-print(c.value())  # prints 1
-print(d.value())  # prints 2
+print(c)  # prints 1
+print(d)  # prints 2
 ```
 """
 
@@ -62,12 +62,12 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     var b = Optional[Int](None)
     if a:
         print(a.value())  # prints 1
-    if b:  # b is False, so no print
+    if b:  # bool(b) is False, so no print
         print(b.value())
     var c = a.or_else(2)
     var d = b.or_else(2)
-    print(c.value())  # prints 1
-    print(d.value())  # prints 2
+    print(c)  # prints 1
+    print(d)  # prints 2
     ```
 
     Parameters:
