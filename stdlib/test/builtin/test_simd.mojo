@@ -365,9 +365,13 @@ def test_interleave():
 
 
 def test_deinterleave():
-    var ts = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
-    assert_equal(ts[0], SIMD[DType.index, 2](0, 2))
-    assert_equal(ts[1], SIMD[DType.index, 2](1, 3))
+    var tup2 = SIMD[DType.float32, 2](1, 2).deinterleave()
+    assert_equal(tup2.get[0](), Float32(1))
+    assert_equal(tup2.get[1](), Float32(2))
+
+    var tup4 = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
+    assert_equal(tup4.get[0](), SIMD[DType.index, 2](0, 2))
+    assert_equal(tup4.get[1](), SIMD[DType.index, 2](1, 3))
 
 
 def test_address():
