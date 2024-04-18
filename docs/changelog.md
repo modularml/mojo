@@ -82,6 +82,25 @@ what we publish.
 - The `testing.assert_almost_equal` and `math.isclose` functions now have an
   `equal_nan` flag. When set to True, then NaNs are considered equal.
 
+- Mojo now supports declaring functions that have both optional and variadic
+  arguments, both positional and keyword-only. E.g. this now works:
+
+  ```mojo
+  fn variadic_arg_after_default(
+    a: Int, b: Int = 3, *args: Int, c: Int, d: Int = 1, **kwargs: Int
+  ): ...
+  ```
+
+  Positional variadic parameters also work in the presence of optional
+  parameters, i.e.:
+
+  ```mojo
+  fn variadic_param_after_default[e: Int, f: Int = 2, *params: Int]():
+    pass
+  ```
+
+  Note that variadic keyword parameters are not supported yet.
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
