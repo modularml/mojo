@@ -575,6 +575,30 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @staticmethod
     fn __str__[U: StringableCollectionElement](self: List[U]) -> String:
+        """Returns a string representation of a list.
+
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(__type_of_(my_list).__str__(my_list))
+        ```
+
+        When the compiler supports conditional methods, then a simple `str(my_list)` will
+        be enough.
+
+        Args:
+            self: The list to represent as a string.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Stringable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the list.
+        """
+        # TODO: Use `String.join()` when it's working with List.
         var result = String("[")
         for i in range(len(self)):
             result += str(self[i])
