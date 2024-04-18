@@ -16,4 +16,7 @@ from .dict import Dict, KeyElement
 from .list import List
 from .optional import Optional, OptionalReg
 from .set import Set
-from .vector import CollectionElement
+from .vector import (
+    CollectionElement,
+    InlinedFixedVector,
+)
