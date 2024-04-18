@@ -12,28 +12,18 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s | FileCheck %s
 
+from testing import assert_equal
 
-# CHECK-LABEL: test_range_len
-fn test_range_len():
-    print("== test_range_len")
 
-    # CHECK: 10
-    print(range(10).__len__())
-
-    # CHECK: 10
-    print(range(0, 10).__len__())
-
-    # CHECK: 5
-    print(range(5, 10).__len__())
-
-    # CHECK: 10
-    print(range(10, 0, -1).__len__())
-
-    # CHECK: 5
-    print(range(0, 10, 2).__len__())
-
-    # CHECK: 3
-    print(range(38, -13, -23).__len__())
+def test_range_len():
+    assert_equal(range(0).__len__(), 0)
+    assert_equal(range(-1).__len__(), 0)
+    assert_equal(range(10).__len__(), 10)
+    assert_equal(range(0, 10).__len__(), 10)
+    assert_equal(range(5, 10).__len__(), 5)
+    assert_equal(range(10, 0, -1).__len__(), 10)
+    assert_equal(range(0, 10, 2).__len__(), 5)
+    assert_equal(range(38, -13, -23).__len__(), 3)
 
 
 # CHECK-LABEL: test_range_getitem
@@ -56,6 +46,6 @@ fn test_range_getitem():
     print(range(0, 10, 2)[4])
 
 
-fn main():
+def main():
     test_range_len()
     test_range_getitem()
