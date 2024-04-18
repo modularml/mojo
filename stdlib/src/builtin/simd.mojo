@@ -1680,7 +1680,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](self, other)
 
     @always_inline("nodebug")
-    fn deinterleave(self) -> StaticTuple[SIMD[type, size // 2], 2]:
+    fn deinterleave(
+        self,
+    ) -> Tuple[SIMD[type, size // 2], SIMD[type, size // 2]]:
         """Constructs two vectors by deinterleaving the even and odd lanes of
         the vector.
 
@@ -1694,12 +1696,19 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         constrained[size > 1, "the vector size must be greater than 1."]()
 
+        @parameter
+        if size == 2:
+            return (
+                rebind[SIMD[type, size // 2]](self[0]),
+                rebind[SIMD[type, size // 2]](self[1]),
+            )
+
         var res = llvm_intrinsic[
             "llvm.experimental.vector.deinterleave2",
             _RegisterPackType[SIMD[type, size // 2], SIMD[type, size // 2]],
             has_side_effect=False,
         ](self)
-        return StaticTuple[SIMD[type, size // 2], 2](
+        return (
             res.get[0, SIMD[type, size // 2]](),
             res.get[1, SIMD[type, size // 2]](),
         )
