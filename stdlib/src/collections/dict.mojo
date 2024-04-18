@@ -80,6 +80,7 @@ struct _DictEntryIter[
     @always_inline
     fn __next__(inout self) -> Self.ref_type:
         while True:
+            @parameter
             if forward:
                 debug_assert(
                     self.index < self.src[]._reserved, "dict iter bounds"
@@ -93,6 +94,7 @@ struct _DictEntryIter[
                     Self.imm_dict_lifetime,
                 ](self.index)
 
+                @parameter
                 if forward:
                     self.index += 1
                 else:
@@ -103,6 +105,7 @@ struct _DictEntryIter[
                 # unsafe reference lifetime casting.
                 return opt_entry_ref.unsafe_bitcast[DictEntry[K, V]]()
 
+            @parameter
             if forward:
                 self.index += 1
             else:
