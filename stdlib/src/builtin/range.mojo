@@ -49,15 +49,6 @@ fn _abs(x: Int) -> Int:
 
 
 @always_inline
-fn _sign(x: Int) -> Int:
-    if x > 0:
-        return 1
-    if x < 0:
-        return -1
-    return 0
-
-
-@always_inline
 fn _max(a: Int, b: Int) -> Int:
     return a if a > b else b
 
@@ -75,7 +66,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange):
     @always_inline("nodebug")
     fn __init__(inout self, end: Int):
         self.curr = _max(0, end)
-        self.end = end
+        self.end = self.curr
 
     @always_inline("nodebug")
     fn __iter__(self) -> Self:
