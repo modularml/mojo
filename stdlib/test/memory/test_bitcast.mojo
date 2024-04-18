@@ -10,7 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+
+# RUN: %mojo-no-debug %s
 
 from memory import bitcast
 from testing import assert_equal
