@@ -105,6 +105,11 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
     }
 
 
+# ===------------------------------------------------------------------------===#
+# SIMD
+# ===------------------------------------------------------------------------===#
+
+
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct SIMD[type: DType, size: Int = simdwidthof[type]()](
@@ -965,6 +970,121 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         self = self.__pow__(rhs)
+
+    # ===-------------------------------------------------------------------===#
+    # Checked operations
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn add_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+        """Computes `self + rhs` and a mask of which indices overflowed.
+
+        Args:
+            rhs: The rhs value.
+
+        Returns:
+            A tuple with the results of the operation and a mask for overflows. The first is a new vector whose element at position `i` is computed as
+            `self[i] + rhs[i]`. The second item is a vector of booleans where a `1` at position `i` represents `self[i] + rhs[i]` overflowed.
+        """
+        constrained[type.is_integral()]()
+
+        @parameter
+        if type.is_signed():
+            var result = llvm_intrinsic[
+                "llvm.sadd.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+        else:
+            var result = llvm_intrinsic[
+                "llvm.uadd.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+
+    @always_inline
+    fn sub_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+        """Computes `self - rhs` and a mask of which indices overflowed.
+
+        Args:
+            rhs: The rhs value.
+
+        Returns:
+            A tuple with the results of the operation and a mask for overflows. The first is a new vector whose element at position `i` is computed as
+            `self[i] - rhs[i]`. The second item is a vector of booleans where a `1` at position `i` represents `self[i] - rhs[i]` overflowed.
+        """
+        constrained[type.is_integral()]()
+
+        @parameter
+        if type.is_signed():
+            var result = llvm_intrinsic[
+                "llvm.ssub.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+        else:
+            var result = llvm_intrinsic[
+                "llvm.usub.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+
+    @always_inline
+    fn mul_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+        """Computes `self * rhs` and a mask of which indices overflowed.
+
+        Args:
+            rhs: The rhs value.
+
+        Returns:
+            A tuple with the results of the operation and a mask for overflows. The first is a new vector whose element at position `i` is computed as
+            `self[i] * rhs[i]`. The second item is a vector of booleans where a `1` at position `i` represents `self[i] * rhs[i]` overflowed.
+        """
+        constrained[type.is_integral()]()
+
+        @parameter
+        if type.is_signed():
+            var result = llvm_intrinsic[
+                "llvm.smul.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
+        else:
+            var result = llvm_intrinsic[
+                "llvm.umul.with.overflow",
+                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                Self,
+                Self,
+            ](self, rhs)
+            return (
+                result.get[0, Self](),
+                result.get[1, SIMD[DType.bool, size]](),
+            )
 
     # ===-------------------------------------------------------------------===#
     # Reversed operations
@@ -2465,11 +2585,6 @@ fn _neginf[type: DType]() -> Scalar[type]:
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
-fn _is_32_bit_system() -> Bool:
-    return sizeof[DType.index]() == sizeof[DType.int32]()
-
-
 @always_inline
 fn _max_finite[type: DType]() -> Scalar[type]:
     """Returns the maximum finite value of type.
@@ -2491,13 +2606,13 @@ fn _max_finite[type: DType]() -> Scalar[type]:
         return 32767
     elif type == DType.uint16:
         return 65535
-    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
+    elif type == DType.int32 or type.is_index32():
         return 2147483647
     elif type == DType.uint32:
         return 4294967295
-    elif type == DType.int64 or (
-        type == DType.index and not _is_32_bit_system()
-    ):
+    elif type == DType.float32:
+        return 3.40282346638528859812e38
+    elif type == DType.int64 or type.is_index64():
         return 9223372036854775807
     elif type == DType.uint64:
         return 18446744073709551615
@@ -2538,11 +2653,9 @@ fn _min_finite[type: DType]() -> Scalar[type]:
         return -128
     elif type == DType.int16:
         return -32768
-    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
+    elif type == DType.int32 or type.is_index32():
         return -2147483648
-    elif type == DType.int64 or (
-        type == DType.index and not _is_32_bit_system()
-    ):
+    elif type == DType.int64 or type.is_index64():
         return -9223372036854775808
     elif type.is_floating_point():
         return -_max_finite[type]()
