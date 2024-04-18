@@ -80,6 +80,7 @@ struct _DictEntryIter[
     @always_inline
     fn __next__(inout self) -> Self.ref_type:
         while True:
+
             @parameter
             if forward:
                 debug_assert(
