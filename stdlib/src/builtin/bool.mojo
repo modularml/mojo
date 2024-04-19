@@ -245,3 +245,29 @@ struct Bool(Stringable, CollectionElement, Boolable, EqualityComparable):
             `value ^ self`.
         """
         return value ^ self
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Convert this Bool to an integer.
+
+        Returns:
+            1 if the Bool is True, 0 otherwise.
+        """
+        return Int(
+            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
+                self.value
+            )
+        )
+
+
+@always_inline
+fn bool(value: None) -> Bool:
+    """Get the bool representation of the `None` type.
+
+    Args:
+        value: The object to get the bool representation of.
+
+    Returns:
+        The bool representation of the object.
+    """
+    return False
