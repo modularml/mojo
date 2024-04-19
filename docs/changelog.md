@@ -78,6 +78,8 @@ what we publish.
 - `Optional` now implements `__is__` and `__isnot__` methods so that you can compare
   an `Optional` with `None`, e.g. `Optional(1) is not None` for example.
 
+- The `ord` and `chr` functions have been improved to accept any Unicode character.
+
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
   initialization status of the underlying value.  This is useful in very
