@@ -337,7 +337,7 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[Int8](buf, int(size_copy), int(size_copy))
+        var list = List[Int8](buf, size=int(size_copy), capacity=int(size_copy))
 
         return list
 
