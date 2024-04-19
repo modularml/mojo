@@ -13,6 +13,7 @@
 # RUN: %mojo -debug-level full %s
 
 from utils._format import Formattable, write_to, Formatter
+from utils.inlined_string import _FixedString
 from testing import assert_equal
 
 
@@ -20,6 +21,8 @@ fn main() raises:
     test_formatter_of_string()
     test_string_format_seq()
     test_stringable_based_on_format()
+
+    test_formatter_of_fixed_string()
 
 
 @value
@@ -65,3 +68,10 @@ fn test_string_format_seq() raises:
 
 fn test_stringable_based_on_format() raises:
     assert_equal(str(Point(10, 11)), "Point(10, 11)")
+
+
+fn test_formatter_of_fixed_string() raises:
+    var s1 = _FixedString[100]()
+    var s1_fmt = Formatter(s1)
+    write_to(s1_fmt, "Hello, World!")
+    assert_equal(s1, "Hello, World!")

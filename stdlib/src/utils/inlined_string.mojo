@@ -19,7 +19,11 @@ from sys import sizeof
 
 from memory import memcpy
 
+from collections import Optional
+
 from utils import StaticTuple, Variant
+from utils._format import ToFormatter
+
 
 # ===----------------------------------------------------------------------===#
 # InlinedString
@@ -261,7 +265,9 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
 
 @value
-struct _FixedString[CAP: Int](Sized, Stringable, CollectionElement):
+struct _FixedString[CAP: Int](
+    Sized, Stringable, Formattable, ToFormatter, CollectionElement
+):
     """A string with a fixed available capacity.
 
     The string data is stored inline in this structs memory layout.
@@ -339,17 +345,24 @@ struct _FixedString[CAP: Int](Sized, Stringable, CollectionElement):
         Args:
             strref: The string to append.
         """
+        var err = self._iadd_non_raising(strref)
+        if err:
+            raise err.value()
+
+    fn _iadd_non_raising(inout self, strref: StringRef) -> Optional[Error]:
         var total_len = len(self) + len(strref)
 
         # Ensure there is sufficient capacity to append `strref`
         if total_len > CAP:
-            raise Error(
-                "Insufficient capacity to append len="
-                + str(len(strref))
-                + " string to len="
-                + str(len(self))
-                + " FixedString with capacity="
-                + str(CAP),
+            return Optional(
+                Error(
+                    "Insufficient capacity to append len="
+                    + str(len(strref))
+                    + " string to len="
+                    + str(len(self))
+                    + " FixedString with capacity="
+                    + str(CAP),
+                )
             )
 
         # Append the bytes from `strref` at the end of the current string
@@ -357,9 +370,62 @@ struct _FixedString[CAP: Int](Sized, Stringable, CollectionElement):
 
         self.size = total_len
 
+        return None
+
+    fn format_to(self, inout writer: Formatter):
+        writer.write_str(self._strref_dangerous())
+
+    fn _unsafe_to_formatter(inout self) -> Formatter:
+        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
+            var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
+
+            # FIXME(#37990):
+            #   Use `ptr[] += strref` and remove _iadd_non_raising after
+            #   "failed to fold operation lit.try" is fixed.
+            # try:
+            #     ptr[] += strref
+            # except e:
+            #     abort("error formatting to FixedString: " + str(e))
+            var err = ptr[]._iadd_non_raising(strref)
+            if err:
+                abort("error formatting to FixedString: " + str(err.value()))
+
+        return Formatter(
+            write_to_string,
+            # Arg data
+            UnsafePointer.address_of(self).bitcast[NoneType](),
+        )
+
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
+
+    @staticmethod
+    fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
+        """
+        Construct a string by concatenating a sequence of formattable arguments.
+
+        Args:
+            args: A sequence of formattable arguments.
+
+        Parameters:
+            Ts: The types of the arguments to format. Each type must be satisfy
+              `Formattable`.
+
+        Returns:
+            A string formed by formatting the argument sequence.
+        """
+
+        var output = Self()
+        var writer = output._unsafe_to_formatter()
+
+        @parameter
+        fn write_arg[T: Formattable](arg: T):
+            arg.format_to(writer)
+
+        args.each[write_arg]()
+
+        return output^
 
     fn as_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
@@ -425,6 +491,12 @@ struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
             The length of the array
         """
         return SIZE
+
+    fn __setitem__(inout self, index: Int, owned value: ElementType):
+        var ptr = __mlir_op.`pop.array.gep`(
+            UnsafePointer(Reference(self.storage.array)).address, index.value
+        )
+        __mlir_op.`pop.store`(value, ptr)
 
     # ===------------------------------------------------------------------=== #
     # Methods
