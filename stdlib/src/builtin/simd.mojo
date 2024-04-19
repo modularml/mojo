@@ -2652,8 +2652,6 @@ fn _max_finite[type: DType]() -> Scalar[type]:
         return 2147483647
     elif type == DType.uint32:
         return 4294967295
-    elif type == DType.float32:
-        return 3.40282346638528859812e38
     elif type == DType.int64 or type.is_index64():
         return 9223372036854775807
     elif type == DType.uint64:
