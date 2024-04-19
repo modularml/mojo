@@ -10,62 +10,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s | FileCheck %s
+# RUN: %mojo %s
 
 from utils._numerics import FPUtils
+from testing import assert_equal, assert_true, assert_false
 
 alias FPU64 = FPUtils[DType.float64]
 
 
-# CHECK-LABEL: test_numerics
-fn test_numerics():
-    print("== test_numerics")
+fn test_numerics() raises:
+    assert_equal(FPUtils[DType.float32].mantissa_width(), 23)
 
-    # CHECK: 23
-    print(FPUtils[DType.float32].mantissa_width())
+    assert_equal(FPUtils[DType.float64].mantissa_width(), 52)
 
-    # CHECK: 52
-    print(FPUtils[DType.float64].mantissa_width())
+    assert_equal(FPUtils[DType.float32].exponent_bias(), 127)
 
-    # CHECK: 127
-    print(FPUtils[DType.float32].exponent_bias())
+    assert_equal(FPUtils[DType.float64].exponent_bias(), 1023)
 
-    # CHECK: 1023
-    print(FPUtils[DType.float64].exponent_bias())
-
-    # CHECK: 2
-    print(FPU64.get_exponent(FPU64.set_exponent(1, 2)))
-    # CHECK-NEXT: 3
-    print(FPU64.get_mantissa(FPU64.set_mantissa(1, 3)))
-    # CHECK-NEXT: 4
-    print(FPU64.get_exponent(FPU64.set_exponent(-1, 4)))
-    # CHECK-NEXT: 5
-    print(FPU64.get_mantissa(FPU64.set_mantissa(-1, 5)))
-    # CHECK-NEXT: True
-    print(FPU64.get_sign(FPU64.set_sign(0, True)))
-    # CHECK-NEXT: False
-    print(FPU64.get_sign(FPU64.set_sign(0, False)))
-    # CHECK-NEXT: True
-    print(FPU64.get_sign(FPU64.set_sign(-0, True)))
-    # CHECK-NEXT: False
-    print(FPU64.get_sign(FPU64.set_sign(-0, False)))
-    # CHECK-NEXT: False
-    print(FPU64.get_sign(1))
-    # CHECK-NEXT: True
-    print(FPU64.get_sign(-1))
-    # CHECK-NEXT: False
-    print(FPU64.get_sign(FPU64.pack(False, 6, 12)))
-    # CHECK-NEXT: 6
-    print(FPU64.get_exponent(FPU64.pack(False, 6, 12)))
-    # CHECK-NEXT: 12
-    print(FPU64.get_mantissa(FPU64.pack(False, 6, 12)))
-    # CHECK-NEXT: True
-    print(FPU64.get_sign(FPU64.pack(True, 6, 12)))
-    # CHECK-NEXT: 6
-    print(FPU64.get_exponent(FPU64.pack(True, 6, 12)))
-    # CHECK-NEXT: 12
-    print(FPU64.get_mantissa(FPU64.pack(True, 6, 12)))
+    assert_equal(FPU64.get_exponent(FPU64.set_exponent(1, 2)), 2)
+    assert_equal(FPU64.get_mantissa(FPU64.set_mantissa(1, 3)), 3)
+    assert_equal(FPU64.get_exponent(FPU64.set_exponent(-1, 4)), 4)
+    assert_equal(FPU64.get_mantissa(FPU64.set_mantissa(-1, 5)), 5)
+    assert_true(FPU64.get_sign(FPU64.set_sign(0, True)))
+    assert_false(FPU64.get_sign(FPU64.set_sign(0, False)))
+    assert_true(FPU64.get_sign(FPU64.set_sign(-0, True)))
+    assert_false(FPU64.get_sign(FPU64.set_sign(-0, False)))
+    assert_false(FPU64.get_sign(1))
+    assert_true(FPU64.get_sign(-1))
+    assert_false(FPU64.get_sign(FPU64.pack(False, 6, 12)))
+    assert_equal(FPU64.get_exponent(FPU64.pack(False, 6, 12)), 6)
+    assert_equal(FPU64.get_mantissa(FPU64.pack(False, 6, 12)), 12)
+    assert_true(FPU64.get_sign(FPU64.pack(True, 6, 12)))
+    assert_equal(FPU64.get_exponent(FPU64.pack(True, 6, 12)), 6)
+    assert_equal(FPU64.get_mantissa(FPU64.pack(True, 6, 12)), 12)
 
 
-fn main():
+def main():
     test_numerics()
