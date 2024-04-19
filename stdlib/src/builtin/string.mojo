@@ -18,8 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
-from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
-
+from memory import UnsafePointer, DTypePointer, Pointer, memcmp, memcpy
 
 from utils import StringRef, StaticIntTuple, StaticTuple
 from utils._format import Formattable, Formatter, ToFormatter

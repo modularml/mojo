@@ -12,8 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo-no-debug %s
 
-from memory.unsafe_pointer import move_from_pointee, move_pointee
 from memory import UnsafePointer
+from memory.unsafe_pointer import move_from_pointee, move_pointee
 from test_utils import MoveCounter
 from testing import assert_equal, assert_not_equal, assert_true
 

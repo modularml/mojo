@@ -15,7 +15,7 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory import Pointer, AnyLifetime
+from memory import Pointer
 ```
 """
 
@@ -32,6 +32,7 @@ from sys.intrinsics import prefetch as _prefetch
 from sys.intrinsics import gather, scatter, strided_load, strided_store
 
 from .memory import _free, _malloc
+from .reference import AddressSpace
 
 # ===----------------------------------------------------------------------===#
 # Utilities

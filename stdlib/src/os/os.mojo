@@ -22,8 +22,11 @@ from os import listdir
 from collections import List
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 
+from memory import (
+    DTypePointer,
+    Pointer,
+)
 from memory.unsafe_pointer import move_from_pointee
-from memory import DTypePointer, Pointer
 
 from utils import StringRef
 

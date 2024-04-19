@@ -20,8 +20,8 @@ from sys import (
     strided_store,
 )
 
-from memory.unsafe import DTypePointer
 from testing import assert_equal
+from memory import DTypePointer
 
 
 fn test_strided_load() raises:

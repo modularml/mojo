@@ -20,9 +20,9 @@ from collections import List
 """
 
 
-from memory.unsafe_pointer import *
-from memory import Reference, UnsafePointer
-from builtin.value import StringableCollectionElement
+from memory import UnsafePointer, Reference
+from memory.unsafe_pointer import move_pointee, move_from_pointee
+
 
 # ===----------------------------------------------------------------------===#
 # Utilties

@@ -15,8 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory.unsafe_pointer import destroy_pointee
 from memory import Reference, UnsafePointer
+from memory.unsafe_pointer import destroy_pointee
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
