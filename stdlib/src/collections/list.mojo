@@ -598,10 +598,18 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A string representation of the list.
         """
-        # TODO: Use `String.join()` when it's working with List.
-        var result = String("[")
+        # we do a rough estimation of the number of chars that we'll see
+        # in the final string, we assume that str(x) will be at least one char.
+        var minimum_capacity = (
+            2  # '[' and ']'
+            + len(self) * 3  # str(x) and ", "
+            - 2  # remove the last ", "
+        )
+        var result = String(List[Int8](capacity=minimum_capacity))
+        result += "["
         for i in range(len(self)):
             result += str(self[i])
             if i < len(self) - 1:
                 result += ", "
-        return result + "]"
+        result += "]"
+        return result
