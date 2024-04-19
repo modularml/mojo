@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s | FileCheck %s
+# RUN: %mojo %s
 
 from sys.intrinsics import (
     compressed_store,
@@ -24,16 +24,16 @@ from memory.unsafe import DTypePointer
 from testing import assert_equal
 
 
-def test_strided_load():
+fn test_strided_load() raises:
     alias size = 16
     var vector = DTypePointer[DType.float32]().alloc(size)
 
     for i in range(size):
         vector[i] = i
 
-    # CHECK: [0.0, 4.0, 8.0, 12.0]
     var s = strided_load[DType.float32, 4](vector, 4)
-    print(s)
+    assert_equal(s, SIMD[DType.float32, 4](0, 4, 8, 12))
+
     vector.free()
 
 
