@@ -19,11 +19,10 @@ from python import Python
 ```
 """
 
-from sys import external_call
+from sys import external_call, sizeof
 from sys.ffi import _get_global
-from sys.info import sizeof
 
-from memory.unsafe import Pointer
+from memory import Pointer
 
 from utils import StringRef
 

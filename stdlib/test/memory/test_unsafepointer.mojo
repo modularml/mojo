@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s | FileCheck %s --dump-input=always
 
-from memory.unsafe_pointer import *
+from memory import UnsafePointer
+from memory.unsafe_pointer import move_from_pointee, move_pointee
 from test_utils import MoveCounter
 from testing import assert_equal, assert_not_equal, assert_true
 

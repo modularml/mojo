@@ -16,8 +16,7 @@
 
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol
-from memory.unsafe import LegacyPointer, DTypePointer
-from memory.unsafe_pointer import UnsafePointer
+from memory import LegacyPointer, UnsafePointer, DTypePointer
 
 # ===----------------------------------------------------------------------=== #
 # Utilities

@@ -19,13 +19,11 @@ from utils._numerics import FPUtils
 ```
 """
 
-from sys import llvm_intrinsic
+from sys import llvm_intrinsic, bitwidthof, has_neon, has_sse4
 from sys._assembly import inlined_assembly
-from sys.info import bitwidthof, has_neon, has_sse4
 
 from builtin.dtype import _integral_type_of
-from memory.unsafe import bitcast
-from memory.unsafe_pointer import UnsafePointer
+from memory import UnsafePointer, bitcast
 
 # ===----------------------------------------------------------------------===#
 # _digits

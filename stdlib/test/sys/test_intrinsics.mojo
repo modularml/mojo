@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys.intrinsics import (
+from sys import (
     compressed_store,
     masked_load,
     masked_store,
@@ -20,8 +20,8 @@ from sys.intrinsics import (
     strided_store,
 )
 
-from memory.unsafe import DTypePointer
 from testing import assert_equal
+from memory import DTypePointer
 
 
 fn test_strided_load() raises:

@@ -20,8 +20,9 @@ from collections import List
 """
 
 
-from memory.unsafe_pointer import *
-from memory.unsafe import Reference
+from memory import UnsafePointer, Reference
+from memory.unsafe_pointer import move_pointee, move_from_pointee
+
 
 # ===----------------------------------------------------------------------===#
 # Utilties

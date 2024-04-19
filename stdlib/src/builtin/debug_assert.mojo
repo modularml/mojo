@@ -18,8 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from os import abort
 from sys._build import is_kernels_debug_build
-from sys.info import triple_is_nvidia_cuda
-from sys.param_env import is_defined
+from sys import triple_is_nvidia_cuda, is_defined
 
 
 fn debug_assert(cond: Bool, msg: StringLiteral):

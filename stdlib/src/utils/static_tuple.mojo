@@ -15,13 +15,13 @@
 You can import these APIs from the `utils` package. For example:
 
 ```mojo
-from utils.static_tuple import StaticTuple
+from utils import StaticTuple
 ```
 """
 
-from memory.unsafe import Pointer
+from memory import Pointer
 
-from utils.loop import unroll
+from utils import unroll
 
 # ===----------------------------------------------------------------------===#
 # Utilities

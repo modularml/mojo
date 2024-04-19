@@ -15,11 +15,11 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory.unsafe_pointer import UnsafePointer
+from memory import UnsafePointer
 ```
 """
 
-from sys.info import alignof, sizeof
+from sys import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
 from memory.memory import _free, _malloc
