@@ -58,15 +58,14 @@ fn b64encode(str: String) -> String:
         out.append(b64chars.load(((si_1 * 4) % 64) + si_2 // 64))
         out.append(b64chars.load(si_2 % 64))
 
-    var i = end
-    if i < length:
-        var si = s(i)
+    if end < length:
+        var si = s(end)
         out.append(b64chars.load(si // 4))
-        if i == length - 1:
+        if end == length - 1:
             out.append(b64chars.load((si * 16) % 64))
             out.append(ord("="))
-        elif i == length - 2:
-            var si_1 = s(i + 1)
+        elif end == length - 2:
+            var si_1 = s(end + 1)
             out.append(b64chars.load(((si * 16) % 64) + si_1 // 16))
             out.append(b64chars.load((si_1 * 4) % 64))
         out.append(ord("="))
