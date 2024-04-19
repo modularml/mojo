@@ -144,7 +144,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn __init__(
         inout self: Self, data: UnsafePointer[T], size: Int, capacity: Int
     ):
-        """Constructs a list from a pointer and its size.
+        """Constructs a list from a pointer, its size, and its capacity.
 
         Args:
             data: The pointer to the data.
