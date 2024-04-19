@@ -142,7 +142,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             self.append(value[])
 
     fn __init__(
-        inout self: Self, data: UnsafePointer[T], size: Int, capacity: Int
+        inout self: Self, data: UnsafePointer[T], *, size: Int, capacity: Int
     ):
         """Constructs a list from a pointer, its size, and its capacity.
 
