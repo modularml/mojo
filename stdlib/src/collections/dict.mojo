@@ -80,6 +80,7 @@ struct _DictEntryIter[
     @always_inline
     fn __next__(inout self) -> Self.ref_type:
         while True:
+
             @parameter
             if forward:
                 debug_assert(
@@ -160,6 +161,7 @@ struct _DictValueIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
+    forward: Bool = True,
 ]:
     """Iterator over Dict value references. These are mutable if the dict
     is mutable.
@@ -169,14 +171,25 @@ struct _DictValueIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
     """
 
     alias ref_type = Reference[V, dict_mutability, dict_lifetime]
 
-    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
+    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime, forward]
 
     fn __iter__(self) -> Self:
         return self
+
+    fn __reversed__[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](self) -> _DictValueIter[K, V, dict_mutability, dict_lifetime, False]:
+        var src = self.iter.src
+        return _DictValueIter[K, V, dict_mutability, dict_lifetime, False](
+            _DictEntryIter[K, V, dict_mutability, dict_lifetime, False](
+                src[]._reserved, 0, src
+            )
+        )
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
@@ -615,7 +628,8 @@ struct Dict[K: KeyElement, V: CollectionElement](
         return Self.__iter__(self)
 
     fn values[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+        mutability: __mlir_type.`i1`,
+        self_life: AnyLifetime[mutability].type,
     ](
         self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _DictValueIter[K, V, mutability, self_life]:

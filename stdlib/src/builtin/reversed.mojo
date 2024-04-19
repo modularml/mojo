@@ -19,7 +19,7 @@ from .range import _StridedRangeIterator
 
 from collections.list import _ListIter
 
-from collections.dict import _DictKeyIter
+from collections.dict import _DictKeyIter, _DictValueIter, _DictEntryIter
 
 # ===----------------------------------------------------------------------=== #
 #  Reversible
@@ -114,6 +114,23 @@ fn reversed[
         value: The dict to get the reversed iterator of.
 
     Returns:
-        The reversed iterator of the dict.
+        The reversed iterator of the dict keys.
     """
+    return Reference(value)[].__reversed__[mutability, self_life]()
+
+
+fn reversed[
+    mutability: __mlir_type.`i1`,
+    self_life: AnyLifetime[mutability].type,
+    K: KeyElement,
+    V: CollectionElement,
+    dict_mutability: __mlir_type.`i1`,
+    dict_lifetime: AnyLifetime[dict_mutability].type,
+](
+    value: Reference[
+        _DictValueIter[K, V, dict_mutability, dict_lifetime],
+        mutability,
+        self_life,
+    ]._mlir_type,
+) -> _DictValueIter[K, V, dict_mutability, dict_lifetime, False]:
     return Reference(value)[].__reversed__[mutability, self_life]()
