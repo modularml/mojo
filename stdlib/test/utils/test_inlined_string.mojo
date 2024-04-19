@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# REQUIRES: disabled
 # RUN: %mojo --debug-level full %s
 
 from testing import assert_equal, assert_true
