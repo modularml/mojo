@@ -1308,12 +1308,50 @@ struct object(IntableRaising, Boolable, Stringable):
             self, rhs
         )
 
-    # TODO: __mod__
-    # TODO: __truediv__
-    # TODO: __floordiv__
+    @always_inline
+    fn __mod__(self, rhs: object) raises -> object:
+        """Modulo operator. Valid only for arithmetic types.
 
-    # TODO: __lshift__
-    # TODO: __rshift__
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value mod the right hand value.
+        """
+        return Self._arithmetic_binary_op[Float64.__mod__, Int64.__mod__](
+            self, rhs
+        )
+
+    @always_inline
+    fn __truediv__(self, rhs: object) raises -> object:
+        """True division operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value true divide the right hand value.
+        """
+        return Self._arithmetic_binary_op[
+            Float64.__truediv__, Int64.__truediv__
+        ](self, rhs)
+
+    @always_inline
+    fn __floordiv__(self, rhs: object) raises -> object:
+        """Floor division operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value floor divide the right hand value.
+        """
+        return Self._arithmetic_binary_op[
+            Float64.__floordiv__, Int64.__floordiv__
+        ](self, rhs)
+
+    # TODO __lshift__
+    # TODO __rshift__
 
     @always_inline
     fn __and__(self, rhs: object) raises -> object:
@@ -1387,9 +1425,32 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         self = self**rhs
 
-    # TODO: __imod__
-    # TODO: __itruediv__
-    # TODO: __ifloordiv__
+    @always_inline
+    fn __imod__(inout self, rhs: object) raises:
+        """In-place modulo operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self % rhs
+
+    @always_inline
+    fn __itruediv__(inout self, rhs: object) raises:
+        """In-place true division operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self / rhs
+
+    @always_inline
+    fn __ifloordiv__(inout self, rhs: object) raises:
+        """In-place floor division operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self // rhs
 
     # TODO: __ilshift__
     # TODO: __irshift__
@@ -1468,8 +1529,42 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         return lhs**self
 
-    # TODO: __rfloordiv__
-    # TODO: __rmod__
+    @always_inline
+    fn __rmod__(self, lhs: object) raises -> object:
+        """Reverse modulo operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value mod the right hand value.
+        """
+        return lhs % self
+
+    @always_inline
+    fn __rtruediv__(self, lhs: object) raises -> object:
+        """Reverse true division operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value divide the right hand value.
+        """
+        return lhs / self
+
+    @always_inline
+    fn __rfloordiv__(self, lhs: object) raises -> object:
+        """Reverse floor division operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value floor divide the right hand value.
+        """
+        return lhs // self
+
     # TODO: __rlshift__
     # TODO: __rrshift__
 
