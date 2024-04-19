@@ -46,7 +46,9 @@ trait Boolable:
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct Bool(Stringable, CollectionElement, Boolable, EqualityComparable):
+struct Bool(
+    Stringable, CollectionElement, Boolable, EqualityComparable, Intable
+):
     """The primitive Bool scalar value used in Mojo."""
 
     var value: __mlir_type.`!pop.scalar<bool>`
