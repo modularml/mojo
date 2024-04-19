@@ -112,6 +112,10 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         eg. by `if my_option:` or without otherwise knowing that it contains a
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
+        Parameters:
+            mutability: Indicates if the optional is mutable or immutable.
+            self_life: The lifetime policy for the optional.
+
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """
@@ -119,6 +123,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         alias RefType = Reference[T, mutability, self_life]
         var ptr = Reference(self)[]._value._get_ptr[T]().value
         return __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](ptr)
+
 
     fn take(owned self) -> T:
         """Unsafely move the value out of the Optional.
