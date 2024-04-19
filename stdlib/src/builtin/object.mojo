@@ -124,20 +124,19 @@ struct _RefCountedAttrsDict:
     directly with `x.attr`, the key will always be a `StringLiteral`.
     """
 
-    var refcount: Atomic[DType.index]
-    """The number of live references to the attribute dictionary."""
-    var impl: Dict[StringLiteral, _ObjectImpl]
+    var impl: Arc[Dict[StringLiteral, _ObjectImpl]]
     """The implementation of the map."""
 
     fn __init__(inout self):
-        self.refcount = 1
-        self.impl = Dict[StringLiteral, _ObjectImpl]()
+        self.impl = Arc[Dict[StringLiteral, _ObjectImpl]](
+            Dict[StringLiteral, _ObjectImpl]()
+        )
 
     @always_inline
     fn set(inout self, key: StringLiteral, value: _ObjectImpl) raises:
-        if key in self.impl:
-            self.impl[key].destroy()
-            self.impl[key] = value
+        if key in self.impl[]:
+            self.impl[][key].destroy()
+            self.impl[][key] = value
             return
         raise Error(
             "AttributeError: Object does not have an attribute of name '"
@@ -147,7 +146,7 @@ struct _RefCountedAttrsDict:
 
     @always_inline
     fn get(self, key: StringLiteral) raises -> _ObjectImpl:
-        var iter = self.impl.find(key)
+        var iter = self.impl[].find(key)
         if iter:
             return iter.value()
         raise Error(
@@ -193,23 +192,17 @@ struct _RefCountedAttrsDictRef:
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
-            ptr[].impl._insert(values[i].key, values[i].value._value.copy())
+            ptr[].impl[]._insert(values[i].key, values[i].value._value.copy())
 
         return Self {attrs: ptr.bitcast[Int8]()}
 
     @always_inline
     fn copy(self) -> Self:
-        _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].refcount.fetch_add(1)
+        _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
         return Self {attrs: self.attrs}
 
     fn release(self):
-        var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()
-        var prev = ptr[].refcount.fetch_sub(1)
-        if prev != 1:
-            return
-
-        # destroy the container.
-        ptr.free()
+        var ptr = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
 
 
 @register_passable("trivial")
@@ -622,7 +615,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
         var ptr = self.get_obj_attrs_ptr()
         var res = String("{")
         var print_sep = False
-        for entry in ptr[].impl.items():
+        for entry in ptr[].impl[].items():
             if print_sep:
                 res += ", "
             res += (
@@ -1715,7 +1708,7 @@ struct object(IntableRaising, Boolable, Stringable):
             _put("{")
             var ptr = self._value.get_obj_attrs_ptr()
             var k = 0
-            for entry in ptr[].impl.items():
+            for entry in ptr[].impl[].items():
                 if k != 0:
                     _put(", ")
                 _printf("'%s' = ", entry[].key)
