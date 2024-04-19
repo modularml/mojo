@@ -140,23 +140,6 @@ def test_reversed_dict():
     assert_equal(check, 10)
 
 
-def test_reversed_dict_v2():
-    var dict = Dict[String, Int]()
-    dict["a"] = 1
-    dict["b"] = 2
-    dict["c"] = 3
-    dict["d"] = 4
-    dict["a"] = 1
-
-    var keys = String("")
-    for item in reversed(dict.items()):
-        print(item[].key)
-        # keys += key[]
-
-    # assert_equal(keys, "dcba")
-
-
 def main():
     test_reversed_dict()
-    # test_reversed_dict_v2()
     test_reversed_list()
