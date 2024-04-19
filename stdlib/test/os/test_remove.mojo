@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo-no-debug %s
 
 from os import remove, unlink
 from os.path import exists
@@ -69,6 +69,10 @@ fn test_remove() raises:
     create_file_and_test_delete_string[unlink, "unlink"](my_file_name)
     create_file_and_test_delete_path[remove, "remove"](my_file_path)
     create_file_and_test_delete_path[unlink, "unlink"](my_file_path)
+
+    # test with relative path
+    my_file_name = Path("my_relative_file.test")
+    create_file_and_test_delete_string[remove, "remove"](my_file_name)
 
 
 def main():
