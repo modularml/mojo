@@ -17,11 +17,12 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import Dict, List
 from os import Atomic
-from sys.intrinsics import _mlirtype_is_eq
+from sys.intrinsics import _type_is_eq
 
 
 from memory import memcmp, memcpy, DTypePointer, Pointer
 from memory._arc import Arc
+from memory.unsafe import LegacyPointer
 
 
 from utils import StringRef, unroll
@@ -57,15 +58,19 @@ struct _ImmutableString:
     pointer and integer pair. Memory will be dynamically allocated.
     """
 
-    var data: Pointer[Int8]
+    var data: LegacyPointer[Int8]
     """The pointer to the beginning of the string contents. It is not
     null-terminated."""
     var length: Int
     """The length of the string."""
 
     @always_inline
-    fn __init__(data: Pointer[Int8], length: Int) -> Self:
-        return Self {data: data, length: length}
+    fn __init__(data: LegacyPointer[Int8], length: Int) -> Self:
+        return Self {data: data.address, length: length}
+
+    @always_inline
+    fn __init__(data: UnsafePointer[Int8], length: Int) -> Self:
+        return Self {data: data.value, length: length}
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
@@ -94,13 +99,13 @@ struct _RefCountedList:
 @register_passable("trivial")
 struct _RefCountedListRef:
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
-    var lst: Pointer[NoneType]
+    var lst: UnsafePointer[NoneType]
     """The reference to the list."""
 
     @always_inline
     fn __init__() -> Self:
-        var ptr = Pointer[_RefCountedList].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
+        var ptr = UnsafePointer[_RefCountedList].alloc(1)
+        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedList()
         return Self {lst: ptr.bitcast[NoneType]()}
 
     @always_inline
@@ -179,13 +184,13 @@ struct Attr:
 struct _RefCountedAttrsDictRef:
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     # FIXME(#12604): Distinguish this type from _RefCountedListRef.
-    var attrs: Pointer[Int8]
+    var attrs: UnsafePointer[Int8]
     """The reference to the dictionary."""
 
     @always_inline
     fn __init__(values: VariadicListMem[Attr, _, _]) -> Self:
-        var ptr = Pointer[_RefCountedAttrsDict].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
+        var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
+        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
             ptr[].impl[]._insert(values[i].key, values[i].value._value.copy())
@@ -206,14 +211,14 @@ struct _Function:
     # The MLIR function type has two arguments:
     # 1. The self value, or the single argument.
     # 2. None, or an additional argument.
-    var value: Pointer[Int16]
+    var value: UnsafePointer[Int16]
     """The function pointer."""
 
     @always_inline
     fn __init__[FnT: AnyRegType](value: FnT) -> Self:
         # FIXME: No "pointer bitcast" for signature function pointers.
-        var f = Pointer[Int16]()
-        Reference(f).get_unsafe_pointer().bitcast[FnT]().store(value)
+        var f = UnsafePointer[Int16]()
+        Reference(f).get_legacy_pointer().bitcast[FnT]().store(value)
         return Self {value: f}
 
     alias fn0 = fn () raises -> object
@@ -229,7 +234,7 @@ struct _Function:
     fn invoke(owned self) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn0]()
             .load()()
         )
@@ -238,7 +243,7 @@ struct _Function:
     fn invoke(owned self, arg0: object) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn1]()
             .load()(arg0)
         )
@@ -247,7 +252,7 @@ struct _Function:
     fn invoke(owned self, arg0: object, arg1: object) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn2]()
             .load()(arg0, arg1)
         )
@@ -258,7 +263,7 @@ struct _Function:
     ) raises -> object:
         return (
             Reference(self.value)
-            .get_unsafe_pointer()
+            .get_legacy_pointer()
             .bitcast[Self.fn3]()
             .load()(arg0, arg1, arg2)
         )
@@ -382,7 +387,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
         if self.is_str():
             var str = self.get_as_string()
             var impl = _ImmutableString(
-                Pointer[Int8].alloc(str.length), str.length
+                UnsafePointer[Int8].alloc(str.length), str.length
             )
             memcpy(impl.data, DTypePointer[DType.int8](str.data), str.length)
             return impl
@@ -577,6 +582,18 @@ struct _ObjectImpl(CollectionElement, Stringable):
         else:
             lhs = lhs.convert_int_to_float()
 
+    @staticmethod
+    fn coerce_integral_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
+        """Coerces two values of integral type to the appropriate
+        lowest-common denominator type for performing bitwise operations.
+        """
+        if lhs.is_int() == rhs.is_int():
+            return
+        if lhs.is_int():
+            rhs = rhs.convert_bool_to_int()
+        else:
+            lhs = lhs.convert_bool_to_int()
+
     fn __str__(self) -> String:
         """Returns the name (in lowercase) of the specific object type."""
         if self.is_none():
@@ -654,7 +671,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn get_obj_attrs_ptr(self) -> Pointer[_RefCountedAttrsDict]:
+    fn get_obj_attrs_ptr(self) -> UnsafePointer[_RefCountedAttrsDict]:
         return self.get_obj_attrs().attrs.bitcast[_RefCountedAttrsDict]()
 
     @always_inline
@@ -783,13 +800,13 @@ struct object(IntableRaising, Boolable, Stringable):
             value: The string value.
         """
         var impl = _ImmutableString(
-            Pointer[Int8].alloc(value.length), value.length
+            UnsafePointer[Int8].alloc(value.length), value.length
         )
         memcpy(impl.data, value.data, value.length)
         self._value = impl
 
     @always_inline
-    fn __init__[*Ts: AnyRegType](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
         """Initializes the object from a list literal.
 
         Parameters:
@@ -799,32 +816,31 @@ struct object(IntableRaising, Boolable, Stringable):
             value: The list value.
         """
         self._value = _RefCountedListRef()
-        alias types = VariadicList(Ts)
 
         @parameter
         @always_inline
         fn append[i: Int]():
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
-            alias T = types[i]
+            alias T = Ts[i]
 
             @parameter
-            if _mlirtype_is_eq[T, Int]():
+            if _type_is_eq[T, Int]():
                 self._append(value.get[i, Int]())
-            elif _mlirtype_is_eq[T, Float64]():
+            elif _type_is_eq[T, Float64]():
                 self._append(value.get[i, Float64]())
-            elif _mlirtype_is_eq[T, Bool]():
+            elif _type_is_eq[T, Bool]():
                 self._append(value.get[i, Bool]())
-            elif _mlirtype_is_eq[T, StringRef]():
+            elif _type_is_eq[T, StringRef]():
                 self._append(value.get[i, StringRef]())
-            elif _mlirtype_is_eq[T, StringLiteral]():
+            elif _type_is_eq[T, StringLiteral]():
                 self._append(value.get[i, StringLiteral]())
             else:
                 constrained[
                     False, "cannot convert nested list element to object"
                 ]()
 
-        unroll[append, len(types)]()
+        unroll[append, len(VariadicList(Ts))]()
 
     @always_inline
     fn __init__(inout self, func: Self.nullary_function):
@@ -1173,6 +1189,12 @@ struct object(IntableRaising, Boolable, Stringable):
         ):
             raise Error("TypeError: not a valid arithmetic type")
 
+    @always_inline
+    fn _arithmetic_integral_type_check(self) raises:
+        """Throws an error if the object is not an integral type."""
+        if not (self._value.is_bool() or self._value.is_int()):
+            raise Error("TypeError: not a valid integral type")
+
     @staticmethod
     @always_inline
     fn _arithmetic_binary_op[
@@ -1244,7 +1266,9 @@ struct object(IntableRaising, Boolable, Stringable):
             var lhsStr = self._value.get_as_string()
             var rhsStr = rhs._value.get_as_string()
             var length = lhsStr.length + rhsStr.length
-            var impl = _ImmutableString(Pointer[Int8].alloc(length), length)
+            var impl = _ImmutableString(
+                UnsafePointer[Int8].alloc(length), length
+            )
             memcpy(impl.data, lhsStr.data, lhsStr.length)
             memcpy(impl.data.offset(lhsStr.length), rhsStr.data, rhsStr.length)
             var result = object()
@@ -1304,12 +1328,75 @@ struct object(IntableRaising, Boolable, Stringable):
             self, rhs
         )
 
-    # TODO: __mod__
-    # TODO: __truediv__
-    # TODO: __floordiv__
+    @always_inline
+    fn __mod__(self, rhs: object) raises -> object:
+        """Modulo operator. Valid only for arithmetic types.
 
-    # TODO: __lshift__
-    # TODO: __rshift__
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value mod the right hand value.
+        """
+        return Self._arithmetic_binary_op[Float64.__mod__, Int64.__mod__](
+            self, rhs
+        )
+
+    @always_inline
+    fn __truediv__(self, rhs: object) raises -> object:
+        """True division operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value true divide the right hand value.
+        """
+        return Self._arithmetic_binary_op[
+            Float64.__truediv__, Int64.__truediv__
+        ](self, rhs)
+
+    @always_inline
+    fn __floordiv__(self, rhs: object) raises -> object:
+        """Floor division operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value floor divide the right hand value.
+        """
+        return Self._arithmetic_binary_op[
+            Float64.__floordiv__, Int64.__floordiv__
+        ](self, rhs)
+
+    @always_inline
+    fn __lshift__(self, rhs: object) raises -> object:
+        """Left shift operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value left shifted by the right hand value.
+        """
+        self._arithmetic_integral_type_check()
+        rhs._arithmetic_integral_type_check()
+        return object(self._value.get_as_int() << rhs._value.get_as_int())
+
+    @always_inline
+    fn __rshift__(self, rhs: object) raises -> object:
+        """Right shift operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value right shifted by the right hand value.
+        """
+        self._arithmetic_integral_type_check()
+        rhs._arithmetic_integral_type_check()
+        return object(self._value.get_as_int() >> rhs._value.get_as_int())
 
     @always_inline
     fn __and__(self, rhs: object) raises -> object:
@@ -1383,12 +1470,50 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         self = self**rhs
 
-    # TODO: __imod__
-    # TODO: __itruediv__
-    # TODO: __ifloordiv__
+    @always_inline
+    fn __imod__(inout self, rhs: object) raises:
+        """In-place modulo operator.
 
-    # TODO: __ilshift__
-    # TODO: __irshift__
+        Args:
+            rhs: Right hand value.
+        """
+        self = self % rhs
+
+    @always_inline
+    fn __itruediv__(inout self, rhs: object) raises:
+        """In-place true division operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self / rhs
+
+    @always_inline
+    fn __ifloordiv__(inout self, rhs: object) raises:
+        """In-place floor division operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self // rhs
+
+    @always_inline
+    fn __ilshift__(inout self, rhs: object) raises:
+        """In-place left shift operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self << rhs
+
+    @always_inline
+    fn __irshift__(inout self, rhs: object) raises:
+        """In-place right shift operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self >> rhs
 
     @always_inline
     fn __iand__(inout self, rhs: object) raises:
@@ -1464,10 +1589,65 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         return lhs**self
 
-    # TODO: __rfloordiv__
-    # TODO: __rmod__
-    # TODO: __rlshift__
-    # TODO: __rrshift__
+    @always_inline
+    fn __rmod__(self, lhs: object) raises -> object:
+        """Reverse modulo operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value mod the right hand value.
+        """
+        return lhs % self
+
+    @always_inline
+    fn __rtruediv__(self, lhs: object) raises -> object:
+        """Reverse true division operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value divide the right hand value.
+        """
+        return lhs / self
+
+    @always_inline
+    fn __rfloordiv__(self, lhs: object) raises -> object:
+        """Reverse floor division operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value floor divide the right hand value.
+        """
+        return lhs // self
+
+    @always_inline
+    fn __rlshift__(self, lhs: object) raises -> object:
+        """Reverse left shift operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value left shifted by the right hand value.
+        """
+        return lhs << self
+
+    @always_inline
+    fn __rrshift__(self, lhs: object) raises -> object:
+        """Reverse right shift operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value right shifted by the right hand value.
+        """
+        return lhs >> self
 
     @always_inline
     fn __rand__(self, lhs: object) raises -> object:
@@ -1562,7 +1742,7 @@ struct object(IntableRaising, Boolable, Stringable):
             raise Error("TypeError: can only index into lists and strings")
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
-            var impl = _ImmutableString(Pointer[Int8].alloc(1), 1)
+            var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
             impl.data.store(
                 self._value.get_as_string().data.offset(index).load()
             )
@@ -1698,7 +1878,7 @@ struct object(IntableRaising, Boolable, Stringable):
                 object(self._value.get_list_element(j)).print()
             _put("]")
         elif self._value.is_func():
-            _printf("function at %p", self._value.get_as_func().value.address)
+            _printf("function at %p", self._value.get_as_func().value)
         else:
             _put("{")
             var ptr = self._value.get_obj_attrs_ptr()

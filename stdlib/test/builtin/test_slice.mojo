@@ -10,18 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo-no-debug %s
 
-from testing import assert_equal, assert_false
+from testing import assert_equal, assert_false, assert_true
 
 
-# CHECK-LABEL: test_none_end_folds
-fn test_none_end_folds():
-    print("== test_none_end_folds")
+def test_none_end_folds():
     alias all_def_slice = slice(0, None, 1)
-    #      CHECK: 0
-    # CHECK-SAME: 1
-    print(all_def_slice.start, all_def_slice.end, all_def_slice.step)
+    assert_equal(all_def_slice.start, 0)
+    assert_true(all_def_slice.end, Int.MAX)
+    assert_equal(all_def_slice.step, 1)
 
 
 # This requires parameter inference of StartT.
@@ -43,31 +41,25 @@ struct Slicable:
     fn __init__(inout self):
         pass
 
-    fn __getitem__(self, a: FunnySlice) -> Int:
-        print(a.upper)
-        print(a.stride)
-        return a.start
+    fn __getitem__(self, a: FunnySlice) -> FunnySlice:
+        return a
 
-    fn __getitem__(self, a: BoringSlice) -> String:
-        print(a.a)
-        print(a.b)
-        return a.c
+    fn __getitem__(self, a: BoringSlice) -> BoringSlice:
+        return a
 
 
 def test_slicable():
-    # CHECK: Slicable
-    print("Slicable")
     var slicable = Slicable()
 
-    # CHECK: hello
-    # CHECK: 4.0
-    # CHECK: 1
-    print(slicable[1:"hello":4.0])
+    var new_slice = slicable[1:"hello":4.0]
+    assert_equal(new_slice.start, 1)
+    assert_equal(new_slice.upper, "hello")
+    assert_equal(new_slice.stride, 4.0)
 
-    # CHECK: 1
-    # CHECK: 2
-    # CHECK: foo
-    print(slicable[1:2:"foo"])
+    var boring_slice = slicable[1:2:"foo"]
+    assert_equal(boring_slice.a, 1)
+    assert_equal(boring_slice.b, 2)
+    assert_equal(boring_slice.c, "foo")
 
 
 def test_has_end():

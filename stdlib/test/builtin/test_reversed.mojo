@@ -10,18 +10,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
-# Test for https://github.com/modularml/mojo/issues/1004
+# RUN: %mojo -debug-level full %s
 
 from testing import assert_equal
 
 
-fn foo(x: String) raises:
-    raise Error("Failed on: " + x)
+def test_reversed_list():
+    var list = List[Int](1, 2, 3, 4, 5, 6)
+    var check: Int = 6
+
+    for item in reversed(list):
+        assert_equal(item[], check, "item[], check")
+        check -= 1
 
 
 def main():
-    try:
-        foo("Hello")
-    except e:
-        assert_equal(str(e), "Failed on: Hello")
+    test_reversed_list()

@@ -142,7 +142,7 @@ struct DType(Stringable, KeyElement):
     @staticmethod
     fn _from_ui8(ui8: __mlir_type.`!pop.scalar<ui8>`) -> DType:
         return DType._from_ui8(
-            __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.`ui8`](ui8)
+            __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.ui8](ui8)
         )
 
     @always_inline("nodebug")
@@ -332,6 +332,24 @@ struct DType(Stringable, KeyElement):
             True if the DType is Index and False otherwise.
         """
         return self.isa[DType.index]()
+
+    @always_inline("nodebug")
+    fn is_index32(self) -> Bool:
+        """Checks if this DType is Index and 32 bit.
+
+        Returns:
+            True if this DType is Index and 32 bit, False otherwise.
+        """
+        return self.is_index() and (self.sizeof() == DType.int32.sizeof())
+
+    @always_inline("nodebug")
+    fn is_index64(self) -> Bool:
+        """Checks if this DType is Index and 64 bit.
+
+        Returns:
+            True if this DType is Index and 64 bit, False otherwise.
+        """
+        return self.is_index() and (self.sizeof() == DType.int64.sizeof())
 
     @always_inline("nodebug")
     fn is_address(self) -> Bool:

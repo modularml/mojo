@@ -10,11 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo-no-debug %s
 
 from random import randn_float64
 from sys import has_neon
-
 from testing import assert_equal, assert_almost_equal
 
 
@@ -35,24 +34,27 @@ def test_methods():
     assert_almost_equal(BFloat16(2.0), 2.0)
 
 
-fn test_bf_primitives():
+def test_bf_primitives():
     # we have to use dynamic values, otherwise these get evaled at compile time.
     var a = randn_float64().cast[DType.bfloat16]()
     var b = randn_float64().cast[DType.bfloat16]()
 
-    print(a + b)
-    print(a - b)
-    print(a / b)
-    print(a * b)
-    print(a == b)
-    print(a != b)
-    print(a <= b)
-    print(a >= b)
+    # higher precision
+    var a_hp = a.cast[DType.float64]()
+    var b_hp = b.cast[DType.float64]()
+
+    assert_almost_equal(a + b, (a_hp + b_hp).cast[DType.bfloat16]())
+    assert_almost_equal(a - b, (a_hp - b_hp).cast[DType.bfloat16]())
+    assert_almost_equal(a / b, (a_hp / b_hp).cast[DType.bfloat16]())
+    assert_almost_equal(a * b, (a_hp * b_hp).cast[DType.bfloat16]())
+    assert_equal(a == b, a_hp == b_hp)
+    assert_equal(a != b, a_hp != b_hp)
+    assert_equal(a <= b, a_hp <= b_hp)
+    assert_equal(a >= b, a_hp >= b_hp)
 
 
-def main():
-    # CHECK: 33.0
-    print(
+def check_float64_values():
+    assert_equal(
         Float64(
             __mlir_op.`pop.cast`[_type = __mlir_type[`!pop.scalar<f64>`]](
                 __mlir_op.`kgen.param.constant`[
@@ -60,20 +62,29 @@ def main():
                     value = __mlir_attr[`#pop.simd<"33"> : !pop.scalar<bf16>`],
                 ]()
             )
-        )
+        ),
+        Float64(33.0),
     )
 
-    # CHECK: nan
-    print(
-        Float64(
-            __mlir_op.`pop.cast`[_type = __mlir_type[`!pop.scalar<f64>`]](
-                __mlir_op.`kgen.param.constant`[
-                    _type = __mlir_type[`!pop.scalar<bf16>`],
-                    value = __mlir_attr[`#pop.simd<"nan"> : !pop.scalar<bf16>`],
-                ]()
+    assert_equal(
+        str(
+            Float64(
+                __mlir_op.`pop.cast`[_type = __mlir_type[`!pop.scalar<f64>`]](
+                    __mlir_op.`kgen.param.constant`[
+                        _type = __mlir_type[`!pop.scalar<bf16>`],
+                        value = __mlir_attr[
+                            `#pop.simd<"nan"> : !pop.scalar<bf16>`
+                        ],
+                    ]()
+                )
             )
-        )
+        ),
+        "nan",
     )
+
+
+def main():
+    check_float64_values()
 
     # TODO re-enable this test when we sort out BF16 support for graviton3 #30525
     @parameter
