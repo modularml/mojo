@@ -14,7 +14,7 @@
 # COM: TODO (17471): Not all aarch64 have neon, so we need to guard against that,
 # for now just require apple-silicon.
 # REQUIRES: apple-silicon
-# RUN: %mojo -debug-level %s
+# RUN: %mojo %s
 
 from sys import alignof, has_avx512f, has_neon, simdbitwidth
 from testing import assert_false, assert_true, assert_equal
