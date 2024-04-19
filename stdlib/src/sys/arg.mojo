@@ -22,7 +22,7 @@ from sys import argv
 
 from sys import external_call
 
-from memory.unsafe_pointer import UnsafePointer
+from memory import UnsafePointer
 
 from utils import StringRef
 

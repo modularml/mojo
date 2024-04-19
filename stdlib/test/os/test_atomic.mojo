@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from os.atomic import Atomic
+from os import Atomic
 from testing import assert_equal, assert_true, assert_false
 
 

@@ -15,7 +15,7 @@
 You can import these APIs from the `python` package. For example:
 
 ```mojo
-from python.object import PythonObject
+from python import PythonObject
 ```
 """
 

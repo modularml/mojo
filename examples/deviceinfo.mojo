@@ -18,6 +18,10 @@ from sys.info import (
     _current_cpu,
     _current_target,
     _triple_attr,
+)
+
+
+from sys import (
     os_is_linux,
     os_is_macos,
     os_is_windows,

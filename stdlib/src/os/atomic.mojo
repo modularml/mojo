@@ -15,12 +15,12 @@
 You can import these APIs from the `os` package. For example:
 
 ```mojo
-from os.atomic import Atomic
+from os import Atomic
 ```
 """
 
 from builtin.dtype import _integral_type_of
-from memory.unsafe import Pointer, bitcast
+from memory import Pointer, bitcast
 
 
 struct Atomic[type: DType]:
