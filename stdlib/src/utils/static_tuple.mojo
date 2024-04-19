@@ -328,7 +328,11 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
     @always_inline
     fn __init__(inout self, *, fill: Self.ElementType):
-        """Constructs an empty (undefined) array."""
+        """Constructs an empty array where each element is the supplied `fill`.
+
+        Args:
+            fill: The element to fill each index.
+        """
         _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
