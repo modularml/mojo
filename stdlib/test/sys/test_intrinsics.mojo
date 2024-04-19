@@ -24,7 +24,7 @@ from memory.unsafe import DTypePointer
 from testing import assert_equal
 
 
-def test_strided_load():
+fn test_strided_load() raises:
     alias size = 16
     var vector = DTypePointer[DType.float32]().alloc(size)
 

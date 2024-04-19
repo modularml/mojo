@@ -20,6 +20,8 @@ from python.python import Python, _get_global_python_itf, PythonObject
 
 from testing import assert_equal
 
+from testing import assert_equal
+
 alias TEST_DIR = env_get_string["TEST_DIR"]()
 
 

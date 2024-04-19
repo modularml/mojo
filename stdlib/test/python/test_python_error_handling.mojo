@@ -20,6 +20,8 @@ from python._cpython import CPython, PyObjectPtr
 
 from testing import assert_equal, assert_raises
 
+from testing import assert_equal, assert_raises
+
 alias TEST_DIR = env_get_string["TEST_DIR"]()
 
 
