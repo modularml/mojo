@@ -133,4 +133,44 @@ fn reversed[
         self_life,
     ]._mlir_type,
 ) -> _DictValueIter[K, V, dict_mutability, dict_lifetime, False]:
+    """Get a reversed iterator of the input dict values.
+
+    **Note**: iterators are currently non-raising.
+
+    Args:
+        value: The dict values to get the reversed iterator of.
+
+    Returns:
+        The reversed iterator of the dict values.
+    """
     return Reference(value)[].__reversed__[mutability, self_life]()
+
+
+fn reversed[
+    mutability: __mlir_type.`i1`,
+    self_life: AnyLifetime[mutability].type,
+    K: KeyElement,
+    V: CollectionElement,
+    dict_mutability: __mlir_type.`i1`,
+    dict_lifetime: AnyLifetime[dict_mutability].type,
+](
+    value: Reference[
+        _DictEntryIter[K, V, dict_mutability, dict_lifetime],
+        mutability,
+        self_life,
+    ]._mlir_type,
+) -> _DictEntryIter[K, V, dict_mutability, dict_lifetime, False]:
+    """Get a reversed iterator of the input dict items.
+
+    **Note**: iterators are currently non-raising.
+
+    Args:
+        value: The dict items to get the reversed iterator of.
+
+    Returns:
+        The reversed iterator of the dict items.
+    """
+    var src = Reference(value)[].src
+    return _DictEntryIter[K, V, dict_mutability, dict_lifetime, False](
+        src[]._reserved, 0, src
+    )

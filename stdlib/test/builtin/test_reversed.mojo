@@ -43,6 +43,15 @@ def test_reversed_dict():
         assert_equal(val[], check)
         check -= 1
 
+    keys = String("")
+    check = 4
+    for item in reversed(dict.items()):
+        keys += item[].key
+        assert_equal(item[].value, check)
+        check -= 1
+
+    assert_equal(keys, "dcba")
+
     # Order preserved
 
     _ = dict.pop("a")
@@ -66,6 +75,15 @@ def test_reversed_dict():
         assert_equal(val[], check)
         check -= 2
 
+    keys = String("")
+    check = 4
+    for item in reversed(dict.items()):
+        keys += item[].key
+        assert_equal(item[].value, check)
+        check -= 2
+
+    assert_equal(keys, "db")
+
     # Empty dict is iterable
 
     _ = dict.pop("b")
@@ -82,6 +100,15 @@ def test_reversed_dict():
         # values is empty, should not reach here
         check += 1
 
+    assert_equal(check, 0)
+
+    keys = String("")
+    check = 0
+    for item in reversed(dict.items()):
+        keys += item[].key
+        check += item[].value
+
+    assert_equal(keys, "")
     assert_equal(check, 0)
 
     # Refill dict
@@ -103,7 +130,33 @@ def test_reversed_dict():
 
     assert_equal(check, 10)
 
+    keys = String("")
+    check = 0
+    for item in reversed(dict.items()):
+        keys += item[].key
+        check += item[].value
+
+    assert_equal(keys, "ebad")
+    assert_equal(check, 10)
+
+
+def test_reversed_dict_v2():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+    dict["c"] = 3
+    dict["d"] = 4
+    dict["a"] = 1
+
+    var keys = String("")
+    for item in reversed(dict.items()):
+        print(item[].key)
+        # keys += key[]
+
+    # assert_equal(keys, "dcba")
+
 
 def main():
     test_reversed_dict()
+    # test_reversed_dict_v2()
     test_reversed_list()
