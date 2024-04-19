@@ -185,7 +185,7 @@ struct _DictValueIter[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](self) -> _DictValueIter[K, V, dict_mutability, dict_lifetime, False]:
         var src = self.iter.src
-        return _DictValueIter[K, V, dict_mutability, dict_lifetime, False](
+        return _DictValueIter(
             _DictEntryIter[K, V, dict_mutability, dict_lifetime, False](
                 src[]._reserved, 0, src
             )
