@@ -112,6 +112,10 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         eg. by `if my_option:` or without otherwise knowing that it contains a
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
+        Parameters:
+            mutability: Indicates if the optional is mutable or immutable.
+            self_life: The lifetime policy for the optional.
+
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """

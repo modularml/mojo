@@ -90,7 +90,12 @@ fn reversed[
     Args:
         value: The list to get the reversed iterator of.
 
+    Parameters:
+        mutability: Indicates if the list is mutable or immutable.
+        self_life: The lifetime policy for the list.
+        T: The type of elements contained in the list.
+
     Returns:
-        The reversed iterator of the list.
+        _ListIter: The reversed iterator of the list.
     """
     return Reference(value)[].__reversed__[mutability, self_life]()
