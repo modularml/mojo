@@ -16,7 +16,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import List
+from collections import List, Optional
+from utils.inlined_string import _ArrayMem
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -61,31 +62,41 @@ fn _abs(x: SIMD) -> __type_of(x):
     return (x > 0).select(x, -x)
 
 
-fn _format_int[
-    T: Intable
-](
-    value: T,
+fn _format_int(
+    value: Int64,
     radix: Int = 10,
-    digit_chars: String = _DEFAULT_DIGIT_CHARS,
-    prefix: String = "",
+    digit_chars: StringLiteral = _DEFAULT_DIGIT_CHARS,
+    prefix: StringLiteral = "",
 ) raises -> String:
-    var buf = List[Int8]()
+    var string = String()
+    var fmt = string._unsafe_to_formatter()
 
-    _write_int(buf, value, radix, digit_chars, prefix)
+    _write_int(fmt, value, radix, digit_chars, prefix)
 
-    return String._from_bytes(buf^)
+    return string^
 
 
 @always_inline
-fn _write_int[
-    T: Intable
-](
-    inout fmt: List[Int8],
-    value0: T,
+fn _write_int(
+    inout fmt: Formatter,
+    value: Int64,
     radix: Int = 10,
-    digit_chars: String = _DEFAULT_DIGIT_CHARS,
-    prefix: String = "",
+    digit_chars: StringLiteral = _DEFAULT_DIGIT_CHARS,
+    prefix: StringLiteral = "",
 ) raises:
+    var err = _try_write_int(fmt, value, radix, digit_chars, prefix)
+    if err:
+        raise err.value()
+
+
+@always_inline
+fn _try_write_int(
+    inout fmt: Formatter,
+    value: Int64,
+    radix: Int = 10,
+    digit_chars: StringLiteral = _DEFAULT_DIGIT_CHARS,
+    prefix: StringLiteral = "",
+) -> Optional[Error]:
     """Writes a formatted string representation of the given integer using the specified radix.
 
     The maximum supported radix is 36 unless a custom `digit_chars` mapping is
@@ -97,16 +108,16 @@ fn _write_int[
     #
 
     if radix < 2:
-        raise Error("Unable to format integer to string with radix < 2")
+        return Error("Unable to format integer to string with radix < 2")
 
     if radix > len(digit_chars):
-        raise Error(
+        return Error(
             "Unable to format integer to string when provided radix is larger "
             "than length of available digit value characters"
         )
 
     if not len(digit_chars) >= 2:
-        raise Error(
+        return Error(
             "Unable to format integer to string when provided digit_chars"
             " mapping len is not >= 2"
         )
@@ -115,46 +126,83 @@ fn _write_int[
     # Process the integer value into its corresponding digits
     #
 
-    var value = Int64(int(value0))
-
     # TODO(#26444, Unicode support): Get an array of Character, not bytes.
-    var digit_chars_array = digit_chars._as_ptr()
+    var digit_chars_array = digit_chars.data()
 
     # Prefix a '-' if the original int was negative and make positive.
     if value < 0:
-        fmt.append(ord("-"))
+        fmt.write_str("-")
 
     # Add the custom number prefix, e.g. "0x" commonly used for hex numbers.
     # This comes *after* the minus sign, if present.
-    fmt.extend(prefix.as_bytes())
+    fmt.write_str(prefix)
 
     if value == 0:
-        fmt.append(digit_chars_array[0])
+        var zero = StringRef(digit_chars_array, 1)
+        fmt.write_str(zero)
         return
 
-    var first_digit_pos = len(fmt)
+    #
+    # Create a buffer to store the formatted value
+    #
+
+    # Stack allocate enough bytes to store any formatted 64-bit integer
+    alias CAPACITY: Int = 64
+
+    var buf = _ArrayMem[Int8, CAPACITY]()
+
+    # Start the buf pointer at the end. We will write the least-significant
+    # digits later in the buffer, and then decrement the pointer to move
+    # earlier in the buffer as we write the more-significant digits.
+    var offset = CAPACITY - 1
+
+    #
+    # Write the digits of the number
+    #
 
     var remaining_int = value
+
+    @parameter
+    fn process_digits[get_digit_value: fn () capturing -> Int64]():
+        while remaining_int:
+            var digit_value = get_digit_value()
+
+            # Write the char representing the value of the least significant
+            # digit.
+            buf[offset] = digit_chars_array[digit_value]
+
+            # Position the offset to write the next digit.
+            offset -= 1
+
+            # Drop the least significant digit
+            remaining_int /= radix
+
     if remaining_int >= 0:
-        while remaining_int:
-            var digit_value = remaining_int % radix
 
-            # Push the char representing the value of the least significant digit
-            fmt.append(digit_chars_array[digit_value])
+        @parameter
+        fn pos_digit_value() -> Int64:
+            return remaining_int % radix
 
-            # Drop the least significant digit
-            remaining_int /= radix
+        process_digits[pos_digit_value]()
     else:
-        while remaining_int:
-            var digit_value = _abs(remaining_int % -radix)
 
-            # Push the char representing the value of the least significant digit
-            fmt.append(digit_chars_array[digit_value])
+        @parameter
+        fn neg_digit_value() -> Int64:
+            return _abs(remaining_int % -radix)
 
-            # Drop the least significant digit
-            remaining_int /= radix
+        process_digits[neg_digit_value]()
 
-    # We pushed the digits with least significant digits coming first, but
-    # the number should have least significant digits at the end, so reverse
-    # the order of the digit characters in the string.
-    fmt._reverse(start=first_digit_pos)
+    # Re-add +1 byte since the loop ended so we didn't write another char.
+    offset += 1
+
+    var buf_ptr = buf.as_ptr() + offset
+
+    # Calculate the length of the buffer we've filled. This is the number of
+    # bytes from our final `buf_ptr` to the end of the buffer.
+    var len = CAPACITY - offset
+
+    var strref = StringRef(rebind[Pointer[Int8]](buf_ptr), len)
+
+    fmt.write_str(strref)
+
+    return None
