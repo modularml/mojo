@@ -105,6 +105,11 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
     }
 
 
+# ===------------------------------------------------------------------------===#
+# SIMD
+# ===------------------------------------------------------------------------===#
+
+
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct SIMD[type: DType, size: Int = simdwidthof[type]()](
@@ -2514,11 +2519,6 @@ fn _neginf[type: DType]() -> Scalar[type]:
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
-fn _is_32_bit_system() -> Bool:
-    return sizeof[DType.index]() == sizeof[DType.int32]()
-
-
 @always_inline
 fn _max_finite[type: DType]() -> Scalar[type]:
     """Returns the maximum finite value of type.
@@ -2540,13 +2540,11 @@ fn _max_finite[type: DType]() -> Scalar[type]:
         return 32767
     elif type == DType.uint16:
         return 65535
-    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
+    elif type == DType.int32 or type.is_index32():
         return 2147483647
     elif type == DType.uint32:
         return 4294967295
-    elif type == DType.int64 or (
-        type == DType.index and not _is_32_bit_system()
-    ):
+    elif type == DType.int64 or type.is_index64():
         return 9223372036854775807
     elif type == DType.uint64:
         return 18446744073709551615
@@ -2587,11 +2585,9 @@ fn _min_finite[type: DType]() -> Scalar[type]:
         return -128
     elif type == DType.int16:
         return -32768
-    elif type == DType.int32 or (type == DType.index and _is_32_bit_system()):
+    elif type == DType.int32 or type.is_index32():
         return -2147483648
-    elif type == DType.int64 or (
-        type == DType.index and not _is_32_bit_system()
-    ):
+    elif type == DType.int64 or type.is_index64():
         return -9223372036854775808
     elif type.is_floating_point():
         return -_max_finite[type]()
