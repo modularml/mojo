@@ -365,6 +365,10 @@ struct String(
         Args:
             impl: The buffer.
         """
+        debug_assert(
+            impl[-1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
         self._buffer = impl^
 
     @always_inline
