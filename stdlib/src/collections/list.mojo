@@ -416,8 +416,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             earlier_idx += 1
             later_idx -= 1
 
-    @always_inline
-    fn index(self, owned value: T, start: Int = 0) raises -> Int:
+    # TODO: Modify these to regular methods when issue 1876 is resolved
+    @staticmethod
+    fn index[C: ComparableCollectionElement](self: List[C], owned value: C, start: Int = 0) raises -> Int:
         """Returns the index of the first occurrence of a value in a list; raises Error if not found."""
         var normalized_start = self.size + start if start < 0 else start
         var normalized_end = self.size
@@ -430,15 +431,15 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
             # could degrade the performance of the List.index method if it were to replace the current implementation,
             # as it would essentially perform the same loop twice.
-            if ((self.data + i).bitcast[T]()[]) == value:
+            if ((self.data + i).bitcast[C]()[]) == value:
                 ret_val = i
                 break
         else:
             raise "Value does not exist in the list."
         return ret_val
 
-    @always_inline
-    fn index(self, owned value: T, start: Int, end: Int) raises -> Int:
+    @staticmethod
+    fn index[C: ComparableCollectionElement](self: List[C], owned value: C, start: Int, end: Int) raises -> Int:
         """Returns the index of the first occurrence of a value in a list; raises Error if not found."""
         var normalized_start = (self.size + start) if start < 0 else start
         var normalized_end = (self.size + end) if end < 0 else (self.size if end > self.size else end)
@@ -451,7 +452,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
             # could degrade the performance of the List.index method if it were to replace the current implementation,
             # as it would essentially perform the same loop twice.
-            if ((self.data + i).bitcast[T]()[]) == value:
+            if ((self.data + i).bitcast[C]()[]) == value:
                 ret_val = i
                 break
         else:
