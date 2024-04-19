@@ -681,6 +681,19 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return mod + mask.select(rhs, Self(0))
 
     @always_inline("nodebug")
+    fn __rmod__(self, value: Self) -> Self:
+        """Returns `value mod self`.
+
+        Args:
+            value: The other value.
+
+        Returns:
+            `value mod self`.
+        """
+        constrained[type.is_numeric(), "the type must be numeric"]()
+        return value % self
+
+    @always_inline("nodebug")
     fn __pow__(self, rhs: Int) -> Self:
         """Computes the vector raised to the power of the input integer value.
 
