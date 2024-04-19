@@ -323,14 +323,14 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     alias type = __mlir_type[
         `!pop.array<`, size.value, `, `, Self.ElementType, `>`
     ]
-    var array: Self.type
+    var _array: Self.type
     """The underlying storage for the array."""
 
     @always_inline
     fn __init__(inout self, *, fill: Self.ElementType):
         """Constructs an empty (undefined) array."""
         _static_tuple_construction_checks[size]()
-        self.array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
         @unroll
         for i in range(size):
@@ -346,7 +346,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         """
         debug_assert(len(elems) == size, "Elements must be of length size")
         _static_tuple_construction_checks[size]()
-        self.array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
         @unroll
         for i in range(size):
@@ -374,7 +374,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Users should opt for `__refitem__` instead of this method.
         """
         var ptr = __mlir_op.`pop.array.gep`(
-            Reference(Reference(self)[].array).get_legacy_pointer().address,
+            Reference(Reference(self)[]._array).get_legacy_pointer().address,
             index.value,
         )
         return Reference[Self.ElementType, mutability, self_life](
