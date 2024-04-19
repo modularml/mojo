@@ -15,7 +15,7 @@
 from testing import assert_equal, assert_false, assert_true
 
 from utils import StaticTuple, StaticIntTuple
-from utils.static_tuple import Array
+from utils.static_tuple import InlineArray
 
 
 def test_static_tuple():
@@ -82,9 +82,7 @@ def test_tuple_literal():
 
 
 def test_array_int():
-    var arr = Array[Int, 3](0, 0, 0)
-    for i in range(len(arr)):
-        print(arr[i])
+    var arr = InlineArray[Int, 3](0, 0, 0)
 
     assert_equal(arr[0], 0)
     assert_equal(arr[1], 0)
@@ -98,6 +96,10 @@ def test_array_int():
     assert_equal(arr[1], 2)
     assert_equal(arr[2], 3)
 
+    # test negative indexing
+    assert_equal(arr[-1], 3)
+    assert_equal(arr[-2], 2)
+
     var copy = arr
     assert_equal(arr[0], copy[0])
     assert_equal(arr[1], copy[1])
@@ -110,13 +112,13 @@ def test_array_int():
 
 
 def test_array_str():
-    var arr = Array[String, 3]("hi", "hello", "hey")
+    var arr = InlineArray[String, 3]("hi", "hello", "hey")
 
     assert_equal(arr[0], "hi")
     assert_equal(arr[1], "hello")
     assert_equal(arr[2], "hey")
 
-    # Test mutating a tuple through its __refitem__
+    # Test mutating an array through its __refitem__
     arr[0] = "howdy"
     arr[1] = "morning"
     arr[2] = "wazzup"
@@ -125,12 +127,9 @@ def test_array_str():
     assert_equal(arr[1], "morning")
     assert_equal(arr[2], "wazzup")
 
-    var ptr = arr.as_ptr()
-    ptr[0] = "good morning"
-    ptr[1] = "good evening"
-
-    assert_equal(arr[0], "good morning")
-    assert_equal(arr[1], "good evening")
+    # test negative indexing
+    assert_equal(arr[-1], "wazzup")
+    assert_equal(arr[-2], "morning")
 
     var copy = arr
     assert_equal(arr[0], copy[0])
