@@ -15,14 +15,14 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections.dict import KeyElement
+from collections import KeyElement
 
 from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
 
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils.index import StaticIntTuple
+from utils import StaticIntTuple
 from utils._format import Formattable, Formatter
 from utils.inlined_string import _ArrayMem
 

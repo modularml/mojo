@@ -12,10 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys.info import sizeof
+from sys import sizeof
 
-from memory import memcmp, memcpy, memset_zero
-from memory.unsafe import DTypePointer, Pointer
+from memory import memcmp, memcpy, memset_zero, DTypePointer, Pointer
 from utils._numerics import nan
 from testing import (
     assert_almost_equal,
@@ -24,7 +23,7 @@ from testing import (
     assert_true,
 )
 
-from utils.index import Index
+from utils import Index
 
 alias void = __mlir_attr.`#kgen.dtype.constant<invalid> : !kgen.dtype`
 alias int8_pop = __mlir_type.`!pop.scalar<si8>`

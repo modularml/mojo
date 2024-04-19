@@ -23,8 +23,7 @@ print(3 == p.get())
 ```
 """
 
-from memory.unsafe_pointer import UnsafePointer
-from memory.memory import stack_allocation
+from memory import UnsafePointer, stack_allocation
 
 
 struct _ArcInner[T: Movable]:

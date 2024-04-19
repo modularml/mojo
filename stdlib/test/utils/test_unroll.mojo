@@ -12,8 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s | FileCheck %s
 
-from utils.index import StaticIntTuple
-from utils.loop import unroll
+from utils import StaticIntTuple, unroll
 
 
 # CHECK-LABEL: test_unroll
