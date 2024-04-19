@@ -20,6 +20,7 @@ from collections import KeyElement
 from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
+from builtin.hex import _try_write_int
 
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils import StaticIntTuple
@@ -308,30 +309,39 @@ struct Int(Intable, Stringable, KeyElement, Boolable, Formattable):
             writer: The formatter to write to.
         """
 
-        # Stack allocate enough bytes to store any formatted 64-bit integer
-        alias size: Int = 32
+        @parameter
+        if triple_is_nvidia_cuda():
+            var err = _try_write_int(writer, Int64(self))
+            if err:
+                abort(
+                    "unreachable: unexpected write int failure condition: "
+                    + str(err.value())
+                )
+        else:
+            # Stack allocate enough bytes to store any formatted 64-bit integer
+            alias size: Int = 32
 
-        var buf = _ArrayMem[Int8, size]()
+            var buf = _ArrayMem[Int8, size]()
 
-        # Format the integer to the local byte array
-        var len = _snprintf(
-            rebind[UnsafePointer[Int8]](buf.as_ptr()),
-            size,
-            "%li",
-            self.value,
-        )
+            # Format the integer to the local byte array
+            var len = _snprintf(
+                rebind[UnsafePointer[Int8]](buf.as_ptr()),
+                size,
+                "%li",
+                self.value,
+            )
 
-        # Create a StringRef that does NOT include the NUL terminator written
-        # to the buffer.
-        #
-        # Write the formatted integer to the formatter.
-        #
-        # SAFETY:
-        #   `buf` is kept alive long enough for the use of this StringRef.
-        writer.write_str(StringRef(buf.as_ptr(), len))
+            # Create a StringRef that does NOT include the NUL terminator written
+            # to the buffer.
+            #
+            # Write the formatted integer to the formatter.
+            #
+            # SAFETY:
+            #   `buf` is kept alive long enough for the use of this StringRef.
+            writer.write_str(StringRef(buf.as_ptr(), len))
 
-        # Keep buf alive until we've finished with the StringRef
-        _ = buf^
+            # Keep buf alive until we've finished with the StringRef
+            _ = buf^
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:

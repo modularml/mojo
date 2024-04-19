@@ -319,20 +319,28 @@ fn _put(x: StringRef):
     if not str_len:
         return
 
-    alias MAX_STR_LEN = 0x1000_0000
+    @parameter
+    if triple_is_nvidia_cuda():
+        var tmp = 0
+        var arg_ptr = Pointer.address_of(tmp)
+        _ = external_call["vprintf", Int32](
+            x.data, arg_ptr.bitcast[Pointer[NoneType]]()
+        )
+    else:
+        alias MAX_STR_LEN = 0x1000_0000
 
-    # The string can be printed, so that's fine.
-    if str_len < MAX_STR_LEN:
-        _printf("%.*s", x.length, x.data)
-        return
+        # The string can be printed, so that's fine.
+        if str_len < MAX_STR_LEN:
+            _printf("%.*s", x.length, x.data)
+            return
 
-    # The string is large, then we need to chunk it.
-    var p = x.data
-    while str_len:
-        var ll = _min(str_len, MAX_STR_LEN)
-        _printf("%.*s", ll, p)
-        str_len -= ll
-        p += ll
+        # The string is large, then we need to chunk it.
+        var p = x.data
+        while str_len:
+            var ll = _min(str_len, MAX_STR_LEN)
+            _printf("%.*s", ll, p)
+            str_len -= ll
+            p += ll
 
 
 @no_inline
@@ -451,5 +459,8 @@ fn _print_fmt[
 
     write_to(writer, end)
 
-    if flush:
-        _flush()
+    # TODO: What is a flush function that works on CUDA?
+    @parameter
+    if not triple_is_nvidia_cuda():
+        if flush:
+            _flush()
