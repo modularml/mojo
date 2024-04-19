@@ -246,7 +246,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             var earlier_ptr = self.data + earlier_idx
             var later_ptr = self.data + later_idx
 
-            var tmp = __get_address_as_owned_value(earlier_ptr.value)
+            var tmp = move_from_pointee(earlier_ptr)
             move_pointee(src=later_ptr, dst=earlier_ptr)
             initialize_pointee(later_ptr, tmp^)
 
