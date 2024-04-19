@@ -10,10 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s | FileCheck %s
+# RUN: %mojo %s
 
 from sys.info import os_is_windows
 from time import now, sleep, time_function
+from testing import assert_true
 
 
 @always_inline
@@ -46,42 +47,30 @@ fn time_capturing_function(iters: Int) -> Int:
     return time_function[time_fn]()
 
 
-# CHECK-LABEL: test_time
-fn test_time():
-    print("== test_time")
-
+fn test_time() raises:
     alias ns_per_sec = 1_000_000_000
 
-    # CHECK: True
-    print(now() > 0)
+    assert_true(now() > 0)
 
     var t1 = time_function[time_me]()
-    # CHECK: True
-    print(t1 > 1 * ns_per_sec)
-    # CHECK: True
-    print(t1 < 10 * ns_per_sec)
+    assert_true(t1 > 1 * ns_per_sec)
+    assert_true(t1 < 10 * ns_per_sec)
 
     var t2 = time_templated_function[DType.float32]()
-    # CHECK: True
-    print(t2 > 1 * ns_per_sec)
-    # CHECK: True
-    print(t2 < 10 * ns_per_sec)
+    assert_true(t2 > 1 * ns_per_sec)
+    assert_true(t2 < 10 * ns_per_sec)
 
     var t3 = time_capturing_function(42)
-    # CHECK: True
-    print(t3 > 1 * ns_per_sec)
-    # CHECK: True
-    print(t3 < 10 * ns_per_sec)
+    assert_true(t3 > 1 * ns_per_sec)
+    assert_true(t3 < 10 * ns_per_sec)
 
     # test now() directly since time_function doesn't use now on windows
     var t4 = now()
     time_me()
     var t5 = now()
-    # CHECK: True
-    print((t5 - t4) > 1 * ns_per_sec)
-    # CHECK: True
-    print((t5 - t4) < 10 * ns_per_sec)
+    assert_true((t5 - t4) > 1 * ns_per_sec)
+    assert_true((t5 - t4) < 10 * ns_per_sec)
 
 
-fn main():
+def main():
     test_time()
