@@ -88,6 +88,8 @@ what we publish.
 
 - `Atomic` is now movable.
 
+- `Dict` and `List` are both `Boolable` now.
+
 - `atol` now handles whitespaces so `int(String( " 10 "))` gives back `10`
   instead of raising an error.
 
