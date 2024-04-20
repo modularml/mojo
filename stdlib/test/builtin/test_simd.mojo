@@ -657,6 +657,10 @@ def test_mul_with_overflow():
     )
 
 
+def test_uint32_max():
+    assert_equal(str(UInt32.MAX), "4294967295")
+
+
 def main():
     test_cast()
     test_simd_variadic()
@@ -674,3 +678,4 @@ def main():
     test_add_with_overflow()
     test_sub_with_overflow()
     test_mul_with_overflow()
+    test_uint32_max()

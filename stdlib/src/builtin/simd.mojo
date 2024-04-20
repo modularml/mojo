@@ -513,7 +513,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             rebind[Scalar[type]](self).value
         )
 
-    @always_inline
+    # @always_inline
     fn __str__(self) -> String:
         """Get the SIMD as a string.
 
