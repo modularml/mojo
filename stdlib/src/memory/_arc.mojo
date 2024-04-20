@@ -147,11 +147,8 @@ struct Arc[T: Movable](CollectionElement):
         Returns:
             A Reference to the managed value.
         """
-        alias RefType = Reference[T, mutability, lifetime]
-        return RefType(
-            __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](
-                Reference(self)[]._data_ptr().address
-            )
+        return Reference[T, mutability, lifetime]._unsafe_from_pointer(
+            Reference(self)[]._data_ptr()
         )
 
     fn _data_ptr(self) -> UnsafePointer[T]:
