@@ -72,6 +72,8 @@ what we publish.
     By default, `List.pop()` removes the last element in the list.
   - `resize(new_size)` for resizing the list without the need to
     specify an additional value.
+  - `insert(index, value)` for inserting a value at a specified index
+    into the `List`.
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
 
