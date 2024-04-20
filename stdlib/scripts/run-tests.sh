@@ -23,6 +23,12 @@ mkdir -p "${BUILD_DIR}"
 
 source "${SCRIPT_DIR}"/build-stdlib.sh
 
+echo "Validating API documentation strings in the Standard Library."
+mojo doc validate "${REPO_ROOT}/stdlib/src" || {
+    echo "Documentation validation failed. Please check the API documentation strings."
+    exit 1
+}
+
 echo "Packaging up the test_utils."
 TEST_UTILS_PATH="${REPO_ROOT}/stdlib/test/test_utils"
 mojo package "${TEST_UTILS_PATH}" -o "${BUILD_DIR}/test_utils.mojopkg"
