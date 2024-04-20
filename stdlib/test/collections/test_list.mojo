@@ -352,38 +352,38 @@ def test_list_index():
     var test_list_a = List[Int](10,20,30,40,50)
     
     # Basic Functionality Tests
-    assert_equal(__type_of(test_list_a).index(test_list_a, 10), 0)  # Verify finding the first element's index.
-    assert_equal(__type_of(test_list_a).index(test_list_a, 30), 2)  # Verify finding the index of a middle element.
-    assert_equal(__type_of(test_list_a).index(test_list_a, 50), 4)  # Verify finding the last element's index.
-    with assert_raises(contains="Value does not exist in the list."):  # Verify error for a non-existent element.
+    assert_equal(__type_of(test_list_a).index(test_list_a, 10), 0)
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30), 2)
+    assert_equal(__type_of(test_list_a).index(test_list_a, 50), 4)
+    with assert_raises(contains="Value does not exist in the list."):
         _ = __type_of(test_list_a).index(test_list_a, 60)
 
     # Tests With Start Parameter
-    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=1), 2)  # Verify search beginning from a specific start index.
-    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=-4), 2)  # Verify element search with a negative start index.
-    with assert_raises(contains="Value does not exist in the list."):  # Verify error when start is after element's index.
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=1), 2)
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=-4), 2)
+    with assert_raises(contains="Value does not exist in the list."):
         _ = __type_of(test_list_a).index(test_list_a, 30, start=3)
-    with assert_raises(contains="Given 'start' parameter (5) is out of range. List only have 5 elements."):  # Verify error when start is out of range.
+    with assert_raises(contains="Given 'start' parameter (5) is out of range. List only have 5 elements."):
         _ = __type_of(test_list_a).index(test_list_a, 30, start=5)
 
     # Tests With Start and End Parameters
-    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=1, end=3), 2)  # Verify finding an element within a specified range.
-    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=-4, end=-2), 2)  # Verify search with negative start and end indices.
-    with assert_raises(contains="Value does not exist in the list."):  # Verify error when element is outside the range.
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=1, end=3), 2)
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=-4, end=-2), 2)
+    with assert_raises(contains="Value does not exist in the list."):
         _ = __type_of(test_list_a).index(test_list_a, 30, start=1, end=2)
-    with assert_raises(contains="Value does not exist in the list."):  # Verify error with an invalid range (start > end).
+    with assert_raises(contains="Value does not exist in the list."):
         _ = __type_of(test_list_a).index(test_list_a, 30, start=3, end=1)
 
     # Edge Cases and Special Conditions
-    assert_equal(__type_of(test_list_a).index(test_list_a, 10, start=-5, end=-1), 0)  # Verify search covers the entire list with negative indices.
-    assert_equal(__type_of(test_list_a).index(test_list_a, 10, start=0, end=50), 0)  # Verify acceptable out-of-range end value.
-    with assert_raises(contains="Value does not exist in the list."):  # Verify error when last element is excluded by end index.
+    assert_equal(__type_of(test_list_a).index(test_list_a, 10, start=-5, end=-1), 0)
+    assert_equal(__type_of(test_list_a).index(test_list_a, 10, start=0, end=50), 0)
+    with assert_raises(contains="Value does not exist in the list."):
         _ = __type_of(test_list_a).index(test_list_a, 50, start=-5, end=-1)
-    with assert_raises(contains="Value does not exist in the list."):  # Verify error when search excludes the last item with -1 as end index.
+    with assert_raises(contains="Value does not exist in the list."):
         _ = __type_of(test_list_a).index(test_list_a, 50, start=0, end=-1)
-    with assert_raises(contains="Value does not exist in the list."):  # Verify error when element is not within the negative indexed range.
+    with assert_raises(contains="Value does not exist in the list."):
         _ = __type_of(test_list_a).index(test_list_a, 10, start=-4, end=-1)
-    with assert_raises(contains="Given 'start' parameter (5) is out of range. List only have 5 elements."):  # Verify error when start value is out-of-range.
+    with assert_raises(contains="Given 'start' parameter (5) is out of range. List only have 5 elements."):
         _ = __type_of(test_list_a).index(test_list_a, 10, start=5, end=50)
     
     # Verify error when list is empty.
@@ -394,21 +394,21 @@ def test_list_index():
     var test_list_b = List[Int](10, 20, 30, 20, 10)
 
     # Test finding the first occurrence of an item
-    assert_equal(__type_of(test_list_b).index(test_list_b, 10), 0)  # Verify first occurrence of '10'.
-    assert_equal(__type_of(test_list_b).index(test_list_b, 20), 1)  # Verify first occurrence of '20'.
+    assert_equal(__type_of(test_list_b).index(test_list_b, 10), 0)
+    assert_equal(__type_of(test_list_b).index(test_list_b, 20), 1)
 
     # Test skipping the first occurrence with a start parameter
-    assert_equal(__type_of(test_list_b).index(test_list_b, 20, start=2), 3)  # Skip first '20', find second.
+    assert_equal(__type_of(test_list_b).index(test_list_b, 20, start=2), 3)
 
     # Test constraining search with start and end, excluding last occurrence
-    with assert_raises(contains="Value does not exist in the list."):  # '10' at end is excluded, expecting an error.
+    with assert_raises(contains="Value does not exist in the list."):
         _ = __type_of(test_list_b).index(test_list_b, 10, start=1, end=4)
 
     # Test search within a range that includes multiple occurrences
-    assert_equal(__type_of(test_list_b).index(test_list_b, 20, start=1, end=4), 1)  # Range includes two '20's, finds first in range.
+    assert_equal(__type_of(test_list_b).index(test_list_b, 20, start=1, end=4), 1)
 
     # Verify error when constrained range excludes occurrences
-    with assert_raises(contains="Value does not exist in the list."):  # No '20' in the given range.
+    with assert_raises(contains="Value does not exist in the list."):
         _ = __type_of(test_list_b).index(test_list_b, 20, start=4, end=5)
 
 
