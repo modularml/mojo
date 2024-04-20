@@ -109,6 +109,9 @@ what we publish.
   low-level logic but isn't designed for general usability and will likely
   change in the future.
 
+- The `testing.assert_equal[SIMD]()` now raises if any of the elements
+  mismatch in the two `SIMD` arguments being compared.
+
 - The `testing.assert_almost_equal` and `math.isclose` functions now have an
   `equal_nan` flag. When set to True, then NaNs are considered equal.
 
