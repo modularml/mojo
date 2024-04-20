@@ -418,7 +418,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     # TODO: Modify this to be regular method when issue 1876 is resolved
     @staticmethod
-    fn index[C: ComparableCollectionElement](self: List[C], owned value: C, start: Int, end: Optional[Int] = None) raises -> Int:
+    fn index[C: ComparableCollectionElement](self: List[C], owned value: C, start: Int = 0, end: Optional[Int] = None) raises -> Int:
         """Returns the index of the first occurrence of a value in a list; raises Error if not found."""
         var normalized_start = (self.size + start) if start < 0 else start
         var normalized_end = self.size if end is None else (self.size + end if end < 0 else (self.size if end > self.size else end))
