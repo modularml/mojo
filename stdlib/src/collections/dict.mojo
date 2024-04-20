@@ -45,6 +45,14 @@ trait KeyElement(CollectionElement, Hashable, EqualityComparable):
     pass
 
 
+trait StringableKeyElement(KeyElement, Stringable):
+    pass
+
+
+trait StringableCollectionElement(CollectionElement, Stringable):
+    pass
+
+
 @value
 struct _DictEntryIter[
     K: KeyElement,
@@ -498,6 +506,62 @@ struct Dict[K: KeyElement, V: CollectionElement](
             `False` if the dictionary is empty, `True` if there is at least one element.
         """
         return len(self).__bool__()
+
+    @staticmethod
+    fn __str__[
+        T: StringableKeyElement, U: StringableCollectionElement
+    ](self: Dict[T, U]) -> String:
+        """Returns a string representation of a `Dict`.
+
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_dict = Dict[Int, Float64]()
+        my_dict[1] = 1.1
+        my_dict[2] = 2.2
+        dict_as_string = __type_of(my_dict).__str__(my_dict)
+        print(dict_as_string)
+        # prints "{1: 1.1, 2: 2.2}"
+        ```
+
+        When the compiler supports conditional methods, then a simple `str(my_dict)` will
+        be enough.
+
+        Args:
+            self: The Dict to represent as a string.
+
+        Parameters:
+            T: The type of the keys in the Dict. Must implement the
+              traits `Stringable` and `KeyElement`.
+            U: The type of the values in the Dict. Must implement the
+                traits `Stringable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the Dict.
+        """
+        var minimum_capacity = self._minimum_size_of_string_representation()
+        var result = String(List[Int8](capacity=minimum_capacity))
+        result += "{"
+
+        var i = 0
+        for key_value in self.items():
+            result += str(key_value[].key) + ": " + str(key_value[].value)
+            if i < len(self) - 1:
+                result += ", "
+            i += 1
+        result += "}"
+        return result
+
+    fn _minimum_size_of_string_representation(self) -> Int:
+        # we do a rough estimation of the minimum number of chars that we'll see
+        # in the string representation, we assume that str(key) and str(value)
+        # will be both at least one char.
+        return (
+            2  # '{' and '}'
+            + len(self) * 6  # str(key), str(value) ": " and ", "
+            - 2  # remove the last ", "
+        )
 
     fn find(self, key: K) -> Optional[V]:
         """Find a value in the dictionary by key.
