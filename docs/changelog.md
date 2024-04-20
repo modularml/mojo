@@ -67,9 +67,11 @@ what we publish.
       print(d)  # prints `{'foo': [1, 2, 'something else'], 7: 'bar'}`
   ```
 
-- `List` now has a `pop(index)` API for removing an element
-  at a particular index.  By default, `List.pop()` removes the last element
-  in the list.
+- `List` now has several new methods:
+  - `pop(index)` for removing an element at a particular index.  
+    By default, `List.pop()` removes the last element in the list.
+  - `resize(new_size)` for resizing the list without the need to
+    specify an additional value.
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
 
