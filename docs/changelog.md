@@ -103,6 +103,10 @@ what we publish.
 
 - `bool(None)` is now implemented.
 
+- The `DTypePointer` type now implements `gather` for gathering a `SIMD`
+  vector from offsets of a current pointer.  Similarly, support for `scatter`
+  was added to scatter a `SIMD` vector into offsets of the current pointer.
+
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
   initialization status of the underlying value.  This is useful in very
