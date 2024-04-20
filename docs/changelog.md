@@ -141,6 +141,23 @@ what we publish.
 
   Note that variadic keyword parameters are not supported yet.
 
+- The `__getitem__`/`__getattr__` and related methods can now take indices as
+  parameter values instead of argument values.  This is enabled when defining
+  these as taking no arguments other than 'self' and the set value in a setter.
+  This enables types that can only be subscript into with parameters, as well
+  as things like:
+
+  ```mojo
+   struct RGB:
+     fn __getattr__[name: StringLiteral](self) -> Int:
+       @parameter
+       if name == "r":   return ...
+       elif name == "g": return ...
+       else:
+         constrained[name == "b", "can only access with r, g, or b members"]()
+         return ...
+    ```
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
