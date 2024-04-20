@@ -582,7 +582,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(__type_of_(my_list).__str__(my_list))
+        print(__type_of(my_list).__str__(my_list))
         ```
 
         When the compiler supports conditional methods, then a simple `str(my_list)` will
