@@ -185,8 +185,8 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         # Convert to an immortal mut reference, which conforms to self_life.
         return UnsafePointer(elt_kgen_ptr)[]
 
-    # TODO: Remove the get methods in favor of __refitem__ some day.  This will
-    # be annoying if we don't have autoderef though.
+    # TODO(#38268): Remove this method when references and parameter expressions
+    # cooperate better.  We can't handle the use in test_simd without this.
     @always_inline("nodebug")
     fn get[i: Int, T: CollectionElement](self) -> T:
         """Get a tuple element and rebind to the specified type.
