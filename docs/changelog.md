@@ -91,6 +91,8 @@ what we publish.
 - `atol` now handles whitespaces so `int(String( " 10 "))` gives back `10`
   instead of raising an error.
 
+- `SIMD` now implements `__rmod__`.
+
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
   initialization status of the underlying value.  This is useful in very
