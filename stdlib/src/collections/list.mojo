@@ -23,7 +23,7 @@ from collections import List
 from builtin.value import StringableCollectionElement
 from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
-
+from .optional import Optional
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -416,33 +416,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             earlier_idx += 1
             later_idx -= 1
 
-    # TODO: Modify these to regular methods when issue 1876 is resolved
+    # TODO: Modify this to be regular method when issue 1876 is resolved
     @staticmethod
-    fn index[C: ComparableCollectionElement](self: List[C], owned value: C, start: Int = 0) raises -> Int:
-        """Returns the index of the first occurrence of a value in a list; raises Error if not found."""
-        var normalized_start = self.size + start if start < 0 else start
-        var normalized_end = self.size
-
-        if not self.size: raise "Cannot find index of a value in an empty list."
-        if normalized_start >= self.size: raise "Given 'start' parameter (" + String(normalized_start) + ") is out of range. List only has " + String(self.size) + " elements."
-
-        var ret_val: Int
-        for i in range(normalized_start, normalized_end):
-            # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
-            # could degrade the performance of the List.index method if it were to replace the current implementation,
-            # as it would essentially perform the same loop twice.
-            if ((self.data + i).bitcast[C]()[]) == value:
-                ret_val = i
-                break
-        else:
-            raise "Value does not exist in the list."
-        return ret_val
-
-    @staticmethod
-    fn index[C: ComparableCollectionElement](self: List[C], owned value: C, start: Int, end: Int) raises -> Int:
+    fn index[C: ComparableCollectionElement](self: List[C], owned value: C, start: Int, end: Optional[Int] = None) raises -> Int:
         """Returns the index of the first occurrence of a value in a list; raises Error if not found."""
         var normalized_start = (self.size + start) if start < 0 else start
-        var normalized_end = (self.size + end) if end < 0 else (self.size if end > self.size else end)
+        var normalized_end = self.size if end is None else (self.size + end if end < 0 else (self.size if end > self.size else end))
 
         if not self.size: raise "Cannot find index of a value in an empty list."
         if normalized_start >= self.size: raise "Given 'start' parameter (" + String(normalized_start) + ") is out of range. List only has " + String(self.size) + " elements."
