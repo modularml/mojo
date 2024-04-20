@@ -220,6 +220,10 @@ struct Reference[
     var value: Self._mlir_type
     """The underlying MLIR reference."""
 
+    # ===------------------------------------------------------------------===#
+    # Initializers
+    # ===------------------------------------------------------------------===#
+
     @always_inline("nodebug")
     fn __init__(inout self, value: Self._mlir_type):
         """Constructs a Reference from the MLIR reference.
@@ -228,6 +232,21 @@ struct Reference[
             value: The MLIR reference.
         """
         self.value = value
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn _unsafe_from_pointer(
+        ptr: UnsafePointer[type, address_space],
+    ) -> Reference[type, is_mutable, lifetime, address_space]:
+        return Reference(
+            __mlir_op.`lit.ref.from_pointer`[_type = Self._mlir_type](
+                ptr.address
+            )
+        )
+
+    # ===------------------------------------------------------------------===#
+    # Operator dunders
+    # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __refitem__(self) -> Self._mlir_type:
@@ -246,6 +265,10 @@ struct Reference[
             The MLIR reference for the Mojo compiler to use.
         """
         return self.value
+
+    # ===------------------------------------------------------------------===#
+    # Methods
+    # ===------------------------------------------------------------------===#
 
     # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
     # disagreement.  Use UnsafePointer instead!

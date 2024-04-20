@@ -521,9 +521,10 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # This means we can't just use `UnsafePointer.__refitem__` here
         # because the mutability won't match.
         var base_ptr = Reference(self)[].data
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life]._mlir_type
-        ]((base_ptr + normalized_idx).address)
+        var offset_ptr = base_ptr + normalized_idx
+        return Reference[T, mutability, self_life]._unsafe_from_pointer(
+            offset_ptr
+        )
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
