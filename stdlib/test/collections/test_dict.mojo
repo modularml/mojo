@@ -273,6 +273,7 @@ def test_dict_update_empty_new():
     assert_equal(orig["b"], 2)
     assert_equal(len(orig), 2)
 
+
 @value
 struct DummyKey(KeyElement):
     var value: Int
@@ -286,10 +287,17 @@ struct DummyKey(KeyElement):
     fn __ne__(self, other: DummyKey) -> Bool:
         return self.value != other.value
 
+
 def test_probing_error():
     var keys = List(
-        7005684093727295727, 2833576045803927472, -446534169874157203, -5597438459201014662, 
-        -7007119737006385570, 7237741981002255125, -649171104678427962, -6981562940350531355,
+        7005684093727295727,
+        2833576045803927472,
+        -446534169874157203,
+        -5597438459201014662,
+        -7007119737006385570,
+        7237741981002255125,
+        -649171104678427962,
+        -6981562940350531355,
     )
     var d = Dict[DummyKey, Int]()
     for i in range(len(keys)):
