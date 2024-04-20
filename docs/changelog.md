@@ -107,6 +107,9 @@ what we publish.
   vector from offsets of a current pointer.  Similarly, support for `scatter`
   was added to scatter a `SIMD` vector into offsets of the current pointer.
 
+- The `len` function for unary `range` with negative end values has been fixed
+  so that things like `len(range(-1))` work correctly now.
+
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
   initialization status of the underlying value.  This is useful in very
