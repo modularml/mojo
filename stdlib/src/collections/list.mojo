@@ -22,6 +22,7 @@ from collections import List
 
 from memory.unsafe_pointer import *
 from memory import Reference, UnsafePointer
+from builtin.value import StringableCollectionElement
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -83,10 +84,6 @@ struct _ListIter[
             return len(self.src[]) - self.index
         else:
             return self.index
-
-
-trait StringableCollectionElement(Stringable, CollectionElement):
-    pass
 
 
 struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
