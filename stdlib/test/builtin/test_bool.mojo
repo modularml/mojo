@@ -29,6 +29,12 @@ def test_bool_none():
     assert_equal(bool(test), False)
 
 
+def test_bool_to_string():
+    assert_equal(str(True), "True")
+    assert_equal(str(False), "False")
+
+
 def main():
     test_bool_cast_to_int()
     test_bool_none()
+    test_bool_to_string()
