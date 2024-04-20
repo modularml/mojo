@@ -79,6 +79,12 @@ what we publish.
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
 
+- `Set` now has named methods for set operations:
+  - `Set.difference()` mapping to `-`
+  - `Set.difference_update()` mapping to `-=`
+  - `Set.intersection_update()` mapping to `&=`
+  - `Set.update()` mapping to `|=`
+
 - `String` now has `removeprefix()` and `removesuffix()` methods.
 
 - `Optional` now implements `__is__` and `__isnot__` methods so that you can compare
