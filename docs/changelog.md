@@ -80,6 +80,8 @@ what we publish.
 
 - The `ord` and `chr` functions have been improved to accept any Unicode character.
 
+- `Atomic` is now movable.
+
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
   initialization status of the underlying value.  This is useful in very
