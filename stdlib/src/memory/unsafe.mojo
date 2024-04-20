@@ -289,8 +289,8 @@ struct LegacyPointer[
         )
 
     @always_inline("nodebug")
-    fn __getitem__[T: Intable](self, offset: T) -> type:
-        """Loads the value the LegacyPointer object points to with the given offset.
+    fn __refitem__[T: Intable](self, offset: T) -> Self._mlir_ref_type:
+        """Enable subscript syntax `ref[idx]` to access the element.
 
         Parameters:
             T: The Intable type of the offset.
@@ -299,23 +299,9 @@ struct LegacyPointer[
             offset: The offset to load from.
 
         Returns:
-            The loaded value.
+            The MLIR reference for the Mojo compiler to use.
         """
-        return self.load(offset)
-
-    @always_inline("nodebug")
-    fn __setitem__[T: Intable](self, offset: T, val: type):
-        """Stores the specified value to the location the LegacyPointer object points
-        to with the given offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        return self.store(offset, val)
+        return (self + offset).__refitem__()
 
     # ===------------------------------------------------------------------=== #
     # Load/Store
