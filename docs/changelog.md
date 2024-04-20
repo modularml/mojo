@@ -74,6 +74,8 @@ what we publish.
     specify an additional value.
   - `insert(index, value)` for inserting a value at a specified index
     into the `List`.
+  - constructor from `(ptr, size, capacity)` to to avoid needing to do a deep
+    copy of an existing contiguous memory allocation when constructing a new `List`.
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
 
