@@ -173,9 +173,9 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     ]:
         # Return a reference to an element at the specified index, propagating
         # mutability of self.
-        var storage_kgen_ptr = Reference(
+        var storage_kgen_ptr = UnsafePointer.address_of(
             Reference(self_lit)[].storage
-        ).get_legacy_pointer().address
+        ).address
 
         # KGenPointer to the element.
         var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](
@@ -198,31 +198,3 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             The tuple element at the requested index.
         """
         return rebind[T](self[i])
-
-    @staticmethod
-    fn _offset[i: Int]() -> Int:
-        constrained[i >= 0, "index must be positive"]()
-
-        @parameter
-        if i == 0:
-            return 0
-        else:
-            return _align_up(
-                Self._offset[i - 1]()
-                + _align_up(
-                    sizeof[element_types[i - 1]](),
-                    alignof[element_types[i - 1]](),
-                ),
-                alignof[element_types[i]](),
-            )
-
-
-# ===----------------------------------------------------------------------=== #
-# Utilities
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _align_up(value: Int, alignment: Int) -> Int:
-    var div_ceil = (value + alignment - 1)._positive_div(alignment)
-    return div_ceil * alignment
