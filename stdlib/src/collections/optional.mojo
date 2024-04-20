@@ -124,7 +124,6 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         var ptr = Reference(self)[]._value._get_ptr[T]().value
         return __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](ptr)
 
-
     fn take(owned self) -> T:
         """Unsafely move the value out of the Optional.
 

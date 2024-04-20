@@ -39,4 +39,11 @@ STDLIB_PACKAGE_NAME="stdlib.mojopkg"
 FULL_STDLIB_PACKAGE_PATH="${BUILD_DIR}"/"${STDLIB_PACKAGE_NAME}"
 mojo package "${STDLIB_PATH}" -o "${FULL_STDLIB_PACKAGE_PATH}"
 
+echo "Validating API documentation strings in the Standard Library."
+
+mojo doc validate "${STDLIB_PATH}" || {
+    echo "Documentation validation failed. Please check the API documentation strings."
+    exit 1
+}
+
 echo Successfully created "${FULL_STDLIB_PACKAGE_PATH}"

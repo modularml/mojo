@@ -96,6 +96,6 @@ fn reversed[
         T: The type of elements contained in the list.
 
     Returns:
-        _ListIter: The reversed iterator of the list.
+        The reversed iterator of the list.
     """
     return Reference(value)[].__reversed__[mutability, self_life]()
