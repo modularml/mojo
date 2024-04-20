@@ -101,6 +101,8 @@ what we publish.
 
 - `SIMD` now implements `__rmod__`.
 
+- `bool(None)` is now implemented.
+
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
   initialization status of the underlying value.  This is useful in very
