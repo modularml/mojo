@@ -76,7 +76,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             # TODO: We could be fancier and take the values out of an owned
             # pack. For now just keep everything simple and copy the element.
             initialize_pointee(
-                UnsafePointer(self._refitem__[idx]()),
+                UnsafePointer(self[idx]),
                 storage.get_element[idx]()[],
             )
 
@@ -89,7 +89,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         # trivial and won't do anything.
         @parameter
         fn destroy_elt[idx: Int]():
-            destroy_pointee(UnsafePointer(self._refitem__[idx]()))
+            destroy_pointee(UnsafePointer(self[idx]))
 
         unroll[destroy_elt, Self.__len__()]()
 
@@ -107,10 +107,10 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            var existing_elt_ptr = UnsafePointer(existing._refitem__[idx]())
+            var existing_elt_ptr = UnsafePointer(existing[idx])
 
             initialize_pointee(
-                UnsafePointer(self._refitem__[idx]()),
+                UnsafePointer(self[idx]),
                 __get_address_as_owned_value(existing_elt_ptr.address),
             )
 
@@ -131,8 +131,8 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         @parameter
         fn initialize_elt[idx: Int]():
             initialize_pointee(
-                UnsafePointer(self._refitem__[idx]()),
-                existing._refitem__[idx]()[],
+                UnsafePointer(self[idx]),
+                existing[idx],
             )
 
         unroll[initialize_elt, Self.__len__()]()
@@ -164,9 +164,8 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         """
         return Self.__len__()
 
-    # TODO: Mojo's small brain can't handle a __refitem__ like this yet.
     @always_inline("nodebug")
-    fn _refitem__[
+    fn __refitem__[
         idx: Int,
         mutability: __mlir_type.i1,
         self_life: AnyLifetime[mutability].type,
@@ -199,19 +198,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         Returns:
             The tuple element at the requested index.
         """
-        return rebind[T](self.get[i]())
-
-    @always_inline("nodebug")
-    fn get[i: Int](self) -> element_types[i.value]:
-        """Get a tuple element.
-
-        Parameters:
-            i: The element index.
-
-        Returns:
-            The tuple element at the requested index.
-        """
-        return self._refitem__[i]()[]
+        return rebind[T](self[i])
 
     @staticmethod
     fn _offset[i: Int]() -> Int:

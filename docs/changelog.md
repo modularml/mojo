@@ -16,10 +16,10 @@ what we publish.
 
 ### 🔥 Legendary
 
-- Tuple now works with memory-only element types like String.  Also, `Tuple.get`
-  now supports a form that just takes an element index but does not
-  require you to specify the result type.  Instead of `tup.get[1, Int]()` you
-  can now just use `tup.get[1]()`.
+- Tuple now works with memory-only element types like String and allows you to
+  directly index into it with a parameter exprssion.  This means you can now
+  simply use `x = tup[1]` like Python instead of `x = tup.get[1, Int]()`.  You
+  can also assign into tuple elements now as well with `tup[1] = x`.
 
 ### ⭐️ New
 
