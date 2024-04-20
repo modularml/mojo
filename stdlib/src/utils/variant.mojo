@@ -313,9 +313,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             The internal data represented as a `Reference[T]`.
         """
         debug_assert(Reference(self)[].isa[T](), "get: wrong variant type")
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life]._mlir_type
-        ](Reference(self)[]._get_ptr[T]().address)
+        return Reference[T, mutability, self_life]._unsafe_from_pointer(
+            Reference(self)[]._get_ptr[T]()
+        )
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:
