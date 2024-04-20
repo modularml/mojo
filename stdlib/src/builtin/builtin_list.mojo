@@ -65,7 +65,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         Returns:
             The element at the given index.
         """
-        return self.storage.get[i, T]()
+        return rebind[T](self.storage[i])
 
 
 # ===----------------------------------------------------------------------===#
