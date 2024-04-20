@@ -431,12 +431,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
             # could degrade the performance of the List.index method if it were to replace the current implementation,
             # as it would essentially perform the same loop twice.
-            if ((self.data + i).bitcast[C]()[]) == value:
-                ret_val = i
-                break
-        else:
-            raise "Value does not exist in the list."
-        return ret_val
+            if self[i] == value:
+                return i
+        raise "ValueError: Given element is not in list"
 
     fn clear(inout self):
         """Clears the elements in the list."""
