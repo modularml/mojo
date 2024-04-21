@@ -10,9 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# TODO(37393): Reenabl once we debug why we are depending on some debug behavior
-# on graviton.
-# REQUIRES: Disabled
 # RUN: %mojo %s
 
 from builtin.string import (
