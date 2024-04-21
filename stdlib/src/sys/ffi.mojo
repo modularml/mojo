@@ -169,6 +169,19 @@ fn _get_global[
 
 
 @always_inline
+fn _get_global[
+    name: StringLiteral,
+    init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
+    destroy_fn: fn (UnsafePointer[NoneType]) -> None,
+](
+    payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()
+) -> UnsafePointer[NoneType]:
+    return external_call[
+        "KGEN_CompilerRT_GetGlobalOrCreate", UnsafePointer[NoneType]
+    ](StringRef(name), payload, init_fn, destroy_fn)
+
+
+@always_inline
 fn _get_global_or_null[name: StringLiteral]() -> Pointer[NoneType]:
     return external_call["KGEN_CompilerRT_GetGlobalOrNull", Pointer[NoneType]](
         StringRef(name)
