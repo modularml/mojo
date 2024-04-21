@@ -131,9 +131,7 @@ fn _set_array_elem_mem[
 @always_inline
 fn _create_array_mem[
     size: Int, type: CollectionElement
-](lst: VariadicList[type]) -> __mlir_type[
-    `!pop.array<`, size.value, `, `, type, `>`
-]:
+](*lst: type) -> __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]:
     """Sets the array element at position `index` with the value `val`.
 
     Parameters:

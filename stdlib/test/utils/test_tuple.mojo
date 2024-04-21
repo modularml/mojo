@@ -14,8 +14,7 @@
 
 from testing import assert_equal, assert_false, assert_true
 
-from utils import StaticTuple, StaticIntTuple
-from utils.static_tuple import InlineArray
+from utils import StaticTuple, StaticIntTuple, InlineArray
 
 
 def test_static_tuple():
