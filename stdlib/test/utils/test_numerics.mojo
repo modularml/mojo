@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from utils._numerics import FPUtils
+from utils._numerics import FPUtils, inf, isinf
 from testing import assert_equal, assert_true, assert_false
 
 alias FPU64 = FPUtils[DType.float64]
@@ -45,5 +45,19 @@ fn test_numerics() raises:
     assert_equal(FPU64.get_mantissa(FPU64.pack(True, 6, 12)), 12)
 
 
+fn test_inf() raises:
+    @parameter
+    fn _test_inf[type: DType]() raises:
+        var val = inf[type]()
+        var msg = "`test_inf` failed for `type == " + str(type) + "`"
+        assert_true((val > 0.0) & isinf(val), msg=msg)
+
+    _test_inf[DType.float16]()
+    _test_inf[DType.bfloat16]()
+    _test_inf[DType.float32]()
+    _test_inf[DType.float64]()
+
+
 def main():
     test_numerics()
+    test_inf()
