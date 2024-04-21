@@ -515,16 +515,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if i < 0:
             normalized_idx += Reference(self)[].size
 
-        # Mutability gets set to the local mutability of this
-        # pointer value, ie. because we defined it with `let` it's now an
-        # "immutable" reference regardless of the mutability of `self`.
-        # This means we can't just use `UnsafePointer.__refitem__` here
-        # because the mutability won't match.
-        var base_ptr = Reference(self)[].data
-        var offset_ptr = base_ptr + normalized_idx
-        return Reference[T, mutability, self_life]._unsafe_from_pointer(
-            offset_ptr
-        )
+        var offset_ptr = Reference(self)[].data + normalized_idx
+        return offset_ptr[]
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type

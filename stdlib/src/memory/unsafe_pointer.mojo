@@ -325,7 +325,9 @@ struct UnsafePointer[
         Returns:
             A reference to the value.
         """
-        return Self._ref_type._unsafe_from_pointer(self).value
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Self._ref_type._mlir_type
+        ](self.address)
 
     @always_inline
     fn __refitem__(self, offset: Int) -> Self._ref_type._mlir_type:
