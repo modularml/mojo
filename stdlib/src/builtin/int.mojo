@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 
 from builtin.hash import _hash_simd
-from builtin.string import _calc_initial_buffer_size, atol
+from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
 from builtin.hex import _try_write_int
 
@@ -165,17 +165,21 @@ fn int[T: IntableRaising](value: T) raises -> Int:
 
 
 fn int(value: String, base: Int = 10) raises -> Int:
-    """Get the Int representation of the string.
+    """Parses the given string as an integer in the given base and returns that value.
+
+    For example, `atol("19")` returns `19`. If the given string cannot be parsed
+    as an integer value, an error is raised. For example, `atol("hi")` raises an
+    error.
+
+    If base is 0 the the string is parsed as an Integer literal,
+    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
 
     Args:
-        value: The string to get the integral representation of.
-        base: Base used for conversion, value must be between 2 and 36.
+        value: A string to be parsed as an integer in the given base.
+        base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
-        The integral representation of the value.
-
-    Raises:
-        If the type does not have an integral representation.
+        An integer value that represents the string, or otherwise raises.
     """
     return atol(value, base)
 

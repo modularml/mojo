@@ -231,6 +231,7 @@ fn test_atol() raises:
     assert_equal(-89, atol(String("-89")))
     assert_equal(-52, atol(String(" -52")))
     assert_equal(-69, atol(String(" -69  ")))
+    assert_equal(1_100_200, atol(" 1_100_200"))
 
     # other bases
     assert_equal(10, atol("A", 16))
@@ -241,31 +242,93 @@ fn test_atol() raises:
 
     # Negative cases
     with assert_raises(
-        contains="String is not convertible to integer with base 10."
+        contains="String is not convertible to integer with base 10: '9.03'"
     ):
         _ = atol(String("9.03"))
 
-    with assert_raises(contains="String is not convertible to integer."):
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: ' 10 1'"
+    ):
         _ = atol(String(" 10 1"))
 
+    # start/end with underscore double underscores
     with assert_raises(
-        contains="String is not convertible to integer with base 5."
+        contains="String is not convertible to integer with base 10: '5__5'"
+    ):
+        _ = atol("5__5")
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: ' _5'"
+    ):
+        _ = atol(" _5")
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: '5_'"
+    ):
+        _ = atol("5_")
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 5: '5'"
     ):
         _ = atol("5", 5)
 
-    with assert_raises(contains="Base must be between 2 and 36 included."):
+    with assert_raises(contains="Base must be >= 2 and <= 36, or 0."):
         _ = atol("0", 1)
 
-    with assert_raises(contains="Base must be between 2 and 36 included."):
+    with assert_raises(contains="Base must be >= 2 and <= 36, or 0."):
         _ = atol("0", 37)
 
-    with assert_raises(contains="Empty String cannot be converted to integer."):
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: ''"
+    ):
         _ = atol(String(""))
 
     with assert_raises(
         contains="String expresses an integer too large to store in Int."
     ):
         _ = atol(String("9223372036854775832"))
+
+
+fn test_atol_base_0() raises:
+    assert_equal(155, atol(" 155", base=0))
+    assert_equal(155_155, atol("155_155 ", base=0))
+
+    assert_equal(0, atol(" 0000", base=0))
+    assert_equal(0, atol(" 000_000", base=0))
+
+    assert_equal(3, atol("0b11", base=0))
+    assert_equal(3, atol("0B1_1", base=0))
+
+    assert_equal(63, atol("0o77", base=0))
+    assert_equal(63, atol(" 0O7_7 ", base=0))
+
+    assert_equal(17, atol("0x11", base=0))
+    assert_equal(17, atol("0X1_1", base=0))
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '00100'"
+    ):
+        _ = atol("00100", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '0r100'"
+    ):
+        _ = atol("0r100", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '0b_0'"
+    ):
+        _ = atol("0b_0", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '0xf__f'"
+    ):
+        _ = atol("0xf__f", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '0of_'"
+    ):
+        _ = atol("0of_", base=0)
 
 
 fn test_calc_initial_buffer_size_int32() raises:
@@ -634,6 +697,7 @@ def main():
     test_chr()
     test_string_indexing()
     test_atol()
+    test_atol_base_0()
     test_calc_initial_buffer_size_int32()
     test_calc_initial_buffer_size_int64()
     test_contains()

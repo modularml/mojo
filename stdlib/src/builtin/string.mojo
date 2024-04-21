@@ -158,25 +158,31 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     as an integer value, an error is raised. For example, `atol("hi")` raises an
     error.
 
+    If base is 0 the the string is parsed as an Integer literal,
+    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+
     Args:
         str_ref: A string to be parsed as an integer in the given base.
-        base: Base used for conversion, value must be between 2 and 36.
+        base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
         An integer value that represents the string, or otherwise raises.
     """
+    if (base != 0) and (base < 2 or base > 36):
+        raise Error("Base must be >= 2 and <= 36, or 0.")
     if not str_ref:
-        raise Error("Empty String cannot be converted to integer.")
-    if base < 2 or base > 36:
-        raise Error("Base must be between 2 and 36 included.")
+        raise Error(_atol_error(base, str_ref))
 
+    var real_base: Int
     var ord_num_max: Int
+
     var ord_letter_max = (-1, -1)
     var result = 0
     var is_negative: Bool = False
     var start: Int = 0
     var str_len = len(str_ref)
     var buff = str_ref._as_ptr()
+
     for pos in range(start, str_len):
         if isspace(buff[pos]):
             continue
@@ -184,21 +190,49 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         if str_ref[pos] == "-":
             is_negative = True
             start = pos + 1
+        elif str_ref[pos] == "+":
+            start = pos + 1
         else:
             start = pos
         break
 
     alias ord_0 = ord("0")
     alias ord_letter_min = (ord("a"), ord("A"))
-    if base <= 10:
-        ord_num_max = ord(str(base - 1))
+    alias ord_underscore = ord("_")
+
+    if base == 0:
+        var real_base_new_start = _identify_base(str_ref, start)
+        real_base = real_base_new_start.get[0]()
+        start = real_base_new_start.get[1]()
+        if real_base == -1:
+            raise Error(_atol_error(base, str_ref))
+    else:
+        real_base = base
+
+    if real_base <= 10:
+        ord_num_max = ord(str(real_base - 1))
     else:
         ord_num_max = ord("9")
-        ord_letter_max = (ord("a") + (base - 11), ord("A") + (base - 11))
+        ord_letter_max = (
+            ord("a") + (real_base - 11),
+            ord("A") + (real_base - 11),
+        )
 
     var has_space_after_number = False
+    # single underscores are only allowed between digits
+    # starting "was_last_digit_undescore" to true such that
+    # if the first digit is an undesrcore an error is raised
+    var was_last_digit_undescore = True
     for pos in range(start, str_len):
         var ord_current = int(buff[pos])
+        if ord_current == ord_underscore:
+            if was_last_digit_undescore:
+                raise Error(_atol_error(base, str_ref))
+            else:
+                was_last_digit_undescore = True
+                continue
+        else:
+            was_last_digit_undescore = False
         if ord_0 <= ord_current <= ord_num_max:
             result += ord_current - ord_0
         elif ord_letter_min.get[0]() <= ord_current <= ord_letter_max.get[0]():
@@ -210,25 +244,70 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
             start = pos + 1
             break
         else:
-            raise Error(
-                "String is not convertible to integer with base "
-                + str(base)
-                + "."
-            )
+            raise Error(_atol_error(base, str_ref))
         if pos + 1 < str_len and not isspace(buff[pos + 1]):
-            var nextresult = result * base
+            var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
-                    "String expresses an integer too large to store in Int."
+                    _atol_error(base, str_ref)
+                    + " String expresses an integer too large to store in Int."
                 )
             result = nextresult
+
+    if was_last_digit_undescore:
+        raise Error(_atol_error(base, str_ref))
+
     if has_space_after_number:
         for pos in range(start, str_len):
             if not isspace(buff[pos]):
-                raise Error("String is not convertible to integer.")
+                raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
     return result
+
+
+fn _atol_error(base: Int, str_ref: StringRef) -> String:
+    return (
+        "String is not convertible to integer with base "
+        + str(base)
+        + ": '"
+        + str(str_ref)
+        + "'"
+    )
+
+
+fn _identify_base(str_ref: StringRef, start: Int) -> Tuple[Int, Int]:
+    var length = len(str_ref)
+    # just 1 digit, assume base 10
+    if start == (length - 1):
+        return 10, start
+    if str_ref[start] == "0":
+        var second_digit = str_ref[start + 1]
+        if second_digit == "b" or second_digit == "B":
+            return 2, start + 2
+        if second_digit == "o" or second_digit == "O":
+            return 8, start + 2
+        if second_digit == "x" or second_digit == "X":
+            return 16, start + 2
+        # checking for special case of all "0", "_" are also allowed
+        var was_last_character_underscore = False
+        for i in range(start + 1, length):
+            if str_ref[i] == "_":
+                if was_last_character_underscore:
+                    return -1, -1
+                else:
+                    was_last_character_underscore = True
+                    continue
+            else:
+                was_last_character_underscore = False
+            if str_ref[i] != "0":
+                return -1, -1
+    elif ord("1") <= ord(str_ref[start]) <= ord("9"):
+        return 10, start
+    else:
+        return -1, -1
+
+    return 10, start
 
 
 fn atol(str: String, base: Int = 10) raises -> Int:
@@ -238,9 +317,12 @@ fn atol(str: String, base: Int = 10) raises -> Int:
     as an integer value, an error is raised. For example, `atol("hi")` raises an
     error.
 
+    If base is 0 the the string is parsed as an Integer literal,
+    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+
     Args:
         str: A string to be parsed as an integer in the given base.
-        base: Base used for conversion, value must be between 2 and 36.
+        base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
         An integer value that represents the string, or otherwise raises.
