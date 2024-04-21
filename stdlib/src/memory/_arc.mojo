@@ -147,9 +147,7 @@ struct Arc[T: Movable](CollectionElement):
         Returns:
             A Reference to the managed value.
         """
-        return Reference[T, mutability, lifetime]._unsafe_from_pointer(
-            Reference(self)[]._data_ptr()
-        )
+        return Reference(self)[]._data_ptr()[]
 
     fn _data_ptr(self) -> UnsafePointer[T]:
         return UnsafePointer.address_of(self._inner[].data)
