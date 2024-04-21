@@ -233,17 +233,6 @@ struct Reference[
         """
         self.value = value
 
-    @always_inline("nodebug")
-    @staticmethod
-    fn _unsafe_from_pointer(
-        ptr: UnsafePointer[type, address_space],
-    ) -> Reference[type, is_mutable, lifetime, address_space]:
-        return Reference(
-            __mlir_op.`lit.ref.from_pointer`[_type = Self._mlir_type](
-                ptr.address
-            )
-        )
-
     # ===------------------------------------------------------------------===#
     # Operator dunders
     # ===------------------------------------------------------------------===#
