@@ -387,15 +387,19 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
     @always_inline("nodebug")
     fn __refitem__[
-        mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
+        mutability: __mlir_type.i1,
+        self_life: AnyLifetime[mutability].type,
+        IntableType: Intable,
     ](
-        self: Reference[Self, mutability, self_life]._mlir_type, index: Int
+        self: Reference[Self, mutability, self_life]._mlir_type,
+        index: IntableType,
     ) -> Reference[Self.ElementType, mutability, self_life]:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
             mutability: The inferred mutability of the reference.
             self_life: The inferred lifetime of the reference.
+            IntableType: The inferred type of an intable argument.
 
         Args:
             index: The index of the item.
@@ -403,9 +407,9 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Returns:
             A reference to the item at the given index.
         """
-        debug_assert(-size <= index < size, "Index must be within bounds.")
-        var normalized_idx = index
-        if index < 0:
+        debug_assert(-size <= int(index) < size, "Index must be within bounds.")
+        var normalized_idx = int(index)
+        if normalized_idx < 0:
             normalized_idx += size
 
         return Reference(self)[]._get_reference_unsafe[mutability, self_life](
@@ -416,7 +420,8 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     fn __refitem__[
         mutability: __mlir_type.i1,
         self_life: AnyLifetime[mutability].type,
-        index: Int,
+        IntableType: Intable,
+        index: IntableType,
     ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
         Self.ElementType, mutability, self_life
     ]:
@@ -425,17 +430,19 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Parameters:
             mutability: The inferred mutability of the reference.
             self_life: The inferred lifetime of the reference.
+            IntableType: The inferred type of an intable argument.
             index: The index of the item.
 
         Returns:
             A reference to the item at the given index.
         """
-        constrained[-size <= index < size, "Index must be within bounds."]()
+        alias i = int(index)
+        constrained[-size <= i < size, "Index must be within bounds."]()
 
-        var normalized_idx = index
+        var normalized_idx = i
 
         @parameter
-        if index < 0:
+        if i < 0:
             normalized_idx += size
 
         return Reference(self)[]._get_reference_unsafe[mutability, self_life](
