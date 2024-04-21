@@ -13,7 +13,6 @@
 # XFAIL: asan && !system-darwin
 # RUN: %mojo-no-debug %s
 
-from memory import Pointer
 from python._cpython import CPython, PyObjectPtr
 
 from python import PythonObject, Python

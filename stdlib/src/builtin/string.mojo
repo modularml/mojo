@@ -537,7 +537,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         var adjusted_span = self._adjust_span(span)
         if adjusted_span.step == 1:
             return StringRef(
-                (self._buffer.data + span.start).value,
+                self._buffer.data + span.start,
                 len(adjusted_span),
             )
 
