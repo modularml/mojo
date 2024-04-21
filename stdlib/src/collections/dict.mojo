@@ -56,6 +56,7 @@ struct _DictEntryIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
+    forward: Bool = True,
 ]:
     """Iterator over immutable DictEntry references.
 
@@ -64,6 +65,7 @@ struct _DictEntryIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the dictionary is mutable.
         dict_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
     """
 
     alias imm_dict_lifetime = __mlir_attr[
@@ -83,18 +85,37 @@ struct _DictEntryIter[
     @always_inline
     fn __next__(inout self) -> Self.ref_type:
         while True:
-            debug_assert(self.index < self.src[]._reserved, "dict iter bounds")
+
+            @parameter
+            if forward:
+                debug_assert(
+                    self.index < self.src[]._reserved, "dict iter bounds"
+                )
+            else:
+                debug_assert(self.index >= 0, "dict iter bounds")
+
             if self.src[]._entries.__get_ref(self.index)[]:
                 var opt_entry_ref = self.src[]._entries.__get_ref[
                     __mlir_attr.`0: i1`,
                     Self.imm_dict_lifetime,
                 ](self.index)
-                self.index += 1
+
+                @parameter
+                if forward:
+                    self.index += 1
+                else:
+                    self.index -= 1
+
                 self.seen += 1
                 # Super unsafe, but otherwise we have to do a bunch of super
                 # unsafe reference lifetime casting.
                 return opt_entry_ref.unsafe_bitcast[DictEntry[K, V]]()
-            self.index += 1
+
+            @parameter
+            if forward:
+                self.index += 1
+            else:
+                self.index -= 1
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.seen
@@ -106,6 +127,7 @@ struct _DictKeyIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
+    forward: Bool = True,
 ]:
     """Iterator over immutable Dict key references.
 
@@ -114,6 +136,7 @@ struct _DictKeyIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
     """
 
     alias imm_dict_lifetime = __mlir_attr[
@@ -121,7 +144,9 @@ struct _DictKeyIter[
     ]
     alias ref_type = Reference[K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime]
 
-    alias dict_entry_iter = _DictEntryIter[K, V, dict_mutability, dict_lifetime]
+    alias dict_entry_iter = _DictEntryIter[
+        K, V, dict_mutability, dict_lifetime, forward
+    ]
 
     var iter: Self.dict_entry_iter
 
@@ -817,6 +842,25 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 self._entries[right] = None
 
         self._n_entries = self.size
+
+    fn __reversed__[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        K, V, mutability, self_life, False
+    ]:
+        """Iterate backwards over the dict keys, returning immutable references.
+
+        Returns:
+            A reversed iterator of immutable references to the dict keys.
+        """
+        var ref = Reference(self)
+        return _DictKeyIter(
+            _DictEntryIter[K, V, mutability, self_life, False](
+                ref[]._reserved, 0, ref
+            )
+        )
 
 
 struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
