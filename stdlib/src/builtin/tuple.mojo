@@ -17,7 +17,10 @@ These are Mojo built-ins, so you don't need to import them.
 
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from memory.unsafe_pointer import initialize_pointee
+from memory.unsafe_pointer import (
+    initialize_pointee_move,
+    initialize_pointee_copy,
+)
 
 # ===----------------------------------------------------------------------===#
 # Tuple
@@ -74,7 +77,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         fn initialize_elt[idx: Int]():
             # TODO: We could be fancier and take the values out of an owned
             # pack. For now just keep everything simple and copy the element.
-            initialize_pointee(
+            initialize_pointee_copy(
                 UnsafePointer(self[idx]),
                 storage.get_element[idx]()[],
             )
@@ -106,7 +109,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            initialize_pointee(UnsafePointer(self[idx]), existing[idx])
+            initialize_pointee_copy(UnsafePointer(self[idx]), existing[idx])
 
         unroll[initialize_elt, Self.__len__()]()
 
@@ -125,7 +128,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         @parameter
         fn initialize_elt[idx: Int]():
             var existing_elt_ptr = UnsafePointer(existing[idx]).address
-            initialize_pointee(
+            initialize_pointee_move(
                 UnsafePointer(self[idx]),
                 __get_address_as_owned_value(existing_elt_ptr),
             )

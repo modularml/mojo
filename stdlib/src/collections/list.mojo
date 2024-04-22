@@ -204,7 +204,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         if self.size >= self.capacity:
             self._realloc(_max(1, self.capacity * 2))
-        initialize_pointee(self.data + self.size, value^)
+        initialize_pointee_move(self.data + self.size, value^)
         self.size += 1
 
     @always_inline
@@ -232,7 +232,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
             var tmp = move_from_pointee(earlier_ptr)
             move_pointee(src=later_ptr, dst=earlier_ptr)
-            initialize_pointee(later_ptr, tmp^)
+            initialize_pointee_move(later_ptr, tmp^)
 
             earlier_idx -= 1
             later_idx -= 1
@@ -336,7 +336,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             for i in range(new_size, self.size):
                 destroy_pointee(self.data + i)
             for i in range(self.size, new_size):
-                initialize_pointee(self.data + i, value)
+                initialize_pointee_copy(self.data + i, value)
             self.size = new_size
 
     @always_inline
@@ -394,7 +394,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
             var tmp = move_from_pointee(earlier_ptr)
             move_pointee(src=later_ptr, dst=earlier_ptr)
-            initialize_pointee(later_ptr, tmp^)
+            initialize_pointee_move(later_ptr, tmp^)
 
             earlier_idx += 1
             later_idx -= 1
@@ -431,7 +431,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             normalized_idx += len(self)
 
         destroy_pointee(self.data + normalized_idx)
-        initialize_pointee(self.data + normalized_idx, value^)
+        initialize_pointee_move(self.data + normalized_idx, value^)
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
