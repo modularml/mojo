@@ -62,6 +62,32 @@ def test_big_dict():
     assert_equal(2000, len(dict))
 
 
+def test_dict_string_representation_string_int():
+    var some_dict = Dict[String, Int]()
+    some_dict["a"] = 1
+    some_dict["b"] = 2
+    dict_as_string = __type_of(some_dict).__str__(some_dict)
+    assert_true(
+        some_dict._minimum_size_of_string_representation()
+        <= len(dict_as_string)
+    )
+    assert_equal(dict_as_string, "{a: 1, b: 2}")
+
+
+def test_dict_string_representation_int_int():
+    var some_dict = Dict[Int, Int]()
+    some_dict[3] = 1
+    some_dict[4] = 2
+    some_dict[5] = 3
+    some_dict[6] = 4
+    dict_as_string = __type_of(some_dict).__str__(some_dict)
+    # one char per key and value, we should have the minimum size of string possible
+    assert_equal(
+        some_dict._minimum_size_of_string_representation(), len(dict_as_string)
+    )
+    assert_equal(dict_as_string, "{3: 1, 4: 2, 5: 3, 6: 4}")
+
+
 def test_compact():
     var dict = Dict[String, Int]()
     for i in range(20):
@@ -335,5 +361,7 @@ def test_owned_kwargs_dict():
 
 def main():
     test_dict()
+    test_dict_string_representation_string_int()
+    test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
     test_bool_conversion()

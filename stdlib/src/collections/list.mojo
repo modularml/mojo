@@ -22,6 +22,7 @@ from collections import List
 
 from memory.unsafe_pointer import *
 from memory import Reference, UnsafePointer
+from builtin.value import StringableCollectionElement
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -568,3 +569,44 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         var ref = Reference(self)
         return _ListIter[T, mutability, self_life, False](len(ref[]), ref)
+
+    @staticmethod
+    fn __str__[U: StringableCollectionElement](self: List[U]) -> String:
+        """Returns a string representation of a `List`.
+
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(__type_of(my_list).__str__(my_list))
+        ```
+
+        When the compiler supports conditional methods, then a simple `str(my_list)` will
+        be enough.
+
+        Args:
+            self: The list to represent as a string.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Stringable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the list.
+        """
+        # we do a rough estimation of the number of chars that we'll see
+        # in the final string, we assume that str(x) will be at least one char.
+        var minimum_capacity = (
+            2  # '[' and ']'
+            + len(self) * 3  # str(x) and ", "
+            - 2  # remove the last ", "
+        )
+        var result = String(List[Int8](capacity=minimum_capacity))
+        result += "["
+        for i in range(len(self)):
+            result += str(self[i])
+            if i < len(self) - 1:
+                result += ", "
+        result += "]"
+        return result

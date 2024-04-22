@@ -15,7 +15,7 @@ from os import getenv
 from sys import external_call
 from sys.ffi import DLHandle
 
-from memory import DTypePointer
+from memory import DTypePointer, LegacyPointer
 
 from utils import StringRef, StaticIntTuple
 

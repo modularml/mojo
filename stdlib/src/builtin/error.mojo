@@ -29,7 +29,9 @@ from memory import memcmp, memcpy, DTypePointer
 struct Error(Stringable, Boolable):
     """This type represents an Error."""
 
-    var data: DTypePointer[DType.int8]
+    alias StorageType = DTypePointer[DType.uint8]
+
+    var data: Self.StorageType
     """A pointer to the beginning of the string data being referenced."""
 
     var loaded_length: Int
@@ -47,7 +49,7 @@ struct Error(Stringable, Boolable):
         Returns:
             The constructed Error object.
         """
-        return Error {data: DTypePointer[DType.int8](), loaded_length: 0}
+        return Error {data: Self.StorageType(), loaded_length: 0}
 
     @always_inline("nodebug")
     fn __init__(value: StringLiteral) -> Error:
@@ -59,7 +61,9 @@ struct Error(Stringable, Boolable):
         Returns:
             The constructed Error object.
         """
-        return Error {data: value.data(), loaded_length: len(value)}
+        return Error {
+            data: value.data().bitcast[DType.uint8](), loaded_length: len(value)
+        }
 
     @always_inline("nodebug")
     fn __init__(src: String) -> Error:
@@ -72,8 +76,8 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         var length = len(src)
-        var dest = UnsafePointer[Int8].alloc(length + 1)
-        memcpy(dest, src._as_ptr(), length)
+        var dest = Self.StorageType.alloc(length + 1)
+        memcpy(dest, src._as_ptr().bitcast[DType.uint8](), length)
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
@@ -88,8 +92,8 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         var length = len(src)
-        var dest = DTypePointer[DType.int8].alloc(length + 1)
-        memcpy(dest, src.data, length)
+        var dest = Self.StorageType.alloc(length + 1)
+        memcpy(dest, src.data.bitcast[DType.uint8](), length)
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
@@ -107,7 +111,7 @@ struct Error(Stringable, Boolable):
         """
         if existing.loaded_length < 0:
             var length = -existing.loaded_length
-            var dest = UnsafePointer[Int8].alloc(length + 1)
+            var dest = Self.StorageType.alloc(length + 1)
             memcpy(dest, existing.data, length)
             dest[length] = 0
             return Error {data: dest, loaded_length: existing.loaded_length}
@@ -153,4 +157,4 @@ struct Error(Stringable, Boolable):
         var length = self.loaded_length
         if length < 0:
             length = -length
-        return String(StringRef(self.data, length))
+        return String(StringRef(self.data.bitcast[DType.int8](), length))
