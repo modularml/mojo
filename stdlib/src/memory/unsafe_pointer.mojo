@@ -372,7 +372,7 @@ fn move_from_pointee[T: Movable](ptr: UnsafePointer[T, _]) -> T:
 
     This performs a _consuming_ move, ending the lifetime of the value stored
     in this pointer memory location. Subsequent reads of this pointer are
-    not valid. If a new valid value is stored using `initialize_pointee()`, then
+    not valid. If a new valid value is stored using `initialize_pointee_move()`, then
     reading from this pointer becomes valid again.
 
     Parameters:
@@ -388,13 +388,18 @@ fn move_from_pointee[T: Movable](ptr: UnsafePointer[T, _]) -> T:
 
 
 @always_inline
-fn initialize_pointee[T: Movable](ptr: UnsafePointer[T, _], owned value: T):
-    """Emplace a new value into the pointer location.
+fn initialize_pointee_move[
+    T: Movable
+](ptr: UnsafePointer[T, _], owned value: T):
+    """Emplace a new value into the pointer location, moving from `value`.
 
     The pointer memory location is assumed to contain uninitialized data,
     and consequently the current contents of this pointer are not destructed
     before writing `value`. Similarly, ownership of `value` is logically
     transfered into the pointer location.
+
+    When compared to `initialize_pointee_copy`, this avoids an extra copy on
+    the caller side when the value is an `owned` rvalue.
 
     Parameters:
         T: The type the pointer points to, which must be `Movable`.
@@ -407,6 +412,28 @@ fn initialize_pointee[T: Movable](ptr: UnsafePointer[T, _], owned value: T):
 
 
 @always_inline
+fn initialize_pointee_copy[T: Copyable](ptr: UnsafePointer[T, _], value: T):
+    """Emplace a copy of `value` into the pointer location.
+
+    The pointer memory location is assumed to contain uninitialized data,
+    and consequently the current contents of this pointer are not destructed
+    before writing `value`. Similarly, ownership of `value` is logically
+    transfered into the pointer location.
+
+    When compared to `initialize_pointee_move`, this avoids an extra move on
+    the callee side when the value must be copied.
+
+    Parameters:
+        T: The type the pointer points to, which must be `Copyable`.
+
+    Args:
+        ptr: The pointer to initialize through.
+        value: The value to emplace.
+    """
+    __get_address_as_uninit_lvalue(ptr.address) = value
+
+
+@always_inline
 fn move_pointee[T: Movable](*, src: UnsafePointer[T, _], dst: UnsafePointer[T]):
     """Moves the value `src` points to into the memory location pointed to by
     `dest`.
@@ -414,7 +441,7 @@ fn move_pointee[T: Movable](*, src: UnsafePointer[T, _], dst: UnsafePointer[T]):
     This performs a consuming move (using `__moveinit__()`) out of the
     memory location pointed to by `src`. Subsequent reads of this
     pointer are not valid unless and until a new, valid value has been
-    moved into this pointer's memory location using `initialize_pointee()`.
+    moved into this pointer's memory location using `initialize_pointee_move()`.
 
     This transfers the value out of `self` and into `dest` using at most one
     `__moveinit__()` call.

@@ -175,7 +175,7 @@ what we publish.
   1) The element type can now be `AnyType`: it doesn't require `Movable`.
   2) Because of this, the `take_value`, `emplace_value`, and `move_into` methods
      have been changed to be top-level functions, and were renamed to
-     `move_from_pointee`, `initialize_pointee` and `move_pointee` respectively.
+     `move_from_pointee`, `initialize_pointee_*` and `move_pointee` respectively.
   3) A new `destroy_pointee` function runs the destructor on the pointee.
   4) `UnsafePointer` can be initialized directly from a `Reference` with
      `UnsafePointer(someRef)` and can convert to an immortal reference with
