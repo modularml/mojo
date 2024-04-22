@@ -155,11 +155,10 @@ experience with the process.
 
 ## Pull requests
 
-[This blog post](https://www.modular.com/blog/how-to-contribute-to-mojo-standard-library-a-step-by-step-guide)
-has a detailed walkthrough of the pull request workflow. You can use a pull
-request to propose a change or bug fix to the Mojo Standard Library,
-Mojo examples, or Mojo documentation. This page gives an overview of
-the process, especially for first-time contributors.
+You can use a pull request to propose a change or bug fix to the Mojo Standard
+Library, Mojo examples, or Mojo documentation. This page gives an overview of
+the process. For a more detailed walkthrough, see 
+[How to contribute to the Mojo standard library: a step-by-step guide](https://www.modular.com/blog/how-to-contribute-to-mojo-standard-library-a-step-by-step-guide).
 
 **Note:** Pull requests should be submitted against the `nightly` branch,
 which represents the most recent nightly build.
