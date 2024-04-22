@@ -580,6 +580,18 @@ struct _ObjectImpl(CollectionElement, Stringable):
         else:
             lhs = lhs.convert_int_to_float()
 
+    @staticmethod
+    fn coerce_integral_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
+        """Coerces two values of integral type to the appropriate
+        lowest-common denominator type for performing bitwise operations.
+        """
+        if lhs.is_int() == rhs.is_int():
+            return
+        if lhs.is_int():
+            rhs = rhs.convert_bool_to_int()
+        else:
+            lhs = lhs.convert_bool_to_int()
+
     fn __str__(self) -> String:
         """Returns the name (in lowercase) of the specific object type."""
         if self.is_none():
@@ -1175,6 +1187,12 @@ struct object(IntableRaising, Boolable, Stringable):
         ):
             raise Error("TypeError: not a valid arithmetic type")
 
+    @always_inline
+    fn _arithmetic_integral_type_check(self) raises:
+        """Throws an error if the object is not an integral type."""
+        if not (self._value.is_bool() or self._value.is_int()):
+            raise Error("TypeError: not a valid integral type")
+
     @staticmethod
     @always_inline
     fn _arithmetic_binary_op[
@@ -1350,8 +1368,33 @@ struct object(IntableRaising, Boolable, Stringable):
             Float64.__floordiv__, Int64.__floordiv__
         ](self, rhs)
 
-    # TODO __lshift__
-    # TODO __rshift__
+    @always_inline
+    fn __lshift__(self, rhs: object) raises -> object:
+        """Left shift operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value left shifted by the right hand value.
+        """
+        self._arithmetic_integral_type_check()
+        rhs._arithmetic_integral_type_check()
+        return object(self._value.get_as_int() << rhs._value.get_as_int())
+
+    @always_inline
+    fn __rshift__(self, rhs: object) raises -> object:
+        """Right shift operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value right shifted by the right hand value.
+        """
+        self._arithmetic_integral_type_check()
+        rhs._arithmetic_integral_type_check()
+        return object(self._value.get_as_int() >> rhs._value.get_as_int())
 
     @always_inline
     fn __and__(self, rhs: object) raises -> object:
@@ -1452,8 +1495,23 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         self = self // rhs
 
-    # TODO: __ilshift__
-    # TODO: __irshift__
+    @always_inline
+    fn __ilshift__(inout self, rhs: object) raises:
+        """In-place left shift operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self << rhs
+
+    @always_inline
+    fn __irshift__(inout self, rhs: object) raises:
+        """In-place right shift operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self >> rhs
 
     @always_inline
     fn __iand__(inout self, rhs: object) raises:
@@ -1565,8 +1623,29 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         return lhs // self
 
-    # TODO: __rlshift__
-    # TODO: __rrshift__
+    @always_inline
+    fn __rlshift__(self, lhs: object) raises -> object:
+        """Reverse left shift operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value left shifted by the right hand value.
+        """
+        return lhs << self
+
+    @always_inline
+    fn __rrshift__(self, lhs: object) raises -> object:
+        """Reverse right shift operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value right shifted by the right hand value.
+        """
+        return lhs >> self
 
     @always_inline
     fn __rand__(self, lhs: object) raises -> object:
