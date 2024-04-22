@@ -145,6 +145,21 @@ def test_arithmetic_ops_div():
     assert_true(5 // object(2) == 2)
 
 
+def test_object_shift():
+    a = object(1)
+    b = object(2)
+    assert_true(a << b == 4)
+    assert_true(b >> a == 1)
+
+    b <<= a
+    assert_true(b == 4)
+    b >>= a
+    assert_true(b == 1)
+
+    assert_true(2 << object(1) == 4)
+    assert_true(2 >> object(1) == 1)
+
+
 def test_function(borrowed lhs, borrowed rhs) -> object:
     return lhs + rhs
 
