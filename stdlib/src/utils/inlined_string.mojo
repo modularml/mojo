@@ -347,7 +347,7 @@ struct _FixedString[CAP: Int](
         """
         var err = self._iadd_non_raising(strref)
         if err:
-            raise err.value()
+            raise err.value()[]
 
     fn _iadd_non_raising(inout self, strref: StringRef) -> Optional[Error]:
         var total_len = len(self) + len(strref)
@@ -388,7 +388,7 @@ struct _FixedString[CAP: Int](
             #     abort("error formatting to FixedString: " + str(e))
             var err = ptr[]._iadd_non_raising(strref)
             if err:
-                abort("error formatting to FixedString: " + str(err.value()))
+                abort("error formatting to FixedString: " + str(err.value()[]))
 
         return Formatter(
             write_to_string,
