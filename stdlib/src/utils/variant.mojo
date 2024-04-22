@@ -43,7 +43,7 @@ from sys.intrinsics import _mlirtype_is_eq
 
 from memory import UnsafePointer
 from memory.unsafe_pointer import (
-    initialize_pointee,
+    initialize_pointee_move,
     move_from_pointee,
     move_pointee,
 )
@@ -176,7 +176,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
         self._get_state()[] = Self._check[T]()
-        initialize_pointee(self._get_ptr[T](), value^)
+        initialize_pointee_move(self._get_ptr[T](), value^)
 
     @always_inline
     fn __copyinit__(inout self, other: Self):
@@ -192,7 +192,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias T = Ts[i]
-                initialize_pointee[T](
+                initialize_pointee_move(
                     UnsafePointer.address_of(self._impl).bitcast[T](),
                     Reference(other._impl).unsafe_bitcast[T]()[],
                 )
@@ -273,7 +273,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._call_correct_deleter()
         self._get_state()[] = Self._check[T]()
-        initialize_pointee(self._get_ptr[T](), value^)
+        initialize_pointee_move(self._get_ptr[T](), value^)
 
     fn isa[T: CollectionElement](self) -> Bool:
         """Check if the variant contains the required type.
