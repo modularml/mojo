@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
-from memory import DTypePointer, Pointer, UnsafePointer, memcmp, memcpy
+from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 
 from utils import StringRef, StaticIntTuple, StaticTuple
@@ -400,7 +400,22 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         self = str(value)
 
     @always_inline
-    fn __init__(inout self, ptr: Pointer[Int8], len: Int):
+    fn __init__(inout self, ptr: UnsafePointer[Int8], len: Int):
+        """Creates a string from the buffer. Note that the string now owns
+        the buffer.
+
+        The buffer must be terminated with a null byte.
+
+        Args:
+            ptr: The pointer to the buffer.
+            len: The length of the buffer, including the null terminator.
+        """
+        # we don't know the capacity of ptr, but we'll assume it's the same or
+        # larger than len
+        self = Self(Self._buffer_type(ptr, len, len))
+
+    @always_inline
+    fn __init__(inout self, ptr: LegacyPointer[Int8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -614,11 +629,13 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
         memcpy(
-            rebind[Pointer[Int8]](buffer.data), self._as_ptr().address, self_len
+            DTypePointer(buffer.data),
+            self._as_ptr(),
+            self_len,
         )
         memcpy(
-            rebind[Pointer[Int8]](buffer.data + self_len),
-            other._as_ptr().address,
+            DTypePointer(buffer.data + self_len),
+            other._as_ptr(),
             other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
