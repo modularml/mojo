@@ -21,7 +21,7 @@ Also, before opening a new issue, take a moment to search through the already
 submitted issues to avoid creating duplicate issues for the maintainers to
 address.
 
-### Writing high-quality bugs
+### Writing high-quality bug descriptions
 
 We encourage you to provide as much information about the issue as practical.
 The more details you provide, the faster we can resolve the issue. The following
@@ -157,7 +157,8 @@ experience with the process.
 
 You can use a pull request to propose a change or bug fix to the Mojo Standard
 Library, Mojo examples, or Mojo documentation. This page gives an overview of
-the process, especially for first-time contributors.
+the process. For a more detailed walkthrough, see 
+[How to contribute to the Mojo standard library: a step-by-step guide](https://www.modular.com/blog/how-to-contribute-to-mojo-standard-library-a-step-by-step-guide).
 
 **Note:** Pull requests should be submitted against the `nightly` branch,
 which represents the most recent nightly build.
