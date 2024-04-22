@@ -315,7 +315,7 @@ struct Int(Intable, Stringable, KeyElement, Boolable, Formattable):
             if err:
                 abort(
                     "unreachable: unexpected write int failure condition: "
-                    + str(err.value())
+                    + str(err.value()[])
                 )
         else:
             # Stack allocate enough bytes to store any formatted 64-bit integer
