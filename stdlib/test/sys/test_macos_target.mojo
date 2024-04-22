@@ -24,8 +24,8 @@ from sys import (
     os_is_linux,
     os_is_macos,
     os_is_windows,
-    _macos_version,
 )
+from sys.info import _macos_version
 from testing import assert_true, assert_false
 
 from testing import assert_true
