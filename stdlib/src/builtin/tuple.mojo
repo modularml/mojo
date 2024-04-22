@@ -106,12 +106,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            var existing_elt_ptr = UnsafePointer(existing[idx])
-
-            initialize_pointee(
-                UnsafePointer(self[idx]),
-                __get_address_as_owned_value(existing_elt_ptr.address),
-            )
+            initialize_pointee(UnsafePointer(self[idx]), existing[idx])
 
         unroll[initialize_elt, Self.__len__()]()
 
@@ -129,12 +124,17 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         @parameter
         fn initialize_elt[idx: Int]():
+            var existing_elt_ptr = UnsafePointer(existing[idx]).address
             initialize_pointee(
                 UnsafePointer(self[idx]),
-                existing[idx],
+                __get_address_as_owned_value(existing_elt_ptr),
             )
 
         unroll[initialize_elt, Self.__len__()]()
+
+        # We transfered all of the elements out of 'existing', so we need to
+        # disable its destructor so they aren't destroyed.
+        __mlir_op.`lit.ownership.mark_destroyed`(Reference(existing).value)
 
     @always_inline
     @staticmethod
