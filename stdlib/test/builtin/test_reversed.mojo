@@ -57,6 +57,8 @@ def test_reversed_dict():
     _ = dict.pop("a")
     _ = dict.pop("c")
 
+    # dict: {'b': 2, 'd': 4}
+
     keys = String("")
     for key in dict:
         keys += key[]
@@ -84,19 +86,35 @@ def test_reversed_dict():
 
     assert_equal(keys, "db")
 
-    # Empty dict is iterable
+    # Refill dict
+    dict["c"] = 2
+    dict["a"] = 1
+    dict["b"] = 4
+    dict["d"] = 3
 
-    _ = dict.pop("b")
-    _ = dict.pop("d")
+    # dict: {'b': 4, 'd': 3, 'c': 2, 'a':1}
 
     keys = String("")
-    for key in reversed(dict):
+    check = 1
+    for item in reversed(dict.items()):
+        keys += item[].key
+        assert_equal(item[].value, check)
+        check += 1
+
+    assert_equal(keys, "acdb")
+
+    # Empty dict is iterable
+
+    var empty_dict = Dict[String, Int]()
+
+    keys = String("")
+    for key in reversed(empty_dict):
         keys += key[]
 
     assert_equal(keys, "")
 
     check = 0
-    for val in reversed(dict.values()):
+    for val in reversed(empty_dict.values()):
         # values is empty, should not reach here
         check += 1
 
@@ -104,40 +122,12 @@ def test_reversed_dict():
 
     keys = String("")
     check = 0
-    for item in reversed(dict.items()):
+    for item in reversed(empty_dict.items()):
         keys += item[].key
         check += item[].value
 
     assert_equal(keys, "")
     assert_equal(check, 0)
-
-    # Refill dict
-
-    dict["d"] = 4
-    dict["a"] = 1
-    dict["b"] = 2
-    dict["e"] = 3
-
-    keys = String("")
-    for key in reversed(dict):
-        keys += key[]
-
-    assert_equal(keys, "ebad")
-
-    check = 0
-    for val in reversed(dict.values()):
-        check += val[]
-
-    assert_equal(check, 10)
-
-    keys = String("")
-    check = 0
-    for item in reversed(dict.items()):
-        keys += item[].key
-        check += item[].value
-
-    assert_equal(keys, "ebad")
-    assert_equal(check, 10)
 
 
 def main():
