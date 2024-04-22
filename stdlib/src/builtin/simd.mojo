@@ -998,10 +998,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 Self,
                 Self,
             ](self, rhs)
-            return (
-                result.get[0, Self](),
-                result.get[1, SIMD[DType.bool, size]](),
-            )
+            return (result[0], result[1])
         else:
             var result = llvm_intrinsic[
                 "llvm.uadd.with.overflow",
@@ -1009,10 +1006,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 Self,
                 Self,
             ](self, rhs)
-            return (
-                result.get[0, Self](),
-                result.get[1, SIMD[DType.bool, size]](),
-            )
+            return (result[0], result[1])
 
     @always_inline
     fn sub_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
@@ -1035,10 +1029,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 Self,
                 Self,
             ](self, rhs)
-            return (
-                result.get[0, Self](),
-                result.get[1, SIMD[DType.bool, size]](),
-            )
+            return (result[0], result[1])
         else:
             var result = llvm_intrinsic[
                 "llvm.usub.with.overflow",
@@ -1046,10 +1037,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 Self,
                 Self,
             ](self, rhs)
-            return (
-                result.get[0, Self](),
-                result.get[1, SIMD[DType.bool, size]](),
-            )
+            return (result[0], result[1])
 
     @always_inline
     fn mul_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
@@ -1072,10 +1060,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 Self,
                 Self,
             ](self, rhs)
-            return (
-                result.get[0, Self](),
-                result.get[1, SIMD[DType.bool, size]](),
-            )
+            return (result[0], result[1])
         else:
             var result = llvm_intrinsic[
                 "llvm.umul.with.overflow",
@@ -1083,10 +1068,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 Self,
                 Self,
             ](self, rhs)
-            return (
-                result.get[0, Self](),
-                result.get[1, SIMD[DType.bool, size]](),
-            )
+            return (result[0], result[1])
 
     # ===-------------------------------------------------------------------===#
     # Reversed operations
