@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo-no-debug %s
+# RUN: %mojo %s
 
 from python import PythonObject, Python
 from testing import assert_raises

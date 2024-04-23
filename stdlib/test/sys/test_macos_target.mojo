@@ -28,8 +28,6 @@ from sys import (
 from sys.info import _macos_version
 from testing import assert_true, assert_false
 
-from testing import assert_true
-
 
 fn test_os_query() raises:
     assert_true(os_is_macos())
