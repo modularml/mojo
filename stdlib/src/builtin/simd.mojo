@@ -728,23 +728,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return _pow(self, rhs)
 
     @always_inline("nodebug")
-    fn __pow__[rhs_type: DType](self, rhs: SIMD[rhs_type, size]) -> Self:
-        """Computes the vector raised elementwise to the right hand side power.
-
-        Parameters:
-          rhs_type: The `dtype` of the rhs SIMD vector.
-
-        Args:
-            rhs: The exponential value.
-
-        Returns:
-            A SIMD vector where each element is raised to the power of the
-            specified exponential value.
-        """
-        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return _pow(self, rhs)
-
-    @always_inline("nodebug")
     fn __lt__(self, rhs: Self) -> SIMD[DType.bool, size]:
         """Compares two SIMD vectors using less-than comparison.
 
