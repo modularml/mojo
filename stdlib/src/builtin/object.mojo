@@ -20,8 +20,9 @@ from collections import Dict, List
 from os import Atomic
 from sys.intrinsics import _type_is_eq
 
-from memory import memcmp, memcpy, DTypePointer, LegacyPointer, UnsafePointer
+from memory import memcmp, memcpy, DTypePointer
 from memory._arc import Arc
+from memory.unsafe_pointer import move_from_pointee
 
 from utils import StringRef, unroll
 
@@ -56,15 +57,11 @@ struct _ImmutableString:
     pointer and integer pair. Memory will be dynamically allocated.
     """
 
-    var data: LegacyPointer[Int8]
+    var data: UnsafePointer[Int8]
     """The pointer to the beginning of the string contents. It is not
     null-terminated."""
     var length: Int
     """The length of the string."""
-
-    @always_inline
-    fn __init__(data: LegacyPointer[Int8], length: Int) -> Self:
-        return Self {data: data.address, length: length}
 
     @always_inline
     fn __init__(data: UnsafePointer[Int8], length: Int) -> Self:
@@ -1268,7 +1265,7 @@ struct object(IntableRaising, Boolable, Stringable):
                 UnsafePointer[Int8].alloc(length), length
             )
             memcpy(impl.data, lhsStr.data, lhsStr.length)
-            memcpy(impl.data.offset(lhsStr.length), rhsStr.data, rhsStr.length)
+            memcpy(impl.data + lhsStr.length, rhsStr.data, rhsStr.length)
             var result = object()
             result._value = impl
             return result
@@ -1741,8 +1738,9 @@ struct object(IntableRaising, Boolable, Stringable):
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
-            impl.data.store(
-                self._value.get_as_string().data.offset(index).load()
+            initialize_pointee_copy(
+                impl.data,
+                move_from_pointee(self._value.get_as_string().data + index),
             )
             return _ObjectImpl(impl)
         return self._value.get_list_element(i._value.get_as_int().value)

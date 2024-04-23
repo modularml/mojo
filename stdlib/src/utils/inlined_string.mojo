@@ -17,7 +17,7 @@
 
 from sys import sizeof
 
-from memory import memcpy
+from memory import memcpy, LegacyPointer
 
 from collections import Optional
 
