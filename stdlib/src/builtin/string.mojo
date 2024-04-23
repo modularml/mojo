@@ -218,6 +218,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
             ord("A") + (real_base - 11),
         )
 
+    var found_valid_chars_after_start = False
     var has_space_after_number = False
     # single underscores are only allowed between digits
     # starting "was_last_digit_undescore" to true such that
@@ -235,10 +236,13 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
             was_last_digit_undescore = False
         if ord_0 <= ord_current <= ord_num_max:
             result += ord_current - ord_0
+            found_valid_chars_after_start = True
         elif ord_letter_min.get[0]() <= ord_current <= ord_letter_max.get[0]():
             result += ord_current - ord_letter_min.get[0]() + 10
+            found_valid_chars_after_start = True
         elif ord_letter_min.get[1]() <= ord_current <= ord_letter_max.get[1]():
             result += ord_current - ord_letter_min.get[1]() + 10
+            found_valid_chars_after_start = True
         elif isspace(ord_current):
             has_space_after_number = True
             start = pos + 1
@@ -254,7 +258,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
                 )
             result = nextresult
 
-    if was_last_digit_undescore:
+    if was_last_digit_undescore or (not found_valid_chars_after_start):
         raise Error(_atol_error(base, str_ref))
 
     if has_space_after_number:

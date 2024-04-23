@@ -183,12 +183,12 @@ fn test_ord() raises:
     alias single_byte2 = ord("!")
     assert_equal(single_byte2, 33)
 
-    # alias multi_byte = ord("α")
-    # assert_equal(multi_byte, 945)
-    # alias multi_byte2 = ord("➿")
-    # assert_equal(multi_byte2, 10175)
-    # alias multi_byte3 = ord("🔥")
-    # assert_equal(multi_byte3, 128293)
+    var multi_byte = ord("α")
+    assert_equal(multi_byte, 945)
+    var multi_byte2 = ord("➿")
+    assert_equal(multi_byte2, 10175)
+    var multi_byte3 = ord("🔥")
+    assert_equal(multi_byte3, 128293)
 
 
 fn test_chr() raises:
@@ -301,6 +301,18 @@ fn test_atol_base_0() raises:
 
     assert_equal(17, atol("0x11", base=0))
     assert_equal(17, atol("0X1_1", base=0))
+
+    assert_equal(0, atol("0X0", base=0))
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '  0x'"
+    ):
+        _ = atol("  0x", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '  0b  '"
+    ):
+        _ = atol("  0b  ", base=0)
 
     with assert_raises(
         contains="String is not convertible to integer with base 0: '00100'"
