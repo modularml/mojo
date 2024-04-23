@@ -569,7 +569,7 @@ struct String(
         var adjusted_span = self._adjust_span(span)
         if adjusted_span.step == 1:
             return StringRef(
-                (self._buffer.data + span.start).address,
+                self._buffer.data + span.start,
                 len(adjusted_span),
             )
 
