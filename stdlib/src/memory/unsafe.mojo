@@ -897,6 +897,22 @@ struct DTypePointer[
             The loaded value.
         """
 
+        @parameter
+        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
+            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
+            # regardless of the alignment that is passed. This causes issues if
+            # this method is called on an unaligned pointer.
+            # TODO #37823 We can make this smarter when we add an `aligned`
+            # trait to the pointer class.
+            var v = SIMD[type, width]()
+
+            # intentionally don't unroll, otherwise the compiler vectorizes
+            for i in range(width):
+                v[i] = self.address.offset(int(offset) + i).load[
+                    alignment=alignment
+                ]()
+            return v
+
         return (
             self.address.offset(offset)
             .bitcast[SIMD[type, width]]()
