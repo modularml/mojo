@@ -5,7 +5,7 @@
 
 # Documentation
 /docs/         @modularml/mojo-docs
-/stdlib/docs/  @modularml/mojo-docs
+/stdlib/docs/  @modularml/mojo-docs @modularml/mojo-standard-library
 
 # Examples
 /examples/     @jackos
