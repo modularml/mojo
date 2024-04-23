@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
-from memory import UnsafePointer, DTypePointer, Pointer, memcmp, memcpy
+from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import StringRef, StaticIntTuple, StaticTuple
 from utils._format import Formattable, Formatter, ToFormatter
@@ -425,7 +425,7 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(Self._buffer_type(ptr, len, len))
+        self = Self(Self._buffer_type(ptr, size=len, capacity=len))
 
     @always_inline
     fn __init__(inout self, ptr: LegacyPointer[Int8], len: Int):
