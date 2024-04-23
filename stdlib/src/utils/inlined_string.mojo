@@ -520,9 +520,12 @@ struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
         """
         return SIZE
 
-    fn __setitem__(inout self, index: Int, owned value: ElementType):
+    fn __setitem__[
+        indexer: Indexer
+    ](inout self, idx: indexer, owned value: ElementType):
         var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer(Reference(self.storage._array)).address, index.value
+            UnsafePointer(Reference(self.storage._array)).address,
+            index(idx).value,
         )
         __mlir_op.`pop.store`(value, ptr)
 

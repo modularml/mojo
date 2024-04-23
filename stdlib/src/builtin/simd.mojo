@@ -139,6 +139,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Sized,
     Stringable,
     Truncable,
+    Indexer,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -482,6 +483,22 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
             rebind[Scalar[type]](self).value
         )
+
+    @always_inline("nodebug")
+    fn __index__(self) -> Int:
+        """Returns the value as an int if it is an integral value
+
+        Contraints:
+            Must be an integral value
+
+        Returns:
+            The value as an integer
+        """
+        constrained[
+            type.is_integral() or type.is_bool(),
+            "expected integral or bool type",
+        ]()
+        return self.__int__()
 
     @always_inline
     fn __str__(self) -> String:
@@ -1731,8 +1748,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> Scalar[type]:
+    fn __getitem__[indexer: Indexer](self, idx: indexer) -> Scalar[type]:
         """Gets an element from the vector.
+
+        Parameters:
+            indexer: The type of the indexing value.
 
         Args:
             idx: The element index.
@@ -1742,32 +1762,44 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         return __mlir_op.`pop.simd.extractelement`[
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-        ](self.value, idx.value)
+        ](self.value, index(idx).value)
 
     @always_inline("nodebug")
-    fn __setitem__(inout self, idx: Int, val: Scalar[type]):
+    fn __setitem__[
+        indexer: Indexer
+    ](inout self, idx: indexer, val: Scalar[type]):
         """Sets an element in the vector.
+
+        Parameters:
+            indexer: The type of the indexing value.
 
         Args:
             idx: The index to set.
             val: The value to set.
         """
         self.value = __mlir_op.`pop.simd.insertelement`(
-            self.value, val.value, idx.value
+            self.value, val.value, index(idx).value
         )
 
     @always_inline("nodebug")
-    fn __setitem__(
-        inout self, idx: Int, val: __mlir_type[`!pop.scalar<`, type.value, `>`]
+    fn __setitem__[
+        indexer: Indexer
+    ](
+        inout self,
+        idx: indexer,
+        val: __mlir_type[`!pop.scalar<`, type.value, `>`],
     ):
         """Sets an element in the vector.
+
+        Parameters:
+            indexer: The type of the indexing value.
 
         Args:
             idx: The index to set.
             val: The value to set.
         """
         self.value = __mlir_op.`pop.simd.insertelement`(
-            self.value, val, idx.value
+            self.value, val, index(idx).value
         )
 
     fn __hash__(self) -> Int:

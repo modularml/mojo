@@ -798,8 +798,11 @@ struct String(
         """
         return len(self) > 0
 
-    fn __getitem__(self, idx: Int) -> String:
+    fn __getitem__[indexer: Indexer](self, idx: indexer) -> String:
         """Gets the character at the specified position.
+
+        Parameters:
+            indexer: The type of the indexing value.
 
         Args:
             idx: The index value.
@@ -807,12 +810,13 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
-        if idx < 0:
-            return self.__getitem__(len(self) + idx)
+        var index_val = index(idx)
+        if index_val < 0:
+            return self.__getitem__(len(self) + index_val)
 
-        debug_assert(0 <= idx < len(self), "index must be in range")
+        debug_assert(0 <= index_val < len(self), "index must be in range")
         var buf = Self._buffer_type(capacity=1)
-        buf.append(self._buffer[idx])
+        buf.append(self._buffer[index_val])
         buf.append(0)
         return String(buf^)
 

@@ -34,6 +34,9 @@ def test_static_tuple():
     assert_equal(tup3[Int(0)], 1)
     assert_equal(tup3[Int64(0)], 1)
 
+    assert_equal(tup3[True], 2)
+    assert_equal(tup3[Int32(2)], 3)
+
 
 def test_static_int_tuple():
     assert_equal(str(StaticIntTuple[1](1)), "(1,)")

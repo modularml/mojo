@@ -103,6 +103,11 @@ def test_inlined_fixed_vector_with_default():
     vector[5] = -2
     assert_equal(-2, vector[5])
 
+    # check we can index with non Int or IntLiteral
+    assert_equal(1, vector[Int16(1)])
+    assert_equal(1, vector[True])
+    assert_equal(1, vector[Scalar[DType.bool](True)])
+
     vector.clear()
     assert_equal(0, len(vector))
 

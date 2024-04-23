@@ -257,8 +257,11 @@ struct StringRef(
         return not (self == rhs)
 
     @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> StringRef:
+    fn __getitem__[indexer: Indexer](self, idx: indexer) -> StringRef:
         """Get the string value at the specified position.
+
+        Parameters:
+            indexer: The type of the indexing value.
 
         Args:
           idx: The index position.
@@ -266,7 +269,7 @@ struct StringRef(
         Returns:
           The character at the specified position.
         """
-        return StringRef {data: self.data + idx, length: 1}
+        return StringRef {data: self.data + index(idx), length: 1}
 
     fn __hash__(self) -> Int:
         """Hash the underlying buffer using builtin hash.

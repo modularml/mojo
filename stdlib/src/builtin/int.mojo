@@ -205,6 +205,7 @@ struct Int(
     Roundable,
     Stringable,
     Truncable,
+    Indexer,
 ):
     """This type represents an integer value."""
 

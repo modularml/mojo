@@ -335,11 +335,11 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         return size
 
     @always_inline("nodebug")
-    fn __getitem__[intable: Intable](self, index: intable) -> Int:
+    fn __getitem__[indexer: Indexer](self, index: indexer) -> Int:
         """Gets an element from the tuple by index.
 
         Parameters:
-            intable: The intable type.
+            indexer: The type of the indexing value.
 
         Args:
             index: The element index.
@@ -362,11 +362,11 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         self.data.__setitem__[index](val)
 
     @always_inline("nodebug")
-    fn __setitem__[intable: Intable](inout self, index: intable, val: Int):
+    fn __setitem__[indexer: Indexer](inout self, index: indexer, val: Int):
         """Sets an element in the tuple at the given index.
 
         Parameters:
-            intable: The intable type.
+            indexer: The type of the indexing value.
 
         Args:
             index: The element index.

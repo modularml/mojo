@@ -203,3 +203,37 @@ trait BoolableKeyElement(Boolable, KeyElement):
     """
 
     pass
+
+
+trait Indexer:
+    """This trait denotes a type that can be used to index a container that
+    handles integral index values.
+
+    This solves the issue of being able to index data structures such as `List` with the various
+    integral types without being too broad and allowing types that should not be used such as float point
+    values.
+    """
+
+    fn __index__(self) -> Int:
+        """Return the index value
+
+        Returns:
+            The index value of the object
+        """
+        ...
+
+
+@always_inline("nodebug")
+fn index[indexer: Indexer](idx: indexer) -> Int:
+    """Returns the value of `__index__` for the given value.
+
+    Parameters:
+        indexer: The type of the given value.
+
+    Args:
+        idx: The value.
+
+    Returns:
+        An int respresenting the index value.
+    """
+    return idx.__index__()

@@ -279,6 +279,9 @@ fn test_string_indexing() raises:
 
     assert_equal("!jMolH", str[:-1:-2])
 
+    assert_equal(str[True], "e")
+    assert_equal(str[Int8(0)], "H")
+
 
 fn test_atol() raises:
     # base 10

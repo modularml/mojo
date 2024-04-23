@@ -197,19 +197,19 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
         self = tmp
 
     @always_inline("nodebug")
-    fn __getitem__[intable: Intable](self, index: intable) -> Self.element_type:
+    fn __getitem__[indexer: Indexer](self, idx: indexer) -> Self.element_type:
         """Returns the value of the tuple at the given dynamic index.
 
         Parameters:
-            intable: The intable type.
+            indexer: The type of the indexing value.
 
         Args:
-            index: The index into the tuple.
+            idx: The index into the tuple.
 
         Returns:
             The value at the specified position.
         """
-        var offset = int(index)
+        var offset = index(idx)
         debug_assert(offset < size, "index must be within bounds")
         # Copy the array so we can get its address, because we can't take the
         # address of 'self' in a non-mutating method.
@@ -221,18 +221,18 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
 
     @always_inline("nodebug")
     fn __setitem__[
-        intable: Intable
-    ](inout self, index: intable, val: Self.element_type):
+        indexer: Indexer
+    ](inout self, idx: indexer, val: Self.element_type):
         """Stores a single value into the tuple at the specified dynamic index.
 
         Parameters:
-            intable: The intable type.
+            indexer: The type of the indexing value.
 
         Args:
-            index: The index into the tuple.
+            idx: The index into the tuple.
             val: The value to store.
         """
-        var offset = int(index)
+        var offset = index(idx)
         debug_assert(offset < size, "index must be within bounds")
         var tmp = self
         var ptr = __mlir_op.`pop.array.gep`(

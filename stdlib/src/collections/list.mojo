@@ -543,17 +543,24 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.capacity = 0
         return ptr
 
-    fn __setitem__(inout self, i: Int, owned value: T):
+    fn __setitem__[indexer: Indexer](inout self, i: indexer, owned value: T):
         """Sets a list element at the given index.
+
+        Parameters:
+            indexer: The type of the indexing value.
 
         Args:
             i: The index of the element.
             value: The value to assign.
         """
-        debug_assert(-self.size <= i < self.size, "index must be within bounds")
+        var normalized_idx = index(i)
 
-        var normalized_idx = i
-        if i < 0:
+        debug_assert(
+            -self.size <= normalized_idx < self.size,
+            "index must be within bounds",
+        )
+
+        if normalized_idx < 0:
             normalized_idx += len(self)
 
         destroy_pointee(self.data + normalized_idx)
@@ -603,10 +610,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return res^
 
     @always_inline
-    fn __getitem__(self, i: Int) -> T:
+    fn __getitem__[indexer: Indexer](self, i: indexer) -> T:
         """Gets a copy of the list element at the given index.
 
         FIXME(lifetimes): This should return a reference, not a copy!
+
+        Parameters:
+            indexer: The type of the indexing value.
 
         Args:
             i: The index of the element.
@@ -614,10 +624,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A copy of the element at the given index.
         """
-        debug_assert(-self.size <= i < self.size, "index must be within bounds")
+        var normalized_idx = index(i)
 
-        var normalized_idx = i
-        if i < 0:
+        debug_assert(
+            -self.size <= normalized_idx < self.size,
+            "index must be within bounds",
+        )
+
+        if normalized_idx < 0:
             normalized_idx += len(self)
 
         return (self.data + normalized_idx)[]
@@ -638,7 +652,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if i < 0:
             normalized_idx += self[].size
 
-        return (self[].data + normalized_idx)[]
+        var offset_ptr = self[].data + normalized_idx
+        return offset_ptr[]
 
     fn __iter__(
         self: Reference[Self, _, _],

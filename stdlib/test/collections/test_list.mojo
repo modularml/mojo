@@ -719,6 +719,14 @@ def test_list_mult():
     assert_equal(len(List[Int](1, 2, 3) * 0), 0)
 
 
+def test_indexer():
+    var l = List[Int](1, 2, 3)
+    assert_equal(l[Int8(1)], 2)
+    assert_equal(l[UInt64(2)], 3)
+    assert_equal(l[False], 1)
+    assert_equal(l[True], 2)
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -746,3 +754,4 @@ def main():
     test_list_count()
     test_list_add()
     test_list_mult()
+    test_indexer()
