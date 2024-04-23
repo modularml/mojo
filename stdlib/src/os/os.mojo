@@ -264,3 +264,67 @@ fn abort[
         print(message, flush=True)
 
     return abort[result]()
+
+
+# ===----------------------------------------------------------------------=== #
+# remove/unlink
+# ===----------------------------------------------------------------------=== #
+fn remove(path: String) raises:
+    """Removes the specified file.
+    If the path is a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+      path: The path to the file.
+
+    """
+    var error = external_call["unlink", Int](path._as_ptr())
+
+    if error != 0:
+        # TODO get error message, the following code prints it
+        # var error_str = String("Something went wrong")
+        # _ = external_call["perror", Pointer[NoneType]](error_str._as_ptr())
+        # _ = error_str
+        raise Error("Can not remove file: " + path)
+
+
+fn remove[pathlike: os.PathLike](path: pathlike) raises:
+    """Removes the specified file.
+    If the path is a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the file.
+
+    """
+    remove(path.__fspath__())
+
+
+fn unlink(path: String) raises:
+    """Removes the specified file.
+    If the path is a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+      path: The path to the file.
+
+    """
+    remove(path)
+
+
+fn unlink[pathlike: os.PathLike](path: pathlike) raises:
+    """Removes the specified file.
+    If the path is a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the file.
+
+    """
+    remove(path.__fspath__())
