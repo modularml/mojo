@@ -47,6 +47,9 @@ trait KeyElement(CollectionElement, Hashable, EqualityComparable):
 
 
 trait StringableKeyElement(KeyElement, Stringable):
+    """A trait composition for types which implement all requirements of
+    dictionary keys and Stringable."""
+
     pass
 
 
