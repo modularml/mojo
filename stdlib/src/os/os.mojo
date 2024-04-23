@@ -293,6 +293,9 @@ fn remove[pathlike: os.PathLike](path: pathlike) raises:
     If the path is a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
 
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
     Args:
       path: The path to the file.
 
@@ -316,6 +319,9 @@ fn unlink[pathlike: os.PathLike](path: pathlike) raises:
     """Removes the specified file.
     If the path is a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file.
