@@ -98,6 +98,20 @@ fn test_equality_operators() raises:
     assert_not_equal(s0, "notabc")
 
 
+fn test_compare_operators() raises:
+    assert_true(str("feefef") > str("feefe"))
+    assert_false(str("hello") > str("hello"))
+    assert_true(str("hello") >= str("hello"))
+    assert_false(str("hello") < str("hello"))
+    assert_true(str("hello") <= str("hello"))
+    assert_false(str("apple") > str("banana"))
+    assert_false(str("apple") > str("banana"))
+    assert_true(str("apple") > str("Banana"))
+    assert_false(str("apple123") > str("apple456"))
+    assert_false(str("appl2$") > str("banana"))
+    assert_false(str("") > str("a"))
+
+
 fn test_add() raises:
     var s1 = String("123")
     var s2 = String("abc")
@@ -697,6 +711,7 @@ def main():
     test_constructors()
     test_copy()
     test_equality_operators()
+    test_compare_operators()
     test_add()
     test_stringable()
     test_string_join()

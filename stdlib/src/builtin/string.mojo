@@ -52,6 +52,23 @@ fn _ctlz(val: SIMD) -> __type_of(val):
     )
 
 
+@always_inline
+fn _str_compare(str1: String, str2: String) -> Int:
+    var min_len = len(str1) if len(str1) < len(str2) else len(str2)
+    var cmp = memcmp(str1._as_ptr(), str2._as_ptr(), min_len)
+    if cmp < 0:
+        return -1
+    elif cmp > 0:
+        return 1
+    # now check length for str1 and str2
+    if len(str1) == len(str2):
+        return 0
+    elif len(str1) > len(str2):
+        return 1
+    else:
+        return -1
+
+
 # ===----------------------------------------------------------------------===#
 # ord
 # ===----------------------------------------------------------------------===#
@@ -714,13 +731,8 @@ struct String(
         Returns:
             True if the Strings are equal and False otherwise.
         """
-        if len(self) != len(other):
-            return False
 
-        if int(self._as_ptr()) == int(other._as_ptr()):
-            return True
-
-        return memcmp(self._as_ptr(), other._as_ptr(), len(self)) == 0
+        return _str_compare(self, other) == 0
 
     @always_inline
     fn __ne__(self, other: String) -> Bool:
@@ -733,6 +745,54 @@ struct String(
             True if the Strings are not equal and False otherwise.
         """
         return not (self == other)
+
+    @always_inline
+    fn __gt__(self, other: String) -> Bool:
+        """Compares two Strings if self greater than the other.
+
+        Args:
+            other: The rhs of the operation.
+
+        Returns:
+            True if self are greater than other string.
+        """
+        return _str_compare(self, other) == 1
+
+    @always_inline
+    fn __ge__(self, other: String) -> Bool:
+        """Compares two Strings if self greater equal the other.
+
+        Args:
+            other: The rhs of the operation.
+
+        Returns:
+            True if self are greater equal the other string.
+        """
+        return _str_compare(self, other) == 0 or _str_compare(self, other) == 1
+
+    @always_inline
+    fn __lt__(self, other: String) -> Bool:
+        """Compares two Strings if self less than the other.
+
+        Args:
+            other: The rhs of the operation.
+
+        Returns:
+            True if self are less than other string.
+        """
+        return _str_compare(self, other) == -1
+
+    @always_inline
+    fn __le__(self, other: String) -> Bool:
+        """Compares two Strings if self less equal the other.
+
+        Args:
+            other: The rhs of the operation.
+
+        Returns:
+            True if self are less equal other string.
+        """
+        return _str_compare(self, other) == 0 or _str_compare(self, other) == -1
 
     @always_inline
     fn __add__(self, other: String) -> String:
