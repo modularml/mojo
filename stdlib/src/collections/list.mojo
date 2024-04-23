@@ -20,6 +20,7 @@ from collections import List
 """
 
 
+from builtin.value import StringableCollectionElement
 from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
 
