@@ -68,7 +68,7 @@ what we publish.
   ```
 
 - `List` now has several new methods:
-  - `pop(index)` for removing an element at a particular index.  
+  - `pop(index)` for removing an element at a particular index.\
     By default, `List.pop()` removes the last element in the list.
   - `resize(new_size)` for resizing the list without the need to
     specify an additional value.
@@ -158,18 +158,45 @@ what we publish.
          return ...
     ```
 
+- Added `reversed()` for creating reversed iterators. Several range types,
+  `List`, and `Dict` now support iterating in reverse.
+  ([PR #2215](https://github.com/modularml/mojo/pull/2215),
+   [PR #2327](https://github.com/modularml/mojo/pull/2327))
+
+- Added left and right shift operations for `object`
+  ([PR #2247](https://github.com/modularml/mojo/pull/2247))
+
+- Added checked arithmetic operations.
+  ([PR #2138](https://github.com/modularml/mojo/pull/2138))
+
+  SIMD integral types (including the sized integral scalars like `Int64`) can
+  now perform checked additions, substractions, and multiplications using the
+  following new methods:
+
+  - `SIMD.add_with_overflow`
+  - `SIMD.sub_with_overflow`
+  - `SIMD.mul_with_overflow`
+
+  Checked arithimetic allows the caller to determine if an operation exceeded
+  the numeric limits of the type.
+
+- Added `os.remove()` and `os.unlink()` for deleting files.
+  ([PR #2310](https://github.com/modularml/mojo/pull/2310))
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
   changed slightly: `mojo build ./test-dir/program.mojo` now outputs an
   executable to the path `./program`, whereas before it would output to the path
   `./test-dir/program`.
+
 - The REPL no longer allows type level variable declarations to be
   uninitialized, e.g. it will reject `var s: String`.  This is because it does
   not do proper lifetime tracking (yet!) across cells, and so such code would
   lead to a crash.  You can work around this by initializing to a dummy value
   and overwriting later.  This limitation only applies to top level variables,
   variables in functions work as they always have.
+
 - `AnyPointer` got renamed to `UnsafePointer` and is now Mojo's preferred unsafe
   pointer type.  It has several enhancements, including:
   1) The element type can now be `AnyType`: it doesn't require `Movable`.
@@ -180,6 +207,7 @@ what we publish.
   4) `UnsafePointer` can be initialized directly from a `Reference` with
      `UnsafePointer(someRef)` and can convert to an immortal reference with
      `yourPointer[]`.  Both infer element type and address space.
+
 - All of the pointers got a pass of cleanup to make them more consistent, for
   example the `unsafe.bitcast` global function is now a consistent `bitcast`
   method on the pointers, which can convert element type and address space.
@@ -225,6 +253,32 @@ what we publish.
     print("bytes read", bytes)
     print(ptr.load[width=8]())
     ```
+
+- `Optional.value()` will now return a reference instead of a copy of the
+  contained value.
+  ([PR #2226](https://github.com/modularml/mojo/pull/2226))
+
+  To perform a copy manually, dereference the result:
+
+  ```mojo
+  var result = Optional(123)
+
+  var value = result.value()[]
+  ```
+
+- Per the accepted community proposal
+  [`proposals/byte-as-uint8.md`](https://github.com/modularml/mojo/blob/main/proposals/byte-as-uint8.md),
+  began transition to using `UInt8` by changing the data pointer of `Error`
+  to `DTypePointer[DType.uint8]`.
+  ([PR #2318](https://github.com/modularml/mojo/pull/2318))
+
+- Continued transition to `UnsafePointer` away from the legacy `Pointer` type
+  in various standard library APIs and internals.
+  ([PR #2365](https://github.com/modularml/mojo/pull/2365),
+   [PR #2367](https://github.com/modularml/mojo/pull/2367),
+   [PR #2368](https://github.com/modularml/mojo/pull/2368),
+   [PR #2370](https://github.com/modularml/mojo/pull/2370),
+   [PR #2371](https://github.com/modularml/mojo/pull/2371))
 
 ### ❌ Removed
 
@@ -298,3 +352,12 @@ what we publish.
 
 - [#1675](https://github.com/modularml/mojo/issues/1675) Ensure `@value`
   decorator fails gracefully after duplicate field error.
+
+- [#2068](https://github.com/modularml/mojo/issues/2068)
+  Fix simd.reduce for size_out == 2
+  ([PR #2102](https://github.com/modularml/mojo/pull/2102))
+
+- [#2224](https://github.com/modularml/mojo/issues/2224)
+  `object` now implements `__truediv__`, `__floordiv__` and related divison
+  and modulo operators.
+  ([PR #2230](https://github.com/modularml/mojo/pull/2230))
