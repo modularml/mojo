@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: is_debug
-# RUN: %mojo %s | FileCheck %s
+# RUN: %mojo %s
 
 from sys._build import is_debug_build, is_release_build
 from testing import assert_true, assert_false
