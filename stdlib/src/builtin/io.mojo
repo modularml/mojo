@@ -19,7 +19,7 @@ from sys import bitwidthof, os_is_windows, triple_is_nvidia_cuda, external_call
 
 from builtin.dtype import _get_dtype_printf_format
 from builtin.builtin_list import _LITRefPackHelper
-from memory import Pointer
+from memory import UnsafePointer
 
 from utils import StringRef, unroll
 from utils._format import Formattable, Formatter, write_to
@@ -53,7 +53,7 @@ fn _dup(fd: Int32) -> Int32:
 struct _fdopen:
     alias STDOUT = 1
     alias STDERR = 2
-    var handle: Pointer[NoneType]
+    var handle: UnsafePointer[NoneType]
 
     fn __init__(inout self, stream_id: Int):
         """Creates a file handle to the stdout/stderr stream.
@@ -62,15 +62,15 @@ struct _fdopen:
             stream_id: The stream id (either `STDOUT` or `STDERR`)
         """
         alias mode = "a"
-        var handle: Pointer[NoneType]
+        var handle: UnsafePointer[NoneType]
 
         @parameter
         if os_is_windows():
-            handle = external_call["_fdopen", Pointer[NoneType]](
+            handle = external_call["_fdopen", UnsafePointer[NoneType]](
                 _dup(stream_id), mode.data()
             )
         else:
-            handle = external_call["fdopen", Pointer[NoneType]](
+            handle = external_call["fdopen", UnsafePointer[NoneType]](
                 _dup(stream_id), mode.data()
             )
         self.handle = handle
