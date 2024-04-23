@@ -20,8 +20,9 @@ from collections import Dict, List
 from os import Atomic
 from sys.intrinsics import _type_is_eq
 
-from memory import memcmp, memcpy, DTypePointer, LegacyPointer, UnsafePointer
+from memory import memcmp, memcpy, DTypePointer
 from memory._arc import Arc
+from memory.unsafe_pointer import move_from_pointee
 
 from utils import StringRef, unroll
 
@@ -1737,7 +1738,7 @@ struct object(IntableRaising, Boolable, Stringable):
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
-            initialize_pointee(
+            initialize_pointee_copy(
                 impl.data,
                 move_from_pointee(self._value.get_as_string().data + index),
             )
