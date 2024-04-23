@@ -89,6 +89,11 @@ fn reversed[
 
     **Note**: iterators are currently non-raising.
 
+    Parameters:
+        mutability: Whether the reference to the list is mutable.
+        self_life: The lifetime of the list.
+        T: The type of the elements in the list.
+
     Args:
         value: The list to get the reversed iterator of.
 
