@@ -198,6 +198,25 @@ what we publish.
   As the example shows above, the protected `_properties` attribute can be
   passed during op construction, with an MLIR `DictionaryAttr` value.
 
+- Mojo now allows users to capture source location of code and call location of
+  functions dynamically. For example:
+
+  ```mojo
+  @always_inline
+  fn my_assert(cond: Bool, msg: String):
+    if not cond:
+      var call_loc = __call_location()
+      print("In", call_loc.file_name, "on line", str(call_loc.line) + ":", msg)
+
+  fn main():
+    my_assert(False, "always fails")  # some_file.mojo, line 193
+  ```
+
+  will print `In /path/to/some_file.mojo on line 193: always fails`. Note that
+  `__call_location` only works in `@always_inline("nodebug")` and
+  `@always_inline` functions, as well as limitations on its use in parameter
+  contexts (see the documentation for more details).
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
