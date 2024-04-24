@@ -70,11 +70,12 @@ what we publish.
 - `List` now has several new methods:
   - `pop(index)` for removing an element at a particular index.\
     By default, `List.pop()` removes the last element in the list.
-  - `resize(new_size)` for resizing the list without the need to
+
+- `resize(new_size)` for resizing the list without the need to
     specify an additional value.
-  - `insert(index, value)` for inserting a value at a specified index
+- `insert(index, value)` for inserting a value at a specified index
     into the `List`.
-  - constructor from `(ptr, size, capacity)` to to avoid needing to do a deep
+- constructor from `(ptr, size, capacity)` to to avoid needing to do a deep
     copy of an existing contiguous memory allocation when constructing a new `List`.
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
@@ -182,6 +183,20 @@ what we publish.
 
 - Added `os.remove()` and `os.unlink()` for deleting files.
   ([PR #2310](https://github.com/modularml/mojo/pull/2310))
+
+- Properties can now be specified on inline mlir ops:
+
+  ```mojo
+  _ = __mlir_op.`kgen.source_loc`[
+      _type = (
+          __mlir_type.index, __mlir_type.index, __mlir_type.`!kgen.string`
+      ),
+      _properties = __mlir_attr.`{inlineCount = 1 : i64}`,
+  ]()
+  ```
+
+  As the example shows above, the protected `_properties` attribute can be
+  passed during op construction, with an MLIR `DictionaryAttr` value.
 
 ### 🦋 Changed
 
