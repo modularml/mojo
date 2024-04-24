@@ -860,7 +860,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var ref = Reference(self)
         return _DictKeyIter(
             _DictEntryIter[K, V, mutability, self_life, False](
-                ref[]._reserved, 0, ref
+                ref[]._reserved - 1, 0, ref
             )
         )
 
