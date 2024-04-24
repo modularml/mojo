@@ -17,38 +17,24 @@
 @value
 @register_passable("trivial")
 struct _SourceLocation(Stringable):
-    var file_name: StringLiteral
-    var function_name: StringLiteral
-    var line: Int
-
-    fn __str__(self) -> String:
-        return (
-            str(self.file_name)
-            + ":"
-            + str(self.function_name)
-            + ":"
-            + str(self.line)
-        )
-
-
-@value
-@register_passable("trivial")
-struct _SourceLocInfo:
     """Type to carry file name, line, and column information."""
 
     var line: Int
     var col: Int
     var file_name: StringLiteral
 
+    fn __str__(self) -> String:
+        return str(self.file_name) + ":" + str(self.line) + ":" + str(self.col)
+
 
 @always_inline("nodebug")
-fn __source_loc() -> _SourceLocInfo:
+fn __source_location() -> _SourceLocation:
     """Returns the location where it's called.
 
     This currently doesn't work when called in a parameter expression.
 
     Returns:
-        The location information of the __source_loc() call.
+        The location information of the __source_location() call.
     """
     var line: __mlir_type.index
     var col: __mlir_type.index
@@ -62,11 +48,11 @@ fn __source_loc() -> _SourceLocInfo:
         ),
     ]()
 
-    return _SourceLocInfo(line, col, file_name)
+    return _SourceLocation(line, col, file_name)
 
 
 @always_inline("nodebug")
-fn __call_loc() -> _SourceLocInfo:
+fn __call_location() -> _SourceLocation:
     """Returns the location where the enclosing function is called.
 
     This should only be used in `@always_inline` and `@always_inline("nodebug")`
@@ -80,7 +66,7 @@ fn __call_loc() -> _SourceLocInfo:
 
     Returns:
         The location information of where the enclosing function (i.e. the
-          function whose body __call_loc() is used in) is called.
+          function whose body __call_location() is used in) is called.
     """
     var line: __mlir_type.index
     var col: __mlir_type.index
@@ -94,4 +80,4 @@ fn __call_loc() -> _SourceLocInfo:
         ),
     ]()
 
-    return _SourceLocInfo(line, col, file_name)
+    return _SourceLocation(line, col, file_name)
