@@ -116,6 +116,9 @@ fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
 
+    Parameters:
+        T: A Testable type.
+
     Args:
         lhs: The lhs of the equality.
         rhs: The rhs of the equality.
@@ -175,6 +178,9 @@ fn assert_equal[
 fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
     """Asserts that the input values are not equal. If it is not then an
     Error is raised.
+
+    Parameters:
+        T: A Testable type.
 
     Args:
         lhs: The lhs of the inequality.

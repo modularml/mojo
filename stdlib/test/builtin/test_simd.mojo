@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 from sys import has_neon, simdwidthof
 
@@ -365,9 +365,13 @@ def test_interleave():
 
 
 def test_deinterleave():
-    var ts = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
-    assert_equal(ts[0], SIMD[DType.index, 2](0, 2))
-    assert_equal(ts[1], SIMD[DType.index, 2](1, 3))
+    var tup2 = SIMD[DType.float32, 2](1, 2).deinterleave()
+    assert_equal(tup2[0], Float32(1))
+    assert_equal(tup2[1], Float32(2))
+
+    var tup4 = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
+    assert_equal(tup4[0], SIMD[DType.index, 2](0, 2))
+    assert_equal(tup4[1], SIMD[DType.index, 2](1, 3))
 
 
 def test_address():

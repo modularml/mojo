@@ -206,12 +206,9 @@ struct Python:
             cpython: The cpython instance we wish to error check.
         """
         if cpython.PyErr_Occurred():
-            var error = PythonObject(cpython.PyErr_Fetch()).__getattr__(
-                "__str__"
-            )()
-            var err: Error = cpython.PyUnicode_AsUTF8AndSize(error.py_object)
+            var error: Error = str(PythonObject(cpython.PyErr_Fetch()))
             cpython.PyErr_Clear()
-            raise err
+            raise error
 
     @staticmethod
     fn is_type(x: PythonObject, y: PythonObject) -> Bool:

@@ -15,7 +15,7 @@
 You can import these APIs from the `memory` package. For example:
 
 ```mojo
-from memory import Pointer, AnyLifetime
+from memory import Pointer
 ```
 """
 
@@ -32,6 +32,7 @@ from sys.intrinsics import prefetch as _prefetch
 from sys.intrinsics import gather, scatter, strided_load, strided_store
 
 from .memory import _free, _malloc
+from .reference import AddressSpace
 
 # ===----------------------------------------------------------------------===#
 # Utilities
@@ -288,8 +289,8 @@ struct LegacyPointer[
         )
 
     @always_inline("nodebug")
-    fn __getitem__[T: Intable](self, offset: T) -> type:
-        """Loads the value the LegacyPointer object points to with the given offset.
+    fn __refitem__[T: Intable](self, offset: T) -> Self._mlir_ref_type:
+        """Enable subscript syntax `ref[idx]` to access the element.
 
         Parameters:
             T: The Intable type of the offset.
@@ -298,23 +299,9 @@ struct LegacyPointer[
             offset: The offset to load from.
 
         Returns:
-            The loaded value.
+            The MLIR reference for the Mojo compiler to use.
         """
-        return self.load(offset)
-
-    @always_inline("nodebug")
-    fn __setitem__[T: Intable](self, offset: T, val: type):
-        """Stores the specified value to the location the LegacyPointer object points
-        to with the given offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        return self.store(offset, val)
+        return (self + offset).__refitem__()
 
     # ===------------------------------------------------------------------=== #
     # Load/Store
@@ -656,13 +643,13 @@ struct DTypePointer[
         self.address = value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: UnsafePointer[Scalar[type], address_space]):
+    fn __init__(inout self, other: UnsafePointer[Scalar[type], address_space]):
         """Constructs a `DTypePointer` from a scalar pointer of the same type.
 
         Args:
-            value: The scalar pointer.
+            other: The scalar pointer.
         """
-        self.address = value.value
+        self.address = other.address
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Scalar[DType.address]):
@@ -909,6 +896,22 @@ struct DTypePointer[
         Returns:
             The loaded value.
         """
+
+        @parameter
+        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
+            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
+            # regardless of the alignment that is passed. This causes issues if
+            # this method is called on an unaligned pointer.
+            # TODO #37823 We can make this smarter when we add an `aligned`
+            # trait to the pointer class.
+            var v = SIMD[type, width]()
+
+            # intentionally don't unroll, otherwise the compiler vectorizes
+            for i in range(width):
+                v[i] = self.address.offset(int(offset) + i).load[
+                    alignment=alignment
+                ]()
+            return v
 
         return (
             self.address.offset(offset)

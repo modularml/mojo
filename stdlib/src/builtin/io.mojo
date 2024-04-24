@@ -22,6 +22,7 @@ from builtin.builtin_list import _LITRefPackHelper
 from memory import UnsafePointer
 
 from utils import StringRef, unroll
+from utils._format import Formattable, Formatter, write_to
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -318,20 +319,28 @@ fn _put(x: StringRef):
     if not str_len:
         return
 
-    alias MAX_STR_LEN = 0x1000_0000
+    @parameter
+    if triple_is_nvidia_cuda():
+        var tmp = 0
+        var arg_ptr = Pointer.address_of(tmp)
+        _ = external_call["vprintf", Int32](
+            x.data, arg_ptr.bitcast[Pointer[NoneType]]()
+        )
+    else:
+        alias MAX_STR_LEN = 0x1000_0000
 
-    # The string can be printed, so that's fine.
-    if str_len < MAX_STR_LEN:
-        _printf("%.*s", x.length, x.data)
-        return
+        # The string can be printed, so that's fine.
+        if str_len < MAX_STR_LEN:
+            _printf("%.*s", x.length, x.data)
+            return
 
-    # The string is large, then we need to chunk it.
-    var p = x.data
-    while str_len:
-        var ll = _min(str_len, MAX_STR_LEN)
-        _printf("%.*s", ll, p)
-        str_len -= ll
-        p += ll
+        # The string is large, then we need to chunk it.
+        var p = x.data
+        while str_len:
+            var ll = _min(str_len, MAX_STR_LEN)
+            _printf("%.*s", ll, p)
+            str_len -= ll
+            p += ll
 
 
 @no_inline
@@ -401,3 +410,57 @@ fn print[
     _put(end)
     if flush:
         _flush()
+
+
+# ===----------------------------------------------------------------------=== #
+#  print_fmt
+# ===----------------------------------------------------------------------=== #
+
+
+# TODO:
+#   Finish transition to using non-allocating formatting abstractions by
+#   default, replace `print` with this function.
+@no_inline
+fn _print_fmt[
+    T: Formattable, *Ts: Formattable
+](
+    first: T,
+    *rest: *Ts,
+    sep: StringLiteral = " ",
+    end: StringLiteral = "\n",
+    flush: Bool = False,
+):
+    """Prints elements to the text stream. Each element is separated by `sep`
+    and followed by `end`.
+
+    This print function does not perform unnecessary intermediate String
+    allocations during formatting.
+
+    Parameters:
+        T: The first element type.
+        Ts: The remaining element types.
+
+    Args:
+        first: The first element.
+        rest: The remaining elements.
+        sep: The separator used between elements.
+        end: The String to write after printing the elements.
+        flush: If set to true, then the stream is forcibly flushed.
+    """
+    var writer = Formatter.stdout()
+
+    write_to(writer, first)
+
+    @parameter
+    fn print_elt[T: Formattable](a: T):
+        write_to(writer, sep, a)
+
+    rest.each[print_elt]()
+
+    write_to(writer, end)
+
+    # TODO: What is a flush function that works on CUDA?
+    @parameter
+    if not triple_is_nvidia_cuda():
+        if flush:
+            _flush()

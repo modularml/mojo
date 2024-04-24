@@ -53,12 +53,13 @@ your changes automatically at each commit, and will also ensure that you
 always have the latest linting tools applied.
 
 To do so, install pre-commit:
+
 ```bash
 pip install pre-commit
 pre-commit install
 ```
-and that's it!
 
+and that's it!
 
 #### Whitespace
 
