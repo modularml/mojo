@@ -98,7 +98,7 @@ fn _clock_gettime(clockid: Int) -> _CTimeSpec:
 
     # Call libc's clock_gettime.
     _ = external_call["clock_gettime", Int32](
-        Int32(clockid), UnsafePointer(Reference(ts))
+        Int32(clockid), UnsafePointer.address_of(ts)
     )
 
     return ts
@@ -129,7 +129,7 @@ fn _monotonic_nanoseconds() -> Int:
     if os_is_windows():
         var ft = _FILETIME()
         external_call["GetSystemTimePreciseAsFileTime", NoneType](
-            UnsafePointer(Reference(ft))
+            UnsafePointer.address_of(ft)
         )
 
         return ft.as_nanoseconds()
@@ -187,13 +187,19 @@ fn _time_function_windows[func: fn () capturing -> None]() -> Int:
     """Calculates elapsed time in Windows"""
 
     var ticks_per_sec: _WINDOWS_LARGE_INTEGER = 0
-    var ticks_per_sec_ptr = UnsafePointer(Reference(ticks_per_sec))
+    var ticks_per_sec_ptr = UnsafePointer[_WINDOWS_LARGE_INTEGER].address_of(
+        ticks_per_sec
+    )
     external_call["QueryPerformanceFrequency", NoneType](ticks_per_sec_ptr)
 
     var starting_tick_count: _WINDOWS_LARGE_INTEGER = 0
-    var start_ptr = UnsafePointer(Reference(starting_tick_count))
+    var start_ptr = UnsafePointer[_WINDOWS_LARGE_INTEGER].address_of(
+        starting_tick_count
+    )
     var ending_tick_count: _WINDOWS_LARGE_INTEGER = 0
-    var end_ptr = UnsafePointer(Reference(ending_tick_count))
+    var end_ptr = UnsafePointer[_WINDOWS_LARGE_INTEGER].address_of(
+        ending_tick_count
+    )
 
     external_call["QueryPerformanceCounter", NoneType](start_ptr)
     func()
@@ -245,7 +251,7 @@ fn sleep(sec: Float64):
         int(total_secs.cast[DType.index]()),
         int((sec - total_secs) * NANOSECONDS_IN_SECOND),
     )
-    var req = UnsafePointer(Reference(tv_spec))
+    var req = UnsafePointer[_CTimeSpec].address_of(tv_spec)
     var rem = UnsafePointer[_CTimeSpec].get_null()
     _ = external_call["nanosleep", Int32](req, rem)
 

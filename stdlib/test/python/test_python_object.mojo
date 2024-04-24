@@ -14,252 +14,245 @@
 # RUN: %mojo %s
 
 from python._cpython import CPython, PyObjectPtr
-
 from python import PythonObject, Python
-
-
 from testing import assert_false, assert_raises, assert_true, assert_equal
-
 
 from utils import StringRef
 
 
-fn test_dunder_methods(inout python: Python):
-    try:
-        var a = PythonObject(34)
-        var b = PythonObject(10)
+def test_dunder_methods(inout python: Python):
+    var a = PythonObject(34)
+    var b = PythonObject(10)
 
-        # __add__
-        var c = a + b
-        assert_true(c, 44)
+    # __add__
+    var c = a + b
+    assert_true(c, 44)
 
-        # __add__
-        c = a + 100
-        assert_true(c, 134)
+    # __add__
+    c = a + 100
+    assert_true(c, 134)
 
-        # __iadd__
-        c += 100
-        assert_equal(c, 234)
+    # __iadd__
+    c += 100
+    assert_equal(c, 234)
 
-        # __radd__
-        c = 100 + a
-        assert_equal(c, 134)
+    # __radd__
+    c = 100 + a
+    assert_equal(c, 134)
 
-        # __sub__
-        c = a - b
-        assert_equal(c, 24)
+    # __sub__
+    c = a - b
+    assert_equal(c, 24)
 
-        # __isub__
-        c -= 100
-        assert_equal(c, -76)
+    # __isub__
+    c -= 100
+    assert_equal(c, -76)
 
-        # __sub__
-        c = a - 100
-        assert_equal(c, -66)
+    # __sub__
+    c = a - 100
+    assert_equal(c, -66)
 
-        # __rsub__
-        c = 100 - a
-        assert_equal(c, 66)
+    # __rsub__
+    c = 100 - a
+    assert_equal(c, 66)
 
-        # __mul__
-        c = a * b
-        assert_equal(c, 340)
+    # __mul__
+    c = a * b
+    assert_equal(c, 340)
 
-        # __imul__
-        c *= 10
-        assert_equal(c, 3400)
+    # __imul__
+    c *= 10
+    assert_equal(c, 3400)
 
-        # __mul__
-        c = a * 10
-        assert_equal(c, 340)
+    # __mul__
+    c = a * 10
+    assert_equal(c, 340)
 
-        # __rmul__
-        c = 34 * b
-        assert_equal(c, 340)
+    # __rmul__
+    c = 34 * b
+    assert_equal(c, 340)
 
-        # __floordiv__
-        c = a // b
-        assert_equal(c, 3)
+    # __floordiv__
+    c = a // b
+    assert_equal(c, 3)
 
-        # __ifloordiv__
-        c //= 2
-        assert_equal(c, 1)
+    # __ifloordiv__
+    c //= 2
+    assert_equal(c, 1)
 
-        # __floordiv__
-        c = a // 10
-        assert_equal(c, 3)
+    # __floordiv__
+    c = a // 10
+    assert_equal(c, 3)
 
-        # __rfloordiv__
-        c = 34 // b
-        assert_equal(c, 3)
+    # __rfloordiv__
+    c = 34 // b
+    assert_equal(c, 3)
 
-        # __truediv__
-        c = a / b
-        assert_equal(c, 3.4)
+    # __truediv__
+    c = a / b
+    assert_equal(c, 3.4)
 
-        # __itruediv__
-        c /= 2
-        assert_equal(c, 1.7)
+    # __itruediv__
+    c /= 2
+    assert_equal(c, 1.7)
 
-        # __truediv__
-        c = a / 10
-        assert_equal(c, 3.4)
+    # __truediv__
+    c = a / 10
+    assert_equal(c, 3.4)
 
-        # __rtruediv__
-        c = 34 / b
-        assert_equal(c, 3.4)
+    # __rtruediv__
+    c = 34 / b
+    assert_equal(c, 3.4)
 
-        # __mod__
-        c = a % b
-        assert_equal(c, 4)
+    # __mod__
+    c = a % b
+    assert_equal(c, 4)
 
-        # __imod__
-        c %= 3
-        assert_equal(c, 1)
+    # __imod__
+    c %= 3
+    assert_equal(c, 1)
 
-        # __mod__
-        c = a % 10
-        assert_equal(c, 4)
+    # __mod__
+    c = a % 10
+    assert_equal(c, 4)
 
-        # __rmod__
-        c = 34 % b
-        assert_equal(c, 4)
+    # __rmod__
+    c = 34 % b
+    assert_equal(c, 4)
 
-        # __xor__
-        c = a ^ b
-        assert_equal(c, 40)
+    # __xor__
+    c = a ^ b
+    assert_equal(c, 40)
 
-        # __ixor__
-        c ^= 15
-        assert_equal(c, 39)
+    # __ixor__
+    c ^= 15
+    assert_equal(c, 39)
 
-        # __xor__
-        c = a ^ 10
-        assert_equal(c, 40)
+    # __xor__
+    c = a ^ 10
+    assert_equal(c, 40)
 
-        # __rxor__
-        c = 34 ^ b
-        assert_equal(c, 40)
+    # __rxor__
+    c = 34 ^ b
+    assert_equal(c, 40)
 
-        # __or__
-        c = a | b
-        assert_equal(c, 42)
+    # __or__
+    c = a | b
+    assert_equal(c, 42)
 
-        # __ior__
-        c |= 9
-        assert_equal(c, 43)
+    # __ior__
+    c |= 9
+    assert_equal(c, 43)
 
-        # __or__
-        c = a | 10
-        assert_equal(c, 42)
+    # __or__
+    c = a | 10
+    assert_equal(c, 42)
 
-        # __ror__
-        c = 34 | b
-        assert_equal(c, 42)
+    # __ror__
+    c = 34 | b
+    assert_equal(c, 42)
 
-        # __and__
-        c = a & b
-        assert_equal(c, 2)
+    # __and__
+    c = a & b
+    assert_equal(c, 2)
 
-        # __iand__
-        c &= 6
-        assert_equal(c, 2)
+    # __iand__
+    c &= 6
+    assert_equal(c, 2)
 
-        # __and__
-        c = a & 10
-        assert_equal(c, 2)
+    # __and__
+    c = a & 10
+    assert_equal(c, 2)
 
-        # __rand__
-        c = 34 & b
-        assert_equal(c, 2)
+    # __rand__
+    c = 34 & b
+    assert_equal(c, 2)
 
-        # __rshift__
-        var d = PythonObject(2)
-        c = a >> d
-        assert_equal(c, 8)
+    # __rshift__
+    var d = PythonObject(2)
+    c = a >> d
+    assert_equal(c, 8)
 
-        # __irshift__
-        c >>= 2
-        assert_equal(c, 2)
+    # __irshift__
+    c >>= 2
+    assert_equal(c, 2)
 
-        # __rshift__
-        c = a >> 2
-        assert_equal(c, 8)
+    # __rshift__
+    c = a >> 2
+    assert_equal(c, 8)
 
-        # __rrshift__
-        c = 34 >> d
-        assert_equal(c, 8)
+    # __rrshift__
+    c = 34 >> d
+    assert_equal(c, 8)
 
-        # __lshift__
-        c = a << d
-        assert_equal(c, 136)
+    # __lshift__
+    c = a << d
+    assert_equal(c, 136)
 
-        # __ilshift__
-        c <<= 1
-        assert_equal(c, 272)
+    # __ilshift__
+    c <<= 1
+    assert_equal(c, 272)
 
-        # __lshift__
-        c = a << 2
-        assert_equal(c, 136)
+    # __lshift__
+    c = a << 2
+    assert_equal(c, 136)
 
-        # __rlshift__
-        c = 34 << d
-        assert_equal(c, 136)
+    # __rlshift__
+    c = 34 << d
+    assert_equal(c, 136)
 
-        # __pow__
-        c = a**d
-        assert_equal(c, 1156)
+    # __pow__
+    c = a**d
+    assert_equal(c, 1156)
 
-        # __ipow__
-        c = 3
-        c **= 4
-        assert_equal(c, 81)
+    # __ipow__
+    c = 3
+    c **= 4
+    assert_equal(c, 81)
 
-        # __pow__
-        c = a**2
-        assert_equal(c, 1156)
+    # __pow__
+    c = a**2
+    assert_equal(c, 1156)
 
-        # __rpow__
-        c = 34**d
-        assert_equal(c, 1156)
+    # __rpow__
+    c = 34**d
+    assert_equal(c, 1156)
 
-        # __lt__
-        c = a < b
-        assert_false(c)
+    # __lt__
+    c = a < b
+    assert_false(c)
 
-        # __le__
-        c = a <= b
-        assert_false(c)
+    # __le__
+    c = a <= b
+    assert_false(c)
 
-        # __gt__
-        c = a > b
-        assert_true(c)
+    # __gt__
+    c = a > b
+    assert_true(c)
 
-        # __ge__
-        c = a >= b
-        assert_true(c)
+    # __ge__
+    c = a >= b
+    assert_true(c)
 
-        # __eq__
-        c = a == b
-        assert_false(c)
+    # __eq__
+    c = a == b
+    assert_false(c)
 
-        # __ne__
-        c = a != b
-        assert_true(c)
+    # __ne__
+    c = a != b
+    assert_true(c)
 
-        # __pos__
-        c = +a
-        assert_equal(c, 34)
+    # __pos__
+    c = +a
+    assert_equal(c, 34)
 
-        # __neg__
-        c = -a
-        assert_equal(c, -34)
+    # __neg__
+    c = -a
+    assert_equal(c, -34)
 
-        # __invert__
-        c = ~a
-        assert_equal(c, -35)
-    except e:
-        pass
+    # __invert__
+    c = ~a
+    assert_equal(c, -35)
 
 
 def test_bool_conversion() -> None:

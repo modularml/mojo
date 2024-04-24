@@ -291,7 +291,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     if r != 0:
         var remaining = StaticTuple[Int8, stride]()
         var ptr = DTypePointer[DType.int8](
-            Reference(remaining).get_legacy_pointer().bitcast[Int8]()
+            Pointer.address_of(remaining).bitcast[Int8]()
         )
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
