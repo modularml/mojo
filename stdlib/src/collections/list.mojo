@@ -193,12 +193,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return self.size
 
     fn __bool__(self) -> Bool:
-        """Checks if the list is empty.
+        """Checks whether the list has any elements or not.
 
         Returns:
             `False` if the list is empty, `True` if there is at least one element.
         """
-        return len(self).__bool__()
+        return len(self) > 0
 
     @always_inline
     fn _realloc(inout self, new_capacity: Int):

@@ -725,7 +725,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn update(inout self, other: Self, /):
         """Update the dictionary with the key/value pairs from other, overwriting existing keys.
-
         The argument must be positional only.
 
         Args:

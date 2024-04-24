@@ -540,6 +540,11 @@ def test_list_span():
     assert_equal(len(es), 3)
 
 
+def test_list_boolable():
+    assert_true(List[Int](1))
+    assert_false(List[Int]())
+
+
 def test_constructor_from_pointer():
     new_pointer = UnsafePointer[Int8].alloc(5)
     new_pointer[0] = 0
@@ -603,6 +608,7 @@ def main():
     test_list_iter()
     test_list_iter_mutable()
     test_list_span()
+    test_list_boolable()
     test_constructor_from_pointer()
     test_constructor_from_other_list_through_pointer()
     test_converting_list_to_string()
