@@ -779,8 +779,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
         # Return (found, slot, index)
-        var insert_slot = Optional[Int]()
-        var insert_index = Optional[Int]()
         var slot = hash % self._reserved
         var perturb = bitcast[DType.uint64](Int64(hash))
         while True:
