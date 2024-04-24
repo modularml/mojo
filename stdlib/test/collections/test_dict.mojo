@@ -288,7 +288,7 @@ struct DummyKey(KeyElement):
         return self.value != other.value
 
 
-def test_probing_error():
+def test_mojo_issue_1729():
     var keys = List(
         7005684093727295727,
         2833576045803927472,
@@ -342,7 +342,7 @@ def test_dict():
     test["test_dict_update_nominal", test_dict_update_nominal]()
     test["test_dict_update_empty_origin", test_dict_update_empty_origin]()
     test["test_dict_update_empty_new", test_dict_update_empty_new]()
-    test["test_probing_error", test_probing_error]()
+    test["test_mojo_issue_1729", test_mojo_issue_1729]()
 
 
 def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
