@@ -71,7 +71,7 @@ def test_dict_string_representation_string_int():
         some_dict._minimum_size_of_string_representation()
         <= len(dict_as_string)
     )
-    assert_equal(dict_as_string, "{a: 1, b: 2}")
+    assert_equal(dict_as_string, "{'a': 1, 'b': 2}")
 
 
 def test_dict_string_representation_int_int():
