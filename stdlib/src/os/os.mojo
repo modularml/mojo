@@ -22,13 +22,30 @@ from os import listdir
 from collections import List
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 
+from memory import (
+    DTypePointer,
+    Pointer,
+)
 from memory.unsafe_pointer import move_from_pointee
-from memory import DTypePointer, Pointer
 
 from utils import StringRef
 
 from .path import isdir
 from .pathlike import PathLike
+
+
+# ===----------------------------------------------------------------------=== #
+# SEEK Constants
+# ===----------------------------------------------------------------------=== #
+
+
+alias SEEK_SET: UInt8 = 0
+"""Seek from the beginning of the file."""
+alias SEEK_CUR: UInt8 = 1
+"""Seek from the current position."""
+alias SEEK_END: UInt8 = 2
+"""Seek from the end of the file."""
+
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -247,3 +264,67 @@ fn abort[
         print(message, flush=True)
 
     return abort[result]()
+
+
+# ===----------------------------------------------------------------------=== #
+# remove/unlink
+# ===----------------------------------------------------------------------=== #
+fn remove(path: String) raises:
+    """Removes the specified file.
+    If the path is a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+      path: The path to the file.
+
+    """
+    var error = external_call["unlink", Int](path._as_ptr())
+
+    if error != 0:
+        # TODO get error message, the following code prints it
+        # var error_str = String("Something went wrong")
+        # _ = external_call["perror", Pointer[NoneType]](error_str._as_ptr())
+        # _ = error_str
+        raise Error("Can not remove file: " + path)
+
+
+fn remove[pathlike: os.PathLike](path: pathlike) raises:
+    """Removes the specified file.
+    If the path is a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the file.
+
+    """
+    remove(path.__fspath__())
+
+
+fn unlink(path: String) raises:
+    """Removes the specified file.
+    If the path is a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+      path: The path to the file.
+
+    """
+    remove(path)
+
+
+fn unlink[pathlike: os.PathLike](path: pathlike) raises:
+    """Removes the specified file.
+    If the path is a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the file.
+
+    """
+    remove(path.__fspath__())

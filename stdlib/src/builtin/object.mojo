@@ -16,14 +16,13 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict, List
+
 from os import Atomic
 from sys.intrinsics import _type_is_eq
 
-
-from memory import memcmp, memcpy, DTypePointer, Pointer
+from memory import memcmp, memcpy, DTypePointer
 from memory._arc import Arc
-from memory.unsafe import LegacyPointer
-
+from memory.unsafe_pointer import move_from_pointee
 
 from utils import StringRef, unroll
 
@@ -58,19 +57,15 @@ struct _ImmutableString:
     pointer and integer pair. Memory will be dynamically allocated.
     """
 
-    var data: LegacyPointer[Int8]
+    var data: UnsafePointer[Int8]
     """The pointer to the beginning of the string contents. It is not
     null-terminated."""
     var length: Int
     """The length of the string."""
 
     @always_inline
-    fn __init__(data: LegacyPointer[Int8], length: Int) -> Self:
-        return Self {data: data.address, length: length}
-
-    @always_inline
     fn __init__(data: UnsafePointer[Int8], length: Int) -> Self:
-        return Self {data: data.value, length: length}
+        return Self {data: data.address, length: length}
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
@@ -105,7 +100,7 @@ struct _RefCountedListRef:
     @always_inline
     fn __init__() -> Self:
         var ptr = UnsafePointer[_RefCountedList].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedList()
+        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         return Self {lst: ptr.bitcast[NoneType]()}
 
     @always_inline
@@ -190,7 +185,7 @@ struct _RefCountedAttrsDictRef:
     @always_inline
     fn __init__(values: VariadicListMem[Attr, _, _]) -> Self:
         var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedAttrsDict()
+        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
             ptr[].impl[]._insert(values[i].key, values[i].value._value.copy())
@@ -581,6 +576,18 @@ struct _ObjectImpl(CollectionElement, Stringable):
             rhs = rhs.convert_int_to_float()
         else:
             lhs = lhs.convert_int_to_float()
+
+    @staticmethod
+    fn coerce_integral_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
+        """Coerces two values of integral type to the appropriate
+        lowest-common denominator type for performing bitwise operations.
+        """
+        if lhs.is_int() == rhs.is_int():
+            return
+        if lhs.is_int():
+            rhs = rhs.convert_bool_to_int()
+        else:
+            lhs = lhs.convert_bool_to_int()
 
     fn __str__(self) -> String:
         """Returns the name (in lowercase) of the specific object type."""
@@ -1177,6 +1184,12 @@ struct object(IntableRaising, Boolable, Stringable):
         ):
             raise Error("TypeError: not a valid arithmetic type")
 
+    @always_inline
+    fn _arithmetic_integral_type_check(self) raises:
+        """Throws an error if the object is not an integral type."""
+        if not (self._value.is_bool() or self._value.is_int()):
+            raise Error("TypeError: not a valid integral type")
+
     @staticmethod
     @always_inline
     fn _arithmetic_binary_op[
@@ -1252,7 +1265,7 @@ struct object(IntableRaising, Boolable, Stringable):
                 UnsafePointer[Int8].alloc(length), length
             )
             memcpy(impl.data, lhsStr.data, lhsStr.length)
-            memcpy(impl.data.offset(lhsStr.length), rhsStr.data, rhsStr.length)
+            memcpy(impl.data + lhsStr.length, rhsStr.data, rhsStr.length)
             var result = object()
             result._value = impl
             return result
@@ -1310,12 +1323,75 @@ struct object(IntableRaising, Boolable, Stringable):
             self, rhs
         )
 
-    # TODO: __mod__
-    # TODO: __truediv__
-    # TODO: __floordiv__
+    @always_inline
+    fn __mod__(self, rhs: object) raises -> object:
+        """Modulo operator. Valid only for arithmetic types.
 
-    # TODO: __lshift__
-    # TODO: __rshift__
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value mod the right hand value.
+        """
+        return Self._arithmetic_binary_op[Float64.__mod__, Int64.__mod__](
+            self, rhs
+        )
+
+    @always_inline
+    fn __truediv__(self, rhs: object) raises -> object:
+        """True division operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value true divide the right hand value.
+        """
+        return Self._arithmetic_binary_op[
+            Float64.__truediv__, Int64.__truediv__
+        ](self, rhs)
+
+    @always_inline
+    fn __floordiv__(self, rhs: object) raises -> object:
+        """Floor division operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value floor divide the right hand value.
+        """
+        return Self._arithmetic_binary_op[
+            Float64.__floordiv__, Int64.__floordiv__
+        ](self, rhs)
+
+    @always_inline
+    fn __lshift__(self, rhs: object) raises -> object:
+        """Left shift operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value left shifted by the right hand value.
+        """
+        self._arithmetic_integral_type_check()
+        rhs._arithmetic_integral_type_check()
+        return object(self._value.get_as_int() << rhs._value.get_as_int())
+
+    @always_inline
+    fn __rshift__(self, rhs: object) raises -> object:
+        """Right shift operator. Valid only for arithmetic types.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The left hand value right shifted by the right hand value.
+        """
+        self._arithmetic_integral_type_check()
+        rhs._arithmetic_integral_type_check()
+        return object(self._value.get_as_int() >> rhs._value.get_as_int())
 
     @always_inline
     fn __and__(self, rhs: object) raises -> object:
@@ -1389,12 +1465,50 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         self = self**rhs
 
-    # TODO: __imod__
-    # TODO: __itruediv__
-    # TODO: __ifloordiv__
+    @always_inline
+    fn __imod__(inout self, rhs: object) raises:
+        """In-place modulo operator.
 
-    # TODO: __ilshift__
-    # TODO: __irshift__
+        Args:
+            rhs: Right hand value.
+        """
+        self = self % rhs
+
+    @always_inline
+    fn __itruediv__(inout self, rhs: object) raises:
+        """In-place true division operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self / rhs
+
+    @always_inline
+    fn __ifloordiv__(inout self, rhs: object) raises:
+        """In-place floor division operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self // rhs
+
+    @always_inline
+    fn __ilshift__(inout self, rhs: object) raises:
+        """In-place left shift operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self << rhs
+
+    @always_inline
+    fn __irshift__(inout self, rhs: object) raises:
+        """In-place right shift operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self >> rhs
 
     @always_inline
     fn __iand__(inout self, rhs: object) raises:
@@ -1470,10 +1584,65 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         return lhs**self
 
-    # TODO: __rfloordiv__
-    # TODO: __rmod__
-    # TODO: __rlshift__
-    # TODO: __rrshift__
+    @always_inline
+    fn __rmod__(self, lhs: object) raises -> object:
+        """Reverse modulo operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value mod the right hand value.
+        """
+        return lhs % self
+
+    @always_inline
+    fn __rtruediv__(self, lhs: object) raises -> object:
+        """Reverse true division operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value divide the right hand value.
+        """
+        return lhs / self
+
+    @always_inline
+    fn __rfloordiv__(self, lhs: object) raises -> object:
+        """Reverse floor division operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value floor divide the right hand value.
+        """
+        return lhs // self
+
+    @always_inline
+    fn __rlshift__(self, lhs: object) raises -> object:
+        """Reverse left shift operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value left shifted by the right hand value.
+        """
+        return lhs << self
+
+    @always_inline
+    fn __rrshift__(self, lhs: object) raises -> object:
+        """Reverse right shift operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The left hand value right shifted by the right hand value.
+        """
+        return lhs >> self
 
     @always_inline
     fn __rand__(self, lhs: object) raises -> object:
@@ -1569,8 +1738,9 @@ struct object(IntableRaising, Boolable, Stringable):
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
-            impl.data.store(
-                self._value.get_as_string().data.offset(index).load()
+            initialize_pointee_copy(
+                impl.data,
+                move_from_pointee(self._value.get_as_string().data + index),
             )
             return _ObjectImpl(impl)
         return self._value.get_list_element(i._value.get_as_int().value)

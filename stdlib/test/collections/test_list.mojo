@@ -540,6 +540,11 @@ def test_list_span():
     assert_equal(len(es), 3)
 
 
+def test_list_boolable():
+    assert_true(List[Int](1))
+    assert_false(List[Int]())
+
+
 def test_constructor_from_pointer():
     new_pointer = UnsafePointer[Int8].alloc(5)
     new_pointer[0] = 0
@@ -571,6 +576,19 @@ def test_constructor_from_other_list_through_pointer():
     assert_equal(some_list.capacity, capacity)
 
 
+def test_converting_list_to_string():
+    var my_list = List[Int](1, 2, 3)
+    assert_equal(__type_of(my_list).__str__(my_list), "[1, 2, 3]")
+
+    var my_list2 = List[SIMD[DType.int8, 2]](
+        SIMD[DType.int8, 2](1, 2), SIMD[DType.int8, 2](3, 4)
+    )
+    assert_equal(__type_of(my_list2).__str__(my_list2), "[[1, 2], [3, 4]]")
+
+    var my_list3 = List[Float64](1.0, 2.0, 3.0)
+    assert_equal(__type_of(my_list3).__str__(my_list3), "[1.0, 2.0, 3.0]")
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -590,5 +608,7 @@ def main():
     test_list_iter()
     test_list_iter_mutable()
     test_list_span()
+    test_list_boolable()
     test_constructor_from_pointer()
     test_constructor_from_other_list_through_pointer()
+    test_converting_list_to_string()

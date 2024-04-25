@@ -206,7 +206,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         self = Int(value)
 
     @always_inline
-    fn __init__(inout self, elems: Tuple[Int, Int]):
+    fn __init__(inout self, elems: (Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
@@ -224,14 +224,14 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = elems.get[idx, Int]()
+            tup[idx] = rebind[Int](elems[idx])
 
         unroll[fill, 2]()
 
         self = tup
 
     @always_inline
-    fn __init__(inout self, elems: Tuple[Int, Int, Int]):
+    fn __init__(inout self, elems: (Int, Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
@@ -249,14 +249,14 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = elems.get[idx, Int]()
+            tup[idx] = rebind[Int](elems[idx])
 
         unroll[fill, 3]()
 
         self = tup
 
     @always_inline
-    fn __init__(inout self, elems: Tuple[Int, Int, Int, Int]):
+    fn __init__(inout self, elems: (Int, Int, Int, Int)):
         """Constructs a static int tuple given a tuple of integers.
 
         Args:
@@ -274,7 +274,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = elems.get[idx, Int]()
+            tup[idx] = rebind[Int](elems[idx])
 
         unroll[fill, 4]()
 

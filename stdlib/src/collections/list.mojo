@@ -20,8 +20,10 @@ from collections import List
 """
 
 
-from memory.unsafe_pointer import *
-from memory import Reference, UnsafePointer
+from builtin.value import StringableCollectionElement
+from memory import UnsafePointer, Reference
+from memory.unsafe_pointer import move_pointee, move_from_pointee
+
 
 # ===----------------------------------------------------------------------===#
 # Utilities
@@ -43,6 +45,7 @@ struct _ListIter[
     T: CollectionElement,
     list_mutability: __mlir_type.`i1`,
     list_lifetime: AnyLifetime[list_mutability].type,
+    forward: Bool = True,
 ]:
     """Iterator for List.
 
@@ -50,6 +53,7 @@ struct _ListIter[
         T: The type of the elements in the list.
         list_mutability: Whether the reference to the list is mutable.
         list_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = List[T]
@@ -57,16 +61,30 @@ struct _ListIter[
     var index: Int
     var src: Reference[Self.list_type, list_mutability, list_lifetime]
 
+    fn __iter__(self) -> Self:
+        return self
+
     fn __next__(
         inout self,
     ) -> Reference[T, list_mutability, list_lifetime]:
-        self.index += 1
-        return self.src[].__get_ref[list_mutability, list_lifetime](
-            self.index - 1
-        )
+        @parameter
+        if forward:
+            self.index += 1
+            return self.src[].__get_ref[list_mutability, list_lifetime](
+                self.index - 1
+            )
+        else:
+            self.index -= 1
+            return self.src[].__get_ref[list_mutability, list_lifetime](
+                self.index
+            )
 
     fn __len__(self) -> Int:
-        return len(self.src[]) - self.index
+        @parameter
+        if forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
 
 
 struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
@@ -125,9 +143,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             self.append(value[])
 
     fn __init__(
-        inout self: Self, data: UnsafePointer[T], size: Int, capacity: Int
+        inout self: Self, data: UnsafePointer[T], *, size: Int, capacity: Int
     ):
-        """Constructs a list from a pointer and its size.
+        """Constructs a list from a pointer, its size, and its capacity.
 
         Args:
             data: The pointer to the data.
@@ -175,12 +193,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return self.size
 
     fn __bool__(self) -> Bool:
-        """Checks if the list is empty.
+        """Checks whether the list has any elements or not.
 
         Returns:
             `False` if the list is empty, `True` if there is at least one element.
         """
-        return len(self).__bool__()
+        return len(self) > 0
 
     @always_inline
     fn _realloc(inout self, new_capacity: Int):
@@ -203,7 +221,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         if self.size >= self.capacity:
             self._realloc(_max(1, self.capacity * 2))
-        initialize_pointee(self.data + self.size, value^)
+        initialize_pointee_move(self.data + self.size, value^)
         self.size += 1
 
     @always_inline
@@ -229,9 +247,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             var earlier_ptr = self.data + earlier_idx
             var later_ptr = self.data + later_idx
 
-            var tmp = __get_address_as_owned_value(earlier_ptr.value)
+            var tmp = move_from_pointee(earlier_ptr)
             move_pointee(src=later_ptr, dst=earlier_ptr)
-            initialize_pointee(later_ptr, tmp^)
+            initialize_pointee_move(later_ptr, tmp^)
 
             earlier_idx -= 1
             later_idx -= 1
@@ -335,7 +353,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             for i in range(new_size, self.size):
                 destroy_pointee(self.data + i)
             for i in range(self.size, new_size):
-                initialize_pointee(self.data + i, value)
+                initialize_pointee_copy(self.data + i, value)
             self.size = new_size
 
     @always_inline
@@ -393,7 +411,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
             var tmp = move_from_pointee(earlier_ptr)
             move_pointee(src=later_ptr, dst=earlier_ptr)
-            initialize_pointee(later_ptr, tmp^)
+            initialize_pointee_move(later_ptr, tmp^)
 
             earlier_idx += 1
             later_idx -= 1
@@ -430,7 +448,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             normalized_idx += len(self)
 
         destroy_pointee(self.data + normalized_idx)
-        initialize_pointee(self.data + normalized_idx, value^)
+        initialize_pointee_move(self.data + normalized_idx, value^)
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
@@ -514,15 +532,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if i < 0:
             normalized_idx += Reference(self)[].size
 
-        # Mutability gets set to the local mutability of this
-        # pointer value, ie. because we defined it with `let` it's now an
-        # "immutable" reference regardless of the mutability of `self`.
-        # This means we can't just use `UnsafePointer.__refitem__` here
-        # because the mutability won't match.
-        var base_ptr = Reference(self)[].data
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life]._mlir_type
-        ]((base_ptr + normalized_idx).value)
+        var offset_ptr = Reference(self)[].data + normalized_idx
+        return offset_ptr[]
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
@@ -537,3 +548,59 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             An iterator of immutable references to the list elements.
         """
         return _ListIter[T, mutability, self_life](0, Reference(self))
+
+    fn __reversed__[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _ListIter[
+        T, mutability, self_life, False
+    ]:
+        """Iterate backwards over the list, returning immutable references.
+
+        Returns:
+            A reversed iterator of immutable references to the list elements.
+        """
+        var ref = Reference(self)
+        return _ListIter[T, mutability, self_life, False](len(ref[]), ref)
+
+    @staticmethod
+    fn __str__[U: StringableCollectionElement](self: List[U]) -> String:
+        """Returns a string representation of a `List`.
+
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(__type_of(my_list).__str__(my_list))
+        ```
+
+        When the compiler supports conditional methods, then a simple `str(my_list)` will
+        be enough.
+
+        Args:
+            self: The list to represent as a string.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Stringable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the list.
+        """
+        # we do a rough estimation of the number of chars that we'll see
+        # in the final string, we assume that str(x) will be at least one char.
+        var minimum_capacity = (
+            2  # '[' and ']'
+            + len(self) * 3  # str(x) and ", "
+            - 2  # remove the last ", "
+        )
+        var result = String(List[Int8](capacity=minimum_capacity))
+        result += "["
+        for i in range(len(self)):
+            result += str(self[i])
+            if i < len(self) - 1:
+                result += ", "
+        result += "]"
+        return result

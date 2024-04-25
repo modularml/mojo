@@ -34,7 +34,7 @@ with open("my_file.txt", "r") as f:
 from os import PathLike
 from sys import external_call
 
-from memory import AddressSpace, DTypePointer
+from memory import AddressSpace, DTypePointer, Pointer
 
 
 @register_passable
@@ -54,7 +54,7 @@ struct _OwnedStringRef(Boolable):
         # Don't free self.data in our dtor.
         self.data = DTypePointer[DType.int8]()
         var length = self.length
-        return Error {data: data, loaded_length: -length}
+        return Error {data: data.bitcast[DType.uint8](), loaded_length: -length}
 
     fn __bool__(self) -> Bool:
         return self.length != 0
@@ -110,7 +110,7 @@ struct FileHandle:
 
     fn close(inout self) raises:
         """Closes the file handle."""
-        if self.handle == DTypePointer[DType.invalid]():
+        if not self.handle:
             return
 
         var err_msg = _OwnedStringRef()
@@ -134,15 +134,55 @@ struct FileHandle:
 
     @always_inline
     fn read(self, size: Int64 = -1) raises -> String:
-        """Reads the data from the file.
+        """Reads data from a file and sets the file handle seek position. If
+        size is left as the default of -1, it will read to the end of the file.
+        Setting size to a number larger than what's in the file will set
+        String.size to the total number of bytes, and read all the data.
 
         Args:
-            size: Requested number of bytes to read.
+            size: Requested number of bytes to read (Default: -1 = EOF).
 
         Returns:
           The contents of the file.
+
+        Raises:
+            An error if this file handle is invalid, or if the file read
+            returned a failure.
+
+        Examples:
+
+        Read the entire file into a String:
+
+        ```mojo
+        var file = open("/tmp/example.txt", "r")
+        var string = file.read()
+        print(string)
+        ```
+
+        Read the first 8 bytes, skip 2 bytes, and then read the next 8 bytes:
+
+        ```mojo
+        import os
+        var file = open("/tmp/example.txt", "r")
+        var word1 = file.read(8)
+        print(word1)
+        _ = file.seek(2, os.SEEK_CUR)
+        var word2 = file.read(8)
+        print(word2)
+        ```
+
+        Read the last 8 bytes in the file, then the first 8 bytes
+        ```mojo
+        _ = file.seek(-8, os.SEEK_END)
+        var last_word = file.read(8)
+        print(last_word)
+        _ = file.seek(8, os.SEEK_SET) # os.SEEK_SET is the default start of file
+        var first_word = file.read(8)
+        print(first_word)
+        ```
+        .
         """
-        if self.handle == DTypePointer[DType.invalid]():
+        if not self.handle:
             raise Error("invalid file handle")
 
         var size_copy: Int64 = size
@@ -161,17 +201,126 @@ struct FileHandle:
 
         return String(buf, int(size_copy) + 1)
 
-    fn read_bytes(self, size: Int64 = -1) raises -> List[Int8]:
-        """Read from file buffer until we have `size` characters or we hit EOF.
-        If `size` is negative or omitted, read until EOF.
+    @always_inline
+    fn read[
+        type: DType
+    ](self, ptr: DTypePointer[type], size: Int64 = -1) raises -> Int64:
+        """Read data from the file into the pointer. Setting size will read up
+        to `sizeof(type) * size`. The default value of `size` is -1 which
+        will read to the end of the file. Starts reading from the file handle
+        seek pointer, and after reading adds `sizeof(type) * size` bytes to the
+        seek pointer.
+
+        Parameters:
+            type: The type that will the data will be represented as.
 
         Args:
-            size: Requested number of bytes to read.
+            ptr: The pointer where the data will be read to.
+            size: Requested number of elements to read.
 
         Returns:
-          The contents of the file.
+            The total amount of data that was read in bytes.
+
+        Raises:
+            An error if this file handle is invalid, or if the file read
+            returned a failure.
+
+        Examples:
+
+        ```mojo
+        import os
+
+        alias file_name = "/tmp/example.txt"
+        var file = open(file_name, "r")
+
+        # Allocate and load 8 elements
+        var ptr = DTypePointer[DType.float32].alloc(8)
+        var bytes = file.read(ptr, 8)
+        print("bytes read", bytes)
+
+        var first_element = ptr.load(0)
+        print(first_element)
+
+        # Skip 2 elements
+        _ = file.seek(2 * sizeof[DType.float32](), os.SEEK_CUR)
+
+        # Allocate and load 8 more elements from file hande seek position
+        var ptr2 = DTypePointer[DType.float32].alloc(8)
+        var bytes2 = file.read(ptr2, 8)
+
+        var eleventh_element = ptr2[0]
+        var twelvth_element = ptr2[1]
+        print(eleventh_element, twelvth_element)
+        ```
+        .
         """
-        if self.handle == DTypePointer[DType.invalid]():
+
+        if not self.handle:
+            raise Error("invalid file handle")
+
+        var size_copy = size * sizeof[type]()
+        var err_msg = _OwnedStringRef()
+
+        external_call["KGEN_CompilerRT_IO_FileReadToAddress", NoneType](
+            self.handle,
+            ptr,
+            UnsafePointer.address_of(size_copy),
+            UnsafePointer.address_of(err_msg),
+        )
+
+        if err_msg:
+            raise (err_msg^).consume_as_error()
+        return size_copy
+
+    fn read_bytes(self, size: Int64 = -1) raises -> List[Int8]:
+        """Reads data from a file and sets the file handle seek position. If
+        size is left as default of -1, it will read to the end of the file.
+        Setting size to a number larger than what's in the file will be handled
+        and set the List.size to the total number of bytes in the file.
+
+        Args:
+            size: Requested number of bytes to read (Default: -1 = EOF).
+
+        Returns:
+            The contents of the file.
+
+        Raises:
+            An error if this file handle is invalid, or if the file read
+            returned a failure.
+
+        Examples:
+
+        Reading the entire file into a List[Int8]:
+
+        ```mojo
+        var file = open("/tmp/example.txt", "r")
+        var string = file.read_bytes()
+        ```
+
+        Reading the first 8 bytes, skipping 2 bytes, and then reading the next
+        8 bytes:
+
+        ```mojo
+        import os
+        var file = open("/tmp/example.txt", "r")
+        var list1 = file.read(8)
+        _ = file.seek(2, os.SEEK_CUR)
+        var list2 = file.read(8)
+        ```
+
+        Reading the last 8 bytes in the file, then the first 8 bytes:
+
+        ```mojo
+        import os
+        var file = open("/tmp/example.txt", "r")
+        _ = file.seek(-8, os.SEEK_END)
+        var last_data = file.read(8)
+        _ = file.seek(8, os.SEEK_SET) # os.SEEK_SET is the default start of file
+        var first_data = file.read(8)
+        ```
+        .
+        """
+        if not self.handle:
             raise Error("invalid file handle")
 
         var size_copy: Int64 = size
@@ -188,20 +337,19 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[Int8](capacity=int(size_copy))
-        var list_ptr = UnsafePointer[Int8](address=int(list.data))
-
-        # Initialize the List elements and set the initialized size
-        memcpy(list_ptr, buf, int(size_copy))
-        list.size = int(size_copy)
+        var list = List[Int8](buf, size=int(size_copy), capacity=int(size_copy))
 
         return list
 
-    fn seek(self, offset: UInt64) raises -> UInt64:
+    fn seek(self, offset: UInt64, whence: UInt8 = os.SEEK_SET) raises -> UInt64:
         """Seeks to the given offset in the file.
 
         Args:
-            offset: The byte offset to seek to from the start of the file.
+            offset: The byte offset to seek to.
+            whence: The reference point for the offset:
+                os.SEEK_SET = 0: start of file (Default).
+                os.SEEK_CUR = 1: current position.
+                os.SEEK_END = 2: end of file.
 
         Raises:
             An error if this file handle is invalid, or if file seek returned a
@@ -209,13 +357,36 @@ struct FileHandle:
 
         Returns:
             The resulting byte offset from the start of the file.
+
+        Examples:
+
+        Skip 32 bytes from the current read position:
+
+        ```mojo
+        import os
+        var f = open("/tmp/example.txt", "r")
+        f.seek(os.SEEK_CUR, 32)
+        ```
+
+        Start from 32 bytes from the end of the file:
+
+        ```mojo
+        import os
+        var f = open("/tmp/example.txt", "r")
+        f.seek(os.SEEK_END, -32)
+        ```
+        .
         """
         if not self.handle:
             raise "invalid file handle"
 
+        debug_assert(
+            whence >= 0 and whence < 3,
+            "Second argument to `seek` must be between 0 and 2.",
+        )
         var err_msg = _OwnedStringRef()
         var pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
-            self.handle, offset, UnsafePointer.address_of(err_msg)
+            self.handle, offset, whence, UnsafePointer.address_of(err_msg)
         )
 
         if err_msg:
@@ -261,7 +432,7 @@ struct FileHandle:
           ptr: The pointer to the data to write.
           len: The length of the pointer (in bytes).
         """
-        if self.handle == DTypePointer[DType.invalid]():
+        if not self.handle:
             raise Error("invalid file handle")
 
         var err_msg = _OwnedStringRef()

@@ -22,7 +22,7 @@ from python import Python
 from sys import external_call, sizeof
 from sys.ffi import _get_global
 
-from memory import Pointer
+from memory import UnsafePointer
 
 from utils import StringRef
 
@@ -30,13 +30,13 @@ from ._cpython import CPython, Py_eval_input
 from .object import PythonObject
 
 
-fn _init_global(ignored: Pointer[NoneType]) -> Pointer[NoneType]:
-    var ptr = Pointer[CPython].alloc(1)
+fn _init_global(ignored: UnsafePointer[NoneType]) -> UnsafePointer[NoneType]:
+    var ptr = UnsafePointer[CPython].alloc(1)
     ptr[] = CPython()
     return ptr.bitcast[NoneType]()
 
 
-fn _destroy_global(python: Pointer[NoneType]):
+fn _destroy_global(python: UnsafePointer[NoneType]):
     var p = python.bitcast[CPython]()
     CPython.destroy(p[])
     python.free()
@@ -49,9 +49,9 @@ fn _get_global_python_itf() -> _PythonInterfaceImpl:
 
 
 struct _PythonInterfaceImpl:
-    var _cpython: Pointer[CPython]
+    var _cpython: UnsafePointer[CPython]
 
-    fn __init__(inout self, cpython: Pointer[CPython]):
+    fn __init__(inout self, cpython: UnsafePointer[CPython]):
         self._cpython = cpython
 
     fn __copyinit__(inout self, existing: Self):
@@ -206,12 +206,9 @@ struct Python:
             cpython: The cpython instance we wish to error check.
         """
         if cpython.PyErr_Occurred():
-            var error = PythonObject(cpython.PyErr_Fetch()).__getattr__(
-                "__str__"
-            )()
-            var err: Error = cpython.PyUnicode_AsUTF8AndSize(error.py_object)
+            var error: Error = str(PythonObject(cpython.PyErr_Fetch()))
             cpython.PyErr_Clear()
-            raise err
+            raise error
 
     @staticmethod
     fn is_type(x: PythonObject, y: PythonObject) -> Bool:

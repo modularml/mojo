@@ -43,18 +43,20 @@ struct UnsafePointer[
         `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
     ]
 
+    alias type = T
+
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful
     # lifetime for them anyway.
-    alias _mlir_ref_type = Reference[
+    alias _ref_type = Reference[
         T,
         __mlir_attr.`1: i1`,
         __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
         address_space,
-    ]._mlir_type
+    ]
 
     """The underlying pointer type."""
-    var value: Self._mlir_type
+    var address: Self._mlir_type
     """The underlying pointer."""
 
     @always_inline
@@ -76,7 +78,7 @@ struct UnsafePointer[
         Returns:
             The pointer.
         """
-        return Self {value: value}
+        return Self {address: value}
 
     @always_inline
     fn __init__(value: Reference[T, _, _, address_space]) -> Self:
@@ -88,7 +90,7 @@ struct UnsafePointer[
         Returns:
             The pointer.
         """
-        return Self {value: __mlir_op.`lit.ref.to_pointer`(value.value)}
+        return Self {address: __mlir_op.`lit.ref.to_pointer`(value.value)}
 
     @always_inline
     fn __init__(*, address: Int) -> Self:
@@ -101,7 +103,7 @@ struct UnsafePointer[
             The pointer.
         """
         return Self {
-            value: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
+            address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
                 Scalar[DType.index](address).value
             )
         }
@@ -115,7 +117,7 @@ struct UnsafePointer[
             Constructed nullptr UnsafePointer object.
         """
         return Self {
-            value: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
+            address: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
         }
 
     @staticmethod
@@ -173,7 +175,7 @@ struct UnsafePointer[
         """
         return __mlir_op.`pop.pointer.bitcast`[
             _type = UnsafePointer[new_type, address_space]._mlir_type,
-        ](self.value)
+        ](self.address)
 
     @always_inline
     fn __int__(self) -> Int:
@@ -184,7 +186,7 @@ struct UnsafePointer[
         """
         return __mlir_op.`pop.pointer_to_index`[
             _type = __mlir_type.`!pop.scalar<index>`
-        ](self.value)
+        ](self.address)
 
     fn __str__(self) -> String:
         return hex(self)
@@ -317,18 +319,18 @@ struct UnsafePointer[
     @always_inline
     fn __refitem__(
         self,
-    ) -> Self._mlir_ref_type:
+    ) -> Self._ref_type._mlir_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Returns:
             A reference to the value.
         """
-        return __mlir_op.`lit.ref.from_pointer`[_type = Self._mlir_ref_type](
-            self.value
-        )
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Self._ref_type._mlir_type
+        ](self.address)
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self._mlir_ref_type:
+    fn __refitem__(self, offset: Int) -> Self._ref_type._mlir_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Args:
@@ -358,7 +360,7 @@ fn destroy_pointee(ptr: UnsafePointer[_, AddressSpace.GENERIC]):
     Args:
         ptr: The pointer whose pointee this destroys.
     """
-    _ = __get_address_as_owned_value(ptr.value)
+    _ = __get_address_as_owned_value(ptr.address)
 
 
 @always_inline
@@ -370,7 +372,7 @@ fn move_from_pointee[T: Movable](ptr: UnsafePointer[T, _]) -> T:
 
     This performs a _consuming_ move, ending the lifetime of the value stored
     in this pointer memory location. Subsequent reads of this pointer are
-    not valid. If a new valid value is stored using `initialize_pointee()`, then
+    not valid. If a new valid value is stored using `initialize_pointee_move()`, then
     reading from this pointer becomes valid again.
 
     Parameters:
@@ -382,17 +384,22 @@ fn move_from_pointee[T: Movable](ptr: UnsafePointer[T, _]) -> T:
     Returns:
         The value at the pointer.
     """
-    return __get_address_as_owned_value(ptr.value)
+    return __get_address_as_owned_value(ptr.address)
 
 
 @always_inline
-fn initialize_pointee[T: Movable](ptr: UnsafePointer[T, _], owned value: T):
-    """Emplace a new value into the pointer location.
+fn initialize_pointee_move[
+    T: Movable
+](ptr: UnsafePointer[T, _], owned value: T):
+    """Emplace a new value into the pointer location, moving from `value`.
 
     The pointer memory location is assumed to contain uninitialized data,
     and consequently the current contents of this pointer are not destructed
     before writing `value`. Similarly, ownership of `value` is logically
     transferred into the pointer location.
+
+    When compared to `initialize_pointee_copy`, this avoids an extra copy on
+    the caller side when the value is an `owned` rvalue.
 
     Parameters:
         T: The type the pointer points to, which must be `Movable`.
@@ -401,7 +408,29 @@ fn initialize_pointee[T: Movable](ptr: UnsafePointer[T, _], owned value: T):
         ptr: The pointer to initialize through.
         value: The value to emplace.
     """
-    __get_address_as_uninit_lvalue(ptr.value) = value^
+    __get_address_as_uninit_lvalue(ptr.address) = value^
+
+
+@always_inline
+fn initialize_pointee_copy[T: Copyable](ptr: UnsafePointer[T, _], value: T):
+    """Emplace a copy of `value` into the pointer location.
+
+    The pointer memory location is assumed to contain uninitialized data,
+    and consequently the current contents of this pointer are not destructed
+    before writing `value`. Similarly, ownership of `value` is logically
+    transfered into the pointer location.
+
+    When compared to `initialize_pointee_move`, this avoids an extra move on
+    the callee side when the value must be copied.
+
+    Parameters:
+        T: The type the pointer points to, which must be `Copyable`.
+
+    Args:
+        ptr: The pointer to initialize through.
+        value: The value to emplace.
+    """
+    __get_address_as_uninit_lvalue(ptr.address) = value
 
 
 @always_inline
@@ -412,7 +441,7 @@ fn move_pointee[T: Movable](*, src: UnsafePointer[T, _], dst: UnsafePointer[T]):
     This performs a consuming move (using `__moveinit__()`) out of the
     memory location pointed to by `src`. Subsequent reads of this
     pointer are not valid unless and until a new, valid value has been
-    moved into this pointer's memory location using `initialize_pointee()`.
+    moved into this pointer's memory location using `initialize_pointee_move()`.
 
     This transfers the value out of `self` and into `dest` using at most one
     `__moveinit__()` call.
@@ -432,6 +461,6 @@ fn move_pointee[T: Movable](*, src: UnsafePointer[T, _], dst: UnsafePointer[T]):
         src: Source pointer that the value will be moved from.
         dst: Destination pointer that the value will be moved into.
     """
-    __get_address_as_uninit_lvalue(dst.value) = __get_address_as_owned_value(
-        src.value
+    __get_address_as_uninit_lvalue(dst.address) = __get_address_as_owned_value(
+        src.address
     )

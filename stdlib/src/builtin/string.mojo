@@ -18,11 +18,10 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
-from memory import DTypePointer, Pointer, UnsafePointer, memcmp, memcpy
-
+from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import StringRef, StaticIntTuple, StaticTuple
-
+from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
 
@@ -43,12 +42,14 @@ fn _abs(x: SIMD) -> __type_of(x):
 
 @always_inline
 fn _ctlz(val: Int) -> Int:
-    return llvm_intrinsic["llvm.ctlz", Int](val, False)
+    return llvm_intrinsic["llvm.ctlz", Int, has_side_effect=False](val, False)
 
 
 @always_inline("nodebug")
 fn _ctlz(val: SIMD) -> __type_of(val):
-    return llvm_intrinsic["llvm.ctlz", __type_of(val)](val, False)
+    return llvm_intrinsic["llvm.ctlz", __type_of(val), has_side_effect=False](
+        val, False
+    )
 
 
 # ===----------------------------------------------------------------------===#
@@ -324,7 +325,15 @@ fn isspace(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 # String
 # ===----------------------------------------------------------------------===#
-struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
+struct String(
+    Sized,
+    Stringable,
+    IntableRaising,
+    KeyElement,
+    Boolable,
+    Formattable,
+    ToFormatter,
+):
     """Represents a mutable string."""
 
     alias _buffer_type = List[Int8]
@@ -334,6 +343,10 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
     @always_inline
     fn __str__(self) -> String:
         return self
+
+    # ===------------------------------------------------------------------===#
+    # Initializers
+    # ===------------------------------------------------------------------===#
 
     @always_inline
     fn __init__(inout self, owned impl: Self._buffer_type):
@@ -352,6 +365,10 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         Args:
             impl: The buffer.
         """
+        debug_assert(
+            impl[-1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
         self._buffer = impl^
 
     @always_inline
@@ -396,7 +413,22 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         self = str(value)
 
     @always_inline
-    fn __init__(inout self, ptr: Pointer[Int8], len: Int):
+    fn __init__(inout self, ptr: UnsafePointer[Int8], len: Int):
+        """Creates a string from the buffer. Note that the string now owns
+        the buffer.
+
+        The buffer must be terminated with a null byte.
+
+        Args:
+            ptr: The pointer to the buffer.
+            len: The length of the buffer, including the null terminator.
+        """
+        # we don't know the capacity of ptr, but we'll assume it's the same or
+        # larger than len
+        self = Self(Self._buffer_type(ptr, size=len, capacity=len))
+
+    @always_inline
+    fn __init__(inout self, ptr: LegacyPointer[Int8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -472,6 +504,10 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
 
         return String(buff^)
 
+    # ===------------------------------------------------------------------===#
+    # Operator dunders
+    # ===------------------------------------------------------------------===#
+
     @always_inline
     fn __bool__(self) -> Bool:
         """Checks if the string is not empty.
@@ -533,7 +569,7 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         var adjusted_span = self._adjust_span(span)
         if adjusted_span.step == 1:
             return StringRef(
-                (self._buffer.data + span.start).value,
+                self._buffer.data + span.start,
                 len(adjusted_span),
             )
 
@@ -610,11 +646,13 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
         memcpy(
-            rebind[Pointer[Int8]](buffer.data), self._as_ptr().address, self_len
+            DTypePointer(buffer.data),
+            self._as_ptr(),
+            self_len,
         )
         memcpy(
-            rebind[Pointer[Int8]](buffer.data + self_len),
-            other._as_ptr().address,
+            DTypePointer(buffer.data + self_len),
+            other._as_ptr(),
             other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
@@ -649,6 +687,73 @@ struct String(Sized, Stringable, IntableRaising, KeyElement, Boolable):
         self._buffer.resize(total_len + 1, 0)
         # Copy the data alongside the terminator.
         memcpy(self._as_ptr() + self_len, other._as_ptr(), other_len + 1)
+
+    # ===------------------------------------------------------------------=== #
+    # Methods
+    # ===------------------------------------------------------------------=== #
+
+    @staticmethod
+    fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
+        """
+        Construct a string by concatenating a sequence of formattable arguments.
+
+        Args:
+            args: A sequence of formattable arguments.
+
+        Parameters:
+            Ts: The types of the arguments to format. Each type must be satisfy
+              `Formattable`.
+
+        Returns:
+            A string formed by formatting the argument sequence.
+        """
+
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+
+        @parameter
+        fn write_arg[T: Formattable](arg: T):
+            arg.format_to(writer)
+
+        args.each[write_arg]()
+
+        return output^
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this string to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # SAFETY:
+        #   Safe because `self` is borrowed, so its lifetime
+        #   extends beyond this function.
+        writer.write_str(self._strref_dangerous())
+
+    fn _unsafe_to_formatter(inout self) -> Formatter:
+        """
+        Constructs a formatter that will write to this mutable string.
+
+        Safety:
+            The returned `Formatter` holds a mutable pointer to this `String`
+            value. This `String` MUST outlive the `Formatter` instance.
+        """
+
+        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
+            var ptr: UnsafePointer[String] = ptr0.bitcast[String]()
+
+            # FIXME:
+            #   String.__iadd__ currently only accepts a String, meaning this
+            #   RHS will allocate unneccessarily.
+            ptr[] += strref
+
+        return Formatter(
+            write_to_string,
+            # Arg data
+            UnsafePointer.address_of(self).bitcast[NoneType](),
+        )
 
     fn join[rank: Int](self, elems: StaticIntTuple[rank]) -> String:
         """Joins the elements from the tuple using the current string as a

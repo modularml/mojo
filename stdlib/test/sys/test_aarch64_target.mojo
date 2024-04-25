@@ -14,24 +14,19 @@
 # COM: TODO (17471): Not all aarch64 have neon, so we need to guard against that,
 # for now just require apple-silicon.
 # REQUIRES: apple-silicon
-# RUN: %mojo -debug-level %s | FileCheck %s
+# RUN: %mojo %s
 
 from sys import alignof, has_avx512f, has_neon, simdbitwidth
+from testing import assert_false, assert_true, assert_equal
 
 
-# CHECK-LABEL: test_arch_query
-fn test_arch_query():
-    print("== test_arch_query")
+def test_arch_query():
+    assert_true(has_neon())
 
-    # CHECK: True
-    print(has_neon())
+    assert_equal(simdbitwidth(), 128)
 
-    # CHECK: 128
-    print(simdbitwidth())
-
-    # CHECK: False
-    print(has_avx512f())
+    assert_false(has_avx512f())
 
 
-fn main():
+def main():
     test_arch_query()

@@ -220,6 +220,10 @@ struct Reference[
     var value: Self._mlir_type
     """The underlying MLIR reference."""
 
+    # ===------------------------------------------------------------------===#
+    # Initializers
+    # ===------------------------------------------------------------------===#
+
     @always_inline("nodebug")
     fn __init__(inout self, value: Self._mlir_type):
         """Constructs a Reference from the MLIR reference.
@@ -228,6 +232,10 @@ struct Reference[
             value: The MLIR reference.
         """
         self.value = value
+
+    # ===------------------------------------------------------------------===#
+    # Operator dunders
+    # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __refitem__(self) -> Self._mlir_type:
@@ -247,6 +255,10 @@ struct Reference[
         """
         return self.value
 
+    # ===------------------------------------------------------------------===#
+    # Methods
+    # ===------------------------------------------------------------------===#
+
     # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
     # disagreement.  Use UnsafePointer instead!
     @always_inline("nodebug")
@@ -259,7 +271,7 @@ struct Reference[
         # Work around AnyRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[
             _type = Pointer[type, address_space]._mlir_type
-        ](UnsafePointer(self).value)
+        ](UnsafePointer(self).address)
 
     @always_inline("nodebug")
     fn unsafe_bitcast[

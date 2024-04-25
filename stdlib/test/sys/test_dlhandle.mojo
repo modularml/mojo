@@ -10,22 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: has_not
-# RUN: not %mojo %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
+# RUN: %mojo %s
 
-from testing import assert_raises
+from sys.ffi import DLHandle
+from testing import assert_false
 
 
-# CHECK-FAIL-LABEL: test_assert_raises_no_match
-fn test_assert_raises_no_match() raises:
-    print("== test_assert_raises_no_match")
-    # CHECK-FAIL-NOT: is never reached
-    # CHECK: AssertionError
-    with assert_raises(contains="Some"):
-        raise "OtherError"
-    # CHECK-FAIL-NOT: is never reached
-    print("is never reached")
+def check_invalid_dlhandle():
+    assert_false(
+        DLHandle("/an/invalid/library"), "the library is not valid location"
+    )
 
 
 def main():
-    test_assert_raises_no_match()
+    check_invalid_dlhandle()

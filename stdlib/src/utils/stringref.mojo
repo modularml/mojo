@@ -16,7 +16,8 @@
 
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol
-from memory import DTypePointer, LegacyPointer, UnsafePointer
+from memory import DTypePointer, UnsafePointer
+
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -89,23 +90,6 @@ struct StringRef(
             A new string.
         """
         return self
-
-    @always_inline
-    fn __init__(ptr: LegacyPointer[Int8], len: Int) -> StringRef:
-        """Construct a StringRef value given a (potentially non-0 terminated
-        string).
-
-        The constructor takes a raw pointer and a length.
-
-        Args:
-            ptr: UnsafePointer to the string.
-            len: The length of the string.
-
-        Returns:
-            Constructed `StringRef` object.
-        """
-
-        return Self {data: ptr, length: len}
 
     @always_inline
     fn __init__(ptr: DTypePointer[DType.int8], len: Int) -> StringRef:
@@ -399,12 +383,14 @@ struct StringRef(
 
 @always_inline("nodebug")
 fn _cttz(val: Int) -> Int:
-    return llvm_intrinsic["llvm.cttz", Int](val, False)
+    return llvm_intrinsic["llvm.cttz", Int, has_side_effect=False](val, False)
 
 
 @always_inline("nodebug")
 fn _cttz(val: SIMD) -> __type_of(val):
-    return llvm_intrinsic["llvm.cttz", __type_of(val)](val, False)
+    return llvm_intrinsic["llvm.cttz", __type_of(val), has_side_effect=False](
+        val, False
+    )
 
 
 @always_inline

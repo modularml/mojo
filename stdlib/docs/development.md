@@ -120,10 +120,12 @@ your changes automatically at each commit, and will also ensure that you
 always have the latest linting tools applied.
 
 To do so, install pre-commit:
+
 ```bash
 pip install pre-commit
 pre-commit install
 ```
+
 and that's it!
 
 If you need to manually apply the `pre-commit`, for example, if you
@@ -335,7 +337,7 @@ Total Discovered Tests: 1
 
 Success! Now we have a test for our new function.
 
-The last step is to [run `mojo format`](#formatting-changes) on all the files. 
+The last step is to [run `mojo format`](#formatting-changes) on all the files.
 This can be skipped if `pre-commit` is installed.
 
 ### Raising a PR

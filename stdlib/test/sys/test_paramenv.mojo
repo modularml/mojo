@@ -13,6 +13,7 @@
 # RUN: %mojo -D bar=99 -D baz=hello -D foo=11 %s
 
 from sys import env_get_int, env_get_string, is_defined
+
 from testing import assert_equal, assert_true, assert_false
 
 
