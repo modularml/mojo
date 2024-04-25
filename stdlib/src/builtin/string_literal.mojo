@@ -15,6 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+import math
 from memory import DTypePointer
 
 from utils import StringRef
@@ -128,6 +129,58 @@ struct StringLiteral(
             True if they are not equal.
         """
         return not self == rhs
+
+    @always_inline("nodebug")
+    fn __lt__(self, rhs: StringLiteral) -> Bool:
+        """Compare this StringLiteral to the RHS using LT comparison.
+
+        Args:
+            rhs: The other StringLiteral to compare against.
+
+        Returns:
+            True if this StringLiteral is strictly less than the RHS StringLiteral and False otherwise.
+        """
+        var len1 = len(self)
+        var len2 = len(rhs)
+        var cmp = _memcmp(self.data(), rhs.data(), math.min(len1, len2))
+
+        return cmp < 0 or cmp == 0 and len1 < len2
+
+    @always_inline("nodebug")
+    fn __le__(self, rhs: StringLiteral) -> Bool:
+        """Compare this StringLiteral to the RHS using LE comparison.
+
+        Args:
+            rhs: The other StringLiteral to compare against.
+
+        Returns:
+            True if this StringLiteral is less than or equal to the RHS StringLiteral and False otherwise.
+        """
+        return not (rhs < self)
+
+    @always_inline("nodebug")
+    fn __gt__(self, rhs: StringLiteral) -> Bool:
+        """Compare this StringLiteral to the RHS using GT comparison.
+
+        Args:
+            rhs: The other StringLiteral to compare against.
+
+        Returns:
+            True if this StringLiteral is strictly greater than the RHS StringLiteral and False otherwise.
+        """
+        return rhs < self
+
+    @always_inline("nodebug")
+    fn __ge__(self, rhs: StringLiteral) -> Bool:
+        """Compare this StringLiteral to the RHS using GE comparison.
+
+        Args:
+            rhs: The other StringLiteral to compare against.
+
+        Returns:
+            True if this StringLiteral is greater than or equal to the RHS StringLiteral and False otherwise.
+        """
+        return not (self < rhs)
 
     fn __hash__(self) -> Int:
         """Hash the underlying buffer using builtin hash.

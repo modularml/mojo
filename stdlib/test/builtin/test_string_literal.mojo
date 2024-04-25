@@ -78,6 +78,34 @@ def test_rfind():
     assert_equal(-1, "abc".rfind("abcd"))
 
 
+fn test_comparison_operators() raises:
+    # Test less than and greater than
+    assert_true("abc" < "def")  # "abc" < "def"
+    assert_false("def" < "abc")  # "def" is not less than "abc"
+    assert_false("abc" < "abc")  # "abc" is not less than "abc"
+    assert_true("ab" < "abc")  # "ab" < "abc"
+    assert_true("abc" > "ab")  # "abc" > "ab"
+    assert_false("abc" > "abcd")  # "abc" is not greater than "abcd"
+
+    # Test less than or equal to and greater than or equal to
+    assert_true("abc" <= "def")  # "abc" <= "def"
+    assert_true("abc" <= "abc")  # "abc" <= "abc"
+    assert_false("def" <= "abc")  # "def" is not less than or equal to "abc"
+    assert_true("abc" >= "abc")  # "abc" >= "abc"
+    assert_false("ab" >= "abc")  # "ab" is not greater than or equal to "abc"
+    assert_true("abcd" >= "abc")  # "abcd" >= "abc"
+
+    # Test case sensitivity in comparison
+    assert_true("abc" > "ABC")  # "abc" > "ABC" assuming ASCII order
+    assert_false("abc" < "ABC")  # "abc" < "ABC" is false assuming ASCII order
+
+    # Test against empty strings
+    assert_true("" < "abc")  # Empty string is less than any non-empty
+    assert_false("abc" < "")  # Non-empty string is not less than empty
+    assert_true("" <= "")  # Empty string is equal to itself
+    assert_true("" >= "")  # Empty string is equal to itself
+
+
 def test_hash():
     # Test a couple basic hash behaviors.
     # `test_hash.test_hash_bytes` has more comprehensive tests.
@@ -99,5 +127,6 @@ def main():
     test_contains()
     test_find()
     test_rfind()
+    test_comparison_operators()
     test_hash()
     test_intable()
