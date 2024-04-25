@@ -68,7 +68,7 @@ fn _initialize_hash_secret(
 ) -> UnsafePointer[NoneType]:
     var secret = random.random_ui64(0, UInt64.MAX)
     var data = UnsafePointer[Int].alloc(1)
-    initialize_pointee_move(data, int(secret))
+    data[] = int(secret)
     return data.bitcast[NoneType]()
 
 
