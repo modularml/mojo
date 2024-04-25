@@ -68,48 +68,66 @@ what we publish.
   ```
 
 - `List` now has several new methods:
-  - `pop(index)` for removing an element at a particular index.\
+  - `pop(index)` for removing an element at a particular index.
+    ([PR #2041](https://github.com/modularml/mojo/pull/2041))\
     By default, `List.pop()` removes the last element in the list.
 
-- `resize(new_size)` for resizing the list without the need to
+  - `resize(new_size)` for resizing the list without the need to
     specify an additional value.
-- `insert(index, value)` for inserting a value at a specified index
+    ([PR #2140](https://github.com/modularml/mojo/pull/2140))
+
+  - `insert(index, value)` for inserting a value at a specified index
     into the `List`.
-- constructor from `(ptr, size, capacity)` to to avoid needing to do a deep
+    ([PR #2148](https://github.com/modularml/mojo/pull/2148))
+
+  - constructor from `(ptr, size, capacity)` to to avoid needing to do a deep
     copy of an existing contiguous memory allocation when constructing a new `List`.
+    ([PR #2182](https://github.com/modularml/mojo/pull/2182))
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
+  ([PR #2085](https://github.com/modularml/mojo/pull/2085))
 
-- `Set` now has named methods for set operations:
+- `Set` now has named methods for set operations
+  ([PR #2214](https://github.com/modularml/mojo/pull/2214)):
   - `Set.difference()` mapping to `-`
   - `Set.difference_update()` mapping to `-=`
   - `Set.intersection_update()` mapping to `&=`
   - `Set.update()` mapping to `|=`
 
 - `String` now has `removeprefix()` and `removesuffix()` methods.
+  ([PR #2038](https://github.com/modularml/mojo/pull/2038))
 
 - `Optional` now implements `__is__` and `__isnot__` methods so that you can compare
   an `Optional` with `None`, e.g. `Optional(1) is not None` for example.
+  ([PR #2082](https://github.com/modularml/mojo/pull/2082))
 
 - The `ord` and `chr` functions have been improved to accept any Unicode character.
+  ([PR #2149](https://github.com/modularml/mojo/pull/2149))
 
 - `Atomic` is now movable.
+  ([PR #2088](https://github.com/modularml/mojo/pull/2088))
 
 - `Dict` and `List` are both `Boolable` now.
+  ([PR #2262](https://github.com/modularml/mojo/pull/2262))
 
 - `atol` now handles whitespaces so `int(String( " 10 "))` gives back `10`
   instead of raising an error.
+  ([PR #2225](https://github.com/modularml/mojo/pull/2225))
 
 - `SIMD` now implements `__rmod__`.
+  ([PR #2186](https://github.com/modularml/mojo/pull/2186))
 
 - `bool(None)` is now implemented.
+  ([PR #2249](https://github.com/modularml/mojo/pull/2249))
 
 - The `DTypePointer` type now implements `gather` for gathering a `SIMD`
   vector from offsets of a current pointer.  Similarly, support for `scatter`
   was added to scatter a `SIMD` vector into offsets of the current pointer.
+  ([PR #2268](https://github.com/modularml/mojo/pull/2268))
 
 - The `len` function for unary `range` with negative end values has been fixed
   so that things like `len(range(-1))` work correctly now.
+  ([PR #2204](https://github.com/modularml/mojo/pull/2204))
 
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
@@ -119,6 +137,7 @@ what we publish.
 
 - The `testing.assert_equal[SIMD]()` now raises if any of the elements
   mismatch in the two `SIMD` arguments being compared.
+  ([PR #2279](https://github.com/modularml/mojo/pull/2279))
 
 - The `testing.assert_almost_equal` and `math.isclose` functions now have an
   `equal_nan` flag. When set to True, then NaNs are considered equal.
@@ -248,6 +267,7 @@ what we publish.
 - All of the pointers got a pass of cleanup to make them more consistent, for
   example the `unsafe.bitcast` global function is now a consistent `bitcast`
   method on the pointers, which can convert element type and address space.
+
 - The `Reference` type has several changes, including:
   1) It is now located in `memory.reference` instead of `memory.unsafe`.
   2) `Reference` now has an unsafe `unsafe_bitcast` method like `UnsafePointer`.
