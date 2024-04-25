@@ -196,14 +196,14 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
             start = pos
         break
 
-    alias ord_0 = ord("0")
-    alias ord_letter_min = (ord("a"), ord("A"))
-    alias ord_underscore = ord("_")
+    var ord_0 = ord("0")
+    var ord_letter_min = (ord("a"), ord("A"))
+    var ord_underscore = ord("_")
 
     if base == 0:
         var real_base_new_start = _identify_base(str_ref, start)
-        real_base = real_base_new_start.get[0]()
-        start = real_base_new_start.get[1]()
+        real_base = real_base_new_start[0]
+        start = real_base_new_start[1]
         if real_base == -1:
             raise Error(_atol_error(base, str_ref))
     else:
@@ -237,11 +237,11 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         if ord_0 <= ord_current <= ord_num_max:
             result += ord_current - ord_0
             found_valid_chars_after_start = True
-        elif ord_letter_min.get[0]() <= ord_current <= ord_letter_max.get[0]():
-            result += ord_current - ord_letter_min.get[0]() + 10
+        elif ord_letter_min[0] <= ord_current <= ord_letter_max[0]:
+            result += ord_current - ord_letter_min[0] + 10
             found_valid_chars_after_start = True
-        elif ord_letter_min.get[1]() <= ord_current <= ord_letter_max.get[1]():
-            result += ord_current - ord_letter_min.get[1]() + 10
+        elif ord_letter_min[1] <= ord_current <= ord_letter_max[1]:
+            result += ord_current - ord_letter_min[1] + 10
             found_valid_chars_after_start = True
         elif isspace(ord_current):
             has_space_after_number = True
