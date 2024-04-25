@@ -22,5 +22,7 @@ fn main():
     print("== test_ok")
     # CHECK-WARN: Assert Warning: failed, but we don't terminate
     debug_assert(False, "failed, but we don't terminate")
+    # CHECK-WARN: Assert Warning: also failed, but in a Boolable
+    debug_assert(0, Error("also failed, but in a Boolable"))
     # CHECK-WARN: is reached
     print("is reached")
