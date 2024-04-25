@@ -63,14 +63,11 @@ fn _isclose(
 
 
 @always_inline
-fn assert_true[
-    T: Boolable
-](val: T, msg: String = "condition was unexpectedly False") raises:
+fn assert_true(
+    val: Bool, msg: String = "condition was unexpectedly False"
+) raises:
     """Asserts that the input value is True. If it is not then an
     Error is raised.
-
-    Parameters:
-        T: A Boolable type.
 
     Args:
         val: The value to assert to be True.
@@ -84,14 +81,11 @@ fn assert_true[
 
 
 @always_inline
-fn assert_false[
-    T: Boolable
-](val: T, msg: String = "condition was unexpectedly True") raises:
+fn assert_false(
+    val: Bool, msg: String = "condition was unexpectedly True"
+) raises:
     """Asserts that the input value is False. If it is not then an Error is
     raised.
-
-    Parameters:
-        T: A Boolable type.
 
     Args:
         val: The value to assert to be False.

@@ -376,32 +376,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @staticmethod
     @always_inline("nodebug")
-    fn splat(x: Bool) -> Self:
-        """Splats (broadcasts) the element onto the vector.
-
-        Args:
-            x: The input value.
-
-        Returns:
-            A new SIMD vector whose elements are the same as the input value.
-        """
-        _simd_construction_checks[type, size]()
-        constrained[type == DType.bool, "input type must be boolean"]()
-        var val = SIMD[DType.bool, size] {
-            value: __mlir_op.`pop.simd.splat`[
-                _type = __mlir_type[
-                    `!pop.simd<`,
-                    size.value,
-                    `, `,
-                    DType.bool.value,
-                    `>`,
-                ]
-            ](x.value)
-        }
-        return rebind[Self](val)
-
-    @staticmethod
-    @always_inline("nodebug")
     fn splat(x: Scalar[type]) -> Self:
         """Splats (broadcasts) the element onto the vector.
 
