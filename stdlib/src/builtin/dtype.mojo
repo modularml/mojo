@@ -428,6 +428,17 @@ struct DType(Stringable, KeyElement):
         )
 
     @always_inline("nodebug")
+    fn is_half_float(self) -> Bool:
+        """Returns True if the type is a half-precision floating point type,
+        e.g. either fp16 or bf16.
+
+        Returns:
+            True if the type is a half-precision float, false otherwise..
+        """
+
+        return self.is_float16() or self.is_bfloat16()
+
+    @always_inline("nodebug")
     fn is_numeric(self) -> Bool:
         """Returns True if the type parameter is numeric (i.e. you can perform
         arithmetic operations on).
