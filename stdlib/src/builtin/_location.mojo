@@ -26,6 +26,17 @@ struct _SourceLocation(Stringable):
     fn __str__(self) -> String:
         return str(self.file_name) + ":" + str(self.line) + ":" + str(self.col)
 
+    fn prefix[T: Stringable](self, msg: T) -> String:
+        """Return the given message prefixed with the pretty-printer location.
+
+        Parameters:
+            T: The type of the message.
+
+        Args:
+            msg: The message to attach the prefix to.
+        """
+        return "At " + str(self) + ": " + msg
+
 
 @always_inline("nodebug")
 fn __source_location() -> _SourceLocation:

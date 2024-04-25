@@ -217,6 +217,9 @@ what we publish.
   `@always_inline` functions, as well as limitations on its use in parameter
   contexts (see the documentation for more details).
 
+- `debug_assert` now prints its location (filename, line, and column where it
+  was called) in its error message.
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has

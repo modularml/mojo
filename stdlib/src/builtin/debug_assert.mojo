@@ -19,8 +19,10 @@ These are Mojo built-ins, so you don't need to import them.
 from os import abort
 from sys._build import is_kernels_debug_build
 from sys import triple_is_nvidia_cuda, is_defined
+from builtin._location import __call_location, _SourceLocation
 
 
+@always_inline
 fn debug_assert[
     boolable: Boolable, stringable: Stringable
 ](cond: boolable, msg: stringable):
@@ -41,13 +43,6 @@ fn debug_assert[
         cond: The bool value to assert.
         msg: The message to display on failure.
     """
-    _debug_assert_impl(cond, msg)
-
-
-fn _debug_assert_impl[
-    boolable: Boolable, stringable: Stringable
-](cond: boolable, msg: stringable):
-    """Asserts that the condition is true."""
 
     # Print an error and fail.
     alias err = is_kernels_debug_build() or is_defined[
@@ -59,22 +54,34 @@ fn _debug_assert_impl[
 
     @parameter
     if err or warn:
-        if cond:
-            return
+        if not cond:
+            _debug_assert_msg[err](msg, __call_location())
 
-        @parameter
-        if triple_is_nvidia_cuda():
-            # On GPUs, assert shouldn't allocate.
 
-            @parameter
-            if err:
-                abort()
-            else:
-                print("Assert Warning")
-            return
+@no_inline
+fn _debug_assert_msg[
+    err: Bool, stringable: Stringable
+](msg: stringable, loc: _SourceLocation):
+    """Aborts with (or prints) the given message and location.
+
+    Note that it's important that this function doesn't get inlined; otherwise,
+    an indirect recursion of @always_inline functions is possible (e.g. because
+    abort's implementation could use debug_assert)
+    """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        # On GPUs, assert shouldn't allocate.
 
         @parameter
         if err:
-            abort("Assert Error: " + str(msg))
+            abort()
         else:
-            print("Assert Warning:", str(msg))
+            print("Assert Warning")
+        return
+
+    @parameter
+    if err:
+        abort(loc.prefix("Assert Error: " + str(msg)))
+    else:
+        print(loc.prefix("Assert Warning:"), str(msg))
