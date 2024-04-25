@@ -626,7 +626,7 @@ struct String(
             True if the Strings are not equal and False otherwise.
         """
         return not (self == other)
-    
+
     @always_inline
     fn __lt__(self, rhs: String) -> Bool:
         """Compare this String to the RHS using LT comparison.
@@ -642,7 +642,7 @@ struct String(
         var cmp = memcmp(self._as_ptr(), rhs._as_ptr(), math.min(len1, len2))
 
         return cmp < 0 or cmp == 0 and len1 < len2
-    
+
     @always_inline
     fn __le__(self, rhs: String) -> Bool:
         """Compare this String to the RHS using LE comparison.
@@ -654,7 +654,7 @@ struct String(
             True if this String is less than or equal to the RHS String and False otherwise.
         """
         return not (rhs < self)
-    
+
     @always_inline
     fn __gt__(self, rhs: String) -> Bool:
         """Compare this String to the RHS using GT comparison.
@@ -666,7 +666,7 @@ struct String(
             True if this String is strictly greater than the RHS String and False otherwise.
         """
         return rhs < self
-    
+
     @always_inline
     fn __ge__(self, rhs: String) -> Bool:
         """Compare this String to the RHS using GE comparison.
