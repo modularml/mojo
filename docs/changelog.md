@@ -69,20 +69,24 @@ what we publish.
 
 - `List` now has several new methods:
   - `pop(index)` for removing an element at a particular index.
-    ([PR #2041](https://github.com/modularml/mojo/pull/2041))\
+    ([PR #2041](https://github.com/modularml/mojo/pull/2041))
+    (Fixes [#2017](https://github.com/modularml/mojo/issues/2017))\
     By default, `List.pop()` removes the last element in the list.
 
   - `resize(new_size)` for resizing the list without the need to
     specify an additional value.
-    ([PR #2140](https://github.com/modularml/mojo/pull/2140))
+    ([PR #2140](https://github.com/modularml/mojo/pull/2140),
+     Fixes [#2133](https://github.com/modularml/mojo/issues/2133))
 
   - `insert(index, value)` for inserting a value at a specified index
     into the `List`.
-    ([PR #2148](https://github.com/modularml/mojo/pull/2148))
+    ([PR #2148](https://github.com/modularml/mojo/pull/2148),
+     Fixes [#2134](https://github.com/modularml/mojo/issues/2134))
 
   - constructor from `(ptr, size, capacity)` to to avoid needing to do a deep
     copy of an existing contiguous memory allocation when constructing a new `List`.
-    ([PR #2182](https://github.com/modularml/mojo/pull/2182))
+    ([PR #2182](https://github.com/modularml/mojo/pull/2182),
+     Fixes [#2170](https://github.com/modularml/mojo/issues/2170))
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
   ([PR #2085](https://github.com/modularml/mojo/pull/2085))
@@ -102,10 +106,12 @@ what we publish.
   ([PR #2082](https://github.com/modularml/mojo/pull/2082))
 
 - The `ord` and `chr` functions have been improved to accept any Unicode character.
-  ([PR #2149](https://github.com/modularml/mojo/pull/2149))
+  ([PR #2149](https://github.com/modularml/mojo/pull/2149),
+   Contributes towards [#1616](https://github.com/modularml/mojo/issues/1616))
 
 - `Atomic` is now movable.
-  ([PR #2088](https://github.com/modularml/mojo/pull/2088))
+  ([PR #2088](https://github.com/modularml/mojo/pull/2088),
+   Fixes [#2026](https://github.com/modularml/mojo/issues/2026))
 
 - `Dict` and `List` are both `Boolable` now.
   ([PR #2262](https://github.com/modularml/mojo/pull/2262))
@@ -115,7 +121,8 @@ what we publish.
   ([PR #2225](https://github.com/modularml/mojo/pull/2225))
 
 - `SIMD` now implements `__rmod__`.
-  ([PR #2186](https://github.com/modularml/mojo/pull/2186))
+  ([PR #2186](https://github.com/modularml/mojo/pull/2186),
+   Fixes [#1482](https://github.com/modularml/mojo/issues/1482))
 
 - `bool(None)` is now implemented.
   ([PR #2249](https://github.com/modularml/mojo/pull/2249))
@@ -181,10 +188,24 @@ what we publish.
 - Added `reversed()` for creating reversed iterators. Several range types,
   `List`, and `Dict` now support iterating in reverse.
   ([PR #2215](https://github.com/modularml/mojo/pull/2215),
-   [PR #2327](https://github.com/modularml/mojo/pull/2327))
+   [PR #2327](https://github.com/modularml/mojo/pull/2327),
+   Contributes towards [#2325](https://github.com/modularml/mojo/issues/2325))
 
-- Added left and right shift operations for `object`
-  ([PR #2247](https://github.com/modularml/mojo/pull/2247))
+- `object` now supports the division, modulo, and left and right shift
+  operators.
+  ([PR #2230](https://github.com/modularml/mojo/pull/2230),
+   [PR #2247](https://github.com/modularml/mojo/pull/2247),
+   Fixes [#2224](https://github.com/modularml/mojo/issues/2224))
+
+  The following operator dunder methods were added:
+
+  - `object.__mod__`
+  - `object.__truediv__`
+  - `object.__floordiv__`
+  - `object.__lshift__`
+  - `object.__rshift__`
+
+  As well as the in-place and reverse variants.
 
 - Added checked arithmetic operations.
   ([PR #2138](https://github.com/modularml/mojo/pull/2138))
@@ -201,7 +222,8 @@ what we publish.
   the numeric limits of the type.
 
 - Added `os.remove()` and `os.unlink()` for deleting files.
-  ([PR #2310](https://github.com/modularml/mojo/pull/2310))
+  ([PR #2310](https://github.com/modularml/mojo/pull/2310),
+   Fixes [#2306](https://github.com/modularml/mojo/issues/2306))
 
 - Properties can now be specified on inline mlir ops:
 
@@ -313,7 +335,8 @@ what we publish.
 
 - `Optional.value()` will now return a reference instead of a copy of the
   contained value.
-  ([PR #2226](https://github.com/modularml/mojo/pull/2226))
+  ([PR #2226](https://github.com/modularml/mojo/pull/2226),
+   Fixes [#2179](https://github.com/modularml/mojo/issues/2179))
 
   To perform a copy manually, dereference the result:
 
@@ -327,7 +350,8 @@ what we publish.
   [`proposals/byte-as-uint8.md`](https://github.com/modularml/mojo/blob/main/proposals/byte-as-uint8.md),
   began transition to using `UInt8` by changing the data pointer of `Error`
   to `DTypePointer[DType.uint8]`.
-  ([PR #2318](https://github.com/modularml/mojo/pull/2318))
+  ([PR #2318](https://github.com/modularml/mojo/pull/2318),
+   Contributes towards [#2317](https://github.com/modularml/mojo/issues/2317))
 
 - Continued transition to `UnsafePointer` away from the legacy `Pointer` type
   in various standard library APIs and internals.
@@ -444,8 +468,3 @@ what we publish.
 - [#2068](https://github.com/modularml/mojo/issues/2068)
   Fix simd.reduce for size_out == 2
   ([PR #2102](https://github.com/modularml/mojo/pull/2102))
-
-- [#2224](https://github.com/modularml/mojo/issues/2224)
-  `object` now implements `__truediv__`, `__floordiv__` and related divison
-  and modulo operators.
-  ([PR #2230](https://github.com/modularml/mojo/pull/2230))
