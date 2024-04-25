@@ -358,6 +358,6 @@ what we publish.
   ([PR #2102](https://github.com/modularml/mojo/pull/2102))
 
 - [#2224](https://github.com/modularml/mojo/issues/2224)
-  `object` now implements `__truediv__`, `__floordiv__` and related divison
+  `object` now implements `__truediv__`, `__floordiv__` and related division
   and modulo operators.
   ([PR #2230](https://github.com/modularml/mojo/pull/2230))

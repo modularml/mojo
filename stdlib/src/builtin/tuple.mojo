@@ -135,7 +135,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         unroll[initialize_elt, Self.__len__()]()
 
-        # We transfered all of the elements out of 'existing', so we need to
+        # We transferred all of the elements out of 'existing', so we need to
         # disable its destructor so they aren't destroyed.
         __mlir_op.`lit.ownership.mark_destroyed`(Reference(existing).value)
 

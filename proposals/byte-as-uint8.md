@@ -5,7 +5,7 @@ Most noticeable example is the underlying data of string types `String`, `String
 
 # Motivation
 
-Logically a byte is an integer value between `0` and `255`. Lots of algorithms make use of arithmetics ground by this assumption.
+Logically a byte is an integer value between `0` and `255`. Lots of algorithms make use of arithmetic ground by this assumption.
 A signed 8 bit integer on the contrary represents values between `-128` and `127`. This introduces very subtle bugs, when an algorithm written for unsigned 8 bit integer is used on a signed 8 bit integer.
 
 Another motivation for this change is that Mojo aims to be familiar to Python users. Those Python users are familiar with the `bytes` class, which itself is working with values between `0` and `255`, not values between `-128` and `127`.

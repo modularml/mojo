@@ -746,7 +746,7 @@ struct String(
 
             # FIXME:
             #   String.__iadd__ currently only accepts a String, meaning this
-            #   RHS will allocate unneccessarily.
+            #   RHS will allocate unnecessarily.
             ptr[] += strref
 
         return Formatter(
