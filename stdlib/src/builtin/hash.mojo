@@ -63,10 +63,12 @@ fn _HASH_SECRET() -> Int:
     return ptr.bitcast[Int]()[0]
 
 
-fn _initialize_hash_secret(payload: UnsafePointer[NoneType]) -> UnsafePointer[NoneType]:
+fn _initialize_hash_secret(
+    payload: UnsafePointer[NoneType],
+) -> UnsafePointer[NoneType]:
     var secret = random.random_ui64(0, UInt64.MAX)
     var data = UnsafePointer[Int].alloc(1)
-    initialize_pointee_move(data,int(secret))
+    initialize_pointee_move(data, int(secret))
     return data.bitcast[NoneType]()
 
 
