@@ -139,10 +139,10 @@ fn test_comparison_operators() raises:
 
     # Testing with implicit conversion
     assert_true(s0 < "defgh")  # String("abc") < "defgh"
-    assert_false("xyz" < s0)  # "xyz" is not less than String("abc")
+    assert_false(s0 > "xyz")  # String("abc") is not greater than "xyz"
     assert_true(s0 >= "abc")  # String("abc") >= "abc"
     assert_false(
-        "ab" >= s0
+        s0 <= "ab"
     )  # "ab" is not greater than or equal to String("abc")
 
     # Test comparisons involving default constructed empty string
