@@ -101,6 +101,68 @@ fn test_equality_operators() raises:
     assert_not_equal(s0, "notabc")
 
 
+fn test_comparison_operators() raises:
+    var s0 = String("abc")
+    var s1 = String("def")
+    var s2 = String("abc")
+    var s3 = String("ABC")
+    var s4 = String("ab")
+    var s5 = String("abcd")
+    var empty = String("")  # Explicit empty string for comparison
+    var default_string = String()  # Default constructed, assumed empty
+
+    # Test less than and greater than
+    assert_true(s0 < s1)    # "abc" < "def"
+    assert_false(s1 < s0)   # "def" is not less than "abc"
+    assert_false(s0 < s2)   # "abc" is not less than "abc"
+    assert_true(s4 < s0)    # "ab" < "abc"
+    assert_true(s0 > s4)    # "abc" > "ab"
+    assert_false(s0 > s5)   # "abc" is not greater than "abcd"
+
+    # Test less than or equal to and greater than or equal to
+    assert_true(s0 <= s1)   # "abc" <= "def"
+    assert_true(s0 <= s2)   # "abc" <= "abc"
+    assert_false(s1 <= s0)  # "def" is not less than or equal to "abc"
+    assert_true(s0 >= s2)   # "abc" >= "abc"
+    assert_false(s4 >= s0)  # "ab" is not greater than or equal to "abc"
+    assert_true(s5 >= s0)   # "abcd" >= "abc"
+
+    # Test case sensitivity in comparison
+    assert_true(s0 > s3)    # "abc" > "ABC" assuming ASCII order
+    assert_false(s0 < s3)   # "abc" < "ABC" is false assuming ASCII order
+
+    # Test against empty strings
+    var empty = String("")
+    assert_true(empty < s0)  # Empty string is less than any non-empty
+    assert_false(s0 < empty) # Non-empty string is not less than empty
+    assert_true(empty <= empty)  # Empty string is equal to itself
+    assert_true(empty >= empty)  # Empty string is equal to itself
+
+    # Testing with implicit conversion
+    assert_true(s0 < "defgh")   # String("abc") < "defgh"
+    assert_false("xyz" < s0)    # "xyz" is not less than String("abc")
+    assert_true(s0 >= "abc")    # String("abc") >= "abc"
+    assert_false("ab" >= s0)    # "ab" is not greater than or equal to String("abc")
+
+    # Test comparisons involving default constructed empty string
+    assert_true(default_string < s0)  # Assumes empty string is less than any non-empty
+    assert_false(s0 < default_string)  # Non-empty string should not be less than an empty string
+    assert_true(default_string <= s0)
+    assert_false(s0 <= default_string)
+    assert_true(default_string <= empty)  # Should be equal to explicitly empty string
+    assert_true(default_string >= empty)
+    assert_false(s0 <= default_string)
+    assert_true(default_string >= default_string)
+
+    # Ensure empty and default strings are treated the same in comparison
+    assert_true(empty < s0)  # Explicit empty is less than any non-empty
+    assert_true(empty <= s0)
+    assert_false(s0 < empty)
+    assert_false(s0 <= empty)
+    assert_true(empty <= empty)
+    assert_true(empty >= empty)
+
+
 fn test_add() raises:
     var s1 = String("123")
     var s2 = String("abc")
@@ -621,6 +683,7 @@ def main():
     test_constructors()
     test_copy()
     test_equality_operators()
+    test_comparison_operators()
     test_add()
     test_stringable()
     test_string_join()
