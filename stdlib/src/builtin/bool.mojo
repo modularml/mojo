@@ -87,6 +87,21 @@ struct Bool(
         return value.__bool__()
 
     @always_inline("nodebug")
+    fn __init__[boolable: Boolable](value: boolable) -> Bool:
+        """Implicitly convert a Boolable value to a Bool.
+
+        Parameters:
+            boolable: The Boolable type.
+
+        Args:
+            value: The boolable value.
+
+        Returns:
+            The constructed Bool value.
+        """
+        return value.__bool__()
+
+    @always_inline("nodebug")
     fn __bool__(self) -> Bool:
         """Convert to Bool.
 
