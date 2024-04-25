@@ -763,36 +763,30 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn _set_index(inout self, slot: Int, index: Int):
         return self._index.set_index(self._reserved, slot, index)
 
-    fn _next_index_slot(self, inout slot: Int, inout perturb: Int):
+    fn _next_index_slot(self, inout slot: Int, inout perturb: UInt64):
         alias PERTURB_SHIFT = 5
         perturb >>= PERTURB_SHIFT
-        slot = ((5 * slot) + perturb + 1) % self._reserved
+        slot = ((5 * slot) + int(perturb + 1)) % self._reserved
 
     fn _find_empty_index(self, hash: Int) -> Int:
         var slot = hash % self._reserved
-        var perturb = hash
-        for _ in range(self._reserved):
+        var perturb = bitcast[DType.uint64](Int64(hash))
+        while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return slot
             self._next_index_slot(slot, perturb)
-        abort("Dict: no empty index in _find_empty_index")
-        return 0
 
     fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
         # Return (found, slot, index)
-        var insert_slot = Optional[Int]()
-        var insert_index = Optional[Int]()
         var slot = hash % self._reserved
-        var perturb = hash
-        for _ in range(self._reserved):
+        var perturb = bitcast[DType.uint64](Int64(hash))
+        while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return (False, slot, self._n_entries)
             elif index == Self.REMOVED:
-                if not insert_slot:
-                    insert_slot = slot
-                    insert_index = self._n_entries
+                return (False, slot, self._n_entries)
             else:
                 var ev = self._entries.__get_ref(index)[]
                 debug_assert(ev.__bool__(), "entry in index must be full")
@@ -800,10 +794,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 if hash == entry.hash and key == entry.key:
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
-
-        debug_assert(insert_slot.__bool__(), "never found a slot")
-        debug_assert(insert_index.__bool__(), "slot populated but not index!!")
-        return (False, insert_slot.value()[], insert_index.value()[])
 
     fn _over_load_factor(self) -> Bool:
         return 3 * self.size > 2 * self._reserved
