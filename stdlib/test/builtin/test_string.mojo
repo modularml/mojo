@@ -132,7 +132,6 @@ fn test_comparison_operators() raises:
     assert_false(s0 < s3)  # "abc" < "ABC" is false assuming ASCII order
 
     # Test against empty strings
-    var empty = String("")
     assert_true(empty < s0)  # Empty string is less than any non-empty
     assert_false(s0 < empty)  # Non-empty string is not less than empty
     assert_true(empty <= empty)  # Empty string is equal to itself
