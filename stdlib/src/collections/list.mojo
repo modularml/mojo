@@ -20,7 +20,10 @@ from collections import List
 """
 
 
-from builtin.value import StringableCollectionElement
+from builtin.value import (
+    StringableCollectionElement,
+    ComparableCollectionElement,
+)
 from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
 from .optional import Optional
@@ -666,3 +669,20 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 result += ", "
         result += "]"
         return result
+
+
+fn count[T: ComparableCollectionElement](list: List[T], value: T) -> Int:
+    """Counts the number of occurrences of a value in the list.
+
+    Args:
+        list: The list to search.
+        value: The value to count.
+
+    Returns:
+        The number of occurrences of the value in the list.
+    """
+    var count = 0
+    for i in range(len(list)):
+        if list[i] == value:
+            count += 1
+    return count

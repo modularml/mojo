@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from collections import List
+from collections import List, count
 
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_true, assert_raises
@@ -682,6 +682,12 @@ def test_converting_list_to_string():
     assert_equal(__type_of(my_list3).__str__(my_list3), "[1.0, 2.0, 3.0]")
 
 
+def test_list_count():
+    var list = List[Int](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
+    assert_equal(1, count(list, 1))
+    assert_equal(2, count(list, 2))
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -706,3 +712,4 @@ def main():
     test_constructor_from_pointer()
     test_constructor_from_other_list_through_pointer()
     test_converting_list_to_string()
+    test_list_count()
