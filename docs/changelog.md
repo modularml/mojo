@@ -337,6 +337,37 @@ what we publish.
    [PR #2370](https://github.com/modularml/mojo/pull/2370),
    [PR #2371](https://github.com/modularml/mojo/pull/2371))
 
+- `Bool` can now be implicitly converted from any type conforming to `Boolable`.
+  This means that you no longer need to write things like this:
+
+  ```mojo
+  @value
+  struct MyBoolable:
+    fn __bool__(self) -> Bool: ...
+
+  fn takes_boolable[T: Boolable](cond: T): ...
+
+  takes_boolable(MyBoolable())
+  ```
+
+  Instead, you can simply have
+
+  ```mojo
+  fn takes_bool(cond: Bool): ...
+
+  takes_bool(MyBoolable())
+  ```
+
+  Note that calls to `takes_bool` will perform the implicit conversion, so in
+  some cases is it still better to explicitly declare type parameter, e.g.:
+
+  ```mojo
+  fn takes_two_boolables[T: Boolable](a: T, b: T):
+    # Short circuit means `b.__bool__()` might not be evaluated.
+    if a.__bool__() and b.__bool__():
+      ...
+  ```
+
 ### ❌ Removed
 
 - Support for "register only" variadic packs has been removed. Instead of
