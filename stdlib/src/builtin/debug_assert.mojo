@@ -21,24 +21,9 @@ from sys._build import is_kernels_debug_build
 from sys import triple_is_nvidia_cuda, is_defined
 
 
-fn debug_assert(cond: Bool, msg: StringLiteral):
-    """Asserts that the condition is true.
-
-    The `debug_assert` is similar to `assert` in C++. It is a no-op in release
-    builds unless MOJO_ENABLE_ASSERTIONS is defined.
-
-    Right now, users of the mojo-sdk must explicitly specify `-D MOJO_ENABLE_ASSERTIONS`
-    to enable assertions.  It is not sufficient to compile programs with `-debug-level full`
-    for enabling assertions in the library.
-
-    Args:
-        cond: The bool value to assert.
-        msg: The message to display on failure.
-    """
-    _debug_assert_impl(cond, msg)
-
-
-fn debug_assert[boolable: Boolable](cond: boolable, msg: StringLiteral):
+fn debug_assert[
+    boolable: Boolable, stringable: Stringable
+](cond: boolable, msg: stringable):
     """Asserts that the condition is true.
 
     The `debug_assert` is similar to `assert` in C++. It is a no-op in release
@@ -49,7 +34,8 @@ fn debug_assert[boolable: Boolable](cond: boolable, msg: StringLiteral):
     for enabling assertions in the library.
 
     Parameters:
-        boolable: The trait of the conditional.
+        boolable: The type of the condition.
+        stringable: The type of the message.
 
     Args:
         cond: The bool value to assert.
@@ -58,7 +44,9 @@ fn debug_assert[boolable: Boolable](cond: boolable, msg: StringLiteral):
     _debug_assert_impl(cond, msg)
 
 
-fn _debug_assert_impl[boolable: Boolable](cond: boolable, msg: StringLiteral):
+fn _debug_assert_impl[
+    boolable: Boolable, stringable: Stringable
+](cond: boolable, msg: stringable):
     """Asserts that the condition is true."""
 
     # Print an error and fail.
@@ -71,22 +59,22 @@ fn _debug_assert_impl[boolable: Boolable](cond: boolable, msg: StringLiteral):
 
     @parameter
     if err or warn:
-        if cond.__bool__():
+        if cond:
+            return
+
+        @parameter
+        if triple_is_nvidia_cuda():
+            # On GPUs, assert shouldn't allocate.
+
+            @parameter
+            if err:
+                abort()
+            else:
+                print("Assert Warning")
             return
 
         @parameter
         if err:
-
-            @parameter
-            if triple_is_nvidia_cuda():
-                abort()
-                return
-
             abort("Assert Error: " + str(msg))
         else:
-
-            @parameter
-            if triple_is_nvidia_cuda():
-                print("Assert Warning")
-                return
-            print("Assert Warning:", msg)
+            print("Assert Warning:", str(msg))
