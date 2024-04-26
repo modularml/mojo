@@ -259,7 +259,8 @@ what we publish.
   contexts (see the documentation for more details).
 
 - `debug_assert` now prints its location (filename, line, and column where it
-  was called) in its error message.
+  was called) in its error message. Similarly, the `assert_*` helpers in the
+  `testing` module now include location information in their messages.
 
 ### 🦋 Changed
 
