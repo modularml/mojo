@@ -262,6 +262,15 @@ what we publish.
   was called) in its error message. Similarly, the `assert_*` helpers in the
   `testing` module now include location information in their messages.
 
+- `int()` can now take a string and a specified base to parse an integer from a
+  string: `int("ff", 16)` returns `255`.
+  ([PR #2273](https://github.com/modularml/mojo/pull/2273),
+   Fixes [#2274](https://github.com/modularml/mojo/issues/2274))
+
+  Additionally, if a base of zero is specified, the string will be parsed as if
+  it was an integer literal, with the base determined by whether the
+  string contains the prefix `"0x"`, `"0o"`, or `"0b"`.
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
