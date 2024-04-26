@@ -84,24 +84,19 @@ If you already have the `modular` tool,
     curl -s https://get.modular.com | sh -
     ```
 
-2. Then install the Mojo SDK:
+2. Then sign in to your Modular account with this command:
+
+    ```sh
+    modular auth
+    ```
+
+3. Now you can install the Mojo SDK:
 
     ```sh
     modular install mojo
     ```
 
-    :::note Get nightlies
-
-    If you want the bleeding-edge (less stable) version, instead install the
-    nightly build:
-
-    ```sh
-    modular install nightly/mojo
-    ```
-
-    :::
-
-3. Set environment variables so you can access the
+4. Set environment variables so you can access the
    [`mojo`](/mojo/cli/) CLI:
 
     <Tabs>

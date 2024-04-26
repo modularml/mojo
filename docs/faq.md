@@ -275,7 +275,7 @@ about our kernel performance in our [matrix multiplication blog
 post](https://www.modular.com/blog/the-worlds-fastest-unified-matrix-multiplication).
 For details about our end-to-end model performance relative to the latest
 releases of TensorFlow and PyTorch, check out our [performance
-dashboard](https://www.modular.com/max/performance).
+dashboard](https://performance.modular.com).
 
 ## Mojo SDK
 
@@ -346,37 +346,27 @@ containers to enable remote development in Mojo.
 
 ### Does the Mojo SDK collect telemetry?
 
-Yes, the Mojo SDK collects some basic system information, basic
-compiler/runtime events, and crash reports that enable us to identify, analyze,
-and prioritize Mojo issues.
+Yes, in combination with the Modular CLI tool, the Mojo SDK collects some basic
+system information and crash reports that enable us to identify, analyze, and
+prioritize Mojo issues.
 
-This telemetry is crucial to help us quickly identify problems and improve our
-products. Without this telemetry, we would have to rely on user-submitted bug
-reports, and in our decades of experience building developer products, we know
-that most people don’t do that. The telemetry provides us the insights we need
-to build better products for you.
+Mojo is still in its early days, and this telemetry is crucial to help us
+quickly identify problems and improve Mojo. Without this telemetry, we would
+have to rely on user-submitted bug reports, and in our decades of building
+developer products, we know that most people don’t bother. Plus, a lot of
+product issues are not easily identified by users or quantifiable with
+individual bug reports. The telemetry provides us the insights we need to build
+Mojo into a premier developer product.
 
-You can opt-out of the crash report and compiler/runtime telemetry, but
-package install/update/uninstall events cannot be
-disabled (see the [MAX SDK terms](https://www.modular.com/legal/max)).
+Of course, if you don't want to share this information with us, you can easily
+opt-out of all telemetry, using the [`modular` CLI](/cli). To stop sharing
+system information, run this:
 
-To disable crash reports, use this command:
+`modular config-set telemetry.enabled=false`
 
-```sh
-modular config-set crash_reporting.enabled=false
-```
+To stop sharing crash reports, run this:
 
-To reduce other telemetry to only the required telemetry events, use this
-command:
-
-```sh
-modular config-set telemetry.level=0
-```
-
-There are 3 telemetry levels: `0` currently records nothing (unless you're also
-using MAX, which records hardware information and session durations); `1`
-records high-level events such as when the compiler is invoked; and `2` records
-more detail such as the time spend compiling.
+`modular config-set crash_reporting.enabled=false`
 
 ## Versioning & compatibility
 
