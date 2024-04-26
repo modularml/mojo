@@ -10,9 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# TODO(37393): Reenabl once we debug why we are depending on some debug behavior
-# on graviton.
-# REQUIRES: Disabled
 # RUN: %mojo %s
 
 from builtin.string import (
@@ -186,11 +183,11 @@ fn test_ord() raises:
     alias single_byte2 = ord("!")
     assert_equal(single_byte2, 33)
 
-    alias multi_byte = ord("α")
+    var multi_byte = ord("α")
     assert_equal(multi_byte, 945)
-    alias multi_byte2 = ord("➿")
+    var multi_byte2 = ord("➿")
     assert_equal(multi_byte2, 10175)
-    alias multi_byte3 = ord("🔥")
+    var multi_byte3 = ord("🔥")
     assert_equal(multi_byte3, 128293)
 
 
@@ -223,6 +220,7 @@ fn test_string_indexing() raises:
 
 
 fn test_atol() raises:
+    # base 10
     assert_equal(375, atol(String("375")))
     assert_equal(1, atol(String("001")))
     assert_equal(5, atol(String(" 005")))
@@ -230,36 +228,116 @@ fn test_atol() raises:
     assert_equal(-89, atol(String("-89")))
     assert_equal(-52, atol(String(" -52")))
     assert_equal(-69, atol(String(" -69  ")))
+    assert_equal(1_100_200, atol(" 1_100_200"))
+
+    # other bases
+    assert_equal(10, atol("A", 16))
+    assert_equal(15, atol("f ", 16))
+    assert_equal(255, atol(" FF", 16))
+    assert_equal(18, atol("10010", 2))
+    assert_equal(35, atol("Z", 36))
 
     # Negative cases
-    try:
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: '9.03'"
+    ):
         _ = atol(String("9.03"))
-        raise Error("Failed to raise when converting string to integer.")
-    except e:
-        assert_equal(str(e), "String is not convertible to integer.")
 
-    try:
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: ' 10 1'"
+    ):
         _ = atol(String(" 10 1"))
-        raise Error("Failed to raise when converting string to integer.")
-    except e:
-        assert_equal(str(e), "String is not convertible to integer.")
 
-    try:
+    # start/end with underscore double underscores
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: '5__5'"
+    ):
+        _ = atol("5__5")
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: ' _5'"
+    ):
+        _ = atol(" _5")
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: '5_'"
+    ):
+        _ = atol("5_")
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 5: '5'"
+    ):
+        _ = atol("5", 5)
+
+    with assert_raises(contains="Base must be >= 2 and <= 36, or 0."):
+        _ = atol("0", 1)
+
+    with assert_raises(contains="Base must be >= 2 and <= 36, or 0."):
+        _ = atol("0", 37)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 10: ''"
+    ):
         _ = atol(String(""))
-        raise Error("Failed to raise when converting empty string to integer.")
-    except e:
-        assert_equal(str(e), "Empty String cannot be converted to integer.")
 
-    try:
+    with assert_raises(
+        contains="String expresses an integer too large to store in Int."
+    ):
         _ = atol(String("9223372036854775832"))
-        raise Error(
-            "Failed to raise when converting an integer too large to store in"
-            " Int."
-        )
-    except e:
-        assert_equal(
-            str(e), "String expresses an integer too large to store in Int."
-        )
+
+
+fn test_atol_base_0() raises:
+    assert_equal(155, atol(" 155", base=0))
+    assert_equal(155_155, atol("155_155 ", base=0))
+
+    assert_equal(0, atol(" 0000", base=0))
+    assert_equal(0, atol(" 000_000", base=0))
+
+    assert_equal(3, atol("0b11", base=0))
+    assert_equal(3, atol("0B1_1", base=0))
+
+    assert_equal(63, atol("0o77", base=0))
+    assert_equal(63, atol(" 0O7_7 ", base=0))
+
+    assert_equal(17, atol("0x11", base=0))
+    assert_equal(17, atol("0X1_1", base=0))
+
+    assert_equal(0, atol("0X0", base=0))
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '  0x'"
+    ):
+        _ = atol("  0x", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '  0b  '"
+    ):
+        _ = atol("  0b  ", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '00100'"
+    ):
+        _ = atol("00100", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '0r100'"
+    ):
+        _ = atol("0r100", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '0b_0'"
+    ):
+        _ = atol("0b_0", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '0xf__f'"
+    ):
+        _ = atol("0xf__f", base=0)
+
+    with assert_raises(
+        contains="String is not convertible to integer with base 0: '0of_'"
+    ):
+        _ = atol("0of_", base=0)
 
 
 fn test_calc_initial_buffer_size_int32() raises:
@@ -385,13 +463,10 @@ fn test_rfind() raises:
 
 fn test_split() raises:
     # Reject empty delimiters
-    try:
+    with assert_raises(
+        contains="empty delimiter not allowed to be passed to split."
+    ):
         _ = String("hello").split("")
-        raise Error("failed to reject empty delimiter")
-    except e:
-        assert_equal(
-            "empty delimiter not allowed to be passed to split.", str(e)
-        )
 
     # Split in middle
     var d1 = String("n")
@@ -606,6 +681,7 @@ def test_removesuffix():
 
 def test_intable():
     assert_equal(int(String("123")), 123)
+    assert_equal(int(String("10"), base=8), 8)
 
     with assert_raises():
         _ = int(String("hi"))
@@ -630,6 +706,7 @@ def main():
     test_chr()
     test_string_indexing()
     test_atol()
+    test_atol_base_0()
     test_calc_initial_buffer_size_int32()
     test_calc_initial_buffer_size_int64()
     test_contains()
