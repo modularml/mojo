@@ -19,12 +19,21 @@ def raise_an_error():
     raise Error("MojoError: This is an error!")
 
 
-def main():
+def test_error_raising():
     try:
-        _ = raise_an_error()
+        raise_an_error()
     except e:
         assert_equal(str(e), "MojoError: This is an error!")
 
+
+def test_from_and_to_string():
     var myString: String = "FOO"
     var error = Error(myString)
     assert_equal(error, "FOO")
+
+    assert_equal(str(Error("bad")), "bad")
+
+
+def main():
+    test_error_raising()
+    test_from_and_to_string()

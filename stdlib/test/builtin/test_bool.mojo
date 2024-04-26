@@ -43,6 +43,13 @@ def test_convert_from_boolable():
     assert_true(takes_bool(MyTrue()))
 
 
+def test_bool_to_string():
+    assert_equal(str(True), "True")
+    assert_equal(str(False), "False")
+
+
 def main():
     test_bool_cast_to_int()
     test_bool_none()
+    test_convert_from_boolable()
+    test_bool_to_string()
