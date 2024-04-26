@@ -69,72 +69,86 @@ what we publish.
 
 - `List` now has several new methods:
   - `pop(index)` for removing an element at a particular index.
-    ([PR #2041](https://github.com/modularml/mojo/pull/2041))
-    (Fixes [#2017](https://github.com/modularml/mojo/issues/2017))\
-    By default, `List.pop()` removes the last element in the list.
+    ([PR #2041](https://github.com/modularml/mojo/pull/2041) by
+    [@LJ-9801](https://github.com/LJ-9801), fixes
+    [#2017](https://github.com/modularml/mojo/issues/2017)). By default,
+    `List.pop()` removes the last element in the list.
 
-  - `resize(new_size)` for resizing the list without the need to
-    specify an additional value.
-    ([PR #2140](https://github.com/modularml/mojo/pull/2140),
-     Fixes [#2133](https://github.com/modularml/mojo/issues/2133))
+  - `resize(new_size)` for resizing the list without the need to specify an
+    additional value. ([PR #2140](https://github.com/modularml/mojo/pull/2140)
+    by [@mikowals](https://github.com/mikowals), fixes
+    [#2133](https://github.com/modularml/mojo/issues/2133))
 
-  - `insert(index, value)` for inserting a value at a specified index
-    into the `List`.
-    ([PR #2148](https://github.com/modularml/mojo/pull/2148),
-     Fixes [#2134](https://github.com/modularml/mojo/issues/2134))
+  - `insert(index, value)` for inserting a value at a specified index into the
+    `List`. ([PR #2148](https://github.com/modularml/mojo/pull/2148) by
+    [@whym1here](https://github.com/whym1here), fixes
+    [#2134](https://github.com/modularml/mojo/issues/2134))
 
   - constructor from `(ptr, size, capacity)` to to avoid needing to do a deep
-    copy of an existing contiguous memory allocation when constructing a new `List`.
-    ([PR #2182](https://github.com/modularml/mojo/pull/2182),
-     Fixes [#2170](https://github.com/modularml/mojo/issues/2170))
+    copy of an existing contiguous memory allocation when constructing a new
+    `List`. ([PR #2182](https://github.com/modularml/mojo/pull/2182) by
+    [@StandinKP](https://github.com/StandinKP), fixes
+    [#2170](https://github.com/modularml/mojo/issues/2170))
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
-  ([PR #2085](https://github.com/modularml/mojo/pull/2085))
+  ([PR #2085](https://github.com/modularml/mojo/pull/2085) by
+  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse)).
 
 - `Set` now has named methods for set operations
-  ([PR #2214](https://github.com/modularml/mojo/pull/2214)):
+  ([PR #2214](https://github.com/modularml/mojo/pull/2214) by
+  [@arvindavoudi](https://github.com/arvindavoudi)):
   - `Set.difference()` mapping to `-`
   - `Set.difference_update()` mapping to `-=`
   - `Set.intersection_update()` mapping to `&=`
   - `Set.update()` mapping to `|=`
 
 - `String` now has `removeprefix()` and `removesuffix()` methods.
-  ([PR #2038](https://github.com/modularml/mojo/pull/2038))
+  ([PR #2038](https://github.com/modularml/mojo/pull/2038) by
+  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
-- `Optional` now implements `__is__` and `__isnot__` methods so that you can compare
-  an `Optional` with `None`, e.g. `Optional(1) is not None` for example.
-  ([PR #2082](https://github.com/modularml/mojo/pull/2082))
+- `Optional` now implements `__is__` and `__isnot__` methods so that you can
+  compare an `Optional` with `None`, e.g. `Optional(1) is not None` for example.
+  ([PR #2082](https://github.com/modularml/mojo/pull/2082) by
+  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
-- The `ord` and `chr` functions have been improved to accept any Unicode character.
-  ([PR #2149](https://github.com/modularml/mojo/pull/2149),
-   Contributes towards [#1616](https://github.com/modularml/mojo/issues/1616))
+- The `ord` and `chr` functions have been improved to accept any Unicode
+  character. ([PR #2149](https://github.com/modularml/mojo/pull/2149) by
+  [@mzaks](https://github.com/mzaks), contributes towards
+  [#1616](https://github.com/modularml/mojo/issues/1616))
 
 - `Atomic` is now movable.
-  ([PR #2088](https://github.com/modularml/mojo/pull/2088),
-   Fixes [#2026](https://github.com/modularml/mojo/issues/2026))
+  ([PR #2088](https://github.com/modularml/mojo/pull/2088) by
+  [@StandinKP](https://github.com/StandinKP), fixes
+  [#2026](https://github.com/modularml/mojo/issues/2026))
 
 - `Dict` and `List` are both `Boolable` now.
-  ([PR #2262](https://github.com/modularml/mojo/pull/2262))
+  ([PR #2262](https://github.com/modularml/mojo/pull/2262) by
+  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - `atol` now handles whitespaces so `int(String( " 10 "))` gives back `10`
   instead of raising an error.
-  ([PR #2225](https://github.com/modularml/mojo/pull/2225))
+  ([PR #2225](https://github.com/modularml/mojo/pull/2225) by
+  [@artemiogr97](https://github.com/artemiogr97))
 
 - `SIMD` now implements `__rmod__`.
-  ([PR #2186](https://github.com/modularml/mojo/pull/2186),
-   Fixes [#1482](https://github.com/modularml/mojo/issues/1482))
+  ([PR #2186](https://github.com/modularml/mojo/pull/2186) by
+  [@bgreni](https://github.com/bgreni), fixes
+  [#1482](https://github.com/modularml/mojo/issues/1482))
 
 - `bool(None)` is now implemented.
-  ([PR #2249](https://github.com/modularml/mojo/pull/2249))
+  ([PR #2249](https://github.com/modularml/mojo/pull/2249) by
+  [@zhoujingya](https://github.com/zhoujingya))
 
-- The `DTypePointer` type now implements `gather` for gathering a `SIMD`
-  vector from offsets of a current pointer.  Similarly, support for `scatter`
-  was added to scatter a `SIMD` vector into offsets of the current pointer.
-  ([PR #2268](https://github.com/modularml/mojo/pull/2268))
+- The `DTypePointer` type now implements `gather` for gathering a `SIMD` vector
+  from offsets of a current pointer. Similarly, support for `scatter` was added
+  to scatter a `SIMD` vector into offsets of the current pointer.
+  ([PR #2268](https://github.com/modularml/mojo/pull/2268) by
+  [@leandrolcampos](https://github.com/leandrolcampos))
 
 - The `len` function for unary `range` with negative end values has been fixed
   so that things like `len(range(-1))` work correctly now.
-  ([PR #2204](https://github.com/modularml/mojo/pull/2204))
+  ([PR #2204](https://github.com/modularml/mojo/pull/2204) by
+  [@soraros](https://github.com/soraros))
 
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
@@ -142,9 +156,10 @@ what we publish.
   low-level logic but isn't designed for general usability and will likely
   change in the future.
 
-- The `testing.assert_equal[SIMD]()` now raises if any of the elements
-  mismatch in the two `SIMD` arguments being compared.
-  ([PR #2279](https://github.com/modularml/mojo/pull/2279))
+- The `testing.assert_equal[SIMD]()` now raises if any of the elements mismatch
+  in the two `SIMD` arguments being compared.
+  ([PR #2279](https://github.com/modularml/mojo/pull/2279) by
+  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - The `testing.assert_almost_equal` and `math.isclose` functions now have an
   `equal_nan` flag. When set to True, then NaNs are considered equal.
@@ -187,15 +202,17 @@ what we publish.
 
 - Added `reversed()` for creating reversed iterators. Several range types,
   `List`, and `Dict` now support iterating in reverse.
-  ([PR #2215](https://github.com/modularml/mojo/pull/2215),
-   [PR #2327](https://github.com/modularml/mojo/pull/2327),
-   Contributes towards [#2325](https://github.com/modularml/mojo/issues/2325))
+  ([PR #2215](https://github.com/modularml/mojo/pull/2215) by
+  [@helehex](https://github.com/helehex),
+  [PR #2327](https://github.com/modularml/mojo/pull/2327) by
+  [@jayzhan211](https://github.com/jayzhan211), contributes towards
+  [#2325](https://github.com/modularml/mojo/issues/2325))
 
 - `object` now supports the division, modulo, and left and right shift
-  operators.
-  ([PR #2230](https://github.com/modularml/mojo/pull/2230),
-   [PR #2247](https://github.com/modularml/mojo/pull/2247),
-   Fixes [#2224](https://github.com/modularml/mojo/issues/2224))
+  operators. ([PR #2230](https://github.com/modularml/mojo/pull/2230),
+  [PR #2247](https://github.com/modularml/mojo/pull/2247) by
+  [@LJ-9801](https://github.com/LJ-9801), fixes
+  [#2224](https://github.com/modularml/mojo/issues/2224))
 
   The following operator dunder methods were added:
 
@@ -208,7 +225,8 @@ what we publish.
   As well as the in-place and reverse variants.
 
 - Added checked arithmetic operations.
-  ([PR #2138](https://github.com/modularml/mojo/pull/2138))
+  ([PR #2138](https://github.com/modularml/mojo/pull/2138) by
+  [#lsh](https://github.com/lsh))
 
   SIMD integral types (including the sized integral scalars like `Int64`) can
   now perform checked additions, substractions, and multiplications using the
@@ -222,8 +240,9 @@ what we publish.
   the numeric limits of the type.
 
 - Added `os.remove()` and `os.unlink()` for deleting files.
-  ([PR #2310](https://github.com/modularml/mojo/pull/2310),
-   Fixes [#2306](https://github.com/modularml/mojo/issues/2306))
+  ([PR #2310](https://github.com/modularml/mojo/pull/2310) by
+  [@artemiogr97](https://github.com/artemiogr97), fixes
+  [#2306](https://github.com/modularml/mojo/issues/2306))
 
 - Properties can now be specified on inline mlir ops:
 
@@ -264,8 +283,9 @@ what we publish.
 
 - `int()` can now take a string and a specified base to parse an integer from a
   string: `int("ff", 16)` returns `255`.
-  ([PR #2273](https://github.com/modularml/mojo/pull/2273),
-   Fixes [#2274](https://github.com/modularml/mojo/issues/2274))
+  ([PR #2273](https://github.com/modularml/mojo/pull/2273) by
+  [@artemiogr97](https://github.com/artemiogr97), fixes
+  [#2274](https://github.com/modularml/mojo/issues/2274))
 
   Additionally, if a base of zero is specified, the string will be parsed as if
   it was an integer literal, with the base determined by whether the
@@ -331,22 +351,22 @@ what we publish.
   f.seek(os.SEEK_END, -32)
   ```
 
-  - `FileHandle.read()` can now read straight into a `DTypePointer`:
+- `FileHandle.read()` can now read straight into a `DTypePointer`:
 
-    ```mojo
-    var file = open("/tmp/example.txt", "r")
+  ```mojo
+  var file = open("/tmp/example.txt", "r")
 
-    # Allocate and load 8 elements
-    var ptr = DTypePointer[DType.float32].alloc(8)
-    var bytes = file.read(ptr, 8)
-    print("bytes read", bytes)
-    print(ptr.load[width=8]())
-    ```
+  # Allocate and load 8 elements
+  var ptr = DTypePointer[DType.float32].alloc(8)
+  var bytes = file.read(ptr, 8)
+  print("bytes read", bytes)
+  print(ptr.load[width=8]())
+  ```
 
 - `Optional.value()` will now return a reference instead of a copy of the
-  contained value.
-  ([PR #2226](https://github.com/modularml/mojo/pull/2226),
-   Fixes [#2179](https://github.com/modularml/mojo/issues/2179))
+  contained value. ([PR #2226](https://github.com/modularml/mojo/pull/2226) by
+  [#lsh](https://github.com/lsh), fixes
+  [#2179](https://github.com/modularml/mojo/issues/2179))
 
   To perform a copy manually, dereference the result:
 
@@ -358,18 +378,20 @@ what we publish.
 
 - Per the accepted community proposal
   [`proposals/byte-as-uint8.md`](https://github.com/modularml/mojo/blob/main/proposals/byte-as-uint8.md),
-  began transition to using `UInt8` by changing the data pointer of `Error`
-  to `DTypePointer[DType.uint8]`.
-  ([PR #2318](https://github.com/modularml/mojo/pull/2318),
-   Contributes towards [#2317](https://github.com/modularml/mojo/issues/2317))
+  began transition to using `UInt8` by changing the data pointer of `Error` to
+  `DTypePointer[DType.uint8]`.
+  ([PR #2318](https://github.com/modularml/mojo/pull/2318) by
+  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse), contributes
+  towards [#2317](https://github.com/modularml/mojo/issues/2317))
 
-- Continued transition to `UnsafePointer` away from the legacy `Pointer` type
-  in various standard library APIs and internals.
+- Continued transition to `UnsafePointer` away from the legacy `Pointer` type in
+  various standard library APIs and internals.
   ([PR #2365](https://github.com/modularml/mojo/pull/2365),
-   [PR #2367](https://github.com/modularml/mojo/pull/2367),
-   [PR #2368](https://github.com/modularml/mojo/pull/2368),
-   [PR #2370](https://github.com/modularml/mojo/pull/2370),
-   [PR #2371](https://github.com/modularml/mojo/pull/2371))
+  [PR #2367](https://github.com/modularml/mojo/pull/2367),
+  [PR #2368](https://github.com/modularml/mojo/pull/2368),
+  [PR #2370](https://github.com/modularml/mojo/pull/2370),
+  [PR #2371](https://github.com/modularml/mojo/pull/2371) by
+  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - `Bool` can now be implicitly converted from any type conforming to `Boolable`.
   This means that you no longer need to write things like this:
@@ -475,6 +497,6 @@ what we publish.
 - [#1675](https://github.com/modularml/mojo/issues/1675) Ensure `@value`
   decorator fails gracefully after duplicate field error.
 
-- [#2068](https://github.com/modularml/mojo/issues/2068)
-  Fix simd.reduce for size_out == 2
-  ([PR #2102](https://github.com/modularml/mojo/pull/2102))
+- [#2068](https://github.com/modularml/mojo/issues/2068) Fix simd.reduce for
+  size_out == 2 ([PR #2102](https://github.com/modularml/mojo/pull/2102) by
+  [@soraros](https://github.com/soraros))
