@@ -14,7 +14,7 @@
 
 from testing import assert_equal, assert_false, assert_true
 
-from utils import StaticTuple, StaticIntTuple
+from utils import StaticTuple, StaticIntTuple, InlineArray
 
 
 def test_static_tuple():
@@ -80,7 +80,95 @@ def test_tuple_literal():
     assert_equal(len(()), 0)
 
 
+def test_array_int():
+    var arr = InlineArray[Int, 3](0, 0, 0)
+
+    assert_equal(arr[0], 0)
+    assert_equal(arr[1], 0)
+    assert_equal(arr[2], 0)
+
+    arr[0] = 1
+    arr[1] = 2
+    arr[2] = 3
+
+    assert_equal(arr[0], 1)
+    assert_equal(arr[1], 2)
+    assert_equal(arr[2], 3)
+
+    # test negative indexing
+    assert_equal(arr[-1], 3)
+    assert_equal(arr[-2], 2)
+
+    # test negative indexing with dynamic index
+    var i = -1
+    assert_equal(arr[i], 3)
+    i -= 1
+    assert_equal(arr[i], 2)
+
+    var copy = arr
+    assert_equal(arr[0], copy[0])
+    assert_equal(arr[1], copy[1])
+    assert_equal(arr[2], copy[2])
+
+    var move = arr^
+    assert_equal(copy[0], move[0])
+    assert_equal(copy[1], move[1])
+    assert_equal(copy[2], move[2])
+
+    # fill element initializer
+    var arr2 = InlineArray[Int, 3](5)
+    assert_equal(arr2[0], 5)
+    assert_equal(arr2[1], 5)
+    assert_equal(arr2[2], 5)
+
+    var arr3 = InlineArray[Int, 1](5)
+    assert_equal(arr2[0], 5)
+
+
+def test_array_str():
+    var arr = InlineArray[String, 3]("hi", "hello", "hey")
+
+    assert_equal(arr[0], "hi")
+    assert_equal(arr[1], "hello")
+    assert_equal(arr[2], "hey")
+
+    # Test mutating an array through its __refitem__
+    arr[0] = "howdy"
+    arr[1] = "morning"
+    arr[2] = "wazzup"
+
+    assert_equal(arr[0], "howdy")
+    assert_equal(arr[1], "morning")
+    assert_equal(arr[2], "wazzup")
+
+    # test negative indexing
+    assert_equal(arr[-1], "wazzup")
+    assert_equal(arr[-2], "morning")
+
+    var copy = arr
+    assert_equal(arr[0], copy[0])
+    assert_equal(arr[1], copy[1])
+    assert_equal(arr[2], copy[2])
+
+    var move = arr^
+    assert_equal(copy[0], move[0])
+    assert_equal(copy[1], move[1])
+    assert_equal(copy[2], move[2])
+
+    # fill element initializer
+    var arr2 = InlineArray[String, 3]("hi")
+    assert_equal(arr2[0], "hi")
+    assert_equal(arr2[1], "hi")
+    assert_equal(arr2[2], "hi")
+
+    # size 1 array to prevent regressions in the constructors
+    var arr3 = InlineArray[String, 1]("hi")
+    assert_equal(arr3[0], "hi")
+
+
 def main():
     test_static_tuple()
     test_static_int_tuple()
     test_tuple_literal()
+    test_array_int()
+    test_array_str()
