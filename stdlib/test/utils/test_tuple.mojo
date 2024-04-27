@@ -115,6 +115,12 @@ def test_array_int():
     assert_equal(copy[1], move[1])
     assert_equal(copy[2], move[2])
 
+    # fill element initializer
+    var arr2 = InlineArray[Int, 3](5)
+    assert_equal(arr2[0], 5)
+    assert_equal(arr2[1], 5)
+    assert_equal(arr2[2], 5)
+
 
 def test_array_str():
     var arr = InlineArray[String, 3]("hi", "hello", "hey")
@@ -145,6 +151,12 @@ def test_array_str():
     assert_equal(copy[0], move[0])
     assert_equal(copy[1], move[1])
     assert_equal(copy[2], move[2])
+
+    # fill element initializer
+    var arr2 = InlineArray[String, 3]("hi")
+    assert_equal(arr2[0], "hi")
+    assert_equal(arr2[1], "hi")
+    assert_equal(arr2[2], "hi")
 
 
 def main():

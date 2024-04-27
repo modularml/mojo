@@ -262,8 +262,21 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     var _array: Self.type
     """The underlying storage for the array."""
 
+    # This constructor will always cause a compile time error if used.
+    # It is used to steer users away from uninitialized memory.
     @always_inline
-    fn __init__(inout self, *, fill: Self.ElementType):
+    fn __init__(inout self):
+        constrained[
+            False,
+            (
+                "Initialize with either a variadic list of arguments or a"
+                " default fill element."
+            ),
+        ]()
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
+    fn __init__(inout self, fill: Self.ElementType):
         """Constructs an empty array where each element is the supplied `fill`.
 
         Args:
