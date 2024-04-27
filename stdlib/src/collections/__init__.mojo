@@ -13,7 +13,7 @@
 """Implements the collections package."""
 
 from .dict import Dict, KeyElement
-from .list import List, count
+from .list import List
 from .optional import Optional, OptionalReg
 from .set import Set
 from .vector import (
