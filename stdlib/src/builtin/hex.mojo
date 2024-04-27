@@ -201,7 +201,7 @@ fn _try_write_int(
     # bytes from our final `buf_ptr` to the end of the buffer.
     var len = CAPACITY - offset
 
-    var strref = StringRef(rebind[Pointer[Int8]](buf_ptr), len)
+    var strref = StringRef(rebind[UnsafePointer[Int8]](buf_ptr), len)
 
     fmt.write_str(strref)
 

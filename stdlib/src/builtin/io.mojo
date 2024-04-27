@@ -322,9 +322,9 @@ fn _put(x: StringRef):
     @parameter
     if triple_is_nvidia_cuda():
         var tmp = 0
-        var arg_ptr = Pointer.address_of(tmp)
+        var arg_ptr = UnsafePointer.address_of(tmp)
         _ = external_call["vprintf", Int32](
-            x.data, arg_ptr.bitcast[Pointer[NoneType]]()
+            x.data, arg_ptr.bitcast[UnsafePointer[NoneType]]()
         )
     else:
         alias MAX_STR_LEN = 0x1000_0000
