@@ -446,6 +446,9 @@ what we publish.
   reference to a value use `Reference(x)` and if you need an unsafe pointer, you
   can use `UnsafePointer.address_of(x)`.
 
+- The method `object.print()` has been removed. Since now, `object` has the
+  `Stringable` trait, you can use `print(my_object)` instead.
+
 ### 🛠️ Fixed
 
 - [#516](https://github.com/modularml/mojo/issues/516) and
