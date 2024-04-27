@@ -97,68 +97,6 @@ fn _create_array[
         return array
 
 
-@always_inline
-fn _set_array_elem_mem[
-    index: Int,
-    size: Int,
-    type: CollectionElement,
-](
-    val: type,
-    array: Reference[
-        __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
-        __mlir_attr.`1 : i1`,
-        _,
-    ],
-):
-    """Sets the array element at position `index` with the value `val`.
-
-    Parameters:
-        index: the position to replace the value at.
-        size: the size of the array.
-        type: the element type of the array
-
-    Args:
-        val: the value to set.
-        array: the array which is captured by reference.
-    """
-    var ptr = __mlir_op.`pop.array.gep`(
-        array.get_legacy_pointer().address, index.value
-    )
-    var p = UnsafePointer(ptr)
-    initialize_pointee(p, val)
-
-
-@always_inline
-fn _create_array_mem[
-    size: Int, type: CollectionElement
-](*lst: type) -> __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]:
-    """Sets the array element at position `index` with the value `val`.
-
-    Parameters:
-        size: the size of the array.
-        type: the element type of the array
-
-    Args:
-        lst: the list of values to set.
-
-    Returns:
-        The array with values filled from the input list.
-    """
-    debug_assert(size == len(lst), "mismatch in the number of elements")
-
-    var array = __mlir_op.`kgen.undef`[
-        _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
-    ]()
-
-    @always_inline
-    @parameter
-    fn fill[idx: Int]():
-        _set_array_elem_mem[idx, size, type](lst[idx], array)
-
-    unroll[fill, size]()
-    return array
-
-
 # ===----------------------------------------------------------------------===#
 # StaticTuple
 # ===----------------------------------------------------------------------===#
@@ -337,7 +275,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         @unroll
         for i in range(size):
             var ptr = self._get_reference_unsafe(i)
-            initialize_pointee(UnsafePointer[Self.ElementType](ptr), fill)
+            initialize_pointee_copy(UnsafePointer[Self.ElementType](ptr), fill)
 
     @always_inline
     fn __init__(inout self, *elems: Self.ElementType):
@@ -353,7 +291,9 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         @unroll
         for i in range(size):
             var ref = self._get_reference_unsafe(i)
-            initialize_pointee(UnsafePointer[Self.ElementType](ref), elems[i])
+            initialize_pointee_move(
+                UnsafePointer[Self.ElementType](ref), elems[i]
+            )
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
