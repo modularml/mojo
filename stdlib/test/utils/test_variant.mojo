@@ -14,7 +14,6 @@
 
 from sys.ffi import _get_global
 
-from memory import Pointer
 from testing import assert_equal, assert_false, assert_true
 
 from utils import Variant
@@ -33,11 +32,11 @@ struct TestCounter(CollectionElement):
         self.moved = other.moved
 
     fn __moveinit__(inout self, owned other: Self):
-        self.copied = other.copied^
+        self.copied = other.copied
         self.moved = other.moved + 1
 
 
-fn _poison_ptr() -> Pointer[Bool]:
+fn _poison_ptr() -> UnsafePointer[Bool]:
     var ptr = _get_global[
         "TEST_VARIANT_POISON", _initialize_poison, _destroy_poison
     ]()
@@ -45,16 +44,18 @@ fn _poison_ptr() -> Pointer[Bool]:
 
 
 fn assert_no_poison() raises:
-    assert_false(_poison_ptr().load())
+    assert_false(move_from_pointee(_poison_ptr()))
 
 
-fn _initialize_poison(payload: Pointer[NoneType]) -> Pointer[NoneType]:
-    var poison = Pointer[Bool].alloc(1)
-    poison.store(False)
+fn _initialize_poison(
+    payload: UnsafePointer[NoneType],
+) -> UnsafePointer[NoneType]:
+    var poison = UnsafePointer[Bool].alloc(1)
+    initialize_pointee_move(poison, False)
     return poison.bitcast[NoneType]()
 
 
-fn _destroy_poison(p: Pointer[NoneType]):
+fn _destroy_poison(p: UnsafePointer[NoneType]):
     p.free()
 
 
@@ -63,13 +64,13 @@ struct Poison(CollectionElement):
         pass
 
     fn __copyinit__(inout self, other: Self):
-        _poison_ptr().store(True)
+        initialize_pointee_move(_poison_ptr(), True)
 
     fn __moveinit__(inout self, owned other: Self):
-        _poison_ptr().store(True)
+        initialize_pointee_move(_poison_ptr(), True)
 
     fn __del__(owned self):
-        _poison_ptr().store(True)
+        initialize_pointee_move(_poison_ptr(), True)
 
 
 alias TestVariant = Variant[TestCounter, Poison]
@@ -123,16 +124,18 @@ def test_move():
 
 @value
 struct ObservableDel(CollectionElement):
-    var target: Pointer[Bool]
+    var target: UnsafePointer[Bool]
 
     fn __del__(owned self):
-        self.target.store(True)
+        initialize_pointee_move(self.target, True)
 
 
 def test_del():
     alias TestDeleterVariant = Variant[ObservableDel, Poison]
     var deleted: Bool = False
-    var v1 = TestDeleterVariant(ObservableDel(Pointer.address_of(deleted)))
+    var v1 = TestDeleterVariant(
+        ObservableDel(UnsafePointer.address_of(deleted))
+    )
     _ = v1^  # call __del__
     assert_true(deleted)
     # test that we didn't call the other deleter too!
@@ -143,8 +146,10 @@ def test_set_calls_deleter():
     alias TestDeleterVariant = Variant[ObservableDel, Poison]
     var deleted: Bool = False
     var deleted2: Bool = False
-    var v1 = TestDeleterVariant(ObservableDel(Pointer.address_of(deleted)))
-    v1.set[ObservableDel](ObservableDel(Pointer.address_of(deleted2)))
+    var v1 = TestDeleterVariant(
+        ObservableDel(UnsafePointer.address_of(deleted))
+    )
+    v1.set[ObservableDel](ObservableDel(UnsafePointer.address_of(deleted2)))
     assert_true(deleted)
     assert_false(deleted2)
     _ = v1^
@@ -156,7 +161,9 @@ def test_set_calls_deleter():
 def test_take_doesnt_call_deleter():
     alias TestDeleterVariant = Variant[ObservableDel, Poison]
     var deleted: Bool = False
-    var v1 = TestDeleterVariant(ObservableDel(Pointer.address_of(deleted)))
+    var v1 = TestDeleterVariant(
+        ObservableDel(UnsafePointer.address_of(deleted))
+    )
     assert_false(deleted)
     var v2 = v1.take[ObservableDel]()
     assert_false(deleted)
