@@ -10,11 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s | FileCheck %s
+# RUN: %mojo %s
 
 from random import random_float64
 
-from testing import assert_equal, assert_false, assert_true
+
+from testing import assert_equal, assert_false, assert_true, assert_raises
 
 
 def test_object_ctors():
@@ -172,21 +173,17 @@ def test_function_raises(borrowed a) -> object:
 
 def test_object_function():
     var a: object = test_function
-    print(a)
-    print(a(1, 2))
+    assert_true(str(a).startswith("Function at address 0x"))
+    assert_equal(a(1, 2), 3)
     a = test_function_raises
-    try:
+    with assert_raises(contains="Error from function type"):
         a(1)
-    except e:
-        print(e)
 
 
 def test_non_object_getattr():
     var a: object = [2, 3, 4]
-    try:
+    with assert_raises(contains="Type 'list' does not have attribute 'foo'"):
         a.foo(2)
-    except e:
-        print(e)
 
 
 # These are all marked borrowed because 'object' doesn't support function
@@ -245,97 +242,61 @@ def test_matrix():
         C.append(row_zero)
 
     matmul_untyped(C, A, B)
-    for k in range(size):
-        C[k].print()
-        print()
+    assert_equal(str(C[0]), "[5, 8, 11]")
+    assert_equal(str(C[1]), "[8, 14, 20]")
+    assert_equal(str(C[2]), "[11, 20, 29]")
+
+
+def test_convert_to_string():
+    var a: object = True
+    assert_equal(str(a), "True")
+    a = 42
+    assert_equal(str(a), "42")
+    a = 2.5
+    assert_equal(str(a), "2.5")
+    a = "hello"
+    assert_equal(str(a), "'hello'")
+    a = []
+    assert_equal(str(a), "[]")
+    a.append(3)
+    a.append(False)
+    a.append(5.5)
+    var b: object = []
+    b.append("foo")
+    b.append("baz")
+    a.append(b)
+    assert_equal(str(a), "[3, False, 5.5, ['foo', 'baz']]")
+    assert_equal(str(a[3, 1]), "'baz'")
+    a[3, 1] = "bar"
+    assert_equal(str(a[3, 1]), "'bar'")
+    var c = a + b
+    assert_equal(str(c), "[3, False, 5.5, ['foo', 'bar'], 'foo', 'bar']")
+    b.append(False)
+    assert_equal(str(c), "[3, False, 5.5, ['foo', 'bar', False], 'foo', 'bar']")
+    assert_equal(str(a), "[3, False, 5.5, ['foo', 'bar', False]]")
+    assert_equal(str(c[3]), "['foo', 'bar', False]")
+    b[1] = object()
+    assert_equal(str(a), "[3, False, 5.5, ['foo', None, False]]")
+    a = "abc"
+    b = a[True]
+    assert_equal(str(b), "'b'")
+    b = a[2]
+    assert_equal(str(b), "'c'")
+    a = [1, 1.2, False, "true"]
+    assert_equal(str(a), "[1, 1.2, False, 'true']")
+
+    a = object(Attr("foo", 5), Attr("bar", "hello"), Attr("baz", False))
+    assert_equal(str(a.bar), "'hello'")
+    a.bar = [1, 2]
+    assert_equal(str(a), "{'foo' = 5, 'bar' = [1, 2], 'baz' = False}")
 
 
 def main():
-    # CHECK-LABEL: == test_object
-    print("== test_object")
-    try:
-        test_object_ctors()
-        test_comparison_ops()
-        test_arithmetic_ops()
-        test_arithmetic_ops_div()
-        # CHECK: Function at address 0x{{[a-float0-9]+}}
-        # CHECK-NEXT: 3
-        # CHECK-NEXT: Error from function type
-        test_object_function()
-        # CHECK: Type 'list' does not have attribute 'foo'
-        test_non_object_getattr()
-        # CHECK: [5, 8, 11]
-        # CHECK: [8, 14, 20]
-        # CHECK: [11, 20, 29]
-        test_matrix()
-    except e0:
-        print(e0)
-        # CHECK-NOT: TEST FAILED
-        print("TEST FAILED")
-
-    try:
-        # CHECK-LABEL: Printing Tests
-        print("Printing Tests")
-        var a: object = True
-        # CHECK-NEXT: True
-        print(a)
-        a = 42
-        # CHECK-NEXT: 42
-        print(a)
-        a = 2.5
-        # CHECK-NEXT: 2.5
-        print(a)
-        a = "hello"
-        # CHECK-NEXT: 'hello'
-        print(a)
-        a = []
-        # CHECK-NEXT: []
-        print(a)
-        a.append(3)
-        a.append(False)
-        a.append(5.5)
-        var b: object = []
-        b.append("foo")
-        b.append("baz")
-        a.append(b)
-        # CHECK: [3, False, 5.5{{.*}}, ['foo', 'baz']]
-        print(a)
-        # CHECK: 'baz'
-        print(a[3, 1])
-        a[3, 1] = "bar"
-        # CHECK: 'bar'
-        print(a[3, 1])
-        var c = a + b
-        # CHECK: [3, False, 5.5{{.*}}, ['foo', 'bar'], 'foo', 'bar']
-        print(c)
-        b.append(False)
-        # CHECK: [3, {{.*}}, ['foo', 'bar', False], 'foo', 'bar']
-        print(c)
-        # CHECK: [3, {{.*}}, ['foo', 'bar', False]]
-        print(a)
-        # CHECK: ['foo', 'bar', False]
-        print(c[3])
-        b[1] = object()
-        # CHECK: [3, False, 5.5{{.*}}, ['foo', None, False]]
-        print(a)
-        a = "abc"
-        b = a[True]
-        # CHECK: 'b'
-        print(b)
-        b = a[2]
-        # CHECK: 'c'
-        print(b)
-        a = [1, 1.2, False, "true"]
-        # CHECK: [1, 1.2, False, 'true']
-        print(a)
-
-        a = object(Attr("foo", 5), Attr("bar", "hello"), Attr("baz", False))
-        # CHECK: 'hello'
-        print(a.bar)
-        a.bar = [1, 2]
-        # CHECK: {'foo' = 5, 'bar' = [1, 2], 'baz' = False}
-        print(a)
-    except e1:
-        print(e1)
-        # CHECK-NOT: TEST FAILED
-        print("TEST FAILED")
+    test_object_ctors()
+    test_comparison_ops()
+    test_arithmetic_ops()
+    test_arithmetic_ops_div()
+    test_object_function()
+    test_non_object_getattr()
+    test_matrix()
+    test_convert_to_string()
