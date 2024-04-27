@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the source range struct.
+"""Implements utilities to capture and represent source code location.
 """
 
 
