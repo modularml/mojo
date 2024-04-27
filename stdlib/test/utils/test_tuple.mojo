@@ -121,6 +121,9 @@ def test_array_int():
     assert_equal(arr2[1], 5)
     assert_equal(arr2[2], 5)
 
+    var arr3 = InlineArray[Int, 1](5)
+    assert_equal(arr2[0], 5)
+
 
 def test_array_str():
     var arr = InlineArray[String, 3]("hi", "hello", "hey")
@@ -157,6 +160,10 @@ def test_array_str():
     assert_equal(arr2[0], "hi")
     assert_equal(arr2[1], "hi")
     assert_equal(arr2[2], "hi")
+
+    # size 1 array to prevent regressions in the constructors
+    var arr3 = InlineArray[String, 1]("hi")
+    assert_equal(arr3[0], "hi")
 
 
 def main():
