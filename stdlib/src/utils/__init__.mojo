@@ -19,6 +19,6 @@ from .index import (
 )
 from .inlined_string import InlinedString
 from .loop import unroll
-from .static_tuple import StaticTuple
+from .static_tuple import StaticTuple, InlineArray
 from .stringref import StringRef
 from .variant import Variant
