@@ -10,17 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-#
-# This file only tests the debug_assert function
-#
-# ===----------------------------------------------------------------------=== #
-# REQUIRES: has_not
-# RUN: not --crash %mojo  -D KERNELS_BUILD_TYPE=debug %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
+# RUN: %mojo %s
+
+from sys.ffi import DLHandle
+from testing import assert_false
 
 
-# CHECK-FAIL-LABEL: test_fail
-fn main():
-    print("== test_fail")
-    debug_assert(False, "fail")
-    # CHECK-FAIL-NOT: is never reached
-    print("is never reached")
+def check_invalid_dlhandle():
+    assert_false(
+        DLHandle("/an/invalid/library"), "the library is not valid location"
+    )
+
+
+def main():
+    check_invalid_dlhandle()

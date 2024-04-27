@@ -10,17 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+#
+# This file only tests the debug_assert function
+#
+# ===----------------------------------------------------------------------=== #
+# REQUIRES: has_not
+# RUN: not --crash %mojo -D KERNELS_BUILD_TYPE=debug %s 2>&1 | FileCheck %s -check-prefix=CHECK-FAIL
 
-from os.path import isdir
-from pathlib import Path, cwd
-from builtin._location import __source_location
 
-from testing import assert_true, assert_false
-
-
-def main():
-    assert_true(isdir(Path()))
-    assert_true(isdir(str(cwd())))
-    assert_false(isdir(str(cwd() / "nonexistant")))
-    assert_false(isdir(__source_location().file_name))
+# CHECK-FAIL-LABEL: test_fail
+fn main():
+    print("== test_fail")
+    debug_assert(False, "fail")
+    # CHECK-FAIL-NOT: is never reached
+    print("is never reached")

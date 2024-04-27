@@ -11,15 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo-no-debug %s
+# RUN: %mojo %s
 
 from python._cpython import CPython, PyObjectPtr
-
 from python import PythonObject, Python
-
-
 from testing import assert_false, assert_raises, assert_true, assert_equal
-
 
 from utils import StringRef
 

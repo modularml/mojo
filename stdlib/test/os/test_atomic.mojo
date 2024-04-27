@@ -19,9 +19,9 @@ from testing import assert_equal, assert_true, assert_false
 fn test_atomic() raises:
     var atom: Atomic[DType.index] = 3
 
-    assert_equal(atom.value, 3)
-
     assert_equal(atom.load(), 3)
+
+    assert_equal(atom.value, 3)
 
     atom += 4
     assert_equal(atom.value, 7)

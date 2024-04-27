@@ -20,9 +20,10 @@ from collections import List
 """
 
 
-from memory.unsafe_pointer import *
-from memory import Reference, UnsafePointer
 from builtin.value import StringableCollectionElement
+from memory import UnsafePointer, Reference
+from memory.unsafe_pointer import move_pointee, move_from_pointee
+
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -142,9 +143,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             self.append(value[])
 
     fn __init__(
-        inout self: Self, data: UnsafePointer[T], size: Int, capacity: Int
+        inout self: Self, data: UnsafePointer[T], *, size: Int, capacity: Int
     ):
-        """Constructs a list from a pointer and its size.
+        """Constructs a list from a pointer, its size, and its capacity.
 
         Args:
             data: The pointer to the data.
@@ -192,12 +193,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return self.size
 
     fn __bool__(self) -> Bool:
-        """Checks if the list is empty.
+        """Checks whether the list has any elements or not.
 
         Returns:
             `False` if the list is empty, `True` if there is at least one element.
         """
-        return len(self).__bool__()
+        return len(self) > 0
 
     @always_inline
     fn _realloc(inout self, new_capacity: Int):
@@ -220,7 +221,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         if self.size >= self.capacity:
             self._realloc(_max(1, self.capacity * 2))
-        initialize_pointee(self.data + self.size, value^)
+        initialize_pointee_move(self.data + self.size, value^)
         self.size += 1
 
     @always_inline
@@ -246,9 +247,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             var earlier_ptr = self.data + earlier_idx
             var later_ptr = self.data + later_idx
 
-            var tmp = __get_address_as_owned_value(earlier_ptr.value)
+            var tmp = move_from_pointee(earlier_ptr)
             move_pointee(src=later_ptr, dst=earlier_ptr)
-            initialize_pointee(later_ptr, tmp^)
+            initialize_pointee_move(later_ptr, tmp^)
 
             earlier_idx -= 1
             later_idx -= 1
@@ -352,7 +353,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             for i in range(new_size, self.size):
                 destroy_pointee(self.data + i)
             for i in range(self.size, new_size):
-                initialize_pointee(self.data + i, value)
+                initialize_pointee_copy(self.data + i, value)
             self.size = new_size
 
     @always_inline
@@ -410,7 +411,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
             var tmp = move_from_pointee(earlier_ptr)
             move_pointee(src=later_ptr, dst=earlier_ptr)
-            initialize_pointee(later_ptr, tmp^)
+            initialize_pointee_move(later_ptr, tmp^)
 
             earlier_idx += 1
             later_idx -= 1
@@ -447,7 +448,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             normalized_idx += len(self)
 
         destroy_pointee(self.data + normalized_idx)
-        initialize_pointee(self.data + normalized_idx, value^)
+        initialize_pointee_move(self.data + normalized_idx, value^)
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
@@ -531,15 +532,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if i < 0:
             normalized_idx += Reference(self)[].size
 
-        # Mutability gets set to the local mutability of this
-        # pointer value, ie. because we defined it with `let` it's now an
-        # "immutable" reference regardless of the mutability of `self`.
-        # This means we can't just use `UnsafePointer.__refitem__` here
-        # because the mutability won't match.
-        var base_ptr = Reference(self)[].data
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life]._mlir_type
-        ]((base_ptr + normalized_idx).value)
+        var offset_ptr = Reference(self)[].data + normalized_idx
+        return offset_ptr[]
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type

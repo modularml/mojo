@@ -41,7 +41,7 @@ alias DEFAULT_RTLD = RTLD.NOW | RTLD.GLOBAL
 
 @value
 @register_passable
-struct DLHandle(CollectionElement):
+struct DLHandle(CollectionElement, Boolable):
     """Represents a dynamically linked library that can be loaded and unloaded.
 
     The library is loaded on initialization and unloaded on deletion of the object.
@@ -84,6 +84,14 @@ struct DLHandle(CollectionElement):
         if not os_is_windows():
             _ = external_call["dlclose", Int](self.handle)
             self.handle = DTypePointer[DType.int8].get_null()
+
+    fn __bool__(self) -> Bool:
+        """Checks if the handle is valid.
+
+        Returns:
+          True if the DLHandle is not null and False otherwise.
+        """
+        return self.handle.__bool__()
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
@@ -436,6 +444,811 @@ fn external_call[
     else:
         return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
             arg0, arg1, arg2, arg3, arg4
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0, arg1, arg2, arg3, arg4, arg5
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0, arg1, arg2, arg3, arg4, arg5
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+    T6: AnyRegType,
+](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5, arg6: T6) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+      T6: The seventh argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+      arg6: The seventh argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+    T6: AnyRegType,
+    T7: AnyRegType,
+](
+    arg0: T0,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+    arg6: T6,
+    arg7: T7,
+) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+      T6: The seventh argument type.
+      T7: The eighth argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+      arg6: The seventh argument.
+      arg7: The eighth argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+    T6: AnyRegType,
+    T7: AnyRegType,
+    T8: AnyRegType,
+](
+    arg0: T0,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+    arg6: T6,
+    arg7: T7,
+    arg8: T8,
+) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+      T6: The seventh argument type.
+      T7: The eighth argument type.
+      T8: The ninth argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+      arg6: The seventh argument.
+      arg7: The eighth argument.
+      arg8: The ninth argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+    T6: AnyRegType,
+    T7: AnyRegType,
+    T8: AnyRegType,
+    T9: AnyRegType,
+](
+    arg0: T0,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+    arg6: T6,
+    arg7: T7,
+    arg8: T8,
+    arg9: T9,
+) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+      T6: The seventh argument type.
+      T7: The eighth argument type.
+      T8: The ninth argument type.
+      T9: The tenth argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+      arg6: The seventh argument.
+      arg7: The eighth argument.
+      arg8: The ninth argument.
+      arg9: The tenth argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+    T6: AnyRegType,
+    T7: AnyRegType,
+    T8: AnyRegType,
+    T9: AnyRegType,
+    T10: AnyRegType,
+](
+    arg0: T0,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+    arg6: T6,
+    arg7: T7,
+    arg8: T8,
+    arg9: T9,
+    arg10: T10,
+) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+      T6: The seventh argument type.
+      T7: The eighth argument type.
+      T8: The ninth argument type.
+      T9: The tenth argument type.
+      T10: The eleventh argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+      arg6: The seventh argument.
+      arg7: The eighth argument.
+      arg8: The ninth argument.
+      arg9: The tenth argument.
+      arg10: The eleventh argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+    T6: AnyRegType,
+    T7: AnyRegType,
+    T8: AnyRegType,
+    T9: AnyRegType,
+    T10: AnyRegType,
+    T11: AnyRegType,
+](
+    arg0: T0,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+    arg6: T6,
+    arg7: T7,
+    arg8: T8,
+    arg9: T9,
+    arg10: T10,
+    arg11: T11,
+) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+      T6: The seventh argument type.
+      T7: The eighth argument type.
+      T8: The ninth argument type.
+      T9: The tenth argument type.
+      T10: The eleventh argument type.
+      T11: The twelfth argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+      arg6: The seventh argument.
+      arg7: The eighth argument.
+      arg8: The ninth argument.
+      arg9: The tenth argument.
+      arg10: The eleventh argument.
+      arg11: The twelfth argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0,
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            arg6,
+            arg7,
+            arg8,
+            arg9,
+            arg10,
+            arg11,
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0,
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            arg6,
+            arg7,
+            arg8,
+            arg9,
+            arg10,
+            arg11,
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+    T6: AnyRegType,
+    T7: AnyRegType,
+    T8: AnyRegType,
+    T9: AnyRegType,
+    T10: AnyRegType,
+    T11: AnyRegType,
+    T12: AnyRegType,
+](
+    arg0: T0,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+    arg6: T6,
+    arg7: T7,
+    arg8: T8,
+    arg9: T9,
+    arg10: T10,
+    arg11: T11,
+    arg12: T12,
+) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+      T6: The seventh argument type.
+      T7: The eighth argument type.
+      T8: The ninth argument type.
+      T9: The tenth argument type.
+      T10: The eleventh argument type.
+      T11: The twelfth argument type.
+      T12: The thirteenth argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+      arg6: The seventh argument.
+      arg7: The eighth argument.
+      arg8: The ninth argument.
+      arg9: The tenth argument.
+      arg10: The eleventh argument.
+      arg11: The twelfth argument.
+      arg12: The thirteenth argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0,
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            arg6,
+            arg7,
+            arg8,
+            arg9,
+            arg10,
+            arg11,
+            arg12,
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0,
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            arg6,
+            arg7,
+            arg8,
+            arg9,
+            arg10,
+            arg11,
+            arg12,
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+    T6: AnyRegType,
+    T7: AnyRegType,
+    T8: AnyRegType,
+    T9: AnyRegType,
+    T10: AnyRegType,
+    T11: AnyRegType,
+    T12: AnyRegType,
+    T13: AnyRegType,
+](
+    arg0: T0,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+    arg6: T6,
+    arg7: T7,
+    arg8: T8,
+    arg9: T9,
+    arg10: T10,
+    arg11: T11,
+    arg12: T12,
+    arg13: T13,
+) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+      T6: The seventh argument type.
+      T7: The eighth argument type.
+      T8: The ninth argument type.
+      T9: The tenth argument type.
+      T10: The eleventh argument type.
+      T11: The twelfth argument type.
+      T12: The thirteenth argument type.
+      T13: The fourteenth argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+      arg6: The seventh argument.
+      arg7: The eighth argument.
+      arg8: The ninth argument.
+      arg9: The tenth argument.
+      arg10: The eleventh argument.
+      arg11: The twelfth argument.
+      arg12: The thirteenth argument.
+      arg13: The fourteenth argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0,
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            arg6,
+            arg7,
+            arg8,
+            arg9,
+            arg10,
+            arg11,
+            arg12,
+            arg13,
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0,
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            arg6,
+            arg7,
+            arg8,
+            arg9,
+            arg10,
+            arg11,
+            arg12,
+            arg13,
+        )
+
+
+@always_inline("nodebug")
+fn external_call[
+    callee: StringLiteral,
+    type: AnyRegType,
+    T0: AnyRegType,
+    T1: AnyRegType,
+    T2: AnyRegType,
+    T3: AnyRegType,
+    T4: AnyRegType,
+    T5: AnyRegType,
+    T6: AnyRegType,
+    T7: AnyRegType,
+    T8: AnyRegType,
+    T9: AnyRegType,
+    T10: AnyRegType,
+    T11: AnyRegType,
+    T12: AnyRegType,
+    T13: AnyRegType,
+    T14: AnyRegType,
+](
+    arg0: T0,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+    arg6: T6,
+    arg7: T7,
+    arg8: T8,
+    arg9: T9,
+    arg10: T10,
+    arg11: T11,
+    arg12: T12,
+    arg13: T13,
+    arg14: T14,
+) -> type:
+    """Calls an external function.
+
+    Parameters:
+      callee: The name of the external function.
+      type: The return type.
+      T0: The first argument type.
+      T1: The second argument type.
+      T2: The third argument type.
+      T3: The fourth argument type.
+      T4: The fifth argument type.
+      T5: The sixth argument type.
+      T6: The seventh argument type.
+      T7: The eighth argument type.
+      T8: The ninth argument type.
+      T9: The tenth argument type.
+      T10: The eleventh argument type.
+      T11: The twelfth argument type.
+      T12: The thirteenth argument type.
+      T13: The fourteenth argument type.
+      T14: The fifteenth argument type.
+
+    Args:
+      arg0: The first argument.
+      arg1: The second argument.
+      arg2: The third argument.
+      arg3: The fourth argument.
+      arg4: The fifth argument.
+      arg5: The sixth argument.
+      arg6: The seventh argument.
+      arg7: The eighth argument.
+      arg8: The ninth argument.
+      arg9: The tenth argument.
+      arg10: The eleventh argument.
+      arg11: The twelfth argument.
+      arg12: The thirteenth argument.
+      arg13: The fourteenth argument.
+      arg14: The fifteenth argument.
+
+    Returns:
+      The external call result.
+    """
+
+    @parameter
+    if _mlirtype_is_eq[type, NoneType]():
+        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
+            arg0,
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            arg6,
+            arg7,
+            arg8,
+            arg9,
+            arg10,
+            arg11,
+            arg12,
+            arg13,
+            arg14,
+        )
+        return rebind[type](None)
+    else:
+        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
+            arg0,
+            arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            arg6,
+            arg7,
+            arg8,
+            arg9,
+            arg10,
+            arg11,
+            arg12,
+            arg13,
+            arg14,
         )
 
 

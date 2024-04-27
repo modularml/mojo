@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 from sys import has_neon, simdwidthof
 
@@ -41,6 +41,64 @@ def test_cast():
 
 def test_simd_variadic():
     assert_equal(str(SIMD[DType.index, 4](52, 12, 43, 5)), "[52, 12, 43, 5]")
+
+
+def test_convert_simd_to_string():
+    var a: SIMD[DType.float32, 2] = 5
+    assert_equal(str(a), "[5.0, 5.0]")
+
+    var b: SIMD[DType.float64, 4] = 6
+    assert_equal(str(b), "[6.0, 6.0, 6.0, 6.0]")
+
+    var c: SIMD[DType.index, 8] = 7
+    assert_equal(str(c), "[7, 7, 7, 7, 7, 7, 7, 7]")
+
+    # TODO: uncomment when https://github.com/modularml/mojo/issues/2353 is fixed
+    # assert_equal(str(UInt32(-1)), "4294967295")
+    assert_equal(str(UInt64(-1)), "18446744073709551615")
+    assert_equal(str(Scalar[DType.address](22)), "0x16")
+    assert_equal(str(Scalar[DType.address](0xDEADBEAF)), "0xdeadbeaf")
+
+    assert_equal(str((UInt16(32768))), "32768")
+    assert_equal(str((UInt16(65535))), "65535")
+    assert_equal(str((Int16(-2))), "-2")
+
+    assert_equal(str(UInt64(16646288086500911323)), "16646288086500911323")
+
+    # https://github.com/modularml/mojo/issues/556
+    assert_equal(
+        str(
+            SIMD[DType.uint64, 4](
+                0xA0761D6478BD642F,
+                0xE7037ED1A0B428DB,
+                0x8EBC6AF09C88C6E3,
+                0x589965CC75374CC3,
+            )
+        ),
+        (
+            "[11562461410679940143, 16646288086500911323, 10285213230658275043,"
+            " 6384245875588680899]"
+        ),
+    )
+
+    assert_equal(
+        str(
+            SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448)
+        ),
+        "[-943274556, -875902520, -808530484, -741158448]",
+    )
+
+
+def test_issue_20421():
+    var a = DTypePointer[DType.uint8]().alloc(16 * 64, alignment=64)
+    for i in range(16 * 64):
+        a[i] = i & 255
+    var av16 = a.offset(128 + 64 + 4).bitcast[DType.int32]().load[width=4]()
+    assert_equal(
+        av16,
+        SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448),
+    )
+    a.free()
 
 
 def test_truthy():
@@ -365,9 +423,13 @@ def test_interleave():
 
 
 def test_deinterleave():
-    var ts = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
-    assert_equal(ts[0], SIMD[DType.index, 2](0, 2))
-    assert_equal(ts[1], SIMD[DType.index, 2](1, 3))
+    var tup2 = SIMD[DType.float32, 2](1, 2).deinterleave()
+    assert_equal(tup2[0], Float32(1))
+    assert_equal(tup2[1], Float32(2))
+
+    var tup4 = SIMD[DType.index, 4](0, 1, 2, 3).deinterleave()
+    assert_equal(tup4[0], SIMD[DType.index, 2](0, 2))
+    assert_equal(tup4[1], SIMD[DType.index, 2](1, 3))
 
 
 def test_address():
@@ -656,6 +718,8 @@ def test_mul_with_overflow():
 def main():
     test_cast()
     test_simd_variadic()
+    test_convert_simd_to_string()
+    test_issue_20421()
     test_truthy()
     test_floordiv()
     test_mod()

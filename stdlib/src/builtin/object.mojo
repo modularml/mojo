@@ -16,14 +16,13 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict, List
+
 from os import Atomic
 from sys.intrinsics import _type_is_eq
-
 
 from memory import memcmp, memcpy, DTypePointer
 from memory._arc import Arc
 from memory.unsafe_pointer import move_from_pointee
-
 
 from utils import StringRef, unroll
 
@@ -66,7 +65,7 @@ struct _ImmutableString:
 
     @always_inline
     fn __init__(data: UnsafePointer[Int8], length: Int) -> Self:
-        return Self {data: data.value, length: length}
+        return Self {data: data.address, length: length}
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
@@ -101,7 +100,7 @@ struct _RefCountedListRef:
     @always_inline
     fn __init__() -> Self:
         var ptr = UnsafePointer[_RefCountedList].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedList()
+        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         return Self {lst: ptr.bitcast[NoneType]()}
 
     @always_inline
@@ -186,7 +185,7 @@ struct _RefCountedAttrsDictRef:
     @always_inline
     fn __init__(values: VariadicListMem[Attr, _, _]) -> Self:
         var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
-        __get_address_as_uninit_lvalue(ptr.value) = _RefCountedAttrsDict()
+        __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
             ptr[].impl[]._insert(values[i].key, values[i].value._value.copy())
@@ -1739,7 +1738,7 @@ struct object(IntableRaising, Boolable, Stringable):
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
-            initialize_pointee(
+            initialize_pointee_copy(
                 impl.data,
                 move_from_pointee(self._value.get_as_string().data + index),
             )

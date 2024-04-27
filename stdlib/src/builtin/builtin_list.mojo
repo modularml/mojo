@@ -15,8 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from memory import Reference, UnsafePointer, LegacyPointer
 from memory.unsafe_pointer import destroy_pointee
-from memory import Reference, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
@@ -65,7 +65,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         Returns:
             The element at the given index.
         """
-        return self.storage.get[i, T]()
+        return rebind[T](self.storage[i])
 
 
 # ===----------------------------------------------------------------------===#
@@ -278,7 +278,9 @@ struct VariadicListMem[
         var tmp = value
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
-        self.value = Pointer.address_of(tmp).bitcast[Self._mlir_type]().load()
+        self.value = (
+            LegacyPointer.address_of(tmp).bitcast[Self._mlir_type]().load()
+        )
         self._is_owned = False
 
     # Provide support for variadics of *owned* arguments.  The reference will
@@ -298,7 +300,9 @@ struct VariadicListMem[
         var tmp = value
         # We need to bitcast different argument conventions to a consistent
         # representation.  This is ugly but effective.
-        self.value = Pointer.address_of(tmp).bitcast[Self._mlir_type]().load()
+        self.value = (
+            LegacyPointer.address_of(tmp).bitcast[Self._mlir_type]().load()
+        )
         self._is_owned = True
 
     @always_inline
