@@ -452,16 +452,17 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # TODO: Once the min() and max() functions are available in Mojo,
         # TODO: we can simplify the entire if-else block into a single line using the ternary operator:
         # var normalized_end = self.size if end is None else min(max(end, 0), self.size)
+        var normalized_end: Int
         if end is None:
-            var normalized_end = self.size
+            normalized_end = self.size
         else:
-            if end < 0:
-                var normalized_end = self.size + end
+            if end.value()[] < 0:
+                normalized_end = self.size + end.value()[]
             else:
-                if end > self.size:
-                    var normalized_end = self.size
+                if end.value()[] > self.size:
+                    normalized_end = self.size
                 else:
-                    var normalized_end = end
+                    normalized_end = end.value()[]
 
         if not self.size:
             raise "Cannot find index of a value in an empty list."
