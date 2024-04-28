@@ -35,6 +35,9 @@ def main():
             # this is the current file
             continue
         file_path = Path(target_paths[i])
+        file_content = file_path.read_text()
+        if file_content.startswith("#!"):
+            file_content = "\n".join(file_content.split("\n")[1:])
         if not file_path.read_text().startswith(LICENSE):
             files_without_license.append(file_path)
 
