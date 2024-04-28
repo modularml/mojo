@@ -426,7 +426,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if not self.size: raise "Cannot find index of a value in an empty list."
         if normalized_start >= self.size: raise "Given 'start' parameter (" + String(normalized_start) + ") is out of range. List only has " + String(self.size) + " elements."
 
-        var ret_val: Int
         for i in range(normalized_start, normalized_end):
             # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
             # could degrade the performance of the List.index method if it were to replace the current implementation,
