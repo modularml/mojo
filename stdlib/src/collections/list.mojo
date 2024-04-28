@@ -418,9 +418,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     # TODO: Modify this to be regular method when issue 1876 is resolved
     @staticmethod
-    fn index[C: ComparableCollectionElement](self: List[C], owned value: C, start: Int = 0, end: Optional[Int] = None) raises -> Int:
+    fn index[
+        C: ComparableCollectionElement
+    ](
+        self: List[C], owned value: C, start: Int = 0, end: Optional[Int] = None
+    ) raises -> Int:
         """
-        Returns the index of the first occurrence of a value in a list, starting from the specified 
+        Returns the index of the first occurrence of a value in a list, starting from the specified
         index (default 0). Raises an Error if the value is not found.
 
         Args:
@@ -459,8 +463,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 else:
                     var normalized_end = end
 
-        if not self.size: raise "Cannot find index of a value in an empty list."
-        if normalized_start >= self.size: raise "Given 'start' parameter (" + String(normalized_start) + ") is out of range. List only has " + String(self.size) + " elements."
+        if not self.size:
+            raise "Cannot find index of a value in an empty list."
+        if normalized_start >= self.size:
+            raise "Given 'start' parameter (" + String(
+                normalized_start
+            ) + ") is out of range. List only has " + String(
+                self.size
+            ) + " elements."
 
         for i in range(normalized_start, normalized_end):
             # Note: Implementing __contains__ with O(n) time complexity in future, indicating it relies on linear search,
