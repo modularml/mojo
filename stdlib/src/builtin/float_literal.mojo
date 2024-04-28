@@ -70,10 +70,37 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
         """
         return Self(__mlir_op.`kgen.int_literal.to_float_literal`(value.value))
 
-    alias nan = Self(__mlir_attr[`#kgen.float_literal<nan>`])
-    alias infinity = Self(__mlir_attr[`#kgen.float_literal<inf>`])
-    alias negative_infinity = Self(__mlir_attr[`#kgen.float_literal<neg_inf>`])
-    alias negative_zero = Self(__mlir_attr[`#kgen.float_literal<neg_zero>`])
+    alias nan = Self(__mlir_attr.`#kgen.float_literal<nan>`)
+    alias infinity = Self(__mlir_attr.`#kgen.float_literal<inf>`)
+    alias negative_infinity = Self(__mlir_attr.`#kgen.float_literal<neg_inf>`)
+    alias negative_zero = Self(__mlir_attr.`#kgen.float_literal<neg_zero>`)
+
+    @always_inline("nodebug")
+    fn is_nan(self) -> Bool:
+        """Return whether the FloatLiteral is nan.
+
+        Since `nan == nan` is False, this provides a way to check for nan-ness.
+
+        Returns:
+            True, if the value is nan, False otherwise.
+        """
+        return __mlir_op.`kgen.float_literal.isa`[
+            special = __mlir_attr.`#kgen<float_literal.special_values nan>`
+        ](self.value)
+
+    @always_inline("nodebug")
+    fn is_neg_zero(self) -> Bool:
+        """Return whether the FloatLiteral is negative zero.
+
+        Since `FloatLiteral.negative_zero == 0.0` is True, this provides a way
+        to check if the FloatLiteral is negative zero.
+
+        Returns:
+            True, if the value is negative zero, False otherwise.
+        """
+        return __mlir_op.`kgen.float_literal.isa`[
+            special = __mlir_attr.`#kgen<float_literal.special_values neg_zero>`
+        ](self.value)
 
     # ===------------------------------------------------------------------===#
     # Conversion Operators
