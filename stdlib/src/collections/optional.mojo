@@ -26,8 +26,8 @@ if b:  # bool(b) is False, so no print
     print(b.value()[])
 var c = a.or_else(2)
 var d = b.or_else(2)
-print(c)  # prints 1
-print(d)  # prints 2
+print(c.value())  # prints 1
+print(d.value())  # prints 2
 ```
 """
 
@@ -113,16 +113,33 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
         Parameters:
+<<<<<<< HEAD
             mutability: Indicates if the optional is mutable or immutable.
             self_life: The lifetime policy for the optional.
+=======
+            mutability: Whether the Optional is mutable.
+            self_life: The Optional's lifetime.
+>>>>>>> upstream/nightly
 
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """
         debug_assert(Reference(self)[].__bool__(), ".value() on empty Optional")
         alias RefType = Reference[T, mutability, self_life]
-        var ptr = Reference(self)[]._value._get_ptr[T]().value
+        var ptr = Reference(self)[]._value._get_ptr[T]().address
         return __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](ptr)
+
+    @always_inline
+    fn _value_copy(self) -> T:
+        """Unsafely retrieve the value out of the Optional.
+
+        Note: only used for Optionals when used in a parameter context
+        due to compiler bugs.  In general, prefer using the public `Optional.value()`
+        function that returns a `Reference[T]`.
+        """
+
+        debug_assert(self.__bool__(), ".value() on empty Optional")
+        return self._value.get[T]()[]
 
     fn take(owned self) -> T:
         """Unsafely move the value out of the Optional.

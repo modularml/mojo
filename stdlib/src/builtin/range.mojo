@@ -118,7 +118,9 @@ struct _SequentialRange(Sized, ReversibleRange):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        return _max(0, self.end - self.start)
+        # FIXME(#38392):
+        # return _max(0, self.end - self.start)
+        return self.end - self.start if self.start < self.end else 0
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
@@ -187,8 +189,9 @@ struct _StridedRange(Sized, ReversibleRange):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        if (self.step > 0) == (self.start > self.end):
-            return 0
+        # FIXME(#38392)
+        # if (self.step > 0) == (self.start > self.end):
+        #     return 0
         return _div_ceil_positive(_abs(self.start - self.end), _abs(self.step))
 
     @always_inline("nodebug")

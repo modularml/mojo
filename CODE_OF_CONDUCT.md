@@ -1,4 +1,4 @@
-# Code of Conduct
+# Code of conduct
 
 In the interest of fostering an open and welcoming environment, we as
 contributors and maintainers pledge to make participation in our project and
@@ -7,7 +7,7 @@ body size, disability, ethnicity, gender identity and expression, level of
 experience, nationality, personal appearance, race, religion, or sexual
 identity and orientation.
 
-## Our Standards
+## Our standards
 
 All community forums and spaces are meant for professional interactions that
 are friendly, inclusive, helpful, and collaborative. Examples of behavior that
@@ -32,7 +32,7 @@ participants include:
 - Conduct which could reasonably be considered inappropriate for the forum in
   which it occurs.
 
-## Our Responsibilities
+## Our responsibilities
 
 Project maintainers are responsible for clarifying the standards of acceptable
 behavior and are expected to take appropriate and fair corrective action in

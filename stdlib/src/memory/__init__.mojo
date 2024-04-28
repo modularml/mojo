@@ -32,8 +32,8 @@ from .unsafe import (
 )
 
 from .reference import (
-    AddressSpace,
     Reference,
+    AddressSpace,
 )
 
 # TODO: consider making Arc public and import it here

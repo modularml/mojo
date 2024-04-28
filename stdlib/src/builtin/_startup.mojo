@@ -18,30 +18,34 @@ from sys import external_call
 @always_inline
 fn _get_global[
     name: StringLiteral,
-    init_fn: fn (Pointer[NoneType]) -> Pointer[NoneType],
-    destroy_fn: fn (Pointer[NoneType]) -> None,
-](payload: Pointer[NoneType] = Pointer[NoneType]()) -> Pointer[NoneType]:
+    init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
+    destroy_fn: fn (UnsafePointer[NoneType]) -> None,
+](
+    payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()
+) -> UnsafePointer[NoneType]:
     return external_call[
-        "KGEN_CompilerRT_GetGlobalOrCreate", Pointer[NoneType]
+        "KGEN_CompilerRT_GetGlobalOrCreate", UnsafePointer[NoneType]
     ](StringRef(name), payload, init_fn, destroy_fn)
 
 
-fn _init_global_runtime(ignored: Pointer[NoneType]) -> Pointer[NoneType]:
+fn _init_global_runtime(
+    ignored: UnsafePointer[NoneType],
+) -> UnsafePointer[NoneType]:
     """Intialize the global runtime. This is a singleton that handle the common
     case where the runtime has the same number of threads as the number of cores.
     """
     return external_call[
-        "KGEN_CompilerRT_LLCL_CreateRuntime", Pointer[NoneType]
+        "KGEN_CompilerRT_LLCL_CreateRuntime", UnsafePointer[NoneType]
     ](0)
 
 
-fn _destroy_global_runtime(ptr: Pointer[NoneType]):
+fn _destroy_global_runtime(ptr: UnsafePointer[NoneType]):
     """Destroy the global runtime if ever used."""
     external_call["KGEN_CompilerRT_LLCL_DestroyRuntime", NoneType](ptr)
 
 
 @always_inline
-fn _get_current_or_global_runtime() -> Pointer[NoneType]:
+fn _get_current_or_global_runtime() -> UnsafePointer[NoneType]:
     """Returns the current runtime, or returns the Mojo singleton global
     runtime, creating it if it does not already exist. When Mojo is used within
     the Modular Execution Engine the current runtime will be that already
@@ -51,7 +55,7 @@ fn _get_current_or_global_runtime() -> Pointer[NoneType]:
     is created with number of threads equal to the number of cores.
     """
     var current_runtime = external_call[
-        "KGEN_CompilerRT_LLCL_GetCurrentRuntime", Pointer[NoneType]
+        "KGEN_CompilerRT_LLCL_GetCurrentRuntime", UnsafePointer[NoneType]
     ]()
     if current_runtime:
         return current_runtime

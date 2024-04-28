@@ -32,6 +32,7 @@ value types must always be Movable so we can resize the dictionary as it grows.
 See the `Dict` docs for more details.
 """
 from memory import UnsafePointer
+from builtin.value import StringableCollectionElement
 
 from .optional import Optional
 
@@ -45,12 +46,20 @@ trait KeyElement(CollectionElement, Hashable, EqualityComparable):
     pass
 
 
+trait StringableKeyElement(KeyElement, Stringable):
+    """A trait composition for types which implement all requirements of
+    dictionary keys and Stringable."""
+
+    pass
+
+
 @value
 struct _DictEntryIter[
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
+    forward: Bool = True,
 ]:
     """Iterator over immutable DictEntry references.
 
@@ -59,6 +68,7 @@ struct _DictEntryIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the dictionary is mutable.
         dict_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
     """
 
     alias imm_dict_lifetime = __mlir_attr[
@@ -78,18 +88,37 @@ struct _DictEntryIter[
     @always_inline
     fn __next__(inout self) -> Self.ref_type:
         while True:
-            debug_assert(self.index < self.src[]._reserved, "dict iter bounds")
+
+            @parameter
+            if forward:
+                debug_assert(
+                    self.index < self.src[]._reserved, "dict iter bounds"
+                )
+            else:
+                debug_assert(self.index >= 0, "dict iter bounds")
+
             if self.src[]._entries.__get_ref(self.index)[]:
                 var opt_entry_ref = self.src[]._entries.__get_ref[
                     __mlir_attr.`0: i1`,
                     Self.imm_dict_lifetime,
                 ](self.index)
-                self.index += 1
+
+                @parameter
+                if forward:
+                    self.index += 1
+                else:
+                    self.index -= 1
+
                 self.seen += 1
                 # Super unsafe, but otherwise we have to do a bunch of super
                 # unsafe reference lifetime casting.
                 return opt_entry_ref.unsafe_bitcast[DictEntry[K, V]]()
-            self.index += 1
+
+            @parameter
+            if forward:
+                self.index += 1
+            else:
+                self.index -= 1
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.seen
@@ -101,6 +130,7 @@ struct _DictKeyIter[
     V: CollectionElement,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
+    forward: Bool = True,
 ]:
     """Iterator over immutable Dict key references.
 
@@ -109,6 +139,7 @@ struct _DictKeyIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
     """
 
     alias imm_dict_lifetime = __mlir_attr[
@@ -116,7 +147,9 @@ struct _DictKeyIter[
     ]
     alias ref_type = Reference[K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime]
 
-    alias dict_entry_iter = _DictEntryIter[K, V, dict_mutability, dict_lifetime]
+    alias dict_entry_iter = _DictEntryIter[
+        K, V, dict_mutability, dict_lifetime, forward
+    ]
 
     var iter: Self.dict_entry_iter
 
@@ -499,6 +532,62 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return len(self).__bool__()
 
+    @staticmethod
+    fn __str__[
+        T: StringableKeyElement, U: StringableCollectionElement
+    ](self: Dict[T, U]) -> String:
+        """Returns a string representation of a `Dict`.
+
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_dict = Dict[Int, Float64]()
+        my_dict[1] = 1.1
+        my_dict[2] = 2.2
+        dict_as_string = __type_of(my_dict).__str__(my_dict)
+        print(dict_as_string)
+        # prints "{1: 1.1, 2: 2.2}"
+        ```
+
+        When the compiler supports conditional methods, then a simple `str(my_dict)` will
+        be enough.
+
+        Args:
+            self: The Dict to represent as a string.
+
+        Parameters:
+            T: The type of the keys in the Dict. Must implement the
+              traits `Stringable` and `KeyElement`.
+            U: The type of the values in the Dict. Must implement the
+                traits `Stringable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the Dict.
+        """
+        var minimum_capacity = self._minimum_size_of_string_representation()
+        var result = String(List[Int8](capacity=minimum_capacity))
+        result += "{"
+
+        var i = 0
+        for key_value in self.items():
+            result += str(key_value[].key) + ": " + str(key_value[].value)
+            if i < len(self) - 1:
+                result += ", "
+            i += 1
+        result += "}"
+        return result
+
+    fn _minimum_size_of_string_representation(self) -> Int:
+        # we do a rough estimation of the minimum number of chars that we'll see
+        # in the string representation, we assume that str(key) and str(value)
+        # will be both at least one char.
+        return (
+            2  # '{' and '}'
+            + len(self) * 6  # str(key), str(value) ": " and ", "
+            - 2  # remove the last ", "
+        )
+
     fn find(self, key: K) -> Optional[V]:
         """Find a value in the dictionary by key.
 
@@ -636,7 +725,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn update(inout self, other: Self, /):
         """Update the dictionary with the key/value pairs from other, overwriting existing keys.
-
         The argument must be positional only.
 
         Args:
@@ -675,36 +763,30 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn _set_index(inout self, slot: Int, index: Int):
         return self._index.set_index(self._reserved, slot, index)
 
-    fn _next_index_slot(self, inout slot: Int, inout perturb: Int):
+    fn _next_index_slot(self, inout slot: Int, inout perturb: UInt64):
         alias PERTURB_SHIFT = 5
         perturb >>= PERTURB_SHIFT
-        slot = ((5 * slot) + perturb + 1) % self._reserved
+        slot = ((5 * slot) + int(perturb + 1)) % self._reserved
 
     fn _find_empty_index(self, hash: Int) -> Int:
         var slot = hash % self._reserved
-        var perturb = hash
-        for _ in range(self._reserved):
+        var perturb = bitcast[DType.uint64](Int64(hash))
+        while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return slot
             self._next_index_slot(slot, perturb)
-        abort("Dict: no empty index in _find_empty_index")
-        return 0
 
     fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
         # Return (found, slot, index)
-        var insert_slot = Optional[Int]()
-        var insert_index = Optional[Int]()
         var slot = hash % self._reserved
-        var perturb = hash
-        for _ in range(self._reserved):
+        var perturb = bitcast[DType.uint64](Int64(hash))
+        while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return (False, slot, self._n_entries)
             elif index == Self.REMOVED:
-                if not insert_slot:
-                    insert_slot = slot
-                    insert_index = self._n_entries
+                return (False, slot, self._n_entries)
             else:
                 var ev = self._entries.__get_ref(index)[]
                 debug_assert(ev.__bool__(), "entry in index must be full")
@@ -712,10 +794,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 if hash == entry.hash and key == entry.key:
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
-
-        debug_assert(insert_slot.__bool__(), "never found a slot")
-        debug_assert(insert_index.__bool__(), "slot populated but not index!!")
-        return (False, insert_slot.value()[], insert_index.value()[])
 
     fn _over_load_factor(self) -> Bool:
         return 3 * self.size > 2 * self._reserved
@@ -756,6 +834,25 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 self._entries[right] = None
 
         self._n_entries = self.size
+
+    fn __reversed__[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _DictKeyIter[
+        K, V, mutability, self_life, False
+    ]:
+        """Iterate backwards over the dict keys, returning immutable references.
+
+        Returns:
+            A reversed iterator of immutable references to the dict keys.
+        """
+        var ref = Reference(self)
+        return _DictKeyIter(
+            _DictEntryIter[K, V, mutability, self_life, False](
+                ref[]._reserved - 1, 0, ref
+            )
+        )
 
 
 struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):

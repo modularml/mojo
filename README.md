@@ -1,6 +1,14 @@
-<p align="center">
+<div align="center">
     <img src="https://modular-assets.s3.amazonaws.com/images/mojo_github_logo_bg.png">
-</p>
+
+  [Website][Mojo] | [Getting Started] | [API Documentation] | [Contributing] | [Changelog]
+</div>
+
+[Mojo]: https://www.modular.com/mojo/
+[Getting Started]: https://docs.modular.com/mojo/manual/get-started/
+[API Documentation]: https://docs.modular.com/mojo/lib
+[Contributing]: ./CONTRIBUTING.md
+[Changelog]: ./docs/changelog.md
 
 # Welcome to Mojo 🔥
 
