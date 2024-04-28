@@ -15,27 +15,19 @@ import subprocess
 from pathlib import Path
 import sys
 
-# TODO: Convert this script to Mojo when Mojo has a subprocess module
+# TODO: Use the "mojo doc" directly when there is an option to
+# fail if warnings are present (something like -Werror for gcc).
 
 def main():
-    # The paths to analyse are given as arguments to the script
-    files_to_analyse = sys.argv[1:]
-
-    files_with_docstrings_issues = []
-    for file in files_to_analyse:
-        file = Path(file)
-        # We run "mojo doc" and if stderr is not empty, we consider that there is an issue
-        # with the docstrings
-        result = subprocess.run(["mojo", "doc", file], capture_output=True)
-        if result.stderr or result.returncode != 0:
-            files_with_docstrings_issues.append((file, result.stderr))
-    
-    for file, error in files_with_docstrings_issues:
-        print(f"Docstring issue in {file}: ")
-        print(error.decode())
-    
-    if files_with_docstrings_issues:
+    # This is actually faster than running "mojo doc" on each file since 
+    # "mojo doc" only accept a single file/path as argument
+    command = ["mojo", "doc", "--warn-missing-doc-strings", "-o", "/dev/null", "./stdlib/src"]
+    result = subprocess.run(command, capture_output=True)
+    if result.stderr or result.returncode != 0:
+        print(f"Docstring issue found in the stdlib: ")
+        print(result.stderr.decode())
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

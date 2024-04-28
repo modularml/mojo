@@ -11,7 +11,7 @@ repos:
         name: check-docstrings
         entry: python ./stdlib/scripts/check-docstrings.py
         language: system
-        files: '^stdlib/src.*\.(mojo|🔥)$'
+        pass_filenames: false
         stages: [commit]
       - id: check-license
         name: check-license
