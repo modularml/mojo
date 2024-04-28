@@ -122,6 +122,7 @@ trait StringableCollectionElement(CollectionElement, Stringable):
 
     pass
 
+
 trait ComparableCollectionElement(CollectionElement, EqualityComparable):
     """
     This trait is a temporary solution to enable comparison of
@@ -130,4 +131,5 @@ trait ComparableCollectionElement(CollectionElement, EqualityComparable):
     This approach will be revised with the introduction of conditional trait
     conformances.
     """
+
     pass
