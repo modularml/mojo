@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from testing import assert_equal
 
 
@@ -33,5 +33,25 @@ def test_b64encode():
     assert_equal(b64encode("ABCDEFabcdef"), "QUJDREVGYWJjZGVm")
 
 
+def test_b64decode():
+    assert_equal(b64decode("YQ=="), "a")
+
+    assert_equal(b64decode("Zm8="), "fo")
+
+    assert_equal(b64decode("SGVsbG8gTW9qbyEhIQ=="), "Hello Mojo!!!")
+
+    assert_equal(b64decode("SGVsbG8g8J+UpSEhIQ=="), "Hello 🔥!!!")
+
+    assert_equal(
+        b64decode(
+            "dGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw=="
+        ),
+        "the quick brown fox jumps over the lazy dog",
+    )
+
+    assert_equal(b64decode("QUJDREVGYWJjZGVm"), "ABCDEFabcdef")
+
+
 def main():
     test_b64encode()
+    test_b64decode()
