@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys import has_neon, simdwidthof
+from sys import has_neon
 
 from testing import assert_equal, assert_not_equal, assert_true
 
