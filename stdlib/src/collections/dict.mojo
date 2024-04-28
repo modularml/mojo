@@ -987,7 +987,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         # return self._dict.__iter__()
         return _DictKeyIter(
             _DictEntryIter[Self.key_type, V, mutability, self_life](
-                0, 0, Reference(self)[]._dict
+                0, 0, UnsafePointer(self)[]._dict
             )
         )
 
@@ -1029,7 +1029,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         # return self._dict.values()
         return _DictValueIter(
             _DictEntryIter[Self.key_type, V, mutability, self_life](
-                0, 0, Reference(self)[]._dict
+                # Use UnsafePointer here to cast away conditional mutability.
+                0,
+                0,
+                UnsafePointer(self)[]._dict,
             )
         )
 
