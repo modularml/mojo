@@ -445,7 +445,19 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             ```
         """
         var normalized_start = (self.size + start) if start < 0 else start
-        var normalized_end = self.size if end is None else (self.size + end if end < 0 else (self.size if end > self.size else end))
+        # TODO: Once the min() and max() functions are available in Mojo,
+        # TODO: we can simplify the entire if-else block into a single line using the ternary operator:
+        # var normalized_end = self.size if end is None else min(max(end, 0), self.size)
+        if end is None:
+            var normalized_end = self.size
+        else:
+            if end < 0:
+                var normalized_end = self.size + end
+            else:
+                if end > self.size:
+                    var normalized_end = self.size
+                else:
+                    var normalized_end = end
 
         if not self.size: raise "Cannot find index of a value in an empty list."
         if normalized_start >= self.size: raise "Given 'start' parameter (" + String(normalized_start) + ") is out of range. List only has " + String(self.size) + " elements."
