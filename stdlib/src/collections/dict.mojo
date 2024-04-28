@@ -1027,9 +1027,9 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         # TODO(#36448): Use this instead of the current workaround
         # return self._dict.values()
+        # Use UnsafePointer here to cast away conditional mutability.
         return _DictValueIter(
             _DictEntryIter[Self.key_type, V, mutability, self_life](
-                # Use UnsafePointer here to cast away conditional mutability.
                 0,
                 0,
                 UnsafePointer(self)[]._dict,
@@ -1060,9 +1060,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
 
         # TODO(#36448): Use this instead of the current workaround
-        # return Reference(self)[]._dict.items()
+        # return UnsafePointer(self)[]._dict.items()
+        # Use UnsafePointer here to cast away conditional mutability.
         return _DictEntryIter[Self.key_type, V, mutability, self_life](
-            0, 0, Reference(self)[]._dict
+            0, 0, UnsafePointer(self)[]._dict
         )
 
     @always_inline("nodebug")
