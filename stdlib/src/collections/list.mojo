@@ -419,7 +419,31 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     # TODO: Modify this to be regular method when issue 1876 is resolved
     @staticmethod
     fn index[C: ComparableCollectionElement](self: List[C], owned value: C, start: Int = 0, end: Optional[Int] = None) raises -> Int:
-        """Returns the index of the first occurrence of a value in a list; raises Error if not found."""
+        """
+        Returns the index of the first occurrence of a value in a list, starting from the specified 
+        index (default 0). Raises an Error if the value is not found.
+
+        Args:
+            self: The list to search in.
+            value: The value to search for.
+            start: The starting index of the search (default 0).
+            end: The ending index of the search (default None, which means the end of the list).
+
+        Returns:
+            The index of the first occurrence of the value in the list.
+
+        Raises:
+            ValueError If the value is not found in the list.
+
+        Type Parameters:
+            C: The type of the elements in the list. Must implement the `ComparableCollectionElement` trait.
+
+        Example:
+            ```mojo
+            var my_list = List[Int](1, 2, 3)
+            print(__type_of(my_list).index(my_list, 2))  # Output: 1
+            ```
+        """
         var normalized_start = (self.size + start) if start < 0 else start
         var normalized_end = self.size if end is None else (self.size + end if end < 0 else (self.size if end > self.size else end))
 
