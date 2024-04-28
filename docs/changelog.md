@@ -291,6 +291,20 @@ what we publish.
   it was an integer literal, with the base determined by whether the
   string contains the prefix `"0x"`, `"0o"`, or `"0b"`.
 
+- Mojo now supports types to opt in to use the `abs` function by implementing
+  the `__abs__` method (i.e. by conforming to the now `Absable` trait), e.g.:
+
+  ```mojo
+  from math import sqrt
+
+  struct Point(Absable):
+      var x: Float64
+      var y: Float64
+
+      fn __abs__(self) -> Self:
+          return sqrt(self.x * self.x + self.y * self.y)
+  ```
+
 ### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
@@ -423,6 +437,9 @@ what we publish.
     if a.__bool__() and b.__bool__():
       ...
   ```
+
+- The `abs` function has also moved from `math` to `builtin`, so you no longer
+  need to do `from math import abs`.
 
 ### ❌ Removed
 

@@ -16,7 +16,7 @@
 @value
 @nonmaterializable(Int)
 @register_passable("trivial")
-struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
+struct IntLiteral(Absable, Intable, Stringable, Boolable, EqualityComparable):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and
     must be lowered to other integer types (like Int), but allow for
@@ -228,6 +228,17 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
             The -self value.
         """
         return Self() - self
+
+    @always_inline("nodebug")
+    fn __abs__(self) -> Self:
+        """Return the absolute value of the IntLiteral value.
+
+        Returns:
+            The absolute value.
+        """
+        if self >= 0:
+            return self
+        return -self
 
     @always_inline("nodebug")
     fn __invert__(self) -> Self:
