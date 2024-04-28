@@ -23,7 +23,7 @@ These are Mojo built-ins, so you don't need to import them.
 @value
 @nonmaterializable(Float64)
 @register_passable("trivial")
-struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
+struct FloatLiteral(Absable, Intable, Stringable, Boolable, EqualityComparable):
     """Mojo floating point literal type."""
 
     alias fp_type = __mlir_type.`!kgen.float_literal`
@@ -60,13 +60,13 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __init__(value: IntLiteral) -> Self:
-        """Convert an IntLiteral to a double value.
+        """Convert an IntLiteral to a FloatLiteral value.
 
         Args:
             value: The IntLiteral value.
 
         Returns:
-            The integer value as a double.
+            The integer value as a FloatLiteral.
         """
         return Self(__mlir_op.`kgen.int_literal.to_float_literal`(value.value))
 
@@ -157,12 +157,23 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __neg__(self) -> FloatLiteral:
-        """Return the negation of the double value.
+        """Return the negation of the FloatLiteral value.
 
         Returns:
-            The negated double value.
+            The negated FloatLiteral value.
         """
         return self * Self(-1)
+
+    @always_inline("nodebug")
+    fn __abs__(self) -> Self:
+        """Return the absolute value of FloatLiteral value.
+
+        Returns:
+            The absolute value.
+        """
+        if self > 0:
+            return self
+        return -self
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
@@ -170,7 +181,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __add__(self, rhs: FloatLiteral) -> FloatLiteral:
-        """Add two doubles.
+        """Add two FloatLiterals.
 
         Args:
             rhs: The value to add.
@@ -184,7 +195,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __sub__(self, rhs: FloatLiteral) -> FloatLiteral:
-        """Subtract two doubles.
+        """Subtract two FloatLiterals.
 
         Args:
             rhs: The value to subtract.
@@ -198,7 +209,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __mul__(self, rhs: FloatLiteral) -> FloatLiteral:
-        """Multiply two doubles.
+        """Multiply two FloatLiterals.
 
         Args:
             rhs: The value to multiply.
@@ -212,7 +223,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __truediv__(self, rhs: FloatLiteral) -> FloatLiteral:
-        """Divide two doubles.
+        """Divide two FloatLiterals.
 
         Args:
             rhs: The value to divide.

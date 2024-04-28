@@ -715,6 +715,28 @@ def test_mul_with_overflow():
     )
 
 
+def test_abs():
+    assert_equal(abs(Float32(1.0)), 1)
+    assert_equal(abs(Float32(-1.0)), 1)
+    assert_equal(abs(Float32(0.0)), 0)
+    assert_equal(
+        abs(SIMD[DType.float32, 4](0.0, 1.5, -42.5, -12.7)),
+        SIMD[DType.float32, 4](0.0, 1.5, 42.5, 12.7),
+    )
+    assert_equal(
+        abs(SIMD[DType.int32, 4](0, 2, -42, -12)),
+        SIMD[DType.int32, 4](0, 2, 42, 12),
+    )
+    assert_equal(
+        abs(SIMD[DType.uint32, 4](0, 2, 42, 12)),
+        SIMD[DType.uint32, 4](0, 2, 42, 12),
+    )
+    assert_equal(
+        abs(SIMD[DType.bool, 4](True, False, True, False)),
+        SIMD[DType.bool, 4](True, False, True, False),
+    )
+
+
 def main():
     test_cast()
     test_simd_variadic()
@@ -734,3 +756,4 @@ def main():
     test_add_with_overflow()
     test_sub_with_overflow()
     test_mul_with_overflow()
+    test_abs()
