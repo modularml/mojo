@@ -53,10 +53,12 @@ your changes automatically at each commit, and will also ensure that you
 always have the latest linting tools applied.
 
 To do so, install pre-commit:
+
 ```bash
 pip install pre-commit
 pre-commit install
 ```
+
 and that's it!
 
  #### API Doc String Validation
@@ -64,10 +66,11 @@ and that's it!
 Mojo provides a command line utility, `mojo doc`, to validate the API doc strings in your code. This ensures that your doc strings are correctly formatted and consistent with the Mojo style guidelines.
 
 ```bash
-> mojo doc -warn-missing-doc-strings -o /dev/null example.mojo
-All done! ✨ 🍰 ✨
-1 file left unchanged.
+> mojo doc -warn-missing-doc-strings -o /dev/null stdlib/src/
 ```
+
+Note that this is also included in the pre-commit. So if you have `pre-commit` enabled, this will run
+automatically before committing.
 
 #### Whitespace
 

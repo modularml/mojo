@@ -10,10 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo-no-debug %s
+# RUN: %mojo %s
 
-from memory.unsafe_pointer import move_from_pointee, move_pointee
 from memory import UnsafePointer
+from memory.unsafe_pointer import move_from_pointee, move_pointee
 from test_utils import MoveCounter
 from testing import assert_equal, assert_not_equal, assert_true
 
@@ -40,10 +40,10 @@ struct MoveOnlyType(Movable):
 
 def test_unsafepointer_of_move_only_type():
     var actions_ptr = UnsafePointer[List[String]].alloc(1)
-    initialize_pointee(actions_ptr, List[String]())
+    initialize_pointee_move(actions_ptr, List[String]())
 
     var ptr = UnsafePointer[MoveOnlyType].alloc(1)
-    initialize_pointee(ptr, MoveOnlyType(42, actions_ptr))
+    initialize_pointee_move(ptr, MoveOnlyType(42, actions_ptr))
     assert_equal(len(actions_ptr[0]), 2)
     assert_equal(actions_ptr[0][0], "__init__")
     assert_equal(actions_ptr[0][1], "__moveinit__", msg="emplace_value")
@@ -66,7 +66,7 @@ def test_unsafepointer_move_pointee_move_count():
 
     var value = MoveCounter(5)
     assert_equal(0, value.move_count)
-    initialize_pointee(ptr, value^)
+    initialize_pointee_move(ptr, value^)
 
     # -----
     # Test that `UnsafePointer.move_pointee` performs exactly one move.

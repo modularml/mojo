@@ -1353,7 +1353,9 @@ fn strided_load[
         return addr.load() if mask else Scalar[type]()
 
     var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector", SIMD[DType.index, simd_width]
+        "llvm.experimental.stepvector",
+        SIMD[DType.index, simd_width],
+        has_side_effect=False,
     ]()
     var offset = (int(addr) + stride * iota * sizeof[type]())
     var passthrough = SIMD[type, simd_width]()
@@ -1432,7 +1434,9 @@ fn strided_store[
         return
 
     var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector", SIMD[DType.index, simd_width]
+        "llvm.experimental.stepvector",
+        SIMD[DType.index, simd_width],
+        has_side_effect=False,
     ]()
     var offset = int(addr) + stride * iota * sizeof[type]()
     scatter[type, simd_width](value, offset.cast[DType.address](), mask)
@@ -1531,16 +1535,13 @@ struct _RegisterPackType[*a: AnyRegType]:
     var storage: __mlir_type[`!kgen.pack<`, a, `>`]
 
     @always_inline("nodebug")
-    fn get[i: Int, T: AnyRegType](self) -> T:
+    fn __getitem__[i: Int](self) -> a[i.value]:
         """Get the element.
 
         Parameters:
             i: The element index.
-            T: The element type.
 
         Returns:
             The tuple element at the requested index.
         """
-        return rebind[T](
-            __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)
-        )
+        return __mlir_op.`kgen.pack.extract`[index = i.value](self.storage)

@@ -41,12 +41,12 @@ print(to_string(who_knows))
 from sys import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
+from memory import UnsafePointer
 from memory.unsafe_pointer import (
-    initialize_pointee,
+    initialize_pointee_move,
     move_from_pointee,
     move_pointee,
 )
-from memory import UnsafePointer
 from utils import unroll, StaticTuple
 
 # ===----------------------------------------------------------------------=== #
@@ -176,7 +176,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
         self._get_state()[] = Self._check[T]()
-        initialize_pointee(self._get_ptr[T](), value^)
+        initialize_pointee_move(self._get_ptr[T](), value^)
 
     @always_inline
     fn __copyinit__(inout self, other: Self):
@@ -192,7 +192,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias T = Ts[i]
-                initialize_pointee[T](
+                initialize_pointee_move(
                     UnsafePointer.address_of(self._impl).bitcast[T](),
                     Reference(other._impl).unsafe_bitcast[T]()[],
                 )
@@ -228,7 +228,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias q = Ts[i]
-                __get_address_as_owned_value(self._get_ptr[q]().value).__del__()
+                __get_address_as_owned_value(
+                    self._get_ptr[q]().address
+                ).__del__()
 
         unroll[each, len(VariadicList(Ts))]()
 
@@ -271,7 +273,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._call_correct_deleter()
         self._get_state()[] = Self._check[T]()
-        initialize_pointee(self._get_ptr[T](), value^)
+        initialize_pointee_move(self._get_ptr[T](), value^)
 
     fn isa[T: CollectionElement](self) -> Bool:
         """Check if the variant contains the required type.
@@ -311,9 +313,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             The internal data represented as a `Reference[T]`.
         """
         debug_assert(Reference(self)[].isa[T](), "get: wrong variant type")
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life]._mlir_type
-        ](Reference(self)[]._get_ptr[T]().value)
+        return Reference(self)[]._get_ptr[T]()[]
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:

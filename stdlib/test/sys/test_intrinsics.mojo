@@ -20,9 +20,8 @@ from sys import (
     strided_store,
 )
 
-from memory import DTypePointer
-
 from testing import assert_equal
+from memory import DTypePointer
 
 
 fn test_strided_load() raises:
@@ -39,8 +38,6 @@ fn test_strided_load() raises:
 
 
 fn test_strided_store() raises:
-    print("== test_strided_store")
-
     alias size = 8
     var vector = DTypePointer[DType.float32]().alloc(size)
     memset_zero(vector, size)

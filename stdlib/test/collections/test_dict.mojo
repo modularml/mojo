@@ -62,6 +62,32 @@ def test_big_dict():
     assert_equal(2000, len(dict))
 
 
+def test_dict_string_representation_string_int():
+    var some_dict = Dict[String, Int]()
+    some_dict["a"] = 1
+    some_dict["b"] = 2
+    dict_as_string = __type_of(some_dict).__str__(some_dict)
+    assert_true(
+        some_dict._minimum_size_of_string_representation()
+        <= len(dict_as_string)
+    )
+    assert_equal(dict_as_string, "{a: 1, b: 2}")
+
+
+def test_dict_string_representation_int_int():
+    var some_dict = Dict[Int, Int]()
+    some_dict[3] = 1
+    some_dict[4] = 2
+    some_dict[5] = 3
+    some_dict[6] = 4
+    dict_as_string = __type_of(some_dict).__str__(some_dict)
+    # one char per key and value, we should have the minimum size of string possible
+    assert_equal(
+        some_dict._minimum_size_of_string_representation(), len(dict_as_string)
+    )
+    assert_equal(dict_as_string, "{3: 1, 4: 2, 5: 3, 6: 4}")
+
+
 def test_compact():
     var dict = Dict[String, Int]()
     for i in range(20):
@@ -248,6 +274,40 @@ def test_dict_update_empty_new():
     assert_equal(len(orig), 2)
 
 
+@value
+struct DummyKey(KeyElement):
+    var value: Int
+
+    fn __hash__(self) -> Int:
+        return self.value
+
+    fn __eq__(self, other: DummyKey) -> Bool:
+        return self.value == other.value
+
+    fn __ne__(self, other: DummyKey) -> Bool:
+        return self.value != other.value
+
+
+def test_mojo_issue_1729():
+    var keys = List(
+        7005684093727295727,
+        2833576045803927472,
+        -446534169874157203,
+        -5597438459201014662,
+        -7007119737006385570,
+        7237741981002255125,
+        -649171104678427962,
+        -6981562940350531355,
+    )
+    var d = Dict[DummyKey, Int]()
+    for i in range(len(keys)):
+        d[DummyKey(keys[i])] = i
+    assert_equal(len(d), len(keys))
+    for i in range(len(d)):
+        var k = keys[i]
+        assert_equal(i, d[k])
+
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print("Test", name_val, "...", end="")
@@ -282,6 +342,7 @@ def test_dict():
     test["test_dict_update_nominal", test_dict_update_nominal]()
     test["test_dict_update_empty_origin", test_dict_update_empty_origin]()
     test["test_dict_update_empty_new", test_dict_update_empty_new]()
+    test["test_mojo_issue_1729", test_mojo_issue_1729]()
 
 
 def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
@@ -335,5 +396,7 @@ def test_owned_kwargs_dict():
 
 def main():
     test_dict()
+    test_dict_string_representation_string_int()
+    test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
     test_bool_conversion()

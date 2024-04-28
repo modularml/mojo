@@ -22,13 +22,30 @@ from os import listdir
 from collections import List
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 
+from memory import (
+    DTypePointer,
+    Pointer,
+)
 from memory.unsafe_pointer import move_from_pointee
-from memory import DTypePointer, Pointer
 
 from utils import StringRef
 
 from .path import isdir
 from .pathlike import PathLike
+
+
+# ===----------------------------------------------------------------------=== #
+# SEEK Constants
+# ===----------------------------------------------------------------------=== #
+
+
+alias SEEK_SET: UInt8 = 0
+"""Seek from the beginning of the file."""
+alias SEEK_CUR: UInt8 = 1
+"""Seek from the current position."""
+alias SEEK_END: UInt8 = 2
+"""Seek from the end of the file."""
+
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -276,6 +293,9 @@ fn remove[pathlike: os.PathLike](path: pathlike) raises:
     If the path is a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
 
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
     Args:
       path: The path to the file.
 
@@ -299,6 +319,9 @@ fn unlink[pathlike: os.PathLike](path: pathlike) raises:
     """Removes the specified file.
     If the path is a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file.

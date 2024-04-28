@@ -48,7 +48,6 @@ config.available_features.add(platform.system().lower())
 # since we're not supporting `--sanitize` initially
 # to allow running the tests with LLVM sanitizers.
 config.substitutions.insert(0, ("%mojo", "mojo"))
-config.substitutions.insert(0, ("%mojo-no-debug", "mojo"))
 
 # The `mojo` nightly compiler ships with its own `stdlib.mojopkg`
 # For the open-source stdlib, we need to specify the paths to the
