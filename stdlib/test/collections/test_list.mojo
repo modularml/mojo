@@ -366,7 +366,7 @@ def test_list_index():
         __type_of(test_list_a).index(test_list_a, 30, start=3)
     with assert_raises(
         contains=(
-            "Given 'start' parameter (5) is out of range. List only have 5"
+            "Given 'start' parameter (5) is out of range. List only has 5"
             " elements."
         )
     ):
@@ -409,7 +409,7 @@ def test_list_index():
         __type_of(test_list_a).index(test_list_a, 10, start=-4, end=-1)
     with assert_raises(
         contains=(
-            "Given 'start' parameter (5) is out of range. List only have 5"
+            "Given 'start' parameter (5) is out of range. List only has 5"
             " elements."
         )
     ):
