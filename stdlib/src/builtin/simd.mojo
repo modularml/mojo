@@ -113,6 +113,7 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct SIMD[type: DType, size: Int = simdwidthof[type]()](
+    Absable,
     Sized,
     Intable,
     CollectionElement,
@@ -815,6 +816,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             self.value, rhs.value
         )
 
+    # ===-------------------------------------------------------------------===#
+    # Unary operations.
+    # ===-------------------------------------------------------------------===#
+
     @always_inline("nodebug")
     fn __pos__(self) -> Self:
         """Defines the unary `+` operation.
@@ -834,6 +839,53 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.neg`(self.value)
+
+    @always_inline
+    fn _bits_to_float[dest_type: DType](self) -> SIMD[dest_type, size]:
+        """Bitcasts the integer value to a floating-point value.
+
+        Parameters:
+            dest_type: DType to bitcast the input SIMD vector to.
+
+        Returns:
+            A floating-point representation of the integer value.
+        """
+        alias integral_type = FPUtils[type].integral_type
+        return bitcast[dest_type, size](self.cast[integral_type]())
+
+    @always_inline
+    fn _float_to_bits[dest_type: DType](self) -> SIMD[dest_type, size]:
+        """Bitcasts the floating-point value to an integer value.
+
+        Parameters:
+            dest_type: DType to bitcast the input SIMD vector to.
+
+        Returns:
+            An integer representation of the floating-point value.
+        """
+        alias integral_type = FPUtils[type].integral_type
+        var v = bitcast[integral_type, size](self)
+        return v.cast[dest_type]()
+
+    @always_inline("nodebug")
+    fn __abs__(self) -> Self:
+        """Defines the absolute value operation.
+
+        Returns:
+            The absolute value of this SIMD vector.
+        """
+
+        @parameter
+        if type.is_unsigned() or type.is_bool():
+            return self
+
+        @parameter
+        if type.is_floating_point():
+            alias integral_type = FPUtils[type].integral_type
+            var m = self._float_to_bits[integral_type]()
+            return (m & (FPUtils[type].sign_mask() - 1))._bits_to_float[type]()
+
+        return (self < 0).select(-self, self)
 
     # ===-------------------------------------------------------------------===#
     # In place operations.
