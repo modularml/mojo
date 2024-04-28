@@ -63,7 +63,8 @@ trait Representable:
 
 
 fn repr[T: Representable](value: T) -> String:
-    """
+    """Returns the string representation of the given value.
+
     Args:
         value: The value to get the string representation of.
 
