@@ -68,47 +68,73 @@ what we publish.
   ```
 
 - `List` now has several new methods:
-  - `pop(index)` for removing an element at a particular index.\
+  - `pop(index)` for removing an element at a particular index.
+    ([PR #2041](https://github.com/modularml/mojo/pull/2041))
+    (Fixes [#2017](https://github.com/modularml/mojo/issues/2017))\
     By default, `List.pop()` removes the last element in the list.
+
   - `resize(new_size)` for resizing the list without the need to
     specify an additional value.
+    ([PR #2140](https://github.com/modularml/mojo/pull/2140),
+     Fixes [#2133](https://github.com/modularml/mojo/issues/2133))
+
   - `insert(index, value)` for inserting a value at a specified index
     into the `List`.
+    ([PR #2148](https://github.com/modularml/mojo/pull/2148),
+     Fixes [#2134](https://github.com/modularml/mojo/issues/2134))
+
   - constructor from `(ptr, size, capacity)` to to avoid needing to do a deep
     copy of an existing contiguous memory allocation when constructing a new `List`.
+    ([PR #2182](https://github.com/modularml/mojo/pull/2182),
+     Fixes [#2170](https://github.com/modularml/mojo/issues/2170))
 
 - `Dict` now has a `update()` method to update keys/values from another `Dict`.
+  ([PR #2085](https://github.com/modularml/mojo/pull/2085))
 
-- `Set` now has named methods for set operations:
+- `Set` now has named methods for set operations
+  ([PR #2214](https://github.com/modularml/mojo/pull/2214)):
   - `Set.difference()` mapping to `-`
   - `Set.difference_update()` mapping to `-=`
   - `Set.intersection_update()` mapping to `&=`
   - `Set.update()` mapping to `|=`
 
 - `String` now has `removeprefix()` and `removesuffix()` methods.
+  ([PR #2038](https://github.com/modularml/mojo/pull/2038))
 
 - `Optional` now implements `__is__` and `__isnot__` methods so that you can compare
   an `Optional` with `None`, e.g. `Optional(1) is not None` for example.
+  ([PR #2082](https://github.com/modularml/mojo/pull/2082))
 
 - The `ord` and `chr` functions have been improved to accept any Unicode character.
+  ([PR #2149](https://github.com/modularml/mojo/pull/2149),
+   Contributes towards [#1616](https://github.com/modularml/mojo/issues/1616))
 
 - `Atomic` is now movable.
+  ([PR #2088](https://github.com/modularml/mojo/pull/2088),
+   Fixes [#2026](https://github.com/modularml/mojo/issues/2026))
 
 - `Dict` and `List` are both `Boolable` now.
+  ([PR #2262](https://github.com/modularml/mojo/pull/2262))
 
 - `atol` now handles whitespaces so `int(String( " 10 "))` gives back `10`
   instead of raising an error.
+  ([PR #2225](https://github.com/modularml/mojo/pull/2225))
 
 - `SIMD` now implements `__rmod__`.
+  ([PR #2186](https://github.com/modularml/mojo/pull/2186),
+   Fixes [#1482](https://github.com/modularml/mojo/issues/1482))
 
 - `bool(None)` is now implemented.
+  ([PR #2249](https://github.com/modularml/mojo/pull/2249))
 
 - The `DTypePointer` type now implements `gather` for gathering a `SIMD`
   vector from offsets of a current pointer.  Similarly, support for `scatter`
   was added to scatter a `SIMD` vector into offsets of the current pointer.
+  ([PR #2268](https://github.com/modularml/mojo/pull/2268))
 
 - The `len` function for unary `range` with negative end values has been fixed
   so that things like `len(range(-1))` work correctly now.
+  ([PR #2204](https://github.com/modularml/mojo/pull/2204))
 
 - A low-level `__get_mvalue_as_litref(x)` builtin was added to give access to
   the underlying memory representation as a `!lit.ref` value without checking
@@ -118,6 +144,7 @@ what we publish.
 
 - The `testing.assert_equal[SIMD]()` now raises if any of the elements
   mismatch in the two `SIMD` arguments being compared.
+  ([PR #2279](https://github.com/modularml/mojo/pull/2279))
 
 - The `testing.assert_almost_equal` and `math.isclose` functions now have an
   `equal_nan` flag. When set to True, then NaNs are considered equal.
@@ -161,10 +188,24 @@ what we publish.
 - Added `reversed()` for creating reversed iterators. Several range types,
   `List`, and `Dict` now support iterating in reverse.
   ([PR #2215](https://github.com/modularml/mojo/pull/2215),
-   [PR #2327](https://github.com/modularml/mojo/pull/2327))
+   [PR #2327](https://github.com/modularml/mojo/pull/2327),
+   Contributes towards [#2325](https://github.com/modularml/mojo/issues/2325))
 
-- Added left and right shift operations for `object`
-  ([PR #2247](https://github.com/modularml/mojo/pull/2247))
+- `object` now supports the division, modulo, and left and right shift
+  operators.
+  ([PR #2230](https://github.com/modularml/mojo/pull/2230),
+   [PR #2247](https://github.com/modularml/mojo/pull/2247),
+   Fixes [#2224](https://github.com/modularml/mojo/issues/2224))
+
+  The following operator dunder methods were added:
+
+  - `object.__mod__`
+  - `object.__truediv__`
+  - `object.__floordiv__`
+  - `object.__lshift__`
+  - `object.__rshift__`
+
+  As well as the in-place and reverse variants.
 
 - Added checked arithmetic operations.
   ([PR #2138](https://github.com/modularml/mojo/pull/2138))
@@ -181,7 +222,54 @@ what we publish.
   the numeric limits of the type.
 
 - Added `os.remove()` and `os.unlink()` for deleting files.
-  ([PR #2310](https://github.com/modularml/mojo/pull/2310))
+  ([PR #2310](https://github.com/modularml/mojo/pull/2310),
+   Fixes [#2306](https://github.com/modularml/mojo/issues/2306))
+
+- Properties can now be specified on inline mlir ops:
+
+  ```mojo
+  _ = __mlir_op.`kgen.source_loc`[
+      _type = (
+          __mlir_type.index, __mlir_type.index, __mlir_type.`!kgen.string`
+      ),
+      _properties = __mlir_attr.`{inlineCount = 1 : i64}`,
+  ]()
+  ```
+
+  As the example shows above, the protected `_properties` attribute can be
+  passed during op construction, with an MLIR `DictionaryAttr` value.
+
+- Mojo now allows users to capture source location of code and call location of
+  functions dynamically. For example:
+
+  ```mojo
+  @always_inline
+  fn my_assert(cond: Bool, msg: String):
+    if not cond:
+      var call_loc = __call_location()
+      print("In", call_loc.file_name, "on line", str(call_loc.line) + ":", msg)
+
+  fn main():
+    my_assert(False, "always fails")  # some_file.mojo, line 193
+  ```
+
+  will print `In /path/to/some_file.mojo on line 193: always fails`. Note that
+  `__call_location` only works in `@always_inline("nodebug")` and
+  `@always_inline` functions, as well as limitations on its use in parameter
+  contexts (see the documentation for more details).
+
+- `debug_assert` now prints its location (filename, line, and column where it
+  was called) in its error message. Similarly, the `assert_*` helpers in the
+  `testing` module now include location information in their messages.
+
+- `int()` can now take a string and a specified base to parse an integer from a
+  string: `int("ff", 16)` returns `255`.
+  ([PR #2273](https://github.com/modularml/mojo/pull/2273),
+   Fixes [#2274](https://github.com/modularml/mojo/issues/2274))
+
+  Additionally, if a base of zero is specified, the string will be parsed as if
+  it was an integer literal, with the base determined by whether the
+  string contains the prefix `"0x"`, `"0o"`, or `"0b"`.
 
 ### 🦋 Changed
 
@@ -211,6 +299,7 @@ what we publish.
 - All of the pointers got a pass of cleanup to make them more consistent, for
   example the `unsafe.bitcast` global function is now a consistent `bitcast`
   method on the pointers, which can convert element type and address space.
+
 - The `Reference` type has several changes, including:
   1) It is now located in `memory.reference` instead of `memory.unsafe`.
   2) `Reference` now has an unsafe `unsafe_bitcast` method like `UnsafePointer`.
@@ -256,7 +345,8 @@ what we publish.
 
 - `Optional.value()` will now return a reference instead of a copy of the
   contained value.
-  ([PR #2226](https://github.com/modularml/mojo/pull/2226))
+  ([PR #2226](https://github.com/modularml/mojo/pull/2226),
+   Fixes [#2179](https://github.com/modularml/mojo/issues/2179))
 
   To perform a copy manually, dereference the result:
 
@@ -270,7 +360,8 @@ what we publish.
   [`proposals/byte-as-uint8.md`](https://github.com/modularml/mojo/blob/main/proposals/byte-as-uint8.md),
   began transition to using `UInt8` by changing the data pointer of `Error`
   to `DTypePointer[DType.uint8]`.
-  ([PR #2318](https://github.com/modularml/mojo/pull/2318))
+  ([PR #2318](https://github.com/modularml/mojo/pull/2318),
+   Contributes towards [#2317](https://github.com/modularml/mojo/issues/2317))
 
 - Continued transition to `UnsafePointer` away from the legacy `Pointer` type
   in various standard library APIs and internals.
@@ -279,6 +370,37 @@ what we publish.
    [PR #2368](https://github.com/modularml/mojo/pull/2368),
    [PR #2370](https://github.com/modularml/mojo/pull/2370),
    [PR #2371](https://github.com/modularml/mojo/pull/2371))
+
+- `Bool` can now be implicitly converted from any type conforming to `Boolable`.
+  This means that you no longer need to write things like this:
+
+  ```mojo
+  @value
+  struct MyBoolable:
+    fn __bool__(self) -> Bool: ...
+
+  fn takes_boolable[T: Boolable](cond: T): ...
+
+  takes_boolable(MyBoolable())
+  ```
+
+  Instead, you can simply have
+
+  ```mojo
+  fn takes_bool(cond: Bool): ...
+
+  takes_bool(MyBoolable())
+  ```
+
+  Note that calls to `takes_bool` will perform the implicit conversion, so in
+  some cases is it still better to explicitly declare type parameter, e.g.:
+
+  ```mojo
+  fn takes_two_boolables[T: Boolable](a: T, b: T):
+    # Short circuit means `b.__bool__()` might not be evaluated.
+    if a.__bool__() and b.__bool__():
+      ...
+  ```
 
 ### ❌ Removed
 
@@ -356,8 +478,3 @@ what we publish.
 - [#2068](https://github.com/modularml/mojo/issues/2068)
   Fix simd.reduce for size_out == 2
   ([PR #2102](https://github.com/modularml/mojo/pull/2102))
-
-- [#2224](https://github.com/modularml/mojo/issues/2224)
-  `object` now implements `__truediv__`, `__floordiv__` and related divison
-  and modulo operators.
-  ([PR #2230](https://github.com/modularml/mojo/pull/2230))

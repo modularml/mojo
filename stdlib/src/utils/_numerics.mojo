@@ -713,3 +713,27 @@ fn isfinite[
     return llvm_intrinsic["llvm.is.fpclass", SIMD[DType.bool, simd_width]](
         val.value, UInt32(0x1F8).value
     )
+
+
+# ===----------------------------------------------------------------------===#
+# get_accum_type
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn get_accum_type[type: DType]() -> DType:
+    """Returns the recommended type for accumulation operations.
+
+    Half precision types can introduce numerical error if they are used
+    in reduction/accumulation operations. This method returns a higher precision
+    type to use for accumulation if a half precision types is provided,
+    otherwise it returns the original type.
+
+    Parameters:
+        type: The type of some accumulation operation.
+
+    Returns:
+        DType.float32 if type is a half-precision float, type otherwise.
+    """
+
+    return DType.float32 if type.is_half_float() else type

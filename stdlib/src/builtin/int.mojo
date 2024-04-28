@@ -164,6 +164,26 @@ fn int[T: IntableRaising](value: T) raises -> Int:
     return value.__int__()
 
 
+fn int(value: String, base: Int = 10) raises -> Int:
+    """Parses the given string as an integer in the given base and returns that value.
+
+    For example, `atol("19")` returns `19`. If the given string cannot be parsed
+    as an integer value, an error is raised. For example, `atol("hi")` raises an
+    error.
+
+    If base is 0 the the string is parsed as an Integer literal,
+    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+
+    Args:
+        value: A string to be parsed as an integer in the given base.
+        base: Base used for conversion, value must be between 2 and 36, or 0.
+
+    Returns:
+        An integer value that represents the string, or otherwise raises.
+    """
+    return atol(value, base)
+
+
 # ===----------------------------------------------------------------------=== #
 #  Int
 # ===----------------------------------------------------------------------=== #
