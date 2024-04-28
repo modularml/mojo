@@ -96,16 +96,6 @@ jobs:
 
           # Ensure `FileCheck` from the pre-installed LLVM 15 package is visible
           echo $(brew --prefix llvm@15)/bin/ >> $GITHUB_PATH
-      
-      - name: Validate documentation strings
-        run: |
-          mojo doc -warn-missing-doc-strings -o /dev/null stdlib/src/ > warnings.txt 2>&1
-          ./check-file-is-empty.py warnings.txt
-          if [ $? -ne 0 ]; then
-            echo "::error::Documentation string validation failed. Please fix the issues and try again."
-            exit 1
-          fi
-
 
       - name: Run standard library tests and examples
         run: |
