@@ -75,6 +75,11 @@ fn test_mkdir_mode() raises:
     var my_dir_path = cwd_path / "my_dir"
     var file_name = my_dir_path / "file.txt"
 
+    assert_false(
+        exists(my_dir_path),
+        "Unexpected dir " + my_dir_path.__fspath__() + " it should not exist",
+    )
+
     # creating dir without writing permission
     mkdir(my_dir_path, 0o111)
 
@@ -88,6 +93,29 @@ fn test_mkdir_mode() raises:
         rmdir(my_dir_path)
 
 
+fn test_rmdir_not_emty() raises:
+    var cwd_path = Path()
+    var my_dir_path = cwd_path / "my_dir"
+    var file_name = my_dir_path / "file.txt"
+
+    assert_false(
+        exists(my_dir_path),
+        "Unexpected dir " + my_dir_path.__fspath__() + " it should not exist",
+    )
+
+    mkdir(my_dir_path)
+    with open(file_name, "w"):
+        pass
+
+    with assert_raises(contains="Can not remove directory: "):
+        rmdir(my_dir_path)
+
+    remove(file_name)
+    rmdir(my_dir_path)
+    assert_false(exists(my_dir_path), "Failed to remove dir")
+
+
 fn main() raises:
     test_mkdir_and_rmdir()
     test_mkdir_mode()
+    test_rmdir_not_emty()
