@@ -2,7 +2,7 @@ name: Modular CLI issue
 description: Create an issue for the Modular CLI tool.
 title: "[Modular CLI]"
 labels:
-  - modular-cli
+  - "modular-cli,mojo-repo"
 body:
   - type: markdown
     attributes:

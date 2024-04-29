@@ -2,7 +2,7 @@ name: Mojo feature request
 description: Suggest an enhancement for Mojo
 title: "[Feature Request]"
 labels:
-  - "enhancement,mojo"
+  - "enhancement,mojo-repo"
 body:
   - type: markdown
     attributes:
