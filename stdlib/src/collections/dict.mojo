@@ -31,7 +31,6 @@ value types must always be Movable so we can resize the dictionary as it grows.
 
 See the `Dict` docs for more details.
 """
-from memory import UnsafePointer
 from builtin.value import StringableCollectionElement
 
 from .optional import Optional
@@ -189,7 +188,8 @@ struct _DictValueIter[
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
-        # Cast through a pointer to grant additional mutability.
+        # Cast through a pointer to grant additional mutability because
+        # _DictEntryIter.next erases it.
         return UnsafePointer.address_of(entry_ref[].value)[]
 
     fn __len__(self) -> Int:
@@ -987,7 +987,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         # return self._dict.__iter__()
         return _DictKeyIter(
             _DictEntryIter[Self.key_type, V, mutability, self_life](
-                0, 0, UnsafePointer(self)[]._dict
+                0, 0, Reference(self)[]._dict
             )
         )
 
@@ -1027,12 +1027,9 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         # TODO(#36448): Use this instead of the current workaround
         # return self._dict.values()
-        # Use UnsafePointer here to cast away conditional mutability.
         return _DictValueIter(
             _DictEntryIter[Self.key_type, V, mutability, self_life](
-                0,
-                0,
-                UnsafePointer(self)[]._dict,
+                0, 0, Reference(self)[]._dict
             )
         )
 
@@ -1060,10 +1057,9 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
 
         # TODO(#36448): Use this instead of the current workaround
-        # return UnsafePointer(self)[]._dict.items()
-        # Use UnsafePointer here to cast away conditional mutability.
+        # return Reference(self)[]._dict.items()
         return _DictEntryIter[Self.key_type, V, mutability, self_life](
-            0, 0, UnsafePointer(self)[]._dict
+            0, 0, Reference(self)[]._dict
         )
 
     @always_inline("nodebug")
