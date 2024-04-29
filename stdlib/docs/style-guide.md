@@ -65,7 +65,7 @@ and that's it!
 
 Mojo provides a command line utility, `mojo doc`, to validate the API doc strings in your code. 
 This ensures that your doc strings are correctly formatted and consistent with the Mojo style guidelines.
-Not that you should not have any warnings.
+Note that you should not have any warnings.
 
 ```bash
 > mojo doc --warn-missing-doc-strings -o /dev/null stdlib/src/

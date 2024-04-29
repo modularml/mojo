@@ -12,7 +12,6 @@
 # ===----------------------------------------------------------------------=== #
 
 import subprocess
-from pathlib import Path
 import sys
 
 # TODO: Use the "mojo doc" directly when there is an option to
