@@ -80,30 +80,30 @@ def test_rfind():
 
 fn test_comparison_operators() raises:
     # Test less than and greater than
-    assert_true("abc" < "def")  # "abc" < "def"
-    assert_false("def" < "abc")  # "def" is not less than "abc"
-    assert_false("abc" < "abc")  # "abc" is not less than "abc"
-    assert_true("ab" < "abc")  # "ab" < "abc"
-    assert_true("abc" > "ab")  # "abc" > "ab"
-    assert_false("abc" > "abcd")  # "abc" is not greater than "abcd"
+    assert_true("abc" < "def")
+    assert_false("def" < "abc")
+    assert_false("abc" < "abc")
+    assert_true("ab" < "abc")
+    assert_true("abc" > "ab")
+    assert_false("abc" > "abcd")
 
     # Test less than or equal to and greater than or equal to
-    assert_true("abc" <= "def")  # "abc" <= "def"
-    assert_true("abc" <= "abc")  # "abc" <= "abc"
-    assert_false("def" <= "abc")  # "def" is not less than or equal to "abc"
-    assert_true("abc" >= "abc")  # "abc" >= "abc"
-    assert_false("ab" >= "abc")  # "ab" is not greater than or equal to "abc"
-    assert_true("abcd" >= "abc")  # "abcd" >= "abc"
+    assert_true("abc" <= "def")
+    assert_true("abc" <= "abc")
+    assert_false("def" <= "abc")
+    assert_true("abc" >= "abc")
+    assert_false("ab" >= "abc")
+    assert_true("abcd" >= "abc")
 
-    # Test case sensitivity in comparison
-    assert_true("abc" > "ABC")  # "abc" > "ABC" assuming ASCII order
-    assert_false("abc" < "ABC")  # "abc" < "ABC" is false assuming ASCII order
+    # Test case sensitivity in comparison (assuming ASCII order)
+    assert_true("abc" > "ABC")
+    assert_false("abc" <= "ABC")
 
     # Test against empty strings
-    assert_true("" < "abc")  # Empty string is less than any non-empty
-    assert_false("abc" < "")  # Non-empty string is not less than empty
-    assert_true("" <= "")  # Empty string is equal to itself
-    assert_true("" >= "")  # Empty string is equal to itself
+    assert_true("" < "abc")
+    assert_false("abc" < "")
+    assert_true("" <= "")
+    assert_true("" >= "")
 
 
 def test_hash():

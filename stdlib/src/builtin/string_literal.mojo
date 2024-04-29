@@ -15,7 +15,6 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-import math
 from memory import DTypePointer
 
 from utils import StringRef
@@ -142,9 +141,11 @@ struct StringLiteral(
         """
         var len1 = len(self)
         var len2 = len(rhs)
-        var cmp = _memcmp(self.data(), rhs.data(), math.min(len1, len2))
 
-        return cmp < 0 or cmp == 0 and len1 < len2
+        if len1 < len2:
+            return _memcmp(self.data(), rhs.data(), len1) <= 0
+        else:
+            return _memcmp(self.data(), rhs.data(), len2) < 0
 
     @always_inline("nodebug")
     fn __le__(self, rhs: StringLiteral) -> Bool:
