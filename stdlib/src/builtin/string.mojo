@@ -456,6 +456,7 @@ struct String(
     # Initializers
     # ===------------------------------------------------------------------===#
 
+    # TODO: Remove this method when #2317 is done
     @always_inline
     fn __init__(inout self, owned impl: Self._buffer_type):
         """Construct a string from a buffer of bytes.
@@ -505,11 +506,11 @@ struct String(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
-        # we store the lenght and capacity beforehand as `steal_data()` will invalidated `impl`
-        var lenght = len(impl)
+        # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
+        var length = len(impl)
         var capacity = impl.capacity
         self._buffer = List[Int8](
-            impl.steal_data().bitcast[Int8](), size=lenght, capacity=capacity
+            impl.steal_data().bitcast[Int8](), size=length, capacity=capacity
         )
 
     @always_inline
@@ -553,6 +554,7 @@ struct String(
 
         self = str(value)
 
+    # TODO: Remove this method when #2317 is done
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[Int8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
@@ -986,6 +988,7 @@ struct String(
         """
         pass
 
+    # TODO: Remove this method when #2317 is done
     fn _as_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
 
