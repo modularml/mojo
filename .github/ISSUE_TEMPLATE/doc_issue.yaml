@@ -2,7 +2,7 @@ name: Documentation issue
 description: Report a problem with the Mojo docs
 title: "[Docs]"
 labels:
-  - documentation
+  - "documentation,mojo-repo"
 body:
   - type: markdown
     attributes:
