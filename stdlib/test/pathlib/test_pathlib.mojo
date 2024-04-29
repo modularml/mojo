@@ -15,6 +15,7 @@
 
 from pathlib import cwd, Path, DIR_SEPARATOR
 from sys import env_get_string
+from builtin._location import __source_location
 
 from testing import assert_true, assert_false, assert_equal, assert_not_equal
 

@@ -21,5 +21,6 @@
 fn main():
     print("== test_ok")
     debug_assert(True, "ok")
+    debug_assert(3, Error("also ok"))
     # CHECK-OK: is reached
     print("is reached")
