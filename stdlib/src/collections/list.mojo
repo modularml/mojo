@@ -23,7 +23,7 @@ from collections import List
 from builtin.value import StringableCollectionElement
 from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
-
+from .optional import Optional
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -415,6 +415,68 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
             earlier_idx += 1
             later_idx -= 1
+
+    # TODO: Modify this to be regular method when issue 1876 is resolved
+    @staticmethod
+    fn index[
+        C: ComparableCollectionElement
+    ](
+        self: List[C], owned value: C, start: Int = 0, end: Optional[Int] = None
+    ) raises -> Int:
+        """
+        Returns the index of the first occurrence of a value in a list, starting from the specified
+        index (default 0). Raises an Error if the value is not found.
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(__type_of(my_list).index(my_list, 2)) # Output: 1
+        ```
+
+        Args:
+            self: The list to search in.
+            value: The value to search for.
+            start: The starting index of the search (default 0).
+            end: The ending index of the search (default None, which means the end of the list).
+
+        Parameters:
+            C: The type of the elements in the list. Must implement the `ComparableCollectionElement` trait.
+
+        Returns:
+            The index of the first occurrence of the value in the list.
+
+        Raises:
+            ValueError If the value is not found in the list.
+
+        """
+        var normalized_start = (self.size + start) if start < 0 else start
+        # TODO: Once the min() and max() functions are available in Mojo,
+        # TODO: we can simplify the entire if-else block into a single line using the ternary operator:
+        # var normalized_end = self.size if end is None else min(max(end, 0), self.size)
+        var normalized_end: Int
+        if end is None:
+            normalized_end = self.size
+        else:
+            if end.value()[] < 0:
+                normalized_end = self.size + end.value()[]
+            else:
+                if end.value()[] > self.size:
+                    normalized_end = self.size
+                else:
+                    normalized_end = end.value()[]
+
+        if not self.size:
+            raise "Cannot find index of a value in an empty list."
+        if normalized_start >= self.size:
+            raise "Given 'start' parameter (" + String(
+                normalized_start
+            ) + ") is out of range. List only has " + String(
+                self.size
+            ) + " elements."
+
+        for i in range(normalized_start, normalized_end):
+            if self[i] == value:
+                return i
+        raise "ValueError: Given element is not in list"
 
     fn clear(inout self):
         """Clears the elements in the list."""

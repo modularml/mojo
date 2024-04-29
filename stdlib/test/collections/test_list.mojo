@@ -15,7 +15,7 @@
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
-from testing import assert_equal, assert_false, assert_true
+from testing import assert_equal, assert_false, assert_true, assert_raises
 
 
 def test_mojo_issue_698():
@@ -349,6 +349,99 @@ def test_list_insert():
         assert_equal(v4[i], i + 1)
 
 
+def test_list_index():
+    var test_list_a = List[Int](10, 20, 30, 40, 50)
+
+    # Basic Functionality Tests
+    assert_equal(__type_of(test_list_a).index(test_list_a, 10), 0)
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30), 2)
+    assert_equal(__type_of(test_list_a).index(test_list_a, 50), 4)
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 60)
+
+    # Tests With Start Parameter
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=1), 2)
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30, start=-4), 2)
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 30, start=3)
+    with assert_raises(
+        contains=(
+            "Given 'start' parameter (5) is out of range. List only has 5"
+            " elements."
+        )
+    ):
+        __type_of(test_list_a).index(test_list_a, 30, start=5)
+
+    # Tests With Start and End Parameters
+    assert_equal(
+        __type_of(test_list_a).index(test_list_a, 30, start=1, end=3), 2
+    )
+    assert_equal(
+        __type_of(test_list_a).index(test_list_a, 30, start=-4, end=-2), 2
+    )
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 30, start=1, end=2)
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 30, start=3, end=1)
+
+    # Tests With End Parameter Only
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30, end=3), 2)
+    assert_equal(__type_of(test_list_a).index(test_list_a, 30, end=-2), 2)
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 30, end=1)
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 30, end=2)
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 60, end=50)
+
+    # Edge Cases and Special Conditions
+    assert_equal(
+        __type_of(test_list_a).index(test_list_a, 10, start=-5, end=-1), 0
+    )
+    assert_equal(
+        __type_of(test_list_a).index(test_list_a, 10, start=0, end=50), 0
+    )
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 50, start=-5, end=-1)
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 50, start=0, end=-1)
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        __type_of(test_list_a).index(test_list_a, 10, start=-4, end=-1)
+    with assert_raises(
+        contains=(
+            "Given 'start' parameter (5) is out of range. List only has 5"
+            " elements."
+        )
+    ):
+        __type_of(test_list_a).index(test_list_a, 10, start=5, end=50)
+    with assert_raises(
+        contains="Cannot find index of a value in an empty list."
+    ):
+        __type_of(List[Int]()).index(List[Int](), 10)
+
+    var test_list_b = List[Int](10, 20, 30, 20, 10)
+
+    # Test finding the first occurrence of an item
+    assert_equal(__type_of(test_list_b).index(test_list_b, 10), 0)
+    assert_equal(__type_of(test_list_b).index(test_list_b, 20), 1)
+
+    # Test skipping the first occurrence with a start parameter
+    assert_equal(__type_of(test_list_b).index(test_list_b, 20, start=2), 3)
+
+    # Test constraining search with start and end, excluding last occurrence
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        _ = __type_of(test_list_b).index(test_list_b, 10, start=1, end=4)
+
+    # Test search within a range that includes multiple occurrences
+    assert_equal(
+        __type_of(test_list_b).index(test_list_b, 20, start=1, end=4), 1
+    )
+
+    # Verify error when constrained range excludes occurrences
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        _ = __type_of(test_list_b).index(test_list_b, 20, start=4, end=5)
+
+
 def test_list_extend():
     #
     # Test extending the list [1, 2, 3] with itself
@@ -600,6 +693,7 @@ def main():
     test_list_reverse()
     test_list_reverse_move_count()
     test_list_insert()
+    test_list_index()
     test_list_extend()
     test_list_extend_non_trivial()
     test_list_explicit_copy()
