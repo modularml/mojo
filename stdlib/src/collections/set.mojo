@@ -273,6 +273,16 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         return self.symmetric_difference(other)
 
+    fn __ixor__(inout self, other: Self):
+        """Overloads the ^= operator. Works like as `symmetric_difference_update` method.
+        
+        Updates the set with the symmetric difference of itself and another set.
+
+        Args:
+            other: The set to find the symmetric difference with.
+        """
+        self.symmetric_difference_update(other)
+
     fn __iter__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
