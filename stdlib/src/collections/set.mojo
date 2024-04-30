@@ -368,3 +368,21 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
                 self.remove(o[])
             except:
                 pass
+
+    fn issubset(self, other: Self) -> Bool:
+        """Check if this set is a subset of another set.
+
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is a subset of the `other` set, False otherwise.
+        """
+        if len(self) > len(other):
+            return False
+
+        for element in self:
+            if element[] not in other:
+                return False
+
+        return True
