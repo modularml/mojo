@@ -302,7 +302,7 @@ This will give you an error showing exactly what went wrong:
 ```plaintext
 /Users/jack/src/mojo-toy-2/stdlib/test/pathlib/test_pathlib.mojo:27:11:
 AssertionError: `left == right` comparison failed:
-   left: Your current working directory is: /Users/jack/src/mojo/stdlib
+   left: Your cwd is: /Users/jack/src/mojo/stdlib
   right: Some random text
 ```
 
