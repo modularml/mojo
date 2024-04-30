@@ -412,3 +412,21 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
                 return False
 
         return True
+
+    fn issuperset(self, other: Self) -> Bool:
+        """Check if this set is a superset of another set.
+
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is a superset of the `other` set, False otherwise.
+        """
+        if len(self) < len(other):
+            return False
+
+        for element in other:
+            if element[] not in self:
+                return False
+
+        return True
