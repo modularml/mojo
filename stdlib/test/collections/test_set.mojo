@@ -435,6 +435,31 @@ def test_discard():
     set5.discard(3)
     assert_true(set5 == Set[Int]())
 
+def test_clear():
+    set1 = Set[Int](1, 2, 3)
+    set1.clear()
+    assert_true(set1 == Set[Int]())
+    
+    set2 = Set[Int]()
+    set2.clear()
+    assert_true(set2 == Set[Int]())
+    
+    set3 = Set[Int](1, 2, 3)
+    set3.clear()
+    set3.add(4)
+    set3.add(5)
+    assert_true(set3 == Set[Int](4, 5))
+    
+    set4 = Set[Int](1, 2, 3)
+    set4.clear()
+    set4.clear()
+    set4.clear()
+    assert_true(set4 == Set[Int]())
+    
+    set5 = Set[Int](1, 2, 3)
+    set5.clear()
+    assert_true(len(set5) == 0)
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print("Test", name_val, "...", end="")
@@ -467,3 +492,4 @@ def main():
     test["test_lessthan", test_lessthan]()
     test["test_symmetric_difference", test_symmetric_difference]()
     test["test_symmetric_difference_update", test_symmetric_difference_update]()
+    test["test_clear", test_clear]()
