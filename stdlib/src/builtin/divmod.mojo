@@ -19,13 +19,13 @@ fn divmod(a: Int, b: Int) -> Tuple[Int, Int]:
     like Int8, Int16... is planned.
 
     This method calls `a.__divmod__(b)`, thus, the actual implementation of
-    divmod should go in the `__divmod__` method of the struct of `a` and `b`.
+    divmod should go in the `__divmod__` method of the struct of `a`.
 
     Args:
         a: The dividend.
         b: The divisor.
 
     Returns:
-        A tuple containing the quotient and the remainder.
+        A `Tuple` containing the quotient and the remainder.
     """
     return a.__divmod__(b)
