@@ -14,7 +14,7 @@
 
 from sys.info import bitwidthof
 
-from testing import assert_equal
+from testing import assert_equal, assert_true
 
 
 def test_constructors():
@@ -92,12 +92,9 @@ def test_divmod():
     assert_equal(a, 0)
     assert_equal(b, 0)
 
-    try:
-        a, b = divmod(5, 0)
-    except e:
-        assert_true(str(e).startswith("ZeroDivisionError"))
-    else:
-        raise Error("divmod(5, 0) should raise an exception, but it did not.")
+    a, b = divmod(5, 0)
+    assert_equal(a, 0)
+    assert_equal(b, 0)
 
 
 def test_abs():

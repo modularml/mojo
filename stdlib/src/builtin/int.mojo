@@ -635,7 +635,7 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
         return mod
 
     @always_inline("nodebug")
-    fn __divmod__(self, rhs: Int) raises -> Tuple[Self, Self]:
+    fn __divmod__(self, rhs: Int) -> Tuple[Int, Int]:
         """Computes both the quotient and remainder using integer division.
 
         Args:
@@ -643,19 +643,16 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
 
         Returns:
             The quotient and remainder as a `Tuple(self // rhs, self % rhs)`.
-
-        Raises:
-            ZeroDivisionError: If `rhs` is zero.
         """
         if rhs == 0:
-            raise Error("ZeroDivisionError: integer division by zero")
+            return 0, 0
         var div: Int = self._positive_div(rhs)
         if rhs > 0 and self > 0:
-            return Tuple(div, self._positive_rem(rhs))
+            return div, self._positive_rem(rhs)
         var mod = self - div * rhs
         if ((rhs < 0) ^ (self < 0)) and mod:
-            return Tuple(div - 1, mod + rhs)
-        return Tuple(div, mod)
+            return div - 1, mod + rhs
+        return div, mod
 
     @always_inline("nodebug")
     fn __pow__(self, rhs: Int) -> Int:
