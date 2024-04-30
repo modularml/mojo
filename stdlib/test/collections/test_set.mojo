@@ -276,6 +276,16 @@ def test_issubset():
     assert_false(Set[Int](1, 2, 3).issubset(Set[Int](4, 5, 6)))
     assert_false(Set[Int](1, 2, 3) <= Set[Int](4, 5, 6))
 
+def test_disjoint():
+    assert_true(Set[Int]().isdisjoint(Set[Int]()))
+    assert_false(Set[Int](1, 2, 3).isdisjoint(Set[Int](1, 2, 3)))
+    assert_true(Set[Int](1, 2, 3).isdisjoint(Set[Int](4, 5, 6)))
+    assert_false(Set[Int](1, 2, 3).isdisjoint(Set[Int](3, 4, 5)))
+    assert_true(Set[Int]().isdisjoint(Set[Int](1, 2, 3)))
+    assert_true(Set[Int](1, 2, 3).isdisjoint(Set[Int]()))
+    assert_false(Set[Int](1, 2, 3).isdisjoint(Set[Int](3)))
+    assert_true(Set[Int](1, 2, 3).isdisjoint(Set[Int](4)))
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print("Test", name_val, "...", end="")
@@ -301,3 +311,5 @@ def main():
     test["test_add", test_add]()
     test["test_remove", test_remove]()
     test["test_pop_insertion_order", test_pop_insertion_order]()
+    test["test_issubset", test_issubset]()
+    test["test_disjoint", test_disjoint]()
