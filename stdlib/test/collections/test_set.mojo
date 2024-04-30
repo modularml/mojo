@@ -155,21 +155,21 @@ def test_subtract():
     assert_equal(s2 - Set[Int](3, 4), Set[Int](1, 2))
 
 
-def test_remove_all():
+def test_difference_update():
     var x = Set[Int]()
-    x.remove_all(Set[Int]())
+    x.difference_update(Set[Int]())
     assert_equal(x, Set[Int]())
 
     x = Set[Int](1, 2, 3)
-    x.remove_all(Set[Int](1, 2, 3))
+    x.difference_update(Set[Int](1, 2, 3))
     assert_equal(x, Set[Int]())
 
     x = Set[Int](1, 2, 3)
-    x.remove_all(Set[Int]())
+    x.difference_update(Set[Int]())
     assert_equal(x, Set[Int](1, 2, 3))
 
     x = Set[Int](1, 2, 3)
-    x.remove_all(Set[Int](3, 4))
+    x.difference_update(Set[Int](3, 4))
     assert_equal(x, Set[Int](1, 2))
 
     x = Set[Int]()
