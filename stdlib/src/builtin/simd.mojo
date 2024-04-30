@@ -1759,7 +1759,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new vector `self_0, self_1, ..., self_n, other_0, ..., other_n`.
         """
 
-        # Common cases will use shuffle which the compiler understands well.
+        @always_inline
         @parameter
         fn build_indices() -> StaticIntTuple[2 * size]:
             var indices = StaticIntTuple[2 * size]()
