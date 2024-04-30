@@ -566,7 +566,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             A string representation of the Dict.
         """
         var minimum_capacity = self._minimum_size_of_string_representation()
-        var result = String(List[Int8](capacity=minimum_capacity))
+        var result = String(List[UInt8](capacity=minimum_capacity))
         result += "{"
 
         var i = 0
