@@ -306,7 +306,7 @@ def main():
     test["test_intersection", test_intersection]()
     test["test_union", test_union]()
     test["test_subtract", test_subtract]()
-    test["test_remove_all", test_remove_all]()
+    test["test_difference_update", test_difference_update]()
     test["test_iter", test_iter]()
     test["test_add", test_add]()
     test["test_remove", test_remove]()
