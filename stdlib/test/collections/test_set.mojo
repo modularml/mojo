@@ -311,6 +311,13 @@ def test_issuperset():
     assert_true(Set[Int]().issuperset(Set[Int]()))
     assert_true(Set[Int]() >= Set[Int]())
 
+def test_greaterthan():
+    assert_true(Set[Int](1, 2, 3, 4) > Set[Int](2, 3))
+    assert_false(Set[Int](2, 3) > Set[Int](1, 2, 3, 4))
+    assert_false(Set[Int](1, 2, 3) > Set[Int](1, 2, 3))
+    assert_false(Set[Int]() > Set[Int]())
+    assert_true(Set[Int](1, 2, 3) > Set[Int]())
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print("Test", name_val, "...", end="")
@@ -339,3 +346,4 @@ def main():
     test["test_issubset", test_issubset]()
     test["test_disjoint", test_disjoint]()
     test["test_issuperset", test_issuperset]()
+    test["test_greaterthan", test_greaterthan]()
