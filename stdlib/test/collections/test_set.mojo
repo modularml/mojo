@@ -325,6 +325,25 @@ def test_lessthan():
     assert_false(Set[Int]() < Set[Int]())
     assert_true(Set[Int]() < Set[Int](1, 2, 3))
 
+def test_symmetric_difference():
+    assert_true(Set[Int](1, 4) == Set[Int](1, 2, 3).symmetric_difference(Set[Int](2, 3, 4)))
+    assert_true(Set[Int](1, 4) == Set[Int](1, 2, 3) ^ Set[Int](2, 3, 4))
+
+    assert_true(Set[Int](1, 2, 3, 4, 5, 6) == Set[Int](1, 2, 3).symmetric_difference(Set[Int](4, 5, 6)))
+    assert_true(Set[Int](1, 2, 3, 4, 5, 6) == Set[Int](1, 2, 3) ^ Set[Int](4, 5, 6))
+
+    assert_true(Set[Int](1, 2, 3) == Set[Int](1, 2, 3).symmetric_difference(Set[Int]()))
+    assert_true(Set[Int](1, 2, 3) == Set[Int](1, 2, 3) ^ Set[Int]())
+
+    assert_true(Set[Int](1, 2, 3) == Set[Int]().symmetric_difference(Set[Int](1, 2, 3)))
+    assert_true(Set[Int](1, 2, 3) == Set[Int]() ^ Set[Int](1, 2, 3))
+
+    assert_true(Set[Int]() == Set[Int]().symmetric_difference(Set[Int]()))
+    assert_true(Set[Int]() == Set[Int]() ^ Set[Int]())
+
+    assert_true(Set[Int]() == Set[Int](1, 2, 3).symmetric_difference(Set[Int](1, 2, 3)))
+    assert_true(Set[Int]() == Set[Int](1, 2, 3) ^ Set[Int](1, 2, 3))
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print("Test", name_val, "...", end="")
@@ -355,3 +374,4 @@ def main():
     test["test_issuperset", test_issuperset]()
     test["test_greaterthan", test_greaterthan]()
     test["test_lessthan", test_lessthan]()
+    test["test_symmetric_difference", test_symmetric_difference]()
