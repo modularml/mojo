@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
-fn divmod(a: Int, b: Int) raises -> Tuple[Int, Int]:
+fn divmod(a: Int, b: Int) -> Tuple[Int, Int]:
     """Performs integer division and returns the quotient and the remainder.
 
     Currently supported only for integers. Support for more standard library types
@@ -27,8 +27,5 @@ fn divmod(a: Int, b: Int) raises -> Tuple[Int, Int]:
 
     Returns:
         A tuple containing the quotient and the remainder.
-
-    Raises:
-        ZeroDivisionError: If `b` is zero.
     """
     return a.__divmod__(b)
