@@ -271,7 +271,7 @@ If you haven't already, follow the steps at:
 ### Adding a test
 
 This section will show you how to add a unit test.
-Add the following at the top of the file
+Add the following at the top of `./stdlib/test/pathlib/test_pathlib.mojo`:
 
 ```mojo
 # RUN: %mojo %s
