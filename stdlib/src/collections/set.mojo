@@ -218,6 +218,17 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         self.difference_update(other)
 
+    fn __le__(self, other: Self) -> Bool:
+        """Overloads the <= operator for sets. Works like as `issubset` method.
+
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is a subset of the `other` set, False otherwise.
+        """
+        return self.issubset(other)
+
     fn __iter__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
