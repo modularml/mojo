@@ -251,6 +251,17 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         return self >= other and self != other
 
+    fn __lt__(self, other: Self) -> Bool:
+        """Overloads the < operator for strict subset comparison of sets.
+
+        Args:
+            other: The set to compare against for the strict subset relationship.
+
+        Returns:
+            True if the set is a strict subset of the `other` set, False otherwise.
+        """
+        return self <= other and self != other
+
     fn __iter__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
