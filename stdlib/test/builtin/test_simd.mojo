@@ -384,8 +384,6 @@ def test_shift():
 
 
 def test_shuffle():
-    print("== test_shuffle")
-
     alias dtype = DType.int32
     alias width = 4
 
@@ -451,7 +449,6 @@ def test_insert():
 
 
 def test_join():
-    print("== test_join")
     vec = SIMD[DType.int32, 4](100, 101, 102, 103)
 
     assert_equal(
