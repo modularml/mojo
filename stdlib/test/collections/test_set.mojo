@@ -442,3 +442,4 @@ def main():
     test["test_greaterthan", test_greaterthan]()
     test["test_lessthan", test_lessthan]()
     test["test_symmetric_difference", test_symmetric_difference]()
+    test["test_symmetric_difference_update", test_symmetric_difference_update]()
