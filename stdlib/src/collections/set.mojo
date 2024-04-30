@@ -341,17 +341,6 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         for e in other:
             self.add(e[])
 
-    fn difference_update(inout self, other: Self):
-        """In-place set difference update.
-
-        Updates the set by removing all elements found in the `other` set,
-        effectively keeping only elements that are unique to this set.
-
-        Args:
-            other: Another Set instance to compare with this one.
-        """
-        self.remove_all(other)
-
     fn intersection_update(inout self, other: Self):
         """In-place set intersection update.
 
@@ -363,12 +352,13 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         # Possible to do this without an extra allocation, but need to be
         # careful about concurrent iteration + mutation
-        self.remove_all(self - other)
+        self.difference_update(self - other)
 
-    fn remove_all(inout self, other: Self):
+    fn difference_update(inout self, other: Self):
         """In-place set subtraction.
 
-        Updates the set to remove any elements from the `other` set.
+        Updates the set by removing all elements found in the `other` set,
+        effectively keeping only elements that are unique to this set.
 
         Args:
             other: Another Set instance to subtract from this one.
