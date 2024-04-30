@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
+from builtin._math import Floorable
 from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
@@ -192,7 +193,9 @@ fn int(value: String, base: Int = 10) raises -> Int:
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
+struct Int(
+    Absable, Boolable, Floorable, Formattable, Intable, KeyElement, Stringable
+):
     """This type represents an integer value."""
 
     var value: __mlir_type.index
@@ -508,6 +511,15 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
             The absolute value.
         """
         return -self if self < 0 else self
+
+    @always_inline("nodebug")
+    fn __floor__(self) -> Self:
+        """Return the floor of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
 
     @always_inline("nodebug")
     fn __invert__(self) -> Int:

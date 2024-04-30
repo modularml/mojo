@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import llvm_intrinsic, has_neon, is_x86, simdwidthof, _RegisterPackType
 
+from builtin._math import Floorable
 from builtin.hash import _hash_simd
 from memory import bitcast
 
@@ -114,12 +115,13 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 @register_passable("trivial")
 struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Absable,
-    Sized,
-    Intable,
-    CollectionElement,
-    Stringable,
-    Hashable,
     Boolable,
+    CollectionElement,
+    Floorable,
+    Hashable,
+    Intable,
+    Sized,
+    Stringable,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -617,7 +619,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter
         if type.is_floating_point():
-            return _floor(div)
+            return div.__floor__()
         elif type.is_unsigned():
             return div
         else:
@@ -886,6 +888,26 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return (m & (FPUtils[type].sign_mask() - 1))._bits_to_float[type]()
 
         return (self < 0).select(-self, self)
+
+    @always_inline("nodebug")
+    fn __floor__(self) -> Self:
+        """Performs elementwise floor on the elements of a SIMD vector.
+
+        Returns:
+            The elementwise floor of this SIMD vector.
+        """
+
+        @parameter
+        if type.is_bool() or type.is_integral():
+            return self
+
+        @parameter
+        if has_neon() and type == DType.bfloat16:
+            return self.cast[DType.float32]().__floor__().cast[type]()
+
+        return llvm_intrinsic[
+            "llvm.floor", SIMD[type, size], has_side_effect=False
+        ](self)
 
     # ===-------------------------------------------------------------------===#
     # In place operations.
@@ -2327,7 +2349,7 @@ fn _pow[
 
     @parameter
     if rhs_type.is_floating_point() and lhs_type == rhs_type:
-        var rhs_quotient = _floor(rhs)
+        var rhs_quotient = rhs.__floor__()
         if rhs >= 0 and rhs_quotient == rhs:
             return _pow(lhs, rhs_quotient.cast[_integral_type_of[rhs_type]()]())
 
@@ -2380,41 +2402,6 @@ fn _pow[
     else:
         # Unsupported.
         return SIMD[lhs_type, simd_width]()
-
-
-# ===----------------------------------------------------------------------===#
-# floor
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline("nodebug")
-fn _floor[
-    type: DType, simd_width: Int
-](x: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Performs elementwise floor on the elements of a SIMD vector.
-
-    Parameters:
-      type: The `dtype` of the input and output SIMD vector.
-      simd_width: The width of the input and output SIMD vector.
-
-    Args:
-      x: SIMD vector to perform floor on.
-
-    Returns:
-      The elementwise floor of x.
-    """
-
-    @parameter
-    if type.is_bool() or type.is_integral():
-        return x
-
-    @parameter
-    if has_neon() and type == DType.bfloat16:
-        return _floor(x.cast[DType.float32]()).cast[type]()
-
-    return llvm_intrinsic[
-        "llvm.floor", SIMD[type, simd_width], has_side_effect=False
-    ](x)
 
 
 # ===----------------------------------------------------------------------===#

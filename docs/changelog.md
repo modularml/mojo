@@ -292,7 +292,7 @@ what we publish.
   string contains the prefix `"0x"`, `"0o"`, or `"0b"`.
 
 - Mojo now supports types to opt in to use the `abs` function by implementing
-  the `__abs__` method (i.e. by conforming to the now `Absable` trait), e.g.:
+  the `__abs__` method (i.e. by conforming to the new `Absable` trait), e.g.:
 
   ```mojo
   from math import sqrt
@@ -303,6 +303,22 @@ what we publish.
 
       fn __abs__(self) -> Self:
           return sqrt(self.x * self.x + self.y * self.y)
+  ```
+
+- Mojo now supports types to opt in to use the `floor` function in the `math`
+  module by implementing the `__floor__` method (and so conforming to the new
+  `math.Floorable` trait), for example:
+
+  ```mojo
+    from math import Floorable, floor
+
+    @value
+    struct Complex(Floorable):
+      var re: Float64
+      var im: Float64
+
+      fn __floor__(self) -> Self:
+          return Self(floor(re), floor(im))
   ```
 
 ### 🦋 Changed

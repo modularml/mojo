@@ -26,6 +26,20 @@ alias inf = FloatLiteral.infinity
 alias neg_inf = FloatLiteral.negative_infinity
 
 
+def test_floor():
+    assert_equal(FloatLiteral.__floor__(1.5), 1.0)
+    assert_equal(FloatLiteral.__floor__(1.6), 1.0)
+    assert_equal(FloatLiteral.__floor__(-1.5), -2.0)
+    assert_equal(FloatLiteral.__floor__(-3.4), -4.0)
+    assert_equal(FloatLiteral.__floor__(3.0), 3.0)
+    assert_equal(FloatLiteral.__floor__(0.0), 0.0)
+
+    assert_true(FloatLiteral.__floor__(nan).is_nan())
+    assert_true(FloatLiteral.__floor__(neg_zero).is_neg_zero())
+    assert_equal(FloatLiteral.__floor__(inf), inf)
+    assert_equal(FloatLiteral.__floor__(neg_inf), neg_inf)
+
+
 def test_division():
     # TODO: https://github.com/modularml/mojo/issues/1787
     # allow this at compile time
@@ -92,6 +106,7 @@ def test_abs():
 
 
 def main():
+    test_floor()
     test_division()
     test_power()
     test_int_conversion()

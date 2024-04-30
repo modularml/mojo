@@ -21,7 +21,7 @@ from time import now
 
 from sys import external_call, os_is_linux, os_is_windows
 
-from builtin.simd import _floor
+from math import floor
 from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
@@ -246,7 +246,7 @@ fn sleep(sec: Float64):
         sec: The number of seconds to sleep for.
     """
     alias NANOSECONDS_IN_SECOND = 1_000_000_000
-    var total_secs = _floor(sec)
+    var total_secs = floor(sec)
     var tv_spec = _CTimeSpec(
         int(total_secs.cast[DType.index]()),
         int((sec - total_secs) * NANOSECONDS_IN_SECOND),
