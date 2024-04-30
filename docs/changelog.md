@@ -465,6 +465,14 @@ what we publish.
 - Added `SIMD.__repr__` to get the verbose string representation of `SIMD` types.
 ([PR #2728](https://github.com/modularml/mojo/pull/2728) by [@bgreni](https://github.com/bgreni))
 
+- `Slice` now implements `indices()` to retrieve the `start`, `end`, and `step` values
+  as a tuple for a slice if applied to a container of a given length.
+  ([PR #2495](https://github.com/modularml/mojo/pull/2495) by [@bgreni](https://github.com/bgreni))
+  
+  ```mojo
+    slice(1, -1, 1).indices(5) # returns (1, 4, 1)
+  ```
+
 ### 🦋 Changed
 
 - Async function calls are no longer allowed to borrow non-trivial
@@ -570,6 +578,16 @@ what we publish.
   accepts a variadic list of integers. New overloads for a `List` or `Span`of
   integers are also added.
   ([PR #2777](https://github.com/modularml/mojo/pull/2777) by [@bgreni](https://github.com/bgreni))
+  
+- `Slice` now uses `OptionalReg[Int]` for `start` and `end` and implements
+  a constructor which accepts optional values. `Slice._has_end()` has also been removed
+  since a Slice with no end is now represented by an empty `Slice.end` option.
+  ([PR #2495](https://github.com/modularml/mojo/pull/2495) by [@bgreni](https://github.com/bgreni))
+
+  ```mojo
+    var s = Slice(1, None, 2)
+    print(s.start.value()) # must retrieve the value from the optional
+  ```
 
 ### ❌ Removed
 

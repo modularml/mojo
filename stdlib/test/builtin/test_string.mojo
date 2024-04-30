@@ -285,11 +285,19 @@ fn test_string_indexing() raises:
 
     assert_equal("!!ojoM olleH", str[::-1])
 
-    assert_equal("!!ojoM oll", str[2::-1])
+    assert_equal("leH", str[2::-1])
 
     assert_equal("!oo le", str[::-2])
 
-    assert_equal("!jMolH", str[:-1:-2])
+    assert_equal("", str[:-1:-2])
+    assert_equal("", str[-50::-1])
+    assert_equal("Hello Mojo!!", str[-50::])
+    assert_equal("!!ojoM olleH", str[:-50:-1])
+    assert_equal("Hello Mojo!!", str[:50:])
+    assert_equal("H", str[::50])
+    assert_equal("!", str[::-50])
+    assert_equal("!", str[50::-50])
+    assert_equal("H", str[-50::50])
 
 
 fn test_atol() raises:

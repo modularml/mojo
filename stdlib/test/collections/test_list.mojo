@@ -671,6 +671,45 @@ def test_list_span():
     assert_equal(es[2], 3)
     assert_equal(len(es), 3)
 
+    assert_equal(vs[1:0:-1][0], 2)
+    assert_equal(vs[2:1:-1][0], 3)
+    es = vs[:0:-1]
+    assert_equal(es[0], 3)
+    assert_equal(es[1], 2)
+    assert_equal(vs[2::-1][0], 3)
+
+    assert_equal(len(vs[1:2:-1]), 0)
+
+    assert_equal(0, len(vs[:-1:-2]))
+    assert_equal(0, len(vs[-50::-1]))
+    es = vs[-50::]
+    assert_equal(3, len(es))
+    assert_equal(es[0], 1)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 3)
+    es = vs[:-50:-1]
+    assert_equal(3, len(es))
+    assert_equal(es[0], 3)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 1)
+    es = vs[:50:]
+    assert_equal(3, len(es))
+    assert_equal(es[0], 1)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 3)
+    es = vs[::50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 1)
+    es = vs[::-50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 3)
+    es = vs[50::-50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 3)
+    es = vs[-50::50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 1)
+
 
 def test_list_boolable():
     assert_true(List[Int](1))

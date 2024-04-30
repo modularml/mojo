@@ -14,7 +14,7 @@
 
 from utils import InlineArray, Span
 from collections.list import List
-from testing import assert_equal
+from testing import assert_equal, assert_true
 
 
 def test_span_list_int():
@@ -118,9 +118,33 @@ def test_indexing():
     assert_equal(s[3], 4)
 
 
+def test_span_slice():
+    def compare(s: Span[Int], l: List[Int]) -> Bool:
+        if len(s) != len(l):
+            return False
+        for i in range(len(s)):
+            if s[i] != l[i]:
+                return False
+        return True
+
+    var l = List(1, 2, 3, 4, 5)
+    var s = Span(l)
+    var res = s[1:2]
+    assert_equal(res[0], 2)
+    res = s[1:-1:1]
+    assert_equal(res[0], 2)
+    assert_equal(res[1], 3)
+    assert_equal(res[2], 4)
+    # TODO: Fix Span slicing
+    # res = s[1::-1]
+    # assert_equal(res[0], 2)
+    # assert_equal(res[1], 1)
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
     test_span_array_int()
     test_span_array_str()
     test_indexing()
+    test_span_slice()
