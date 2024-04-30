@@ -456,6 +456,7 @@ struct String(
     # Initializers
     # ===------------------------------------------------------------------===#
 
+    # TODO: Remove this method when #2317 is done
     @always_inline
     fn __init__(inout self, owned impl: Self._buffer_type):
         """Construct a string from a buffer of bytes.
@@ -470,6 +471,11 @@ struct String(
         var hi = String(buf)
         ```
 
+        Note that you should use the constructor from `List[UInt8]` instead
+        as we are now storing the bytes as UInt8.
+
+        See https://github.com/modularml/mojo/issues/2317 for more information.
+
         Args:
             impl: The buffer.
         """
@@ -478,6 +484,34 @@ struct String(
             "expected last element of String buffer to be null terminator",
         )
         self._buffer = impl^
+
+    @always_inline
+    fn __init__(inout self, owned impl: List[UInt8]):
+        """Construct a string from a buffer of bytes.
+
+        The buffer must be terminated with a null byte:
+
+        ```mojo
+        var buf = List[UInt8]()
+        buf.append(ord('H'))
+        buf.append(ord('i'))
+        buf.append(0)
+        var hi = String(buf)
+        ```
+
+        Args:
+            impl: The buffer.
+        """
+        debug_assert(
+            impl[-1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
+        # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
+        var length = len(impl)
+        var capacity = impl.capacity
+        self._buffer = List[Int8](
+            impl.steal_data().bitcast[Int8](), size=length, capacity=capacity
+        )
 
     @always_inline
     fn __init__(inout self):
@@ -520,8 +554,29 @@ struct String(
 
         self = str(value)
 
+    # TODO: Remove this method when #2317 is done
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[Int8], len: Int):
+        """Creates a string from the buffer. Note that the string now owns
+        the buffer.
+
+        The buffer must be terminated with a null byte.
+
+        Note that you should use the constructor from `UnsafePointer[UInt8]` instead
+        as we are now storing the bytes as UInt8.
+
+        See https://github.com/modularml/mojo/issues/2317 for more information.
+
+        Args:
+            ptr: The pointer to the buffer.
+            len: The length of the buffer, including the null terminator.
+        """
+        # we don't know the capacity of ptr, but we'll assume it's the same or
+        # larger than len
+        self = Self(Self._buffer_type(ptr, size=len, capacity=len))
+
+    @always_inline
+    fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -533,7 +588,9 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(Self._buffer_type(ptr, size=len, capacity=len))
+        self = Self(
+            Self._buffer_type(ptr.bitcast[Int8](), size=len, capacity=len)
+        )
 
     @always_inline
     fn __init__(inout self, ptr: LegacyPointer[Int8], len: Int):
@@ -794,7 +851,11 @@ struct String(
         var total_len = self_len + other_len
         self._buffer.resize(total_len + 1, 0)
         # Copy the data alongside the terminator.
-        memcpy(self._as_ptr() + self_len, other._as_ptr(), other_len + 1)
+        memcpy(
+            self._as_uint8_ptr() + self_len,
+            other._as_uint8_ptr(),
+            other_len + 1,
+        )
 
     # ===------------------------------------------------------------------=== #
     # Methods
@@ -927,13 +988,29 @@ struct String(
         """
         pass
 
+    # TODO: Remove this method when #2317 is done
     fn _as_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
+
+        Note that you should use `_as_uint8_ptr()` if you need to access the
+        pointer as we are now storing the bytes as UInt8.
+
+        See https://github.com/modularml/mojo/issues/2317 for more information.
 
         Returns:
             The pointer to the underlying memory.
         """
         return rebind[DTypePointer[DType.int8]](self._buffer.data)
+
+    fn _as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return rebind[DTypePointer[DType.uint8]](
+            self._buffer.data.bitcast[UInt8]()
+        )
 
     fn as_bytes(self) -> List[Int8]:
         """Retrieves the underlying byte sequence encoding the characters in

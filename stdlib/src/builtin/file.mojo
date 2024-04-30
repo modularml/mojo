@@ -189,7 +189,7 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
 
         var buf = external_call[
-            "KGEN_CompilerRT_IO_FileRead", UnsafePointer[Int8]
+            "KGEN_CompilerRT_IO_FileRead", UnsafePointer[UInt8]
         ](
             self.handle,
             UnsafePointer.address_of(size_copy),
