@@ -463,3 +463,24 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
                 return False
 
         return True
+
+    fn symmetric_difference(self, other: Self) -> Self:
+        """Returns the symmetric difference of two sets.
+        
+        Args:
+            other: The set to find the symmetric difference with.
+
+        Returns:
+            A new set containing the symmetric difference of the two sets.
+        """
+        var result = Set[T]()
+        
+        for element in self:
+            if element[] not in other:
+                result.add(element[])
+        
+        for element in other:
+            if element[] not in self:
+                result.add(element[])
+        
+        return result ^
