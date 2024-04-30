@@ -22,6 +22,12 @@ def test_int():
     assert_equal(6 - 1, 5)
 
 
+def test_floor():
+    assert_equal(IntLiteral.__floor__(5), 5)
+    assert_equal(IntLiteral.__floor__(0), 0)
+    assert_equal(IntLiteral.__floor__(-5), -5)
+
+
 def test_floordiv():
     assert_equal(2 // 2, 1)
     assert_equal(2 // 3, 0)
@@ -56,6 +62,7 @@ def test_abs():
 
 def main():
     test_int()
+    test_floor()
     test_floordiv()
     test_mod()
     test_bit_width()
