@@ -262,6 +262,17 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         return self <= other and self != other
 
+    fn __xor__(self, other: Self) -> Self:
+        """Overloads the ^ operator for sets. Works like as `symmetric_difference` method.
+        
+        Args:
+            other: The set to find the symmetric difference with.
+
+        Returns:
+            A new set containing the symmetric difference of the two sets.
+        """
+        return self.symmetric_difference(other)
+
     fn __iter__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
