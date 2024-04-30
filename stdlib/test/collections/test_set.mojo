@@ -492,4 +492,5 @@ def main():
     test["test_lessthan", test_lessthan]()
     test["test_symmetric_difference", test_symmetric_difference]()
     test["test_symmetric_difference_update", test_symmetric_difference_update]()
+    test["test_discard", test_discard]()
     test["test_clear", test_clear]()
