@@ -49,6 +49,12 @@ def test_pow():
     assert_equal(81, Int(3) ** Int(4))
 
 
+def test_ceil():
+    assert_equal(Int.__ceil__(Int(5)), 5)
+    assert_equal(Int.__ceil__(Int(0)), 0)
+    assert_equal(Int.__ceil__(Int(-5)), -5)
+
+
 def test_floor():
     assert_equal(Int.__floor__(Int(5)), 5)
     assert_equal(Int.__floor__(Int(0)), 0)
@@ -88,6 +94,7 @@ def main():
     test_sub()
     test_div()
     test_pow()
+    test_ceil()
     test_floor()
     test_floordiv()
     test_mod()
