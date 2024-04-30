@@ -254,6 +254,27 @@ def test_pop_insertion_order():
     with assert_raises():
         s.pop()  # pop from empty set raises
 
+def test_issubset():
+    assert_true(Set[Int]().issubset(Set[Int](1, 2, 3)))
+    assert_true(Set[Int]() <= Set[Int](1, 2, 3))
+
+    assert_true(Set[Int](1, 2, 3).issubset(Set[Int](1, 2, 3)))
+    assert_true(Set[Int](1, 2, 3) <= Set[Int](1, 2, 3))
+
+    assert_true(Set[Int](2, 3).issubset(Set[Int](1, 2, 3, 4)))
+    assert_true(Set[Int](2, 3) <= Set[Int](1, 2, 3, 4))
+
+    assert_false(Set[Int](1, 2, 3, 4).issubset(Set[Int](2, 3)))
+    assert_false(Set[Int](1, 2, 3, 4) <= Set[Int](2, 3))
+
+    assert_false(Set[Int](1, 2, 3, 4, 5).issubset(Set[Int](2, 3)))
+    assert_false(Set[Int](1, 2, 3, 4, 5) <= Set[Int](2, 3))
+
+    assert_true(Set[Int]().issubset(Set[Int]()))
+    assert_true(Set[Int]() <= Set[Int]())
+
+    assert_false(Set[Int](1, 2, 3).issubset(Set[Int](4, 5, 6)))
+    assert_false(Set[Int](1, 2, 3) <= Set[Int](4, 5, 6))
 
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
