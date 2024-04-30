@@ -344,6 +344,73 @@ def test_symmetric_difference():
     assert_true(Set[Int]() == Set[Int](1, 2, 3).symmetric_difference(Set[Int](1, 2, 3)))
     assert_true(Set[Int]() == Set[Int](1, 2, 3) ^ Set[Int](1, 2, 3))
 
+def test_symmetric_difference_update():
+    # Test case 1
+    set1 = Set[Int](1, 2, 3)
+    set2 = Set[Int](2, 3, 4)
+    set1.symmetric_difference_update(set2)
+    assert_true(Set[Int](1, 4) == set1)
+
+    set1 = Set[Int](1, 2, 3)
+    set2 = Set[Int](2, 3, 4)
+    set1 ^= set2
+    assert_true(Set[Int](1, 4) == set1)
+
+    # Test case 2
+    set3 = Set[Int](1, 2, 3)
+    set4 = Set[Int](4, 5, 6)
+    set3.symmetric_difference_update(set4)
+    assert_true(Set[Int](1, 2, 3, 4, 5, 6) == set3)
+
+    set3 = Set[Int](1, 2, 3)
+    set4 = Set[Int](4, 5, 6)
+    set3 ^= set4
+    assert_true(Set[Int](1, 2, 3, 4, 5, 6) == set3)
+
+    # Test case 3
+    set5 = Set[Int](1, 2, 3)
+    set6 = Set[Int]()
+    set5.symmetric_difference_update(set6)
+    assert_true(Set[Int](1, 2, 3) == set5)
+
+    set5 = Set[Int](1, 2, 3)
+    set6 = Set[Int]()
+    set5 ^= set6
+    assert_true(Set[Int](1, 2, 3) == set5)
+
+    # Test case 4
+    set7 = Set[Int]()
+    set8 = Set[Int](1, 2, 3)
+    set7.symmetric_difference_update(set8)
+    assert_true(Set[Int](1, 2, 3) == set7)
+
+    set7 = Set[Int]()
+    set8 = Set[Int](1, 2, 3)
+    set7 ^= set8
+    assert_true(Set[Int](1, 2, 3) == set7)
+
+    # Test case 5
+    set9 = Set[Int]()
+    set10 = Set[Int]()
+    set9.symmetric_difference_update(set10)
+    assert_true(Set[Int]() == set9)
+
+    set9 = Set[Int]()
+    set10 = Set[Int]()
+    set9 ^= set10
+    assert_true(Set[Int]() == set9)
+
+    # Test case 6
+    set11 = Set[Int](1, 2, 3)
+    set12 = Set[Int](1, 2, 3)
+    set11.symmetric_difference_update(set12)
+    assert_true(Set[Int]() == set11)
+
+    set11 = Set[Int](1, 2, 3)
+    set12 = Set[Int](1, 2, 3)
+    set11 ^= set12
+    assert_true(Set[Int]() == set11)
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print("Test", name_val, "...", end="")
