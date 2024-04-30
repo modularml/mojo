@@ -495,3 +495,11 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
                 result.add(element[])
         
         return result ^
+
+    fn symmetric_difference_update(inout self, other: Self):
+        """Updates the set with the symmetric difference of itself and another set.
+        
+        Args:
+            other: The set to find the symmetric difference with.
+        """
+        self = self.symmetric_difference(other)
