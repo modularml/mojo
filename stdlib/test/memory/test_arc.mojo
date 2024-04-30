@@ -15,7 +15,8 @@
 from collections import List
 
 from memory._arc import Arc
-from testing import *
+from memory.unsafe_pointer import initialize_pointee_move
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_basic():
@@ -27,15 +28,15 @@ def test_basic():
 
 @value
 struct ObservableDel(CollectionElement):
-    var target: Pointer[Bool]
+    var target: UnsafePointer[Bool]
 
     fn __del__(owned self):
-        self.target.store(True)
+        initialize_pointee_move(self.target, True)
 
 
 def test_deleter_not_called_until_no_references():
     var deleted = False
-    var p = Arc(ObservableDel(Pointer.address_of(deleted)))
+    var p = Arc(ObservableDel(UnsafePointer.address_of(deleted)))
     var p2 = p
     _ = p^
     assert_false(deleted)

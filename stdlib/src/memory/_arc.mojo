@@ -23,8 +23,7 @@ print(3 == p.get())
 ```
 """
 
-from memory.anypointer import AnyPointer
-from memory.memory import stack_allocation
+from memory import UnsafePointer, stack_allocation
 
 
 struct _ArcInner[T: Movable]:
@@ -80,7 +79,7 @@ struct Arc[T: Movable](CollectionElement):
     """
 
     alias _type = _ArcInner[T]
-    var _inner: Pointer[Self._type]
+    var _inner: UnsafePointer[Self._type]
 
     fn __init__(inout self, owned value: T):
         """Construct a new thread-safe, reference-counted smart pointer,
@@ -89,11 +88,11 @@ struct Arc[T: Movable](CollectionElement):
         Args:
             value: The value to manage.
         """
-        self._inner = Pointer[Self._type].alloc(1)
+        self._inner = UnsafePointer[Self._type].alloc(1)
         __get_address_as_uninit_lvalue(self._inner.address) = Self._type(value^)
         _ = self._inner[].increment()
 
-    fn __init__(inout self, *, owned inner: Pointer[Self._type]):
+    fn __init__(inout self, *, owned inner: UnsafePointer[Self._type]):
         """Copy an existing reference. Increment the refcount to the object."""
         _ = inner[].increment()
         self._inner = inner
@@ -138,27 +137,20 @@ struct Arc[T: Movable](CollectionElement):
         self._inner[].data = new_value^
 
     fn __refitem__[
-        mutability: __mlir_type.`i1`,
+        mutability: __mlir_type.i1,
         lifetime: AnyLifetime[mutability].type,
-    ](self: Reference[Self, mutability, lifetime].mlir_ref_type) -> Reference[
+    ](self: Reference[Self, mutability, lifetime]._mlir_type) -> Reference[
         T, mutability, lifetime
     ]:
-        """Get a copy of the managed value.
-
-        When we have lifetimes this will not have to copy.
+        """Returns a Reference to the managed value.
 
         Returns:
-            A copy of the managed value.
+            A Reference to the managed value.
         """
-        alias RefType = Reference[T, mutability, lifetime]
-        return RefType(
-            __mlir_op.`lit.ref.from_pointer`[_type = RefType.mlir_ref_type](
-                Reference(self)[]._data_ptr().value
-            )
-        )
+        return Reference(self)[]._data_ptr()[]
 
-    fn _data_ptr(self) -> AnyPointer[T]:
-        return AnyPointer.address_of(self._inner[].data)
+    fn _data_ptr(self) -> UnsafePointer[T]:
+        return UnsafePointer.address_of(self._inner[].data)
 
     fn _bitcast[T2: Movable](self) -> Arc[T2]:
         constrained[
@@ -177,7 +169,7 @@ struct Arc[T: Movable](CollectionElement):
             ),
         ]()
 
-        var ptr: Pointer[_ArcInner[T]] = self._inner
+        var ptr: UnsafePointer[_ArcInner[T]] = self._inner
 
         # Add a +1 to the ref count, since we're creating a new `Arc` instance
         # pointing at the same data.

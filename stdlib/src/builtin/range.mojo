@@ -16,7 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
-from python.object import PythonObject
+from python import PythonObject
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -48,19 +48,33 @@ fn _abs(x: Int) -> Int:
     return x if x > 0 else -x
 
 
+@always_inline
+fn _sign(x: Int) -> Int:
+    if x > 0:
+        return 1
+    if x < 0:
+        return -1
+    return 0
+
+
+@always_inline
+fn _max(a: Int, b: Int) -> Int:
+    return a if a > b else b
+
+
 # ===----------------------------------------------------------------------=== #
 # Range
 # ===----------------------------------------------------------------------=== #
 
 
 @register_passable("trivial")
-struct _ZeroStartingRange(Sized):
+struct _ZeroStartingRange(Sized, ReversibleRange):
     var curr: Int
     var end: Int
 
     @always_inline("nodebug")
     fn __init__(inout self, end: Int):
-        self.curr = end
+        self.curr = _max(0, end)
         self.end = end
 
     @always_inline("nodebug")
@@ -81,10 +95,14 @@ struct _ZeroStartingRange(Sized):
     fn __getitem__(self, idx: Int) -> Int:
         return idx
 
+    @always_inline("nodebug")
+    fn __reversed__(self) -> _StridedRangeIterator:
+        return _StridedRangeIterator(self.end - 1, -1, -1)
+
 
 @value
 @register_passable("trivial")
-struct _SequentialRange(Sized):
+struct _SequentialRange(Sized, ReversibleRange):
     var start: Int
     var end: Int
 
@@ -100,11 +118,17 @@ struct _SequentialRange(Sized):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
+        # FIXME(#38392):
+        # return _max(0, self.end - self.start)
         return self.end - self.start if self.start < self.end else 0
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
         return self.start + idx
+
+    @always_inline("nodebug")
+    fn __reversed__(self) -> _StridedRangeIterator:
+        return _StridedRangeIterator(self.end - 1, self.start - 1, -1)
 
 
 @value
@@ -113,6 +137,10 @@ struct _StridedRangeIterator(Sized):
     var start: Int
     var end: Int
     var step: Int
+
+    @always_inline("nodebug")
+    fn __iter__(self) -> Self:
+        return self
 
     @always_inline
     fn __len__(self) -> Int:
@@ -132,7 +160,7 @@ struct _StridedRangeIterator(Sized):
 
 @value
 @register_passable("trivial")
-struct _StridedRange(Sized):
+struct _StridedRange(Sized, ReversibleRange):
     var start: Int
     var end: Int
     var step: Int
@@ -161,11 +189,22 @@ struct _StridedRange(Sized):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
+        # FIXME(#38392)
+        # if (self.step > 0) == (self.start > self.end):
+        #     return 0
         return _div_ceil_positive(_abs(self.start - self.end), _abs(self.step))
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
         return self.start + idx * self.step
+
+    @always_inline("nodebug")
+    fn __reversed__(self) -> _StridedRangeIterator:
+        var shifted_end = self.end - _sign(self.step)
+        var start = shifted_end - ((shifted_end - self.start) % self.step)
+        var end = self.start - self.step
+        var step = -self.step
+        return _StridedRangeIterator(start, end, step)
 
 
 @always_inline("nodebug")
@@ -215,9 +254,7 @@ fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _SequentialRange:
     Returns:
         The constructed range.
     """
-    var s = int(start)
-    var e = int(end)
-    return _SequentialRange(s, e)
+    return _SequentialRange(int(start), int(end))
 
 
 @always_inline("nodebug")
@@ -237,9 +274,7 @@ fn range[
     Returns:
         The constructed range.
     """
-    var s = int(start)
-    var e = int(end)
-    return _SequentialRange(s, e)
+    return _SequentialRange(int(start), int(end))
 
 
 @always_inline

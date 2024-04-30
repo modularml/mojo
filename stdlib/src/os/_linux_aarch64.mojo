@@ -13,7 +13,7 @@
 
 from time.time import _CTimeSpec
 
-from utils.index import StaticIntTuple
+from utils import StaticIntTuple
 
 from .fstat import stat_result
 
@@ -49,26 +49,24 @@ struct _c_stat(Stringable):
     var st_birthtimespec: _CTimeSpec  # time of file creation(birth)
     var unused: StaticTuple[Int64, 2]  # RESERVED: DO NOT USE!
 
-    fn __init__() -> Self:
-        return Self {
-            st_dev: 0,
-            st_mode: 0,
-            st_nlink: 0,
-            st_ino: 0,
-            st_uid: 0,
-            st_gid: 0,
-            __pad0: 0,
-            st_rdev: 0,
-            st_size: 0,
-            st_blksize: 0,
-            __pad1: 0,
-            st_blocks: 0,
-            st_atimespec: _CTimeSpec(),
-            st_mtimespec: _CTimeSpec(),
-            st_ctimespec: _CTimeSpec(),
-            st_birthtimespec: _CTimeSpec(),
-            unused: StaticTuple[Int64, 2](0, 0),
-        }
+    fn __init__(inout self):
+        self.st_dev = 0
+        self.st_mode = 0
+        self.st_nlink = 0
+        self.st_ino = 0
+        self.st_uid = 0
+        self.st_gid = 0
+        self.__pad0 = 0
+        self.st_rdev = 0
+        self.st_size = 0
+        self.st_blksize = 0
+        self.__pad1 = 0
+        self.st_blocks = 0
+        self.st_atimespec = _CTimeSpec()
+        self.st_mtimespec = _CTimeSpec()
+        self.st_ctimespec = _CTimeSpec()
+        self.st_birthtimespec = _CTimeSpec()
+        self.unused = StaticTuple[Int64, 2](0, 0)
 
     fn __str__(self) -> String:
         var res = String("{\n")
@@ -112,7 +110,7 @@ struct _c_stat(Stringable):
 fn _stat(path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__xstat", Int32](
-        Int32(0), path._as_ptr(), Pointer.address_of(stat)
+        Int32(0), path._as_ptr(), UnsafePointer.address_of(stat)
     )
     if err == -1:
         raise "unable to stat '" + path + "'"
@@ -123,7 +121,7 @@ fn _stat(path: String) raises -> _c_stat:
 fn _lstat(path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__lxstat", Int32](
-        Int32(0), path._as_ptr(), Pointer.address_of(stat)
+        Int32(0), path._as_ptr(), UnsafePointer.address_of(stat)
     )
     if err == -1:
         raise "unable to lstat '" + path + "'"

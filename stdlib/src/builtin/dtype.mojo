@@ -15,10 +15,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections.dict import KeyElement
-from sys.info import sizeof as _sizeof
+from collections import KeyElement
+from sys import sizeof as _sizeof
 
-from utils.loop import unroll
+from utils import unroll
 
 alias _mIsSigned = UInt8(1)
 alias _mIsInteger = UInt8(1 << 7)
@@ -142,7 +142,7 @@ struct DType(Stringable, KeyElement):
     @staticmethod
     fn _from_ui8(ui8: __mlir_type.`!pop.scalar<ui8>`) -> DType:
         return DType._from_ui8(
-            __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.`ui8`](ui8)
+            __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.ui8](ui8)
         )
 
     @always_inline("nodebug")
@@ -334,6 +334,24 @@ struct DType(Stringable, KeyElement):
         return self.isa[DType.index]()
 
     @always_inline("nodebug")
+    fn is_index32(self) -> Bool:
+        """Checks if this DType is Index and 32 bit.
+
+        Returns:
+            True if this DType is Index and 32 bit, False otherwise.
+        """
+        return self.is_index() and (self.sizeof() == DType.int32.sizeof())
+
+    @always_inline("nodebug")
+    fn is_index64(self) -> Bool:
+        """Checks if this DType is Index and 64 bit.
+
+        Returns:
+            True if this DType is Index and 64 bit, False otherwise.
+        """
+        return self.is_index() and (self.sizeof() == DType.int64.sizeof())
+
+    @always_inline("nodebug")
     fn is_address(self) -> Bool:
         """Checks if this DType is Address.
 
@@ -408,6 +426,17 @@ struct DType(Stringable, KeyElement):
                 UInt8(0).value,
             )
         )
+
+    @always_inline("nodebug")
+    fn is_half_float(self) -> Bool:
+        """Returns True if the type is a half-precision floating point type,
+        e.g. either fp16 or bf16.
+
+        Returns:
+            True if the type is a half-precision float, false otherwise..
+        """
+
+        return self.is_float16() or self.is_bfloat16()
 
     @always_inline("nodebug")
     fn is_numeric(self) -> Bool:

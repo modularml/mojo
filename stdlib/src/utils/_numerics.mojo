@@ -19,12 +19,11 @@ from utils._numerics import FPUtils
 ```
 """
 
-from sys import llvm_intrinsic
+from sys import llvm_intrinsic, bitwidthof, has_neon, has_sse4
 from sys._assembly import inlined_assembly
-from sys.info import bitwidthof, has_neon, has_sse4
 
 from builtin.dtype import _integral_type_of
-from memory.unsafe import Pointer, bitcast
+from memory import UnsafePointer, bitcast
 
 # ===----------------------------------------------------------------------===#
 # _digits
@@ -501,7 +500,7 @@ struct FlushDenormals:
                 mxcsr |= 0x8000  # flush to zero
                 mxcsr |= 0x40  # denormals are zero
             llvm_intrinsic["llvm.x86.sse.ldmxcsr", NoneType](
-                Pointer[Int32].address_of(mxcsr)
+                UnsafePointer[Int32].address_of(mxcsr)
             )
             return
 
@@ -539,7 +538,7 @@ struct FlushDenormals:
         if has_sse4():
             var mxcsr = Int32()
             llvm_intrinsic["llvm.x86.sse.stmxcsr", NoneType](
-                Pointer[Int32].address_of(mxcsr)
+                UnsafePointer[Int32].address_of(mxcsr)
             )
             return mxcsr
 
@@ -643,9 +642,9 @@ fn isnan[
 
     alias signaling_nan_test: UInt32 = 0x0001
     alias quiet_nan_test: UInt32 = 0x0002
-    return llvm_intrinsic["llvm.is.fpclass", SIMD[DType.bool, simd_width]](
-        val.value, (signaling_nan_test | quiet_nan_test).value
-    )
+    return llvm_intrinsic[
+        "llvm.is.fpclass", SIMD[DType.bool, simd_width], has_side_effect=False
+    ](val.value, (signaling_nan_test | quiet_nan_test).value)
 
 
 # ===----------------------------------------------------------------------===#
@@ -714,3 +713,27 @@ fn isfinite[
     return llvm_intrinsic["llvm.is.fpclass", SIMD[DType.bool, simd_width]](
         val.value, UInt32(0x1F8).value
     )
+
+
+# ===----------------------------------------------------------------------===#
+# get_accum_type
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn get_accum_type[type: DType]() -> DType:
+    """Returns the recommended type for accumulation operations.
+
+    Half precision types can introduce numerical error if they are used
+    in reduction/accumulation operations. This method returns a higher precision
+    type to use for accumulation if a half precision types is provided,
+    otherwise it returns the original type.
+
+    Parameters:
+        type: The type of some accumulation operation.
+
+    Returns:
+        DType.float32 if type is a half-precision float, type otherwise.
+    """
+
+    return DType.float32 if type.is_half_float() else type

@@ -10,12 +10,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
-from os import *
+from os import stat
 from stat import S_ISREG
+from builtin._location import __source_location
 
-from testing import *
+from testing import assert_not_equal, assert_true
 
 
 def main():

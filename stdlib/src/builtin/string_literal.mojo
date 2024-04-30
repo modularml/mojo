@@ -15,10 +15,11 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from memory.unsafe import DTypePointer
+from memory import DTypePointer
 
 from utils import StringRef
 from utils._visualizers import lldb_formatter_wrapping_type
+from utils._format import Formattable, Formatter
 
 from .string import _atol
 
@@ -35,6 +36,7 @@ struct StringLiteral(
     Stringable,
     KeyElement,
     Boolable,
+    Formattable,
 ):
     """This type represents a string literal.
 
@@ -144,6 +146,19 @@ struct StringLiteral(
             A new string.
         """
         return self
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this string literal to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # SAFETY:
+        #   Safe because `self` is borrowed, so the lifetime of this
+        #   StringRef extends beyond this function.
+        writer.write_str(StringRef(self))
 
     fn __contains__(self, substr: StringLiteral) -> Bool:
         """Returns True if the substring is contained within the current string.

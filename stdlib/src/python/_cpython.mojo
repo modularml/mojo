@@ -15,10 +15,9 @@ from os import getenv
 from sys import external_call
 from sys.ffi import DLHandle
 
-from memory.unsafe import DTypePointer, Pointer
+from memory import DTypePointer, UnsafePointer
 
-from utils import StringRef
-from utils.index import StaticIntTuple
+from utils import StringRef, StaticIntTuple
 
 # https://github.com/python/cpython/blob/d45225bd66a8123e4a30314c627f2586293ba532/Include/compile.h#L7
 alias Py_single_input = 256
@@ -157,7 +156,7 @@ struct CPython:
     var dict_type: PyObjectPtr
     var logging_enabled: Bool
     var version: PythonVersion
-    var total_ref_count: Pointer[Int]
+    var total_ref_count: UnsafePointer[Int]
 
     fn __init__(inout self: CPython):
         var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
@@ -173,7 +172,7 @@ struct CPython:
         var null_pointer = DTypePointer[DType.int8].get_null()
 
         self.lib = DLHandle(python_lib)
-        self.total_ref_count = Pointer[Int].alloc(1)
+        self.total_ref_count = UnsafePointer[Int].alloc(1)
         self.none_value = PyObjectPtr(null_pointer)
         self.dict_type = PyObjectPtr(null_pointer)
         self.logging_enabled = logging_enabled
@@ -188,7 +187,12 @@ struct CPython:
         existing.Py_DecRef(existing.none_value)
         if existing.logging_enabled:
             print("CPython destroy")
-            print("Number of remaining refs:", existing.total_ref_count.load())
+            var remaining_refs = move_from_pointee(existing.total_ref_count)
+            print("Number of remaining refs:", remaining_refs)
+            # Technically not necessary since we're working with register
+            # passable types, by it's good practice to re-initialize the
+            # pointer after a consuming move.
+            initialize_pointee_move(existing.total_ref_count, remaining_refs)
         _py_finalize(existing.lib)
         existing.lib.close()
         existing.total_ref_count.free()
@@ -218,12 +222,12 @@ struct CPython:
         self.total_ref_count = existing.total_ref_count
 
     fn _inc_total_rc(inout self):
-        var v = self.total_ref_count.load()
-        self.total_ref_count[0] = v + 1
+        var v = move_from_pointee(self.total_ref_count)
+        initialize_pointee_move(self.total_ref_count, v + 1)
 
     fn _dec_total_rc(inout self):
-        var v = self.total_ref_count.load()
-        self.total_ref_count[0] = v - 1
+        var v = move_from_pointee(self.total_ref_count)
+        initialize_pointee_move(self.total_ref_count, v - 1)
 
     fn Py_IncRef(inout self, ptr: PyObjectPtr):
         if self.logging_enabled:
@@ -453,6 +457,11 @@ struct CPython:
             )
         )
 
+    fn PyObject_Hash(inout self, obj: PyObjectPtr) -> Int:
+        return int(
+            self.lib.get_function[fn (PyObjectPtr) -> Int]("PyObject_Hash")(obj)
+        )
+
     fn PyTuple_New(inout self, count: Int) -> PyObjectPtr:
         var r = self.lib.get_function[fn (Int) -> PyObjectPtr](
             StringRef("PyTuple_New")
@@ -631,8 +640,8 @@ struct CPython:
 
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
         var result = self.lib.get_function[
-            fn (PyObjectPtr, Pointer[Int]) -> DTypePointer[DType.int8]
-        ]("PyUnicode_AsUTF8AndSize")(py_object, Pointer[Int]())
+            fn (PyObjectPtr, UnsafePointer[Int]) -> DTypePointer[DType.int8]
+        ]("PyUnicode_AsUTF8AndSize")(py_object, UnsafePointer[Int]())
         return StringRef(result)
 
     fn PyErr_Clear(inout self):
@@ -649,16 +658,18 @@ struct CPython:
         var value = DTypePointer[DType.int8]()
         var traceback = DTypePointer[DType.int8]()
 
-        var type_ptr = Pointer[DTypePointer[DType.int8]].address_of(type)
-        var value_ptr = Pointer[DTypePointer[DType.int8]].address_of(value)
-        var traceback_ptr = Pointer[DTypePointer[DType.int8]].address_of(
+        var type_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(type)
+        var value_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
+            value
+        )
+        var traceback_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
             traceback
         )
         var func = self.lib.get_function[
             fn (
-                Pointer[DTypePointer[DType.int8]],
-                Pointer[DTypePointer[DType.int8]],
-                Pointer[DTypePointer[DType.int8]],
+                UnsafePointer[DTypePointer[DType.int8]],
+                UnsafePointer[DTypePointer[DType.int8]],
+                UnsafePointer[DTypePointer[DType.int8]],
             ) -> None
         ]("PyErr_Fetch")(type_ptr, value_ptr, traceback_ptr)
         var r = PyObjectPtr {value: value}
@@ -766,15 +777,17 @@ struct CPython:
         var key = DTypePointer[DType.int8].get_null()
         var value = DTypePointer[DType.int8].get_null()
         var v = p
-        var position = Pointer[Int].address_of(v)
-        var value_ptr = Pointer[DTypePointer[DType.int8]].address_of(value)
-        var key_ptr = Pointer[DTypePointer[DType.int8]].address_of(key)
+        var position = UnsafePointer[Int].address_of(v)
+        var value_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
+            value
+        )
+        var key_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(key)
         var result = self.lib.get_function[
             fn (
                 PyObjectPtr,
-                Pointer[Int],
-                Pointer[DTypePointer[DType.int8]],
-                Pointer[DTypePointer[DType.int8]],
+                UnsafePointer[Int],
+                UnsafePointer[DTypePointer[DType.int8]],
+                UnsafePointer[DTypePointer[DType.int8]],
             ) -> Int
         ]("PyDict_Next")(
             dictionary,
@@ -801,6 +814,6 @@ struct CPython:
         return PyKeyValuePair {
             key: key,
             value: value,
-            position: position.load(),
+            position: move_from_pointee(position),
             success: result == 1,
         }

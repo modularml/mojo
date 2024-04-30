@@ -16,7 +16,7 @@
 @value
 @nonmaterializable(Int)
 @register_passable("trivial")
-struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
+struct IntLiteral(Absable, Intable, Stringable, Boolable, EqualityComparable):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and
     must be lowered to other integer types (like Int), but allow for
@@ -24,12 +24,11 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
     precision integer types.
     """
 
-    var value: __mlir_type.`!kgen.int_literal`
+    alias _mlir_type = __mlir_type.`!kgen.int_literal`
+
+    var value: Self._mlir_type
     """The underlying storage for the integer value."""
 
-    alias _zero = IntLiteral(
-        __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
-    )
     alias _one = IntLiteral(
         __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
     )
@@ -41,7 +40,9 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             The constructed Self object.
         """
-        return Self._zero
+        return IntLiteral(
+            __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
+        )
 
     @always_inline("nodebug")
     fn __init__(value: __mlir_type.`!kgen.int_literal`) -> Self:
@@ -198,7 +199,7 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             False Bool value if the value is equal to 0 and True otherwise.
         """
-        return self != Self._zero
+        return self != Self()
 
     @always_inline("nodebug")
     fn __index__(self) -> Int:
@@ -226,7 +227,18 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             The -self value.
         """
-        return Self._zero - self
+        return Self() - self
+
+    @always_inline("nodebug")
+    fn __abs__(self) -> Self:
+        """Return the absolute value of the IntLiteral value.
+
+        Returns:
+            The absolute value.
+        """
+        if self >= 0:
+            return self
+        return -self
 
     @always_inline("nodebug")
     fn __invert__(self) -> Self:
@@ -235,7 +247,7 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             The ~self value.
         """
-        return self ^ (Self._zero - Self._one)
+        return self ^ (Self() - Self._one)
 
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
@@ -295,9 +307,9 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             `self // rhs` value.
         """
-        if rhs == Self._zero:
+        if rhs == Self():
             # this should raise an exception.
-            return Self._zero
+            return Self()
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind floordiv>`
@@ -314,9 +326,9 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             The remainder of dividing self by rhs.
         """
-        if rhs == Self._zero:
+        if rhs == Self():
             # this should raise an exception.
-            return Self._zero
+            return Self()
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mod>`
@@ -333,9 +345,9 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             `self << rhs`.
         """
-        if rhs < Self._zero:
+        if rhs < Self():
             # this should raise an exception.
-            return Self._zero
+            return Self()
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind lshift>`
@@ -352,9 +364,9 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             `self >> rhs`.
         """
-        if rhs < Self._zero:
+        if rhs < Self():
             # this should raise an exception.
-            return Self._zero
+            return Self()
         return Self(
             __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind rshift>`

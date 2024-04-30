@@ -11,13 +11,14 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo -D TEST_DIR=%S %s | FileCheck %s
+# RUN: %mojo -D TEST_DIR=%S %s
 
-from sys.param_env import env_get_string
+from sys import env_get_string
 
 from python._cpython import CPython, PyObjectPtr
-from python.object import PythonObject
-from python.python import Python, _get_global_python_itf
+from python.python import Python, _get_global_python_itf, PythonObject
+
+from testing import assert_equal
 
 alias TEST_DIR = env_get_string["TEST_DIR"]()
 
@@ -63,23 +64,23 @@ fn test_call(inout python: Python) -> String:
 
 def main():
     var python = Python()
-    # CHECK: orange
-    print(test_local_import(python))
+    assert_equal(test_local_import(python), "orange")
 
-    # CHECK: carrot ('bread', 'rice') fruit=pear {'protein': 'fish', 'cake': 'yes'}
-    print(test_call(python))
+    assert_equal(
+        test_call(python),
+        (
+            "carrot ('bread', 'rice') fruit=pear {'protein': 'fish', 'cake':"
+            " 'yes'}"
+        ),
+    )
 
-    # CHECK: [1, 2.4, True, 'False']
     var obj: PythonObject = [1, 2.4, True, "False"]
-    print(obj)
+    assert_equal(str(obj), "[1, 2.4, True, 'False']")
 
-    # CHECK: (1, 2.4, True, 'False')
     obj = (1, 2.4, True, "False")
-    print(obj)
+    assert_equal(str(obj), "(1, 2.4, True, 'False')")
 
-    # CHECK: None
     obj = None
-    print(obj)
+    assert_equal(str(obj), "None")
 
-    # CHECK: ab
-    print(test_execute_python_string(python))
+    assert_equal(test_execute_python_string(python), "ab")

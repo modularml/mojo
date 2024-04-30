@@ -10,15 +10,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
-from testing import *
-from builtin.divmod import divmod
+from sys.info import bitwidthof
+
+from testing import assert_equal
 
 
 def test_constructors():
     var i1 = Int(3)  # Constructible from IntLiteral
-    var i2 = Int(Int(5))  # Constructible from Int
+
+
+def test_properties():
+    assert_equal(Int.MAX, (1 << bitwidthof[DType.index]() - 1) - 1)
+    assert_equal(Int.MIN, -(1 << bitwidthof[DType.index]() - 1))
 
 
 def test_add():
@@ -95,8 +100,15 @@ def test_divmod():
         raise Error("divmod(5, 0) should raise an exception, but it did not.")
 
 
+def test_abs():
+    assert_equal(abs(Int(-5)), 5)
+    assert_equal(abs(Int(2)), 2)
+    assert_equal(abs(Int(0)), 0)
+
+
 def main():
     test_constructors()
+    test_properties()
     test_add()
     test_sub()
     test_div()
@@ -104,3 +116,4 @@ def main():
     test_floordiv()
     test_mod()
     test_divmod()
+    test_abs()

@@ -11,343 +11,268 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo %s | FileCheck %s
+# RUN: %mojo %s
 
-from memory.unsafe import Pointer
 from python._cpython import CPython, PyObjectPtr
-from python.object import PythonObject
-from python.python import Python
-from testing import assert_false, assert_raises, assert_true
+from python import PythonObject, Python
+from testing import assert_false, assert_raises, assert_true, assert_equal
 
 from utils import StringRef
 
 
-# CHECK-LABEL: test_dunder_methods
-fn test_dunder_methods(inout python: Python):
-    print("=== test_dunder_methods ===")
-    try:
-        var a = PythonObject(34)
-        var b = PythonObject(10)
+def test_dunder_methods(inout python: Python):
+    var a = PythonObject(34)
+    var b = PythonObject(10)
 
-        # __add__
-        # CHECK-NEXT: 44
-        var c = a + b
-        print(c)
+    # __add__
+    var c = a + b
+    assert_true(c, 44)
 
-        # __add__
-        # CHECK-NEXT: 134
-        c = a + 100
-        print(c)
+    # __add__
+    c = a + 100
+    assert_true(c, 134)
 
-        # __iadd__
-        # CHECK-NEXT: 234
-        c += 100
-        print(c)
+    # __iadd__
+    c += 100
+    assert_equal(c, 234)
 
-        # __radd__
-        # CHECK-NEXT: 134
-        c = 100 + a
-        print(c)
+    # __radd__
+    c = 100 + a
+    assert_equal(c, 134)
 
-        # __sub__
-        # CHECK-NEXT: 24
-        c = a - b
-        print(c)
+    # __sub__
+    c = a - b
+    assert_equal(c, 24)
 
-        # __isub__
-        # CHECK-NEXT: -76
-        c -= 100
-        print(c)
+    # __isub__
+    c -= 100
+    assert_equal(c, -76)
 
-        # __sub__
-        # CHECK-NEXT: -66
-        c = a - 100
-        print(c)
+    # __sub__
+    c = a - 100
+    assert_equal(c, -66)
 
-        # __rsub__
-        # CHECK-NEXT: 66
-        c = 100 - a
-        print(c)
+    # __rsub__
+    c = 100 - a
+    assert_equal(c, 66)
 
-        # __mul__
-        # CHECK-NEXT: 340
-        c = a * b
-        print(c)
+    # __mul__
+    c = a * b
+    assert_equal(c, 340)
 
-        # __imul__
-        # CHECK-NEXT: 3400
-        c *= 10
-        print(c)
+    # __imul__
+    c *= 10
+    assert_equal(c, 3400)
 
-        # __mul__
-        # CHECK-NEXT: 340
-        c = a * 10
-        print(c)
+    # __mul__
+    c = a * 10
+    assert_equal(c, 340)
 
-        # __rmul__
-        # CHECK-NEXT: 340
-        c = 34 * b
-        print(c)
+    # __rmul__
+    c = 34 * b
+    assert_equal(c, 340)
 
-        # __floordiv__
-        # CHECK-NEXT: 3
-        c = a // b
-        print(c)
+    # __floordiv__
+    c = a // b
+    assert_equal(c, 3)
 
-        # __ifloordiv__
-        # CHECK-NEXT: 1
-        c //= 2
-        print(c)
+    # __ifloordiv__
+    c //= 2
+    assert_equal(c, 1)
 
-        # __floordiv__
-        # CHECK-NEXT: 3
-        c = a // 10
-        print(c)
+    # __floordiv__
+    c = a // 10
+    assert_equal(c, 3)
 
-        # __rfloordiv__
-        # CHECK-NEXT: 3
-        c = 34 // b
-        print(c)
+    # __rfloordiv__
+    c = 34 // b
+    assert_equal(c, 3)
 
-        # __truediv__
-        # CHECK-NEXT: 3.4
-        c = a / b
-        print(c)
+    # __truediv__
+    c = a / b
+    assert_equal(c, 3.4)
 
-        # __itruediv__
-        # CHECK-NEXT: 1.7
-        c /= 2
-        print(c)
+    # __itruediv__
+    c /= 2
+    assert_equal(c, 1.7)
 
-        # __truediv__
-        # CHECK-NEXT: 3.4
-        c = a / 10
-        print(c)
+    # __truediv__
+    c = a / 10
+    assert_equal(c, 3.4)
 
-        # __rtruediv__
-        # CHECK-NEXT: 3.4
-        c = 34 / b
-        print(c)
+    # __rtruediv__
+    c = 34 / b
+    assert_equal(c, 3.4)
 
-        # __mod__
-        # CHECK-NEXT: 4
-        c = a % b
-        print(c)
+    # __mod__
+    c = a % b
+    assert_equal(c, 4)
 
-        # __imod__
-        # CHECK-NEXT: 1
-        c %= 3
-        print(c)
+    # __imod__
+    c %= 3
+    assert_equal(c, 1)
 
-        # __mod__
-        # CHECK-NEXT: 4
-        c = a % 10
-        print(c)
+    # __mod__
+    c = a % 10
+    assert_equal(c, 4)
 
-        # __rmod__
-        # CHECK-NEXT: 4
-        c = 34 % b
-        print(c)
+    # __rmod__
+    c = 34 % b
+    assert_equal(c, 4)
 
-        # __xor__
-        # CHECK-NEXT: 40
-        c = a ^ b
-        print(c)
+    # __xor__
+    c = a ^ b
+    assert_equal(c, 40)
 
-        # __ixor__
-        # CHECK-NEXT: 39
-        c ^= 15
-        print(c)
+    # __ixor__
+    c ^= 15
+    assert_equal(c, 39)
 
-        # __xor__
-        # CHECK-NEXT: 40
-        c = a ^ 10
-        print(c)
+    # __xor__
+    c = a ^ 10
+    assert_equal(c, 40)
 
-        # __rxor__
-        # CHECK-NEXT: 40
-        c = 34 ^ b
-        print(c)
+    # __rxor__
+    c = 34 ^ b
+    assert_equal(c, 40)
 
-        # __or__
-        # CHECK-NEXT: 42
-        c = a | b
-        print(c)
+    # __or__
+    c = a | b
+    assert_equal(c, 42)
 
-        # __ior__
-        # CHECK-NEXT: 43
-        c |= 9
-        print(c)
+    # __ior__
+    c |= 9
+    assert_equal(c, 43)
 
-        # __or__
-        # CHECK-NEXT: 42
-        c = a | 10
-        print(c)
+    # __or__
+    c = a | 10
+    assert_equal(c, 42)
 
-        # __ror__
-        # CHECK-NEXT: 42
-        c = 34 | b
-        print(c)
+    # __ror__
+    c = 34 | b
+    assert_equal(c, 42)
 
-        # __and__
-        # CHECK-NEXT: 2
-        c = a & b
-        print(c)
+    # __and__
+    c = a & b
+    assert_equal(c, 2)
 
-        # __iand__
-        # CHECK-NEXT: 2
-        c &= 6
-        print(c)
+    # __iand__
+    c &= 6
+    assert_equal(c, 2)
 
-        # __and__
-        # CHECK-NEXT: 2
-        c = a & 10
-        print(c)
+    # __and__
+    c = a & 10
+    assert_equal(c, 2)
 
-        # __rand__
-        # CHECK-NEXT: 2
-        c = 34 & b
-        print(c)
+    # __rand__
+    c = 34 & b
+    assert_equal(c, 2)
 
-        # __rshift__
-        var d = PythonObject(2)
-        # CHECK-NEXT: 8
-        c = a >> d
-        print(c)
+    # __rshift__
+    var d = PythonObject(2)
+    c = a >> d
+    assert_equal(c, 8)
 
-        # __irshift__
-        # CHECK-NEXT: 2
-        c >>= 2
-        print(c)
+    # __irshift__
+    c >>= 2
+    assert_equal(c, 2)
 
-        # __rshift__
-        # CHECK-NEXT: 8
-        c = a >> 2
-        print(c)
+    # __rshift__
+    c = a >> 2
+    assert_equal(c, 8)
 
-        # __rrshift__
-        # CHECK-NEXT: 8
-        c = 34 >> d
-        print(c)
+    # __rrshift__
+    c = 34 >> d
+    assert_equal(c, 8)
 
-        # __lshift__
-        # CHECK-NEXT: 136
-        c = a << d
-        print(c)
+    # __lshift__
+    c = a << d
+    assert_equal(c, 136)
 
-        # __ilshift__
-        # CHECK-NEXT: 272
-        c <<= 1
-        print(c)
+    # __ilshift__
+    c <<= 1
+    assert_equal(c, 272)
 
-        # __lshift__
-        # CHECK-NEXT: 136
-        c = a << 2
-        print(c)
+    # __lshift__
+    c = a << 2
+    assert_equal(c, 136)
 
-        # __rlshift__
-        # CHECK-NEXT: 136
-        c = 34 << d
-        print(c)
+    # __rlshift__
+    c = 34 << d
+    assert_equal(c, 136)
 
-        # __pow__
-        # CHECK-NEXT: 1156
-        c = a**d
-        print(c)
+    # __pow__
+    c = a**d
+    assert_equal(c, 1156)
 
-        # __ipow__
-        # CHECK-NEXT: 81
-        c = 3
-        c **= 4
-        print(c)
+    # __ipow__
+    c = 3
+    c **= 4
+    assert_equal(c, 81)
 
-        # __pow__
-        # CHECK-NEXT: 1156
-        c = a**2
-        print(c)
+    # __pow__
+    c = a**2
+    assert_equal(c, 1156)
 
-        # __rpow__
-        # CHECK-NEXT: 1156
-        c = 34**d
-        print(c)
+    # __rpow__
+    c = 34**d
+    assert_equal(c, 1156)
 
-        # __lt__
-        # CHECK-NEXT: False
-        c = a < b
-        print(c)
+    # __lt__
+    c = a < b
+    assert_false(c)
 
-        # __le__
-        # CHECK-NEXT: False
-        c = a <= b
-        print(c)
+    # __le__
+    c = a <= b
+    assert_false(c)
 
-        # __gt__
-        # CHECK-NEXT: True
-        c = a > b
-        print(c)
+    # __gt__
+    c = a > b
+    assert_true(c)
 
-        # __ge__
-        # CHECK-NEXT: True
-        c = a >= b
-        print(c)
+    # __ge__
+    c = a >= b
+    assert_true(c)
 
-        # __eq__
-        # CHECK-NEXT: False
-        c = a == b
-        print(c)
+    # __eq__
+    c = a == b
+    assert_false(c)
 
-        # __ne__
-        # CHECK-NEXT: True
-        c = a != b
-        print(c)
+    # __ne__
+    c = a != b
+    assert_true(c)
 
-        # __pos__
-        # CHECK-NEXT: 34
-        c = +a
-        print(c)
+    # __pos__
+    c = +a
+    assert_equal(c, 34)
 
-        # __neg__
-        # CHECK-NEXT: -34
-        c = -a
-        print(c)
+    # __neg__
+    c = -a
+    assert_equal(c, -34)
 
-        # __invert__
-        # CHECK-NEXT: -35
-        c = ~a
-        print(c)
-    except e:
-        pass
+    # __invert__
+    c = ~a
+    assert_equal(c, -35)
 
 
-# CHECK-LABEL: test_bool_conversion
 def test_bool_conversion() -> None:
-    print("=== test_bool_conversion ===")
     var x: PythonObject = 1
-    # CHECK: test_bool: True
-    print("test_bool:", x == 0 or x == 1)
+    assert_true(x == 0 or x == 1)
 
 
-# CHECK-LABEL: test_string_conversions
-fn test_string_conversions() -> None:
-    print("=== test_string_conversions ===")
-
-    # CHECK-LABEL: test_string_literal
+fn test_string_conversions() raises -> None:
     fn test_string_literal() -> None:
-        print("=== test_string_literal ===")
         try:
             var mojo_str: StringLiteral = "mojo"
             var py_str = PythonObject(mojo_str)
             var py_capitalized = py_str.capitalize()
             var py = Python()
             var mojo_capitalized = py.__str__(py_capitalized)
-            # CHECK: Mojo
-            print(mojo_capitalized)
+            assert_equal(mojo_capitalized, "Mojo")
         except e:
             print("Error occurred")
 
-    # CHECK-LABEL: test_string_ref
     fn test_string_ref() -> None:
-        print("=== test_string_ref ===")
         try:
             var mojo_str: StringLiteral = "mojo"
             var mojo_strref = StringRef(mojo_str)
@@ -355,14 +280,11 @@ fn test_string_conversions() -> None:
             var py_capitalized = py_str.capitalize()
             var py = Python()
             var mojo_capitalized = py.__str__(py_capitalized)
-            # CHECK: Mojo
-            print(mojo_capitalized)
+            assert_equal(mojo_capitalized, "Mojo")
         except e:
             print("Error occurred")
 
-    # CHECK-LABEL: test_string
     fn test_string() -> None:
-        print("=== test_string ===")
         try:
             var mo_str = String("mo")
             var jo_str = String("jo")
@@ -371,19 +293,15 @@ fn test_string_conversions() -> None:
             var py_capitalized = py_str.capitalize()
             var py = Python()
             var mojo_capitalized = py.__str__(py_capitalized)
-            # CHECK: Mojo
-            print(mojo_capitalized)
+            assert_equal(mojo_capitalized, "Mojo")
         except e:
             print("Error occurred")
 
-    # CHECK-LABEL: test_type_object
-    fn test_type_object() -> None:
-        print("=== test_type_object ===")
+    fn test_type_object() raises -> None:
         var py = Python()
         var py_float = PythonObject(3.14)
         var type_obj = py.type(py_float)
-        # CHECK: <class 'float'>
-        print(type_obj)
+        assert_equal(str(type_obj), "<class 'float'>")
 
     test_string_literal()
     test_string_ref()
@@ -391,25 +309,18 @@ fn test_string_conversions() -> None:
     test_type_object()
 
 
-# CHECK-LABEL: test_len
 def test_len():
-    print("=== test_len ===")
-    var empty_list = Python.evaluate("[]")
-    # CHECK: 0
-    print(len(empty_list))
+    var empty_list = Python.list()
+    assert_equal(len(empty_list), 0)
 
     var l1 = Python.evaluate("[1,2,3]")
-    # CHECK: 3
-    print(len(l1))
+    assert_equal(len(l1), 3)
 
     var l2 = Python.evaluate("[42,42.0]")
-    # CHECK: 2
-    print(len(l2))
+    assert_equal(len(l2), 2)
 
 
-# CHECK-LABEL: test_is
 def test_is():
-    print("=== test_is ===")
     var x = PythonObject(500)
     var y = PythonObject(500)
     assert_false(x is y)
@@ -429,28 +340,60 @@ def test_is():
     assert_true(l1 is not l2)
 
 
-# CHECK-LABEL: test_iter
-fn test_iter() raises -> None:
-    print("=== test_iter ===")
-
-    var list: PythonObject = ["apple", "orange", "banana"]
-    # CHECK: I like to eat apple
-    # CHECK: I like to eat orange
-    # CHECK: I like to eat banana
-    for fruit in list:
-        print("I like to eat", fruit)
+fn test_iter() raises:
+    var list_obj: PythonObject = ["apple", "orange", "banana"]
+    var i = 0
+    for fruit in list_obj:
+        if i == 0:
+            assert_equal(fruit, "apple")
+        elif i == 1:
+            assert_equal(fruit, "orange")
+        elif i == 2:
+            assert_equal(fruit, "banana")
+        i += 1
 
     var list2: PythonObject = []
-    # CHECK-NOT: I have eaten
     for fruit in list2:
-        print("I have eaten", fruit)
+        raise Error("This should not be reachable as the list is empty.")
 
     var not_iterable: PythonObject = 3
     with assert_raises():
         for x in not_iterable:
-            # CHECK-NOT: I should not exist
-            print("I should not exist", x)
-            assert_false(True)
+            assert_false(
+                True,
+                "This should not be reachable as the object is not iterable.",
+            )
+
+
+fn test_setitem() raises:
+    var ll = PythonObject([1, 2, 3, "food"])
+    assert_equal(str(ll), "[1, 2, 3, 'food']")
+    ll[1] = "nomnomnom"
+    assert_equal(str(ll), "[1, 'nomnomnom', 3, 'food']")
+
+
+fn test_dict() raises:
+    var d = Dict[PythonObject, PythonObject]()
+    d["food"] = "remove this"
+    d["fries"] = "yes"
+    d["food"] = 123  # intentionally replace to ensure keys stay in order
+
+    var dd = PythonObject(d)
+    assert_equal(str(dd), "{'food': 123, 'fries': 'yes'}")
+
+    dd["food"] = "salad"
+    dd[42] = Python.evaluate("[4, 2]")
+    assert_equal(str(dd), "{'food': 'salad', 'fries': 'yes', 42: [4, 2]}")
+
+    # Also test that Python.dict() creates the right object.
+    var empty = Python.dict()
+    assert_equal(str(empty), "{}")
+
+
+fn test_none() raises:
+    var n = Python.none()
+    assert_equal(str(n), "None")
+    assert_true(n is None)
 
 
 def main():
@@ -463,3 +406,6 @@ def main():
     test_len()
     test_is()
     test_iter()
+    test_setitem()
+    test_dict()
+    test_none()

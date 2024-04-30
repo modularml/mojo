@@ -26,8 +26,8 @@ trait Stringable:
     [`String`](https://docs.modular.com/mojo/stdlib/builtin/string.html).
 
     Any type that conforms to `Stringable` or
-    [`StringableRaising`](/mojo/stdlib/builtin/str.html#stringableraising) works
-    with the built-in [`print()`](/mojo/stdlib/builtin/io.html#print) and
+    [`StringableRaising`](/mojo/stdlib/builtin/str/stringableraising) works
+    with the built-in [`print()`](/mojo/stdlib/builtin/io/print) and
     [`str()`](/mojo/stdlib/builtin/str.html) functions.
 
     The `Stringable` trait requires the type to define the `__str__()` method.
@@ -55,7 +55,7 @@ trait Stringable:
     ```
 
     **Note:** If the `__str__()` method might raise an error, use the
-    [`StringableRaising`](/mojo/stdlib/builtin/str.html#stringableraising)
+    [`StringableRaising`](/mojo/stdlib/builtin/str/stringableraising)
     trait, instead.
     """
 
@@ -73,10 +73,10 @@ trait StringableRaising:
     [`String`](https://docs.modular.com/mojo/stdlib/builtin/string.html).
 
     Any type that conforms to
-    [`Stringable`](/mojo/stdlib/builtin/str.html#stringable) or
+    [`Stringable`](/mojo/stdlib/builtin/str/stringable) or
     `StringableRaising` works with the built-in
-    [`print()`](/mojo/stdlib/builtin/io.html#print) and
-    [`str()`](/mojo/stdlib/builtin/str.html#str) functions.
+    [`print()`](/mojo/stdlib/builtin/io/print) and
+    [`str()`](/mojo/stdlib/builtin/str/str) functions.
 
     The `StringableRaising` trait requires the type to define the `__str__()`
     method, which can raise an error. For example:
@@ -136,7 +136,7 @@ fn str[T: Stringable](value: T) -> String:
     Returns:
         The string representation of the object.
     """
-     return value.__str__()
+    return value.__str__()
 
 
 @always_inline

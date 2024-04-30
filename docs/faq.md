@@ -275,7 +275,7 @@ about our kernel performance in our [matrix multiplication blog
 post](https://www.modular.com/blog/the-worlds-fastest-unified-matrix-multiplication).
 For details about our end-to-end model performance relative to the latest
 releases of TensorFlow and PyTorch, check out our [performance
-dashboard](https://performance.modular.com).
+dashboard](https://www.modular.com/max/performance).
 
 ## Mojo SDK
 
@@ -285,8 +285,30 @@ You can [get the Mojo SDK here](https://developer.modular.com/download)!
 
 ### Is the Mojo Playground still available?
 
-Yes, you can [get access today](https://www.modular.com/get-started)
-to the Mojo Playground, a hosted set of Mojo-supported Jupyter notebooks.
+Yes, but it's different. When we first announced Mojo, it was available
+only through login, in a JupyterLab environment. Now that Mojo is available
+for local development, we've shut down that service (you can instead [run
+Mojo notebooks
+locally](https://github.com/modularml/mojo/tree/main/examples/notebooks#readme)).
+
+The new [Mojo Playground](/mojo/playground) is built into the docs website
+and does not require login.
+
+- It provides access to Mojo and the Mojo standard library. It does not have
+  network access, so you can't install additional Mojo or Python packages.
+
+- It doesn't include any Python packages by default. In the future,
+  we intend to make some common Python packages available to import in the
+  Playground.
+
+- You can download your code or share it as a gist, but there's no mechanism
+  for saving code in the Playground itself. Any changes will be lost when you
+  switch code examples (as well as in the event of a server refresh or update).
+  If you come up with something you want to save, download it or share it
+  using buttons in the Playground toolbar.
+
+- There might be some bugs. Please [report issues and feedback on
+  GitHub](https://github.com/modularml/mojo/issues/new/choose).
 
 ### What are the license terms for the SDK?
 

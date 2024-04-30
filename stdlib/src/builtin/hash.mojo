@@ -63,14 +63,16 @@ fn _HASH_SECRET() -> Int:
     return ptr.bitcast[Int]()[0]
 
 
-fn _initialize_hash_secret(payload: Pointer[NoneType]) -> Pointer[NoneType]:
+fn _initialize_hash_secret(
+    payload: UnsafePointer[NoneType],
+) -> UnsafePointer[NoneType]:
     var secret = random.random_ui64(0, UInt64.MAX)
-    var data = Pointer[Int].alloc(1)
-    data.store(int(secret))
+    var data = UnsafePointer[Int].alloc(1)
+    data[] = int(secret)
     return data.bitcast[NoneType]()
 
 
-fn _destroy_hash_secret(p: Pointer[NoneType]):
+fn _destroy_hash_secret(p: UnsafePointer[NoneType]):
     p.free()
 
 
@@ -194,8 +196,8 @@ fn _hash_int8[size: Int](data: SIMD[DType.uint8, size]) -> Int:
     for i in range(size):
         hash_data = _HASH_UPDATE(hash_data, data[i].cast[DType.int64]())
     # TODO(27659): 'lit.globalvar.ref' error
-    # return hash_data.to_int() ^ HASH_SECRET
-    return hash_data.to_int() ^ _HASH_SECRET()
+    # return int(hash_data) ^ HASH_SECRET
+    return int(hash_data) ^ _HASH_SECRET()
 
 
 fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
@@ -226,7 +228,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
 
     - Interpret those bytes as a SIMD vector.
     - Apply a vectorized hash: _v_ = 33 * _v_ + _bytes_as_simd_value_
-    - Call [`reduce_add()`](/mojo/stdlib/builtin/simd.html#reduce_add) on the
+    - Call [`reduce_add()`](/mojo/stdlib/builtin/simd/SIMD#reduce_add) on the
       final result to get a single hash value.
     - Use this value in fallback for the remaining suffix bytes
       with standard DJBX33A.
@@ -291,7 +293,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     if r != 0:
         var remaining = StaticTuple[Int8, stride]()
         var ptr = DTypePointer[DType.int8](
-            Pointer.address_of(remaining).bitcast[Int8]()
+            UnsafePointer.address_of(remaining).bitcast[Int8]()
         )
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0

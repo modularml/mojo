@@ -15,7 +15,7 @@
 You can use this type to implement variant/sum types. For example:
 
 ```mojo
-from utils.variant import Variant
+from utils import Variant
 
 alias IntOrString = Variant[Int, String]
 fn to_string(inout x: IntOrString) -> String:
@@ -38,13 +38,16 @@ print(to_string(who_knows))
 ```
 """
 
-from sys.info import alignof, sizeof
+from sys import alignof, sizeof
 from sys.intrinsics import _mlirtype_is_eq
 
-from memory.unsafe import _LITRef, emplace_ref_unsafe
-
-from utils.loop import unroll
-from utils.static_tuple import StaticTuple
+from memory import UnsafePointer
+from memory.unsafe_pointer import (
+    initialize_pointee_move,
+    move_from_pointee,
+    move_pointee,
+)
+from utils import unroll, StaticTuple
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -116,7 +119,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     Example:
     ```mojo
-    from utils.variant import Variant
+    from utils import Variant
     alias IntOrString = Variant[Int, String]
     fn to_string(inout x: IntOrString) -> String:
         if x.isa[String]():
@@ -147,27 +150,19 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     ]
     var _impl: Self._type
 
-    fn _get_ptr[T: CollectionElement](self) -> AnyPointer[T]:
+    fn _get_ptr[T: CollectionElement](self) -> UnsafePointer[T]:
         constrained[
             Self._check[T]() != Self._sentinel, "not a union element type"
         ]()
-        var ptr = Reference(self._impl).get_unsafe_pointer().address
-        var result = AnyPointer[T]()
-        result.value = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type[`!kgen.pointer<`, T, `>`]
-        ](ptr)
-        return result
+        return UnsafePointer.address_of(self._impl).bitcast[T]()
 
     fn _get_state[
         is_mut: __mlir_type.i1, lt: __mlir_type[`!lit.lifetime<`, is_mut, `>`]
-    ](self: _LITRef[Self, is_mut, lt, Int(0).value].type) -> Reference[
+    ](self: Reference[Self, is_mut, lt]._mlir_type) -> Reference[
         Int8, is_mut, lt
     ]:
-        return (
-            Reference(self)
-            .bitcast_element[Int8]()
-            .offset(_UnionSize[Ts].compute())
-        )
+        var int8_self = UnsafePointer.address_of(self).bitcast[Int8]()
+        return (int8_self + _UnionSize[Ts].compute())[]
 
     fn __init__[T: CollectionElement](inout self, owned value: T):
         """Create a variant with one of the types.
@@ -181,7 +176,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
         self._get_state()[] = Self._check[T]()
-        self._get_ptr[T]().emplace_value(value^)
+        initialize_pointee_move(self._get_ptr[T](), value^)
 
     @always_inline
     fn __copyinit__(inout self, other: Self):
@@ -197,9 +192,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias T = Ts[i]
-                emplace_ref_unsafe[T](
-                    Reference(self._impl).bitcast_element[T](),
-                    Reference(other._impl).bitcast_element[T]()[],
+                initialize_pointee_move(
+                    UnsafePointer.address_of(self._impl).bitcast[T](),
+                    Reference(other._impl).unsafe_bitcast[T]()[],
                 )
 
         unroll[each, len(VariadicList(Ts))]()
@@ -219,9 +214,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             if self._get_state()[] == i:
                 alias T = Ts[i]
                 # Calls the correct __moveinit__
-                self._get_ptr[T]().emplace_value(
-                    other._get_ptr[T]().take_value()
-                )
+                move_pointee(src=other._get_ptr[T](), dst=self._get_ptr[T]())
 
         unroll[each, len(VariadicList(Ts))]()
 
@@ -235,7 +228,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias q = Ts[i]
-                __get_address_as_owned_value(self._get_ptr[q]().value).__del__()
+                __get_address_as_owned_value(
+                    self._get_ptr[q]().address
+                ).__del__()
 
         unroll[each, len(VariadicList(Ts))]()
 
@@ -262,7 +257,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         self._get_state()[] = (
             Self._sentinel
         )  # don't call the variant's deleter later
-        return self._get_ptr[T]().take_value()
+        return move_from_pointee(self._get_ptr[T]())
 
     fn set[T: CollectionElement](inout self, owned value: T):
         """Set the variant value.
@@ -278,7 +273,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._call_correct_deleter()
         self._get_state()[] = Self._check[T]()
-        self._get_ptr[T]().emplace_value(value^)
+        initialize_pointee_move(self._get_ptr[T](), value^)
 
     fn isa[T: CollectionElement](self) -> Bool:
         """Check if the variant contains the required type.
@@ -294,9 +289,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     fn get[
         T: CollectionElement,
-        mutability: __mlir_type.`i1`,
+        mutability: __mlir_type.i1,
         self_life: AnyLifetime[mutability].type,
-    ](self: Reference[Self, mutability, self_life].mlir_ref_type) -> Reference[
+    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
         T, mutability, self_life
     ]:
         """Get the value out of the variant as a type-checked type.
@@ -318,9 +313,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             The internal data represented as a `Reference[T]`.
         """
         debug_assert(Reference(self)[].isa[T](), "get: wrong variant type")
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life].mlir_ref_type
-        ](Reference(self)[]._get_ptr[T]().value)
+        return Reference(self)[]._get_ptr[T]()[]
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:

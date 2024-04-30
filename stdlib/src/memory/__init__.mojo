@@ -20,17 +20,20 @@ from .memory import (
     stack_allocation,
 )
 
-from .anypointer import (
-    AnyPointer,
+from .unsafe_pointer import (
+    UnsafePointer,
 )
 
 from .unsafe import (
     bitcast,
-    AddressSpace,
-    Reference,
-    emplace_ref_unsafe,
     Pointer,
+    LegacyPointer,
     DTypePointer,
+)
+
+from .reference import (
+    Reference,
+    AddressSpace,
 )
 
 # TODO: consider making Arc public and import it here

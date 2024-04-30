@@ -10,12 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
 from collections.vector import InlinedFixedVector
 
 from test_utils import MoveCounter
-from testing import *
+from testing import assert_equal
 
 
 def test_inlined_fixed_vector():

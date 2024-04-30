@@ -19,6 +19,8 @@ from testing import assert_true
 ```
 """
 from collections import Optional
+from utils._numerics import isnan
+from builtin._location import __call_location, _SourceLocation
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -32,15 +34,28 @@ fn _abs(x: SIMD) -> __type_of(x):
 
 @always_inline
 fn _isclose(
-    a: SIMD, b: __type_of(a), *, atol: Scalar[a.type], rtol: Scalar[a.type]
+    a: SIMD,
+    b: __type_of(a),
+    *,
+    atol: Scalar[a.type],
+    rtol: Scalar[a.type],
+    equal_nan: Bool,
 ) -> SIMD[DType.bool, a.size]:
     @parameter
     if a.type.is_bool() or a.type.is_integral():
         return a == b
 
+    if equal_nan and isnan(a) and isnan(b):
+        return True
+
     var atol_vec = SIMD[a.type, a.size](atol)
     var rtol_vec = SIMD[a.type, a.size](rtol)
-    return _abs(a - b) <= (atol_vec.max(rtol_vec * _abs(a).max(_abs(b))))
+    var res = _abs(a - b) <= (atol_vec.max(rtol_vec * _abs(a).max(_abs(b))))
+
+    if not equal_nan:
+        return res
+
+    return res.select(res, isnan(a) and isnan(b))
 
 
 # ===----------------------------------------------------------------------=== #
@@ -49,14 +64,16 @@ fn _isclose(
 
 
 @always_inline
-fn assert_true[
-    T: Boolable
-](val: T, msg: String = "condition was unexpectedly False") raises:
+fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
+    return loc.prefix("AssertionError: " + str(msg))
+
+
+@always_inline
+fn assert_true(
+    val: Bool, msg: String = "condition was unexpectedly False"
+) raises:
     """Asserts that the input value is True. If it is not then an
     Error is raised.
-
-    Parameters:
-        T: A Boolable type.
 
     Args:
         val: The value to assert to be True.
@@ -66,18 +83,15 @@ fn assert_true[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if not val:
-        raise Error("AssertionError: " + msg)
+        raise _assert_error(msg, __call_location())
 
 
 @always_inline
-fn assert_false[
-    T: Boolable
-](val: T, msg: String = "condition was unexpectedly True") raises:
+fn assert_false(
+    val: Bool, msg: String = "condition was unexpectedly True"
+) raises:
     """Asserts that the input value is False. If it is not then an Error is
     raised.
-
-    Parameters:
-        T: A Boolable type.
 
     Args:
         val: The value to assert to be False.
@@ -87,15 +101,23 @@ fn assert_false[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if val:
-        raise Error("AssertionError: " + msg)
+        raise _assert_error(msg, __call_location())
 
 
-# TODO: Collapse these two overloads for generic T that has the
-# Equality Comparable trait.
+trait Testable(EqualityComparable, Stringable):
+    """A trait that a struct should conform to if we do equality testing on it.
+    """
+
+    pass
+
+
 @always_inline
-fn assert_equal(lhs: Int, rhs: Int, msg: String = "") raises:
+fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
+
+    Parameters:
+        T: A Testable type.
 
     Args:
         lhs: The lhs of the equality.
@@ -106,9 +128,10 @@ fn assert_equal(lhs: Int, rhs: Int, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(str(lhs), str(rhs), msg=msg)
+        raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
 
 
+# TODO: Remove the String and SIMD overloads once we have more powerful traits.
 @always_inline
 fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
@@ -123,7 +146,7 @@ fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(lhs, rhs, msg=msg)
+        raise _assert_equal_error(lhs, rhs, msg, __call_location())
 
 
 @always_inline
@@ -145,14 +168,19 @@ fn assert_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    if lhs != rhs:
-        raise _assert_equal_error(str(lhs), str(rhs), msg=msg)
+    # `if lhs != rhs:` is not enough. `reduce_or()` must be used here,
+    # otherwise, if any of the elements are equal, the error is not triggered.
+    if (lhs != rhs).reduce_or():
+        raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
 
 
 @always_inline
-fn assert_not_equal(lhs: Int, rhs: Int, msg: String = "") raises:
+fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
     """Asserts that the input values are not equal. If it is not then an
     Error is raised.
+
+    Parameters:
+        T: A Testable type.
 
     Args:
         lhs: The lhs of the inequality.
@@ -163,7 +191,9 @@ fn assert_not_equal(lhs: Int, rhs: Int, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise _assert_not_equal_error(str(lhs), str(rhs), msg=msg)
+        raise _assert_not_equal_error(
+            str(lhs), str(rhs), msg, __call_location()
+        )
 
 
 @always_inline
@@ -180,7 +210,7 @@ fn assert_not_equal(lhs: String, rhs: String, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise _assert_not_equal_error(str(lhs), str(rhs), msg=msg)
+        raise _assert_not_equal_error(lhs, rhs, msg, __call_location())
 
 
 @always_inline
@@ -203,7 +233,9 @@ fn assert_not_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise _assert_not_equal_error(str(lhs), str(rhs), msg=msg)
+        raise _assert_not_equal_error(
+            str(lhs), str(rhs), msg, __call_location()
+        )
 
 
 @always_inline
@@ -217,6 +249,7 @@ fn assert_almost_equal[
     msg: String = "",
     atol: Scalar[type] = 1e-08,
     rtol: Scalar[type] = 1e-05,
+    equal_nan: Bool = False,
 ) raises:
     """Asserts that the input values are equal up to a tolerance. If it is
     not then an Error is raised.
@@ -231,36 +264,49 @@ fn assert_almost_equal[
         msg: The message to print.
         atol: The _absolute tolerance.
         rtol: The relative tolerance.
+        equal_nan: Whether to treat nans as equal.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    var almost_equal = _isclose(lhs, rhs, atol=atol, rtol=rtol)
+    var almost_equal = _isclose(
+        lhs, rhs, atol=atol, rtol=rtol, equal_nan=equal_nan
+    )
     if not almost_equal:
-        var err = "AssertionError: " + str(lhs) + " is not close to " + str(
+        var err = str(lhs) + " is not close to " + str(
             rhs
         ) + " with a diff of " + _abs(lhs - rhs)
         if msg:
             err += " (" + msg + ")"
-        raise err
+        raise _assert_error(err, __call_location())
 
 
 fn _assert_equal_error(
-    lhs: String, rhs: String, msg: String = ""
-) raises -> Error:
-    var err = "AssertionError: `left == right` comparison failed:\n   left: " + lhs + "\n  right: " + rhs
+    lhs: String, rhs: String, msg: String, loc: _SourceLocation
+) -> String:
+    var err = (
+        "`left == right` comparison failed:\n   left: "
+        + lhs
+        + "\n  right: "
+        + rhs
+    )
     if msg:
         err += "\n  reason: " + msg
-    raise err
+    return _assert_error(err, loc)
 
 
 fn _assert_not_equal_error(
-    lhs: String, rhs: String, msg: String = ""
-) raises -> Error:
-    var err = "AssertionError: `left != right` comparison failed:\n   left: " + lhs + "\n  right: " + rhs
+    lhs: String, rhs: String, msg: String, loc: _SourceLocation
+) -> String:
+    var err = (
+        "`left != right` comparison failed:\n   left: "
+        + lhs
+        + "\n  right: "
+        + rhs
+    )
     if msg:
         err += "\n  reason: " + msg
-    raise err
+    return _assert_error(err, loc)
 
 
 struct assert_raises:
@@ -325,5 +371,7 @@ struct assert_raises:
             Error: If the error raised doesn't match the expected error to raise.
         """
         if self.message_contains:
-            return self.message_contains.value() in str(error)
+            return self.message_contains.value[
+                __mlir_attr.`0: i1`, __lifetime_of(self)
+            ]()[] in str(error)
         return True

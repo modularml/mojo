@@ -25,8 +25,8 @@ trait Sized:
     string or array).
 
     Any type that conforms to `Sized` or
-    [`SizedRaising`](/mojo/stdlib/builtin/len.html#sizedraising) works with the
-    built-in [`len()`](/mojo/stdlib/builtin/len.html#len) function.
+    [`SizedRaising`](/mojo/stdlib/builtin/len/sizedraising) works with the
+    built-in [`len()`](/mojo/stdlib/builtin/len/len) function.
 
     The `Sized` trait requires a type to implement the `__len__()`
     method. For example:
@@ -53,7 +53,7 @@ trait Sized:
     ```
 
     **Note:** If the `__len__()` method can raise an error, use the
-    [`SizedRaising`](/mojo/stdlib/builtin/len.html#sizedraising) trait instead.
+    [`SizedRaising`](/mojo/stdlib/builtin/len/sizedraising) trait instead.
 
     """
 
@@ -70,9 +70,9 @@ trait SizedRaising:
     """The `SizedRaising` trait describes a type that has an integer length,
     which might raise an error if the length can't be determined.
 
-    Any type that conforms to [`Sized`](/mojo/stdlib/builtin/len.html#sized) or
+    Any type that conforms to [`Sized`](/mojo/stdlib/builtin/len/sized) or
     `SizedRaising` works with the built-in
-    [`len()`](/mojo/stdlib/builtin/len.html#len) function.
+    [`len()`](/mojo/stdlib/builtin/len/len) function.
 
     The `SizedRaising` trait requires a type to implement the `__len__()`
     method, which can raise an error. For example:

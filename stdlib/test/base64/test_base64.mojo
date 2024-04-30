@@ -10,30 +10,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s
 
-from base64 import b64encode
-
-
-# CHECK-LABEL: test_b64encode
-fn test_b64encode():
-    print("== test_b64encode")
-
-    # CHECK: YQ==
-    print(b64encode("a"))
-
-    # CHECK: Zm8=
-    print(b64encode("fo"))
-
-    # CHECK: SGVsbG8gTW9qbyEhIQ==
-    print(b64encode("Hello Mojo!!!"))
-
-    # CHECK: dGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==
-    print(b64encode("the quick brown fox jumps over the lazy dog"))
-
-    # CHECK: QUJDREVGYWJjZGVm
-    print(b64encode("ABCDEFabcdef"))
+from base64 import b64encode, b64decode
+from testing import assert_equal
 
 
-fn main():
+def test_b64encode():
+    assert_equal(b64encode("a"), "YQ==")
+
+    assert_equal(b64encode("fo"), "Zm8=")
+
+    assert_equal(b64encode("Hello Mojo!!!"), "SGVsbG8gTW9qbyEhIQ==")
+
+    assert_equal(b64encode("Hello 🔥!!!"), "SGVsbG8g8J+UpSEhIQ==")
+
+    assert_equal(
+        b64encode("the quick brown fox jumps over the lazy dog"),
+        "dGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==",
+    )
+
+    assert_equal(b64encode("ABCDEFabcdef"), "QUJDREVGYWJjZGVm")
+
+
+def test_b64decode():
+    assert_equal(b64decode("YQ=="), "a")
+
+    assert_equal(b64decode("Zm8="), "fo")
+
+    assert_equal(b64decode("SGVsbG8gTW9qbyEhIQ=="), "Hello Mojo!!!")
+
+    assert_equal(b64decode("SGVsbG8g8J+UpSEhIQ=="), "Hello 🔥!!!")
+
+    assert_equal(
+        b64decode(
+            "dGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw=="
+        ),
+        "the quick brown fox jumps over the lazy dog",
+    )
+
+    assert_equal(b64decode("QUJDREVGYWJjZGVm"), "ABCDEFabcdef")
+
+
+def main():
     test_b64encode()
+    test_b64decode()

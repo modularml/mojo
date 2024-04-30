@@ -20,8 +20,10 @@ from collections import List
 """
 
 
-from memory.anypointer import AnyPointer
-from memory.unsafe import Reference
+from builtin.value import StringableCollectionElement
+from memory import UnsafePointer, Reference
+from memory.unsafe_pointer import move_pointee, move_from_pointee
+from .optional import Optional
 
 # ===----------------------------------------------------------------------===#
 # Utilties
@@ -43,6 +45,7 @@ struct _ListIter[
     T: CollectionElement,
     list_mutability: __mlir_type.`i1`,
     list_lifetime: AnyLifetime[list_mutability].type,
+    forward: Bool = True,
 ]:
     """Iterator for List.
 
@@ -50,6 +53,7 @@ struct _ListIter[
         T: The type of the elements in the list.
         list_mutability: Whether the reference to the list is mutable.
         list_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
     """
 
     alias list_type = List[T]
@@ -57,19 +61,33 @@ struct _ListIter[
     var index: Int
     var src: Reference[Self.list_type, list_mutability, list_lifetime]
 
+    fn __iter__(self) -> Self:
+        return self
+
     fn __next__(
         inout self,
     ) -> Reference[T, list_mutability, list_lifetime]:
-        self.index += 1
-        return self.src[].__get_ref[list_mutability, list_lifetime](
-            self.index - 1
-        )
+        @parameter
+        if forward:
+            self.index += 1
+            return self.src[].__get_ref[list_mutability, list_lifetime](
+                self.index - 1
+            )
+        else:
+            self.index -= 1
+            return self.src[].__get_ref[list_mutability, list_lifetime](
+                self.index
+            )
 
     fn __len__(self) -> Int:
-        return len(self.src[]) - self.index
+        @parameter
+        if forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
 
 
-struct List[T: CollectionElement](CollectionElement, Sized):
+struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -79,7 +97,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         T: The type of the elements.
     """
 
-    var data: AnyPointer[T]
+    var data: UnsafePointer[T]
     """The underlying storage for the list."""
     var size: Int
     """The number of elements in the list."""
@@ -88,7 +106,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
 
     fn __init__(inout self):
         """Constructs an empty list."""
-        self.data = AnyPointer[T]()
+        self.data = UnsafePointer[T]()
         self.size = 0
         self.capacity = 0
 
@@ -108,7 +126,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         Args:
             capacity: The requested capacity of the list.
         """
-        self.data = AnyPointer[T].alloc(capacity)
+        self.data = UnsafePointer[T].alloc(capacity)
         self.size = 0
         self.capacity = capacity
 
@@ -123,6 +141,20 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self = Self(capacity=len(values))
         for value in values:
             self.append(value[])
+
+    fn __init__(
+        inout self: Self, data: UnsafePointer[T], *, size: Int, capacity: Int
+    ):
+        """Constructs a list from a pointer, its size, and its capacity.
+
+        Args:
+            data: The pointer to the data.
+            size: The number of elements in the list.
+            capacity: The capacity of the list.
+        """
+        self.data = data
+        self.size = size
+        self.capacity = capacity
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing list into a new one.
@@ -148,7 +180,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
-            _ = (self.data + i).take_value()
+            destroy_pointee(self.data + i)
         if self.data:
             self.data.free()
 
@@ -160,12 +192,20 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         """
         return self.size
 
+    fn __bool__(self) -> Bool:
+        """Checks whether the list has any elements or not.
+
+        Returns:
+            `False` if the list is empty, `True` if there is at least one element.
+        """
+        return len(self) > 0
+
     @always_inline
     fn _realloc(inout self, new_capacity: Int):
-        var new_data = AnyPointer[T].alloc(new_capacity)
+        var new_data = UnsafePointer[T].alloc(new_capacity)
 
         for i in range(self.size):
-            (new_data + i).emplace_value((self.data + i).take_value())
+            move_pointee(src=self.data + i, dst=new_data + i)
 
         if self.data:
             self.data.free()
@@ -181,8 +221,38 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         """
         if self.size >= self.capacity:
             self._realloc(_max(1, self.capacity * 2))
-        (self.data + self.size).emplace_value(value^)
+        initialize_pointee_move(self.data + self.size, value^)
         self.size += 1
+
+    @always_inline
+    fn insert(inout self, i: Int, owned value: T):
+        """Inserts a value to the list at the given index.
+        `a.insert(len(a), value)` is equivalent to `a.append(value)`.
+
+        Args:
+            i: The index for the value.
+            value: The value to insert.
+        """
+        debug_assert(i <= self.size, "insert index out of range")
+
+        var normalized_idx = i
+        if i < 0:
+            normalized_idx = _max(0, len(self) + i)
+
+        var earlier_idx = len(self)
+        var later_idx = len(self) - 1
+        self.append(value^)
+
+        for _ in range(normalized_idx, len(self) - 1):
+            var earlier_ptr = self.data + earlier_idx
+            var later_ptr = self.data + later_idx
+
+            var tmp = move_from_pointee(earlier_ptr)
+            move_pointee(src=later_ptr, dst=earlier_ptr)
+            initialize_pointee_move(later_ptr, tmp^)
+
+            earlier_idx -= 1
+            later_idx -= 1
 
     @always_inline
     fn extend(inout self, owned other: List[T]):
@@ -217,7 +287,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             # `other` list into this list using a single `T.__moveinit()__`
             # call, without moving into an intermediate temporary value
             # (avoiding an extra redundant move constructor call).
-            src_ptr.move_into(dest_ptr)
+            move_pointee(src=src_ptr, dst=dest_ptr)
 
             dest_ptr = dest_ptr + 1
 
@@ -226,13 +296,24 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         self.size = final_size
 
     @always_inline
-    fn pop_back(inout self) -> T:
-        """Pops a value from the back of this list.
+    fn pop(inout self, i: Int = -1) -> T:
+        """Pops a value from the list at the given index.
+
+        Args:
+            i: The index of the value to pop.
 
         Returns:
             The popped value.
         """
-        var ret_val = (self.data + (self.size - 1)).take_value()
+        debug_assert(-len(self) <= i < len(self), "pop index out of range")
+
+        var normalized_idx = i
+        if i < 0:
+            normalized_idx += len(self)
+
+        var ret_val = move_from_pointee(self.data + normalized_idx)
+        for j in range(normalized_idx + 1, self.size):
+            move_pointee(src=self.data + j, dst=self.data + j - 1)
         self.size -= 1
         if self.size * 4 < self.capacity:
             if self.capacity > 1:
@@ -265,12 +346,37 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             new_size: The new size.
             value: The value to use to populate new elements.
         """
-        self.reserve(new_size)
+        if new_size <= self.size:
+            self.resize(new_size)
+        else:
+            self.reserve(new_size)
+            for i in range(new_size, self.size):
+                destroy_pointee(self.data + i)
+            for i in range(self.size, new_size):
+                initialize_pointee_copy(self.data + i, value)
+            self.size = new_size
+
+    @always_inline
+    fn resize(inout self, new_size: Int):
+        """Resizes the list to the given new size.
+
+        With no new value provided, the new size must be smaller than or equal
+        to the current one. Elements at the end are discarded.
+
+        Args:
+            new_size: The new size.
+        """
+        debug_assert(
+            new_size <= self.size,
+            (
+                "New size must be smaller than or equal to current size when no"
+                " new value is provided."
+            ),
+        )
         for i in range(new_size, self.size):
-            _ = (self.data + i).take_value()
-        for i in range(self.size, new_size):
-            (self.data + i).emplace_value(value)
+            destroy_pointee(self.data + i)
         self.size = new_size
+        self.reserve(new_size)
 
     fn reverse(inout self):
         """Reverses the elements of the list."""
@@ -303,27 +409,89 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             var earlier_ptr = self.data + earlier_idx
             var later_ptr = self.data + later_idx
 
-            var tmp = earlier_ptr.take_value()
-            later_ptr.move_into(earlier_ptr)
-            later_ptr.emplace_value(tmp^)
+            var tmp = move_from_pointee(earlier_ptr)
+            move_pointee(src=later_ptr, dst=earlier_ptr)
+            initialize_pointee_move(later_ptr, tmp^)
 
             earlier_idx += 1
             later_idx -= 1
 
+    # TODO: Modify this to be regular method when issue 1876 is resolved
+    @staticmethod
+    fn index[
+        C: ComparableCollectionElement
+    ](
+        self: List[C], owned value: C, start: Int = 0, end: Optional[Int] = None
+    ) raises -> Int:
+        """
+        Returns the index of the first occurrence of a value in a list, starting from the specified
+        index (default 0). Raises an Error if the value is not found.
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(__type_of(my_list).index(my_list, 2)) # Output: 1
+        ```
+
+        Args:
+            self: The list to search in.
+            value: The value to search for.
+            start: The starting index of the search (default 0).
+            end: The ending index of the search (default None, which means the end of the list).
+
+        Parameters:
+            C: The type of the elements in the list. Must implement the `ComparableCollectionElement` trait.
+
+        Returns:
+            The index of the first occurrence of the value in the list.
+
+        Raises:
+            ValueError If the value is not found in the list.
+
+        """
+        var normalized_start = (self.size + start) if start < 0 else start
+        # TODO: Once the min() and max() functions are available in Mojo,
+        # TODO: we can simplify the entire if-else block into a single line using the ternary operator:
+        # var normalized_end = self.size if end is None else min(max(end, 0), self.size)
+        var normalized_end: Int
+        if end is None:
+            normalized_end = self.size
+        else:
+            if end.value()[] < 0:
+                normalized_end = self.size + end.value()[]
+            else:
+                if end.value()[] > self.size:
+                    normalized_end = self.size
+                else:
+                    normalized_end = end.value()[]
+
+        if not self.size:
+            raise "Cannot find index of a value in an empty list."
+        if normalized_start >= self.size:
+            raise "Given 'start' parameter (" + String(
+                normalized_start
+            ) + ") is out of range. List only has " + String(
+                self.size
+            ) + " elements."
+
+        for i in range(normalized_start, normalized_end):
+            if self[i] == value:
+                return i
+        raise "ValueError: Given element is not in list"
+
     fn clear(inout self):
         """Clears the elements in the list."""
         for i in range(self.size):
-            _ = (self.data + i).take_value()
+            destroy_pointee(self.data + i)
         self.size = 0
 
-    fn steal_data(inout self) -> AnyPointer[T]:
+    fn steal_data(inout self) -> UnsafePointer[T]:
         """Take ownership of the underlying pointer from the list.
 
         Returns:
             The underlying data.
         """
         var ptr = self.data
-        self.data = AnyPointer[T]()
+        self.data = UnsafePointer[T]()
         self.size = 0
         self.capacity = 0
         return ptr
@@ -341,8 +509,8 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         if i < 0:
             normalized_idx += len(self)
 
-        _ = (self.data + normalized_idx).take_value()
-        (self.data + normalized_idx).emplace_value(value^)
+        destroy_pointee(self.data + normalized_idx)
+        initialize_pointee_move(self.data + normalized_idx, value^)
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
@@ -411,7 +579,7 @@ struct List[T: CollectionElement](CollectionElement, Sized):
     fn __get_ref[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
         i: Int,
     ) -> Reference[T, mutability, self_life]:
         """Gets a reference to the list element at the given index.
@@ -426,20 +594,13 @@ struct List[T: CollectionElement](CollectionElement, Sized):
         if i < 0:
             normalized_idx += Reference(self)[].size
 
-        # Mutability gets set to the local mutability of this
-        # pointer value, ie. because we defined it with `let` it's now an
-        # "immutable" reference regardless of the mutability of `self`.
-        # This means we can't just use `AnyPointer.__refitem__` here
-        # because the mutability won't match.
-        var base_ptr = Reference(self)[].data
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Reference[T, mutability, self_life].mlir_ref_type
-        ]((base_ptr + normalized_idx).value)
+        var offset_ptr = Reference(self)[].data + normalized_idx
+        return offset_ptr[]
 
     fn __iter__[
         mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
     ](
-        self: Reference[Self, mutability, self_life].mlir_ref_type,
+        self: Reference[Self, mutability, self_life]._mlir_type,
     ) -> _ListIter[
         T, mutability, self_life
     ]:
@@ -449,3 +610,59 @@ struct List[T: CollectionElement](CollectionElement, Sized):
             An iterator of immutable references to the list elements.
         """
         return _ListIter[T, mutability, self_life](0, Reference(self))
+
+    fn __reversed__[
+        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+    ](
+        self: Reference[Self, mutability, self_life]._mlir_type,
+    ) -> _ListIter[
+        T, mutability, self_life, False
+    ]:
+        """Iterate backwards over the list, returning immutable references.
+
+        Returns:
+            A reversed iterator of immutable references to the list elements.
+        """
+        var ref = Reference(self)
+        return _ListIter[T, mutability, self_life, False](len(ref[]), ref)
+
+    @staticmethod
+    fn __str__[U: StringableCollectionElement](self: List[U]) -> String:
+        """Returns a string representation of a `List`.
+
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(__type_of(my_list).__str__(my_list))
+        ```
+
+        When the compiler supports conditional methods, then a simple `str(my_list)` will
+        be enough.
+
+        Args:
+            self: The list to represent as a string.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Stringable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the list.
+        """
+        # we do a rough estimation of the number of chars that we'll see
+        # in the final string, we assume that str(x) will be at least one char.
+        var minimum_capacity = (
+            2  # '[' and ']'
+            + len(self) * 3  # str(x) and ", "
+            - 2  # remove the last ", "
+        )
+        var result = String(List[Int8](capacity=minimum_capacity))
+        result += "["
+        for i in range(len(self)):
+            result += str(self[i])
+            if i < len(self) - 1:
+                result += ", "
+        result += "]"
+        return result

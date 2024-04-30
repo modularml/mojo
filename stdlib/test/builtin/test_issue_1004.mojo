@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s
 # Test for https://github.com/modularml/mojo/issues/1004
 
 from testing import assert_equal
@@ -24,6 +24,4 @@ def main():
     try:
         foo("Hello")
     except e:
-        # CHECK: Failed on: Hello
-        print(e)
         assert_equal(str(e), "Failed on: Hello")

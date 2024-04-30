@@ -15,22 +15,16 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: linux
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s
+
+from sys import os_is_linux, os_is_macos
+from testing import assert_false, assert_true
 
 
-from sys.info import os_is_linux, os_is_macos
+def test_os_query():
+    assert_false(os_is_macos())
+    assert_true(os_is_linux())
 
 
-# CHECK-LABEL: test_os_query
-fn test_os_query():
-    print("== test_os_query")
-
-    # CHECK: False
-    print(os_is_macos())
-
-    # CHECK: True
-    print(os_is_linux())
-
-
-fn main():
+def main():
     test_os_query()

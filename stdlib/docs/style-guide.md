@@ -48,17 +48,22 @@ All done! ✨ 🍰 ✨
 Unless otherwise noted, Mojo standard library code should follow the formatting
 produced by `mojo format`.
 
+It is advised, to avoid forgetting, to set-up `pre-commit`, which will format
+your changes automatically at each commit, and will also ensure that you
+always have the latest linting tools applied.
+
+To do so, install pre-commit:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+and that's it!
+
 #### Whitespace
 
-- Use 4-space indentation.
-- Do NOT use Tab characters.
 - Use vertical whitespace only as needed to organize code into logical sections.
-
-*We encourage updating your editor settings to be consistent with the above.*
-
-#### Column limit
-
-Mojo code has a column limit (line length) of 80 characters.
 
 #### File license header
 
@@ -120,6 +125,13 @@ struct MyStruct(Sized, Stringable):
 ```
 
 ## Code conventions
+
+### Python Standard Library
+
+We want to be a good member of the Python family and aim to become a full
+superset, so we inherit naming from the Python standard library, including any
+inconsistencies. These naming inconsistencies are the only exceptions to the
+naming conventions outlined below.
 
 ### Identifier naming conventions
 

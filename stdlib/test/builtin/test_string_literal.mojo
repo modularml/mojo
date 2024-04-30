@@ -10,9 +10,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 
-from testing import *
+from testing import (
+    assert_equal,
+    assert_not_equal,
+    assert_true,
+    assert_false,
+    assert_raises,
+)
 
 
 def test_basics():
@@ -85,7 +91,7 @@ def test_intable():
     assert_equal(int("123"), 123)
 
     with assert_raises():
-        int("hi")
+        _ = int("hi")
 
 
 def main():

@@ -15,7 +15,7 @@
 
 import os
 from os import PathLike, listdir, stat_result
-from sys.info import os_is_windows
+from sys import os_is_windows
 
 from memory import stack_allocation
 
@@ -290,7 +290,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
             pathsegments: The path segments.
 
         Returns:
-            The path concatination with the pathsegments using the
+            The path concatenation with the pathsegments using the
             directory separator.
         """
         if len(pathsegments) == 0:
@@ -307,7 +307,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         """Gets the list of entries contained in the path provided.
 
         Returns:
-          Returns the list of entries in the path provided.
+            The list of entries in the path provided.
         """
 
         var ls = listdir(self)

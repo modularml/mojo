@@ -18,8 +18,7 @@ encouraged to engage with the standard library and language evolution. We
 intend to ignite enthusiasm to contribute to the expanding Mojo package
 ecosystem.
 
-- The standard library prioritizes
-  **Performance `>` Safety `>` Portability `>` Debuggability.**
+- The standard library prioritizes **Performance, Safety, Portability, and Debuggability.**
 
 - **Respectable performance by default.** The standard library should provide
 respectable performance by default, but not perfect performance. We support

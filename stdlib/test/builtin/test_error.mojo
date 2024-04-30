@@ -10,23 +10,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s
+
+from testing import assert_equal
 
 
 def raise_an_error():
     raise Error("MojoError: This is an error!")
 
 
-fn main():
-    # CHECK: == test_error
-    print("== test_error")
+def test_error_raising():
     try:
-        _ = raise_an_error()
+        raise_an_error()
     except e:
-        # CHECK: MojoError: This is an error!
-        print(e)
+        assert_equal(str(e), "MojoError: This is an error!")
 
+
+def test_from_and_to_string():
     var myString: String = "FOO"
     var error = Error(myString)
-    # CHECK: FOO
-    print(error)
+    assert_equal(error, "FOO")
+
+    assert_equal(str(Error("bad")), "bad")
+
+
+def main():
+    test_error_raising()
+    test_from_and_to_string()

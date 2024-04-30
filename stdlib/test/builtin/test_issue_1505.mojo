@@ -11,12 +11,12 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: disabled
-# RUN: %mojo -debug-level full %s
+# RUN: %mojo %s
 # Test for https://github.com/modularml/mojo/issues/1505
 
 from random import random_ui64
 
-from testing import *
+from testing import assert_equal
 
 
 fn gen_perm() -> StaticIntTuple[64]:

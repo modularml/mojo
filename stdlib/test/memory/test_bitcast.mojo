@@ -10,21 +10,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -debug-level full %s | FileCheck %s
+# RUN: %mojo %s
 
-from memory.unsafe import bitcast
-
-
-# CHECK-LABEL: test_bitcast
-fn test_bitcast():
-    print("== test_bitcast")
-
-    # CHECK: [1, 0, 2, 0, 3, 0, 4, 0]
-    print(bitcast[DType.int8, 8](SIMD[DType.int16, 4](1, 2, 3, 4)))
-
-    # CHECK: 1442775295
-    print(bitcast[DType.int32, 1](SIMD[DType.int8, 4](0xFF, 0x00, 0xFF, 0x55)))
+from memory import bitcast
+from testing import assert_equal
 
 
-fn main():
+def test_bitcast():
+    assert_equal(
+        bitcast[DType.int8, 8](SIMD[DType.int16, 4](1, 2, 3, 4)),
+        SIMD[DType.int8, 8](1, 0, 2, 0, 3, 0, 4, 0),
+    )
+
+    assert_equal(
+        bitcast[DType.int32, 1](SIMD[DType.int8, 4](0xFF, 0x00, 0xFF, 0x55)),
+        Int32(1442775295),
+    )
+
+
+def main():
     test_bitcast()
