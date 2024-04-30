@@ -658,7 +658,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             + len(self) * 3  # str(x) and ", "
             - 2  # remove the last ", "
         )
-        var result = String(List[Int8](capacity=minimum_capacity))
+        var result = String(List[UInt8](capacity=minimum_capacity))
         result += "["
         for i in range(len(self)):
             result += str(self[i])
