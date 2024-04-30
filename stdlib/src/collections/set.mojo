@@ -513,3 +513,14 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             other: The set to find the symmetric difference with.
         """
         self = self.symmetric_difference(other)
+
+    fn discard(inout self, value: T):
+        """Remove a value from the set if it exists. Pass otherwise.
+
+        Args:
+            value: The element to remove from the set.
+        """
+        try:
+            self._data.pop(value)
+        except:
+            pass
