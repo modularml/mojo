@@ -18,6 +18,38 @@ module should be eventually moved to the `math` module when it's open sourced.
 """
 
 # ===----------------------------------------------------------------------===#
+# Ceilable
+# ===----------------------------------------------------------------------===#
+
+
+trait Ceilable:
+    """
+      The `Ceilable` trait describes a type that defines a ceiling operation.
+
+      Types that conform to `Ceilable` will work with the builtin `ceil`
+      function. The ceiling operation always returns the same type as the input.
+
+      For example:
+      ```mojo
+      from math import Ceilable, ceil
+
+      @value
+      struct Complex(Ceilable):
+          var re: Float64
+          var im: Float64
+
+          fn __ceil__(self) -> Self:
+              return Self(ceil(re), ceil(im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __ceil__(self) -> Self:
+        ...
+
+
+# ===----------------------------------------------------------------------===#
 # Floorable
 # ===----------------------------------------------------------------------===#
 

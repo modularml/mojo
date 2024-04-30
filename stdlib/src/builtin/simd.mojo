@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import llvm_intrinsic, has_neon, is_x86, simdwidthof, _RegisterPackType
 
-from builtin._math import Floorable
+from builtin._math import Ceilable, Floorable
 from builtin.hash import _hash_simd
 from memory import bitcast
 
@@ -116,6 +116,7 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Absable,
     Boolable,
+    Ceilable,
     CollectionElement,
     Floorable,
     Hashable,
@@ -889,13 +890,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         return (self < 0).select(-self, self)
 
-    @always_inline("nodebug")
-    fn __floor__(self) -> Self:
-        """Performs elementwise floor on the elements of a SIMD vector.
-
-        Returns:
-            The elementwise floor of this SIMD vector.
-        """
+    fn _floor_ceil_impl[intrinsic: StringLiteral](self) -> Self:
+        constrained[
+            intrinsic == "llvm.floor" or intrinsic == "llvm.ceil",
+            "unsupported intrinsic",
+        ]()
 
         @parameter
         if type.is_bool() or type.is_integral():
@@ -903,11 +902,33 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter
         if has_neon() and type == DType.bfloat16:
-            return self.cast[DType.float32]().__floor__().cast[type]()
+            return (
+                self.cast[DType.float32]()
+                ._floor_ceil_impl[intrinsic]()
+                .cast[type]()
+            )
 
         return llvm_intrinsic[
-            "llvm.floor", SIMD[type, size], has_side_effect=False
+            intrinsic, __type_of(self), has_side_effect=False
         ](self)
+
+    @always_inline("nodebug")
+    fn __floor__(self) -> Self:
+        """Performs elementwise floor on the elements of a SIMD vector.
+
+        Returns:
+            The elementwise floor of this SIMD vector.
+        """
+        return self._floor_ceil_impl["llvm.floor"]()
+
+    @always_inline("nodebug")
+    fn __ceil__(self) -> Self:
+        """Performs elementwise ceiling on the elements of a SIMD vector.
+
+        Returns:
+            The elementwise ceiling of this SIMD vector.
+        """
+        return self._floor_ceil_impl["llvm.ceil"]()
 
     # ===-------------------------------------------------------------------===#
     # In place operations.

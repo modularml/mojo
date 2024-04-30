@@ -146,6 +146,29 @@ def test_truthy():
         test_dtype[DType.bfloat16]()
 
 
+def test_ceil():
+    assert_equal(Float32.__ceil__(Float32(1.5)), 2.0)
+    assert_equal(Float32.__ceil__(Float32(-1.5)), -1.0)
+    assert_equal(Float32.__ceil__(Float32(3.0)), 3.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(
+        F.__ceil__(F(0.0, 1.4, -42.5, -12.6)), F(0.0, 2.0, -42.0, -12.0)
+    )
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(0, 2, -42, -12)
+    assert_equal(I.__ceil__(i), i)
+
+    alias U = SIMD[DType.uint32, 4]
+    var u = U(0, 2, 42, 12)
+    assert_equal(U.__ceil__(u), u)
+
+    alias B = SIMD[DType.bool, 4]
+    var b = B(True, False, True, False)
+    assert_equal(B.__ceil__(b), b)
+
+
 def test_floor():
     assert_equal(Float32.__floor__(Float32(1.5)), 1.0)
     assert_equal(Float32.__floor__(Float32(-1.5)), -2.0)
@@ -766,6 +789,7 @@ def main():
     test_convert_simd_to_string()
     test_issue_20421()
     test_truthy()
+    test_ceil()
     test_floor()
     test_floordiv()
     test_mod()

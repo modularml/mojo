@@ -26,6 +26,20 @@ alias inf = FloatLiteral.infinity
 alias neg_inf = FloatLiteral.negative_infinity
 
 
+def test_ceil():
+    assert_equal(FloatLiteral.__ceil__(1.5), 2.0)
+    assert_equal(FloatLiteral.__ceil__(1.4), 2.0)
+    assert_equal(FloatLiteral.__ceil__(-1.5), -1.0)
+    assert_equal(FloatLiteral.__ceil__(-3.6), -3.0)
+    assert_equal(FloatLiteral.__ceil__(3.0), 3.0)
+    assert_equal(FloatLiteral.__ceil__(0.0), 0.0)
+
+    assert_true(FloatLiteral.__ceil__(nan).is_nan())
+    assert_true(FloatLiteral.__ceil__(neg_zero).is_neg_zero())
+    assert_equal(FloatLiteral.__ceil__(inf), inf)
+    assert_equal(FloatLiteral.__ceil__(neg_inf), neg_inf)
+
+
 def test_floor():
     assert_equal(FloatLiteral.__floor__(1.5), 1.0)
     assert_equal(FloatLiteral.__floor__(1.6), 1.0)

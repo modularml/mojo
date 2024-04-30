@@ -22,6 +22,12 @@ def test_int():
     assert_equal(6 - 1, 5)
 
 
+def test_ceil():
+    assert_equal(IntLiteral.__ceil__(5), 5)
+    assert_equal(IntLiteral.__ceil__(0), 0)
+    assert_equal(IntLiteral.__ceil__(-5), -5)
+
+
 def test_floor():
     assert_equal(IntLiteral.__floor__(5), 5)
     assert_equal(IntLiteral.__floor__(0), 0)
@@ -62,6 +68,7 @@ def test_abs():
 
 def main():
     test_int()
+    test_ceil()
     test_floor()
     test_floordiv()
     test_mod()

@@ -305,17 +305,21 @@ what we publish.
           return sqrt(self.x * self.x + self.y * self.y)
   ```
 
-- Mojo now supports types to opt in to use the `floor` function in the `math`
-  module by implementing the `__floor__` method (and so conforming to the new
-  `math.Floorable` trait), for example:
+- Mojo now supports types to opt in to use the `floor` and `ceil` functions in
+  the `math` module by implementing the `__floor__` and `__ceil__` methods (and
+  so conforming to the new `math.Floorable` and `math.Ceilable` traits)
+  respectively. For example:
 
   ```mojo
-    from math import Floorable, floor
+    from math import Ceilable, Floorable, ceil, floor
 
     @value
-    struct Complex(Floorable):
+    struct Complex(Ceilable, Floorable):
       var re: Float64
       var im: Float64
+
+      fn __ceil__(self) -> Self:
+          return Self(ceil(re), ceil(im))
 
       fn __floor__(self) -> Self:
           return Self(floor(re), floor(im))

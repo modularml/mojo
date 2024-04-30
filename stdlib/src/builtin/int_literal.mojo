@@ -12,14 +12,20 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the IntLiteral class."""
 
-from builtin._math import Floorable
+from builtin._math import Ceilable, Floorable
 
 
 @value
 @nonmaterializable(Int)
 @register_passable("trivial")
 struct IntLiteral(
-    Absable, Boolable, EqualityComparable, Floorable, Intable, Stringable
+    Absable,
+    Boolable,
+    Ceilable,
+    EqualityComparable,
+    Floorable,
+    Intable,
+    Stringable,
 ):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and
@@ -243,6 +249,15 @@ struct IntLiteral(
         if self >= 0:
             return self
         return -self
+
+    @always_inline("nodebug")
+    fn __ceil__(self) -> Self:
+        """Return the ceiling of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
 
     @always_inline("nodebug")
     fn __floor__(self) -> Self:

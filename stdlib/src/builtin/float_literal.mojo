@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin._math import Floorable
+from builtin._math import Ceilable, Floorable
 
 # ===----------------------------------------------------------------------===#
 # FloatLiteral
@@ -26,7 +26,13 @@ from builtin._math import Floorable
 @nonmaterializable(Float64)
 @register_passable("trivial")
 struct FloatLiteral(
-    Absable, Boolable, EqualityComparable, Floorable, Intable, Stringable
+    Absable,
+    Boolable,
+    Ceilable,
+    EqualityComparable,
+    Floorable,
+    Intable,
+    Stringable,
 ):
     """Mojo floating point literal type."""
 
@@ -210,6 +216,27 @@ struct FloatLiteral(
         if self >= 0 or self.__eq__(Self(truncated)):
             return truncated
         return truncated - 1
+
+    @always_inline("nodebug")
+    fn __ceil__(self) -> Self:
+        """Return the ceiling value of the FloatLiteral.
+
+        Returns:
+            The ceiling value.
+        """
+
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        # __int_literal__ rounds towards zero, so it's correct for integers and
+        # negative values.
+        var truncated: IntLiteral = self.__int_literal__()
+
+        # Ensure this equality doesn't hit any implicit conversions.
+        if self <= 0 or self.__eq__(Self(truncated)):
+            return truncated
+        return truncated + 1
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
