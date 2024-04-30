@@ -411,6 +411,30 @@ def test_symmetric_difference_update():
     set11 ^= set12
     assert_true(Set[Int]() == set11)
 
+def test_discard():
+    set1 = Set[Int](1, 2, 3)
+    set1.discard(2)
+    assert_true(set1 == Set[Int](1, 3))
+
+    set2 = Set[Int](1, 2, 3)
+    set2.discard(4)
+    assert_true(set2 == Set[Int](1, 2, 3))
+
+    set3 = Set[Int]()
+    set3.discard(1)
+    assert_true(set3 == Set[Int]())
+
+    set4 = Set[Int](1, 2, 3, 4, 5)
+    set4.discard(2)
+    set4.discard(4)
+    assert_true(set4 == Set[Int](1, 3, 5))
+
+    set5 = Set[Int](1, 2, 3)
+    set5.discard(1)
+    set5.discard(2)
+    set5.discard(3)
+    assert_true(set5 == Set[Int]())
+
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.
     print("Test", name_val, "...", end="")
