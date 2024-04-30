@@ -719,7 +719,9 @@ def main():
     test_islower()
     test_lower()
     test_upper()
-    test_isspace()
+    # TODO(37393): Re-enable once we debug why we are depending on some debug behavior
+    # on graviton.  Showing an error in our O3 LLVM pipeline; could be a bug in LLVM.
+    # test_isspace()
     test_rstrip()
     test_lstrip()
     test_strip()
