@@ -524,3 +524,17 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             self._data.pop(value)
         except:
             pass
+
+    fn clear(inout self) raises:
+        """Removes all elements from the set.
+
+        This method modifies the set in-place, removing all of its elements.
+        After calling this method, the set will be empty.
+        """
+        for _ in range(len(self)):
+            var a = self.pop()
+        
+        #! This code below (without using range function) won't pass tests
+        #! It leaves set with one remaining item. Is this a bug?
+        # for _ in self:
+        #     var a = self.pop()
