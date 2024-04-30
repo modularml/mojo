@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal
 from sys.info import bitwidthof
+
+from testing import assert_equal
 
 
 def test_constructors():
@@ -68,6 +69,12 @@ def test_mod():
     assert_equal(1, Int(-3) % Int(2))
 
 
+def test_abs():
+    assert_equal(abs(Int(-5)), 5)
+    assert_equal(abs(Int(2)), 2)
+    assert_equal(abs(Int(0)), 0)
+
+
 def main():
     test_constructors()
     test_properties()
@@ -77,3 +84,4 @@ def main():
     test_pow()
     test_floordiv()
     test_mod()
+    test_abs()
