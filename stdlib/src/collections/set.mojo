@@ -229,6 +229,17 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         return self.issubset(other)
 
+    fn __ge__(self, other: Self) -> Bool:
+        """Overloads the >= operator for sets. Works like as `issuperset` method.
+        
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is a superset of the `other` set, False otherwise.
+        """
+        return self.issuperset(other)
+
     fn __iter__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
