@@ -397,3 +397,18 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
                 return False
 
         return True
+
+    fn isdisjoint(self, other: Self) -> Bool:
+        """Check if this set is disjoint with another set.
+
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is disjoint with the `other` set, False otherwise.
+        """
+        for element in self:
+            if element[] in other:
+                return False
+
+        return True
