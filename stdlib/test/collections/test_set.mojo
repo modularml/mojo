@@ -254,6 +254,7 @@ def test_pop_insertion_order():
     with assert_raises():
         s.pop()  # pop from empty set raises
 
+
 def test_issubset():
     assert_true(Set[Int]().issubset(Set[Int](1, 2, 3)))
     assert_true(Set[Int]() <= Set[Int](1, 2, 3))
@@ -276,6 +277,7 @@ def test_issubset():
     assert_false(Set[Int](1, 2, 3).issubset(Set[Int](4, 5, 6)))
     assert_false(Set[Int](1, 2, 3) <= Set[Int](4, 5, 6))
 
+
 def test_disjoint():
     assert_true(Set[Int]().isdisjoint(Set[Int]()))
     assert_false(Set[Int](1, 2, 3).isdisjoint(Set[Int](1, 2, 3)))
@@ -285,6 +287,7 @@ def test_disjoint():
     assert_true(Set[Int](1, 2, 3).isdisjoint(Set[Int]()))
     assert_false(Set[Int](1, 2, 3).isdisjoint(Set[Int](3)))
     assert_true(Set[Int](1, 2, 3).isdisjoint(Set[Int](4)))
+
 
 def test_issuperset():
     assert_true(Set[Int](1, 2, 3).issuperset(Set[Int]()))
@@ -311,12 +314,14 @@ def test_issuperset():
     assert_true(Set[Int]().issuperset(Set[Int]()))
     assert_true(Set[Int]() >= Set[Int]())
 
+
 def test_greaterthan():
     assert_true(Set[Int](1, 2, 3, 4) > Set[Int](2, 3))
     assert_false(Set[Int](2, 3) > Set[Int](1, 2, 3, 4))
     assert_false(Set[Int](1, 2, 3) > Set[Int](1, 2, 3))
     assert_false(Set[Int]() > Set[Int]())
     assert_true(Set[Int](1, 2, 3) > Set[Int]())
+
 
 def test_lessthan():
     assert_true(Set[Int](2, 3) < Set[Int](1, 2, 3, 4))
@@ -325,24 +330,40 @@ def test_lessthan():
     assert_false(Set[Int]() < Set[Int]())
     assert_true(Set[Int]() < Set[Int](1, 2, 3))
 
+
 def test_symmetric_difference():
-    assert_true(Set[Int](1, 4) == Set[Int](1, 2, 3).symmetric_difference(Set[Int](2, 3, 4)))
+    assert_true(
+        Set[Int](1, 4)
+        == Set[Int](1, 2, 3).symmetric_difference(Set[Int](2, 3, 4))
+    )
     assert_true(Set[Int](1, 4) == Set[Int](1, 2, 3) ^ Set[Int](2, 3, 4))
 
-    assert_true(Set[Int](1, 2, 3, 4, 5, 6) == Set[Int](1, 2, 3).symmetric_difference(Set[Int](4, 5, 6)))
-    assert_true(Set[Int](1, 2, 3, 4, 5, 6) == Set[Int](1, 2, 3) ^ Set[Int](4, 5, 6))
+    assert_true(
+        Set[Int](1, 2, 3, 4, 5, 6)
+        == Set[Int](1, 2, 3).symmetric_difference(Set[Int](4, 5, 6))
+    )
+    assert_true(
+        Set[Int](1, 2, 3, 4, 5, 6) == Set[Int](1, 2, 3) ^ Set[Int](4, 5, 6)
+    )
 
-    assert_true(Set[Int](1, 2, 3) == Set[Int](1, 2, 3).symmetric_difference(Set[Int]()))
+    assert_true(
+        Set[Int](1, 2, 3) == Set[Int](1, 2, 3).symmetric_difference(Set[Int]())
+    )
     assert_true(Set[Int](1, 2, 3) == Set[Int](1, 2, 3) ^ Set[Int]())
 
-    assert_true(Set[Int](1, 2, 3) == Set[Int]().symmetric_difference(Set[Int](1, 2, 3)))
+    assert_true(
+        Set[Int](1, 2, 3) == Set[Int]().symmetric_difference(Set[Int](1, 2, 3))
+    )
     assert_true(Set[Int](1, 2, 3) == Set[Int]() ^ Set[Int](1, 2, 3))
 
     assert_true(Set[Int]() == Set[Int]().symmetric_difference(Set[Int]()))
     assert_true(Set[Int]() == Set[Int]() ^ Set[Int]())
 
-    assert_true(Set[Int]() == Set[Int](1, 2, 3).symmetric_difference(Set[Int](1, 2, 3)))
+    assert_true(
+        Set[Int]() == Set[Int](1, 2, 3).symmetric_difference(Set[Int](1, 2, 3))
+    )
     assert_true(Set[Int]() == Set[Int](1, 2, 3) ^ Set[Int](1, 2, 3))
+
 
 def test_symmetric_difference_update():
     # Test case 1
@@ -411,6 +432,7 @@ def test_symmetric_difference_update():
     set11 ^= set12
     assert_true(Set[Int]() == set11)
 
+
 def test_discard():
     set1 = Set[Int](1, 2, 3)
     set1.discard(2)
@@ -435,30 +457,32 @@ def test_discard():
     set5.discard(3)
     assert_true(set5 == Set[Int]())
 
+
 def test_clear():
     set1 = Set[Int](1, 2, 3)
     set1.clear()
     assert_true(set1 == Set[Int]())
-    
+
     set2 = Set[Int]()
     set2.clear()
     assert_true(set2 == Set[Int]())
-    
+
     set3 = Set[Int](1, 2, 3)
     set3.clear()
     set3.add(4)
     set3.add(5)
     assert_true(set3 == Set[Int](4, 5))
-    
+
     set4 = Set[Int](1, 2, 3)
     set4.clear()
     set4.clear()
     set4.clear()
     assert_true(set4 == Set[Int]())
-    
+
     set5 = Set[Int](1, 2, 3)
     set5.clear()
     assert_true(len(set5) == 0)
+
 
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.

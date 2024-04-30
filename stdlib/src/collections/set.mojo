@@ -231,7 +231,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
 
     fn __ge__(self, other: Self) -> Bool:
         """Overloads the >= operator for sets. Works like as `issuperset` method.
-        
+
         Args:
             other: Another Set instance to check against.
 
@@ -264,7 +264,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
 
     fn __xor__(self, other: Self) -> Self:
         """Overloads the ^ operator for sets. Works like as `symmetric_difference` method.
-        
+
         Args:
             other: The set to find the symmetric difference with.
 
@@ -275,7 +275,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
 
     fn __ixor__(inout self, other: Self):
         """Overloads the ^= operator. Works like as `symmetric_difference_update` method.
-        
+
         Updates the set with the symmetric difference of itself and another set.
 
         Args:
@@ -487,7 +487,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
 
     fn symmetric_difference(self, other: Self) -> Self:
         """Returns the symmetric difference of two sets.
-        
+
         Args:
             other: The set to find the symmetric difference with.
 
@@ -495,20 +495,20 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             A new set containing the symmetric difference of the two sets.
         """
         var result = Set[T]()
-        
+
         for element in self:
             if element[] not in other:
                 result.add(element[])
-        
+
         for element in other:
             if element[] not in self:
                 result.add(element[])
-        
-        return result ^
+
+        return result^
 
     fn symmetric_difference_update(inout self, other: Self):
         """Updates the set with the symmetric difference of itself and another set.
-        
+
         Args:
             other: The set to find the symmetric difference with.
         """
@@ -533,7 +533,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         for _ in range(len(self)):
             var a = self.pop()
-        
+
         #! This code below (without using range function) won't pass tests
         #! It leaves set with one remaining item. Is this a bug?
         # for _ in self:
