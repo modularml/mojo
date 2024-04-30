@@ -240,6 +240,17 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         return self.issuperset(other)
 
+    fn __gt__(self, other: Self) -> Bool:
+        """Overloads the > operator for strict superset comparison of sets.
+
+        Args:
+            other: The set to compare against for the strict superset relationship.
+
+        Returns:
+            True if the set is a strict superset of the `other` set, False otherwise.
+        """
+        return self >= other and self != other
+
     fn __iter__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
