@@ -617,7 +617,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return _ListIter[T, mutability, self_life, False](len(ref[]), ref)
 
     @staticmethod
-    fn __str__[U: StringableCollectionElement](self: List[U]) -> String:
+    fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -631,12 +631,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         When the compiler supports conditional methods, then a simple `str(my_list)` will
         be enough.
 
+        The elements' type must implement the `__repr__()` for this to work.
+
         Args:
             self: The list to represent as a string.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
-              traits `Stringable` and `CollectionElement`.
+              traits `Representable` and `CollectionElement`.
 
         Returns:
             A string representation of the list.
@@ -651,7 +653,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         var result = String(List[UInt8](capacity=minimum_capacity))
         result += "["
         for i in range(len(self)):
-            result += str(self[i])
+            result += repr(self[i])
             if i < len(self) - 1:
                 result += ", "
         result += "]"

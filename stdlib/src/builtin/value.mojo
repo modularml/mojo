@@ -133,3 +133,15 @@ trait ComparableCollectionElement(CollectionElement, EqualityComparable):
     """
 
     pass
+
+
+trait RepresentableCollectionElement(CollectionElement, Representable):
+    """The RepresentableCollectionElement trait denotes a trait composition
+    of the `CollectionElement` and `Representable` traits.
+
+    This is useful to have as a named entity since Mojo does not
+    currently support anonymous trait compositions to constrain
+    on `CollectionElement & Representable` in the parameter.
+    """
+
+    pass
