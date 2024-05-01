@@ -63,6 +63,20 @@ what we publish.
           return Self(floor(re), floor(im))
   ```
 
+- Add an `InlinedArray` type that works on memory-only types.
+  Compare with the existing `StaticTuple` type, which is conceptually an array
+  type, but only worked on `AnyRegType`.
+    ([PR #2294](https://github.com/modularml/mojo/pull/2294) by [@lsh](https://github.com/lsh))
+
+- Base64 decoding support has been added.
+    ([PR #2364](https://github.com/modularml/mojo/pull/2364) by [@mikowals](https://github.com/mikowals))
+
+- Add `repr()` function and `Representable` trait.
+    ([PR #2361](https://github.com/modularml/mojo/pull/2361) by [@mikowals](https://github.com/gabrieldemarmiesse))
+
+- Add `SIMD.shuffle()` with `StaticIntTuple` mask.
+    ([PR #2315](https://github.com/modularml/mojo/pull/2315) by [@mikowals](https://github.com/mikowals))
+
 ### 🦋 Changed
 
 ### ❌ Removed
