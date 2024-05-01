@@ -70,6 +70,9 @@ what we publish.
 - The method `object.print()` has been removed. Since now, `object` has the
   `Stringable` trait, you can use `print(my_object)` instead.
 
+- The `math.clamp` function has been removed in favor of a new `SIMD.clamp`
+  method.
+
 ### 🛠️ Fixed
 
 - [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on
