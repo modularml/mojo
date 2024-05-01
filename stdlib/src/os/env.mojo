@@ -72,7 +72,7 @@ fn getenv(name: String, default: String = "") -> String:
     if not os_is_supported:
         return default
 
-    var ptr = external_call["getenv", DTypePointer[DType.int8]](name._as_ptr())
+    var ptr = external_call["getenv", DTypePointer[DType.uint8]](name._as_ptr())
     if not ptr:
         return default
     return String(StringRef(ptr))
