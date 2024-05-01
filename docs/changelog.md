@@ -73,6 +73,9 @@ what we publish.
 - The `math.clamp` function has been removed in favor of a new `SIMD.clamp`
   method.
 
+- The `math.round_half_down` and `math.round_half_up` functions are removed.
+  These can be trivially implemented using the `ceil` and `floor` functions.
+
 ### 🛠️ Fixed
 
 - [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on
