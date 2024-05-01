@@ -31,16 +31,6 @@ from .io import _snprintf
 
 
 @always_inline
-fn _abs(x: Int) -> Int:
-    return x if x > 0 else -x
-
-
-@always_inline
-fn _abs(x: SIMD) -> __type_of(x):
-    return (x > 0).select(x, -x)
-
-
-@always_inline
 fn _ctlz(val: Int) -> Int:
     return llvm_intrinsic["llvm.ctlz", Int, has_side_effect=False](val, False)
 
@@ -1522,7 +1512,7 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
 
 @always_inline
 fn _calc_initial_buffer_size(n0: Int) -> Int:
-    var n = _abs(n0)
+    var n = abs(n0)
     var sign = 0 if n0 > 0 else 1
     alias is_32bit_system = bitwidthof[DType.index]() == 32
 
@@ -1544,7 +1534,7 @@ fn _calc_initial_buffer_size(n: Float64) -> Int:
 fn _calc_initial_buffer_size[type: DType](n0: Scalar[type]) -> Int:
     @parameter
     if type.is_integral():
-        var n = _abs(n0)
+        var n = abs(n0)
         var sign = 0 if n0 > 0 else 1
         alias is_32bit_system = bitwidthof[DType.index]() == 32
 

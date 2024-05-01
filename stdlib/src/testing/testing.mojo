@@ -28,11 +28,6 @@ from builtin._location import __call_location, _SourceLocation
 
 
 @always_inline
-fn _abs(x: SIMD) -> __type_of(x):
-    return (x > 0).select(x, -x)
-
-
-@always_inline
 fn _isclose(
     a: SIMD,
     b: __type_of(a),
@@ -50,7 +45,7 @@ fn _isclose(
 
     var atol_vec = SIMD[a.type, a.size](atol)
     var rtol_vec = SIMD[a.type, a.size](rtol)
-    var res = _abs(a - b) <= (atol_vec.max(rtol_vec * _abs(a).max(_abs(b))))
+    var res = abs(a - b) <= (atol_vec.max(rtol_vec * abs(a).max(abs(b))))
 
     if not equal_nan:
         return res
@@ -275,7 +270,8 @@ fn assert_almost_equal[
     if not almost_equal:
         var err = str(lhs) + " is not close to " + str(
             rhs
-        ) + " with a diff of " + _abs(lhs - rhs)
+        ) + " with a diff of " + abs(lhs - rhs)
+
         if msg:
             err += " (" + msg + ")"
         raise _assert_error(err, __call_location())
