@@ -299,7 +299,21 @@ struct FloatLiteral(
             oper = __mlir_attr.`#kgen<float_literal.binop_kind truediv>`
         ](self.value, rhs.value)
 
-    # TODO - __floordiv__
+    @always_inline("nodebug")
+    fn __floordiv__(self, rhs: Self) -> Self:
+        """Returns self divided by rhs, rounded down to the nearest integer.
+
+        Constraints:
+            The element type of the SIMD vector must be numeric.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            `floor(self / rhs)` value.
+        """
+        return self.__truediv__(rhs).__floor__()
+
     # TODO - maybe __mod__?
     # TODO - maybe __pow__?
 

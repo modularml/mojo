@@ -55,13 +55,16 @@ def test_floor():
 
 
 def test_division():
-    # TODO: https://github.com/modularml/mojo/issues/1787
-    # allow this at compile time
     assert_equal(FloatLiteral(4.4) / 0.5, 8.8)
-    assert_equal(FloatLiteral(4.4) // 0.5, 8.0)
-    assert_equal(FloatLiteral(-4.4) // 0.5, -9.0)
-    assert_equal(FloatLiteral(4.4) // -0.5, -9.0)
-    assert_equal(FloatLiteral(-4.4) // -0.5, 8.0)
+
+    alias f1 = 4.4 // 0.5
+    assert_equal(f1, 8.0)
+    alias f2 = -4.4 // 0.5
+    assert_equal(f2, -9.0)
+    alias f3 = 4.4 // -0.5
+    assert_equal(f3, -9.0)
+    alias f4 = -4.4 // -0.5
+    assert_equal(f4, 8.0)
 
 
 def test_power():
