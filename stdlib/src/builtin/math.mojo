@@ -14,12 +14,6 @@
 source parts of the standard library since the `math`
 package is currently closed source and cannot be depended
 on in the open source parts of the standard library.
-
-You can import these APIs from the `utils` package. For example:
-
-```mojo
-from utils._math import min, max
-```
 """
 
 # ===----------------------------------------------------------------------===#
