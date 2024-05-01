@@ -930,6 +930,24 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         return self._floor_ceil_impl["llvm.ceil"]()
 
+    fn clamp(self, lower_bound: Self, upper_bound: Self) -> Self:
+        """Clamps the values in a SIMD vector to be in a certain range.
+
+        Clamp cuts values in the input SIMD vector off at the upper bound and
+        lower bound values. For example,  SIMD vector `[0, 1, 2, 3]` clamped to
+        a lower bound of 1 and an upper bound of 2 would return `[1, 1, 2, 2]`.
+
+        Args:
+            lower_bound: Minimum of the range to clamp to.
+            upper_bound: Maximum of the range to clamp to.
+
+        Returns:
+            A new SIMD vector containing x clamped to be within lower_bound and
+            upper_bound.
+        """
+
+        return self.min(upper_bound).max(lower_bound)
+
     # ===-------------------------------------------------------------------===#
     # In place operations.
     # ===-------------------------------------------------------------------===#
