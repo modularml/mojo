@@ -26,16 +26,6 @@ from memory.unsafe_pointer import move_pointee, move_from_pointee
 from .optional import Optional
 
 # ===----------------------------------------------------------------------===#
-# Utilties
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _max(a: Int, b: Int) -> Int:
-    return a if a > b else b
-
-
-# ===----------------------------------------------------------------------===#
 # List
 # ===----------------------------------------------------------------------===#
 
@@ -220,7 +210,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             value: The value to append.
         """
         if self.size >= self.capacity:
-            self._realloc(_max(1, self.capacity * 2))
+            self._realloc(max(1, self.capacity * 2))
         initialize_pointee_move(self.data + self.size, value^)
         self.size += 1
 
@@ -237,7 +227,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         var normalized_idx = i
         if i < 0:
-            normalized_idx = _max(0, len(self) + i)
+            normalized_idx = max(0, len(self) + i)
 
         var earlier_idx = len(self)
         var later_idx = len(self) - 1

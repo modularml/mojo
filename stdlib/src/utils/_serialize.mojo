@@ -22,11 +22,6 @@ alias _kCompactMaxElemsToPrint = 7
 alias _kCompactElemPerSide = _kCompactMaxElemsToPrint // 2
 
 
-@always_inline
-fn _max(a: Int, b: Int) -> Int:
-    return a if a > b else b
-
-
 fn _serialize_elements_compact[
     serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
 ](ptr: DTypePointer, len: Int):
@@ -107,7 +102,7 @@ fn _serialize[
     # product of all dims other than last two.
 
     var num_matrices = 1
-    for i in range(_max(rank - 2, 0)):
+    for i in range(max(rank - 2, 0)):
         num_matrices *= shape[i]
 
     var matrix_idx = 0

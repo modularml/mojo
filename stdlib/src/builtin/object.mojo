@@ -29,16 +29,6 @@ from utils import StringRef, unroll
 from .io import _printf, _put
 
 # ===----------------------------------------------------------------------=== #
-# Utilities
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _min(a: Int, b: Int) -> Int:
-    return a if a < b else b
-
-
-# ===----------------------------------------------------------------------=== #
 # _ObjectImpl
 # ===----------------------------------------------------------------------=== #
 
@@ -69,7 +59,7 @@ struct _ImmutableString:
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
-        var res = memcmp(self.data, rhs.data, _min(self.length, rhs.length))
+        var res = memcmp(self.data, rhs.data, min(self.length, rhs.length))
         if res != 0:
             return -1 if res < 0 else 1
         if self.length == rhs.length:
@@ -1017,7 +1007,7 @@ struct object(IntableRaising, Boolable, Stringable):
     fn _list_compare(self, rhs: object) raises -> Int:
         var llen = self._value.get_list_length()
         var rlen = self._value.get_list_length()
-        var cmp_len = _min(llen, rlen)
+        var cmp_len = min(llen, rlen)
         for i in range(cmp_len):
             var lelt: object = self._value.get_list_element(i)
             var relt: object = rhs._value.get_list_element(i)

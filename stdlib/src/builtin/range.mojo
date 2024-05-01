@@ -57,11 +57,6 @@ fn _sign(x: Int) -> Int:
     return 0
 
 
-@always_inline
-fn _max(a: Int, b: Int) -> Int:
-    return a if a > b else b
-
-
 # ===----------------------------------------------------------------------=== #
 # Range
 # ===----------------------------------------------------------------------=== #
@@ -74,7 +69,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange):
 
     @always_inline("nodebug")
     fn __init__(inout self, end: Int):
-        self.curr = _max(0, end)
+        self.curr = max(0, end)
         self.end = end
 
     @always_inline("nodebug")
@@ -119,7 +114,7 @@ struct _SequentialRange(Sized, ReversibleRange):
     @always_inline("nodebug")
     fn __len__(self) -> Int:
         # FIXME(#38392):
-        # return _max(0, self.end - self.start)
+        # return max(0, self.end - self.start)
         return self.end - self.start if self.start < self.end else 0
 
     @always_inline("nodebug")

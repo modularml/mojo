@@ -40,11 +40,6 @@ fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
     return (numerator + denominator - 1)._positive_div(denominator)
 
 
-@always_inline
-fn _max(a: Int, b: Int) -> Int:
-    return a if a > b else b
-
-
 # ===----------------------------------------------------------------------=== #
 # Implementation
 # ===----------------------------------------------------------------------=== #
@@ -161,7 +156,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     #   nondeterminism (read) or memory corruption (write)
     # TODO(#31160): use math.lcm
     # Technically this is LCM, but alignments should always be multiples of 2.
-    alias alignment = _max(
+    alias alignment = max(
         alignof[SIMD[type, size]](), alignof[SIMD[DType.uint8, int8_size]]()
     )
     var bytes = stack_allocation[int8_size, DType.uint8, alignment=alignment]()

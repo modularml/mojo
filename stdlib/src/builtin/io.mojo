@@ -307,10 +307,6 @@ fn _put(x: String):
     _put(x._strref_dangerous())
 
 
-fn _min(x: Int, y: Int) -> Int:
-    return x if x < y else y
-
-
 @no_inline
 fn _put(x: StringRef):
     # Avoid printing "(null)" for an empty/default constructed `String`
@@ -337,7 +333,7 @@ fn _put(x: StringRef):
         # The string is large, then we need to chunk it.
         var p = x.data
         while str_len:
-            var ll = _min(str_len, MAX_STR_LEN)
+            var ll = min(str_len, MAX_STR_LEN)
             _printf("%.*s", ll, p)
             str_len -= ll
             p += ll
