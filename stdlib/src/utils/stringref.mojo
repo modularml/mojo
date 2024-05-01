@@ -81,8 +81,31 @@ struct StringRef(
         """
         return self
 
+    # TODO: #2317 Drop support for this constructor when we have fully
+    # transitionned to UInt8 as the main byte type.
     @always_inline
     fn __init__(ptr: DTypePointer[DType.int8], len: Int) -> StringRef:
+        """Construct a StringRef value given a (potentially non-0 terminated
+        string).
+
+        The constructor takes a raw pointer and a length.
+
+        Note that you should use the constructor from `DTypePointer[DType.uint8]` instead
+        as we are now storing the bytes as UInt8.
+        See https://github.com/modularml/mojo/issues/2317 for more information.
+
+        Args:
+            ptr: DTypePointer to the string.
+            len: The length of the string.
+
+        Returns:
+            Constructed `StringRef` object.
+        """
+
+        return Self {data: ptr, length: len}
+
+    @always_inline
+    fn __init__(ptr: DTypePointer[DType.uint8], len: Int) -> StringRef:
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -96,11 +119,17 @@ struct StringRef(
             Constructed `StringRef` object.
         """
 
-        return Self {data: ptr, length: len}
+        return Self {data: ptr.bitcast[DType.int8](), length: len}
 
+    # TODO: #2317 Drop support for this constructor when we have fully
+    # transitionned to UInt8 as the main byte type.
     @always_inline
     fn __init__(ptr: UnsafePointer[Int8]) -> StringRef:
         """Construct a StringRef value given a null-terminated string.
+
+        Note that you should use the constructor from `UnsafePointer[UInt8]` instead
+        as we are now storing the bytes as UInt8.
+        See https://github.com/modularml/mojo/issues/2317 for more information.
 
         Args:
             ptr: UnsafePointer to the string.
@@ -112,8 +141,27 @@ struct StringRef(
         return DTypePointer[DType.int8](ptr)
 
     @always_inline
+    fn __init__(ptr: UnsafePointer[UInt8]) -> StringRef:
+        """Construct a StringRef value given a null-terminated string.
+
+        Args:
+            ptr: UnsafePointer to the string.
+
+        Returns:
+            Constructed `StringRef` object.
+        """
+
+        return DTypePointer[DType.uint8](ptr)
+
+    # TODO: #2317 Drop support for this constructor when we have fully
+    # transitionned to UInt8 as the main byte type.
+    @always_inline
     fn __init__(ptr: DTypePointer[DType.int8]) -> StringRef:
         """Construct a StringRef value given a null-terminated string.
+
+        Note that you should use the constructor from `DTypePointer[DType.uint8]` instead
+        as we are now storing the bytes as UInt8.
+        See https://github.com/modularml/mojo/issues/2317 for more information.
 
         Args:
             ptr: DTypePointer to the string.
@@ -129,13 +177,43 @@ struct StringRef(
         return StringRef(ptr, len)
 
     @always_inline
+    fn __init__(ptr: DTypePointer[DType.uint8]) -> StringRef:
+        """Construct a StringRef value given a null-terminated string.
+
+        Args:
+            ptr: DTypePointer to the string.
+
+        Returns:
+            Constructed `StringRef` object.
+        """
+
+        var len = 0
+        while ptr.load(len):
+            len += 1
+
+        return StringRef(ptr.bitcast[DType.int8](), len)
+
+    # TODO: #2317 Drop support for this method when we have fully
+    # transitionned to UInt8 as the main byte type.
+    @always_inline
     fn _as_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
+
+        Prefer to use `_as_uint8_ptr()` instead.
 
         Returns:
             The DTypePointer to the underlying memory.
         """
         return self.data
+
+    @always_inline
+    fn _as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The DTypePointer to the underlying memory.
+        """
+        return self.data.bitcast[DType.uint8]()
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -268,16 +346,16 @@ struct StringRef(
         var haystack_str = self._from_start(start)
 
         var loc = _memmem(
-            haystack_str._as_ptr(),
+            haystack_str._as_uint8_ptr(),
             len(haystack_str),
-            substr._as_ptr(),
+            substr._as_uint8_ptr(),
             len(substr),
         )
 
         if not loc:
             return -1
 
-        return int(loc) - int(self._as_ptr())
+        return int(loc) - int(self._as_uint8_ptr())
 
     fn rfind(self, substr: StringRef, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -301,16 +379,16 @@ struct StringRef(
         var haystack_str = self._from_start(start)
 
         var loc = _memrmem(
-            haystack_str._as_ptr(),
+            haystack_str._as_uint8_ptr(),
             len(haystack_str),
-            substr._as_ptr(),
+            substr._as_uint8_ptr(),
             len(substr),
         )
 
         if not loc:
             return -1
 
-        return int(loc) - int(self._as_ptr())
+        return int(loc) - int(self._as_uint8_ptr())
 
     fn _from_start(self, start: Int) -> StringRef:
         """Gets the StringRef pointing to the substring after the specified slice start position.
