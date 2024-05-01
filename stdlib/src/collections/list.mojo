@@ -20,7 +20,6 @@ from collections import List
 """
 
 
-from builtin.value import StringableCollectionElement
 from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
 from .optional import Optional
@@ -658,3 +657,34 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 result += ", "
         result += "]"
         return result
+
+    @staticmethod
+    fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
+        """Counts the number of occurrences of a value in the list.
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below.
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(__type_of(my_list).count(my_list, 1))
+        ```
+
+        When the compiler supports conditional methods, then a simple `my_list.count(1)` will
+        be enough.
+
+        Parameters:
+            T: The type of the elements in the list. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            self: The list to search.
+            value: The value to count.
+
+        Returns:
+            The number of occurrences of the value in the list.
+        """
+        var count = 0
+        for elem in self:
+            if elem[] == value:
+                count += 1
+        return count
