@@ -80,3 +80,5 @@ what we publish.
 
 - [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on
   simple trait definitions.
+- [#1787](https://github.com/modularml/mojo/issues/1787) Fix error when using
+  `//` on `FloatLiteral` in alias expression.
