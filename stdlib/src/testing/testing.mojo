@@ -19,7 +19,7 @@ from testing import assert_true
 ```
 """
 from collections import Optional
-from utils._numerics import isfinite, isnan
+from utils._numerics import isnan
 from builtin._location import __call_location, _SourceLocation
 
 # ===----------------------------------------------------------------------=== #
@@ -41,29 +41,21 @@ fn _isclose(
     rtol: Scalar[a.type],
     equal_nan: Bool,
 ) -> SIMD[DType.bool, a.size]:
-    constrained[
-        a.type.is_bool() or a.type.is_integral() or a.type.is_floating_point(),
-        "input type must be boolean, integral, or floating-point",
-    ]()
-
     @parameter
     if a.type.is_bool() or a.type.is_integral():
         return a == b
-    else:
-        var both_nan = isnan(a) & isnan(b)
-        if equal_nan and both_nan.reduce_and():
-            return True
 
-        var res = (a == b)
-        var atol_vec = SIMD[a.type, a.size](atol)
-        var rtol_vec = SIMD[a.type, a.size](rtol)
-        res |= (
-            isfinite(a)
-            & isfinite(b)
-            & (_abs(a - b) <= (atol_vec.max(rtol_vec * _abs(a).max(_abs(b)))))
-        )
+    if equal_nan and isnan(a) and isnan(b):
+        return True
 
-        return res | both_nan if equal_nan else res
+    var atol_vec = SIMD[a.type, a.size](atol)
+    var rtol_vec = SIMD[a.type, a.size](rtol)
+    var res = _abs(a - b) <= (atol_vec.max(rtol_vec * _abs(a).max(_abs(b))))
+
+    if not equal_nan:
+        return res
+
+    return res.select(res, isnan(a) and isnan(b))
 
 
 # ===----------------------------------------------------------------------=== #
@@ -262,14 +254,6 @@ fn assert_almost_equal[
     """Asserts that the input values are equal up to a tolerance. If it is
     not then an Error is raised.
 
-    When the type is boolean or integral, then equality is checked. When the
-    type is floating-point, then this checks if the two input values are
-    numerically the close using the $abs(lhs - rhs) <= max(rtol * max(abs(lhs),
-    abs(rhs)), atol)$ formula.
-
-    Constraints:
-        The type must be boolean, integral, or floating-point.
-
     Parameters:
         type: The dtype of the left- and right-hand-side SIMD vectors.
         size: The width of the left- and right-hand-side SIMD vectors.
@@ -278,31 +262,22 @@ fn assert_almost_equal[
         lhs: The lhs of the equality.
         rhs: The rhs of the equality.
         msg: The message to print.
-        atol: The absolute tolerance.
+        atol: The _absolute tolerance.
         rtol: The relative tolerance.
         equal_nan: Whether to treat nans as equal.
 
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    constrained[
-        type.is_bool() or type.is_integral() or type.is_floating_point(),
-        "type must be boolean, integral, or floating-point",
-    ]()
-
     var almost_equal = _isclose(
         lhs, rhs, atol=atol, rtol=rtol, equal_nan=equal_nan
     )
-    if not almost_equal.reduce_and():
-        var err = "AssertionError: " + str(lhs) + " is not close to " + str(rhs)
-
-        @parameter
-        if type.is_integral() or type.is_floating_point():
-            err += " with a diff of " + str(_abs(lhs - rhs))
-
+    if not almost_equal:
+        var err = str(lhs) + " is not close to " + str(
+            rhs
+        ) + " with a diff of " + _abs(lhs - rhs)
         if msg:
             err += " (" + msg + ")"
-
         raise _assert_error(err, __call_location())
 
 
