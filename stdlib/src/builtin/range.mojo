@@ -44,11 +44,6 @@ fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
 
 
 @always_inline
-fn _abs(x: Int) -> Int:
-    return x if x > 0 else -x
-
-
-@always_inline
 fn _sign(x: Int) -> Int:
     if x > 0:
         return 1
@@ -187,7 +182,7 @@ struct _StridedRange(Sized, ReversibleRange):
         # FIXME(#38392)
         # if (self.step > 0) == (self.start > self.end):
         #     return 0
-        return _div_ceil_positive(_abs(self.start - self.end), _abs(self.step))
+        return _div_ceil_positive(abs(self.start - self.end), abs(self.step))
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
