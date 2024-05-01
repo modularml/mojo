@@ -35,16 +35,6 @@ fn _align_down(value: Int, alignment: Int) -> Int:
     return value._positive_div(alignment) * alignment
 
 
-@always_inline
-fn _min(a: Int, b: Int) -> Int:
-    return a if a < b else b
-
-
-@always_inline
-fn _max(a: Int, b: Int) -> Int:
-    return a if a > b else b
-
-
 # ===----------------------------------------------------------------------===#
 # StringRef
 # ===----------------------------------------------------------------------===#
@@ -343,12 +333,12 @@ struct StringRef(
             # Avoid out of bounds earlier than the start
             # len = 5, start = -3,  then abs_start == 2, i.e. a partial string
             # len = 5, start = -10, then abs_start == 0, i.e. the full string
-            abs_start = _max(self_len + start, 0)
+            abs_start = max(self_len + start, 0)
         else:
             # Avoid out of bounds past the end
             # len = 5, start = 2,   then abs_start == 2, i.e. a partial string
             # len = 5, start = 8,   then abs_start == 5, i.e. an empty string
-            abs_start = _min(start, self_len)
+            abs_start = min(start, self_len)
 
         debug_assert(
             abs_start >= 0, "strref absolute start must be non-negative"
