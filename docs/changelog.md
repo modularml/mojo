@@ -76,6 +76,10 @@ what we publish.
 - The `math.round_half_down` and `math.round_half_up` functions are removed.
   These can be trivially implemented using the `ceil` and `floor` functions.
 
+- The `add`, `sub`, `mul`, `div`, and `mod` functions have been removed from the
+  `math` module. Instead, users should rely on the `+`, `-`, `*`, `/`, and `%`
+  operators, respectively.
+
 ### 🛠️ Fixed
 
 - [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on
