@@ -40,8 +40,8 @@ what we publish.
           return sqrt(self.x * self.x + self.y * self.y)
   ```
 
-- The `abs()` function has also moved from `math` to `builtin`, so you no longer
-  need to do `from math import abs`.
+- The `abs(), min(), and max()` functions have moved from `math` to `builtin`,
+  so you no longer need to do `from math import abs, min, max`.
 
 - Mojo now allows types to opt in to use the `floor()` and `ceil()` functions in
   the `math` module by implementing the `__floor__()` and `__ceil__()` methods
