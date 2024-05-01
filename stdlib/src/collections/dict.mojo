@@ -45,7 +45,7 @@ trait KeyElement(CollectionElement, Hashable, EqualityComparable):
     pass
 
 
-trait StringableKeyElement(KeyElement, Stringable):
+trait RepresentableKeyElement(KeyElement, Representable):
     """A trait composition for types which implement all requirements of
     dictionary keys and Stringable."""
 
@@ -534,7 +534,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     @staticmethod
     fn __str__[
-        T: StringableKeyElement, U: StringableCollectionElement
+        T: RepresentableKeyElement, U: RepresentableCollectionElement
     ](self: Dict[T, U]) -> String:
         """Returns a string representation of a `Dict`.
 
@@ -553,14 +553,17 @@ struct Dict[K: KeyElement, V: CollectionElement](
         When the compiler supports conditional methods, then a simple `str(my_dict)` will
         be enough.
 
+        Note that both they keys and values' types must implement the `__repr__()` method
+        for this to work. See the `Representable` trait for more information.
+
         Args:
             self: The Dict to represent as a string.
 
         Parameters:
             T: The type of the keys in the Dict. Must implement the
-              traits `Stringable` and `KeyElement`.
+              traits `Representable` and `KeyElement`.
             U: The type of the values in the Dict. Must implement the
-                traits `Stringable` and `CollectionElement`.
+                traits `Representable` and `CollectionElement`.
 
         Returns:
             A string representation of the Dict.
@@ -571,7 +574,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
         var i = 0
         for key_value in self.items():
-            result += str(key_value[].key) + ": " + str(key_value[].value)
+            result += repr(key_value[].key) + ": " + repr(key_value[].value)
             if i < len(self) - 1:
                 result += ", "
             i += 1
