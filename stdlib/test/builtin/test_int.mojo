@@ -87,6 +87,22 @@ def test_abs():
     assert_equal(abs(Int(0)), 0)
 
 
+def test_string_conversion():
+    assert_equal(str(Int(3)), "3")
+    assert_equal(str(Int(-3)), "-3")
+    assert_equal(str(Int(0)), "0")
+    assert_equal(str(Int(100)), "100")
+    assert_equal(str(Int(-100)), "-100")
+
+
+def test_int_representation():
+    assert_equal(repr(Int(3)), "3")
+    assert_equal(repr(Int(-3)), "-3")
+    assert_equal(repr(Int(0)), "0")
+    assert_equal(repr(Int(100)), "100")
+    assert_equal(repr(Int(-100)), "-100")
+
+
 def main():
     test_constructors()
     test_properties()
@@ -99,3 +115,5 @@ def main():
     test_floordiv()
     test_mod()
     test_abs()
+    test_string_conversion()
+    test_int_representation()

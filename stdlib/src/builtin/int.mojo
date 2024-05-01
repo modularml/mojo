@@ -373,6 +373,14 @@ struct Int(
             # Keep buf alive until we've finished with the StringRef
             _ = buf^
 
+    fn __repr__(self) -> String:
+        """Get the integer as a string. Returns the same `String` as `__str__`.
+
+        Returns:
+            A string representation.
+        """
+        return str(self)
+
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
         """Convert to index.

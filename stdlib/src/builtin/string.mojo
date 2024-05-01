@@ -452,6 +452,17 @@ struct String(
     fn __str__(self) -> String:
         return self
 
+    @always_inline
+    fn __repr__(self) -> String:
+        """Return a Mojo-compatible representation of the `String` instance.
+
+        You don't need to call this method directly, use `repr(my_string)` instead.
+        """
+        if "'" in self:
+            return '"' + self + "'"
+        else:
+            return "'" + self + "'"
+
     # ===------------------------------------------------------------------===#
     # Initializers
     # ===------------------------------------------------------------------===#
