@@ -57,6 +57,13 @@ trait Stringable:
     **Note:** If the `__str__()` method might raise an error, use the
     [`StringableRaising`](/mojo/stdlib/builtin/str/stringableraising)
     trait, instead.
+
+    About the difference between `__repr__()` and `__str__()`:
+    The method `__repr__` compute the compute the "official" string representation of an object
+    while `__str__` computes the "informal" or nicely printable string representation of an object.
+
+    This method differs from `__repr__()` in that there is no expectation that `__str__()`
+    return a valid Mojo expression: a more convenient or concise representation can be used.
     """
 
     fn __str__(self) -> String:
