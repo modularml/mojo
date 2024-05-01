@@ -71,3 +71,6 @@ what we publish.
   `Stringable` trait, you can use `print(my_object)` instead.
 
 ### 🛠️ Fixed
+
+- [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on
+  simple trait definitions.
