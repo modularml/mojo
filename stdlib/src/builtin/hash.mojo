@@ -63,14 +63,16 @@ fn _HASH_SECRET() -> Int:
     return ptr.bitcast[Int]()[0]
 
 
-fn _initialize_hash_secret(payload: Pointer[NoneType]) -> Pointer[NoneType]:
+fn _initialize_hash_secret(
+    payload: UnsafePointer[NoneType],
+) -> UnsafePointer[NoneType]:
     var secret = random.random_ui64(0, UInt64.MAX)
-    var data = Pointer[Int].alloc(1)
-    data.store(int(secret))
+    var data = UnsafePointer[Int].alloc(1)
+    data[] = int(secret)
     return data.bitcast[NoneType]()
 
 
-fn _destroy_hash_secret(p: Pointer[NoneType]):
+fn _destroy_hash_secret(p: UnsafePointer[NoneType]):
     p.free()
 
 
@@ -291,7 +293,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     if r != 0:
         var remaining = StaticTuple[Int8, stride]()
         var ptr = DTypePointer[DType.int8](
-            Pointer.address_of(remaining).bitcast[Int8]()
+            UnsafePointer.address_of(remaining).bitcast[Int8]()
         )
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
