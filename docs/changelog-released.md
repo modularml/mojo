@@ -35,7 +35,7 @@ modular update mojo
 ### ✨ Highlights
 
 - `AnyPointer` was renamed to
-  [`UnsafePointer`](mojo/stdlib/memory/unsafe_pointer/UnsafePointer) and is now
+  [`UnsafePointer`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer) and is now
   Mojo's preferred unsafe pointer type.  It has several enhancements, including:
 
   - The element type can now be any type: it doesn't require `Movable`.
@@ -990,7 +990,7 @@ fixed in a future release.
 - The [`memcpy()`](/mojo/stdlib/memory/memory/memcpy) overload that worked on
   [`Buffer`](/mojo/stdlib/buffer/buffer/Buffer) types has been removed in favor
   of just overloads for [`Pointer`](/mojo/stdlib/memory/unsafe/Pointer) and
-  [`DTypePointer`](/mojo/stdlib/memory/unsafe/dtypepointer):
+  [`DTypePointer`](/mojo/stdlib/memory/unsafe/DTypePointer):
 
   ```mojo
   # Doesn't work
@@ -1119,7 +1119,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
 - A new version of the [Mojo Playground](/mojo/playground) is available. The new
   playground is a simple interactive editor for Mojo code, similar to the Rust
   Playground or Go Playground. The old
-  [JupyterLab based playground](https://playground.modular.com) will remain
+  JupyterLab based playground will remain
   online until March 20th.
 
 - The Mojo LSP server will now generate fixits for populating empty
@@ -1184,7 +1184,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
 
 - [`DynamicVector`](/mojo/stdlib/collections/list/List) now
   supports iteration. Iteration values are instances of
-  [Reference](/mojo/stdlib/memory/unsafe/Reference) and require dereferencing:
+  [Reference](/mojo/stdlib/memory/reference/Reference) and require dereferencing:
 
   ```mojo
   var v: DynamicVector[String]()
@@ -1269,10 +1269,10 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   `UnusualSlice` constructor.
 
 - The `__refitem__()` accessor method may now return a
-  [`Reference`](/mojo/stdlib/memory/unsafe/reference) instead of having to
+  [`Reference`](/mojo/stdlib/memory/reference/reference) instead of having to
   return an MLIR internal reference type.
 
-- Added [`AnyPointer.move_into()`](/mojo/stdlib/memory/anypointer/AnyPointer#move_into)
+- Added [`AnyPointer.move_into()`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer#move_into)
   method, for moving a value from one pointer memory location to another.
 
 - Added built-in [`hex()`](/mojo/stdlib/builtin/hex/hex) function, which can be
@@ -1467,17 +1467,17 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   `Int`.
 
 - [`Variant.get[T]()`](/mojo/stdlib/utils/variant/Variant#get) now returns a
-  [`Reference`](/mojo/stdlib/memory/unsafe/reference) to the value rather than a
-  copy.
+[`Reference`](/mojo/stdlib/memory/reference/Reference) to the value rather than
+a copy.
 
 - The [`String`](/mojo/stdlib/builtin/string/String) methods `tolower()`
   and `toupper()` have been renamed to `str.lower()` and `str.upper()`.
 
 - The `ref` and `mutref` identifiers are no longer reserved as Mojo keywords.
-  We originally thought about using those as language sugar for references, but
-  we believe that generic language features combined with the
-  [`Reference`](/mojo/stdlib/memory/unsafe/reference) type will provide a good
-  experience without dedicated sugar.
+We originally thought about using those as language sugar for references, but
+we believe that generic language features combined with the
+[`Reference`](/mojo/stdlib/memory/reference/Reference) type will provide a good
+experience without dedicated sugar.
 
 ### 🛠️ Fixed
 
@@ -1643,11 +1643,11 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   a `VariadicListMem` returned a low-level pointer, which required the user to
   call `__get_address_as_lvalue()` to access the element.)
 
-  Note that subscripting the variadic list works nicely as above, but
-  iterating over the variadic list directly with a `for` loop produces a
-  [`Reference`](/mojo/stdlib/memory/unsafe/reference) (described below) instead
-  of the desired value, so an extra subscript is required; We intend to fix this
-  in the future.
+  Note that subscripting the variadic list works nicely as above, but iterating
+  over the variadic list directly with a `for` loop produces a
+  [`Reference`](/mojo/stdlib/memory/reference/Reference) (described below)
+  instead of the desired value, so an extra subscript is required; We intend to
+  fix this in the future.
 
   ```mojo
   fn make_worldly(inout *strs: String):
@@ -1671,7 +1671,7 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   ```
 
 - Mojo now has a prototype version of a safe
-  [`Reference`](/mojo/stdlib/memory/unsafe/reference) type. The compiler's
+  [`Reference`](/mojo/stdlib/memory/reference/Reference) type. The compiler's
   lifetime tracking pass can reason about references to safely extend local
   variable lifetime, and check indirect access safety.  The `Reference` type
   is brand new (and currently has no syntactic sugar) so it must be explicitly
@@ -2299,7 +2299,7 @@ the previous "read to EOF" behavior when size is negative.
   ```
 
 - Subscripting added to
-  [`DTypePointer`](/mojo/stdlib/memory/unsafe/dtypepointer) and
+  [`DTypePointer`](/mojo/stdlib/memory/unsafe/DTypePointer) and
   [`Pointer`](/mojo/stdlib/memory/unsafe/Pointer):
 
   ```mojo
