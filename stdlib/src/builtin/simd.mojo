@@ -948,6 +948,21 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         return self.min(upper_bound).max(lower_bound)
 
+    @always_inline("nodebug")
+    fn roundeven(self) -> Self:
+        """Performs elementwise banker's rounding on the elements of a SIMD
+        vector.
+
+        This rounding goes to the nearest integer with ties toward the nearest
+        even integer.
+
+        Returns:
+            The elementwise banker's rounding of this SIMD vector.
+        """
+        return llvm_intrinsic[
+            "llvm.roundeven", __type_of(self), has_side_effect=False
+        ](self)
+
     # ===-------------------------------------------------------------------===#
     # In place operations.
     # ===-------------------------------------------------------------------===#
