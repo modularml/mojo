@@ -192,7 +192,7 @@ fn int(value: String, base: Int = 10) raises -> Int:
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct Int(Intable, Stringable, KeyElement, Boolable, Formattable):
+struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
     """This type represents an integer value."""
 
     var value: __mlir_type.index
@@ -499,6 +499,15 @@ struct Int(Intable, Stringable, KeyElement, Boolable, Formattable):
             self.value,
             __mlir_op.`index.constant`[value = __mlir_attr.`-1:index`](),
         )
+
+    @always_inline("nodebug")
+    fn __abs__(self) -> Self:
+        """Return the absolute value of the Int value.
+
+        Returns:
+            The absolute value.
+        """
+        return -self if self < 0 else self
 
     @always_inline("nodebug")
     fn __invert__(self) -> Int:

@@ -240,3 +240,163 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
         )
         Pointer(ptr).store(val)
         self = tmp
+
+
+# ===----------------------------------------------------------------------===#
+# Array
+# ===----------------------------------------------------------------------===#
+
+
+@value
+struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
+    """A fixed-size sequence of size homogenous elements where size is a constant expression.
+
+    Parameters:
+        ElementType: The type of the elements in the array.
+        size: The size of the array.
+    """
+
+    alias type = __mlir_type[
+        `!pop.array<`, size.value, `, `, Self.ElementType, `>`
+    ]
+    var _array: Self.type
+    """The underlying storage for the array."""
+
+    @always_inline
+    fn __init__(inout self):
+        """This constructor will always cause a compile time error if used.
+        It is used to steer users away from uninitialized memory.
+        """
+        constrained[
+            False,
+            (
+                "Initialize with either a variadic list of arguments or a"
+                " default fill element."
+            ),
+        ]()
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
+    fn __init__(inout self, fill: Self.ElementType):
+        """Constructs an empty array where each element is the supplied `fill`.
+
+        Args:
+            fill: The element to fill each index.
+        """
+        _static_tuple_construction_checks[size]()
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+        @unroll
+        for i in range(size):
+            var ptr = self._get_reference_unsafe(i)
+            initialize_pointee_copy(UnsafePointer[Self.ElementType](ptr), fill)
+
+    @always_inline
+    fn __init__(inout self, *elems: Self.ElementType):
+        """Constructs an array given a set of arguments.
+
+        Args:
+            elems: The element types.
+        """
+        debug_assert(len(elems) == size, "Elements must be of length size")
+        _static_tuple_construction_checks[size]()
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+        @unroll
+        for i in range(size):
+            var ref = self._get_reference_unsafe(i)
+            initialize_pointee_move(
+                UnsafePointer[Self.ElementType](ref), elems[i]
+            )
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        """Returns the length of the array. This is a known constant value.
+
+        Returns:
+            The size of the list.
+        """
+        return size
+
+    @always_inline("nodebug")
+    fn _get_reference_unsafe[
+        mutability: __mlir_type.i1,
+        self_life: AnyLifetime[mutability].type,
+    ](
+        self: Reference[Self, mutability, self_life]._mlir_type, index: Int
+    ) -> Reference[Self.ElementType, mutability, self_life]:
+        """Get a reference to an element of self without checking index bounds.
+
+        Users should opt for `__refitem__` instead of this method.
+        """
+        var ptr = __mlir_op.`pop.array.gep`(
+            Reference(Reference(self)[]._array).get_legacy_pointer().address,
+            index.value,
+        )
+        return Reference[Self.ElementType, mutability, self_life](
+            UnsafePointer(ptr)[]
+        )
+
+    @always_inline("nodebug")
+    fn __refitem__[
+        mutability: __mlir_type.i1,
+        self_life: AnyLifetime[mutability].type,
+        IntableType: Intable,
+    ](
+        self: Reference[Self, mutability, self_life]._mlir_type,
+        index: IntableType,
+    ) -> Reference[Self.ElementType, mutability, self_life]:
+        """Get a `Reference` to the element at the given index.
+
+        Parameters:
+            mutability: The inferred mutability of the reference.
+            self_life: The inferred lifetime of the reference.
+            IntableType: The inferred type of an intable argument.
+
+        Args:
+            index: The index of the item.
+
+        Returns:
+            A reference to the item at the given index.
+        """
+        debug_assert(-size <= int(index) < size, "Index must be within bounds.")
+        var normalized_idx = int(index)
+        if normalized_idx < 0:
+            normalized_idx += size
+
+        return Reference(self)[]._get_reference_unsafe[mutability, self_life](
+            normalized_idx
+        )
+
+    @always_inline("nodebug")
+    fn __refitem__[
+        mutability: __mlir_type.i1,
+        self_life: AnyLifetime[mutability].type,
+        IntableType: Intable,
+        index: IntableType,
+    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
+        Self.ElementType, mutability, self_life
+    ]:
+        """Get a `Reference` to the element at the given index.
+
+        Parameters:
+            mutability: The inferred mutability of the reference.
+            self_life: The inferred lifetime of the reference.
+            IntableType: The inferred type of an intable argument.
+            index: The index of the item.
+
+        Returns:
+            A reference to the item at the given index.
+        """
+        alias i = int(index)
+        constrained[-size <= i < size, "Index must be within bounds."]()
+
+        var normalized_idx = i
+
+        @parameter
+        if i < 0:
+            normalized_idx += size
+
+        return Reference(self)[]._get_reference_unsafe[mutability, self_life](
+            normalized_idx
+        )
