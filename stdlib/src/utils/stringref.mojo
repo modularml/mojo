@@ -547,7 +547,7 @@ fn _memrmem[
         return DTypePointer[type]()
     if needle_len == 1:
         return _memrchr[type](haystack, needle[0], haystack_len)
-    for i in range(haystack_len - needle_len, -1, -1):
+    for i in reversed(range(haystack_len - needle_len + 1)):
         if haystack[i] != needle[0]:
             continue
         if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:

@@ -329,8 +329,8 @@ struct VariadicListMem[
             # Otherwise this is a variadic of owned elements, destroy them.  We
             # destroy in backwards order to match how arguments are normally torn
             # down when CheckLifetimes is left to its own devices.
-            for i in range(len(self), 0, -1):
-                destroy_pointee(UnsafePointer.address_of(self[i - 1]))
+            for i in reversed(range(len(self))):
+                destroy_pointee(UnsafePointer.address_of(self[i]))
 
     @always_inline
     fn __len__(self) -> Int:
