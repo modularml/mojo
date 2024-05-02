@@ -278,7 +278,7 @@ fn remove(path: String) raises:
       path: The path to the file.
 
     """
-    var error = external_call["unlink", Int](path._as_ptr())
+    var error = external_call["unlink", Int32](path._as_ptr())
 
     if error != 0:
         # TODO get error message, the following code prints it
@@ -345,7 +345,7 @@ fn mkdir(path: String, mode: Int = 0o777) raises:
       mode: The mode to create the directory with.
     """
 
-    var error = external_call["mkdir", Int](path._as_ptr(), mode)
+    var error = external_call["mkdir", Int32](path._as_ptr(), mode)
     if error != 0:
         raise Error("Can not create directory: " + path)
 
@@ -371,7 +371,7 @@ fn rmdir(path: String) raises:
     Args:
       path: The path to the directory.
     """
-    var error = external_call["rmdir", Int](path._as_ptr())
+    var error = external_call["rmdir", Int32](path._as_ptr())
     if error != 0:
         raise Error("Can not remove directory: " + path)
 
