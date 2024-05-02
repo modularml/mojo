@@ -32,7 +32,7 @@ modular update mojo
 
 ## v24.3 (2024-05-02)
 
-### 🔥 Legendary
+### ✨ Highlights
 
 - `AnyPointer` was renamed to
   [`UnsafePointer`](mojo/stdlib/memory/unsafe_pointer/UnsafePointer) and is now
@@ -103,24 +103,20 @@ modular update mojo
 
     Note that variadic keyword parameters are not supported yet.
 
-- [`Tuple`](/mojo/stdlib/builtin/tuple/Tuple) now works with memory-only element
-  types like `String` and allows you to directly index into it with a parameter
-  expression.  This means you can now simply use `x = tup[1]` like Python
-  instead of `x = tup.get[1, Int]()`. You can also assign into tuple elements
-  now as well with `tup[1] = x`.
+  For more information, see
+  [Variadic arguments](/mojo/manual/functions#variadic-arguments) in the Mojo
+  Manual.
 
-  ```mojo
-  var tuple = ("Green", 9.3)
-  var name = tuple[0]
-  var value = tuple[1]
-  ```
+- The `mojo build` and `mojo run` commands now support a `-g` option. This
+  shorter alias is equivalent to writing `--debug-level full`. This option is
+  also available in the `mojo debug` command, but is already the default.
 
-  Note that because the subscript must be a parameter expression, you can't
-  iterate through a `Tuple` using an ordinary `for` loop.
+- Many new standard library APIs have been filled in, including many community
+  contributions. Changes are listed in the standard library section.
+
+- The Mojo Manual has a new page on [Types](/mojo/manual/types).
 
 ### Language changes
-
-#### ⭐️ New
 
 - Certain dunder methods that take indices
   (`__getitem__()`, `__setitem__()`, and `__refitem__()`) or names
@@ -149,10 +145,12 @@ modular update mojo
   ```
 
 - Mojo now allows users to capture the source location of code and call location
-  of functions dynamically using the built-in `__source_location()` and
+  of functions dynamically using the `__source_location()` and
   `__call_location()` functions. For example:
 
   ```mojo
+  from builtin._location import __call_location
+
   @always_inline
   fn my_assert(cond: Bool, msg: String):
       if not cond:
@@ -169,10 +167,16 @@ modular update mojo
   an `@always_inline` function that's called *from* an
   `@always_inline("nodebug")` function.
 
+  This feature is still evolving and for the time being you need to explicitly
+  import these APIs, as shown above. In the future, these will probably be
+  built-in functions and not require an import statement.
+
   Neither `__source_location()` nor `__call_location()` work when called in a
   parameter context. For example:
 
   ```mojo
+  from builtin._location import __call_location
+
   @always_inline
   fn mystery_location() -> String:
       var loc = __call_location()
@@ -190,31 +194,26 @@ modular update mojo
 
   - `pop(index)` for removing an element at a particular index.
     By default, `List.pop()` removes the last element in the list.
-    ([PR #2041](https://github.com/modularml/mojo/pull/2041) by
-    [@LJ-9801](https://github.com/LJ-9801), fixes
-    [#2017](https://github.com/modularml/mojo/issues/2017).)
+    ([@LJ-9801](https://github.com/LJ-9801), fixes
+    [#2017](https://github.com/modularml/mojo/issues/2017))
 
   - `resize(new_size)` for resizing the list without the need to
     specify an additional value.
-    ([PR #2140](https://github.com/modularml/mojo/pull/2140)
-    by [@mikowals](https://github.com/mikowals), fixes
-    [#2133](https://github.com/modularml/mojo/issues/2133).)
+    ([@mikowals](https://github.com/mikowals), fixes
+    [#2133](https://github.com/modularml/mojo/issues/2133))
 
   - `insert(index, value)` for inserting a value at a specified index
-    into the `List`. ([PR #2148](https://github.com/modularml/mojo/pull/2148) by
-    [@whym1here](https://github.com/whym1here), fixes
-    [#2134](https://github.com/modularml/mojo/issues/2134).)
+    into the `List`. ([@whym1here](https://github.com/whym1here), fixes
+    [#2134](https://github.com/modularml/mojo/issues/2134))
 
   - A new constructor `List(ptr, size, capacity)` to to avoid needing to
     do a deep copy of an existing contiguous memory allocation when constructing
-    a new `List`. ([PR #2182](https://github.com/modularml/mojo/pull/2182) by
-    [@StandinKP](https://github.com/StandinKP), fixes
-    [#2170](https://github.com/modularml/mojo/issues/2170).)
+    a new `List`. ([@StandinKP](https://github.com/StandinKP), fixes
+    [#2170](https://github.com/modularml/mojo/issues/2170))
 
 - [`Dict`](/mojo/stdlib/collections/dict/Dict) now has a `update()` method to
   update keys/values from another `Dict`.
-  ([PR #2085](https://github.com/modularml/mojo/pull/2085) by
-  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse).)
+  ([@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - [`Set`](/mojo/stdlib/collections/set/Set) now has named methods for set
   operations:
@@ -223,8 +222,7 @@ modular update mojo
   - `intersection_update()` mapping to `&=`
   - `update()` mapping to `|=`
 
-  ([PR #2214](https://github.com/modularml/mojo/pull/2214) by
-  [@arvindavoudi](https://github.com/arvindavoudi).)
+  ([@arvindavoudi](https://github.com/arvindavoudi))
 
 - `Dict`, `List`, and `Set` all conform to the `Boolable` trait. The collections
   evaluate to `True` if they contain any elements, `False` otherwise:
@@ -238,8 +236,7 @@ modular update mojo
           print("No names to list.")
   ```
 
-  ([PR #2262](https://github.com/modularml/mojo/pull/2262) by
-  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse).)
+  ([@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - Added [`reversed()`](/mojo/stdlib/builtin/reversed/reversed) function for
   creating reversed iterators. Several range types, `List`, and `Dict` now
@@ -251,11 +248,9 @@ modular update mojo
       print(number)
   ```
 
-  ([PR #2215](https://github.com/modularml/mojo/pull/2215) by
-  [@helehex](https://github.com/helehex),
-  [PR #2327](https://github.com/modularml/mojo/pull/2327) by
+  ([@helehex](https://github.com/helehex) and
   [@jayzhan211](https://github.com/jayzhan211), contributes towards
-  [#2325](https://github.com/modularml/mojo/issues/2325).)
+  [#2325](https://github.com/modularml/mojo/issues/2325))
 
 - [`Optional`](/mojo/stdlib/collections/optional/Optional) now implements
   `__is__` and `__isnot__` methods so that you can compare an `Optional` with
@@ -267,8 +262,22 @@ modular update mojo
       print(opt.value()[])
   ```
 
-  ([PR #2082](https://github.com/modularml/mojo/pull/2082) by
-  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse).)
+  ([@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
+- [`Tuple`](/mojo/stdlib/builtin/tuple/Tuple) now works with memory-only element
+  types like `String` and allows you to directly index into it with a parameter
+  expression.  This means you can now simply use `x = tup[1]` like Python
+  instead of `x = tup.get[1, Int]()`. You can also assign into tuple elements
+  now as well with `tup[1] = x`.
+
+  ```mojo
+  var tuple = ("Green", 9.3)
+  var name = tuple[0]
+  var value = tuple[1]
+  ```
+
+  Note that because the subscript must be a parameter expression, you can't
+  iterate through a `Tuple` using an ordinary `for` loop.
 
 - The [`Reference`](/mojo/stdlib/memory/reference/Reference) type has several
   changes, including:
@@ -382,48 +391,40 @@ modular update mojo
 
 - [`String`](/mojo/stdlib/builtin/string/String) now has `removeprefix()` and
   `removesuffix()` methods.
-  ([PR #2038](https://github.com/modularml/mojo/pull/2038) by
-  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse).)
+  ([@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - The [`ord`](/mojo/stdlib/builtin/string/ord) and
   [`chr`](/mojo/stdlib/builtin/string/chr) functions have been improved to
   accept any Unicode character.
-  ([PR #2149](https://github.com/modularml/mojo/pull/2149) by
-  [@mzaks](https://github.com/mzaks), contributes towards
-  [#1616](https://github.com/modularml/mojo/issues/1616).)
+  ([@mzaks](https://github.com/mzaks), contributes towards
+  [#1616](https://github.com/modularml/mojo/issues/1616))
 
 - [`Atomic`](/mojo/stdlib/os/atomic/Atomic) is now movable.
-  ([PR #2088](https://github.com/modularml/mojo/pull/2088) by
-  [@StandinKP](https://github.com/StandinKP), fixes
-  [#2026](https://github.com/modularml/mojo/issues/2026).)
+  ([@StandinKP](https://github.com/StandinKP), fixes
+  [#2026](https://github.com/modularml/mojo/issues/2026))
 
 - [`atol()`](/mojo/stdlib/builtin/string/atol) now handles whitespace. The
   `atol()`function is used internally by `String.__int__()`, so
   `int(String( " 10 "))` now returns `10` instead of raising an error.
-  ([PR #2225](https://github.com/modularml/mojo/pull/2225) by
-  [@artemiogr97](https://github.com/artemiogr97).)
+  ([@artemiogr97](https://github.com/artemiogr97))
 
 - [`SIMD`](/mojo/stdlib/builtin/simd/SIMD) now implements the `__rmod__()`
-  method. ([PR #2186](https://github.com/modularml/mojo/pull/2186) by
-  [@bgreni](https://github.com/bgreni), fixes
-  [#1482](https://github.com/modularml/mojo/issues/1482).)
+  method. ([@bgreni](https://github.com/bgreni), fixes
+  [#1482](https://github.com/modularml/mojo/issues/1482))
 
 - [`bool(None)`](/mojo/stdlib/builtin/bool/bool-function) is now implemented.
-  ([PR #2249](https://github.com/modularml/mojo/pull/2249) by
-  [@zhoujingya](https://github.com/zhoujingya).)
+  ([@zhoujingya](https://github.com/zhoujingya))
 
 - The [`DTypePointer`](/mojo/stdlib/memory/unsafe/DTypePointer) type now
   implements `gather()` for gathering a `SIMD` vector from offsets of a current
   pointer.  Similarly, support for `scatter()` was added to scatter a `SIMD`
   vector into offsets of the current pointer.
-  ([PR #2268](https://github.com/modularml/mojo/pull/2268) by
-  [@leandrolcampos](https://github.com/leandrolcampos).)
+  ([@leandrolcampos](https://github.com/leandrolcampos))
 
 - The [`len()`](/mojo/stdlib/builtin/len/len) function now handles a
   [`range()`](/mojo/stdlib/builtin/range/range) specified with a negative end
   value, so that things like `len(range(-1))` work correctly.
-  ([PR #2204](https://github.com/modularml/mojo/pull/2204) by
-  [@soraros](https://github.com/soraros).)
+  ([@soraros](https://github.com/soraros))
 
 - [`debug_assert()`](/mojo/stdlib/builtin/debug_assert/debug_assert) now prints
   its location (filename, line, and column where it was called) in its error
@@ -434,8 +435,7 @@ modular update mojo
 - The [`testing.assert_equal[SIMD]()`](/mojo/stdlib/testing/testing/assert_equal)
   function now raises if any of the elements mismatch in the two `SIMD`
   arguments being compared.
-    ([PR #2279](https://github.com/modularml/mojo/pull/2279) by
-  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse).)
+  ([@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - The [`testing.assert_almost_equal()`](/mojo/stdlib/testing/testing/assert_almost_equal)
   and [`math.isclose()`](/mojo/stdlib/math/math/isclose) functions now have an
@@ -444,10 +444,8 @@ modular update mojo
 - The [`object`](/mojo/stdlib/builtin/object/object) type now supports the
   division, modulo, and left and right shift operators, including the in-place
   and reverse variants.
-  ([PR #2230](https://github.com/modularml/mojo/pull/2230),
-  [PR #2247](https://github.com/modularml/mojo/pull/2247) by
-  [@LJ-9801](https://github.com/LJ-9801), fixes
-  [#2224](https://github.com/modularml/mojo/issues/2224).)
+  ([@LJ-9801](https://github.com/LJ-9801), fixes
+  [#2224](https://github.com/modularml/mojo/issues/2224))
 
 - Added checked arithmetic operations for `SIMD` integers.
 
@@ -474,13 +472,11 @@ modular update mojo
             print(product[i])
   ```
 
-  ([PR #2138](https://github.com/modularml/mojo/pull/2138) by
-  [@lsh](https://github.com/lsh).)
+  ([@lsh](https://github.com/lsh))
 
 - Added [`os.remove()`](/mojo/stdlib/os/os/remove) and
   [`os.unlink()`](/mojo/stdlib/os/os/unlink) for deleting files.
-  ([PR #2310](https://github.com/modularml/mojo/pull/2310) by
-  [@artemiogr97](https://github.com/artemiogr97), fixes
+  ([@artemiogr97](https://github.com/artemiogr97), fixes
   [#2306](https://github.com/modularml/mojo/issues/2306))
 
 #### 🦋 Changed
@@ -491,7 +487,6 @@ modular update mojo
 
 - [`Optional.value()`](/mojo/stdlib/collections/optional/Optional#value) now
   returns a reference instead of a copy of the contained value.
-  ([PR #2226](https://github.com/modularml/mojo/pull/2226))
 
   To perform a copy manually, dereference the result:
 
@@ -501,37 +496,22 @@ modular update mojo
   var value = result.value()[]
   ```
 
-  ([PR #2226](https://github.com/modularml/mojo/pull/2226) by
-  [@lsh](https://github.com/lsh), fixes
-  [#2179](https://github.com/modularml/mojo/issues/2179).)
+  ([@lsh](https://github.com/lsh), fixes
+  [#2179](https://github.com/modularml/mojo/issues/2179))
 
 - Per the accepted community proposal,
   [Standardize the representation of byte sequence as a sequence of unsigned
   8-bit integers](https://github.com/modularml/mojo/blob/main/proposals/byte-as-uint8.md),
   began transition to using `UInt8` by changing the data pointer of `Error`
   to `DTypePointer[DType.uint8]`.
-  ([PR #2318](https://github.com/modularml/mojo/pull/2318) by
-  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse), contributes
-  towards [#2317](https://github.com/modularml/mojo/issues/2317).)
+  ([@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse), contributes
+  towards [#2317](https://github.com/modularml/mojo/issues/2317))
 
 - Continued transition to `UnsafePointer` from the legacy `Pointer` type
   in various standard library APIs and internals.
-  ([PR #2365](https://github.com/modularml/mojo/pull/2365),
-  [PR #2367](https://github.com/modularml/mojo/pull/2367),
-  [PR #2368](https://github.com/modularml/mojo/pull/2368),
-  [PR #2370](https://github.com/modularml/mojo/pull/2370),
-  [PR #2371](https://github.com/modularml/mojo/pull/2371) by
-  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse).)
+  ([@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 ### Tooling changes
-
-#### ⭐️ New
-
-- The `mojo build` and `mojo run` commands now support a `-g` option. This
-  shorter alias is equivalent to writing `--debug-level full`. This option is
-  also available in the `mojo debug` command, but is already the default.
-
-#### 🦋 Changed
 
 - The behavior of `mojo build` when invoked without an output `-o` argument has
   changed slightly: `mojo build ./test-dir/program.mojo` now outputs an
@@ -648,8 +628,7 @@ modular update mojo
 
 - [#2068](https://github.com/modularml/mojo/issues/2068)
   Fix `SIMD.reduce()` for size_out == 2.
-  ([PR #2102](https://github.com/modularml/mojo/pull/2102) by
-  [@soraros](https://github.com/soraros).)
+  ([@soraros](https://github.com/soraros))
 
 ## v24.2.1 (2024-04-11)
 
