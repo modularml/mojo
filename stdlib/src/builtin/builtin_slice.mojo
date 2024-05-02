@@ -63,22 +63,21 @@ struct Slice(Sized, Stringable, EqualityComparable):
     """The step increment value of the slice."""
 
     @always_inline("nodebug")
-    fn __init__(start: Int, end: Int) -> Self:
+    fn __init__(inout self, start: Int, end: Int):
         """Construct slice given the start and end values.
 
         Args:
             start: The start value.
             end: The end value.
-
-        Returns:
-            The constructed slice.
         """
-        return Self {start: start, end: end, step: 1}
+        self.start = start
+        self.end = end
+        self.step = 1
 
     @always_inline("nodebug")
     fn __init__[
         T0: AnyRegType, T1: AnyRegType, T2: AnyRegType
-    ](start: T0, end: T1, step: T2) -> Self:
+    ](inout self, start: T0, end: T1, step: T2):
         """Construct slice given the start, end and step values.
 
         Parameters:
@@ -90,15 +89,10 @@ struct Slice(Sized, Stringable, EqualityComparable):
             start: The start value.
             end: The end value.
             step: The step value.
-
-        Returns:
-            The constructed slice.
         """
-        return Self {
-            start: _default_or(start, 0),
-            end: _default_or(end, _int_max_value()),
-            step: _default_or(step, 1),
-        }
+        self.start = _default_or(start, 0)
+        self.end = _default_or(end, _int_max_value())
+        self.step = _default_or(step, 1)
 
     fn __str__(self) -> String:
         """Gets the string representation of the span.
