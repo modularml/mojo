@@ -16,7 +16,14 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
-from sys import llvm_intrinsic, has_neon, is_x86, simdwidthof, _RegisterPackType
+from sys import (
+    llvm_intrinsic,
+    has_neon,
+    is_x86,
+    triple_is_nvidia_cuda,
+    simdwidthof,
+    _RegisterPackType,
+)
 
 from builtin._math import Ceilable, Floorable
 from builtin.hash import _hash_simd
@@ -2430,37 +2437,36 @@ fn _pow[
 
         var result = SIMD[lhs_type, simd_width]()
 
-        @parameter
-        if lhs_type.is_floating_point():
-
-            @unroll
-            for i in range(simd_width):
-                result[i] = llvm_intrinsic[
-                    "llvm.powi", Scalar[lhs_type], has_side_effect=False
-                ](lhs[i], rhs[i].cast[DType.int32]())
-        else:
-            for i in range(simd_width):
-                if rhs[i] < 0:
-                    # Not defined for Integers, this should raise an
-                    # exception.
-                    debug_assert(
-                        False, "exponent < 0 is undefined for integers"
-                    )
-                    result[i] = 0
-                    break
-                var res: Scalar[lhs_type] = 1
-                var x = lhs[i]
-                var n = rhs[i]
-                while n > 0:
-                    if n & 1 != 0:
-                        res *= x
-                    x *= x
-                    n >>= 1
-                result[i] = res
+        @unroll
+        for i in range(simd_width):
+            result[i] = _powi(lhs[i], rhs[i].cast[DType.int32]())
         return result
     else:
         # Unsupported.
         return SIMD[lhs_type, simd_width]()
+
+
+@always_inline
+fn _powi[type: DType](lhs: Scalar[type], rhs: Int32) -> __type_of(lhs):
+    if type.is_integral() and rhs < 0:
+        # Not defined for Integers, this should raise an
+        # exception.
+        debug_assert(False, "exponent < 0 is undefined for integers")
+        return 0
+    var a = lhs
+    var b = abs(rhs) if type.is_floating_point() else rhs
+    var res: Scalar[type] = 1
+    while b > 0:
+        if b & 1:
+            res *= a
+        a *= a
+        b >>= 1
+
+    @parameter
+    if type.is_floating_point():
+        if rhs < 0:
+            return 1 / res
+    return res
 
 
 # ===----------------------------------------------------------------------===#
