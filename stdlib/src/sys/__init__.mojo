@@ -14,7 +14,6 @@
 
 from .arg import argv
 from .debug import breakpointhook
-from ._exit import exit
 from .ffi import RTLD, DEFAULT_RTLD, DLHandle, external_call
 from .info import (
     is_x86,
@@ -69,3 +68,4 @@ from .param_env import (
     env_get_int,
     env_get_string,
 )
+from .terminate import exit
