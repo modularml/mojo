@@ -46,7 +46,7 @@ modular update mojo
 
     - [`initialize_pointee_copy`](/mojo/stdlib/memory/unsafe_pointer/initialize_pointee_copy)
     - [`initialize_pointee_move`](/mojo/stdlib/memory/unsafe_pointer/initialize_pointee_move)
-    - [`move_from_pointee()`](/mojo/stdlib/memory/unsafe_pointer/initialize_pointee_move)
+    - [`move_from_pointee()`](/mojo/stdlib/memory/unsafe_pointer/move_from_pointee)
     - [`move_pointee`](/mojo/stdlib/memory/unsafe_pointer/move_pointee)
 
   - A new
