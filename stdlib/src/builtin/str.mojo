@@ -23,12 +23,12 @@ These are Mojo built-ins, so you don't need to import them.
 trait Stringable:
     """
     The `Stringable` trait describes a type that can be converted to a
-    [`String`](https://docs.modular.com/mojo/stdlib/builtin/string.html).
+    [`String`](/mojo/stdlib/builtin/string/String).
 
     Any type that conforms to `Stringable` or
-    [`StringableRaising`](/mojo/stdlib/builtin/str/stringableraising) works
+    [`StringableRaising`](/mojo/stdlib/builtin/str/StringableRaising) works
     with the built-in [`print()`](/mojo/stdlib/builtin/io/print) and
-    [`str()`](/mojo/stdlib/builtin/str.html) functions.
+    [`str()`](/mojo/stdlib/builtin/str/str) functions.
 
     The `Stringable` trait requires the type to define the `__str__()` method.
     For example:
@@ -55,7 +55,7 @@ trait Stringable:
     ```
 
     **Note:** If the `__str__()` method might raise an error, use the
-    [`StringableRaising`](/mojo/stdlib/builtin/str/stringableraising)
+    [`StringableRaising`](/mojo/stdlib/builtin/str/StringableRaising)
     trait, instead.
 
     About the difference between `__repr__()` and `__str__()`:
@@ -77,10 +77,10 @@ trait Stringable:
 
 trait StringableRaising:
     """The StringableRaising trait describes a type that can be converted to a
-    [`String`](https://docs.modular.com/mojo/stdlib/builtin/string.html).
+    [`String`](/mojo/stdlib/builtin/string/String).
 
     Any type that conforms to
-    [`Stringable`](/mojo/stdlib/builtin/str/stringable) or
+    [`Stringable`](/mojo/stdlib/builtin/str/Stringable) or
     `StringableRaising` works with the built-in
     [`print()`](/mojo/stdlib/builtin/io/print) and
     [`str()`](/mojo/stdlib/builtin/str/str) functions.
