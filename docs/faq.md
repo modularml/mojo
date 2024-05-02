@@ -275,7 +275,7 @@ about our kernel performance in our [matrix multiplication blog
 post](https://www.modular.com/blog/the-worlds-fastest-unified-matrix-multiplication).
 For details about our end-to-end model performance relative to the latest
 releases of TensorFlow and PyTorch, check out our [performance
-dashboard](https://performance.modular.com).
+dashboard](https://www.modular.com/max/performance).
 
 ## Mojo SDK
 
