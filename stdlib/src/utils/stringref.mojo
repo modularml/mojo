@@ -532,7 +532,7 @@ fn _memrchr[
 ]:
     if not len:
         return DTypePointer[type]()
-    for i in range(len - 1, -1, -1):
+    for i in reversed(range(len)):
         if source[i] == char:
             return source + i
     return DTypePointer[type]()
