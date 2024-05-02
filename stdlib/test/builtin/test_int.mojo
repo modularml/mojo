@@ -61,6 +61,12 @@ def test_floor():
     assert_equal(Int.__floor__(Int(-5)), -5)
 
 
+def test_round():
+    assert_equal(Int.__round__(Int(5)), 5)
+    assert_equal(Int.__round__(Int(0)), 0)
+    assert_equal(Int.__round__(Int(-5)), -5)
+
+
 def test_floordiv():
     assert_equal(1, Int(2) // Int(2))
     assert_equal(0, Int(2) // Int(3))
@@ -112,6 +118,7 @@ def main():
     test_pow()
     test_ceil()
     test_floor()
+    test_round()
     test_floordiv()
     test_mod()
     test_abs()

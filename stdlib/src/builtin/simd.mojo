@@ -121,6 +121,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Floorable,
     Hashable,
     Intable,
+    Roundable,
     Sized,
     Stringable,
 ):
@@ -961,6 +962,19 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         return llvm_intrinsic[
             "llvm.roundeven", __type_of(self), has_side_effect=False
+        ](self)
+
+    @always_inline("nodebug")
+    fn __round__(self) -> Self:
+        """Performs elementwise rounding on the elements of a SIMD vector.
+
+        This rounding goes to the nearest integer with ties away from zero.
+
+        Returns:
+            The elementwise rounded value of this SIMD vector.
+        """
+        return llvm_intrinsic[
+            "llvm.round", __type_of(self), has_side_effect=False
         ](self)
 
     # ===-------------------------------------------------------------------===#
