@@ -49,11 +49,11 @@ struct IntLiteral(
         """Default constructor.
 
         Returns:
-            The constructed Self object.
+            The constructed IntLiteral object.
         """
-        return IntLiteral(
-            __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
-        )
+        return Self {
+            value: __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
+        }
 
     @always_inline("nodebug")
     fn __init__(value: __mlir_type.`!kgen.int_literal`) -> Self:
@@ -66,18 +66,6 @@ struct IntLiteral(
             The constructed IntLiteral object.
         """
         return Self {value: value}
-
-    @always_inline("nodebug")
-    fn __init__(value: IntLiteral) -> Self:
-        """Construct IntLiteral from another one.
-
-        Args:
-            value: The init value.
-
-        Returns:
-            The constructed IntLiteral object.
-        """
-        return Self {value: value.value}
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
