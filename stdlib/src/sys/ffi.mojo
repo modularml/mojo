@@ -52,27 +52,22 @@ struct DLHandle(CollectionElement, Boolable):
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn __init__(path: String, flags: Int = DEFAULT_RTLD) -> Self:
+    fn __init__(inout self, path: String, flags: Int = DEFAULT_RTLD):
         """Initialize a DLHandle object by loading the dynamic library at the
         given path.
 
         Args:
             path: The path to the dynamic library file.
             flags: The flags to load the dynamic library.
-
-        Returns:
-            The constructed handle object.
         """
 
         @parameter
         if not os_is_windows():
-            return Self {
-                handle: external_call["dlopen", DTypePointer[DType.int8]](
-                    path._as_ptr(), flags
-                )
-            }
+            self.handle = external_call["dlopen", DTypePointer[DType.int8]](
+                path._as_ptr(), flags
+            )
         else:
-            return Self {handle: DTypePointer[DType.int8]()}
+            self.handle = DTypePointer[DType.int8]()
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline

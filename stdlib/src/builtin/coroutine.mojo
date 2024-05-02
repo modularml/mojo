@@ -248,23 +248,19 @@ struct RaisingCoroutine[type: AnyRegType]:
         return self._get_promise().bitcast[ctx_type]() - 1
 
     @always_inline
-    fn __init__(handle: Self._handle_type) -> Self:
+    fn __init__(inout self, handle: Self._handle_type):
         """Construct a coroutine object from a handle.
 
         Args:
             handle: The init handle.
-
-        Returns:
-            The constructed coroutine object.
         """
-        var self = Self {_handle: handle}
+        self = Self {_handle: handle}
         var parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
         self._get_ctx[_CoroutineContext]().store(
             _CoroutineContext {
                 _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
             }
         )
-        return self^
 
     @always_inline
     fn __del__(owned self):

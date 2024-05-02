@@ -287,7 +287,7 @@ struct Int(
         )
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<index>`) -> Int:
+    fn __init__(value: __mlir_type.`!pop.scalar<index>`) -> Self:
         """Construct Int from the given Index value.
 
         Args:
@@ -303,7 +303,7 @@ struct Int(
         )
 
     @always_inline("nodebug")
-    fn __init__(value: IntLiteral) -> Int:
+    fn __init__(value: IntLiteral) -> Self:
         """Construct Int from the given IntLiteral value.
 
         Args:
