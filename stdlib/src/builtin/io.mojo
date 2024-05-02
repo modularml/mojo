@@ -379,17 +379,16 @@ fn print[
         end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
     """
-    alias number_of_values = values.__len__()
 
     @parameter
-    fn print_with_separator[i: Int]():
-        _put(values.get_element[i]()[])
+    fn print_with_separator[i: Int, T: Stringable](value: T):
+        _put(value)
 
         @parameter
-        if i < number_of_values - 1:
+        if i < values.__len__() - 1:
             _put(sep)
 
-    unroll[print_with_separator, number_of_values]()
+    values.each_idx[print_with_separator]()
 
     _put(end)
     if flush:
