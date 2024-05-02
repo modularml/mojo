@@ -54,8 +54,9 @@ struct _ImmutableString:
     """The length of the string."""
 
     @always_inline
-    fn __init__(data: UnsafePointer[Int8], length: Int) -> Self:
-        return Self {data: data.address, length: length}
+    fn __init__(inout self, data: UnsafePointer[Int8], length: Int):
+        self.data = data.address
+        self.length = length
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
@@ -88,10 +89,10 @@ struct _RefCountedListRef:
     """The reference to the list."""
 
     @always_inline
-    fn __init__() -> Self:
+    fn __init__(inout self):
         var ptr = UnsafePointer[_RefCountedList].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
-        return Self {lst: ptr.bitcast[NoneType]()}
+        self.lst = ptr.bitcast[NoneType]()
 
     @always_inline
     fn copy(self) -> Self:
@@ -173,14 +174,14 @@ struct _RefCountedAttrsDictRef:
     """The reference to the dictionary."""
 
     @always_inline
-    fn __init__(values: VariadicListMem[Attr, _, _]) -> Self:
+    fn __init__(inout self, values: VariadicListMem[Attr, _, _]):
         var ptr = UnsafePointer[_RefCountedAttrsDict].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedAttrsDict()
         # Elements can only be added on construction.
         for i in range(len(values)):
             ptr[].impl[]._insert(values[i].key, values[i].value._value.copy())
 
-        return Self {attrs: ptr.bitcast[Int8]()}
+        self.attrs = ptr.bitcast[Int8]()
 
     @always_inline
     fn copy(self) -> Self:
@@ -200,11 +201,11 @@ struct _Function:
     """The function pointer."""
 
     @always_inline
-    fn __init__[FnT: AnyRegType](value: FnT) -> Self:
+    fn __init__[FnT: AnyRegType](inout self, value: FnT):
         # FIXME: No "pointer bitcast" for signature function pointers.
         var f = UnsafePointer[Int16]()
         Reference(f).get_legacy_pointer().bitcast[FnT]().store(value)
-        return Self {value: f}
+        self.value = f
 
     alias fn0 = fn () raises -> object
     """Nullary function type."""
@@ -312,60 +313,60 @@ struct _ObjectImpl(CollectionElement, Stringable):
     # ===------------------------------------------------------------------=== #
 
     @always_inline
-    fn __init__(value: Self.type) -> Self:
-        return Self {value: value}
+    fn __init__(inout self, value: Self.type):
+        self.value = value
 
     @always_inline
-    fn __init__() -> Self:
-        return __mlir_op.`kgen.variant.create`[
+    fn __init__(inout self):
+        self.value = __mlir_op.`kgen.variant.create`[
             _type = Self.type, index = Self.none.value
         ](_NoneMarker {})
 
     @always_inline
-    fn __init__(value: Bool) -> Self:
-        return __mlir_op.`kgen.variant.create`[
+    fn __init__(inout self, value: Bool):
+        self.value = __mlir_op.`kgen.variant.create`[
             _type = Self.type, index = Self.bool.value
         ](value)
 
     @always_inline
-    fn __init__[dt: DType](value: SIMD[dt, 1]) -> Self:
+    fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
         @parameter
         if dt.is_integral():
-            return __mlir_op.`kgen.variant.create`[
+            self.value = __mlir_op.`kgen.variant.create`[
                 _type = Self.type, index = Self.int.value
             ](value.cast[DType.int64]())
         else:
-            return __mlir_op.`kgen.variant.create`[
+            self.value = __mlir_op.`kgen.variant.create`[
                 _type = Self.type, index = Self.float.value
             ](value.cast[DType.float64]())
 
     @always_inline
-    fn __init__(value: _ImmutableString) -> Self:
-        return __mlir_op.`kgen.variant.create`[
+    fn __init__(inout self, value: _ImmutableString):
+        self.value = __mlir_op.`kgen.variant.create`[
             _type = Self.type, index = Self.str.value
         ](value)
 
     @always_inline
-    fn __init__(value: _RefCountedListRef) -> Self:
-        return __mlir_op.`kgen.variant.create`[
+    fn __init__(inout self, value: _RefCountedListRef):
+        self.value = __mlir_op.`kgen.variant.create`[
             _type = Self.type, index = Self.list.value
         ](value)
 
     @always_inline
-    fn __init__(value: _Function) -> Self:
-        return __mlir_op.`kgen.variant.create`[
+    fn __init__(inout self, value: _Function):
+        self.value = __mlir_op.`kgen.variant.create`[
             _type = Self.type, index = Self.function.value
         ](value)
 
     @always_inline
-    fn __init__(value: _RefCountedAttrsDictRef) -> Self:
-        return __mlir_op.`kgen.variant.create`[
+    fn __init__(inout self, value: _RefCountedAttrsDictRef):
+        self.value = __mlir_op.`kgen.variant.create`[
             _type = Self.type, index = Self.obj.value
         ](value)
 
     @always_inline
-    fn __copyinit__(self) -> Self:
-        return self.value
+    fn __copyinit__(inout self, existing: Self):
+        self = existing.value
 
     @always_inline
     fn copy(self) -> Self:
