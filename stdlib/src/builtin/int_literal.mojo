@@ -25,6 +25,7 @@ struct IntLiteral(
     EqualityComparable,
     Floorable,
     Intable,
+    Roundable,
     Stringable,
 ):
     """This type represents a static integer literal value with
@@ -262,6 +263,15 @@ struct IntLiteral(
     @always_inline("nodebug")
     fn __floor__(self) -> Self:
         """Return the floor of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __round__(self) -> Self:
+        """Return the rounded value of the IntLiteral value, which is itself.
 
         Returns:
             The IntLiteral value itself.
