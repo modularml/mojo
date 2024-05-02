@@ -410,7 +410,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn index[
         C: ComparableCollectionElement
     ](
-        self: List[C], owned value: C, start: Int = 0, end: Optional[Int] = None
+        self: List[C], value: C, start: Int = 0, end: Optional[Int] = None
     ) raises -> Int:
         """
         Returns the index of the first occurrence of a value in a list, starting from the specified
