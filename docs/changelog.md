@@ -26,22 +26,27 @@ what we publish.
   [@artemiogr97](https://github.com/artemiogr97), fixes
   [#2274](https://github.com/modularml/mojo/issues/2274))
 
-- Mojo now allows types to opt in to use the `abs()` function by implementing
-  the `__abs__()` method, defined by the new `Absable`:
+- Mojo now supports types to opt in to use the `abs` and `round` functions by
+  implementing the `__abs__` and `__round__` methods (i.e. by conforming to the
+  new `Absable` and `Roundable` traits), respectively, e.g.:
 
   ```mojo
   from math import sqrt
 
-  struct Point(Absable):
-      var x: Float64
-      var y: Float64
+  @value
+  struct Complex(Absable, Roundable):
+      var re: Float64
+      var im: Float64
 
       fn __abs__(self) -> Self:
-          return sqrt(self.x * self.x + self.y * self.y)
+          return Self(sqrt(self.re * self.re + self.im * self.im), 0.0)
+
+      fn __round__(self) -> Self:
+          return Self(round(self.re), round(self.im))
   ```
 
-- The `abs(), min(), and max()` functions have moved from `math` to `builtin`,
-  so you no longer need to do `from math import abs, min, max`.
+- The `abs, round, min, and max` functions have moved from `math` to `builtin`,
+  so you no longer need to do `from math import abs, round, min, max`.
 
 - Mojo now allows types to opt in to use the `floor()` and `ceil()` functions in
   the `math` module by implementing the `__floor__()` and `__ceil__()` methods
@@ -78,6 +83,9 @@ what we publish.
     ([PR #2315](https://github.com/modularml/mojo/pull/2315) by [@mikowals](https://github.com/mikowals))
 
 ### 🦋 Changed
+
+- The `abs` and `round` functions have moved from `math` to `builtin`, so you no
+  longer need to do `from math import abs, round`.
 
 ### ❌ Removed
 

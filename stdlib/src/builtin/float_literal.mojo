@@ -238,6 +238,8 @@ struct FloatLiteral(
             return truncated
         return truncated + 1
 
+    # TODO: implement __round__
+
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
     # ===------------------------------------------------------------------===#

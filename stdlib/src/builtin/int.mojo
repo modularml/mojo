@@ -201,6 +201,7 @@ struct Int(
     Formattable,
     Intable,
     KeyElement,
+    Roundable,
     Stringable,
 ):
     """This type represents an integer value."""
@@ -539,6 +540,15 @@ struct Int(
     @always_inline("nodebug")
     fn __floor__(self) -> Self:
         """Return the floor of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __round__(self) -> Self:
+        """Return the rounded value of the Int value, which is itself.
 
         Returns:
             The Int value itself.
