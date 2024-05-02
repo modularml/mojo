@@ -374,7 +374,7 @@ fn print[
         Ts: The elements types.
 
     Args:
-        values: The remaining elements.
+        values: The elements to print.
         sep: The separator used between elements.
         end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
