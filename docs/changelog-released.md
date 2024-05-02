@@ -399,10 +399,6 @@ modular update mojo
   ([@mzaks](https://github.com/mzaks), contributes towards
   [#1616](https://github.com/modularml/mojo/issues/1616))
 
-- [`Atomic`](/mojo/stdlib/os/atomic/Atomic) is now movable.
-  ([@StandinKP](https://github.com/StandinKP), fixes
-  [#2026](https://github.com/modularml/mojo/issues/2026))
-
 - [`atol()`](/mojo/stdlib/builtin/string/atol) now handles whitespace. The
   `atol()`function is used internally by `String.__int__()`, so
   `int(String( " 10 "))` now returns `10` instead of raising an error.
