@@ -94,6 +94,9 @@ what we publish.
   `math` module. Instead, users should rely on the `+`, `-`, `*`, `/`, and `%`
   operators, respectively.
 
+- The `math.roundeven` function has been removed from the `math` module. The new
+  `SIMD.roundeven` method now provides the identical functionality.
+
 ### 🛠️ Fixed
 
 - [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on

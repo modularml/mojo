@@ -192,6 +192,14 @@ def test_floor():
     assert_equal(B.__floor__(b), b)
 
 
+def test_roundeven():
+    assert_equal(Float32(2.5).roundeven(), 2.0)
+    assert_equal(Float32(-3.5).roundeven(), -4.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(F(1.5, 2.5, -2.5, -3.5).roundeven(), F(2.0, 2.0, -2.0, -4.0))
+
+
 def test_floordiv():
     assert_equal(Int32(2) // Int32(2), 1)
     assert_equal(Int32(2) // Int32(3), 0)
@@ -854,6 +862,7 @@ def main():
     test_truthy()
     test_ceil()
     test_floor()
+    test_roundeven()
     test_floordiv()
     test_mod()
     test_rotate()
