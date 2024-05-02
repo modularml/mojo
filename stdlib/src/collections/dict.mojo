@@ -31,7 +31,6 @@ value types must always be Movable so we can resize the dictionary as it grows.
 
 See the `Dict` docs for more details.
 """
-from memory import UnsafePointer
 from builtin.value import StringableCollectionElement
 
 from .optional import Optional
@@ -189,7 +188,8 @@ struct _DictValueIter[
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
-        # Cast through a pointer to grant additional mutability.
+        # Cast through a pointer to grant additional mutability because
+        # _DictEntryIter.next erases it.
         return UnsafePointer.address_of(entry_ref[].value)[]
 
     fn __len__(self) -> Int:
