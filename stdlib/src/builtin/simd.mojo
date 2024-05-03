@@ -568,7 +568,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             "SIMD[" + repr(self.element_type) + ", " + str(self.size) + "]("
         )
 
-        # Usafe operations incoming, beware.
+        # Unsafe operations incoming, beware.
         # removing the null terminator
         result._buffer.pop()
         self._add_elements_as_str_to_buffer(result._buffer)
