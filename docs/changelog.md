@@ -87,6 +87,9 @@ what we publish.
   directory, now outputs a Mojo package to `my-dir/my-package.mojopkg`.
   Previously, this had to be spelled out, as in `-o my-dir/my-package.mojopkg`.
 
+- The `math` module now has `CeilDivable` and `CeilDivableRaising` traits that
+  allow users to opt into the `math.ceildiv` function.
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
