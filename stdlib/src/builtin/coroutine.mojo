@@ -134,14 +134,7 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The constructed coroutine object.
         """
-        var self = Coroutine[type] {_handle: handle}
-        var parent_hdl = __mlir_op.`co.opaque_handle`()
-        self._get_ctx[_CoroutineContext]().store(
-            _CoroutineContext {
-                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
-            }
-        )
-        return self^
+        return Self {_handle: handle}
 
     @always_inline
     fn __del__(owned self):
@@ -172,6 +165,12 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
+        var parent_hdl = __mlir_op.`co.opaque_handle`()
+        self._get_ctx[_CoroutineContext]().store(
+            _CoroutineContext {
+                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
+            }
+        )
 
         __mlir_region await_body():
             __mlir_op.`co.resume`(self._handle)
@@ -253,12 +252,6 @@ struct RaisingCoroutine[type: AnyRegType]:
             handle: The init handle.
         """
         self = Self {_handle: handle}
-        var parent_hdl = __mlir_op.`co.opaque_handle`()
-        self._get_ctx[_CoroutineContext]().store(
-            _CoroutineContext {
-                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
-            }
-        )
 
     @always_inline
     fn __del__(owned self):
@@ -292,6 +285,12 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
+        var parent_hdl = __mlir_op.`co.opaque_handle`()
+        self._get_ctx[_CoroutineContext]().store(
+            _CoroutineContext {
+                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
+            }
+        )
 
         __mlir_region await_body():
             __mlir_op.`co.resume`(self._handle)
