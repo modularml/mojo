@@ -26,7 +26,7 @@ fn create_file_and_test_delete_string[
         with open(filename, "w"):
             pass
     except:
-        assert_true(False, "Failed to create file for test")
+        assert_true(False, msg="Failed to create file for test")
 
     assert_true(exists(filename))
     func(filename)
@@ -41,7 +41,7 @@ fn create_file_and_test_delete_path[
         with open(filepath.__fspath__(), "w"):
             pass
     except:
-        assert_true(False, "Failed to create file for test")
+        assert_true(False, msg="Failed to create file for test")
 
     assert_true(exists(filepath))
     func(filepath)
