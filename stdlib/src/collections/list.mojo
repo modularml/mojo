@@ -380,18 +380,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Args:
             start: A non-negative integer indicating the position after which to reverse elements.
         """
+        var start_idx = start if start >= 0 else len(self) + start
 
-        # TODO(polish): Support a negative slice-like start position here that
-        #               counts from the end.
-        debug_assert(
-            start >= 0,
-            "List reverse start position must be non-negative",
-        )
-
-        var earlier_idx = start
+        var earlier_idx = start_idx
         var later_idx = len(self) - 1
 
-        var effective_len = len(self) - start
+        var effective_len = len(self) - start_idx
         var half_len = effective_len // 2
 
         for _ in range(half_len):

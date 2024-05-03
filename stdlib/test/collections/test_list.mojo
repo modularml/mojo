@@ -222,6 +222,22 @@ def test_list_reverse():
     assert_equal(vec[4], 3)
 
     #
+    # Test reversing the list [1, 2, 3] with negative indexes
+    #
+
+    vec = List[Int]()
+    vec.append(1)
+    vec.append(2)
+    vec.append(3)
+
+    vec._reverse(start=-2)
+
+    assert_equal(len(vec), 3)
+    assert_equal(vec[0], 1)
+    assert_equal(vec[1], 3)
+    assert_equal(vec[2], 2)
+
+    #
     # Test edge case of reversing the list [1, 2, 3] but starting after the
     # last element.
     #
