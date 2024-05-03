@@ -430,7 +430,7 @@ This is because whether `i` is defined at this line is dynamic in Python. For
 instance the following Python program will fail:
 
 ```python
-for i range(0): pass
+for i in range(0): pass
 print(i)
 ```
 
@@ -461,7 +461,7 @@ fn bar():
 ### Name scoping of nested function declarations
 
 In Python, nested function declarations produce dynamic values. They are
-essentially syntax sugar for `bar = lambda ...`.
+essentially syntactic sugar for `bar = lambda ...`.
 
 ```python
 def foo():
@@ -650,7 +650,7 @@ The upstream dialects available in the Playground are the
 
 ### `@value` is limited with trait conformance check
 
-Structs with `@value` decorator still need to explicitly provide dundner
+Structs with `@value` decorator still need to explicitly provide dunder
 methods such as `__init__`, `__copyinit__`, and `__moveinit__` when
 both of the following are true:
 
