@@ -456,11 +456,11 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         }
 
     @always_inline
-    fn __floordiv__(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn __floordiv__(self, rhs: Self) -> Self:
         """Performs element-wise integer floor division.
 
         Args:
-            rhs: Right hand side operand.
+            rhs: The elementwise divisor.
 
         Returns:
             The resulting index tuple.
@@ -473,6 +473,18 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         return Self {
             data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
         }
+
+    @always_inline
+    fn __rfloordiv__(self, rhs: Self) -> Self:
+        """Floor divides rhs by this object.
+
+        Args:
+            rhs: The value to elementwise divide by self.
+
+        Returns:
+            The resulting index tuple.
+        """
+        return rhs // self
 
     @always_inline
     fn remu(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:

@@ -17,9 +17,9 @@ module should be exposed by the current `math` module. The contents of this
 module should be eventually moved to the `math` module when it's open sourced.
 """
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # Ceilable
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 trait Ceilable:
@@ -49,9 +49,9 @@ trait Ceilable:
         ...
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # Floorable
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 trait Floorable:
@@ -78,4 +78,87 @@ trait Floorable:
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
     # associated types.
     fn __floor__(self) -> Self:
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+# CeilDivable
+# ===----------------------------------------------------------------------=== #
+
+
+trait CeilDivable:
+    """
+    The `CeilDivable` trait describes a type that defines a ceil divison
+    operation.
+
+    Types that conform to `CeilDivable` will work with the `math.ceildiv`
+    function.
+
+    For example:
+    ```mojo
+    from math import CeilDivable
+
+    @value
+    struct Foo(CeilDivable):
+        var x: Float64
+
+        fn __floordiv__(self, other: Self) -> Self:
+            return self.x // other.x
+
+        fn __rfloordiv__(self, other: Self) -> Self:
+            return other // self
+
+        fn __neg__(self) -> Self:
+            return -self.x
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
+    # or associated types.
+    fn __floordiv__(self, other: Self) -> Self:
+        ...
+
+    fn __rfloordiv__(self, other: Self) -> Self:
+        ...
+
+    fn __neg__(self) -> Self:
+        ...
+
+
+trait CeilDivableRaising:
+    """
+    The `CeilDivable` trait describes a type that define a floor divison and
+    negation operation that can raise.
+
+    Types that conform to `CeilDivableRaising` will work with the `//` operator
+    as well as the `math.ceildiv` function.
+
+    For example:
+    ```mojo
+    from math import CeilDivableRaising
+
+    @value
+    struct Foo(CeilDivableRaising):
+        var x: object
+
+        fn __floordiv__(self, other: Self) raises -> Self:
+            return self.x // other.x
+
+        fn __rfloordiv__(self, other: Self) raises -> Self:
+            return other // self
+
+        fn __neg__(self) raises -> Self:
+            return -self.x
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider these signatures when we have parametric traits
+    # or associated types.
+    fn __floordiv__(self, other: Self) raises -> Self:
+        ...
+
+    fn __rfloordiv__(self, other: Self) raises -> Self:
+        ...
+
+    fn __neg__(self) raises -> Self:
         ...

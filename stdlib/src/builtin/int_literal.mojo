@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the IntLiteral class."""
 
-from builtin._math import Ceilable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable
 
 
 @value
@@ -22,6 +22,7 @@ struct IntLiteral(
     Absable,
     Boolable,
     Ceilable,
+    CeilDivable,
     EqualityComparable,
     Floorable,
     Intable,
@@ -582,7 +583,7 @@ struct IntLiteral(
         Returns:
             `value // self`.
         """
-        return self // value
+        return value // self
 
     @always_inline("nodebug")
     fn __rlshift__(self, value: Self) -> Self:
