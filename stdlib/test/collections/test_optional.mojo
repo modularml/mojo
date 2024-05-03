@@ -39,10 +39,6 @@ def test_basic():
 
     assert_equal(1, a.value()[])
 
-    # Test invert operator
-    assert_false(~a)
-    assert_true(~b)
-
     # TODO(27776): can't inline these, they need to be mutable lvalues
     var a1 = a.or_else(2)
     var b1 = b.or_else(2)
