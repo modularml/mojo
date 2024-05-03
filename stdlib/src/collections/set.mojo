@@ -218,6 +218,71 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         self.difference_update(other)
 
+    fn __le__(self, other: Self) -> Bool:
+        """Overloads the <= operator for sets. Works like as `issubset` method.
+
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is a subset of the `other` set, False otherwise.
+        """
+        return self.issubset(other)
+
+    fn __ge__(self, other: Self) -> Bool:
+        """Overloads the >= operator for sets. Works like as `issuperset` method.
+
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is a superset of the `other` set, False otherwise.
+        """
+        return self.issuperset(other)
+
+    fn __gt__(self, other: Self) -> Bool:
+        """Overloads the > operator for strict superset comparison of sets.
+
+        Args:
+            other: The set to compare against for the strict superset relationship.
+
+        Returns:
+            True if the set is a strict superset of the `other` set, False otherwise.
+        """
+        return self >= other and self != other
+
+    fn __lt__(self, other: Self) -> Bool:
+        """Overloads the < operator for strict subset comparison of sets.
+
+        Args:
+            other: The set to compare against for the strict subset relationship.
+
+        Returns:
+            True if the set is a strict subset of the `other` set, False otherwise.
+        """
+        return self <= other and self != other
+
+    fn __xor__(self, other: Self) -> Self:
+        """Overloads the ^ operator for sets. Works like as `symmetric_difference` method.
+
+        Args:
+            other: The set to find the symmetric difference with.
+
+        Returns:
+            A new set containing the symmetric difference of the two sets.
+        """
+        return self.symmetric_difference(other)
+
+    fn __ixor__(inout self, other: Self):
+        """Overloads the ^= operator. Works like as `symmetric_difference_update` method.
+
+        Updates the set with the symmetric difference of itself and another set.
+
+        Args:
+            other: The set to find the symmetric difference with.
+        """
+        self.symmetric_difference_update(other)
+
     fn __iter__[
         mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
     ](
@@ -341,17 +406,6 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         for e in other:
             self.add(e[])
 
-    fn difference_update(inout self, other: Self):
-        """In-place set difference update.
-
-        Updates the set by removing all elements found in the `other` set,
-        effectively keeping only elements that are unique to this set.
-
-        Args:
-            other: Another Set instance to compare with this one.
-        """
-        self.remove_all(other)
-
     fn intersection_update(inout self, other: Self):
         """In-place set intersection update.
 
@@ -363,12 +417,13 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         # Possible to do this without an extra allocation, but need to be
         # careful about concurrent iteration + mutation
-        self.remove_all(self - other)
+        self.difference_update(self - other)
 
-    fn remove_all(inout self, other: Self):
+    fn difference_update(inout self, other: Self):
         """In-place set subtraction.
 
-        Updates the set to remove any elements from the `other` set.
+        Updates the set by removing all elements found in the `other` set,
+        effectively keeping only elements that are unique to this set.
 
         Args:
             other: Another Set instance to subtract from this one.
@@ -378,3 +433,108 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
                 self.remove(o[])
             except:
                 pass
+
+    fn issubset(self, other: Self) -> Bool:
+        """Check if this set is a subset of another set.
+
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is a subset of the `other` set, False otherwise.
+        """
+        if len(self) > len(other):
+            return False
+
+        for element in self:
+            if element[] not in other:
+                return False
+
+        return True
+
+    fn isdisjoint(self, other: Self) -> Bool:
+        """Check if this set is disjoint with another set.
+
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is disjoint with the `other` set, False otherwise.
+        """
+        for element in self:
+            if element[] in other:
+                return False
+
+        return True
+
+    fn issuperset(self, other: Self) -> Bool:
+        """Check if this set is a superset of another set.
+
+        Args:
+            other: Another Set instance to check against.
+
+        Returns:
+            True if this set is a superset of the `other` set, False otherwise.
+        """
+        if len(self) < len(other):
+            return False
+
+        for element in other:
+            if element[] not in self:
+                return False
+
+        return True
+
+    fn symmetric_difference(self, other: Self) -> Self:
+        """Returns the symmetric difference of two sets.
+
+        Args:
+            other: The set to find the symmetric difference with.
+
+        Returns:
+            A new set containing the symmetric difference of the two sets.
+        """
+        var result = Set[T]()
+
+        for element in self:
+            if element[] not in other:
+                result.add(element[])
+
+        for element in other:
+            if element[] not in self:
+                result.add(element[])
+
+        return result^
+
+    fn symmetric_difference_update(inout self, other: Self):
+        """Updates the set with the symmetric difference of itself and another set.
+
+        Args:
+            other: The set to find the symmetric difference with.
+        """
+        self = self.symmetric_difference(other)
+
+    fn discard(inout self, value: T):
+        """Remove a value from the set if it exists. Pass otherwise.
+
+        Args:
+            value: The element to remove from the set.
+        """
+        try:
+            self._data.pop(value)
+        except:
+            pass
+
+    fn clear(inout self) raises:
+        """Removes all elements from the set.
+
+        This method modifies the set in-place, removing all of its elements.
+        After calling this method, the set will be empty.
+        """
+        for _ in range(len(self)):
+            var a = self.pop()
+
+        #! This code below (without using range function) won't pass tests
+        #! It leaves set with one remaining item. Is this a bug?
+        # for _ in self:
+        #     var a = self.pop()
