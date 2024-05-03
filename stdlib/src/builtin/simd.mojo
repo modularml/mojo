@@ -131,6 +131,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Roundable,
     Sized,
     Stringable,
+    Representable,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -519,18 +520,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if size > 1:
             buf.size += _snprintf(buf.data, 2, "[")
-        # Print each element.
-        for i in range(size):
-            var element = self[i]
-            # Print separators between each element.
-            if i != 0:
-                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
 
-            buf.size += _snprintf_scalar[type](
-                buf.data + buf.size,
-                _calc_initial_buffer_size(element),
-                element,
-            )
+        self._add_elements_as_str_to_buffer(buf)
 
         # Print a closing `]`.
         @parameter
@@ -539,6 +530,55 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         buf.size += 1  # for the null terminator.
         return String(buf^)
+
+    @always_inline
+    fn _add_elements_as_str_to_buffer(self, inout buffer: String._buffer_type):
+        # Print each element.
+        for i in range(size):
+            var element = self[i]
+            # Print separators between each element.
+            if i != 0:
+                buffer.size += _snprintf(buffer.data + buffer.size, 3, ", ")
+
+            buffer.size += _snprintf_scalar[type](
+                buffer.data + buffer.size,
+                _calc_initial_buffer_size(element),
+                element,
+            )
+
+    @always_inline
+    fn __repr__(self) -> String:
+        """Get the representation of the SIMD vector that you can
+        copy-paste into the code to recreate it.
+
+        Example:
+        ```mojo
+        print(repr(SIMD[DType.float64, 4](1.0, 2.0, 3.0, 4.0)))
+        # SIMD[DType.float64, 4](1.0, 2.0, 3.0, 4.0)
+        print(repr(Int8(3)))
+        # SIMD[DType.int8, 1](3)
+        ```
+
+        Returns:
+            A string representation.
+        """
+        # TODO: Compute the exact amount of memory to store the representation.
+        var result = String(List[UInt8](capacity=32))
+        result += (
+            "SIMD[" + repr(self.element_type) + ", " + str(self.size) + "]("
+        )
+
+        # Usafe operations incoming, beware.
+        # removing the null terminator
+        result._buffer.pop()
+        self._add_elements_as_str_to_buffer(result._buffer)
+        # null terminator since we did unsafe operations
+        result._buffer.append(0)
+
+        result += ")"
+        # TODO: Represent the short form of the SIMD vector when the size is 1.
+        # e.g. Float32(3.5) instead of SIMD[Float32, 1](3.5)
+        return result
 
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
