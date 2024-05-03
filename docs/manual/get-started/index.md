@@ -130,6 +130,17 @@ If you already have the `modular` tool,
       ```
 
       </TabItem>
+      <TabItem value="fish" label="fish">
+
+      If you're using fish, run this command:
+
+      ```sh
+      set MOJO_PATH (modular config mojo.path) \
+        && set -Ux MODULAR_HOME $HOME/.modular \
+        && fish_add_path $MOJO_PATH/bin
+      ```
+
+      </TabItem>
     </Tabs>
 
 Next, get started with **[Hello, world!](hello-world.html)**
