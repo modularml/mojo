@@ -82,7 +82,7 @@ struct Coroutine[type: AnyRegType]:
         type: Type of value returned upon completion of the coroutine.
     """
 
-    alias _handle_type = __mlir_type[`!co.routine<() -> `, type, `>`]
+    alias _handle_type = __mlir_type[`!co.routine<`, type, `>`]
     alias _promise_type = __mlir_type[`!kgen.struct<(`, type, `)>`]
     var _handle: Self._handle_type
 
@@ -200,9 +200,7 @@ struct RaisingCoroutine[type: AnyRegType]:
     """
 
     alias _var_type = __mlir_type[`!kgen.variant<`, Error, `, `, type, `>`]
-    alias _handle_type = __mlir_type[
-        `!co.routine<() throws -> `, Self._var_type, `>`
-    ]
+    alias _handle_type = __mlir_type[`!co.routine<`, Self._var_type, `>`]
     alias _promise_type = __mlir_type[`!kgen.struct<(`, Self._var_type, `)>`]
     var _handle: Self._handle_type
 
