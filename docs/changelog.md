@@ -110,6 +110,9 @@ what we publish.
 - The `math.roundeven` function has been removed from the `math` module. The new
   `SIMD.roundeven` method now provides the identical functionality.
 
+- The `math.div_ceil` function has been removed in favor of the `math.ceildiv`
+  function.
+
 ### 🛠️ Fixed
 
 - [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on

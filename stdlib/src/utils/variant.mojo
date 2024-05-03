@@ -47,7 +47,7 @@ from memory.unsafe_pointer import (
     move_from_pointee,
     move_pointee,
 )
-from utils import unroll, StaticTuple
+from utils import unroll
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
