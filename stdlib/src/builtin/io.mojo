@@ -100,17 +100,23 @@ fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
     # aren't stripped off correctly.
     var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
 
-    with _fdopen(_fdopen.STDOUT) as fd:
-        _ = __mlir_op.`pop.external_call`[
-            func = "KGEN_CompilerRT_fprintf".value,
-            variadicType = __mlir_attr[
-                `(`,
-                `!kgen.pointer<none>,`,
-                `!kgen.pointer<scalar<si8>>`,
-                `) -> !pop.scalar<si32>`,
-            ],
-            _type=Int32,
-        ](fd, fmt.data(), loaded_pack)
+    @parameter
+    if triple_is_nvidia_cuda():
+        _ = external_call["vprintf", Int32](
+            fmt.data(), UnsafePointer.address_of(loaded_pack)
+        )
+    else:
+        with _fdopen(_fdopen.STDOUT) as fd:
+            _ = __mlir_op.`pop.external_call`[
+                func = "KGEN_CompilerRT_fprintf".value,
+                variadicType = __mlir_attr[
+                    `(`,
+                    `!kgen.pointer<none>,`,
+                    `!kgen.pointer<scalar<si8>>`,
+                    `) -> !pop.scalar<si32>`,
+                ],
+                _type=Int32,
+            ](fd, fmt.data(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
