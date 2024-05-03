@@ -70,7 +70,7 @@ fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
 
 @always_inline
 fn assert_true(
-    val: Bool, msg: String = "condition was unexpectedly False"
+    val: Bool, *, msg: String = "condition was unexpectedly False"
 ) raises:
     """Asserts that the input value is True. If it is not then an
     Error is raised.
@@ -88,7 +88,7 @@ fn assert_true(
 
 @always_inline
 fn assert_false(
-    val: Bool, msg: String = "condition was unexpectedly True"
+    val: Bool, *, msg: String = "condition was unexpectedly True"
 ) raises:
     """Asserts that the input value is False. If it is not then an Error is
     raised.
@@ -112,7 +112,7 @@ trait Testable(EqualityComparable, Stringable):
 
 
 @always_inline
-fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
+fn assert_equal[T: Testable](lhs: T, rhs: T, *, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
 
@@ -133,7 +133,7 @@ fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
 
 # TODO: Remove the String and SIMD overloads once we have more powerful traits.
 @always_inline
-fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
+fn assert_equal(lhs: String, rhs: String, *, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
 
@@ -175,7 +175,7 @@ fn assert_equal[
 
 
 @always_inline
-fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
+fn assert_not_equal[T: Testable](lhs: T, rhs: T, *, msg: String = "") raises:
     """Asserts that the input values are not equal. If it is not then an
     Error is raised.
 
@@ -197,7 +197,7 @@ fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
 
 
 @always_inline
-fn assert_not_equal(lhs: String, rhs: String, msg: String = "") raises:
+fn assert_not_equal(lhs: String, rhs: String, *, msg: String = "") raises:
     """Asserts that the input values are not equal. If it is not then an
     an Error is raised.
 
@@ -282,8 +282,7 @@ fn assert_almost_equal[
 
 
 fn _assert_equal_error(
-    lhs: String, rhs: String, msg: String, loc: _SourceLocation
-) -> String:
+    lhs: String, rhs: String, loc: _SourceLocation, *, msg: String = "") -> String:
     var err = (
         "`left == right` comparison failed:\n   left: "
         + lhs
@@ -296,8 +295,7 @@ fn _assert_equal_error(
 
 
 fn _assert_not_equal_error(
-    lhs: String, rhs: String, msg: String, loc: _SourceLocation
-) -> String:
+    lhs: String, rhs: String, loc: _SourceLocation, *, msg: String := "") -> String:
     var err = (
         "`left != right` comparison failed:\n   left: "
         + lhs
