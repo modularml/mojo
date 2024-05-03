@@ -23,11 +23,11 @@ fn test_stringable() raises:
 
 
 fn test_representable() raises:
-    assert_equal("DType.float32", repr(DType.float32))
-    assert_equal("DType.int64", repr(DType.int64))
-    assert_equal("DType.bool", repr(DType.bool))
-    assert_equal("DType.address", repr(DType.address))
-    assert_equal("DType.index", repr(DType.index))
+    assert_equal(repr(DType.float32), "DType.float32")
+    assert_equal(repr(DType.int64), "DType.int64")
+    assert_equal(repr(DType.bool), "DType.bool")
+    assert_equal(repr(DType.address), "DType.address")
+    assert_equal(repr(DType.index), "DType.index")
 
 
 fn test_key_element() raises:
