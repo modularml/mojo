@@ -36,7 +36,7 @@ fn _abs(x: SIMD) -> __type_of(x):
 fn _isclose(
     a: SIMD,
     b: __type_of(a),
-    *,
+    *-,
     atol: Scalar[a.type],
     rtol: Scalar[a.type],
     equal_nan: Bool,
