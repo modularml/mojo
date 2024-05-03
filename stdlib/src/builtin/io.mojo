@@ -355,27 +355,10 @@ fn _put(x: DType):
 
 
 @no_inline
-fn print(
-    *, sep: StringLiteral = " ", end: StringLiteral = "\n", flush: Bool = False
-):
-    """Prints the end value.
-
-    Args:
-        sep: The separator used between elements.
-        end: The String to write after printing the elements.
-        flush: If set to true, then the stream is forcibly flushed.
-    """
-    _put(end)
-    if flush:
-        _flush()
-
-
-@no_inline
 fn print[
-    T: Stringable, *Ts: Stringable
+    *Ts: Stringable
 ](
-    first: T,
-    *rest: *Ts,
+    *values: *Ts,
     sep: StringLiteral = " ",
     end: StringLiteral = "\n",
     flush: Bool = False,
@@ -384,24 +367,24 @@ fn print[
     and followed by `end`.
 
     Parameters:
-        T: The first element type.
-        Ts: The remaining element types.
+        Ts: The elements types.
 
     Args:
-        first: The first element.
-        rest: The remaining elements.
+        values: The elements to print.
         sep: The separator used between elements.
         end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
     """
-    _put(str(first))
 
     @parameter
-    fn print_elt[T: Stringable](a: T):
-        _put(sep)
-        _put(a)
+    fn print_with_separator[i: Int, T: Stringable](value: T):
+        _put(value)
 
-    rest.each[print_elt]()
+        @parameter
+        if i < values.__len__() - 1:
+            _put(sep)
+
+    values.each_idx[print_with_separator]()
 
     _put(end)
     if flush:
