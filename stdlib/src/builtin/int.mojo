@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
-from builtin._math import Ceilable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable
 from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
@@ -197,6 +197,7 @@ struct Int(
     Absable,
     Boolable,
     Ceilable,
+    CeilDivable,
     Floorable,
     Formattable,
     Intable,
