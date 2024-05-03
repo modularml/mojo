@@ -238,6 +238,19 @@ def test_list_reverse():
     assert_equal(vec[2], 2)
 
     #
+    # Test reversing the list [1, 2] with out of bounds indexes
+    #
+    vec = List[Int]()
+    vec.append(1)
+    vec.append(2)
+
+    with assert_raises(contains="IndexError"):
+        vec._reverse(start=-3)
+
+    with assert_raises(contains="IndexError"):
+        vec._reverse(start=3)
+
+    #
     # Test edge case of reversing the list [1, 2, 3] but starting after the
     # last element.
     #
