@@ -529,7 +529,7 @@ struct String(
         var length = len(str)
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
-        memcpy(rebind[DTypePointer[DType.int8]](buffer.data), str.data, length)
+        memcpy(rebind[DTypePointer[DType.uint8]](buffer.data), str.data, length)
         buffer[length] = 0
         self._buffer = buffer^
 
@@ -979,7 +979,7 @@ struct String(
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self._as_ptr(), length: len(self)}
+        return StringRef {data: self._as_uint8_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """

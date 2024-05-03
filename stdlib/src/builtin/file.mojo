@@ -417,7 +417,7 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        self._write(data.data, len(data))
+        self._write(data._as_ptr(), len(data))
 
     @always_inline
     fn _write[
