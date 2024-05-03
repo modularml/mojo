@@ -20,7 +20,7 @@ from os import Atomic
 """
 
 from builtin.dtype import _integral_type_of
-from memory import Pointer, bitcast
+from memory import UnsafePointer, bitcast
 
 
 struct Atomic[type: DType]:
@@ -78,7 +78,7 @@ struct Atomic[type: DType]:
     @staticmethod
     @always_inline
     fn _fetch_add(
-        ptr: Pointer[Scalar[type]], rhs: Scalar[type]
+        ptr: UnsafePointer[Scalar[type]], rhs: Scalar[type]
     ) -> Scalar[type]:
         """Performs atomic in-place add.
 
@@ -120,7 +120,7 @@ struct Atomic[type: DType]:
         Returns:
             The original value before addition.
         """
-        var value_addr = Pointer.address_of(self.value)
+        var value_addr = UnsafePointer.address_of(self.value)
         return Self._fetch_add(value_addr, rhs)
 
     @always_inline
@@ -154,7 +154,7 @@ struct Atomic[type: DType]:
         Returns:
             The original value before subtraction.
         """
-        var value_addr = Pointer.address_of(self.value.value)
+        var value_addr = UnsafePointer.address_of(self.value.value)
         return __mlir_op.`pop.atomic.rmw`[
             bin_op = __mlir_attr.`#pop<bin_op sub>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
@@ -196,7 +196,7 @@ struct Atomic[type: DType]:
 
         @parameter
         if type.is_integral():
-            var value_addr = Pointer.address_of(self.value.value)
+            var value_addr = UnsafePointer.address_of(self.value.value)
             var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
                 bin_op = __mlir_attr.`#pop<bin_op sub>`,
                 failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
@@ -220,9 +220,9 @@ struct Atomic[type: DType]:
         # operation on that.
 
         alias integral_type = _integral_type_of[type]()
-        var value_integral_addr = Pointer.address_of(self.value.value).bitcast[
-            __mlir_type[`!pop.scalar<`, integral_type.value, `>`]
-        ]()
+        var value_integral_addr = UnsafePointer.address_of(
+            self.value.value
+        ).bitcast[__mlir_type[`!pop.scalar<`, integral_type.value, `>`]]()
         var expected_integral = bitcast[integral_type](expected)
         var desired_integral = bitcast[integral_type](desired)
 
@@ -264,7 +264,7 @@ struct Atomic[type: DType]:
             "the input type must be arithmetic",
         ]()
 
-        var value_addr = Pointer.address_of(self.value.value)
+        var value_addr = UnsafePointer.address_of(self.value.value)
         _ = __mlir_op.`pop.atomic.rmw`[
             bin_op = __mlir_attr.`#pop<bin_op max>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
@@ -292,7 +292,7 @@ struct Atomic[type: DType]:
             "the input type must be arithmetic",
         ]()
 
-        var value_addr = Pointer.address_of(self.value.value)
+        var value_addr = UnsafePointer.address_of(self.value.value)
         _ = __mlir_op.`pop.atomic.rmw`[
             bin_op = __mlir_attr.`#pop<bin_op min>`,
             ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
