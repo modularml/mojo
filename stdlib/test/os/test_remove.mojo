@@ -30,7 +30,7 @@ fn create_file_and_test_delete_string[
 
     assert_true(exists(filename))
     func(filename)
-    assert_false(exists(filename), "test with '" + name + "' failed")
+    assert_false(exists(filename), msg="test with '" + name + "' failed")
 
 
 fn create_file_and_test_delete_path[
