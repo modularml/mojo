@@ -43,7 +43,7 @@ def test_hash_byte_array():
     num_same += same_low_bits(hash("b".data(), 1), hash("d".data(), 1))
     num_same += same_low_bits(hash("c".data(), 1), hash("d".data(), 1))
 
-    assert_true(num_same < 2, "too little entropy in hash fn low bits")
+    assert_true(num_same < 2, msg="too little entropy in hash fn low bits")
 
 
 def _test_hash_int_simd[type: DType](bits: Int = 4):
@@ -67,7 +67,7 @@ def _test_hash_int_simd[type: DType](bits: Int = 4):
     num_same += same_low_bits(_hash_simd(b), _hash_simd(d), bits)
     num_same += same_low_bits(_hash_simd(c), _hash_simd(d), bits)
 
-    assert_true(num_same < 2, "too little entropy in hash fn low bits")
+    assert_true(num_same < 2, msg="too little entropy in hash fn low bits")
 
 
 def test_hash_simd():
