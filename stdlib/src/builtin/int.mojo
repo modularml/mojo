@@ -216,7 +216,7 @@ struct Int(
     """Returns the minimum value of type."""
 
     @always_inline("nodebug")
-    fn __init__() -> Int:
+    fn __init__() -> Self:
         """Default constructor.
 
         Returns:
@@ -227,7 +227,7 @@ struct Int(
         }
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.index) -> Int:
+    fn __init__(value: __mlir_type.index) -> Self:
         """Construct Int from the given index value.
 
         Args:
@@ -239,7 +239,7 @@ struct Int(
         return Self {value: value}
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<si16>`) -> Int:
+    fn __init__(value: __mlir_type.`!pop.scalar<si16>`) -> Self:
         """Construct Int from the given Int16 value.
 
         Args:
@@ -255,7 +255,7 @@ struct Int(
         )
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<si32>`) -> Int:
+    fn __init__(value: __mlir_type.`!pop.scalar<si32>`) -> Self:
         """Construct Int from the given Int32 value.
 
         Args:
@@ -271,7 +271,7 @@ struct Int(
         )
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<si64>`) -> Int:
+    fn __init__(value: __mlir_type.`!pop.scalar<si64>`) -> Self:
         """Construct Int from the given Int64 value.
 
         Args:
