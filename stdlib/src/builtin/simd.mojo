@@ -25,7 +25,7 @@ from sys import (
     _RegisterPackType,
 )
 
-from builtin._math import Ceilable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable
 from builtin.hash import _hash_simd
 from memory import bitcast
 
@@ -124,6 +124,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Absable,
     Boolable,
     Ceilable,
+    CeilDivable,
     CollectionElement,
     Floorable,
     Hashable,
@@ -613,7 +614,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             The element type of the SIMD vector must be numeric.
 
         Args:
-            rhs: The value to divide on.
+            rhs: The value to divide with.
 
         Returns:
             `floor(self / rhs)` value.
@@ -638,6 +639,22 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             var mod = self - div * rhs
             var mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
             return div - mask.cast[type]()
+
+    @always_inline("nodebug")
+    fn __rfloordiv__(self, rhs: Self) -> Self:
+        """Returns the division of rhs and self rounded down to the nearest
+        integer.
+
+        Constraints:
+            The element type of the SIMD vector must be numeric.
+
+        Args:
+            rhs: The value to divide by self.
+
+        Returns:
+            `floor(rhs / self)` value.
+        """
+        return rhs // self
 
     @always_inline("nodebug")
     fn __mod__(self, rhs: Self) -> Self:

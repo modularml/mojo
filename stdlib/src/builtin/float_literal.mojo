@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin._math import Ceilable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable
 
 # ===----------------------------------------------------------------------===#
 # FloatLiteral
@@ -29,6 +29,7 @@ struct FloatLiteral(
     Absable,
     Boolable,
     Ceilable,
+    CeilDivable,
     EqualityComparable,
     Floorable,
     Intable,
@@ -305,16 +306,25 @@ struct FloatLiteral(
     fn __floordiv__(self, rhs: Self) -> Self:
         """Returns self divided by rhs, rounded down to the nearest integer.
 
-        Constraints:
-            The element type of the SIMD vector must be numeric.
-
         Args:
-            rhs: The value to divide on.
+            rhs: The divisor value.
 
         Returns:
             `floor(self / rhs)` value.
         """
         return self.__truediv__(rhs).__floor__()
+
+    @always_inline("nodebug")
+    fn __rfloordiv__(self, rhs: Self) -> Self:
+        """Returns rhs divided by self, rounded down to the nearest integer.
+
+        Args:
+            rhs: The value to be divided by self.
+
+        Returns:
+            `floor(rhs / self)` value.
+        """
+        return rhs // self
 
     # TODO - maybe __mod__?
     # TODO - maybe __pow__?
