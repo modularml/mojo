@@ -33,11 +33,12 @@ from utils._numerics import FPUtils
 from utils._numerics import isnan as _isnan
 from utils._numerics import nan as _nan
 from utils._visualizers import lldb_formatter_wrapping_type
+from utils.inlined_string import _ArrayMem
 from utils import StaticTuple
 
-from .dtype import _integral_type_of
-from .io import _snprintf_scalar, _snprintf
-from .string import _calc_initial_buffer_size
+from .dtype import _integral_type_of, _get_dtype_printf_format
+from .io import _snprintf_scalar, _snprintf, _printf
+from .string import _calc_initial_buffer_size, _calc_format_buffer_size
 
 # ===------------------------------------------------------------------------===#
 # Type Aliases
@@ -508,38 +509,54 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A string representation.
         """
 
-        # Reserve space for opening and closing brackets, plus each element and
-        # its trailing commas.
-        var buf = String._buffer_type()
-        var initial_buffer_size = 2
-        for i in range(size):
-            initial_buffer_size += _calc_initial_buffer_size(self[i]) + 2
-        buf.reserve(initial_buffer_size)
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this SIMD value to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
 
         # Print an opening `[`.
         @parameter
         if size > 1:
-            buf.size += _snprintf(buf.data, 2, "[")
+            writer.write_str("[")
+
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
+                writer.write_str(", ")
 
-            buf.size += _snprintf_scalar[type](
-                buf.data + buf.size,
-                _calc_initial_buffer_size(element),
-                element,
-            )
+            @parameter
+            if triple_is_nvidia_cuda():
+                # FIXME(MSTDL-406):
+                #   This prints "out of band" with the `Formatter` passed in,
+                #   meaning this will only work if `Formatter` is an unbuffered
+                #   wrapper around printf (which Formatter.stdout currently
+                #   is by default).
+                #
+                #   This is a workaround to permit debug formatting of
+                #   floating-point values on GPU, where printing to stdout is
+                #   the only way the Formatter framework is currently used.
+                var format = _get_dtype_printf_format[type]()
+
+                @parameter
+                if type.is_floating_point():
+                    # get_dtype_printf_format hardcodes 17 digits of precision.
+                    format = "%g"
+
+                _printf(format, element)
+            else:
+                _format_scalar(writer, element)
 
         # Print a closing `]`.
         @parameter
         if size > 1:
-            buf.size += _snprintf(buf.data + buf.size, 2, "]")
-
-        buf.size += 1  # for the null terminator.
-        return String(buf^)
+            writer.write_str("]")
 
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
@@ -2836,3 +2853,33 @@ fn _simd_apply[
         result[i] = func[x.type, y.type, result_type](x[i], y[i])
 
     return result
+
+
+# ===----------------------------------------------------------------------===#
+# _format_scalar
+# ===----------------------------------------------------------------------===#
+
+
+fn _format_scalar[dtype: DType](inout writer: Formatter, value: Scalar[dtype]):
+    # Stack allocate enough bytes to store any formatted Scalar value of any
+    # type.
+    alias size: Int = _calc_format_buffer_size[dtype]()
+
+    var buf = _ArrayMem[Int8, size]()
+    # TODO(MOCO-268):
+    #   Remove this rebind(..) once compiler type comparision bug is fixed.
+    var buf_ptr: UnsafePointer[Int8] = rebind[UnsafePointer[Int8]](
+        buf.unsafe_ptr()
+    )
+
+    var wrote = _snprintf_scalar[dtype](
+        buf_ptr,
+        size,
+        value,
+    )
+
+    var strref = StringRef(buf_ptr, wrote)
+
+    writer.write_str(strref)
+
+    _ = buf^  # Keep alive

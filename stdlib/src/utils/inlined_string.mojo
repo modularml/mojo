@@ -17,7 +17,7 @@
 
 from sys import sizeof
 
-from memory import memcpy, LegacyPointer
+from memory import memcpy, LegacyPointer, UnsafePointer
 
 from collections import Optional
 
@@ -510,3 +510,12 @@ struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
         """
 
         return LegacyPointer.address_of(self.storage).bitcast[ElementType]()
+
+    fn unsafe_ptr(inout self) -> UnsafePointer[ElementType]:
+        """Get a pointer to the elements contained by this array.
+
+        Returns:
+            A pointer to the elements contained by this array.
+        """
+
+        return UnsafePointer.address_of(self.storage).bitcast[ElementType]()
