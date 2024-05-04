@@ -29,9 +29,7 @@ alias AnyCoroutine = __mlir_type.`!co.routine`
 
 @always_inline
 fn _suspend_async[body: fn (AnyCoroutine) capturing -> None]():
-    var hdl = __mlir_op.`co.opaque_handle`()
-
-    __mlir_region await_body():
+    __mlir_region await_body(hdl: AnyCoroutine):
         body(hdl)
         __mlir_op.`co.suspend.end`()
 
