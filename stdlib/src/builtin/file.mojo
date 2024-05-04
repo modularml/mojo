@@ -325,7 +325,6 @@ struct FileHandle:
 
         var size_copy: Int64 = size
         var err_msg = _OwnedStringRef()
-
         var buf = external_call[
             "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[UInt8]
         ](
@@ -336,7 +335,6 @@ struct FileHandle:
 
         if err_msg:
             raise (err_msg^).consume_as_error()
-
         return List[UInt8](buf, size=int(size_copy), capacity=int(size_copy))
 
     fn seek(self, offset: UInt64, whence: UInt8 = os.SEEK_SET) raises -> UInt64:
