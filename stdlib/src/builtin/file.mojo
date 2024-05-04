@@ -272,7 +272,7 @@ struct FileHandle:
             raise (err_msg^).consume_as_error()
         return size_copy
 
-    fn read_bytes(self, size: Int64 = -1) raises -> List[Int8]:
+    fn read_bytes(self, size: Int64 = -1) raises -> List[UInt8]:
         """Reads data from a file and sets the file handle seek position. If
         size is left as default of -1, it will read to the end of the file.
         Setting size to a number larger than what's in the file will be handled
@@ -290,7 +290,7 @@ struct FileHandle:
 
         Examples:
 
-        Reading the entire file into a List[Int8]:
+        Reading the entire file into a List[UInt8]:
 
         ```mojo
         var file = open("/tmp/example.txt", "r")
@@ -327,7 +327,7 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
 
         var buf = external_call[
-            "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[Int8]
+            "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[UInt8]
         ](
             self.handle,
             UnsafePointer.address_of(size_copy),
@@ -337,7 +337,9 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[Int8](buf, size=int(size_copy), capacity=int(size_copy))
+        var list = List[UInt8](
+            buf, size=int(size_copy), capacity=int(size_copy)
+        )
 
         return list
 
@@ -365,7 +367,7 @@ struct FileHandle:
         ```mojo
         import os
         var f = open("/tmp/example.txt", "r")
-        f.seek(os.SEEK_CUR, 32)
+        _ = f.seek(32, os.SEEK_CUR)
         ```
 
         Start from 32 bytes from the end of the file:
@@ -373,7 +375,7 @@ struct FileHandle:
         ```mojo
         import os
         var f = open("/tmp/example.txt", "r")
-        f.seek(os.SEEK_END, -32)
+        _ = f.seek(-32, os.SEEK_END)
         ```
         .
         """
