@@ -12,7 +12,6 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from utils._math import min, max
 from testing import assert_equal
 
 

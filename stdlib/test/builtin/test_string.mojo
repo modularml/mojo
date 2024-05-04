@@ -40,6 +40,13 @@ fn test_stringable() raises:
     assert_equal("a string", str(String(AString())))
 
 
+fn test_representable() raises:
+    assert_equal(repr(String("hello")), "'hello'")
+    assert_equal(repr(String(0)), "'0'")
+    # TODO: Add more complex cases with "'", escape characters, etc
+    # and make String.__repr__ more robust to handle those cases.
+
+
 fn test_constructors() raises:
     # Default construction
     assert_equal(0, len(String()))
@@ -750,6 +757,7 @@ def main():
     test_comparison_operators()
     test_add()
     test_stringable()
+    test_representable()
     test_string_join()
     test_stringref()
     test_stringref_from_dtypepointer()
@@ -770,7 +778,9 @@ def main():
     test_islower()
     test_lower()
     test_upper()
-    test_isspace()
+    # TODO(37393): Re-enable once we debug why we are depending on some debug behavior
+    # on graviton.  Showing an error in our O3 LLVM pipeline; could be a bug in LLVM.
+    # test_isspace()
     test_rstrip()
     test_lstrip()
     test_strip()

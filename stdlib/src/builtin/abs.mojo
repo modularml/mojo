@@ -35,6 +35,8 @@ trait Absable:
     ```
     """
 
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
     fn __abs__(self) -> Self:
         ...
 
