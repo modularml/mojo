@@ -329,8 +329,8 @@ that it needs to work with as well as element type:
         alias pointer_type = __mlir_type[...]
         var address: pointer_type
 
-           fn __init__() -> Self: ...
-        fn __init__(address: pointer_type) -> Self: ...
+           fn __init__(inout self): ...
+        fn __init__(inout self, address: pointer_type): ...
 
         # Should this be an __init__ to allow implicit conversions?
         @static_method
@@ -385,8 +385,8 @@ We may also want to wire up the prefix star operator into a dunder method.
         var ptr: MutablePointer[type, life]
         var size: Int
 
-        fn __init__() -> Self:
-        fn __init__(ptr: MutablePointer[type, life], size: Int) -> Self:
+        fn __init__(inout self):
+        fn __init__(inout self, ptr: MutablePointer[type, life], size: Int):
 
         # All the normal slicing operations etc, with bounds checks.
         fn __getitem__(self, offset: Int) -> inout[life] type:
