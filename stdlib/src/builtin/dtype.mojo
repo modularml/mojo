@@ -727,7 +727,7 @@ fn _get_runtime_dtype_size(type: DType) -> Int:
     statically known dtypes. Instead, we have to perform a dispatch to
     determine the size of the dtype.
     """
-    alias type_list = List[DType](
+    alias type_list = StaticTuple[DType, 16](
         DType.bool,
         DType.int8,
         DType.uint8,

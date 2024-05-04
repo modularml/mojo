@@ -59,10 +59,10 @@ struct _ListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__get_ref(self.index - 1)
+            return self.src[].__refitem__(self.index - 1)
         else:
             self.index -= 1
-            return self.src[].__get_ref(self.index)
+            return self.src[].__refitem__(self.index)
 
     fn __len__(self) -> Int:
         @parameter
@@ -481,22 +481,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.capacity = 0
         return ptr
 
-    fn __setitem__(inout self, i: Int, owned value: T):
-        """Sets a list element at the given index.
-
-        Args:
-            i: The index of the element.
-            value: The value to assign.
-        """
-        debug_assert(-self.size <= i < self.size, "index must be within bounds")
-
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += len(self)
-
-        destroy_pointee(self.data + normalized_idx)
-        initialize_pointee_move(self.data + normalized_idx, value^)
-
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
         """Adjusts the span based on the list length."""
@@ -540,29 +524,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         return res^
 
-    @always_inline
-    fn __getitem__(self, i: Int) -> T:
-        """Gets a copy of the list element at the given index.
-
-        FIXME(lifetimes): This should return a reference, not a copy!
-
-        Args:
-            i: The index of the element.
-
-        Returns:
-            A copy of the element at the given index.
-        """
-        debug_assert(-self.size <= i < self.size, "index must be within bounds")
-
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += len(self)
-
-        return (self.data + normalized_idx)[]
-
-    # TODO(30737): Replace __getitem__ with this as __refitem__, but lots of places use it
-    fn __get_ref(
-        self: Reference[Self, _, _], i: Int
+    fn __refitem__(
+        self: Reference[Self, _, _],
+        i: Int,
     ) -> Reference[T, self.is_mutable, self.lifetime]:
         """Gets a reference to the list element at the given index.
 

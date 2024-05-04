@@ -96,7 +96,7 @@ struct _DictEntryIter[
             else:
                 debug_assert(self.index >= 0, "dict iter bounds")
 
-            var opt_entry_ref = self.src[]._entries.__get_ref(self.index)
+            var opt_entry_ref = self.src[]._entries.__refitem__(self.index)
             if opt_entry_ref[]:
 
                 @parameter
@@ -602,7 +602,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var index: Int
         found, slot, index = self._find_index(hash, key)
         if found:
-            var ev = self._entries.__get_ref(index)[]
+            var ev = self._entries[index]
             debug_assert(ev.__bool__(), "entry in index must be full")
             return ev.value()[].value
         return None
@@ -630,7 +630,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         found, slot, index = self._find_index(hash, key)
         if found:
             self._set_index(slot, Self.REMOVED)
-            var entry = self._entries.__get_ref(index)[]
+            var entry = self._entries[index]
             self._entries[index] = None
             self.size -= 1
             debug_assert(entry.__bool__(), "entry in index must be full")
@@ -752,7 +752,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             elif index == Self.REMOVED:
                 return (False, slot, self._n_entries)
             else:
-                var ev = self._entries.__get_ref(index)[]
+                var ev = self._entries[index]
                 debug_assert(ev.__bool__(), "entry in index must be full")
                 var entry = ev.value()[]
                 if hash == entry.hash and key == entry.key:
@@ -778,7 +778,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._entries = self._new_entries(self._reserved)
 
         for i in range(len(old_entries)):
-            var entry = old_entries.__get_ref(i)[]
+            var entry = old_entries[i]
             if entry:
                 self._insert(entry.value()[])
 
@@ -786,10 +786,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = _DictIndex(self._reserved)
         var right = 0
         for left in range(self.size):
-            while not self._entries.__get_ref(right)[]:
+            while not self._entries[right]:
                 right += 1
                 debug_assert(right < self._reserved, "Invalid dict state")
-            var entry = self._entries.__get_ref(right)[]
+            var entry = self._entries[right]
             debug_assert(entry.__bool__(), "Logic error")
             var slot = self._find_empty_index(entry.value()[].hash)
             self._set_index(slot, left)

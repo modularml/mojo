@@ -551,8 +551,8 @@ def test_list_explicit_copy():
     var list = List[CopyCounter]()
     list.append(CopyCounter())
     var list_copy = List(list)
-    assert_equal(0, list.__get_ref(0)[].copy_count)
-    assert_equal(1, list_copy.__get_ref(0)[].copy_count)
+    assert_equal(0, list[0].copy_count)
+    assert_equal(1, list_copy[0].copy_count)
 
     var l2 = List[Int]()
     for i in range(10):
