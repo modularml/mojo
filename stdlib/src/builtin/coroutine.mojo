@@ -174,9 +174,9 @@ struct Coroutine[type: AnyRegType]:
 
         __mlir_region await_body():
             __mlir_op.`co.resume`(self._handle)
-            __mlir_op.`co.await.end`()
+            __mlir_op.`co.suspend.end`()
 
-        __mlir_op.`co.await`[_region = "await_body".value]()
+        __mlir_op.`co.suspend`[_region = "await_body".value]()
         return self.get()
 
 
@@ -294,7 +294,7 @@ struct RaisingCoroutine[type: AnyRegType]:
 
         __mlir_region await_body():
             __mlir_op.`co.resume`(self._handle)
-            __mlir_op.`co.await.end`()
+            __mlir_op.`co.suspend.end`()
 
-        __mlir_op.`co.await`[_region = "await_body".value]()
+        __mlir_op.`co.suspend`[_region = "await_body".value]()
         return self.get()
