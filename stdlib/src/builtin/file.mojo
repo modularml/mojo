@@ -303,9 +303,9 @@ struct FileHandle:
         ```mojo
         import os
         var file = open("/tmp/example.txt", "r")
-        var list1 = file.read(8)
+        var list1 = file.read_bytes(8)
         _ = file.seek(2, os.SEEK_CUR)
-        var list2 = file.read(8)
+        var list2 = file.read_bytes(8)
         ```
 
         Reading the last 8 bytes in the file, then the first 8 bytes:
@@ -314,9 +314,9 @@ struct FileHandle:
         import os
         var file = open("/tmp/example.txt", "r")
         _ = file.seek(-8, os.SEEK_END)
-        var last_data = file.read(8)
+        var last_data = file.read_bytes(8)
         _ = file.seek(8, os.SEEK_SET) # os.SEEK_SET is the default start of file
-        var first_data = file.read(8)
+        var first_data = file.read_bytes(8)
         ```
         .
         """
@@ -337,11 +337,7 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[UInt8](
-            buf, size=int(size_copy), capacity=int(size_copy)
-        )
-
-        return list
+        return List[UInt8](buf, size=int(size_copy), capacity=int(size_copy))
 
     fn seek(self, offset: UInt64, whence: UInt8 = os.SEEK_SET) raises -> UInt64:
         """Seeks to the given offset in the file.
