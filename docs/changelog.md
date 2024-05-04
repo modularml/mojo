@@ -87,6 +87,8 @@ what we publish.
   directory, now outputs a Mojo package to `my-dir/my-package.mojopkg`.
   Previously, this had to be spelled out, as in `-o my-dir/my-package.mojopkg`.
 
+- The Mojo Language Server now reports a warning when a local variable is unused.
+
 - The `math` module now has `CeilDivable` and `CeilDivableRaising` traits that
   allow users to opt into the `math.ceildiv` function.
 
