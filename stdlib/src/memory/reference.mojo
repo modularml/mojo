@@ -44,8 +44,8 @@ struct _GPUAddressSpace(EqualityComparable):
     """Local address space."""
 
     @always_inline("nodebug")
-    fn __init__(value: Int) -> Self:
-        return Self {_value: value}
+    fn __init__(inout self, value: Int):
+        self._value = value
 
     @always_inline("nodebug")
     fn value(self) -> Int:
@@ -119,28 +119,22 @@ struct AddressSpace(EqualityComparable):
     """Generic address space."""
 
     @always_inline("nodebug")
-    fn __init__(value: Int) -> Self:
+    fn __init__(inout self, value: Int):
         """Initializes the address space from the underlying integeral value.
 
         Args:
           value: The address space value.
-
-        Returns:
-          The address space.
         """
-        return Self {_value: value}
+        self._value = value
 
     @always_inline("nodebug")
-    fn __init__(value: _GPUAddressSpace) -> Self:
+    fn __init__(inout self, value: _GPUAddressSpace):
         """Initializes the address space from the underlying integeral value.
 
         Args:
           value: The address space value.
-
-        Returns:
-          The address space.
         """
-        return Self {_value: int(value)}
+        self._value = int(value)
 
     @always_inline("nodebug")
     fn value(self) -> Int:

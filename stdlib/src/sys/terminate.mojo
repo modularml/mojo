@@ -17,20 +17,20 @@ from .ffi import external_call
 
 
 fn exit():
-    """Exist from Mojo. Unlike the Python implementation this does not raise
-    an exception to exit.
+    """Exits from Mojo. Unlike the Python implementation this does not raise an
+    exception to exit.
     """
     exit(0)
 
 
 fn exit[intable: Intable](code: intable):
-    """Exist from Mojo. Unlike the Python implementation this does not raise
-    an exception to exit.
+    """Exits from Mojo. Unlike the Python implementation this does not raise an
+    exception to exit.
 
-    Params:
-      intable: The type of the code.
+    Parameters:
+        intable: The type of the exit code.
 
     Args:
-      code: The exit code.
+        code: The exit code.
     """
     external_call["exit", NoneType](Int32(int(code)))

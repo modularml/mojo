@@ -146,6 +146,68 @@ def test_truthy():
         test_dtype[DType.bfloat16]()
 
 
+def test_ceil():
+    assert_equal(Float32.__ceil__(Float32(1.5)), 2.0)
+    assert_equal(Float32.__ceil__(Float32(-1.5)), -1.0)
+    assert_equal(Float32.__ceil__(Float32(3.0)), 3.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(
+        F.__ceil__(F(0.0, 1.4, -42.5, -12.6)), F(0.0, 2.0, -42.0, -12.0)
+    )
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(0, 2, -42, -12)
+    assert_equal(I.__ceil__(i), i)
+
+    alias U = SIMD[DType.uint32, 4]
+    var u = U(0, 2, 42, 12)
+    assert_equal(U.__ceil__(u), u)
+
+    alias B = SIMD[DType.bool, 4]
+    var b = B(True, False, True, False)
+    assert_equal(B.__ceil__(b), b)
+
+
+def test_floor():
+    assert_equal(Float32.__floor__(Float32(1.5)), 1.0)
+    assert_equal(Float32.__floor__(Float32(-1.5)), -2.0)
+    assert_equal(Float32.__floor__(Float32(3.0)), 3.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(
+        F.__floor__(F(0.0, 1.6, -42.5, -12.4)), F(0.0, 1.0, -43.0, -13.0)
+    )
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(0, 2, -42, -12)
+    assert_equal(I.__floor__(i), i)
+
+    alias U = SIMD[DType.uint32, 4]
+    var u = U(0, 2, 42, 12)
+    assert_equal(U.__floor__(u), u)
+
+    alias B = SIMD[DType.bool, 4]
+    var b = B(True, False, True, False)
+    assert_equal(B.__floor__(b), b)
+
+
+def test_round():
+    assert_equal(Float32.__round__(Float32(2.5)), 3.0)
+    assert_equal(Float32.__round__(Float32(-3.5)), -4.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(F.__round__(F(1.5, 2.5, -2.5, -3.5)), F(2.0, 3.0, -3.0, -4.0))
+
+
+def test_roundeven():
+    assert_equal(Float32(2.5).roundeven(), 2.0)
+    assert_equal(Float32(-3.5).roundeven(), -4.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(F(1.5, 2.5, -2.5, -3.5).roundeven(), F(2.0, 2.0, -2.0, -4.0))
+
+
 def test_floordiv():
     assert_equal(Int32(2) // Int32(2), 1)
     assert_equal(Int32(2) // Int32(3), 0)
@@ -383,6 +445,41 @@ def test_shift():
     )
 
 
+def test_shuffle():
+    alias dtype = DType.int32
+    alias width = 4
+
+    vec = SIMD[dtype, width](100, 101, 102, 103)
+
+    assert_equal(
+        vec.shuffle[3, 2, 1, 0](), SIMD[dtype, width](103, 102, 101, 100)
+    )
+    assert_equal(
+        vec.shuffle[0, 2, 4, 6](vec), SIMD[dtype, width](100, 102, 100, 102)
+    )
+
+    assert_equal(
+        vec._shuffle_list[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](vec),
+        SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
+    )
+
+    assert_equal(
+        vec.shuffle[StaticIntTuple[width](3, 2, 1, 0)](),
+        SIMD[dtype, width](103, 102, 101, 100),
+    )
+    assert_equal(
+        vec.shuffle[StaticIntTuple[width](0, 2, 4, 6)](vec),
+        SIMD[dtype, width](100, 102, 100, 102),
+    )
+
+    assert_equal(
+        vec._shuffle_list[
+            2 * width, StaticIntTuple[2 * width](7, 6, 5, 4, 3, 2, 1, 0)
+        ](vec),
+        SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
+    )
+
+
 def test_insert():
     assert_equal(Int32(3).insert(Int32(4)), 4)
 
@@ -410,6 +507,15 @@ def test_insert():
             SIMD[DType.index, 4](9, 6, 3, 7)
         ),
         SIMD[DType.index, 8](0, 1, 2, 9, 6, 3, 7, 8),
+    )
+
+
+def test_join():
+    vec = SIMD[DType.int32, 4](100, 101, 102, 103)
+
+    assert_equal(
+        vec.join(vec),
+        SIMD[DType.int32, 8](100, 101, 102, 103, 100, 101, 102, 103),
     )
 
 
@@ -737,17 +843,42 @@ def test_abs():
     )
 
 
+def test_min_max_clamp():
+    alias F = SIMD[DType.float32, 4]
+
+    var f = F(-10.5, -5.0, 5.0, 10.0)
+    assert_equal(f.min(F(-9.0, -6.0, -4.0, 10.5)), F(-10.5, -6.0, -4.0, 10.0))
+    assert_equal(f.min(-4.0), F(-10.5, -5.0, -4.0, -4.0))
+    assert_equal(f.max(F(-9.0, -6.0, -4.0, 10.5)), F(-9.0, -5.0, 5.0, 10.5))
+    assert_equal(f.max(-4.0), F(-4.0, -4.0, 5.0, 10.0))
+    assert_equal(f.clamp(-6.0, 5.5), F(-6.0, -5.0, 5.0, 5.5))
+
+    alias I = SIMD[DType.float32, 4]
+    var i = I(-10, -5, 5, 10)
+    assert_equal(i.min(I(-9, -6, -4, 11)), I(-10, -6, -4, 10))
+    assert_equal(i.min(-4), I(-10, -5, -4, -4))
+    assert_equal(i.max(I(-9, -6, -4, 11)), I(-9, -5, 5, 11))
+    assert_equal(i.max(-4), I(-4, -4, 5, 10))
+    assert_equal(i.clamp(-7, 4), I(-7, -5, 4, 4))
+
+
 def main():
     test_cast()
     test_simd_variadic()
     test_convert_simd_to_string()
     test_issue_20421()
     test_truthy()
+    test_ceil()
+    test_floor()
+    test_round()
+    test_roundeven()
     test_floordiv()
     test_mod()
     test_rotate()
     test_shift()
+    test_shuffle()
     test_insert()
+    test_join()
     test_interleave()
     test_deinterleave()
     test_address()
@@ -757,3 +888,4 @@ def main():
     test_sub_with_overflow()
     test_mul_with_overflow()
     test_abs()
+    test_min_max_clamp()

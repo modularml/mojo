@@ -153,8 +153,8 @@ Let's try adding a small piece of functionality to `path.mojo`:
 ```mojo
 # ./stdlib/src/pathlib/path.mojo
 
-fn print_cwd() raises:
-    print("cwd:", cwd())
+fn get_cwd_message() raises -> String:
+    return "Your cwd is: " + cwd()
 ```
 
 And make sure you're importing it from the module root:
@@ -165,7 +165,7 @@ And make sure you're importing it from the module root:
 from .path import (
     DIR_SEPARATOR,
     cwd,
-    print_cwd,
+    get_cwd_message,
     Path,
 )
 ```
@@ -180,13 +180,13 @@ functionality before you write tests:
 from src import pathlib
 
 def main():
-    pathlib.print_cwd()
+    print(pathlib.get_cwd_message())
 ```
 
 Now when you run `mojo main.mojo` it'll reflect the changes:
 
 ```plaintext
-cwd: /Users/jack/src/mojo/stdlib
+Your cwd is: /Users/jack/src/mojo/stdlib
 ```
 
 ### A change with dependencies
@@ -202,10 +202,11 @@ Try adding this to `os.mojo`, which depends on what we just added to
 
 import pathlib
 
-fn print_paths() raises:
-    pathlib.print_cwd()
+fn get_cwd_and_paths() raises -> List[String]:
+    result = List[String]()
+    result.append(pathlib.get_cwd_message())
     for path in cwd().listdir():
-        print(path[])
+        result.append(str(path[]))
 ```
 
 This won't work because it's importing `pathlib` from the `stdlib.mojopkg` that
@@ -224,7 +225,8 @@ syntax:
 import os
 
 def main():
-    os.print_paths()
+    all_paths = os.get_cwd_and_paths()
+    print(__type_of(all_paths).__str__(all_paths))
 ```
 
 We also need to set the following environment variable that tells Mojo to
@@ -268,30 +270,25 @@ If you haven't already, follow the steps at:
 
 ### Adding a test
 
-This will show you how the `FileCheck` utility works. First, turn it on by
-adding it to the end of line 7 in `./stdlib/test/pathlib/test_pathlib.mojo`:
+This section will show you how to add a unit test.
+Add the following at the top of `./stdlib/test/pathlib/test_pathlib.mojo`:
 
 ```mojo
-# RUN: %mojo -debug-level full -D TEMP_FILE=%t %s | FileCheck %s
+# RUN: %mojo %s
 ```
 
 Now we can add the test and force it to fail:
 
 ```mojo
-# CHECK-LABEL: test_print_cwd
-
-def test_print_cwd():
-    print("== test_print_cwd")
-
-    # CHECK: This will fail
-    print_cwd()
+def test_get_cwd_message():
+    assert_equal(get_cwd_message(), "Some random text")
 ```
 
 Don't forget to call it from `main()`:
 
 ```bash
 def main():
-    test_print_cwd()
+    test_get_cwd_message()
 ```
 
 Now, instead of testing all the modules, we can just test `pathlib`:
@@ -304,29 +301,20 @@ This will give you an error showing exactly what went wrong:
 
 ```plaintext
 /Users/jack/src/mojo-toy-2/stdlib/test/pathlib/test_pathlib.mojo:27:11:
-error: CHECK: expected string not found in input
-
-# CHECK: This will fail
-          ^
-<stdin>:1:18: note: scanning from here
-== test_print_cwd
-                 ^
+AssertionError: `left == right` comparison failed:
+   left: Your cwd is: /Users/jack/src/mojo/stdlib
+  right: Some random text
 ```
 
 Lets fix the test that we just added:
 
 ```mojo
-# CHECK-LABEL: test_print_cwd
-
-def test_print_cwd():
-    print("== test_print_cwd")
-
-    # CHECK: cwd:
-    print_cwd()
+def test_get_cwd_message():
+    assert_true(get_cwd_message().startswith("Your cwd is:"))
 ```
 
-We're now checking that `print_cwd` is prefixed with `cwd:` just like the
-function we added. Run the test again:
+We're now checking that `get_cwd_message` is prefixed with `Your cwd is:` just
+like the function we added. Run the test again:
 
 ```plaintext
 Testing Time: 0.65s

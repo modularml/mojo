@@ -26,14 +26,58 @@ alias inf = FloatLiteral.infinity
 alias neg_inf = FloatLiteral.negative_infinity
 
 
+def test_ceil():
+    assert_equal(FloatLiteral.__ceil__(1.5), 2.0)
+    assert_equal(FloatLiteral.__ceil__(1.4), 2.0)
+    assert_equal(FloatLiteral.__ceil__(-1.5), -1.0)
+    assert_equal(FloatLiteral.__ceil__(-3.6), -3.0)
+    assert_equal(FloatLiteral.__ceil__(3.0), 3.0)
+    assert_equal(FloatLiteral.__ceil__(0.0), 0.0)
+
+    assert_true(FloatLiteral.__ceil__(nan).is_nan())
+    assert_true(FloatLiteral.__ceil__(neg_zero).is_neg_zero())
+    assert_equal(FloatLiteral.__ceil__(inf), inf)
+    assert_equal(FloatLiteral.__ceil__(neg_inf), neg_inf)
+
+
+def test_floor():
+    assert_equal(FloatLiteral.__floor__(1.5), 1.0)
+    assert_equal(FloatLiteral.__floor__(1.6), 1.0)
+    assert_equal(FloatLiteral.__floor__(-1.5), -2.0)
+    assert_equal(FloatLiteral.__floor__(-3.4), -4.0)
+    assert_equal(FloatLiteral.__floor__(3.0), 3.0)
+    assert_equal(FloatLiteral.__floor__(0.0), 0.0)
+
+    assert_true(FloatLiteral.__floor__(nan).is_nan())
+    assert_true(FloatLiteral.__floor__(neg_zero).is_neg_zero())
+    assert_equal(FloatLiteral.__floor__(inf), inf)
+    assert_equal(FloatLiteral.__floor__(neg_inf), neg_inf)
+
+
+fn round10(x: Float64) -> Float64:
+    # TODO: implement __div__ on FloatLiteral?
+    return (round(Float64(x * 10)) / 10).value
+
+
+def test_round10():
+    assert_equal(round10(FloatLiteral(4.4) % 0.5), 0.4)
+    assert_equal(round10(FloatLiteral(-4.4) % 0.5), 0.1)
+    assert_equal(round10(FloatLiteral(4.4) % -0.5), -0.1)
+    assert_equal(round10(FloatLiteral(-4.4) % -0.5), -0.4)
+    assert_equal(round10(FloatLiteral(3.1) % 1.0), 0.1)
+
+
 def test_division():
-    # TODO: https://github.com/modularml/mojo/issues/1787
-    # allow this at compile time
     assert_equal(FloatLiteral(4.4) / 0.5, 8.8)
-    assert_equal(FloatLiteral(4.4) // 0.5, 8.0)
-    assert_equal(FloatLiteral(-4.4) // 0.5, -9.0)
-    assert_equal(FloatLiteral(4.4) // -0.5, -9.0)
-    assert_equal(FloatLiteral(-4.4) // -0.5, 8.0)
+
+    alias f1 = 4.4 // 0.5
+    assert_equal(f1, 8.0)
+    alias f2 = -4.4 // 0.5
+    assert_equal(f2, -9.0)
+    alias f3 = 4.4 // -0.5
+    assert_equal(f3, -9.0)
+    alias f4 = -4.4 // -0.5
+    assert_equal(f4, 8.0)
 
 
 def test_power():
@@ -92,6 +136,9 @@ def test_abs():
 
 
 def main():
+    test_ceil()
+    test_floor()
+    test_round10()
     test_division()
     test_power()
     test_int_conversion()

@@ -18,7 +18,7 @@ from testing import assert_equal, assert_false, assert_true
 def test_none_end_folds():
     alias all_def_slice = slice(0, None, 1)
     assert_equal(all_def_slice.start, 0)
-    assert_true(all_def_slice.end, Int.MAX)
+    assert_equal(all_def_slice.end, int(Int32.MAX))
     assert_equal(all_def_slice.step, 1)
 
 
