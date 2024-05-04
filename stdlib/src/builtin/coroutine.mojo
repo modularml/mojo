@@ -20,6 +20,22 @@ from sys import sizeof
 from memory import Pointer
 
 # ===----------------------------------------------------------------------=== #
+# _suspend_async
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _suspend_async[body: fn (Pointer[__mlir_type.i8]) capturing -> None]():
+    var hdl = __mlir_op.`co.opaque_handle`()
+
+    __mlir_region await_body():
+        body(hdl)
+        __mlir_op.`co.suspend.end`()
+
+    __mlir_op.`co.suspend`[_region = "await_body".value]()
+
+
+# ===----------------------------------------------------------------------=== #
 # _CoroutineContext
 # ===----------------------------------------------------------------------=== #
 
@@ -165,18 +181,18 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
-        var parent_hdl = __mlir_op.`co.opaque_handle`()
-        self._get_ctx[_CoroutineContext]().store(
-            _CoroutineContext {
-                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
-            }
-        )
 
-        __mlir_region await_body():
+        @always_inline
+        @parameter
+        fn await_body(parent_hdl: Pointer[__mlir_type.i8]):
+            self._get_ctx[_CoroutineContext]().store(
+                _CoroutineContext {
+                    _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
+                }
+            )
             __mlir_op.`co.resume`(self._handle)
-            __mlir_op.`co.suspend.end`()
 
-        __mlir_op.`co.suspend`[_region = "await_body".value]()
+        _suspend_async[await_body]()
         return self.get()
 
 
@@ -285,16 +301,16 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
-        var parent_hdl = __mlir_op.`co.opaque_handle`()
-        self._get_ctx[_CoroutineContext]().store(
-            _CoroutineContext {
-                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
-            }
-        )
 
-        __mlir_region await_body():
+        @always_inline
+        @parameter
+        fn await_body(parent_hdl: Pointer[__mlir_type.i8]):
+            self._get_ctx[_CoroutineContext]().store(
+                _CoroutineContext {
+                    _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
+                }
+            )
             __mlir_op.`co.resume`(self._handle)
-            __mlir_op.`co.suspend.end`()
 
-        __mlir_op.`co.suspend`[_region = "await_body".value]()
+        _suspend_async[await_body]()
         return self.get()
