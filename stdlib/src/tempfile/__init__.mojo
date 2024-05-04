@@ -12,4 +12,4 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the tempfile package."""
 
-from .tempfile import NamedTemporaryFile
+from .tempfile import NamedTemporaryFile, TemporaryDirectory

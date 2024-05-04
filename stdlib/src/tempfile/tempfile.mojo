@@ -108,6 +108,7 @@ struct NamedTemporaryFile:
     var _file_handle: FileHandle
     """The underlying file handle."""
     var _delete: Bool
+    """Whether the file is deleted on close."""
     var name: String
     """Name of the file."""
 
@@ -119,7 +120,7 @@ struct NamedTemporaryFile:
         dir: Optional[String] = None,
         delete: Bool = True,
     ) raises:
-        """Create a named temporary file.
+        """Create a named temporary file. Can be used as a context manager.
         This is a wrapper around a `FileHandle`,
         os.remove is called in close method if `delete` is True.
 
@@ -231,3 +232,66 @@ struct NamedTemporaryFile:
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
         return self^
+
+
+struct TemporaryDirectory:
+    """A temporary directory."""
+
+    var name: String
+    """The name of the temporary directory."""
+    var _ignore_cleanup_errors: Bool
+    """Whether to ignore cleanup errors."""
+
+    fn __init__(
+        inout self,
+        suffix: String = "",
+        prefix: String = "tmp",
+        dir: Optional[String] = None,
+        ignore_cleanup_errors: Bool = False,
+    ) raises:
+        """Create a temporary directory. Can be used as a context manager.
+
+        Args:
+            suffix: Suffix to use for the directory name.
+            prefix: Prefix to use for the directory name.
+            dir: Directory in which the directory will be created.
+            ignore_cleanup_errors: Whether to ignore cleanup errors.
+        """
+        self._ignore_cleanup_errors = ignore_cleanup_errors
+        var final_dir: Path
+        if not dir:
+            final_dir = Path(_get_default_tempdir())
+        else:
+            final_dir = Path(dir.value()[])
+
+        var MAX_TRIES = 100
+        for _ in range(MAX_TRIES):
+            var potential_name = final_dir / (
+                prefix + _get_random_name() + suffix
+            )
+            if os.path.exists(potential_name):
+                continue
+            try:
+                os.mkdir(potential_name, mode=0o700)
+                # TODO for now this name could be relative,
+                # python implementation expands the path,
+                # but several functions are not yet implemented in mojo
+                # i.e. abspath, normpath
+                self.name = potential_name
+                return
+            except:
+                continue
+        raise Error("Failed to create temporary file")
+
+    fn __enter__(self) -> String:
+        return self.name
+
+    fn __exit__(self) raises:
+        shutil.rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+
+    fn __exit__(self, err: Error) -> Bool:
+        try:
+            self.__exit__()
+            return True
+        except:
+            return False
