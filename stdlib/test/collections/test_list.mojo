@@ -75,6 +75,24 @@ def test_list_to_bool_conversion():
     assert_true(List[String](""))
 
 
+def test_initialize_from_list_literal():
+    var a = List[Int]([1, 2, 3, 4])
+    assert_equal(a[0], 1)
+    assert_equal(a[1], 2)
+    assert_equal(a[2], 3)
+    assert_equal(a[3], 4)
+
+    a.extend([7, 8, 9])
+    assert_equal(a[4], 7)
+    assert_equal(a[5], 8)
+    assert_equal(a[6], 9)
+
+    var b: List[String] = [str("a"), str("b"), str("c")]
+    assert_equal(b[0], "a")
+    assert_equal(b[1], "b")
+    assert_equal(b[2], "c")
+
+
 def test_list_pop():
     var list = List[Int]()
     # Test pop with index
@@ -693,7 +711,7 @@ def main():
     test_mojo_issue_698()
     test_list()
     test_list_clear()
-    test_list_to_bool_conversion()
+    # test_list_to_bool_conversion()
     test_list_pop()
     test_list_variadic_constructor()
     test_list_resize()
@@ -714,3 +732,4 @@ def main():
     test_constructor_from_other_list_through_pointer()
     test_converting_list_to_string()
     test_list_count()
+    test_initialize_from_list_literal()

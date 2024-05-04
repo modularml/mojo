@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from memory import Reference, UnsafePointer, LegacyPointer
 from memory.unsafe_pointer import destroy_pointee
+from utils.variadics import variadic_size
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
@@ -66,6 +67,18 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
             The element at the given index.
         """
         return rebind[T](self.storage[i])
+
+    @always_inline
+    @staticmethod
+    fn __len__() -> Int:
+        """Return the ListLiteral length.
+
+        Returns:
+            The number of elements in the list literal.
+        """
+
+        alias result = variadic_size[CollectionElement, Ts]()
+        return result
 
 
 # ===----------------------------------------------------------------------===#
@@ -551,13 +564,7 @@ struct VariadicPack[
             The number of elements in the variadic pack.
         """
 
-        @parameter
-        fn variadic_size(
-            x: __mlir_type[`!kgen.variadic<`, element_trait, `>`]
-        ) -> Int:
-            return __mlir_op.`pop.variadic.size`(x)
-
-        alias result = variadic_size(element_types)
+        alias result = variadic_size[element_trait, element_types]()
         return result
 
     @always_inline

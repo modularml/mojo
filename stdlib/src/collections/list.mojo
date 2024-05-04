@@ -23,6 +23,7 @@ from collections import List
 from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
 from .optional import Optional
+from utils.variadics import all_collection_types_eq
 
 # ===----------------------------------------------------------------------===#
 # List
@@ -130,6 +131,30 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self = Self(capacity=len(values))
         for value in values:
             self.append(value[])
+
+    fn __init__[*Ts: CollectionElement](inout self, values: ListLiteral[Ts]):
+        constrained[
+            __type_of(values).__len__() == 0
+            or all_collection_types_eq[T, Ts](),
+            (
+                "All items in the ListLiteral must be of the same type as the"
+                " list."
+            ),
+        ]()
+        """Constructs a list from the given ListLiteral.
+
+        Args:
+            values: The ListLiteral of values to populate the list with.
+        """
+        self = Self(capacity=len(values))
+
+        @parameter
+        fn _append[i: Int]():
+            var ptr = UnsafePointer(values.storage.__refitem__[i]())
+            var val = ptr.bitcast[T]()
+            self.append(val[])
+
+        unroll[_append, __type_of(values).__len__()]()
 
     fn __init__(
         inout self: Self, data: UnsafePointer[T], *, size: Int, capacity: Int
