@@ -1549,3 +1549,19 @@ fn _calc_initial_buffer_size[type: DType](n0: Scalar[type]) -> Int:
             )
 
     return 128 + 1  # Add 1 for the terminator
+
+
+fn _calc_format_buffer_size[type: DType]() -> Int:
+    """
+    Returns a buffer size in bytes that is large enough to store a formatted
+    number of the specified type.
+    """
+
+    # TODO:
+    #   Use a smaller size based on the `dtype`, e.g. we don't need as much
+    #   space to store a formatted int8 as a float64.
+    @parameter
+    if type.is_integral():
+        return 64 + 1
+    else:
+        return 128 + 1  # Add 1 for the terminator
