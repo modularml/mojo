@@ -148,6 +148,14 @@ fn reversed[
 
     **Note**: iterators are currently non-raising.
 
+    Parameters:
+        mutability: Whether the reference to the dict is mutable.
+        self_life: The lifetime of the dict.
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+        dict_mutability: Whether the reference to the dict values is mutable.
+        dict_lifetime: The lifetime of the dict values.
+
     Args:
         value: The dict values to get the reversed iterator of.
 
@@ -174,6 +182,14 @@ fn reversed[
     """Get a reversed iterator of the input dict items.
 
     **Note**: iterators are currently non-raising.
+
+    Parameters:
+        mutability: Whether the reference to the dict is mutable.
+        self_life: The lifetime of the dict.
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+        dict_mutability: Whether the reference to the dict items is mutable.
+        dict_lifetime: The lifetime of the dict items.
 
     Args:
         value: The dict items to get the reversed iterator of.
