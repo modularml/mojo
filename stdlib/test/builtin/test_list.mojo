@@ -21,14 +21,14 @@ fn test_list() raises:
 
 fn test_variadic_list() raises:
     @parameter
-    fn print_list(*nums: Int) raises:
+    fn check_list(*nums: Int) raises:
         assert_equal(nums[0], 5)
         assert_equal(nums[1], 8)
         assert_equal(nums[2], 6)
 
         assert_equal(len(nums), 3)
 
-    print_list(5, 8, 6)
+    check_list(5, 8, 6)
 
 
 def main():
