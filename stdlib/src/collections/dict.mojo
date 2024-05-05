@@ -612,6 +612,18 @@ struct Dict[K: KeyElement, V: CollectionElement](
             return ev.value()[].value
         return None
 
+    fn get(self, key: K) -> Optional[V]:
+        """Get a value from the dictionary by key.
+
+        Args:
+            key: The key to search for in the dictionary.
+
+        Returns:
+            An optional value containing a copy of the value if it was present,
+            otherwise an empty Optional.
+        """
+        return self.find(key)
+
     fn pop(inout self, key: K, owned default: Optional[V] = None) raises -> V:
         """Remove a value from the dictionary by key.
 
