@@ -82,6 +82,11 @@ what we publish.
 - Add `SIMD.shuffle()` with `StaticIntTuple` mask.
     ([PR #2315](https://github.com/modularml/mojo/pull/2315) by [@mikowals](https://github.com/mikowals))
 
+- Invoking `mojo package my-package -o my-dir` on the command line, where
+  `my-package` is a Mojo package source directory, and `my-dir` is an existing
+  directory, now outputs a Mojo package to `my-dir/my-package.mojopkg`.
+  Previously, this had to be spelled out, as in `-o my-dir/my-package.mojopkg`.
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
