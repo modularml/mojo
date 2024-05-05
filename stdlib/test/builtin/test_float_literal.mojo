@@ -54,6 +54,20 @@ def test_floor():
     assert_equal(FloatLiteral.__floor__(neg_inf), neg_inf)
 
 
+def test_round():
+    assert_equal(FloatLiteral.__round__(1.5), 2.0)
+    assert_equal(FloatLiteral.__round__(1.4), 1.0)
+    assert_equal(FloatLiteral.__round__(-1.5), -2.0)
+    assert_equal(FloatLiteral.__round__(-3.4), -3.0)
+    assert_equal(FloatLiteral.__round__(3.0), 3.0)
+    assert_equal(FloatLiteral.__round__(0.0), 0.0)
+
+    assert_true(FloatLiteral.__round__(nan).is_nan())
+    assert_true(FloatLiteral.__round__(neg_zero).is_neg_zero())
+    assert_equal(FloatLiteral.__round__(inf), inf)
+    assert_equal(FloatLiteral.__round__(neg_inf), neg_inf)
+
+
 fn round10(x: Float64) -> Float64:
     # TODO: implement __div__ on FloatLiteral?
     return (round(Float64(x * 10)) / 10).value
@@ -138,6 +152,7 @@ def test_abs():
 def main():
     test_ceil()
     test_floor()
+    test_round()
     test_round10()
     test_division()
     test_power()

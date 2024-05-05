@@ -238,7 +238,27 @@ struct FloatLiteral(
             return truncated
         return truncated + 1
 
-    # TODO: implement __round__
+    @always_inline("nodebug")
+    fn __round__(self) -> Self:
+        """Return the rounded value of the FloatLiteral.
+
+        Returns:
+            The rounded value.
+        """
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        var truncated: IntLiteral = self.__int_literal__()
+        var result: Self
+        if self.__abs__() - Self(truncated).__abs__() < 0.5:
+            result = Self(truncated)
+        elif self > 0:
+            result = Self(truncated + 1)
+        else:
+            result = Self(truncated - 1)
+        return result
+
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
