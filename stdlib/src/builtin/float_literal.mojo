@@ -256,8 +256,8 @@ struct FloatLiteral(
         var multiplier = one
         for _ in range(ndigits):
             multiplier = __mlir_op.`kgen.int_literal.binop`[
-                    oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
-                ](multiplier, ten)
+                oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
+            ](multiplier, ten)
         var target: Self = self * Self(multiplier)  # 119.8
         var truncated: IntLiteral = target.__int_literal__()  # 119.0
         var result: Self
@@ -270,7 +270,6 @@ struct FloatLiteral(
         if ndigits > 0:
             result /= Self(multiplier)
         return result
-
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
