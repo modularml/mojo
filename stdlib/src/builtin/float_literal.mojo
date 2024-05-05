@@ -239,9 +239,11 @@ struct FloatLiteral(
         return truncated + 1
 
     @always_inline("nodebug")
-    fn __round__(self) -> Self:
+    fn __round__(self, ndigits: IntLiteral = 0) -> Self:
         """Return the rounded value of the FloatLiteral.
 
+        Args:
+            ndigits: The number of digits to round to. Defaults to 0.
         Returns:
             The rounded value.
         """
@@ -249,14 +251,24 @@ struct FloatLiteral(
         if not self._is_normal():
             return self
 
-        var truncated: IntLiteral = self.__int_literal__()
+        alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
+        alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
+        var multiplier = one
+        for _ in range(ndigits):
+            multiplier = __mlir_op.`kgen.int_literal.binop`[
+                    oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
+                ](multiplier, ten)
+        var target: Self = self * Self(multiplier)  # 119.8
+        var truncated: IntLiteral = target.__int_literal__()  # 119.0
         var result: Self
-        if self.__abs__() - Self(truncated).__abs__() < 0.5:
+        if abs(target) - abs(truncated) < 0.5:
             result = Self(truncated)
         elif self > 0:
             result = Self(truncated + 1)
         else:
             result = Self(truncated - 1)
+        if ndigits > 0:
+            result /= Self(multiplier)
         return result
 
 
