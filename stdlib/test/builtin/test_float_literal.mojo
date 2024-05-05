@@ -114,6 +114,15 @@ def test_mod():
     assert_equal(FloatLiteral(6).__mod__(2.5), 1.0)
 
 
+def test_div_mod():
+    pass
+    # TODO: uncomment to test the __divmod__ method when the Tuple objects conforms Testable
+    # So we do not receive this error: argument type 'Tuple[FloatLiteral, FloatLiteral]' does not conform to trait 'Testable'
+    # assert_equal(FloatLiteral(4.5).__divmod__(2.0), (2.0, 0.5))
+    # assert_equal(FloatLiteral(-4.5).__divmod__(2.0), (-3.0, 1.5))
+    # assert_equal(FloatLiteral(6).__divmod__(2.5), (2.0, 1.0))
+
+
 def test_int_conversion():
     assert_equal(int(FloatLiteral(-4.0)), -4)
     assert_equal(int(FloatLiteral(-4.5)), -4)
@@ -168,6 +177,7 @@ def main():
     test_division()
     test_power()
     test_mod()
+    test_div_mod()
     test_int_conversion()
     test_boolean_comparable()
     test_equality()
