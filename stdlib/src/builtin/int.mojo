@@ -691,14 +691,14 @@ struct Int(
         """
         if rhs == 0:
             # this should raise an exception.
-            return Tuple(0, 0)
+            return 0, 0
         var div: Int = self._positive_div(rhs)
         if rhs > 0 and self > 0:
-            return Tuple(div, self._positive_rem(rhs))
+            return div, self._positive_rem(rhs)
         var mod = self - div * rhs
         if ((rhs < 0) ^ (self < 0)) and mod:
-            return Tuple[Int, Int](div - 1, mod + rhs)
-        return Tuple[Int, Int](div, mod)
+            return div - 1, mod + rhs
+        return div, mod
 
     @always_inline("nodebug")
     fn __pow__(self, rhs: Int) -> Int:
