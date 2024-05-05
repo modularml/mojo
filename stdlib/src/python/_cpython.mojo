@@ -164,7 +164,7 @@ struct CPython:
             print("CPython init")
         var python_lib = getenv("MOJO_PYTHON_LIBRARY")
         if python_lib == "":
-            print(
+            abort(
                 "Mojo/Python interoperability error: Unable to locate a"
                 " suitable libpython, please set `MOJO_PYTHON_LIBRARY`"
             )

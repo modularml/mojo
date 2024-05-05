@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
+from builtin._math import Ceilable, Floorable
 from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
@@ -36,7 +37,7 @@ trait Intable:
     """The `Intable` trait describes a type that can be converted to an Int.
 
     Any type that conforms to `Intable` or
-    [`IntableRaising`](/mojo/stdlib/builtin/int/intableraising) works with
+    [`IntableRaising`](/mojo/stdlib/builtin/int/IntableRaising) works with
     the built-in [`int()`](/mojo/stdlib/builtin/int/int-function) function.
 
     This trait requires the type to implement the `__int__()` method. For
@@ -82,7 +83,7 @@ trait IntableRaising:
     The `IntableRaising` trait describes a type can be converted to an Int, but
     the conversion might raise an error.
 
-    Any type that conforms to [`Intable`](/mojo/stdlib/builtin/int/intable)
+    Any type that conforms to [`Intable`](/mojo/stdlib/builtin/int/Intable)
     or `IntableRaising` works with the built-in
     [`int()`](/mojo/stdlib/builtin/int/int-function) function.
 
@@ -192,7 +193,17 @@ fn int(value: String, base: Int = 10) raises -> Int:
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
+struct Int(
+    Absable,
+    Boolable,
+    Ceilable,
+    Floorable,
+    Formattable,
+    Intable,
+    KeyElement,
+    Roundable,
+    Stringable,
+):
     """This type represents an integer value."""
 
     var value: __mlir_type.index
@@ -205,7 +216,7 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
     """Returns the minimum value of type."""
 
     @always_inline("nodebug")
-    fn __init__() -> Int:
+    fn __init__() -> Self:
         """Default constructor.
 
         Returns:
@@ -216,7 +227,7 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
         }
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.index) -> Int:
+    fn __init__(value: __mlir_type.index) -> Self:
         """Construct Int from the given index value.
 
         Args:
@@ -228,7 +239,7 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
         return Self {value: value}
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<si16>`) -> Int:
+    fn __init__(value: __mlir_type.`!pop.scalar<si16>`) -> Self:
         """Construct Int from the given Int16 value.
 
         Args:
@@ -244,7 +255,7 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
         )
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<si32>`) -> Int:
+    fn __init__(value: __mlir_type.`!pop.scalar<si32>`) -> Self:
         """Construct Int from the given Int32 value.
 
         Args:
@@ -260,7 +271,7 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
         )
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<si64>`) -> Int:
+    fn __init__(value: __mlir_type.`!pop.scalar<si64>`) -> Self:
         """Construct Int from the given Int64 value.
 
         Args:
@@ -276,7 +287,7 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
         )
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<index>`) -> Int:
+    fn __init__(value: __mlir_type.`!pop.scalar<index>`) -> Self:
         """Construct Int from the given Index value.
 
         Args:
@@ -292,7 +303,7 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
         )
 
     @always_inline("nodebug")
-    fn __init__(value: IntLiteral) -> Int:
+    fn __init__(value: IntLiteral) -> Self:
         """Construct Int from the given IntLiteral value.
 
         Args:
@@ -362,6 +373,14 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
 
             # Keep buf alive until we've finished with the StringRef
             _ = buf^
+
+    fn __repr__(self) -> String:
+        """Get the integer as a string. Returns the same `String` as `__str__`.
+
+        Returns:
+            A string representation.
+        """
+        return str(self)
 
     @always_inline("nodebug")
     fn __mlir_index__(self) -> __mlir_type.index:
@@ -507,7 +526,34 @@ struct Int(Absable, Intable, Stringable, KeyElement, Boolable, Formattable):
         Returns:
             The absolute value.
         """
-        return -self if self < 0 else self
+        return self if self > 0 else -self
+
+    @always_inline("nodebug")
+    fn __ceil__(self) -> Self:
+        """Return the ceiling of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __floor__(self) -> Self:
+        """Return the floor of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __round__(self) -> Self:
+        """Return the rounded value of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
 
     @always_inline("nodebug")
     fn __invert__(self) -> Int:
