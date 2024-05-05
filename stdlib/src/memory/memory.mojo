@@ -63,16 +63,14 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
     for i in range(0, vector_end_simd, simd_width):
         var s1i = s1.load[width=simd_width](i)
         var s2i = s2.load[width=simd_width](i)
-        var smaller = s1i < s2i
-        var bigger = s1i > s2i
-        if smaller.reduce_or() or bigger.reduce_or():
-            var smaller_index = smaller.select(
-                iota, SIMD[DType.uint8, simd_width](255)
-            ).reduce_min()
-            var bigger_index = bigger.select(
-                iota, SIMD[DType.uint8, simd_width](255)
-            ).reduce_min()
-            return -1 if smaller_index < bigger_index else 1
+        var diff = s1i != s2i
+        if diff.reduce_or():
+            var index = int(
+                diff.select(
+                    iota, SIMD[DType.uint8, simd_width](255)
+                ).reduce_min()
+            )
+            return -1 if s1i[index] < s2i[index] else 1
 
     var last = count - simd_width
     if last <= 0:
@@ -80,16 +78,12 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
 
     var s1i = s1.load[width=simd_width](last)
     var s2i = s2.load[width=simd_width](last)
-    var smaller = s1i < s2i
-    var bigger = s1i > s2i
-    if smaller.reduce_or() or bigger.reduce_or():
-        var smaller_index = smaller.select(
-            iota, SIMD[DType.uint8, simd_width](255)
-        ).reduce_min()
-        var bigger_index = bigger.select(
-            iota, SIMD[DType.uint8, simd_width](255)
-        ).reduce_min()
-        return -1 if smaller_index < bigger_index else 1
+    var diff = s1i != s2i
+    if diff.reduce_or():
+        var index = int(
+            diff.select(iota, SIMD[DType.uint8, simd_width](255)).reduce_min()
+        )
+        return -1 if s1i[index] < s2i[index] else 1
     return 0
 
 
