@@ -49,10 +49,8 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         for i in range(count):
             var s1i = s1[i]
             var s2i = s2[i]
-            var smaller = s1i < s2i
-            var bigger = s1i > s2i
-            if smaller or bigger:
-                return -int(smaller) + int(bigger)
+            if s1i != s2i:
+                return 1 if s1i > s2i else -1
         return 0
 
     var iota = llvm_intrinsic[
