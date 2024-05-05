@@ -5,7 +5,7 @@ repos:
         name: mojo-format
         entry: mojo format
         language: system
-        files: '\.(mojo|🔥)$'
+        files: '\.(mojo|🔥|py)$'
         stages: [commit]
       - id: check-docstrings
         name: check-docstrings
