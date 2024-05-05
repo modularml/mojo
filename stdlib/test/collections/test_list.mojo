@@ -673,13 +673,20 @@ def test_converting_list_to_string():
     var my_list = List[Int](1, 2, 3)
     assert_equal(__type_of(my_list).__str__(my_list), "[1, 2, 3]")
 
-    var my_list2 = List[SIMD[DType.int8, 2]](
-        SIMD[DType.int8, 2](1, 2), SIMD[DType.int8, 2](3, 4)
+    var my_list4 = List[String]("a", "b", "c", "foo")
+    assert_equal(
+        __type_of(my_list4).__str__(my_list4), "['a', 'b', 'c', 'foo']"
     )
-    assert_equal(__type_of(my_list2).__str__(my_list2), "[[1, 2], [3, 4]]")
 
-    var my_list3 = List[Float64](1.0, 2.0, 3.0)
-    assert_equal(__type_of(my_list3).__str__(my_list3), "[1.0, 2.0, 3.0]")
+
+def test_list_count():
+    var list = List[Int](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
+    assert_equal(1, __type_of(list).count(list, 1))
+    assert_equal(2, __type_of(list).count(list, 2))
+    assert_equal(0, __type_of(list).count(list, 4))
+
+    var list2 = List[Int]()
+    assert_equal(0, __type_of(list2).count(list2, 1))
 
 
 def main():
@@ -706,3 +713,4 @@ def main():
     test_constructor_from_pointer()
     test_constructor_from_other_list_through_pointer()
     test_converting_list_to_string()
+    test_list_count()

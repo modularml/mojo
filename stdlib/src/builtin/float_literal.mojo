@@ -15,6 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from builtin._math import Ceilable, Floorable
+
 # ===----------------------------------------------------------------------===#
 # FloatLiteral
 # ===----------------------------------------------------------------------===#
@@ -23,7 +25,15 @@ These are Mojo built-ins, so you don't need to import them.
 @value
 @nonmaterializable(Float64)
 @register_passable("trivial")
-struct FloatLiteral(Absable, Intable, Stringable, Boolable, EqualityComparable):
+struct FloatLiteral(
+    Absable,
+    Boolable,
+    Ceilable,
+    EqualityComparable,
+    Floorable,
+    Intable,
+    Stringable,
+):
     """Mojo floating point literal type."""
 
     alias fp_type = __mlir_type.`!kgen.float_literal`
@@ -102,6 +112,17 @@ struct FloatLiteral(Absable, Intable, Stringable, Boolable, EqualityComparable):
             special = __mlir_attr.`#kgen<float_literal.special_values neg_zero>`
         ](self.value)
 
+    @always_inline("nodebug")
+    fn _is_normal(self) -> Bool:
+        """Return whether the FloatLiteral is a normal (i.e. not special) value.
+
+        Returns:
+            True, if the value is a normal float, False otherwise.
+        """
+        return __mlir_op.`kgen.float_literal.isa`[
+            special = __mlir_attr.`#kgen<float_literal.special_values normal>`
+        ](self.value)
+
     # ===------------------------------------------------------------------===#
     # Conversion Operators
     # ===------------------------------------------------------------------===#
@@ -166,7 +187,7 @@ struct FloatLiteral(Absable, Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __abs__(self) -> Self:
-        """Return the absolute value of FloatLiteral value.
+        """Return the absolute value of the FloatLiteral.
 
         Returns:
             The absolute value.
@@ -174,6 +195,50 @@ struct FloatLiteral(Absable, Intable, Stringable, Boolable, EqualityComparable):
         if self > 0:
             return self
         return -self
+
+    @always_inline("nodebug")
+    fn __floor__(self) -> Self:
+        """Return the floor value of the FloatLiteral.
+
+        Returns:
+            The floor value.
+        """
+
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        # __int_literal__ rounds towards zero, so it's correct for integers and
+        # positive values.
+        var truncated: IntLiteral = self.__int_literal__()
+
+        # Ensure this equality doesn't hit any implicit conversions.
+        if self >= 0 or self.__eq__(Self(truncated)):
+            return truncated
+        return truncated - 1
+
+    @always_inline("nodebug")
+    fn __ceil__(self) -> Self:
+        """Return the ceiling value of the FloatLiteral.
+
+        Returns:
+            The ceiling value.
+        """
+
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        # __int_literal__ rounds towards zero, so it's correct for integers and
+        # negative values.
+        var truncated: IntLiteral = self.__int_literal__()
+
+        # Ensure this equality doesn't hit any implicit conversions.
+        if self <= 0 or self.__eq__(Self(truncated)):
+            return truncated
+        return truncated + 1
+
+    # TODO: implement __round__
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
@@ -236,7 +301,21 @@ struct FloatLiteral(Absable, Intable, Stringable, Boolable, EqualityComparable):
             oper = __mlir_attr.`#kgen<float_literal.binop_kind truediv>`
         ](self.value, rhs.value)
 
-    # TODO - __floordiv__
+    @always_inline("nodebug")
+    fn __floordiv__(self, rhs: Self) -> Self:
+        """Returns self divided by rhs, rounded down to the nearest integer.
+
+        Constraints:
+            The element type of the SIMD vector must be numeric.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            `floor(self / rhs)` value.
+        """
+        return self.__truediv__(rhs).__floor__()
+
     # TODO - maybe __mod__?
     # TODO - maybe __pow__?
 

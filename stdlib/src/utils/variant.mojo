@@ -60,11 +60,6 @@ fn _align_up(value: Int, alignment: Int) -> Int:
     return div_ceil * alignment
 
 
-@always_inline
-fn _max(a: Int, b: Int) -> Int:
-    return a if a > b else b
-
-
 # ===----------------------------------------------------------------------=== #
 # Variant
 # ===----------------------------------------------------------------------=== #
@@ -78,7 +73,7 @@ struct _UnionSize[*Ts: CollectionElement]():
 
         @parameter
         fn each[i: Int]():
-            size = _max(size, _align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
+            size = max(size, _align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
 
         unroll[each, len(VariadicList(Ts))]()
         return _align_up(size, alignof[Int]())
