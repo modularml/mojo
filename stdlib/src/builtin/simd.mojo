@@ -570,7 +570,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         # Unsafe operations incoming, beware.
         # removing the null terminator
-        result._buffer.pop()
+        _ = result._buffer.pop()
         self._add_elements_as_str_to_buffer(result._buffer)
         # null terminator since we did unsafe operations
         result._buffer.append(0)
