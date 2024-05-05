@@ -68,8 +68,12 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         var smaller = s1i < s2i
         var bigger = s1i > s2i
         if smaller.reduce_or() or bigger.reduce_or():
-            var smaller_index = smaller.select(iota, SIMD[DType.uint8, simd_width](255)).reduce_min()
-            var bigger_index = bigger.select(iota, SIMD[DType.uint8, simd_width](255)).reduce_min()
+            var smaller_index = smaller.select(
+                iota, SIMD[DType.uint8, simd_width](255)
+            ).reduce_min()
+            var bigger_index = bigger.select(
+                iota, SIMD[DType.uint8, simd_width](255)
+            ).reduce_min()
             return -1 if smaller_index < bigger_index else 1
 
     var last = count - simd_width
@@ -81,8 +85,12 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
     var smaller = s1i < s2i
     var bigger = s1i > s2i
     if smaller.reduce_or() or bigger.reduce_or():
-        var smaller_index = smaller.select(iota, SIMD[DType.uint8, simd_width](255)).reduce_min()
-        var bigger_index = bigger.select(iota, SIMD[DType.uint8, simd_width](255)).reduce_min()
+        var smaller_index = smaller.select(
+            iota, SIMD[DType.uint8, simd_width](255)
+        ).reduce_min()
+        var bigger_index = bigger.select(
+            iota, SIMD[DType.uint8, simd_width](255)
+        ).reduce_min()
         return -1 if smaller_index < bigger_index else 1
     return 0
 
