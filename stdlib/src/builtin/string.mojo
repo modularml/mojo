@@ -20,7 +20,7 @@ from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, StaticTuple
+from utils import StringRef
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
@@ -925,12 +925,9 @@ struct String(
             UnsafePointer.address_of(self).bitcast[NoneType](),
         )
 
-    fn join[rank: Int](self, elems: StaticIntTuple[rank]) -> String:
+    fn join(self, *elems: Int) -> String:
         """Joins the elements from the tuple using the current string as a
         delimiter.
-
-        Parameters:
-            rank: The size of the tuple.
 
         Args:
             elems: The input tuple.

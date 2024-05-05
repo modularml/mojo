@@ -13,8 +13,6 @@
 
 from time.time import _CTimeSpec
 
-from utils import StaticIntTuple
-
 from .fstat import stat_result
 
 alias dev_t = Int64
