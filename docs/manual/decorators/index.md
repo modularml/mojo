@@ -29,7 +29,9 @@ function](https://en.wikipedia.org/wiki/Higher-order_function) that modifies or
 extends the behavior of a struct, a function, or some other code. Instead of
 actually calling the higher-order function, you simply add the decorator (such
 as the `@value` decorator) above your code (such as a struct). The Mojo
-compiler then uses the decorator function to modify your code at compile time.
+compiler then uses the decorator function to modify your code at compile time. 
+
+The creation of custom decorators is not yet supported. The available ones are built directly into the compiler.
 
 The following pages describe each built-in decorator with examples.
 
