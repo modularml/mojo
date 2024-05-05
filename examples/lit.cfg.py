@@ -28,7 +28,7 @@ config.suffixes = [".mojo", ".🔥"]
 config.excludes = [
     # No RUN: directive, just bare examples
     "hello_interop.mojo",
-    "matmul.mojo"
+    "matmul.mojo",
 ]
 
 # Have the examples run in the build directory.
@@ -53,9 +53,9 @@ pre_built_packages_path = (
     / "mojo"
 )
 
-os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = (
-    f"{build_root},{pre_built_packages_path}"
-)
+os.environ[
+    "MODULAR_MOJO_NIGHTLY_IMPORT_PATH"
+] = f"{build_root},{pre_built_packages_path}"
 
 # Pass through several environment variables
 # to the underlying subprocesses that run the tests.
