@@ -33,7 +33,7 @@ from utils._numerics import FPUtils
 from utils._numerics import isnan as _isnan
 from utils._numerics import nan as _nan
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils import StaticTuple
+from utils import StaticTuple, StaticIntTuple
 
 from .dtype import _integral_type_of
 from .io import _snprintf_scalar, _snprintf
