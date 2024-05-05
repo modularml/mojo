@@ -108,6 +108,12 @@ def test_power():
     # assert_almost_equal(FloatLiteral(-4.5) ** -2.5, -0.023279235)
 
 
+def test_mod():
+    assert_equal(FloatLiteral(4.5).__mod__(2), 0.5)
+    assert_equal(FloatLiteral(-4.5).__mod__(2), 1.5)
+    assert_equal(FloatLiteral(6).__mod__(2.5), 1.0)
+
+
 def test_int_conversion():
     assert_equal(int(FloatLiteral(-4.0)), -4)
     assert_equal(int(FloatLiteral(-4.5)), -4)
@@ -161,6 +167,7 @@ def main():
     test_round10()
     test_division()
     test_power()
+    test_mod()
     test_int_conversion()
     test_boolean_comparable()
     test_equality()

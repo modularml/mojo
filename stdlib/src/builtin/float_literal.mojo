@@ -348,7 +348,19 @@ struct FloatLiteral(
         """
         return self.__truediv__(rhs).__floor__()
 
-    # TODO - maybe __mod__?
+    @always_inline("nodebug")
+    fn __mod__(self, rhs: Self) -> Self:
+        """Return the remainder of self divided by rhs.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            The remainder of dividing self by rhs.
+        """
+        var dividend: Self = self.__floordiv__(rhs)
+        return self - (dividend * rhs)
+
     # TODO - maybe __pow__?
 
     # ===------------------------------------------------------------------===#
