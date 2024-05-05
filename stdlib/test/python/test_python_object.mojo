@@ -26,11 +26,11 @@ def test_dunder_methods(inout python: Python):
 
     # __add__
     var c = a + b
-    assert_true(c, 44)
+    assert_equal(c, 44)
 
     # __add__
     c = a + 100
-    assert_true(c, 134)
+    assert_equal(c, 134)
 
     # __iadd__
     c += 100
