@@ -28,17 +28,15 @@ from memory import UnsafePointer, stack_allocation
 
 struct _ArcInner[T: Movable]:
     var refcount: Atomic[DType.int64]
-    var data: T
+    var payload: T
 
     fn __init__(inout self, owned value: T):
         self.refcount = 0
-        self.data = value^
+        self.payload = value^
 
-    fn increment(inout self) -> Int64:
-        """Atomically increment the refcount.
-        `fetch_add` returns the old value, but for clarity of
-        correctness of the refcount logic we return the new value."""
-        return self.refcount.fetch_add(1) + 1
+    fn increment(inout self):
+        """Atomically increment the refcount."""
+        _ = self.refcount.fetch_add(1)
 
     fn decrement(inout self) -> Int64:
         """Atomically decrement the refcount.
@@ -65,7 +63,7 @@ struct Arc[T: Movable](CollectionElement):
         since a copy being created is always being created from another
         live copy on its own thread.
 
-        Note that the _interior_ of the data is not thread safe; the guarantees
+        Note that the _interior_ of the payload is not thread safe; the guarantees
         here apply only to the memory management. Calling `.set` or mutating the
         interior value in any way is not guaranteed to be safe! Any interior data
         that will be mutated should manage synchronization somehow.
@@ -78,8 +76,8 @@ struct Arc[T: Movable](CollectionElement):
         T: The type of the stored value.
     """
 
-    alias _type = _ArcInner[T]
-    var _inner: UnsafePointer[Self._type]
+    alias _inner_type = _ArcInner[T]
+    var _inner: UnsafePointer[Self._inner_type]
 
     fn __init__(inout self, owned value: T):
         """Construct a new thread-safe, reference-counted smart pointer,
@@ -88,20 +86,19 @@ struct Arc[T: Movable](CollectionElement):
         Args:
             value: The value to manage.
         """
-        self._inner = UnsafePointer[Self._type].alloc(1)
-        __get_address_as_uninit_lvalue(self._inner.address) = Self._type(value^)
-        _ = self._inner[].increment()
+        self._inner = UnsafePointer[Self._inner_type].alloc(1)
+        # Cannot use initialize_pointee_move as _ArcInner isn't movable.
+        __get_address_as_uninit_lvalue(self._inner.address) = Self._inner_type(
+            value^
+        )
+        self._inner[].increment()
 
-    fn __init__(inout self, *, owned inner: UnsafePointer[Self._type]):
+    fn __copyinit__(inout self, existing: Self):
         """Copy an existing reference. Increment the refcount to the object."""
-        _ = inner[].increment()
-        self._inner = inner
-
-    fn __copyinit__(inout self, other: Self):
-        """Copy an existing reference. Increment the refcount to the object."""
-        # Order here does not matter since `other` is borrowed, and can't
-        # be destroyed until our copy completes.
-        self.__init__(inner=other._inner)
+        # Order here does not matter since `existing` can't be destroyed until
+        # sometime after we return.
+        existing._inner[].increment()
+        self._inner = existing._inner
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move an existing reference."""
@@ -116,26 +113,11 @@ struct Arc[T: Movable](CollectionElement):
         var rc = self._inner[].decrement()
         if rc < 1:
             # Call inner destructor, then free the memory
-            _ = __get_address_as_owned_value(self._inner.address)
+            destroy_pointee(self._inner)
             self._inner.free()
 
-    fn set(self, owned new_value: T):
-        """Replace the existing value with a new value. The old value is deleted.
-
-        Thread safety: This method is currently not thread-safe. The old value's
-        deleter is called and the new value's __moveinit__ is called. If either of
-        these occur while another thread is also trying to perform a `get` or `set`
-        operation, then functions may run or copy improperly initialized memory.
-
-        If you want to mutate an Arc pointer, for now make sure you're doing it
-        in a single thread or with an internally-managed mutex.
-
-        Args:
-            new_value: The new value to manage. Other pointers to the memory will
-                now see the new value.
-        """
-        self._inner[].data = new_value^
-
+    # FIXME: This isn't right - the element should be mutable regardless
+    # of whether the 'self' type is mutable.
     fn __refitem__[
         mutability: __mlir_type.i1,
         lifetime: AnyLifetime[mutability].type,
@@ -147,10 +129,12 @@ struct Arc[T: Movable](CollectionElement):
         Returns:
             A Reference to the managed value.
         """
-        return Reference(self)[]._data_ptr()[]
+        return Reference(self)[]._inner[].payload
 
-    fn _data_ptr(self) -> UnsafePointer[T]:
-        return UnsafePointer.address_of(self._inner[].data)
+    fn __init__(inout self, *, owned inner: UnsafePointer[Self._inner_type]):
+        """Copy an existing reference. Increment the refcount to the object."""
+        inner[].increment()
+        self._inner = inner
 
     fn _bitcast[T2: Movable](self) -> Arc[T2]:
         constrained[
@@ -173,6 +157,6 @@ struct Arc[T: Movable](CollectionElement):
 
         # Add a +1 to the ref count, since we're creating a new `Arc` instance
         # pointing at the same data.
-        _ = self._inner[].increment()
+        self._inner[].increment()
 
         return Arc[T2](inner=ptr.bitcast[_ArcInner[T2]]())
