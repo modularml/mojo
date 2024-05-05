@@ -133,7 +133,6 @@ def test_memcmp():
 
 
 def test_memcmp_overflow():
-    print("== test_memcmp_overflow")
     var p1 = DTypePointer[DType.int8].alloc(1)
     var p2 = DTypePointer[DType.int8].alloc(1)
     p1.store(-120)
@@ -147,8 +146,6 @@ def test_memcmp_overflow():
 
 
 def test_memcmp_simd():
-    print("== test_memcmp_simd")
-
     var length = simdwidthof[DType.int8]() + 10
 
     var p1 = DTypePointer[DType.int8].alloc(length)
