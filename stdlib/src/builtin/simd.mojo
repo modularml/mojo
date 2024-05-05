@@ -33,7 +33,7 @@ from utils._numerics import FPUtils
 from utils._numerics import isnan as _isnan
 from utils._numerics import nan as _nan
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils import StaticTuple, StaticIntTuple
+from utils import StaticTuple, InlineArray
 
 from .dtype import _integral_type_of
 from .io import _snprintf_scalar, _snprintf
@@ -1602,7 +1602,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn _shuffle_list[
-        output_size: Int, mask: StaticIntTuple[output_size]
+        output_size: Int, mask: InlineArray[Int, output_size]
     ](self, other: Self) -> SIMD[type, output_size]:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask values
@@ -1620,17 +1620,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `(self+other)[permutation[i]]`.
         """
 
-        @parameter
-        fn _check[i: Int]():
-            constrained[
-                0 <= mask[i] < 2 * size,
-                "invalid index in the shuffle operation",
-            ]()
-
-        unroll[_check, output_size]()
-
         return __mlir_op.`pop.simd.shuffle`[
-            mask = mask.data.array,
+            mask = mask._array,
             _type = __mlir_type[
                 `!pop.simd<`, output_size.value, `, `, type.value, `>`
             ],
@@ -1670,7 +1661,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return self._shuffle_list[mask](other)
 
     @always_inline("nodebug")
-    fn shuffle[mask: StaticIntTuple[size]](self) -> Self:
+    fn shuffle[mask: InlineArray[Int, size]](self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask values
         must be within `2*len(self)`.
@@ -1685,7 +1676,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return self._shuffle_list[size, mask](self)
 
     @always_inline("nodebug")
-    fn shuffle[mask: StaticIntTuple[size]](self, other: Self) -> Self:
+    fn shuffle[mask: InlineArray[Int, size]](self, other: Self) -> Self:
         """Shuffles (also called blend) the values of the current vector with
         the `other` value using the specified mask (permutation). The mask values
         must be within `2*len(self)`.
@@ -1858,14 +1849,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @always_inline
         @parameter
-        fn build_indices() -> StaticIntTuple[2 * size]:
-            var indices = StaticIntTuple[2 * size]()
+        fn build_indices() -> InlineArray[Int, 2 * size]:
+            var indices = InlineArray[Int, 2 * size](0)
 
             @parameter
-            fn _fill[i: Int]():
+            fn _create_fill[i: Int]():
                 indices[i] = i
 
-            unroll[_fill, 2 * size]()
+            unroll[_create_fill, 2 * size]()
             return indices
 
         return self._shuffle_list[2 * size, build_indices()](other)
