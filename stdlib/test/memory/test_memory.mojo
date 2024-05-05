@@ -131,18 +131,20 @@ def test_memcmp():
 
     assert_equal(errors2, 0)
 
+
 def test_memcmp_overflow():
     print("== test_memcmp_overflow")
     var p1 = DTypePointer[DType.int8].alloc(1)
     var p2 = DTypePointer[DType.int8].alloc(1)
     p1.store(-120)
     p2.store(120)
-    
+
     var c = memcmp(p1, p2, 1)
     assert_equal(c, -1, "-120 is smaller than 120")
 
     c = memcmp(p2, p1, 1)
     assert_equal(c, 1, "120 is bigger than -120")
+
 
 def test_memcmp_simd():
     print("== test_memcmp_simd")
