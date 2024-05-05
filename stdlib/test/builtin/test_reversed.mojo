@@ -92,7 +92,7 @@ def test_reversed_dict():
     dict["b"] = 4
     dict["d"] = 3
 
-    # dict: {'b': 4, 'd': 3, 'c': 2, 'a':1}
+    # dict: {'b': 4, 'd': 3, 'c': 2, 'a': 1}
 
     keys = String("")
     check = 1

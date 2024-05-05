@@ -18,6 +18,8 @@ what we publish.
 
 ### ⭐️ New
 
+- `Dict()` now support `reversed` for `dict.items()` and `dict.values()`, see more details [here](https://github.com/modularml/mojo/pull/2340)
+
 - `int()` can now take a string and a specified base to parse an integer from a
   string: `int("ff", 16)` returns `255`. Additionally, if a base of zero is
   specified, the string will be parsed as if it was an integer literal, with the
