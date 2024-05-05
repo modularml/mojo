@@ -450,6 +450,44 @@ struct FileHandle:
         """The function to call when entering the context."""
         return self^
 
+    fn __iter__(self) raises -> List[String]:
+        """Iterate over lines in the file separated by the
+        newline character: \\n.
+
+        Returns:
+            A List of the file lines.
+
+        Examples:
+
+        ```mojo
+        var f = open("/tmp/example.txt", "r")
+        # TODO: this is ugly stil, since List doesn't implement __next__
+        # but once we have generators the problem should go away
+        for line in f.__iter__().__iter__():
+            print(line[])
+        ```
+        """
+        # TODO: when generators are implemented this should be something like
+        # alias eol = String("\n").as_bytes()[0]
+        # var content = self.read_bytes()
+        # var i = 0
+        # while i < content.size:
+        #     var new_i = content[i:].index(eol).or_else(content.size)
+        #     yield StringRef(content[i:new_i])
+        #     i = new_i
+        return self.read().split("\n")
+
+    fn __reversed__(self) raises -> List[String]:
+        """Iterate backwards over lines in the file separated by the
+        newline character: \\n.
+
+        Returns:
+            A reversed List of the file line elements.
+        """
+        var content = self.read().split("\n")
+        content.reverse()
+        return content
+
 
 fn open(path: String, mode: String) raises -> FileHandle:
     """Opens the file specified by path using the mode provided, returning a

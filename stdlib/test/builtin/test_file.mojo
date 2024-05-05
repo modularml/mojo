@@ -212,6 +212,31 @@ def test_file_read_to_dtype_pointer():
     )
 
 
+def test_file_iter():
+    var TMP_FILE = Path(TEMP_FILE_DIR) / "dummy_newline_iterator.txt"
+    alias textitems = (
+        "Lorem",
+        "ipsum",
+        "dolor",
+        "sit",
+        "namet,",
+        "consectetur",
+        "adipiscing elit.",
+    )
+    alias text2 = "Lorem\nipsum\ndolor\nsit\namet,\nconsectetur\nadipiscing elit."
+    alias text1 = "Lorem\nipsum\ndolor\nsit\namet,\nconsectetur\nadipiscing elit.\n"
+    for text in List(text1, text2):
+        with open(TMP_FILE, "w") as f:
+            f.write(text1)
+        var f_r = open(TMP_FILE, "r")
+        var counter = 0
+        for line in f_r.__iter__().__iter__():
+            assert_equal(line[], textitems[counter])
+            counter += 1
+        f_r.close()
+        assert_equal(counter, len(textitems))
+
+
 def main():
     test_file_read()
     test_file_read_multi()
@@ -224,3 +249,4 @@ def main():
     test_file_write()
     test_file_write_again()
     test_file_read_to_dtype_pointer()
+    test_file_iter()
