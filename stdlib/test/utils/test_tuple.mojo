@@ -18,8 +18,6 @@ from utils import StaticTuple, StaticIntTuple, InlineArray
 
 
 def test_static_tuple():
-    print("== test_static_tuple")
-
     var tup1 = StaticTuple[Int, 1](1)
     assert_equal(tup1[0], 1)
 
@@ -38,7 +36,6 @@ def test_static_tuple():
 
 
 def test_static_int_tuple():
-    print("== test_static_int_tuple")
     assert_equal(str(StaticIntTuple[1](1)), "(1,)")
 
     assert_equal(str(StaticIntTuple[3](2)), "(2, 2, 2)")
@@ -75,7 +72,6 @@ def test_static_int_tuple():
 
 
 def test_tuple_literal():
-    print("== test_tuple_literal\n")
     assert_equal(len((1, 2, (3, 4), 5)), 4)
     assert_equal(len(()), 0)
 

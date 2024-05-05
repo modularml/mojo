@@ -129,7 +129,7 @@ def test_file_seek():
         pos = f.seek(-16, os.SEEK_END)
         assert_equal(pos, 938)
 
-        print(f.read(6))
+        f.read(6)
 
         # Seek from current possition, skip the space
         pos = f.seek(1, os.SEEK_CUR)
@@ -195,10 +195,7 @@ struct Word:
         return word
 
 
-# CHECK-LABEL: test_file_read_to_dtype_pointer
 def test_file_read_to_dtype_pointer():
-    print("== test_file_read_to_dtype_pointer")
-
     var f = open(Path(CURRENT_DIR) / "test_file_dummy_input.txt", "r")
 
     var ptr = DTypePointer[DType.int8].alloc(8)
