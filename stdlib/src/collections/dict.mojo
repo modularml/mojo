@@ -632,8 +632,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             default: Default value to return.
 
         Returns:
-            An optional value containing a copy of the value if it was present,
-            otherwise an empty Optional.
+            A copy of the value if it was present, otherwise default.
         """
         return self.find(key).or_else(default)
 
