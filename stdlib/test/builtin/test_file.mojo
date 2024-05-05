@@ -214,7 +214,7 @@ def test_file_read_to_dtype_pointer():
 
 def test_file_iter():
     var TMP_FILE = Path(TEMP_FILE_DIR) / "dummy_newline_iterator.txt"
-    alias textitems = (
+    alias textitems = List(
         "Lorem",
         "ipsum",
         "dolor",
