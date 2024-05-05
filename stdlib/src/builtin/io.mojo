@@ -307,10 +307,6 @@ fn _put(x: String):
     _put(x._strref_dangerous())
 
 
-fn _min(x: Int, y: Int) -> Int:
-    return x if x < y else y
-
-
 @no_inline
 fn _put(x: StringRef):
     # Avoid printing "(null)" for an empty/default constructed `String`
@@ -322,9 +318,9 @@ fn _put(x: StringRef):
     @parameter
     if triple_is_nvidia_cuda():
         var tmp = 0
-        var arg_ptr = Pointer.address_of(tmp)
+        var arg_ptr = UnsafePointer.address_of(tmp)
         _ = external_call["vprintf", Int32](
-            x.data, arg_ptr.bitcast[Pointer[NoneType]]()
+            x.data, arg_ptr.bitcast[UnsafePointer[NoneType]]()
         )
     else:
         alias MAX_STR_LEN = 0x1000_0000
@@ -337,7 +333,7 @@ fn _put(x: StringRef):
         # The string is large, then we need to chunk it.
         var p = x.data
         while str_len:
-            var ll = _min(str_len, MAX_STR_LEN)
+            var ll = min(str_len, MAX_STR_LEN)
             _printf("%.*s", ll, p)
             str_len -= ll
             p += ll
@@ -359,27 +355,10 @@ fn _put(x: DType):
 
 
 @no_inline
-fn print(
-    *, sep: StringLiteral = " ", end: StringLiteral = "\n", flush: Bool = False
-):
-    """Prints the end value.
-
-    Args:
-        sep: The separator used between elements.
-        end: The String to write after printing the elements.
-        flush: If set to true, then the stream is forcibly flushed.
-    """
-    _put(end)
-    if flush:
-        _flush()
-
-
-@no_inline
 fn print[
-    T: Stringable, *Ts: Stringable
+    *Ts: Stringable
 ](
-    first: T,
-    *rest: *Ts,
+    *values: *Ts,
     sep: StringLiteral = " ",
     end: StringLiteral = "\n",
     flush: Bool = False,
@@ -388,24 +367,24 @@ fn print[
     and followed by `end`.
 
     Parameters:
-        T: The first element type.
-        Ts: The remaining element types.
+        Ts: The elements types.
 
     Args:
-        first: The first element.
-        rest: The remaining elements.
+        values: The elements to print.
         sep: The separator used between elements.
         end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
     """
-    _put(str(first))
 
     @parameter
-    fn print_elt[T: Stringable](a: T):
-        _put(sep)
-        _put(a)
+    fn print_with_separator[i: Int, T: Stringable](value: T):
+        _put(value)
 
-    rest.each[print_elt]()
+        @parameter
+        if i < values.__len__() - 1:
+            _put(sep)
+
+    values.each_idx[print_with_separator]()
 
     _put(end)
     if flush:

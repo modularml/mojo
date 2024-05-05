@@ -15,6 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from builtin._math import Ceilable, Floorable
+
 # ===----------------------------------------------------------------------===#
 # FloatLiteral
 # ===----------------------------------------------------------------------===#
@@ -23,7 +25,15 @@ These are Mojo built-ins, so you don't need to import them.
 @value
 @nonmaterializable(Float64)
 @register_passable("trivial")
-struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
+struct FloatLiteral(
+    Absable,
+    Boolable,
+    Ceilable,
+    EqualityComparable,
+    Floorable,
+    Intable,
+    Stringable,
+):
     """Mojo floating point literal type."""
 
     alias fp_type = __mlir_type.`!kgen.float_literal`
@@ -60,20 +70,58 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __init__(value: IntLiteral) -> Self:
-        """Convert an IntLiteral to a double value.
+        """Convert an IntLiteral to a FloatLiteral value.
 
         Args:
             value: The IntLiteral value.
 
         Returns:
-            The integer value as a double.
+            The integer value as a FloatLiteral.
         """
         return Self(__mlir_op.`kgen.int_literal.to_float_literal`(value.value))
 
-    alias nan = Self(__mlir_attr[`#kgen.float_literal<nan>`])
-    alias infinity = Self(__mlir_attr[`#kgen.float_literal<inf>`])
-    alias negative_infinity = Self(__mlir_attr[`#kgen.float_literal<neg_inf>`])
-    alias negative_zero = Self(__mlir_attr[`#kgen.float_literal<neg_zero>`])
+    alias nan = Self(__mlir_attr.`#kgen.float_literal<nan>`)
+    alias infinity = Self(__mlir_attr.`#kgen.float_literal<inf>`)
+    alias negative_infinity = Self(__mlir_attr.`#kgen.float_literal<neg_inf>`)
+    alias negative_zero = Self(__mlir_attr.`#kgen.float_literal<neg_zero>`)
+
+    @always_inline("nodebug")
+    fn is_nan(self) -> Bool:
+        """Return whether the FloatLiteral is nan.
+
+        Since `nan == nan` is False, this provides a way to check for nan-ness.
+
+        Returns:
+            True, if the value is nan, False otherwise.
+        """
+        return __mlir_op.`kgen.float_literal.isa`[
+            special = __mlir_attr.`#kgen<float_literal.special_values nan>`
+        ](self.value)
+
+    @always_inline("nodebug")
+    fn is_neg_zero(self) -> Bool:
+        """Return whether the FloatLiteral is negative zero.
+
+        Since `FloatLiteral.negative_zero == 0.0` is True, this provides a way
+        to check if the FloatLiteral is negative zero.
+
+        Returns:
+            True, if the value is negative zero, False otherwise.
+        """
+        return __mlir_op.`kgen.float_literal.isa`[
+            special = __mlir_attr.`#kgen<float_literal.special_values neg_zero>`
+        ](self.value)
+
+    @always_inline("nodebug")
+    fn _is_normal(self) -> Bool:
+        """Return whether the FloatLiteral is a normal (i.e. not special) value.
+
+        Returns:
+            True, if the value is a normal float, False otherwise.
+        """
+        return __mlir_op.`kgen.float_literal.isa`[
+            special = __mlir_attr.`#kgen<float_literal.special_values normal>`
+        ](self.value)
 
     # ===------------------------------------------------------------------===#
     # Conversion Operators
@@ -130,12 +178,67 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __neg__(self) -> FloatLiteral:
-        """Return the negation of the double value.
+        """Return the negation of the FloatLiteral value.
 
         Returns:
-            The negated double value.
+            The negated FloatLiteral value.
         """
         return self * Self(-1)
+
+    @always_inline("nodebug")
+    fn __abs__(self) -> Self:
+        """Return the absolute value of the FloatLiteral.
+
+        Returns:
+            The absolute value.
+        """
+        if self > 0:
+            return self
+        return -self
+
+    @always_inline("nodebug")
+    fn __floor__(self) -> Self:
+        """Return the floor value of the FloatLiteral.
+
+        Returns:
+            The floor value.
+        """
+
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        # __int_literal__ rounds towards zero, so it's correct for integers and
+        # positive values.
+        var truncated: IntLiteral = self.__int_literal__()
+
+        # Ensure this equality doesn't hit any implicit conversions.
+        if self >= 0 or self.__eq__(Self(truncated)):
+            return truncated
+        return truncated - 1
+
+    @always_inline("nodebug")
+    fn __ceil__(self) -> Self:
+        """Return the ceiling value of the FloatLiteral.
+
+        Returns:
+            The ceiling value.
+        """
+
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        # __int_literal__ rounds towards zero, so it's correct for integers and
+        # negative values.
+        var truncated: IntLiteral = self.__int_literal__()
+
+        # Ensure this equality doesn't hit any implicit conversions.
+        if self <= 0 or self.__eq__(Self(truncated)):
+            return truncated
+        return truncated + 1
+
+    # TODO: implement __round__
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
@@ -143,7 +246,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __add__(self, rhs: FloatLiteral) -> FloatLiteral:
-        """Add two doubles.
+        """Add two FloatLiterals.
 
         Args:
             rhs: The value to add.
@@ -157,7 +260,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __sub__(self, rhs: FloatLiteral) -> FloatLiteral:
-        """Subtract two doubles.
+        """Subtract two FloatLiterals.
 
         Args:
             rhs: The value to subtract.
@@ -171,7 +274,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __mul__(self, rhs: FloatLiteral) -> FloatLiteral:
-        """Multiply two doubles.
+        """Multiply two FloatLiterals.
 
         Args:
             rhs: The value to multiply.
@@ -185,7 +288,7 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __truediv__(self, rhs: FloatLiteral) -> FloatLiteral:
-        """Divide two doubles.
+        """Divide two FloatLiterals.
 
         Args:
             rhs: The value to divide.
@@ -198,7 +301,21 @@ struct FloatLiteral(Intable, Stringable, Boolable, EqualityComparable):
             oper = __mlir_attr.`#kgen<float_literal.binop_kind truediv>`
         ](self.value, rhs.value)
 
-    # TODO - __floordiv__
+    @always_inline("nodebug")
+    fn __floordiv__(self, rhs: Self) -> Self:
+        """Returns self divided by rhs, rounded down to the nearest integer.
+
+        Constraints:
+            The element type of the SIMD vector must be numeric.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            `floor(self / rhs)` value.
+        """
+        return self.__truediv__(rhs).__floor__()
+
     # TODO - maybe __mod__?
     # TODO - maybe __pow__?
 

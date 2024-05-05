@@ -31,7 +31,7 @@ from utils import StaticTuple
 @value
 struct _VecIter[
     type: AnyRegType,
-    vec_type: AnyRegType,
+    vec_type: AnyType,
     deref: fn (UnsafePointer[vec_type], Int) -> type,
 ](Sized):
     """Iterator for any random-access container"""

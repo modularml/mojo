@@ -31,7 +31,6 @@ value types must always be Movable so we can resize the dictionary as it grows.
 
 See the `Dict` docs for more details.
 """
-from memory import UnsafePointer
 from builtin.value import StringableCollectionElement
 
 from .optional import Optional
@@ -46,7 +45,7 @@ trait KeyElement(CollectionElement, Hashable, EqualityComparable):
     pass
 
 
-trait StringableKeyElement(KeyElement, Stringable):
+trait RepresentableKeyElement(KeyElement, Representable):
     """A trait composition for types which implement all requirements of
     dictionary keys and Stringable."""
 
@@ -189,7 +188,8 @@ struct _DictValueIter[
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()
-        # Cast through a pointer to grant additional mutability.
+        # Cast through a pointer to grant additional mutability because
+        # _DictEntryIter.next erases it.
         return UnsafePointer.address_of(entry_ref[].value)[]
 
     fn __len__(self) -> Int:
@@ -534,7 +534,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     @staticmethod
     fn __str__[
-        T: StringableKeyElement, U: StringableCollectionElement
+        T: RepresentableKeyElement, U: RepresentableCollectionElement
     ](self: Dict[T, U]) -> String:
         """Returns a string representation of a `Dict`.
 
@@ -553,25 +553,28 @@ struct Dict[K: KeyElement, V: CollectionElement](
         When the compiler supports conditional methods, then a simple `str(my_dict)` will
         be enough.
 
+        Note that both they keys and values' types must implement the `__repr__()` method
+        for this to work. See the `Representable` trait for more information.
+
         Args:
             self: The Dict to represent as a string.
 
         Parameters:
             T: The type of the keys in the Dict. Must implement the
-              traits `Stringable` and `KeyElement`.
+              traits `Representable` and `KeyElement`.
             U: The type of the values in the Dict. Must implement the
-                traits `Stringable` and `CollectionElement`.
+                traits `Representable` and `CollectionElement`.
 
         Returns:
             A string representation of the Dict.
         """
         var minimum_capacity = self._minimum_size_of_string_representation()
-        var result = String(List[Int8](capacity=minimum_capacity))
+        var result = String(List[UInt8](capacity=minimum_capacity))
         result += "{"
 
         var i = 0
         for key_value in self.items():
-            result += str(key_value[].key) + ": " + str(key_value[].value)
+            result += repr(key_value[].key) + ": " + repr(key_value[].value)
             if i < len(self) - 1:
                 result += ", "
             i += 1
@@ -763,36 +766,30 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn _set_index(inout self, slot: Int, index: Int):
         return self._index.set_index(self._reserved, slot, index)
 
-    fn _next_index_slot(self, inout slot: Int, inout perturb: Int):
+    fn _next_index_slot(self, inout slot: Int, inout perturb: UInt64):
         alias PERTURB_SHIFT = 5
         perturb >>= PERTURB_SHIFT
-        slot = ((5 * slot) + perturb + 1) % self._reserved
+        slot = ((5 * slot) + int(perturb + 1)) % self._reserved
 
     fn _find_empty_index(self, hash: Int) -> Int:
         var slot = hash % self._reserved
-        var perturb = hash
-        for _ in range(self._reserved):
+        var perturb = bitcast[DType.uint64](Int64(hash))
+        while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return slot
             self._next_index_slot(slot, perturb)
-        abort("Dict: no empty index in _find_empty_index")
-        return 0
 
     fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
         # Return (found, slot, index)
-        var insert_slot = Optional[Int]()
-        var insert_index = Optional[Int]()
         var slot = hash % self._reserved
-        var perturb = hash
-        for _ in range(self._reserved):
+        var perturb = bitcast[DType.uint64](Int64(hash))
+        while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return (False, slot, self._n_entries)
             elif index == Self.REMOVED:
-                if not insert_slot:
-                    insert_slot = slot
-                    insert_index = self._n_entries
+                return (False, slot, self._n_entries)
             else:
                 var ev = self._entries.__get_ref(index)[]
                 debug_assert(ev.__bool__(), "entry in index must be full")
@@ -800,10 +797,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 if hash == entry.hash and key == entry.key:
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
-
-        debug_assert(insert_slot.__bool__(), "never found a slot")
-        debug_assert(insert_index.__bool__(), "slot populated but not index!!")
-        return (False, insert_slot.value()[], insert_index.value()[])
 
     fn _over_load_factor(self) -> Bool:
         return 3 * self.size > 2 * self._reserved
@@ -860,7 +853,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var ref = Reference(self)
         return _DictKeyIter(
             _DictEntryIter[K, V, mutability, self_life, False](
-                ref[]._reserved, 0, ref
+                ref[]._reserved - 1, 0, ref
             )
         )
 

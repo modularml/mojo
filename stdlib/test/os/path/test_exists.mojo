@@ -15,6 +15,7 @@
 
 from os.path import exists, lexists
 from pathlib import Path, cwd
+from builtin._location import __source_location
 
 from testing import assert_true, assert_false
 

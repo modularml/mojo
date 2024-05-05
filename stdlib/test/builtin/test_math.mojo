@@ -15,25 +15,28 @@
 from testing import assert_equal
 
 
-def raise_an_error():
-    raise Error("MojoError: This is an error!")
+def test_min():
+    assert_equal(0, min(0, 1))
+    assert_equal(1, min(1, 42))
+
+    var lhs = SIMD[DType.int32, 4](1, 2, 3, 4)
+    var rhs = SIMD[DType.int32, 4](0, 1, 5, 7)
+    var expected = SIMD[DType.int32, 4](0, 1, 3, 4)
+    assert_equal(expected, lhs.min(rhs))
+    assert_equal(expected, rhs.min(lhs))
 
 
-def test_error_raising():
-    try:
-        raise_an_error()
-    except e:
-        assert_equal(str(e), "MojoError: This is an error!")
+def test_max():
+    assert_equal(1, max(0, 1))
+    assert_equal(2, max(1, 2))
 
-
-def test_from_and_to_string():
-    var myString: String = "FOO"
-    var error = Error(myString)
-    assert_equal(error, "FOO")
-
-    assert_equal(str(Error("bad")), "bad")
+    var lhs = SIMD[DType.int32, 4](1, 2, 3, 4)
+    var rhs = SIMD[DType.int32, 4](0, 1, 5, 7)
+    var expected = SIMD[DType.int32, 4](1, 2, 5, 7)
+    assert_equal(expected, lhs.max(rhs))
+    assert_equal(expected, rhs.max(lhs))
 
 
 def main():
-    test_error_raising()
-    test_from_and_to_string()
+    test_min()
+    test_max()
