@@ -128,14 +128,9 @@ struct DLHandle(CollectionElement, Boolable):
             var opaque_function_ptr = external_call[
                 "dlsym", DTypePointer[DType.int8]
             ](self.handle.address, name)
-            return (
-                Reference(opaque_function_ptr)
-                .get_legacy_pointer()
-                .bitcast[result_type]()
-                .load()
-            )
+            return UnsafePointer(opaque_function_ptr).bitcast[result_type]()[]
         else:
-            return Pointer[result_type].get_null().load()
+            return abort[result_type]("get_function isn't supported on windows")
 
     @always_inline
     fn _get_function[
@@ -214,21 +209,13 @@ fn _get_dylib_function[
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
-        return (
-            Reference(func_ptr)
-            .get_legacy_pointer()
-            .bitcast[result_type]()
-            .load()
-        )
+        return UnsafePointer(func_ptr).bitcast[result_type]()[]
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        Reference(new_func)
-        .get_legacy_pointer()
-        .bitcast[Pointer[NoneType]]()
-        .load(),
+        UnsafePointer(new_func).bitcast[Pointer[NoneType]]()[],
     )
 
     return new_func
