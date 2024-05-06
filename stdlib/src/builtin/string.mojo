@@ -1219,7 +1219,7 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self, chars: String = " \n\t\r\f\v") -> String:
+    fn strip(self, chars: String = String.WHITESPACE) -> String:
         """Return a copy of the string with leading and trailing characters removed.
 
         Args:
@@ -1231,7 +1231,7 @@ struct String(
 
         return self.lstrip(chars).rstrip(chars)
 
-    fn rstrip(self, chars: String = " \n\t\r\f\v") -> String:
+    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
         """Return a copy of the string with trailing characters removed.
 
         Args:
@@ -1247,7 +1247,7 @@ struct String(
 
         return self[:r_idx]
 
-    fn lstrip(self, chars: String = " \n\t\r\f\v") -> String:
+    fn lstrip(self, chars: String = String.WHITESPACE) -> String:
         """Return a copy of the string with leading characters removed.
 
         Args:
