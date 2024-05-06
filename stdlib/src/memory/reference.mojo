@@ -248,21 +248,3 @@ struct Reference[
             The MLIR reference for the Mojo compiler to use.
         """
         return self.value
-
-    # ===------------------------------------------------------------------===#
-    # Methods
-    # ===------------------------------------------------------------------===#
-
-    # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
-    # disagreement.  Use UnsafePointer instead!
-    @always_inline("nodebug")
-    fn get_legacy_pointer(self) -> LegacyPointer[type, address_space]:
-        """Constructs a LegacyPointer from a safe reference.
-
-        Returns:
-            Constructed LegacyPointer object.
-        """
-        # Work around AnyRegType vs AnyType.
-        return __mlir_op.`pop.pointer.bitcast`[
-            _type = LegacyPointer[type, address_space]._mlir_type
-        ](UnsafePointer(self).address)
