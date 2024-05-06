@@ -578,6 +578,7 @@ fn test_isspace() raises:
 
 
 fn test_rstrip() raises:
+    # with default rstrip chars
     var empty_string = String("")
     assert_true(empty_string.rstrip() == "")
 
@@ -593,8 +594,17 @@ fn test_rstrip() raises:
     var str2 = String("something \t\n\t\v\f")
     assert_true(str2.rstrip() == "something")
 
+    # with custom chars for rstrip
+    var str3 = String("mississippi")
+    assert_true(str3.rstrip("sip") == "m")
+
+    var str4 = String("mississippimississippi \n ")
+    assert_true(str4.rstrip("sip ") == "mississippimississippi \n")
+    assert_true(str4.rstrip("sip \n") == "mississippim")
+
 
 fn test_lstrip() raises:
+    # with default lstrip chars
     var empty_string = String("")
     assert_true(empty_string.lstrip() == "")
 
@@ -610,9 +620,18 @@ fn test_lstrip() raises:
     var str2 = String(" \t\n\t\v\fsomething")
     assert_true(str2.lstrip() == "something")
 
+    # with custom chars for lstrip
+    var str3 = String("mississippi")
+    assert_true(str3.lstrip("mis") == "ppi")
+
+    var str4 = String(" \n mississippimississippi")
+    assert_true(str4.lstrip("mis ") == "\n mississippimississippi")
+    assert_true(str4.lstrip("mis \n") == "ppimississippi")
+
 
 fn test_strip() raises:
     print("start strip")
+    # with default strip chars
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
 
@@ -627,6 +646,15 @@ fn test_strip() raises:
 
     var str2 = String(" \t\n\t\v\fsomething \t\n\t\v\f")
     assert_true(str2.strip() == "something")
+
+    # with custom strip chars
+    var str3 = String("mississippi")
+    assert_true(str3.strip("mips") == "")
+    assert_true(str3.strip("mip") == "ssiss")
+
+    var str4 = String(" \n mississippimississippi \n ")
+    assert_true(str4.strip(" ") == "\n mississippimississippi \n")
+    assert_true(str4.strip("\nmip ") == "ssissippimississ")
 
 
 fn test_hash() raises:
