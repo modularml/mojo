@@ -21,7 +21,7 @@ from os import Atomic
 from sys.intrinsics import _type_is_eq
 
 from memory import memcmp, memcpy, DTypePointer
-from memory._arc import Arc
+from memory import Arc
 from memory.unsafe_pointer import move_from_pointee
 
 from utils import StringRef, unroll
