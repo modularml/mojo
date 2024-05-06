@@ -187,7 +187,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
                 alias T = Ts[i]
                 initialize_pointee_move(
                     UnsafePointer.address_of(self._impl).bitcast[T](),
-                    Reference(other._impl).unsafe_bitcast[T]()[],
+                    UnsafePointer.address_of(other._impl).bitcast[T]()[],
                 )
 
         unroll[each, len(VariadicList(Ts))]()
