@@ -307,6 +307,7 @@ def test_mojo_issue_1729():
         var k = keys[i]
         assert_equal(i, d[k])
 
+
 def test_dict_popitem():
     var dict = Dict[String, Int]()
     dict["a"] = 1
@@ -320,6 +321,7 @@ def test_dict_popitem():
     assert_equal(item.value, 1)
     with assert_raises(contains="KeyError"):
         _ = dict.popitem()
+
 
 fn test[name: String, test_fn: fn () raises -> object]() raises:
     var name_val = name  # FIXME(#26974): Can't pass 'name' directly.

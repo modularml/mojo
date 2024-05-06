@@ -644,10 +644,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
             return default.value()[]
         raise "KeyError"
 
-    fn popitem(inout self) raises -> DictEntry[K,V]:
+    fn popitem(inout self) raises -> DictEntry[K, V]:
         """Remove and return a (key, value) pair from the dictionary. Pairs are returned in LIFO order.
 
-        popitem() is useful to destructively iterate over a dictionary, as often used in set algorithms. 
+        popitem() is useful to destructively iterate over a dictionary, as often used in set algorithms.
         If the dictionary is empty, calling popitem() raises a KeyError.
 
         Args: None
@@ -665,7 +665,13 @@ struct Dict[K: KeyElement, V: CollectionElement](
             var slot: Int
             var index: Int
             found, slot, index = self._find_index(hash, key[])
-            debug_assert(found == True, "Should found the key, otherwise there is something wrong in reversed")
+            debug_assert(
+                found == True,
+                (
+                    "Should found the key, otherwise there is something wrong"
+                    " in reversed"
+                ),
+            )
             self._set_index(slot, Self.REMOVED)
             var entry = self._entries.__get_ref(index)[]
             self._entries[index] = None
