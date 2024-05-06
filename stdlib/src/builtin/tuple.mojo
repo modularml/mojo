@@ -164,23 +164,19 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
     @always_inline("nodebug")
     fn __refitem__[
-        idx: Int,
-        mutability: __mlir_type.i1,
-        self_life: AnyLifetime[mutability].type,
-    ](self_lit: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
-        element_types[idx.value], mutability, self_life
+        idx: Int
+    ](self: Reference[Self, _, _]) -> Reference[
+        element_types[idx.value], self.is_mutable, self.lifetime
     ]:
         # Return a reference to an element at the specified index, propagating
         # mutability of self.
-        var storage_kgen_ptr = UnsafePointer.address_of(
-            Reference(self_lit)[].storage
-        ).address
+        var storage_kgen_ptr = UnsafePointer.address_of(self[].storage).address
 
         # KGenPointer to the element.
         var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](
             storage_kgen_ptr
         )
-        # Convert to an immortal mut reference, which conforms to self_life.
+        # Use an immortal mut reference, which converts to self's lifetime.
         return UnsafePointer(elt_kgen_ptr)[]
 
     # TODO(#38268): Remove this method when references and parameter expressions
