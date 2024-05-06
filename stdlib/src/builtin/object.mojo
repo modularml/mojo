@@ -1206,6 +1206,30 @@ struct object(IntableRaising, Boolable, Stringable):
             return fp_func(lhsValue.get_as_float(), rhsValue.get_as_float())
         return int_func(lhsValue.get_as_int(), rhsValue.get_as_int())
 
+    @staticmethod
+    @always_inline
+    fn _arithmetic_bitwise_op[
+        int_func: fn (Int64, Int64) -> Int64,
+        bool_func: fn (Bool, Bool) -> Bool,
+    ](lhs: object, rhs: object) raises -> object:
+        """Generic bitwise operator.
+
+        Parameters:
+            int_func: Integer operator.
+            bool_func: Boolean operator.
+
+        Returns:
+            The bitwise operation result.
+        """
+        lhs._arithmetic_integral_type_check()
+        rhs._arithmetic_integral_type_check()
+        var lhsValue = lhs._value
+        var rhsValue = rhs._value
+        _ObjectImpl.coerce_integral_type(lhsValue, rhsValue)
+        if lhsValue.is_int():
+            return int_func(lhsValue.get_as_int(), rhsValue.get_as_int())
+        return bool_func(lhsValue.get_as_bool(), rhsValue.get_as_bool())
+
     @always_inline
     fn __neg__(self) raises -> object:
         """Negation operator. Only valid for bool, int, and float
@@ -1386,8 +1410,7 @@ struct object(IntableRaising, Boolable, Stringable):
 
     @always_inline
     fn __and__(self, rhs: object) raises -> object:
-        """Bool AND operator. If the left hand value is False, return the
-        left-hand value.
+        """Bitwise AND operator.
 
         Args:
             rhs: Right hand value.
@@ -1395,14 +1418,13 @@ struct object(IntableRaising, Boolable, Stringable):
         Returns:
             The current value if it is False.
         """
-        if not self:
-            return self
-        return rhs
+        return Self._arithmetic_bitwise_op[Int64.__and__, Bool.__and__](
+            self, rhs
+        )
 
     @always_inline
     fn __or__(self, rhs: object) raises -> object:
-        """Bool OR operator. If the left hand value is True, return the
-        left-hand value.
+        """Bitwise OR operator.
 
         Args:
             rhs: Right hand value.
@@ -1410,11 +1432,21 @@ struct object(IntableRaising, Boolable, Stringable):
         Returns:
             The current value if it is True.
         """
-        if self:
-            return self
-        return rhs
+        return Self._arithmetic_bitwise_op[Int64.__or__, Bool.__or__](self, rhs)
 
-    # TODO: __xor__
+    @always_inline
+    fn __xor__(self, rhs: object) raises -> object:
+        """Bitwise XOR operator.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            The current value if it is True.
+        """
+        return Self._arithmetic_bitwise_op[Int64.__xor__, Bool.__xor__](
+            self, rhs
+        )
 
     # ===------------------------------------------------------------------=== #
     # In-Place Operators
@@ -1508,8 +1540,7 @@ struct object(IntableRaising, Boolable, Stringable):
         Args:
             rhs: Right hand value.
         """
-        if self:
-            self = rhs
+        self = self & rhs
 
     @always_inline
     fn __ior__(inout self, rhs: object) raises:
@@ -1518,10 +1549,16 @@ struct object(IntableRaising, Boolable, Stringable):
         Args:
             rhs: Right hand value.
         """
-        if not self:
-            self = rhs
+        self = self | rhs
 
-    # TODO: __ixor__
+    @always_inline
+    fn __ixor__(inout self, rhs: object) raises:
+        """In-place XOR operator.
+
+        Args:
+            rhs: Right hand value.
+        """
+        self = self ^ rhs
 
     # ===------------------------------------------------------------------=== #
     # Reversed Operators
@@ -1645,9 +1682,7 @@ struct object(IntableRaising, Boolable, Stringable):
         Returns:
             The bitwise AND of the left-hand-side value and this.
         """
-        if not lhs:
-            return lhs
-        return self
+        return lhs & self
 
     @always_inline
     fn __ror__(self, lhs: object) raises -> object:
@@ -1659,11 +1694,19 @@ struct object(IntableRaising, Boolable, Stringable):
         Returns:
             The bitwise OR of the left-hand-side value and this.
         """
-        if lhs:
-            return lhs
-        return self
+        return lhs | self
 
-    # TODO: __rxor__
+    @always_inline
+    fn __rxor__(self, lhs: object) raises -> object:
+        """Reverse XOR operator.
+
+        Args:
+            lhs: Left hand value.
+
+        Returns:
+            The bitwise XOR of the left-hand-side value and this.
+        """
+        return lhs ^ self
 
     # ===------------------------------------------------------------------=== #
     # Interface
