@@ -333,7 +333,7 @@ struct Int(
 
             # Format the integer to the local byte array
             var len = _snprintf(
-                rebind[UnsafePointer[Int8]](buf.as_ptr()),
+                rebind[UnsafePointer[Int8]](buf.unsafe_ptr()),
                 size,
                 "%li",
                 self.value,

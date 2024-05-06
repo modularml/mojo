@@ -496,7 +496,7 @@ struct CPython:
                 DTypePointer[DType.int8], Int, DTypePointer[DType.int8]
             ) -> PyObjectPtr
         ](StringRef("PyUnicode_DecodeUTF8"))(
-            strref.data, strref.length, "strict".data()
+            strref.data, strref.length, "strict".unsafe_ptr()
         )
         if self.logging_enabled:
             print(
