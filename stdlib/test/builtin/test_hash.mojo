@@ -29,19 +29,31 @@ def same_low_bits(i1: Int, i2: Int, bits: Int = 4) -> Int:
 
 def test_hash_byte_array():
     # Test that values hash deterministically
-    assert_equal(hash("a".data(), 1), hash("a".data(), 1))
-    assert_equal(hash("b".data(), 1), hash("b".data(), 1))
-    assert_equal(hash("c".data(), 1), hash("c".data(), 1))
-    assert_equal(hash("d".data(), 1), hash("d".data(), 1))
+    assert_equal(hash("a".unsafe_ptr(), 1), hash("a".unsafe_ptr(), 1))
+    assert_equal(hash("b".unsafe_ptr(), 1), hash("b".unsafe_ptr(), 1))
+    assert_equal(hash("c".unsafe_ptr(), 1), hash("c".unsafe_ptr(), 1))
+    assert_equal(hash("d".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1))
 
     # Test that low bits are different
     var num_same = 0
-    num_same += same_low_bits(hash("a".data(), 1), hash("b".data(), 1))
-    num_same += same_low_bits(hash("a".data(), 1), hash("c".data(), 1))
-    num_same += same_low_bits(hash("a".data(), 1), hash("d".data(), 1))
-    num_same += same_low_bits(hash("b".data(), 1), hash("c".data(), 1))
-    num_same += same_low_bits(hash("b".data(), 1), hash("d".data(), 1))
-    num_same += same_low_bits(hash("c".data(), 1), hash("d".data(), 1))
+    num_same += same_low_bits(
+        hash("a".unsafe_ptr(), 1), hash("b".unsafe_ptr(), 1)
+    )
+    num_same += same_low_bits(
+        hash("a".unsafe_ptr(), 1), hash("c".unsafe_ptr(), 1)
+    )
+    num_same += same_low_bits(
+        hash("a".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1)
+    )
+    num_same += same_low_bits(
+        hash("b".unsafe_ptr(), 1), hash("c".unsafe_ptr(), 1)
+    )
+    num_same += same_low_bits(
+        hash("b".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1)
+    )
+    num_same += same_low_bits(
+        hash("c".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1)
+    )
 
     assert_true(num_same < 2, "too little entropy in hash fn low bits")
 

@@ -105,6 +105,9 @@ what we publish.
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
   longer need to do `from math import abs, round`.
 
+- Many functions returning a pointer type have been unified to have a public
+  API function of `unsafe_ptr()`.
+
 ### ❌ Removed
 
 - The method `object.print()` has been removed. Since now, `object` has the

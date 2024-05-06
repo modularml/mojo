@@ -69,7 +69,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    fn data(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
         """Get raw pointer to the underlying data.
 
         Returns:
@@ -112,7 +112,7 @@ struct StringLiteral(
         if length != len(rhs):
             return False
 
-        return _memcmp(self.data(), rhs.data(), length) == 0
+        return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), length) == 0
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: StringLiteral) -> Bool:
@@ -134,7 +134,7 @@ struct StringLiteral(
             uses. Its intended usage is for data structures. See the `hash`
             builtin documentation for more details.
         """
-        return hash(self.data(), len(self))
+        return hash(self.unsafe_ptr(), len(self))
 
     fn __str__(self) -> String:
         """Convert the string literal to a string.

@@ -100,14 +100,14 @@ def test_small_string_construction():
     # ==================================
 
     var heap_s1 = String("hello")
-    var heap_s1_addr = int(heap_s1._as_ptr())
+    var heap_s1_addr = int(heap_s1.unsafe_ptr())
 
     var s3 = InlinedString(heap_s1^)
 
     # Test that a InlinedString constructed from a String uses the same
     # allocation as the original String (even if the String size is small
     # enough to fit inline).
-    assert_equal(int(s3.as_ptr()), heap_s1_addr)
+    assert_equal(int(s3.unsafe_ptr()), heap_s1_addr)
 
 
 def test_small_string_iadd():

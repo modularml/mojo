@@ -70,7 +70,7 @@ fn b64encode(str: String) -> String:
       Base64 encoding of the input string.
     """
     alias lookup = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    var b64chars = lookup.data()
+    var b64chars = lookup.unsafe_ptr()
 
     var length = len(str)
     var out = List[Int8](capacity=length + 1)
@@ -78,7 +78,7 @@ fn b64encode(str: String) -> String:
     @parameter
     @always_inline
     fn s(idx: Int) -> Int:
-        return int(str._as_ptr().bitcast[DType.uint8]()[idx])
+        return int(str.unsafe_ptr().bitcast[DType.uint8]()[idx])
 
     # This algorithm is based on https://arxiv.org/abs/1704.00605
     var end = length - (length % 3)

@@ -122,7 +122,7 @@ fn _try_write_int(
     #
 
     # TODO(#26444, Unicode support): Get an array of Character, not bytes.
-    var digit_chars_array = digit_chars.data()
+    var digit_chars_array = digit_chars.unsafe_ptr()
 
     # Prefix a '-' if the original int was negative and make positive.
     if value < 0:
@@ -190,7 +190,7 @@ fn _try_write_int(
     # Re-add +1 byte since the loop ended so we didn't write another char.
     offset += 1
 
-    var buf_ptr = buf.as_ptr() + offset
+    var buf_ptr = buf.unsafe_ptr() + offset
 
     # Calculate the length of the buffer we've filled. This is the number of
     # bytes from our final `buf_ptr` to the end of the buffer.

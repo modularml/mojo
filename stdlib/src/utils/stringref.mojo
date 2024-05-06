@@ -65,7 +65,7 @@ struct StringRef(
         Returns:
             Constructed `StringRef` object.
         """
-        return StringRef(str.data(), len(str))
+        return StringRef(str.unsafe_ptr(), len(str))
 
     fn __str__(self) -> String:
         """Convert the string reference to a string.
@@ -190,10 +190,10 @@ struct StringRef(
     # TODO: #2317 Drop support for this method when we have fully
     # transitionned to UInt8 as the main byte type.
     @always_inline
-    fn _as_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
 
-        Prefer to use `_as_uint8_ptr()` instead.
+        Prefer to use `as_uint8_ptr()` instead.
 
         Returns:
             The DTypePointer to the underlying memory.
@@ -201,7 +201,7 @@ struct StringRef(
         return self.data
 
     @always_inline
-    fn _as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+    fn unsafe_uint8_ptr(self) -> DTypePointer[DType.uint8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
@@ -340,16 +340,16 @@ struct StringRef(
         var haystack_str = self._from_start(start)
 
         var loc = _memmem(
-            haystack_str._as_uint8_ptr(),
+            haystack_str.unsafe_uint8_ptr(),
             len(haystack_str),
-            substr._as_uint8_ptr(),
+            substr.unsafe_uint8_ptr(),
             len(substr),
         )
 
         if not loc:
             return -1
 
-        return int(loc) - int(self._as_uint8_ptr())
+        return int(loc) - int(self.unsafe_uint8_ptr())
 
     fn rfind(self, substr: StringRef, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -373,16 +373,16 @@ struct StringRef(
         var haystack_str = self._from_start(start)
 
         var loc = _memrmem(
-            haystack_str._as_uint8_ptr(),
+            haystack_str.unsafe_uint8_ptr(),
             len(haystack_str),
-            substr._as_uint8_ptr(),
+            substr.unsafe_uint8_ptr(),
             len(substr),
         )
 
         if not loc:
             return -1
 
-        return int(loc) - int(self._as_uint8_ptr())
+        return int(loc) - int(self.unsafe_uint8_ptr())
 
     fn _from_start(self, start: Int) -> StringRef:
         """Gets the StringRef pointing to the substring after the specified slice start position.

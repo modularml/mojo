@@ -716,7 +716,7 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
     var buf_len = Int(INITIAL_CAPACITY)
 
     var err = external_call["sysctlbyname", Int32](
-        "kern.osproductversion".data(),
+        "kern.osproductversion".unsafe_ptr(),
         buf.data,
         UnsafePointer.address_of(buf_len),
         UnsafePointer[NoneType](),

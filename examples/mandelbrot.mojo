@@ -77,7 +77,7 @@ fn main() raises:
             var cx = min_x + (col + iota[float_type, simd_width]()) * scale_x
             var cy = min_y + row * scale_y
             var c = ComplexSIMD[float_type, simd_width](cx, cy)
-            t.data().store[width=simd_width](
+            t.unsafe_ptr().store[width=simd_width](
                 row * width + col, mandelbrot_kernel_SIMD[simd_width](c)
             )
 

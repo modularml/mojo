@@ -64,7 +64,7 @@ struct DLHandle(CollectionElement, Boolable):
         @parameter
         if not os_is_windows():
             self.handle = external_call["dlopen", DTypePointer[DType.int8]](
-                path._as_ptr(), flags
+                path.unsafe_ptr(), flags
             )
         else:
             self.handle = DTypePointer[DType.int8]()
@@ -104,7 +104,7 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](name._as_ptr())
+        return self._get_function[result_type](name.unsafe_ptr())
 
     @always_inline
     fn _get_function[
@@ -147,7 +147,7 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](func_name.data())
+        return self._get_function[result_type](func_name.unsafe_ptr())
 
 
 # ===----------------------------------------------------------------------===#

@@ -62,7 +62,8 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         return Error {
-            data: value.data().bitcast[DType.uint8](), loaded_length: len(value)
+            data: value.unsafe_ptr().bitcast[DType.uint8](),
+            loaded_length: len(value),
         }
 
     @always_inline("nodebug")
@@ -77,7 +78,7 @@ struct Error(Stringable, Boolable):
         """
         var length = len(src)
         var dest = Self.StorageType.alloc(length + 1)
-        memcpy(dest, src._as_ptr().bitcast[DType.uint8](), length)
+        memcpy(dest, src.unsafe_ptr().bitcast[DType.uint8](), length)
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
