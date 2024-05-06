@@ -36,4 +36,6 @@ from .reference import (
     AddressSpace,
 )
 
-# TODO: consider making Arc public and import it here
+from .arc import (
+    Arc,
+)
