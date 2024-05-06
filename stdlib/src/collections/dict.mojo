@@ -669,7 +669,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 found == True,
                 (
                     "Should found the key, otherwise there is something wrong"
-                    " in reversed"
+                    " in reversed or _find_index"
                 ),
             )
             self._set_index(slot, Self.REMOVED)
