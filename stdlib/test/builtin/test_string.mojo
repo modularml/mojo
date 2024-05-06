@@ -578,16 +578,6 @@ fn test_isspace() raises:
 
 
 fn test_ascii_aliases() raises:
-    # alias WHITESPACE = String(" \n\t\r\f\v")
-    # alias ASCII_LOWERCASE = String('abcdefghijklmnopqrstuvwxyz')
-    # alias ASCII_UPPERCASE = String('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-    # alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
-    # alias DIGITS = String('0123456789')
-    # alias HEXDIGITS = String.DIGITS + String('abcdef') + String('ABCDEF')
-    # alias OCTDIGITS = String('01234567')
-    # alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
-    # alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
-
     var whitespaces = String(" \n\t\r\f\v")
     for i in range(len(whitespaces)):
         assert_true(whitespaces[i] in String.WHITESPACE)

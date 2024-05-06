@@ -212,7 +212,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     var found_valid_chars_after_start = False
     var has_space_after_number = False
-    # single underscores are only allowed between DIGITS
+    # single underscores are only allowed between digits
     # starting "was_last_digit_undescore" to true such that
     # if the first digit is an undesrcore an error is raised
     var was_last_digit_undescore = True
