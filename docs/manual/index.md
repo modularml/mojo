@@ -68,6 +68,7 @@ feedback](/mojo/community.html).
 - **Tools**
 
   - [Debugging](/mojo/tools/debugging.html)
+  - [Testing](/mojo/tools/testing.html)
 
 - **Project information**
 
