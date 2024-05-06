@@ -577,6 +577,63 @@ fn test_isspace() raises:
     assert_false(isspace(ord(".")))
 
 
+fn test_ascii_aliases() raises:
+    # alias WHITESPACE = String(" \n\t\r\f\v")
+    # alias ASCII_LOWERCASE = String('abcdefghijklmnopqrstuvwxyz')
+    # alias ASCII_UPPERCASE = String('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+    # alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
+    # alias DIGITS = String('0123456789')
+    # alias HEXDIGITS = String.DIGITS + String('abcdef') + String('ABCDEF')
+    # alias OCTDIGITS = String('01234567')
+    # alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
+    # alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
+
+    var whitespaces = String(" \n\t\r\f\v")
+    for i in range(len(whitespaces)):
+        assert_true(whitespaces[i] in String.WHITESPACE)
+
+    assert_true(String("a") in String.ASCII_LOWERCASE)
+    assert_true(String("b") in String.ASCII_LOWERCASE)
+    assert_true(String("y") in String.ASCII_LOWERCASE)
+    assert_true(String("z") in String.ASCII_LOWERCASE)
+
+    assert_true(String("A") in String.ASCII_UPPERCASE)
+    assert_true(String("B") in String.ASCII_UPPERCASE)
+    assert_true(String("Y") in String.ASCII_UPPERCASE)
+    assert_true(String("Z") in String.ASCII_UPPERCASE)
+
+    assert_true(String("a") in String.ASCII_LETTERS)
+    assert_true(String("b") in String.ASCII_LETTERS)
+    assert_true(String("y") in String.ASCII_LETTERS)
+    assert_true(String("z") in String.ASCII_LETTERS)
+    assert_true(String("A") in String.ASCII_LETTERS)
+    assert_true(String("B") in String.ASCII_LETTERS)
+    assert_true(String("Y") in String.ASCII_LETTERS)
+    assert_true(String("Z") in String.ASCII_LETTERS)
+
+    assert_true(String("0") in String.DIGITS)
+    assert_true(String("9") in String.DIGITS)
+
+    assert_true(String("0") in String.HEXDIGITS)
+    assert_true(String("9") in String.HEXDIGITS)
+    assert_true(String("A") in String.HEXDIGITS)
+    assert_true(String("F") in String.HEXDIGITS)
+
+    assert_true(String("7") in String.OCTDIGITS)
+    assert_false(String("8") in String.OCTDIGITS)
+
+    assert_true(String(",") in String.PUNCTUATION)
+    assert_true(String(".") in String.PUNCTUATION)
+    assert_true(String("\\") in String.PUNCTUATION)
+    assert_true(String("@") in String.PUNCTUATION)
+    assert_true(String('"') in String.PUNCTUATION)
+    assert_true(String("'") in String.PUNCTUATION)
+
+    var text = String("I love my Mom and Dad so much!!!\n")
+    for i in range(len(text)):
+        assert_true(text[i] in String.PRINTABLE)
+
+
 fn test_rstrip() raises:
     # with default rstrip chars
     var empty_string = String("")
@@ -758,6 +815,7 @@ def main():
     # TODO(37393): Re-enable once we debug why we are depending on some debug behavior
     # on graviton.  Showing an error in our O3 LLVM pipeline; could be a bug in LLVM.
     # test_isspace()
+    test_ascii_aliases()
     test_rstrip()
     test_lstrip()
     test_strip()
