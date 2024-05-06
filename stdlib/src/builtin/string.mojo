@@ -420,13 +420,6 @@ fn isspace(c: Int8) -> Bool:
     return c == ord_space or ord_tab <= int(c) <= ord_carriage_return
 
 
-# fn isspace(s: String) -> Bool:
-#     # TODO: docstring
-#     alias spaces: String = " \n\t\r\f\v"
-
-#     return s in spaces
-
-
 # ===----------------------------------------------------------------------===#
 # String
 # ===----------------------------------------------------------------------===#
