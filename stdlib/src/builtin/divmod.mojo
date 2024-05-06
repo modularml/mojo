@@ -12,7 +12,12 @@
 # ===----------------------------------------------------------------------=== #
 
 
-fn divmod(a: Int, b: Int) -> Tuple[Int, Int]:
+trait DivModable:
+    fn __divmod__(self: Self, other: Self) -> Tuple[Self, Self]:
+        ...
+
+
+fn divmod[T: DivModable](a: T, b: T) -> Tuple[T, T]:
     """Performs integer division and returns the quotient and the remainder.
 
     Currently supported only for integers. Support for more standard library types
