@@ -239,7 +239,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         if self._is_small():
             return self._storage.get[_FixedString[Self.SMALL_CAP]]()[].as_ptr()
         else:
-            return self._storage.get[String]()[]._as_ptr()
+            return self._storage.get[String]()[].unsafe_ptr()
 
     fn _strref_dangerous(self) -> StringRef:
         """
@@ -309,7 +309,7 @@ struct _FixedString[CAP: Int](
         self.buffer = _ArrayMem[Int8, CAP]()
         self.size = len(literal)
 
-        memcpy(self.buffer.as_ptr(), literal.data(), len(literal))
+        memcpy(self.buffer.as_ptr(), literal.unsafe_ptr(), len(literal))
 
     # ===------------------------------------------------------------------=== #
     # Trait Interfaces
