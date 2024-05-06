@@ -266,23 +266,3 @@ struct Reference[
         return __mlir_op.`pop.pointer.bitcast`[
             _type = LegacyPointer[type, address_space]._mlir_type
         ](UnsafePointer(self).address)
-
-    @always_inline("nodebug")
-    fn unsafe_bitcast[
-        new_element_type: AnyType = type,
-        /,
-        address_space: AddressSpace = Self.address_space,
-    ](self) -> Reference[new_element_type, is_mutable, lifetime, address_space]:
-        """Cast the reference to one of another element type and AddressSpace,
-        but the same lifetime and mutability.
-
-        Parameters:
-            new_element_type: The result type.
-            address_space: The address space of the result.
-
-        Returns:
-            The new reference.
-        """
-        # We don't have a `lit.ref.cast`` operation, so convert through a KGEN
-        # pointer.
-        return UnsafePointer(self).bitcast[new_element_type, address_space]()[]
