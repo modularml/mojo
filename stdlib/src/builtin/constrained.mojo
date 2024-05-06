@@ -34,6 +34,7 @@ fn constrained[cond: Bool, msg: StringLiteral = "param assertion failed"]():
     ]()
     return
 
+
 @always_inline("nodebug")
 fn unreachable[msg: StringLiteral = "unreachable code"]():
     """Compile time checks for unreachable code.
