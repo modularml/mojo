@@ -92,6 +92,11 @@ what we publish.
 - The `math` module now has `CeilDivable` and `CeilDivableRaising` traits that
   allow users to opt into the `math.ceildiv` function.
 
+- Mojo now allows methods to declare `self` as a `Reference` directly, which
+  can be useful for advanced cases of parametric mutabilty and custom lifetime
+  processing.  Previously it required the use of an internal MLIR type to
+  achieve this.
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no

@@ -114,9 +114,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             A reference to the contained data of the option as a Reference[T].
         """
         debug_assert(self[].__bool__(), ".value() on empty Optional")
-        alias RefType = Reference[T, self.is_mutable, self.lifetime]
-        var ptr = self[]._value._get_ptr[T]().address
-        return __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](ptr)
+        return self[]._value.get[T]()
 
     @always_inline
     fn _value_copy(self) -> T:
