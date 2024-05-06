@@ -53,9 +53,9 @@ fn _set_array_elem[
         array: the array which is captured by reference.
     """
     var ptr = __mlir_op.`pop.array.gep`(
-        array.get_legacy_pointer().address, index.value
+        UnsafePointer(array).address, index.value
     )
-    Pointer(ptr).store(val)
+    UnsafePointer(ptr)[] = val
 
 
 @always_inline
