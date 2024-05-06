@@ -99,15 +99,12 @@ struct Arc[T: Movable](CollectionElement):
 
     # FIXME: This isn't right - the element should be mutable regardless
     # of whether the 'self' type is mutable.
-    fn __refitem__[
-        mutability: __mlir_type.i1,
-        lifetime: AnyLifetime[mutability].type,
-    ](self: Reference[Self, mutability, lifetime]._mlir_type) -> Reference[
-        T, mutability, lifetime
-    ]:
+    fn __refitem__(
+        self: Reference[Self, _, _]
+    ) -> Reference[T, self.is_mutable, self.lifetime]:
         """Returns a Reference to the managed value.
 
         Returns:
             A Reference to the managed value.
         """
-        return Reference(self)[]._inner[].payload
+        return self[]._inner[].payload
