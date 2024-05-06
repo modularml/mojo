@@ -77,14 +77,22 @@ struct Arc[T: Movable](CollectionElement):
         )
 
     fn __copyinit__(inout self, existing: Self):
-        """Copy an existing reference. Increment the refcount to the object."""
+        """Copy an existing reference. Increment the refcount to the object.
+
+        Args:
+            existing: The existing reference.
+        """
         # Order here does not matter since `existing` can't be destroyed until
         # sometime after we return.
         existing._inner[].add_ref()
         self._inner = existing._inner
 
     fn __moveinit__(inout self, owned existing: Self):
-        """Move an existing reference."""
+        """Move an existing reference.
+
+        Args:
+            existing: The existing reference.
+        """
         self._inner = existing._inner
 
     fn __del__(owned self):

@@ -14,7 +14,7 @@
 
 from collections import List
 
-from memory._arc import Arc
+from memory import Arc
 from memory.unsafe_pointer import initialize_pointee_move
 from testing import assert_equal, assert_false, assert_true
 
