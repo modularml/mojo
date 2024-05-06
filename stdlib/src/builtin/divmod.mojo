@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
-trait DivModable:
+trait DivModable(CollectionElement):
     fn __divmod__(self: Self, other: Self) -> Tuple[Self, Self]:
         ...
 
