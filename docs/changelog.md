@@ -18,7 +18,7 @@ what we publish.
 
 ### ⭐️ New
 
-- `Dict` now support `popitem`, which remove and return the last dict item. ([PR #2541](https://github.com/modularml/mojo/pull/2541) by [@jayzhan211](https://github.com/jayzhan211))
+- `Dict` now support `popitem`, which remove and return the last dict item. ([PR #2542](https://github.com/modularml/mojo/pull/2542) by [@jayzhan211](https://github.com/jayzhan211))
 - `int()` can now take a string and a specified base to parse an integer from a
   string: `int("ff", 16)` returns `255`. Additionally, if a base of zero is
   specified, the string will be parsed as if it was an integer literal, with the
