@@ -54,6 +54,25 @@ def test_floor():
     assert_equal(FloatLiteral.__floor__(neg_inf), neg_inf)
 
 
+def test_round():
+    assert_equal(FloatLiteral.__round__(1.5), 2.0)
+    assert_equal(FloatLiteral.__round__(1.4), 1.0)
+    assert_equal(FloatLiteral.__round__(-1.5), -2.0)
+    assert_equal(FloatLiteral.__round__(-3.4), -3.0)
+    assert_equal(FloatLiteral.__round__(3.0), 3.0)
+    assert_equal(FloatLiteral.__round__(0.0), 0.0)
+
+    assert_true(FloatLiteral.__round__(nan).is_nan())
+    assert_true(FloatLiteral.__round__(neg_zero).is_neg_zero())
+    assert_equal(FloatLiteral.__round__(inf), inf)
+    assert_equal(FloatLiteral.__round__(neg_inf), neg_inf)
+
+    assert_equal(FloatLiteral.__round__(1.5, 1), 1.5)
+    assert_equal(FloatLiteral.__round__(1.123, 1), 1.1)
+    assert_equal(FloatLiteral.__round__(1.198, 2), 1.2)
+    assert_equal(FloatLiteral.__round__(1.123, 2), 1.12)
+
+
 fn round10(x: Float64) -> Float64:
     # TODO: implement __div__ on FloatLiteral?
     return (round(Float64(x * 10)) / 10).value
@@ -87,6 +106,21 @@ def test_power():
     # issues with negative numbers raised to fractional powers.
     # assert_almost_equal(FloatLiteral(-4.5) ** 2.5, -42.95673695)
     # assert_almost_equal(FloatLiteral(-4.5) ** -2.5, -0.023279235)
+
+
+def test_mod():
+    assert_equal(FloatLiteral(4.5).__mod__(2), 0.5)
+    assert_equal(FloatLiteral(-4.5).__mod__(2), 1.5)
+    assert_equal(FloatLiteral(6).__mod__(2.5), 1.0)
+
+
+def test_div_mod():
+    pass
+    # TODO: uncomment to test the __divmod__ method when the Tuple objects conforms Testable
+    # So we do not receive this error: argument type 'Tuple[FloatLiteral, FloatLiteral]' does not conform to trait 'Testable'
+    # assert_equal(FloatLiteral(4.5).__divmod__(2.0), (2.0, 0.5))
+    # assert_equal(FloatLiteral(-4.5).__divmod__(2.0), (-3.0, 1.5))
+    # assert_equal(FloatLiteral(6).__divmod__(2.5), (2.0, 1.0))
 
 
 def test_int_conversion():
@@ -138,9 +172,12 @@ def test_abs():
 def main():
     test_ceil()
     test_floor()
+    test_round()
     test_round10()
     test_division()
     test_power()
+    test_mod()
+    test_div_mod()
     test_int_conversion()
     test_boolean_comparable()
     test_equality()

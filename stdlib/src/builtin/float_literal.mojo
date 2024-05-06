@@ -238,7 +238,38 @@ struct FloatLiteral(
             return truncated
         return truncated + 1
 
-    # TODO: implement __round__
+    @always_inline("nodebug")
+    fn __round__(self, ndigits: IntLiteral = 0) -> Self:
+        """Return the rounded value of the FloatLiteral.
+
+        Args:
+            ndigits: The number of digits to round to. Defaults to 0.
+        Returns:
+            The rounded value.
+        """
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
+        alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
+        var multiplier = one
+        for _ in range(ndigits):
+            multiplier = __mlir_op.`kgen.int_literal.binop`[
+                oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
+            ](multiplier, ten)
+        var target: Self = self * Self(multiplier)  # 119.8
+        var truncated: IntLiteral = target.__int_literal__()  # 119.0
+        var result: Self
+        if abs(target) - abs(truncated) < 0.5:
+            result = Self(truncated)
+        elif self > 0:
+            result = Self(truncated + 1)
+        else:
+            result = Self(truncated - 1)
+        if ndigits > 0:
+            result /= Self(multiplier)
+        return result
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
@@ -316,7 +347,33 @@ struct FloatLiteral(
         """
         return self.__truediv__(rhs).__floor__()
 
-    # TODO - maybe __mod__?
+    @always_inline("nodebug")
+    fn __mod__(self, rhs: Self) -> Self:
+        """Return the remainder of self divided by rhs.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            The remainder of dividing self by rhs.
+        """
+        var dividend: Self = self.__floordiv__(rhs)
+        return self - (dividend * rhs)
+
+    @always_inline("nodebug")
+    fn __divmod__(self, rhs: Self) -> Tuple[Self, Self]:
+        """Return a tuple with the dividend and the remainder of self divided by rhs.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            The tuple with the dividend and the remainder
+        """
+        var dividend: Self = self.__floordiv__(rhs)
+        var remainder: Self = self - (dividend * rhs)
+        return Tuple[Self, Self](dividend, remainder)
+
     # TODO - maybe __pow__?
 
     # ===------------------------------------------------------------------===#
