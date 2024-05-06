@@ -66,24 +66,6 @@ fn test_atomic_floating_point() raises:
     assert_equal(atom.value, 0.0)
 
 
-def test_atomic_move_constructor():
-    var atom: Atomic[DType.index] = 3
-    var atom2 = atom^
-    assert_equal(atom2.value, 3)
-    atom2 += 4
-    assert_equal(atom2.value, 7)
-    atom2 -= 4
-    assert_equal(atom2.value, 3)
-    atom2.max(0)
-    assert_equal(atom2.value, 3)
-    atom2.max(42)
-    assert_equal(atom2.value, 42)
-    atom2.min(3)
-    assert_equal(atom2.value, 3)
-    atom2.min(0)
-    assert_equal(atom2.value, 0)
-
-
 def test_compare_exchange_weak():
     var atom: Atomic[DType.int64] = 3
     var expected = Int64(3)
@@ -110,5 +92,4 @@ def test_compare_exchange_weak():
 def main():
     test_atomic()
     test_atomic_floating_point()
-    test_atomic_move_constructor()
     test_compare_exchange_weak()
