@@ -100,11 +100,9 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         self = Self()
 
     @always_inline
-    fn value[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
-        T, mutability, self_life
-    ]:
+    fn value(
+        self: Reference[Self, _, _]
+    ) -> Reference[T, self.is_mutable, self.lifetime]:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
@@ -112,16 +110,12 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         eg. by `if my_option:` or without otherwise knowing that it contains a
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
-        Parameters:
-            mutability: Whether the Optional is mutable.
-            self_life: The Optional's lifetime.
-
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """
-        debug_assert(Reference(self)[].__bool__(), ".value() on empty Optional")
-        alias RefType = Reference[T, mutability, self_life]
-        var ptr = Reference(self)[]._value._get_ptr[T]().address
+        debug_assert(self[].__bool__(), ".value() on empty Optional")
+        alias RefType = Reference[T, self.is_mutable, self.lifetime]
+        var ptr = self[]._value._get_ptr[T]().address
         return __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](ptr)
 
     @always_inline

@@ -77,21 +77,17 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRangeIterator:
 
 
 fn reversed[
-    mutability: __mlir_type.`i1`,
-    self_life: AnyLifetime[mutability].type,
-    T: CollectionElement,
+    T: CollectionElement
 ](
-    value: Reference[List[T], mutability, self_life]._mlir_type,
+    value: Reference[List[T], _, _],
 ) -> _ListIter[
-    T, mutability, self_life, False
+    T, value.is_mutable, value.lifetime, False
 ]:
     """Get a reversed iterator of the input list.
 
     **Note**: iterators are currently non-raising.
 
     Parameters:
-        mutability: Whether the reference to the list is mutable.
-        self_life: The lifetime of the list.
         T: The type of the elements in the list.
 
     Args:
@@ -100,24 +96,22 @@ fn reversed[
     Returns:
         The reversed iterator of the list.
     """
-    return Reference(value)[].__reversed__[mutability, self_life]()
+    return value[].__reversed__()
 
 
 fn reversed[
-    mutability: __mlir_type.`i1`,
-    self_life: AnyLifetime[mutability].type,
     K: KeyElement,
     V: CollectionElement,
 ](
-    value: Reference[Dict[K, V], mutability, self_life]._mlir_type,
-) -> _DictKeyIter[K, V, mutability, self_life, False]:
+    value: Reference[Dict[K, V], _, _],
+) -> _DictKeyIter[
+    K, V, value.is_mutable, value.lifetime, False
+]:
     """Get a reversed iterator of the input dict.
 
     **Note**: iterators are currently non-raising.
 
     Parameters:
-        mutability: Whether the reference to the dict is mutable.
-        self_life: The lifetime of the dict.
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
 
@@ -127,4 +121,4 @@ fn reversed[
     Returns:
         The reversed iterator of the dict.
     """
-    return Reference(value)[].__reversed__[mutability, self_life]()
+    return value[].__reversed__()
