@@ -614,13 +614,13 @@ fn test_ascii_aliases() raises:
     assert_true(String("0") in String.DIGITS)
     assert_true(String("9") in String.DIGITS)
 
-    assert_true(String("0") in String.HEXDIGITS)
-    assert_true(String("9") in String.HEXDIGITS)
-    assert_true(String("A") in String.HEXDIGITS)
-    assert_true(String("F") in String.HEXDIGITS)
+    assert_true(String("0") in String.HEX_DIGITS)
+    assert_true(String("9") in String.HEX_DIGITS)
+    assert_true(String("A") in String.HEX_DIGITS)
+    assert_true(String("F") in String.HEX_DIGITS)
 
-    assert_true(String("7") in String.OCTDIGITS)
-    assert_false(String("8") in String.OCTDIGITS)
+    assert_true(String("7") in String.OCT_DIGITS)
+    assert_false(String("8") in String.OCT_DIGITS)
 
     assert_true(String(",") in String.PUNCTUATION)
     assert_true(String(".") in String.PUNCTUATION)

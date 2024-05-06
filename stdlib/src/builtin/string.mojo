@@ -361,10 +361,10 @@ fn isupper(c: Int8) -> Bool:
     Returns:
         True if the character is uppercase.
     """
-    return _is_ASCII_UPPERCASE(c)
+    return _is_ascii_uppercase(c)
 
 
-fn _is_ASCII_UPPERCASE(c: Int8) -> Bool:
+fn _is_ascii_uppercase(c: Int8) -> Bool:
     alias ord_a = ord("A")
     alias ord_z = ord("Z")
     return ord_a <= int(c) <= ord_z
@@ -386,10 +386,10 @@ fn islower(c: Int8) -> Bool:
     Returns:
         True if the character is lowercase.
     """
-    return _is_ASCII_LOWERCASE(c)
+    return _is_ascii_lowercase(c)
 
 
-fn _is_ASCII_LOWERCASE(c: Int8) -> Bool:
+fn _is_ascii_lowercase(c: Int8) -> Bool:
     alias ord_a = ord("a")
     alias ord_z = ord("z")
     return ord_a <= int(c) <= ord_z
@@ -444,8 +444,8 @@ struct String(
     alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
     alias DIGITS = String("0123456789")
-    alias HEXDIGITS = String.DIGITS + String("abcdef") + String("ABCDEF")
-    alias OCTDIGITS = String("01234567")
+    alias HEX_DIGITS = String.DIGITS + String("abcdef") + String("ABCDEF")
+    alias OCT_DIGITS = String("01234567")
     alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
     alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
 
@@ -1296,7 +1296,7 @@ struct String(
         # TODO(#26444):
         # Support the Unicode standard casing behavior to handle cased letters
         # outside of the standard ASCII letters.
-        return self._toggle_ascii_case[_is_ASCII_UPPERCASE]()
+        return self._toggle_ascii_case[_is_ascii_uppercase]()
 
     fn upper(self) -> String:
         """Returns a copy of the string with all ASCII cased characters
@@ -1309,7 +1309,7 @@ struct String(
         # TODO(#26444):
         # Support the Unicode standard casing behavior to handle cased letters
         # outside of the standard ASCII letters.
-        return self._toggle_ascii_case[_is_ASCII_LOWERCASE]()
+        return self._toggle_ascii_case[_is_ascii_lowercase]()
 
     @always_inline
     fn _toggle_ascii_case[check_case: fn (Int8) -> Bool](self) -> String:
@@ -1467,7 +1467,7 @@ fn _toggle_ascii_case(char: Int8) -> Int8:
 
 fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
     # See https://commaok.xyz/post/lookup_tables/ and
-    # https://lemire.me/blog/2021/06/03/computing-the-number-of-DIGITS-of-an-integer-even-faster/
+    # https://lemire.me/blog/2021/06/03/computing-the-number-of-digits-of-an-integer-even-faster/
     # for a description.
     alias lookup_table = VariadicList[Int](
         4294967296,
