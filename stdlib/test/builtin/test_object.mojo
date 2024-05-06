@@ -146,7 +146,7 @@ def test_arithmetic_ops_div():
     assert_true(5 // object(2) == 2)
 
 
-def test_object_shift():
+def test_object_bitwise():
     a = object(1)
     b = object(2)
     assert_true(a << b == 4)
@@ -155,10 +155,29 @@ def test_object_shift():
     b <<= a
     assert_true(b == 4)
     b >>= a
-    assert_true(b == 1)
+    assert_true(b == 2)
 
     assert_true(2 << object(1) == 4)
     assert_true(2 >> object(1) == 1)
+
+    assert_true(object(15) & object(7) == 7)
+    assert_true(object(15) | object(7) == 15)
+    assert_true(object(15) ^ object(7) == 8)
+
+    a = object(15)
+    b = object(7)
+    a &= b
+    assert_true(a == 7)
+    a = object(15)
+    a |= b
+    assert_true(a == 15)
+    a = object(15)
+    a ^= b
+    assert_true(a == 8)
+
+    assert_true(15 & object(7) == 7)
+    assert_true(15 | object(7) == 15)
+    assert_true(15 ^ object(7) == 8)
 
 
 def test_function(borrowed lhs, borrowed rhs) -> object:
@@ -296,6 +315,7 @@ def main():
     test_comparison_ops()
     test_arithmetic_ops()
     test_arithmetic_ops_div()
+    test_object_bitwise()
     test_object_function()
     test_non_object_getattr()
     test_matrix()

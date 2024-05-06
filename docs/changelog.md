@@ -97,6 +97,9 @@ what we publish.
   processing.  Previously it required the use of an internal MLIR type to
   achieve this.
 
+- `object` now implements all the bitwise operators.
+    ([PR #2324](https://github.com/modularml/mojo/pull/2324) by [@LJ-9801](https://github.com/LJ-9801))
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
