@@ -33,3 +33,15 @@ fn constrained[cond: Bool, msg: StringLiteral = "param assertion failed"]():
         cond = cond.__mlir_i1__(), message = msg.value
     ]()
     return
+
+@always_inline("nodebug")
+fn unreachable[msg: StringLiteral = "unreachable code"]():
+    """Compile time checks for unreachable code.
+
+    Parameters:
+        msg: The message to display on failure.
+    """
+    __mlir_op.`kgen.param.assert`[
+        cond = __mlir_attr.`0: i1`, message = msg.value
+    ]()
+    return
