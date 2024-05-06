@@ -671,3 +671,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             if elem[] == value:
                 count += 1
         return count
+
+    @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[T]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The UnsafePointer to the underlying memory.
+        """
+        return self.data

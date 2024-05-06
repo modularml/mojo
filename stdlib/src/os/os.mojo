@@ -111,7 +111,7 @@ struct _DirHandle:
             raise "the directory '" + path + "' does not exist"
 
         self._handle = external_call["opendir", UnsafePointer[NoneType]](
-            path._as_ptr()
+            path.unsafe_ptr()
         )
 
         if not self._handle:
@@ -277,12 +277,12 @@ fn remove(path: String) raises:
       path: The path to the file.
 
     """
-    var error = external_call["unlink", Int](path._as_ptr())
+    var error = external_call["unlink", Int](path.unsafe_ptr())
 
     if error != 0:
         # TODO get error message, the following code prints it
         # var error_str = String("Something went wrong")
-        # _ = external_call["perror", UnsafePointer[NoneType]](error_str._as_ptr())
+        # _ = external_call["perror", UnsafePointer[NoneType]](error_str.unsafe_ptr())
         # _ = error_str
         raise Error("Can not remove file: " + path)
 

@@ -116,3 +116,11 @@ struct Arc[T: Movable](CollectionElement):
             A Reference to the managed value.
         """
         return self[]._inner[].payload
+
+    fn as_ptr(self) -> UnsafePointer[T]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The UnsafePointer to the underlying memory.
+        """
+        return UnsafePointer.address_of(self._inner[].payload)
