@@ -341,7 +341,9 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[Int8](buf, size=int(size_copy), capacity=int(size_copy))
+        var list = List[Int8](
+            unsafe_pointer=buf, size=int(size_copy), capacity=int(size_copy)
+        )
 
         return list
 
