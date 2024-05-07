@@ -341,4 +341,4 @@ library, test your changes, and raise a PR.
 
 If you're still having troubles make sure to reach out on
 [GitHub](https://github.com/modularml/mojo/discussions/new?category=general) or
-[Discord](modul.ar/discord)!
+[Discord](https://modul.ar/discord)!

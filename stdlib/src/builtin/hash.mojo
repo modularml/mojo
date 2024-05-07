@@ -16,7 +16,7 @@ There are a few main tools in this module:
 
 - `Hashable` trait for types implementing `__hash__(self) -> Int`
 - `hash[T: Hashable](hashable: T) -> Int` built-in function.
-- A `hash()` implementation for abritrary byte strings,
+- A `hash()` implementation for arbitrary byte strings,
   `hash(data: DTypePointer[DType.int8], n: Int) -> Int`,
   is the workhorse function, which implements efficient hashing via SIMD
   vectors. See the documentation of this function for more details on the hash
