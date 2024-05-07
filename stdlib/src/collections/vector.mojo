@@ -19,7 +19,7 @@ from collections.vector import InlinedFixedVector
 ```
 """
 
-from memory import Pointer, Reference
+from memory import UnsafePointer, Reference
 
 from utils import StaticTuple
 
@@ -31,14 +31,14 @@ from utils import StaticTuple
 @value
 struct _VecIter[
     type: AnyRegType,
-    vec_type: AnyRegType,
-    deref: fn (Pointer[vec_type], Int) -> type,
+    vec_type: AnyType,
+    deref: fn (UnsafePointer[vec_type], Int) -> type,
 ](Sized):
     """Iterator for any random-access container"""
 
     var i: Int
     var size: Int
-    var vec: Pointer[vec_type]
+    var vec: UnsafePointer[vec_type]
 
     fn __next__(inout self) -> type:
         self.i += 1
@@ -100,7 +100,7 @@ struct InlinedFixedVector[
     alias static_data_type = StaticTuple[type, size]
     var static_data: Self.static_data_type
     """The underlying static storage, used for small vectors."""
-    var dynamic_data: Pointer[type]
+    var dynamic_data: UnsafePointer[type]
     """The underlying dynamic storage, used to grow large vectors."""
     var current_size: Int
     """The number of elements in the vector."""
@@ -117,9 +117,9 @@ struct InlinedFixedVector[
             capacity: The requested maximum capacity of the vector.
         """
         self.static_data = Self.static_data_type()  # Undef initialization
-        self.dynamic_data = Pointer[type]()
+        self.dynamic_data = UnsafePointer[type]()
         if capacity > Self.static_size:
-            self.dynamic_data = Pointer[type].alloc(capacity - size)
+            self.dynamic_data = UnsafePointer[type].alloc(capacity - size)
         self.current_size = 0
         self.capacity = capacity
 
@@ -231,7 +231,7 @@ struct InlinedFixedVector[
         self.current_size = 0
 
     @staticmethod
-    fn _deref_iter_impl(selfptr: Pointer[Self], i: Int) -> type:
+    fn _deref_iter_impl(selfptr: UnsafePointer[Self], i: Int, /) -> type:
         return selfptr[][i]
 
     alias _iterator = _VecIter[type, Self, Self._deref_iter_impl]
@@ -243,5 +243,5 @@ struct InlinedFixedVector[
             An iterator to the start of the vector.
         """
         return Self._iterator(
-            0, self.current_size, Reference(self).get_legacy_pointer()
+            0, self.current_size, UnsafePointer(Reference(self))
         )
