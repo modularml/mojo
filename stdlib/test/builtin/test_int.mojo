@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal
 from sys.info import bitwidthof
+
+from testing import assert_equal
 
 
 def test_constructors():
@@ -48,6 +49,24 @@ def test_pow():
     assert_equal(81, Int(3) ** Int(4))
 
 
+def test_ceil():
+    assert_equal(Int.__ceil__(Int(5)), 5)
+    assert_equal(Int.__ceil__(Int(0)), 0)
+    assert_equal(Int.__ceil__(Int(-5)), -5)
+
+
+def test_floor():
+    assert_equal(Int.__floor__(Int(5)), 5)
+    assert_equal(Int.__floor__(Int(0)), 0)
+    assert_equal(Int.__floor__(Int(-5)), -5)
+
+
+def test_round():
+    assert_equal(Int.__round__(Int(5)), 5)
+    assert_equal(Int.__round__(Int(0)), 0)
+    assert_equal(Int.__round__(Int(-5)), -5)
+
+
 def test_floordiv():
     assert_equal(1, Int(2) // Int(2))
     assert_equal(0, Int(2) // Int(3))
@@ -68,6 +87,28 @@ def test_mod():
     assert_equal(1, Int(-3) % Int(2))
 
 
+def test_abs():
+    assert_equal(abs(Int(-5)), 5)
+    assert_equal(abs(Int(2)), 2)
+    assert_equal(abs(Int(0)), 0)
+
+
+def test_string_conversion():
+    assert_equal(str(Int(3)), "3")
+    assert_equal(str(Int(-3)), "-3")
+    assert_equal(str(Int(0)), "0")
+    assert_equal(str(Int(100)), "100")
+    assert_equal(str(Int(-100)), "-100")
+
+
+def test_int_representation():
+    assert_equal(repr(Int(3)), "3")
+    assert_equal(repr(Int(-3)), "-3")
+    assert_equal(repr(Int(0)), "0")
+    assert_equal(repr(Int(100)), "100")
+    assert_equal(repr(Int(-100)), "-100")
+
+
 def main():
     test_constructors()
     test_properties()
@@ -75,5 +116,11 @@ def main():
     test_sub()
     test_div()
     test_pow()
+    test_ceil()
+    test_floor()
+    test_round()
     test_floordiv()
     test_mod()
+    test_abs()
+    test_string_conversion()
+    test_int_representation()

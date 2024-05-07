@@ -14,6 +14,7 @@
 
 from os.path import isfile
 from pathlib import Path
+from builtin._location import __source_location
 
 from testing import assert_true, assert_false
 

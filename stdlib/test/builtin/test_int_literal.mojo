@@ -15,21 +15,39 @@
 from testing import assert_equal
 
 
-fn test_int() raises:
+def test_int():
     assert_equal(3, 3)
     assert_equal(3 + 3, 6)
     assert_equal(4 - 1, 3)
     assert_equal(6 - 1, 5)
 
 
-fn test_floordiv() raises:
+def test_ceil():
+    assert_equal(IntLiteral.__ceil__(5), 5)
+    assert_equal(IntLiteral.__ceil__(0), 0)
+    assert_equal(IntLiteral.__ceil__(-5), -5)
+
+
+def test_floor():
+    assert_equal(IntLiteral.__floor__(5), 5)
+    assert_equal(IntLiteral.__floor__(0), 0)
+    assert_equal(IntLiteral.__floor__(-5), -5)
+
+
+def test_round():
+    assert_equal(IntLiteral.__round__(5), 5)
+    assert_equal(IntLiteral.__round__(0), 0)
+    assert_equal(IntLiteral.__round__(-5), -5)
+
+
+def test_floordiv():
     assert_equal(2 // 2, 1)
     assert_equal(2 // 3, 0)
     assert_equal(2 // -2, -1)
     assert_equal(99 // -2, -50)
 
 
-fn test_mod() raises:
+def test_mod():
     assert_equal(99 % 1, 0)
     assert_equal(99 % 3, 0)
     assert_equal(99 % -2, -1)
@@ -41,15 +59,25 @@ fn test_mod() raises:
     assert_equal(-3 % 2, 1)
 
 
-fn test_bit_width() raises:
+def test_bit_width():
     assert_equal((0)._bit_width(), 1)
     assert_equal((-1)._bit_width(), 1)
     assert_equal((255)._bit_width(), 9)
     assert_equal((-256)._bit_width(), 9)
 
 
+def test_abs():
+    assert_equal(abs(-5), 5)
+    assert_equal(abs(2), 2)
+    assert_equal(abs(0), 0)
+
+
 def main():
     test_int()
+    test_ceil()
+    test_floor()
+    test_round()
     test_floordiv()
     test_mod()
     test_bit_width()
+    test_abs()

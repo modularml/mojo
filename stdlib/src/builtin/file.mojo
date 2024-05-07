@@ -189,7 +189,7 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
 
         var buf = external_call[
-            "KGEN_CompilerRT_IO_FileRead", UnsafePointer[Int8]
+            "KGEN_CompilerRT_IO_FileRead", UnsafePointer[UInt8]
         ](
             self.handle,
             UnsafePointer.address_of(size_copy),
@@ -251,6 +251,10 @@ struct FileHandle:
         var eleventh_element = ptr2[0]
         var twelvth_element = ptr2[1]
         print(eleventh_element, twelvth_element)
+
+        # Free the memory
+        ptr.free()
+        ptr2.free()
         ```
         .
         """

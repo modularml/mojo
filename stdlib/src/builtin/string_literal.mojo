@@ -51,16 +51,13 @@ struct StringLiteral(
     """The underlying storage for the string literal."""
 
     @always_inline("nodebug")
-    fn __init__(value: Self.type) -> Self:
+    fn __init__(inout self, value: Self.type):
         """Create a string literal from a builtin string type.
 
         Args:
             value: The string value.
-
-        Returns:
-            A string literal object.
         """
-        return StringLiteral {value: value}
+        self.value = value
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:

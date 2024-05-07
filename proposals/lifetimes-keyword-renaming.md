@@ -9,9 +9,15 @@ the current Mojo keyword paint:
 
 ## `borrowed` Keyword => `borrow` or `ref`
 
-`borrowed` as a keyword doesn’t really make sense in our new world.  This is currently used to indicate an argument that is a borrowed version of an existing value.  Given the introduction of lifetimes, these things can now appear in arbitrary places (e.g. you can have an array of references) so it makes sense to use a noun.
+`borrowed` as a keyword doesn’t really make sense in our new world.  This is
+currently used to indicate an argument that is a borrowed version of an existing
+value.  Given the introduction of lifetimes, these things can now appear in
+arbitrary places (e.g. you can have an array of references) so it makes sense to
+use a noun.
 
-Instead of reading an argument as “this function takes foo which is a borrowed string”, we would read it as “foo is a borrow/ref of a string”.  This makes it consistent with local borrows on the stack:
+Instead of reading an argument as “this function takes foo which is a borrowed
+string”, we would read it as “foo is a borrow/ref of a string”.  This makes it
+consistent with local borrows on the stack:
 
 ```mojo
 fn do_stuff[a: Lifetime](x: ref[a] String): ...
@@ -54,7 +60,10 @@ Given this possible direction and layering, I think we should go with something
 like this:
 
 1. `ref`: immutable reference, this is spelled “`borrowed`” today
-2. `mutref`: mutable reference, this is spelled “`inout`” today. I’d love a better keyword suggestion than `mutref`, perhaps just `mut`?
+
+2. `mutref`: mutable reference, this is spelled “`inout`” today. I’d love a
+better keyword suggestion than `mutref`, perhaps just `mut`?
+
 3. `inout`: abstracted computed mutable reference with getter/setter.
 
 `inout` can decay to `mutref` and `ref` in an argument position with writeback,
@@ -62,7 +71,10 @@ and `mutref` is a subtype of `ref` generally.
 
 ## `owned` Keyword => `var`
 
-People on the forums have pointed out that the “`owned`” keyword in argument lists is very analogous to the `var` keyword.  It defines a new, whole, value and it is mutable just like `var`.  Switching to `var` eliminates a concept and reduces the number of keywords we are introducing.
+People on the forums have pointed out that the “`owned`” keyword in argument
+lists is very analogous to the `var` keyword.  It defines a new, whole, value
+and it is mutable just like `var`.  Switching to `var` eliminates a concept and
+reduces the number of keywords we are introducing.
 
 ## Allow `let` in argument lists ... or remove them entirely (!)
 
@@ -97,9 +109,11 @@ only do so after the whole lifetime system is up and working.  This will give us
 more information about how things feel in practice and whether they are worth
 the complexity.
 
-## More alternatives to consider:
+## More alternatives to consider
 
-[@sa- suggests](https://github.com/modularml/mojo/discussions/338#discussioncomment-6104926) the keyword `fix` instead of `let`.
+[@sa-
+suggests](https://github.com/modularml/mojo/discussions/338#discussioncomment-6104926)
+the keyword `fix` instead of `let`.
 
 [@mojodojodev suggests](https://github.com/modularml/mojo/discussions/338#discussioncomment-6105688):
 
@@ -109,20 +123,25 @@ the complexity.
 `var[a]` - mutable owned
 
 Having three letters for all of the keywords will allow the user to understand
-"this is related to ownership and mutability". The problem with the proposed removing let is that code ported from Python to Mojo won't behave the same, keeping let and var is advantageous in that it says this is a Mojo variable so you can add all the weird Python dynamic behavior when the keyword is elided.
+"this is related to ownership and mutability". The problem with the proposed
+removing let is that code ported from Python to Mojo won't behave the same,
+keeping let and var is advantageous in that it says this is a Mojo variable so
+you can add all the weird Python dynamic behavior when the keyword is elided.
 
-[@mzaks suggests](https://github.com/modularml/mojo/discussions/338#discussioncomment-6134220) using numbers to identify lifetimes, e.g.:
+[@mzaks
+suggests](https://github.com/modularml/mojo/discussions/338#discussioncomment-6134220)
+using numbers to identify lifetimes, e.g.:
 
-```
+```mojo
 fn example['1_life](cond: Bool,
                     x: borrowed'1 String,
                     y: borrowed'1 String):
-    # Late initialized local borrow with explicit lifetime
-    borrowed'1 str_ref : String
+   # Late initialized local borrow with explicit lifetime
+   borrowed'1 str_ref : String
 
-    if cond:
-        str_ref = x
-    else:
-      	str_ref = y
-    print(str_ref)
+   if cond:
+      str_ref = x
+   else:
+      str_ref = y
+   print(str_ref)
 ```
