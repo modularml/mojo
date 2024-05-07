@@ -135,7 +135,7 @@ struct FloatLiteral(
         Returns:
             A string representation.
         """
-        return self
+        return str(self)
 
     @always_inline("nodebug")
     fn __int_literal__(self) -> IntLiteral:
