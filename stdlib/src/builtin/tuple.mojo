@@ -79,7 +79,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             # pack. For now just keep everything simple and copy the element.
             initialize_pointee_copy(
                 UnsafePointer(self[idx]),
-                storage.get_element[idx]()[],
+                storage[idx],
             )
 
         unroll[initialize_elt, Self.__len__()]()
