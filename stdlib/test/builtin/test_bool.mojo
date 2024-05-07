@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from testing import assert_equal, assert_true
+from testing import assert_equal, assert_true, assert_false
 
 
 def test_bool_cast_to_int():
@@ -49,8 +49,55 @@ def test_bool_to_string():
     assert_equal(str(False), "False")
 
 
+def test_bitwise():
+    var value: Bool
+
+    # and
+    value = False
+    value &= False
+    assert_false(value)
+    value = False
+    value &= True
+    assert_false(value)
+    value = True
+    value &= False
+    assert_false(value)
+    value = True
+    value &= True
+    assert_true(value)
+
+    # or
+    value = False
+    value |= False
+    assert_false(value)
+    value = False
+    value |= True
+    assert_true(value)
+    value = True
+    value |= False
+    assert_true(value)
+    value = True
+    value |= True
+    assert_true(value)
+
+    # xor
+    value = False
+    value ^= False
+    assert_false(value)
+    value = False
+    value ^= True
+    assert_true(value)
+    value = True
+    value ^= False
+    assert_true(value)
+    value = True
+    value ^= True
+    assert_false(value)
+
+
 def main():
     test_bool_cast_to_int()
     test_bool_none()
     test_convert_from_boolable()
     test_bool_to_string()
+    test_bitwise()

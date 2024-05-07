@@ -18,6 +18,11 @@ These are Mojo built-ins, so you don't need to import them.
 from utils._visualizers import lldb_formatter_wrapping_type
 
 
+# ===----------------------------------------------------------------------=== #
+#  Boolable
+# ===----------------------------------------------------------------------=== #
+
+
 trait Boolable:
     """The `Boolable` trait describes a type that can be converted to a bool.
 
@@ -41,6 +46,11 @@ trait Boolable:
             The boolean representation of the value.
         """
         ...
+
+
+# ===----------------------------------------------------------------------=== #
+#  Bool
+# ===----------------------------------------------------------------------=== #
 
 
 @lldb_formatter_wrapping_type
@@ -117,6 +127,19 @@ struct Bool(
         return "True" if self else "False"
 
     @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Convert this Bool to an integer.
+
+        Returns:
+            1 if the Bool is True, 0 otherwise.
+        """
+        return Int(
+            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
+                self.value
+            )
+        )
+
+    @always_inline("nodebug")
     fn __eq__(self, rhs: Bool) -> Bool:
         """Compare this Bool to RHS.
 
@@ -151,50 +174,9 @@ struct Bool(
             self.value, rhs.value
         )
 
-    @always_inline("nodebug")
-    fn __and__(self, rhs: Bool) -> Bool:
-        """Compute `self & rhs`.
-
-        Bitwise and's the Bool value with the argument. This method gets invoked
-        when a user uses the `and` infix operator.
-
-        Args:
-            rhs: The rhs value of the and statement.
-
-        Returns:
-            `self & rhs`.
-        """
-        return __mlir_op.`pop.and`(self.value, rhs.value)
-
-    @always_inline("nodebug")
-    fn __or__(self, rhs: Bool) -> Bool:
-        """Compute `self | rhs`.
-
-        Bitwise or's the Bool value with the argument. This method gets invoked
-        when a user uses the `or` infix operator.
-
-        Args:
-            rhs: The rhs value of the or statement.
-
-        Returns:
-            `self | rhs`.
-        """
-        return __mlir_op.`pop.or`(self.value, rhs.value)
-
-    @always_inline("nodebug")
-    fn __xor__(self, rhs: Bool) -> Bool:
-        """Compute `self ^ rhs`.
-
-        Bitwise Xor's the Bool value with the argument. This method gets invoked
-        when a user uses the `^` infix operator.
-
-        Args:
-            rhs: The rhs value of the xor statement.
-
-        Returns:
-            `self ^ rhs`.
-        """
-        return __mlir_op.`pop.xor`(self.value, rhs.value)
+    # ===-------------------------------------------------------------------===#
+    # Bitwise operations
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __invert__(self) -> Bool:
@@ -210,53 +192,117 @@ struct Bool(
         return __mlir_op.`pop.xor`(self.value, true)
 
     @always_inline("nodebug")
-    fn __rand__(self, value: Bool) -> Bool:
-        """Return `value & self`.
+    fn __and__(self, rhs: Bool) -> Bool:
+        """Returns `self & rhs`.
+
+        Bitwise and's the Bool value with the argument. This method gets invoked
+        when a user uses the `and` infix operator.
 
         Args:
-            value: The other value.
+            rhs: The right hand side of the `and` statement.
 
         Returns:
-            `value & self`.
+            `self & rhs`.
         """
-        return value & self
+        return __mlir_op.`pop.and`(self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __ror__(self, value: Bool) -> Bool:
-        """Return `value | self`.
+    fn __iand__(inout self, rhs: Bool):
+        """Computes `self & rhs` and store the result in `self`.
 
         Args:
-            value: The other value.
-
-        Returns:
-            `value | self`.
+            rhs: The right hand side of the `and` statement.
         """
-        return value | self
+        self = self & rhs
 
     @always_inline("nodebug")
-    fn __rxor__(self, value: Bool) -> Bool:
-        """Return `value ^ self`.
+    fn __rand__(self, lhs: Bool) -> Bool:
+        """Returns `lhs & self`.
 
         Args:
-            value: The other value.
+            lhs: The left hand side of the `and` statement.
 
         Returns:
-            `value ^ self`.
+            `lhs & self`.
         """
-        return value ^ self
+        return lhs & self
 
     @always_inline("nodebug")
-    fn __int__(self) -> Int:
-        """Convert this Bool to an integer.
+    fn __or__(self, rhs: Bool) -> Bool:
+        """Returns `self | rhs`.
+
+        Bitwise or's the Bool value with the argument. This method gets invoked
+        when a user uses the `or` infix operator.
+
+        Args:
+            rhs: The right hand side of the `or` statement.
 
         Returns:
-            1 if the Bool is True, 0 otherwise.
+            `self | rhs`.
         """
-        return Int(
-            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-                self.value
-            )
-        )
+        return __mlir_op.`pop.or`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __ior__(inout self, rhs: Bool):
+        """Computes `self | rhs` and store the result in `self`.
+
+        Args:
+            rhs: The right hand side of the `or` statement.
+        """
+        self = self | rhs
+
+    @always_inline("nodebug")
+    fn __ror__(self, lhs: Bool) -> Bool:
+        """Returns `lhs | self`.
+
+        Args:
+            lhs: The left hand side of the `or` statement.
+
+        Returns:
+            `lhs | self`.
+        """
+        return lhs | self
+
+    @always_inline("nodebug")
+    fn __xor__(self, rhs: Bool) -> Bool:
+        """Returns `self ^ rhs`.
+
+        Bitwise Xor's the Bool value with the argument. This method gets invoked
+        when a user uses the `^` infix operator.
+
+        Args:
+            rhs: The right hand side of the `xor` statement.
+
+        Returns:
+            `self ^ rhs`.
+        """
+        return __mlir_op.`pop.xor`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __ixor__(inout self, rhs: Bool):
+        """Computes `self ^ rhs` and stores the result in `self`.
+
+        Args:
+            rhs: The right hand side of the `xor` statement.
+        """
+        self = self ^ rhs
+
+    @always_inline("nodebug")
+    fn __rxor__(self, lhs: Bool) -> Bool:
+        """Returns `lhs ^ self`.
+
+        Args:
+            lhs: The left hand side of the `xor` statement.
+
+        Returns:
+            `lhs ^ self`.
+        """
+        return lhs ^ self
+
+
+# ===----------------------------------------------------------------------=== #
+#  bool
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
