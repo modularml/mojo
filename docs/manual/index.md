@@ -24,8 +24,8 @@ feedback](/mojo/community.html).
 
 - **Get started**
 
-  - [Get started with Mojo](/mojo/manual/get-started/index.html)
-  - [Hello World!](/mojo/manual/get-started/hello-world.html)
+  - [Why Mojo](/mojo/manual/why-mojo)
+  - [Get started with Mojo](/mojo/manual/get-started)
 
 - **Language basics**
 
