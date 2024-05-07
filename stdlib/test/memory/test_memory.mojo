@@ -36,7 +36,6 @@ struct Pair:
 
 
 def test_memcpy():
-    print("== test_memcpy")
     var pair1 = Pair(1, 2)
     var pair2 = Pair(0, 0)
 
@@ -89,7 +88,6 @@ def test_memcpy():
 
 
 def test_memcpy_dtype():
-    print("== test_memcpy_dtype")
     var a = DTypePointer[DType.int32].alloc(4)
     var b = DTypePointer[DType.int32].alloc(4)
     for i in range(4):
@@ -113,7 +111,6 @@ def test_memcpy_dtype():
 
 
 def test_memcmp():
-    print("== test_memcmp")
     var pair1 = Pair(1, 2)
     var pair2 = Pair(1, 2)
 
@@ -235,7 +232,6 @@ def test_memcmp_extensive():
 
 
 def test_memset():
-    print("== test_memset")
     var pair = Pair(1, 2)
 
     var ptr = Pointer.address_of(pair)

@@ -608,7 +608,7 @@ fn test_upper() raises:
 
 
 fn test_isspace() raises:
-    print("checking true cases")
+    # checking true cases
     assert_true(isspace(ord(" ")))
     assert_true(isspace(ord("\n")))
     assert_true(isspace(ord("\t")))
@@ -616,7 +616,7 @@ fn test_isspace() raises:
     assert_true(isspace(ord("\v")))
     assert_true(isspace(ord("\f")))
 
-    print("Checking false cases")
+    # Checking false cases
     assert_false(isspace(ord("a")))
     assert_false(isspace(ord("u")))
     assert_false(isspace(ord("s")))
@@ -662,7 +662,6 @@ fn test_lstrip() raises:
 
 
 fn test_strip() raises:
-    print("start strip")
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
 
