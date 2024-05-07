@@ -3,11 +3,6 @@ title: Mojo🔥 community
 sidebar_label: Community
 description: Resources to share feedback, report issues, and chat.
 hide_table_of_contents: true
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 ---
 
 

@@ -2,11 +2,6 @@
 title: Mojo🔥 FAQ
 sidebar_label: FAQ
 description: Answers to questions we expect about Mojo.
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 ---
 
 We tried to anticipate your questions about Mojo on this page. If this page

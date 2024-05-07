@@ -3,11 +3,6 @@ title: Mojo🔥 notebooks
 sidebar_label: Overview
 hide_table_of_contents: true
 description: All the Jupyter notebooks we've created for the Mojo Playground.
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 anchor-sections: false
 listing:
   - id: docs

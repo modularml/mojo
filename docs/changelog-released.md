@@ -3,11 +3,6 @@ title: Mojo🔥 changelog
 sidebar_label: Changelog
 description: A history of significant Mojo changes.
 toc_max_heading_level: 2
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 ---
 
 This is a running list of significant changes for the Mojo language and tools.
