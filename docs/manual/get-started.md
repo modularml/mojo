@@ -1,34 +1,31 @@
 ---
-title: Hello, world!
-sidebar_position: 2
-description: Learn to run your first Mojo program.
-css: /static/styles/page-navigation.css
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
+title: Get started with Mojo🔥
+sidebar_label: Get started
+description: Install Mojo now and start developing
 ---
 
-After you [install the MAX SDK](/engine/get-started) or
-[Mojo SDK](/mojo/manual/get-started/) or  you can use the
-[Mojo CLI](/mojo/cli/) to build and run Mojo programs. So let's create the
-classic starter program that prints "Hello, world!", in three different ways.
+On this page, we'll show you how to create the classic "Hello world" starter
+program with Mojo, in three different ways. If you'd rather read how to write
+Mojo code beyond just printing text, see the [introduction to
+Mojo](/mojo/manual/basics).
 
-## Before you start
+:::tip Updating?
 
-Before you start, make sure the `MODULAR_HOME` and `PATH` environment variables
-are set, as described in the install procedure, so you can run the `mojo`
-command:
+If you already installed Mojo, see the [update guide](/max/update).
 
-```text
-mojo --version
-```
+:::
 
-If you have other issues during install, check our [known
-issues](/mojo/roadmap.html#mojo-sdk-known-issues).
+## 1. Install Mojo
 
-## 1. Run code in the REPL
+Mojo is now bundled with MAX, which provides everything to compile,
+run, debug, and package Mojo code ([read
+why](/engine/faq#why-bundle-mojo-with-max)).
+
+To install Mojo, [see the MAX install guide](/max/install).
+
+## 2. Run code in the REPL
+
+Now that you've installed Mojo, let's write some code!
 
 First, let's use the Mojo
 [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop),
@@ -63,7 +60,7 @@ The REPL is primarily useful for short experiments because the code isn't
 saved. So when you want to write a real program, you need to write the code in
 a `.mojo` source file.
 
-## 2. Run a Mojo file
+## 3. Run a Mojo file
 
 Now let's write the code in a Mojo source file and run it with the
 [`mojo`](/mojo/cli/) command:
@@ -93,11 +90,11 @@ If this didn't work for you, double-check your code looks exactly like the code
 in step 1, and make sure you correctly [installed
 Mojo](/mojo/manual/get-started/#install-mojo).
 
-## 3. Build an executable binary
+## 4. Build an executable binary
 
 Finally, let's build and run that same code as an executable:
 
-1. Create an executable file with the [`build`](/mojo/cli/build.html) command:
+1. Create an executable file with the [`build`](/mojo/cli/build) command:
 
     ```sh
     mojo build hello.mojo
@@ -115,10 +112,19 @@ Finally, let's build and run that same code as an executable:
 This creates a statically compiled binary file, so it contains all the code and
 libraries it needs to run.
 
+## 5. Install our VS Code extension (optional)
+
+To provide a first-class developer experience with features like code
+completion, quick fixes, and hover help, we've created a [Mojo extension for
+Visual Studio
+Code](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo).
+
+![](./images/mojo-vscode.png)
+
 ## Next steps
 
-- If you're new to Mojo, we suggest you continue to the next section about
-  [language basics](/mojo/manual/basics.html).
+- If you're new to Mojo, we suggest you learn the language basics in the
+  [introduction to Mojo](/mojo/manual/basics).
 
 - If you want to experiment with some code, clone [the Mojo
 repo](https://github.com/modularml/mojo/) to try our code examples:
@@ -132,4 +138,15 @@ repo](https://github.com/modularml/mojo/) to try our code examples:
   that teach advanced Mojo features.
 
 - To see all the available Mojo APIs, check out the [Mojo standard library
-  reference](/mojo/lib.html).
+  reference](/mojo/lib).
+
+If you have issues during install, check our [known
+issues](/mojo/roadmap#mojo-sdk-known-issues).
+
+:::note
+
+To help us improve Mojo, we collect some basic system information and
+crash reports. [Learn
+more](/mojo/faq#does-the-mojo-sdk-collect-telemetry).
+
+:::
