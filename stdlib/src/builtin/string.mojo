@@ -511,7 +511,9 @@ struct String(
         var length = len(impl)
         var capacity = impl.capacity
         self._buffer = List[Int8](
-            impl.steal_data().bitcast[Int8](), size=length, capacity=capacity
+            unsafe_pointer=impl.steal_data().bitcast[Int8](),
+            size=length,
+            capacity=capacity,
         )
 
     @always_inline
@@ -574,7 +576,9 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(Self._buffer_type(ptr, size=len, capacity=len))
+        self._buffer = Self._buffer_type(
+            unsafe_pointer=ptr, size=len, capacity=len
+        )
 
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
@@ -589,8 +593,8 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(
-            Self._buffer_type(ptr.bitcast[Int8](), size=len, capacity=len)
+        self._buffer = Self._buffer_type(
+            unsafe_pointer=ptr.bitcast[Int8](), size=len, capacity=len
         )
 
     @always_inline
