@@ -103,6 +103,11 @@ what we publish.
 - A new `--validate-doc-strings` option has been added to `mojo` to emit errors
   on invalid doc strings instead of warnings.
 
+- A new decorator, `@doc_private`, was added that can be used to hide a decl
+  from being generated in the output of `mojo doc`. It also removes the
+  requirement that the decl has documentation (e.g. when used with
+  --diagnose-missing-doc-strings).
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
