@@ -82,6 +82,24 @@ what we publish.
 - Add `SIMD.shuffle()` with `StaticIntTuple` mask.
     ([PR #2315](https://github.com/modularml/mojo/pull/2315) by [@mikowals](https://github.com/mikowals))
 
+- Invoking `mojo package my-package -o my-dir` on the command line, where
+  `my-package` is a Mojo package source directory, and `my-dir` is an existing
+  directory, now outputs a Mojo package to `my-dir/my-package.mojopkg`.
+  Previously, this had to be spelled out, as in `-o my-dir/my-package.mojopkg`.
+
+- The Mojo Language Server now reports a warning when a local variable is unused.
+
+- The `math` module now has `CeilDivable` and `CeilDivableRaising` traits that
+  allow users to opt into the `math.ceildiv` function.
+
+- Mojo now allows methods to declare `self` as a `Reference` directly, which
+  can be useful for advanced cases of parametric mutabilty and custom lifetime
+  processing.  Previously it required the use of an internal MLIR type to
+  achieve this.
+
+- `object` now implements all the bitwise operators.
+    ([PR #2324](https://github.com/modularml/mojo/pull/2324) by [@LJ-9801](https://github.com/LJ-9801))
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
@@ -104,6 +122,9 @@ what we publish.
 
 - The `math.roundeven` function has been removed from the `math` module. The new
   `SIMD.roundeven` method now provides the identical functionality.
+
+- The `math.div_ceil` function has been removed in favor of the `math.ceildiv`
+  function.
 
 ### 🛠️ Fixed
 

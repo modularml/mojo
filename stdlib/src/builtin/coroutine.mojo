@@ -20,6 +20,23 @@ from sys import sizeof
 from memory import Pointer
 
 # ===----------------------------------------------------------------------=== #
+# _suspend_async
+# ===----------------------------------------------------------------------=== #
+
+
+alias AnyCoroutine = __mlir_type.`!co.routine`
+
+
+@always_inline
+fn _suspend_async[body: fn (AnyCoroutine) capturing -> None]():
+    __mlir_region await_body(hdl: AnyCoroutine):
+        body(hdl)
+        __mlir_op.`co.suspend.end`()
+
+    __mlir_op.`co.suspend`[_region = "await_body".value]()
+
+
+# ===----------------------------------------------------------------------=== #
 # _CoroutineContext
 # ===----------------------------------------------------------------------=== #
 
@@ -32,34 +49,28 @@ struct _CoroutineContext:
     interpretations of the payload, but which nevertheless be the same size
     and contain the resume function and a payload pointer."""
 
-    alias _opaque_handle = Pointer[__mlir_type.i8]
     # Passed the coroutine being completed and its context's payload.
-    alias _resume_fn_type = fn (
-        Self._opaque_handle, Self._opaque_handle
-    ) -> None
+    alias _resume_fn_type = fn (AnyCoroutine, AnyCoroutine) -> None
 
     var _resume_fn: Self._resume_fn_type
-    var _parent_hdl: Self._opaque_handle
+    var _parent_hdl: AnyCoroutine
 
 
 fn _coro_resume_callback(
-    handle: _CoroutineContext._opaque_handle,
-    parent: _CoroutineContext._opaque_handle,
+    handle: AnyCoroutine,
+    parent: AnyCoroutine,
 ):
     """Resume the parent Coroutine."""
     _coro_resume_fn(parent)
 
 
 @always_inline
-fn _coro_resume_fn(handle: _CoroutineContext._opaque_handle):
+fn _coro_resume_fn(handle: AnyCoroutine):
     """This function is a generic coroutine resume function."""
-    __mlir_op.`pop.coroutine.resume`(handle.address)
+    __mlir_op.`co.resume`(handle)
 
 
-fn _coro_resume_noop_callback(
-    handle: _CoroutineContext._opaque_handle,
-    null: _CoroutineContext._opaque_handle,
-):
+fn _coro_resume_noop_callback(handle: AnyCoroutine, null: AnyCoroutine):
     """Return immediately since nothing to resume."""
     return
 
@@ -82,9 +93,8 @@ struct Coroutine[type: AnyRegType]:
         type: Type of value returned upon completion of the coroutine.
     """
 
-    alias _handle_type = __mlir_type[`!co.routine<() -> `, type, `>`]
     alias _promise_type = __mlir_type[`!kgen.struct<(`, type, `)>`]
-    var _handle: Self._handle_type
+    var _handle: AnyCoroutine
 
     @always_inline
     fn _get_promise(self) -> Pointer[type]:
@@ -94,9 +104,9 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
-        var promise: Pointer[
-            Self._promise_type
-        ] = __mlir_op.`pop.coroutine.promise`(self._handle)
+        var promise: Pointer[Self._promise_type] = __mlir_op.`co.promise`[
+            _type = __mlir_type[`!kgen.pointer<`, Self._promise_type, `>`]
+        ](self._handle)
         return promise.bitcast[type]()
 
     @always_inline
@@ -125,7 +135,7 @@ struct Coroutine[type: AnyRegType]:
         return self._get_promise().bitcast[ctx_type]() - 1
 
     @always_inline
-    fn __init__(handle: Self._handle_type) -> Coroutine[type]:
+    fn __init__(handle: AnyCoroutine) -> Coroutine[type]:
         """Construct a coroutine object from a handle.
 
         Args:
@@ -134,36 +144,12 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The constructed coroutine object.
         """
-        var self = Coroutine[type] {_handle: handle}
-        var parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
-        self._get_ctx[_CoroutineContext]().store(
-            _CoroutineContext {
-                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
-            }
-        )
-        return self^
+        return Self {_handle: handle}
 
     @always_inline
     fn __del__(owned self):
         """Destroy the coroutine object."""
-        __mlir_op.`pop.coroutine.destroy`(self._handle)
-
-    @always_inline
-    fn __call__(self) -> type:
-        """Execute the coroutine synchronously.
-
-        Returns:
-            The coroutine promise.
-        """
-
-        self._get_ctx[_CoroutineContext]().store(
-            _CoroutineContext {
-                _resume_fn: _coro_resume_noop_callback,
-                _parent_hdl: _CoroutineContext._opaque_handle.get_null(),
-            }
-        )
-        __mlir_op.`pop.coroutine.resume`(self._handle)
-        return self.get()
+        __mlir_op.`co.destroy`(self._handle)
 
     @always_inline
     fn __await__(self) -> type:
@@ -173,11 +159,28 @@ struct Coroutine[type: AnyRegType]:
             The coroutine promise.
         """
 
-        __mlir_region await_body():
-            __mlir_op.`pop.coroutine.resume`(self._handle)
-            __mlir_op.`pop.coroutine.await.end`()
+        @always_inline
+        @parameter
+        fn await_body(parent_hdl: AnyCoroutine):
+            self._get_ctx[_CoroutineContext]().store(
+                _CoroutineContext {
+                    _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
+                }
+            )
+            __mlir_op.`co.resume`(self._handle)
 
-        __mlir_op.`pop.coroutine.await`[_region = "await_body".value]()
+        _suspend_async[await_body]()
+        return self.get()
+
+    # Never call this method.
+    fn _deprecated_direct_resume(self) -> type:
+        self._get_ctx[_CoroutineContext]().store(
+            _CoroutineContext {
+                _resume_fn: _coro_resume_noop_callback,
+                _parent_hdl: self._handle,
+            }
+        )
+        __mlir_op.`co.resume`(self._handle)
         return self.get()
 
 
@@ -200,11 +203,8 @@ struct RaisingCoroutine[type: AnyRegType]:
     """
 
     alias _var_type = __mlir_type[`!kgen.variant<`, Error, `, `, type, `>`]
-    alias _handle_type = __mlir_type[
-        `!co.routine<() throws -> `, Self._var_type, `>`
-    ]
     alias _promise_type = __mlir_type[`!kgen.struct<(`, Self._var_type, `)>`]
-    var _handle: Self._handle_type
+    var _handle: AnyCoroutine
 
     @always_inline
     fn _get_promise(self) -> Pointer[Self._var_type]:
@@ -214,9 +214,9 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The coroutine promise.
         """
-        var promise: Pointer[
-            Self._promise_type
-        ] = __mlir_op.`pop.coroutine.promise`(self._handle)
+        var promise: Pointer[Self._promise_type] = __mlir_op.`co.promise`[
+            _type = __mlir_type[`!kgen.pointer<`, Self._promise_type, `>`]
+        ](self._handle)
         return promise.bitcast[Self._var_type]()
 
     @always_inline
@@ -248,44 +248,18 @@ struct RaisingCoroutine[type: AnyRegType]:
         return self._get_promise().bitcast[ctx_type]() - 1
 
     @always_inline
-    fn __init__(inout self, handle: Self._handle_type):
+    fn __init__(inout self, handle: AnyCoroutine):
         """Construct a coroutine object from a handle.
 
         Args:
             handle: The init handle.
         """
         self = Self {_handle: handle}
-        var parent_hdl = __mlir_op.`pop.coroutine.opaque_handle`()
-        self._get_ctx[_CoroutineContext]().store(
-            _CoroutineContext {
-                _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
-            }
-        )
 
     @always_inline
     fn __del__(owned self):
         """Destroy the coroutine object."""
-        __mlir_op.`pop.coroutine.destroy`(self._handle)
-
-    @always_inline
-    fn __call__(self) raises -> type:
-        """Execute the coroutine synchronously.
-
-        Returns:
-            The coroutine promise.
-        """
-
-        fn _coro_noop_fn(handle: _CoroutineContext._opaque_handle):
-            return
-
-        self._get_ctx[_CoroutineContext]().store(
-            _CoroutineContext {
-                _resume_fn: _coro_resume_noop_callback,
-                _parent_hdl: _CoroutineContext._opaque_handle.get_null(),
-            }
-        )
-        __mlir_op.`pop.coroutine.resume`(self._handle)
-        return self.get()
+        __mlir_op.`co.destroy`(self._handle)
 
     @always_inline
     fn __await__(self) raises -> type:
@@ -295,9 +269,15 @@ struct RaisingCoroutine[type: AnyRegType]:
             The coroutine promise.
         """
 
-        __mlir_region await_body():
-            __mlir_op.`pop.coroutine.resume`(self._handle)
-            __mlir_op.`pop.coroutine.await.end`()
+        @always_inline
+        @parameter
+        fn await_body(parent_hdl: AnyCoroutine):
+            self._get_ctx[_CoroutineContext]().store(
+                _CoroutineContext {
+                    _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
+                }
+            )
+            __mlir_op.`co.resume`(self._handle)
 
-        __mlir_op.`pop.coroutine.await`[_region = "await_body".value]()
+        _suspend_async[await_body]()
         return self.get()

@@ -251,6 +251,10 @@ struct FileHandle:
         var eleventh_element = ptr2[0]
         var twelvth_element = ptr2[1]
         print(eleventh_element, twelvth_element)
+
+        # Free the memory
+        ptr.free()
+        ptr2.free()
         ```
         .
         """

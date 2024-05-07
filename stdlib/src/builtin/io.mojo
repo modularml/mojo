@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import bitwidthof, os_is_windows, triple_is_nvidia_cuda, external_call
+from sys import os_is_windows, triple_is_nvidia_cuda, external_call
 
 from builtin.dtype import _get_dtype_printf_format
 from builtin.builtin_list import _LITRefPackHelper
@@ -23,16 +23,6 @@ from memory import UnsafePointer
 
 from utils import StringRef, unroll
 from utils._format import Formattable, Formatter, write_to
-
-# ===----------------------------------------------------------------------=== #
-# Utilities
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _align_up(value: Int, alignment: Int) -> Int:
-    var div_ceil = (value + alignment - 1)._positive_div(alignment)
-    return div_ceil * alignment
 
 
 # ===----------------------------------------------------------------------=== #
@@ -110,17 +100,23 @@ fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
     # aren't stripped off correctly.
     var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
 
-    with _fdopen(_fdopen.STDOUT) as fd:
-        _ = __mlir_op.`pop.external_call`[
-            func = "KGEN_CompilerRT_fprintf".value,
-            variadicType = __mlir_attr[
-                `(`,
-                `!kgen.pointer<none>,`,
-                `!kgen.pointer<scalar<si8>>`,
-                `) -> !pop.scalar<si32>`,
-            ],
-            _type=Int32,
-        ](fd, fmt.data(), loaded_pack)
+    @parameter
+    if triple_is_nvidia_cuda():
+        _ = external_call["vprintf", Int32](
+            fmt.data(), UnsafePointer.address_of(loaded_pack)
+        )
+    else:
+        with _fdopen(_fdopen.STDOUT) as fd:
+            _ = __mlir_op.`pop.external_call`[
+                func = "KGEN_CompilerRT_fprintf".value,
+                variadicType = __mlir_attr[
+                    `(`,
+                    `!kgen.pointer<none>,`,
+                    `!kgen.pointer<scalar<si8>>`,
+                    `) -> !pop.scalar<si32>`,
+                ],
+                _type=Int32,
+            ](fd, fmt.data(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -355,27 +351,10 @@ fn _put(x: DType):
 
 
 @no_inline
-fn print(
-    *, sep: StringLiteral = " ", end: StringLiteral = "\n", flush: Bool = False
-):
-    """Prints the end value.
-
-    Args:
-        sep: The separator used between elements.
-        end: The String to write after printing the elements.
-        flush: If set to true, then the stream is forcibly flushed.
-    """
-    _put(end)
-    if flush:
-        _flush()
-
-
-@no_inline
 fn print[
-    T: Stringable, *Ts: Stringable
+    *Ts: Stringable
 ](
-    first: T,
-    *rest: *Ts,
+    *values: *Ts,
     sep: StringLiteral = " ",
     end: StringLiteral = "\n",
     flush: Bool = False,
@@ -384,24 +363,24 @@ fn print[
     and followed by `end`.
 
     Parameters:
-        T: The first element type.
-        Ts: The remaining element types.
+        Ts: The elements types.
 
     Args:
-        first: The first element.
-        rest: The remaining elements.
+        values: The elements to print.
         sep: The separator used between elements.
         end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
     """
-    _put(str(first))
 
     @parameter
-    fn print_elt[T: Stringable](a: T):
-        _put(sep)
-        _put(a)
+    fn print_with_separator[i: Int, T: Stringable](value: T):
+        _put(value)
 
-    rest.each[print_elt]()
+        @parameter
+        if i < values.__len__() - 1:
+            _put(sep)
+
+    values.each_idx[print_with_separator]()
 
     _put(end)
     if flush:
