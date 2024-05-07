@@ -199,7 +199,6 @@ struct Int(
     Ceilable,
     CeilDivable,
     Floorable,
-    DivModable,
     Formattable,
     Intable,
     KeyElement,
