@@ -25,8 +25,12 @@ actually calling the higher-order function, you simply add the decorator (such
 as the `@value` decorator) above your code (such as a struct). The Mojo
 compiler then uses the decorator function to modify your code at compile time.
 
+:::note No custom decorators
+
 The creation of custom decorators is not yet supported. The available ones are
 built directly into the compiler.
+
+:::
 
 The following pages describe each built-in decorator with examples.
 
