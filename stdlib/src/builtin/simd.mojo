@@ -671,6 +671,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             `floor(rhs / self)` value.
         """
+        constrained[type.is_numeric(), "the type must be numeric"]()
         return rhs // self
 
     @always_inline("nodebug")
