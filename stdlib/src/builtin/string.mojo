@@ -639,18 +639,6 @@ struct String(
 
         self = String(StringRef(str))
 
-    fn __init__[stringable: Stringable](inout self, value: stringable):
-        """Creates a string from a value that conforms to Stringable trait.
-
-        Parameters:
-            stringable: The Stringable type.
-
-        Args:
-            value: The value that conforms to Stringable.
-        """
-
-        self = str(value)
-
     # TODO: Remove this method when #2317 is done
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[Int8], len: Int):
