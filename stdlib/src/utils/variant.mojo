@@ -47,7 +47,7 @@ from memory.unsafe_pointer import (
     move_from_pointee,
     move_pointee,
 )
-from utils import unroll, StaticTuple
+from utils import unroll
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -58,11 +58,6 @@ from utils import unroll, StaticTuple
 fn _align_up(value: Int, alignment: Int) -> Int:
     var div_ceil = (value + alignment - 1)._positive_div(alignment)
     return div_ceil * alignment
-
-
-@always_inline
-fn _max(a: Int, b: Int) -> Int:
-    return a if a > b else b
 
 
 # ===----------------------------------------------------------------------=== #
@@ -78,7 +73,7 @@ struct _UnionSize[*Ts: CollectionElement]():
 
         @parameter
         fn each[i: Int]():
-            size = _max(size, _align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
+            size = max(size, _align_up(sizeof[Ts[i]](), alignof[Ts[i]]()))
 
         unroll[each, len(VariadicList(Ts))]()
         return _align_up(size, alignof[Int]())
@@ -156,12 +151,10 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         ]()
         return UnsafePointer.address_of(self._impl).bitcast[T]()
 
-    fn _get_state[
-        is_mut: __mlir_type.i1, lt: __mlir_type[`!lit.lifetime<`, is_mut, `>`]
-    ](self: Reference[Self, is_mut, lt]._mlir_type) -> Reference[
-        Int8, is_mut, lt
-    ]:
-        var int8_self = UnsafePointer.address_of(self).bitcast[Int8]()
+    fn _get_state(
+        self: Reference[Self, _, _]
+    ) -> Reference[Int8, self.is_mutable, self.lifetime]:
+        var int8_self = UnsafePointer(self).bitcast[Int8]()
         return (int8_self + _UnionSize[Ts].compute())[]
 
     fn __init__[T: CollectionElement](inout self, owned value: T):
@@ -288,11 +281,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         return self._get_state()[] == idx
 
     fn get[
-        T: CollectionElement,
-        mutability: __mlir_type.i1,
-        self_life: AnyLifetime[mutability].type,
-    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
-        T, mutability, self_life
+        T: CollectionElement
+    ](self: Reference[Self, _, _]) -> Reference[
+        T, self.is_mutable, self.lifetime
     ]:
         """Get the value out of the variant as a type-checked type.
 
@@ -306,14 +297,12 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         Parameters:
             T: The type of the value to get out.
-            mutability: The inferred mutability of the variant type.
-            self_life: The inferred lifetime of the variant type.
 
         Returns:
             The internal data represented as a `Reference[T]`.
         """
-        debug_assert(Reference(self)[].isa[T](), "get: wrong variant type")
-        return Reference(self)[]._get_ptr[T]()[]
+        debug_assert(self[].isa[T](), "get: wrong variant type")
+        return self[]._get_ptr[T]()[]
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:

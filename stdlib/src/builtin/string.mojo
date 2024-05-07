@@ -31,16 +31,6 @@ from .io import _snprintf
 
 
 @always_inline
-fn _abs(x: Int) -> Int:
-    return x if x > 0 else -x
-
-
-@always_inline
-fn _abs(x: SIMD) -> __type_of(x):
-    return (x > 0).select(x, -x)
-
-
-@always_inline
 fn _ctlz(val: Int) -> Int:
     return llvm_intrinsic["llvm.ctlz", Int, has_side_effect=False](val, False)
 
@@ -150,28 +140,39 @@ fn chr(c: Int) -> String:
 # ===----------------------------------------------------------------------===#
 
 
-# TODO: this is hard coded for decimal base
 @always_inline
-fn _atol(str_ref: StringRef) raises -> Int:
-    """Parses the given string as a base-10 integer and returns that value.
+fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
+    """Parses the given string as an integer in the given base and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
     as an integer value, an error is raised. For example, `atol("hi")` raises an
     error.
 
+    If base is 0 the the string is parsed as an Integer literal,
+    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+
     Args:
-        str_ref: A string to be parsed as a base-10 integer.
+        str_ref: A string to be parsed as an integer in the given base.
+        base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
         An integer value that represents the string, or otherwise raises.
     """
+    if (base != 0) and (base < 2 or base > 36):
+        raise Error("Base must be >= 2 and <= 36, or 0.")
     if not str_ref:
-        raise Error("Empty String cannot be converted to integer.")
+        raise Error(_atol_error(base, str_ref))
+
+    var real_base: Int
+    var ord_num_max: Int
+
+    var ord_letter_max = (-1, -1)
     var result = 0
     var is_negative: Bool = False
     var start: Int = 0
     var str_len = len(str_ref)
     var buff = str_ref._as_ptr()
+
     for pos in range(start, str_len):
         if isspace(buff[pos]):
             continue
@@ -179,53 +180,150 @@ fn _atol(str_ref: StringRef) raises -> Int:
         if str_ref[pos] == "-":
             is_negative = True
             start = pos + 1
+        elif str_ref[pos] == "+":
+            start = pos + 1
         else:
             start = pos
         break
 
     alias ord_0 = ord("0")
-    alias ord_9 = ord("9")
+    # FIXME:
+    #   Change this to `alias` after fixing support for __refitem__ of alias.
+    var ord_letter_min = (ord("a"), ord("A"))
+    alias ord_underscore = ord("_")
+
+    if base == 0:
+        var real_base_new_start = _identify_base(str_ref, start)
+        real_base = real_base_new_start[0]
+        start = real_base_new_start[1]
+        if real_base == -1:
+            raise Error(_atol_error(base, str_ref))
+    else:
+        real_base = base
+
+    if real_base <= 10:
+        ord_num_max = ord(str(real_base - 1))
+    else:
+        ord_num_max = ord("9")
+        ord_letter_max = (
+            ord("a") + (real_base - 11),
+            ord("A") + (real_base - 11),
+        )
+
+    var found_valid_chars_after_start = False
     var has_space_after_number = False
+    # single underscores are only allowed between digits
+    # starting "was_last_digit_undescore" to true such that
+    # if the first digit is an undesrcore an error is raised
+    var was_last_digit_undescore = True
     for pos in range(start, str_len):
-        var digit = int(buff[pos])
-        if ord_0 <= digit <= ord_9:
-            result += digit - ord_0
-        elif isspace(digit):
+        var ord_current = int(buff[pos])
+        if ord_current == ord_underscore:
+            if was_last_digit_undescore:
+                raise Error(_atol_error(base, str_ref))
+            else:
+                was_last_digit_undescore = True
+                continue
+        else:
+            was_last_digit_undescore = False
+        if ord_0 <= ord_current <= ord_num_max:
+            result += ord_current - ord_0
+            found_valid_chars_after_start = True
+        elif ord_letter_min[0] <= ord_current <= ord_letter_max[0]:
+            result += ord_current - ord_letter_min[0] + 10
+            found_valid_chars_after_start = True
+        elif ord_letter_min[1] <= ord_current <= ord_letter_max[1]:
+            result += ord_current - ord_letter_min[1] + 10
+            found_valid_chars_after_start = True
+        elif isspace(ord_current):
             has_space_after_number = True
             start = pos + 1
             break
         else:
-            raise Error("String is not convertible to integer.")
+            raise Error(_atol_error(base, str_ref))
         if pos + 1 < str_len and not isspace(buff[pos + 1]):
-            var nextresult = result * 10
+            var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
-                    "String expresses an integer too large to store in Int."
+                    _atol_error(base, str_ref)
+                    + " String expresses an integer too large to store in Int."
                 )
             result = nextresult
+
+    if was_last_digit_undescore or (not found_valid_chars_after_start):
+        raise Error(_atol_error(base, str_ref))
+
     if has_space_after_number:
         for pos in range(start, str_len):
             if not isspace(buff[pos]):
-                raise Error("String is not convertible to integer.")
+                raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
     return result
 
 
-fn atol(str: String) raises -> Int:
-    """Parses the given string as a base-10 integer and returns that value.
+fn _atol_error(base: Int, str_ref: StringRef) -> String:
+    return (
+        "String is not convertible to integer with base "
+        + str(base)
+        + ": '"
+        + str(str_ref)
+        + "'"
+    )
+
+
+fn _identify_base(str_ref: StringRef, start: Int) -> Tuple[Int, Int]:
+    var length = len(str_ref)
+    # just 1 digit, assume base 10
+    if start == (length - 1):
+        return 10, start
+    if str_ref[start] == "0":
+        var second_digit = str_ref[start + 1]
+        if second_digit == "b" or second_digit == "B":
+            return 2, start + 2
+        if second_digit == "o" or second_digit == "O":
+            return 8, start + 2
+        if second_digit == "x" or second_digit == "X":
+            return 16, start + 2
+        # checking for special case of all "0", "_" are also allowed
+        var was_last_character_underscore = False
+        for i in range(start + 1, length):
+            if str_ref[i] == "_":
+                if was_last_character_underscore:
+                    return -1, -1
+                else:
+                    was_last_character_underscore = True
+                    continue
+            else:
+                was_last_character_underscore = False
+            if str_ref[i] != "0":
+                return -1, -1
+    elif ord("1") <= ord(str_ref[start]) <= ord("9"):
+        return 10, start
+    else:
+        return -1, -1
+
+    return 10, start
+
+
+fn atol(str: String, base: Int = 10) raises -> Int:
+    """Parses the given string as an integer in the given base and returns that value.
 
     For example, `atol("19")` returns `19`. If the given string cannot be parsed
     as an integer value, an error is raised. For example, `atol("hi")` raises an
     error.
 
+    If base is 0 the the string is parsed as an Integer literal,
+    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+
     Args:
-        str: A string to be parsed as a base-10 integer.
+        str: A string to be parsed as an integer in the given base.
+        base: Base used for conversion, value must be between 2 and 36, or 0.
 
     Returns:
         An integer value that represents the string, or otherwise raises.
     """
-    return _atol(str._strref_dangerous())
+    return _atol(str._strref_dangerous(), base)
 
 
 # ===----------------------------------------------------------------------===#
@@ -344,10 +442,22 @@ struct String(
     fn __str__(self) -> String:
         return self
 
+    @always_inline
+    fn __repr__(self) -> String:
+        """Return a Mojo-compatible representation of the `String` instance.
+
+        You don't need to call this method directly, use `repr(my_string)` instead.
+        """
+        if "'" in self:
+            return '"' + self + "'"
+        else:
+            return "'" + self + "'"
+
     # ===------------------------------------------------------------------===#
     # Initializers
     # ===------------------------------------------------------------------===#
 
+    # TODO: Remove this method when #2317 is done
     @always_inline
     fn __init__(inout self, owned impl: Self._buffer_type):
         """Construct a string from a buffer of bytes.
@@ -362,6 +472,11 @@ struct String(
         var hi = String(buf)
         ```
 
+        Note that you should use the constructor from `List[UInt8]` instead
+        as we are now storing the bytes as UInt8.
+
+        See https://github.com/modularml/mojo/issues/2317 for more information.
+
         Args:
             impl: The buffer.
         """
@@ -370,6 +485,34 @@ struct String(
             "expected last element of String buffer to be null terminator",
         )
         self._buffer = impl^
+
+    @always_inline
+    fn __init__(inout self, owned impl: List[UInt8]):
+        """Construct a string from a buffer of bytes.
+
+        The buffer must be terminated with a null byte:
+
+        ```mojo
+        var buf = List[UInt8]()
+        buf.append(ord('H'))
+        buf.append(ord('i'))
+        buf.append(0)
+        var hi = String(buf)
+        ```
+
+        Args:
+            impl: The buffer.
+        """
+        debug_assert(
+            impl[-1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
+        # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
+        var length = len(impl)
+        var capacity = impl.capacity
+        self._buffer = List[Int8](
+            impl.steal_data().bitcast[Int8](), size=length, capacity=capacity
+        )
 
     @always_inline
     fn __init__(inout self):
@@ -412,8 +555,29 @@ struct String(
 
         self = str(value)
 
+    # TODO: Remove this method when #2317 is done
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[Int8], len: Int):
+        """Creates a string from the buffer. Note that the string now owns
+        the buffer.
+
+        The buffer must be terminated with a null byte.
+
+        Note that you should use the constructor from `UnsafePointer[UInt8]` instead
+        as we are now storing the bytes as UInt8.
+
+        See https://github.com/modularml/mojo/issues/2317 for more information.
+
+        Args:
+            ptr: The pointer to the buffer.
+            len: The length of the buffer, including the null terminator.
+        """
+        # we don't know the capacity of ptr, but we'll assume it's the same or
+        # larger than len
+        self = Self(Self._buffer_type(ptr, size=len, capacity=len))
+
+    @always_inline
+    fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -425,7 +589,9 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(Self._buffer_type(ptr, size=len, capacity=len))
+        self = Self(
+            Self._buffer_type(ptr.bitcast[Int8](), size=len, capacity=len)
+        )
 
     @always_inline
     fn __init__(inout self, ptr: LegacyPointer[Int8], len: Int):
@@ -686,7 +852,11 @@ struct String(
         var total_len = self_len + other_len
         self._buffer.resize(total_len + 1, 0)
         # Copy the data alongside the terminator.
-        memcpy(self._as_ptr() + self_len, other._as_ptr(), other_len + 1)
+        memcpy(
+            self._as_uint8_ptr() + self_len,
+            other._as_uint8_ptr(),
+            other_len + 1,
+        )
 
     # ===------------------------------------------------------------------=== #
     # Methods
@@ -819,13 +989,29 @@ struct String(
         """
         pass
 
+    # TODO: Remove this method when #2317 is done
     fn _as_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
+
+        Note that you should use `_as_uint8_ptr()` if you need to access the
+        pointer as we are now storing the bytes as UInt8.
+
+        See https://github.com/modularml/mojo/issues/2317 for more information.
 
         Returns:
             The pointer to the underlying memory.
         """
         return rebind[DTypePointer[DType.int8]](self._buffer.data)
+
+    fn _as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return rebind[DTypePointer[DType.uint8]](
+            self._buffer.data.bitcast[UInt8]()
+        )
 
     fn as_bytes(self) -> List[Int8]:
         """Retrieves the underlying byte sequence encoding the characters in
@@ -1326,7 +1512,7 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
 
 @always_inline
 fn _calc_initial_buffer_size(n0: Int) -> Int:
-    var n = _abs(n0)
+    var n = abs(n0)
     var sign = 0 if n0 > 0 else 1
     alias is_32bit_system = bitwidthof[DType.index]() == 32
 
@@ -1348,7 +1534,7 @@ fn _calc_initial_buffer_size(n: Float64) -> Int:
 fn _calc_initial_buffer_size[type: DType](n0: Scalar[type]) -> Int:
     @parameter
     if type.is_integral():
-        var n = _abs(n0)
+        var n = abs(n0)
         var sign = 0 if n0 > 0 else 1
         alias is_32bit_system = bitwidthof[DType.index]() == 32
 
@@ -1363,3 +1549,19 @@ fn _calc_initial_buffer_size[type: DType](n0: Scalar[type]) -> Int:
             )
 
     return 128 + 1  # Add 1 for the terminator
+
+
+fn _calc_format_buffer_size[type: DType]() -> Int:
+    """
+    Returns a buffer size in bytes that is large enough to store a formatted
+    number of the specified type.
+    """
+
+    # TODO:
+    #   Use a smaller size based on the `dtype`, e.g. we don't need as much
+    #   space to store a formatted int8 as a float64.
+    @parameter
+    if type.is_integral():
+        return 64 + 1
+    else:
+        return 128 + 1  # Add 1 for the terminator

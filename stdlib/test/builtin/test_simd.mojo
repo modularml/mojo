@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from sys import has_neon, simdwidthof
+from sys import has_neon
 
 from testing import assert_equal, assert_not_equal, assert_true
 
@@ -41,6 +41,64 @@ def test_cast():
 
 def test_simd_variadic():
     assert_equal(str(SIMD[DType.index, 4](52, 12, 43, 5)), "[52, 12, 43, 5]")
+
+
+def test_convert_simd_to_string():
+    var a: SIMD[DType.float32, 2] = 5
+    assert_equal(str(a), "[5.0, 5.0]")
+
+    var b: SIMD[DType.float64, 4] = 6
+    assert_equal(str(b), "[6.0, 6.0, 6.0, 6.0]")
+
+    var c: SIMD[DType.index, 8] = 7
+    assert_equal(str(c), "[7, 7, 7, 7, 7, 7, 7, 7]")
+
+    # TODO: uncomment when https://github.com/modularml/mojo/issues/2353 is fixed
+    # assert_equal(str(UInt32(-1)), "4294967295")
+    assert_equal(str(UInt64(-1)), "18446744073709551615")
+    assert_equal(str(Scalar[DType.address](22)), "0x16")
+    assert_equal(str(Scalar[DType.address](0xDEADBEAF)), "0xdeadbeaf")
+
+    assert_equal(str((UInt16(32768))), "32768")
+    assert_equal(str((UInt16(65535))), "65535")
+    assert_equal(str((Int16(-2))), "-2")
+
+    assert_equal(str(UInt64(16646288086500911323)), "16646288086500911323")
+
+    # https://github.com/modularml/mojo/issues/556
+    assert_equal(
+        str(
+            SIMD[DType.uint64, 4](
+                0xA0761D6478BD642F,
+                0xE7037ED1A0B428DB,
+                0x8EBC6AF09C88C6E3,
+                0x589965CC75374CC3,
+            )
+        ),
+        (
+            "[11562461410679940143, 16646288086500911323, 10285213230658275043,"
+            " 6384245875588680899]"
+        ),
+    )
+
+    assert_equal(
+        str(
+            SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448)
+        ),
+        "[-943274556, -875902520, -808530484, -741158448]",
+    )
+
+
+def test_issue_20421():
+    var a = DTypePointer[DType.uint8]().alloc(16 * 64, alignment=64)
+    for i in range(16 * 64):
+        a[i] = i & 255
+    var av16 = a.offset(128 + 64 + 4).bitcast[DType.int32]().load[width=4]()
+    assert_equal(
+        av16,
+        SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448),
+    )
+    a.free()
 
 
 def test_truthy():
@@ -86,6 +144,68 @@ def test_truthy():
     if not has_neon():
         # TODO bfloat16 is not supported on neon #30525
         test_dtype[DType.bfloat16]()
+
+
+def test_ceil():
+    assert_equal(Float32.__ceil__(Float32(1.5)), 2.0)
+    assert_equal(Float32.__ceil__(Float32(-1.5)), -1.0)
+    assert_equal(Float32.__ceil__(Float32(3.0)), 3.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(
+        F.__ceil__(F(0.0, 1.4, -42.5, -12.6)), F(0.0, 2.0, -42.0, -12.0)
+    )
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(0, 2, -42, -12)
+    assert_equal(I.__ceil__(i), i)
+
+    alias U = SIMD[DType.uint32, 4]
+    var u = U(0, 2, 42, 12)
+    assert_equal(U.__ceil__(u), u)
+
+    alias B = SIMD[DType.bool, 4]
+    var b = B(True, False, True, False)
+    assert_equal(B.__ceil__(b), b)
+
+
+def test_floor():
+    assert_equal(Float32.__floor__(Float32(1.5)), 1.0)
+    assert_equal(Float32.__floor__(Float32(-1.5)), -2.0)
+    assert_equal(Float32.__floor__(Float32(3.0)), 3.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(
+        F.__floor__(F(0.0, 1.6, -42.5, -12.4)), F(0.0, 1.0, -43.0, -13.0)
+    )
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(0, 2, -42, -12)
+    assert_equal(I.__floor__(i), i)
+
+    alias U = SIMD[DType.uint32, 4]
+    var u = U(0, 2, 42, 12)
+    assert_equal(U.__floor__(u), u)
+
+    alias B = SIMD[DType.bool, 4]
+    var b = B(True, False, True, False)
+    assert_equal(B.__floor__(b), b)
+
+
+def test_round():
+    assert_equal(Float32.__round__(Float32(2.5)), 3.0)
+    assert_equal(Float32.__round__(Float32(-3.5)), -4.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(F.__round__(F(1.5, 2.5, -2.5, -3.5)), F(2.0, 3.0, -3.0, -4.0))
+
+
+def test_roundeven():
+    assert_equal(Float32(2.5).roundeven(), 2.0)
+    assert_equal(Float32(-3.5).roundeven(), -4.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(F(1.5, 2.5, -2.5, -3.5).roundeven(), F(2.0, 2.0, -2.0, -4.0))
 
 
 def test_floordiv():
@@ -325,6 +445,41 @@ def test_shift():
     )
 
 
+def test_shuffle():
+    alias dtype = DType.int32
+    alias width = 4
+
+    vec = SIMD[dtype, width](100, 101, 102, 103)
+
+    assert_equal(
+        vec.shuffle[3, 2, 1, 0](), SIMD[dtype, width](103, 102, 101, 100)
+    )
+    assert_equal(
+        vec.shuffle[0, 2, 4, 6](vec), SIMD[dtype, width](100, 102, 100, 102)
+    )
+
+    assert_equal(
+        vec._shuffle_list[7, 6, 5, 4, 3, 2, 1, 0, output_size = 2 * width](vec),
+        SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
+    )
+
+    assert_equal(
+        vec.shuffle[StaticIntTuple[width](3, 2, 1, 0)](),
+        SIMD[dtype, width](103, 102, 101, 100),
+    )
+    assert_equal(
+        vec.shuffle[StaticIntTuple[width](0, 2, 4, 6)](vec),
+        SIMD[dtype, width](100, 102, 100, 102),
+    )
+
+    assert_equal(
+        vec._shuffle_list[
+            2 * width, StaticIntTuple[2 * width](7, 6, 5, 4, 3, 2, 1, 0)
+        ](vec),
+        SIMD[dtype, 2 * width](103, 102, 101, 100, 103, 102, 101, 100),
+    )
+
+
 def test_insert():
     assert_equal(Int32(3).insert(Int32(4)), 4)
 
@@ -352,6 +507,15 @@ def test_insert():
             SIMD[DType.index, 4](9, 6, 3, 7)
         ),
         SIMD[DType.index, 8](0, 1, 2, 9, 6, 3, 7, 8),
+    )
+
+
+def test_join():
+    vec = SIMD[DType.int32, 4](100, 101, 102, 103)
+
+    assert_equal(
+        vec.join(vec),
+        SIMD[DType.int32, 8](100, 101, 102, 103, 100, 101, 102, 103),
     )
 
 
@@ -657,15 +821,64 @@ def test_mul_with_overflow():
     )
 
 
+def test_abs():
+    assert_equal(abs(Float32(1.0)), 1)
+    assert_equal(abs(Float32(-1.0)), 1)
+    assert_equal(abs(Float32(0.0)), 0)
+    assert_equal(
+        abs(SIMD[DType.float32, 4](0.0, 1.5, -42.5, -12.7)),
+        SIMD[DType.float32, 4](0.0, 1.5, 42.5, 12.7),
+    )
+    assert_equal(
+        abs(SIMD[DType.int32, 4](0, 2, -42, -12)),
+        SIMD[DType.int32, 4](0, 2, 42, 12),
+    )
+    assert_equal(
+        abs(SIMD[DType.uint32, 4](0, 2, 42, 12)),
+        SIMD[DType.uint32, 4](0, 2, 42, 12),
+    )
+    assert_equal(
+        abs(SIMD[DType.bool, 4](True, False, True, False)),
+        SIMD[DType.bool, 4](True, False, True, False),
+    )
+
+
+def test_min_max_clamp():
+    alias F = SIMD[DType.float32, 4]
+
+    var f = F(-10.5, -5.0, 5.0, 10.0)
+    assert_equal(f.min(F(-9.0, -6.0, -4.0, 10.5)), F(-10.5, -6.0, -4.0, 10.0))
+    assert_equal(f.min(-4.0), F(-10.5, -5.0, -4.0, -4.0))
+    assert_equal(f.max(F(-9.0, -6.0, -4.0, 10.5)), F(-9.0, -5.0, 5.0, 10.5))
+    assert_equal(f.max(-4.0), F(-4.0, -4.0, 5.0, 10.0))
+    assert_equal(f.clamp(-6.0, 5.5), F(-6.0, -5.0, 5.0, 5.5))
+
+    alias I = SIMD[DType.float32, 4]
+    var i = I(-10, -5, 5, 10)
+    assert_equal(i.min(I(-9, -6, -4, 11)), I(-10, -6, -4, 10))
+    assert_equal(i.min(-4), I(-10, -5, -4, -4))
+    assert_equal(i.max(I(-9, -6, -4, 11)), I(-9, -5, 5, 11))
+    assert_equal(i.max(-4), I(-4, -4, 5, 10))
+    assert_equal(i.clamp(-7, 4), I(-7, -5, 4, 4))
+
+
 def main():
     test_cast()
     test_simd_variadic()
+    test_convert_simd_to_string()
+    test_issue_20421()
     test_truthy()
+    test_ceil()
+    test_floor()
+    test_round()
+    test_roundeven()
     test_floordiv()
     test_mod()
     test_rotate()
     test_shift()
+    test_shuffle()
     test_insert()
+    test_join()
     test_interleave()
     test_deinterleave()
     test_address()
@@ -674,3 +887,5 @@ def main():
     test_add_with_overflow()
     test_sub_with_overflow()
     test_mul_with_overflow()
+    test_abs()
+    test_min_max_clamp()

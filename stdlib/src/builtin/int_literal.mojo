@@ -12,11 +12,23 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the IntLiteral class."""
 
+from builtin._math import Ceilable, CeilDivable, Floorable
+
 
 @value
 @nonmaterializable(Int)
 @register_passable("trivial")
-struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
+struct IntLiteral(
+    Absable,
+    Boolable,
+    Ceilable,
+    CeilDivable,
+    EqualityComparable,
+    Floorable,
+    Intable,
+    Roundable,
+    Stringable,
+):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and
     must be lowered to other integer types (like Int), but allow for
@@ -34,39 +46,18 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
     )
 
     @always_inline("nodebug")
-    fn __init__() -> Self:
-        """Default constructor.
-
-        Returns:
-            The constructed Self object.
-        """
-        return IntLiteral(
-            __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
-        )
+    fn __init__(inout self):
+        """Default constructor."""
+        self.value = __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!kgen.int_literal`) -> Self:
+    fn __init__(inout self, value: __mlir_type.`!kgen.int_literal`):
         """Construct IntLiteral from the given mlir !kgen.int_literal value.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed IntLiteral object.
         """
-        return Self {value: value}
-
-    @always_inline("nodebug")
-    fn __init__(value: IntLiteral) -> Self:
-        """Construct IntLiteral from another one.
-
-        Args:
-            value: The init value.
-
-        Returns:
-            The constructed IntLiteral object.
-        """
-        return Self {value: value.value}
+        self.value = value
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -228,6 +219,44 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
             The -self value.
         """
         return Self() - self
+
+    @always_inline("nodebug")
+    fn __abs__(self) -> Self:
+        """Return the absolute value of the IntLiteral value.
+
+        Returns:
+            The absolute value.
+        """
+        if self >= 0:
+            return self
+        return -self
+
+    @always_inline("nodebug")
+    fn __ceil__(self) -> Self:
+        """Return the ceiling of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __floor__(self) -> Self:
+        """Return the floor of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __round__(self) -> Self:
+        """Return the rounded value of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
 
     @always_inline("nodebug")
     fn __invert__(self) -> Self:
@@ -545,7 +574,7 @@ struct IntLiteral(Intable, Stringable, Boolable, EqualityComparable):
         Returns:
             `value // self`.
         """
-        return self // value
+        return value // self
 
     @always_inline("nodebug")
     fn __rlshift__(self, value: Self) -> Self:

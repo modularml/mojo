@@ -57,11 +57,6 @@ fn hex[T: Intable](value: T) -> String:
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline
-fn _abs(x: SIMD) -> __type_of(x):
-    return (x > 0).select(x, -x)
-
-
 fn _format_int(
     value: Int64,
     radix: Int = 10,
@@ -188,7 +183,7 @@ fn _try_write_int(
 
         @parameter
         fn neg_digit_value() -> Int64:
-            return _abs(remaining_int % -radix)
+            return abs(remaining_int % -radix)
 
         process_digits[neg_digit_value]()
 
@@ -201,7 +196,7 @@ fn _try_write_int(
     # bytes from our final `buf_ptr` to the end of the buffer.
     var len = CAPACITY - offset
 
-    var strref = StringRef(rebind[Pointer[Int8]](buf_ptr), len)
+    var strref = StringRef(rebind[UnsafePointer[Int8]](buf_ptr), len)
 
     fmt.write_str(strref)
 

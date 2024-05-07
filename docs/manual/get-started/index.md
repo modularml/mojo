@@ -84,19 +84,24 @@ If you already have the `modular` tool,
     curl -s https://get.modular.com | sh -
     ```
 
-2. Then sign in to your Modular account with this command:
-
-    ```sh
-    modular auth
-    ```
-
-3. Now you can install the Mojo SDK:
+2. Then install the Mojo SDK:
 
     ```sh
     modular install mojo
     ```
 
-4. Set environment variables so you can access the
+    :::note Get nightlies
+
+    If you want the bleeding-edge (less stable) version, instead install the
+    nightly build:
+
+    ```sh
+    modular install nightly/mojo
+    ```
+
+    :::
+
+3. Set environment variables so you can access the
    [`mojo`](/mojo/cli/) CLI:
 
     <Tabs>
@@ -122,6 +127,17 @@ If you already have the `modular` tool,
         && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> ~/.zshrc \
         && echo 'export PATH="'$MOJO_PATH'/bin:$PATH"' >> ~/.zshrc \
         && source ~/.zshrc
+      ```
+
+      </TabItem>
+      <TabItem value="fish" label="fish">
+
+      If you're using fish, run this command:
+
+      ```sh
+      set MOJO_PATH (modular config mojo.path) \
+        && set -Ux MODULAR_HOME $HOME/.modular \
+        && fish_add_path $MOJO_PATH/bin
       ```
 
       </TabItem>

@@ -61,6 +61,25 @@ pre-commit install
 
 and that's it!
 
+#### API Doc String Validation
+
+Mojo provides a command line utility, `mojo doc`, to validate the API doc
+strings in your code. This ensures that your doc strings are correctly
+formatted and consistent with the Mojo style guidelines.
+Note that you should not have any warnings.
+
+```bash
+> mojo doc --warn-missing-doc-strings -o /dev/null stdlib/src/
+```
+
+Note that this is also included in the pre-commit. So if you have `pre-commit`
+enabled, this will run automatically before committing. If you want to run it
+manually with pre-commit, just run
+
+```bash
+pre-commit run --all-files
+```
+
 #### Whitespace
 
 - Use vertical whitespace only as needed to organize code into logical sections.
