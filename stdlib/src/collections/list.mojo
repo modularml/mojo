@@ -223,7 +223,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             value: The value to insert.
         """
         debug_assert(i <= self.size, "insert index out of range")
-
+        if i < 0 or i > len(self):
+            abort("Index out of bounds")
         var normalized_idx = self._normalize_index(i)
 
         var earlier_idx = len(self)
@@ -293,7 +294,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             The popped value.
         """
         debug_assert(-len(self) <= i < len(self), "pop index out of range")
-
+        if i > len(self) - 1:
+            abort("Index out of bounds")
         var normalized_idx = self._normalize_index(i)
 
         var ret_val = move_from_pointee(self.data + normalized_idx)
@@ -489,7 +491,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             value: The value to assign.
         """
         debug_assert(-self.size <= i < self.size, "index must be within bounds")
-
+        if i < 0 or i >= len(self):
+            abort("Index out of bounds")
         var normalized_idx = self._normalize_index(i)
 
         destroy_pointee(self.data + normalized_idx)
@@ -551,7 +554,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             A copy of the element at the given index.
         """
         debug_assert(-self.size <= i < self.size, "index must be within bounds")
-
+        if i < 0 or i >= len(self):
+            abort("Index out of bounds")
         var normalized_idx = self._normalize_index(i)
 
         return (self.data + normalized_idx)[]
@@ -568,7 +572,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             An immutable reference to the element at the given index.
         """
-        var normalized_idx = Reference(self)[]._normalize_index(i)
+        if i < 0 or i >= len(self[]):
+            abort("Index out of bounds")
+        var normalized_idx = Reference(self)._normalize_index(i)
 
         return (self[].data + normalized_idx)[]
 
@@ -677,6 +683,4 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @always_inline
     fn _normalize_index(self, index: Int) -> Int:
-        if index < 0:
-            return _max(0, len(self) + index)
-        return index
+        return index if index >= 0 else index + len(self)
