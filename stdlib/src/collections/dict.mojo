@@ -96,11 +96,8 @@ struct _DictEntryIter[
             else:
                 debug_assert(self.index >= 0, "dict iter bounds")
 
-            if self.src[]._entries.__get_ref(self.index)[]:
-                var opt_entry_ref = self.src[]._entries.__get_ref[
-                    __mlir_attr.`0: i1`,
-                    Self.imm_dict_lifetime,
-                ](self.index)
+            var opt_entry_ref = self.src[]._entries.__get_ref(self.index)
+            if opt_entry_ref[]:
 
                 @parameter
                 if forward:
@@ -109,9 +106,7 @@ struct _DictEntryIter[
                     self.index -= 1
 
                 self.seen += 1
-                # Super unsafe, but otherwise we have to do a bunch of super
-                # unsafe reference lifetime casting.
-                return opt_entry_ref.unsafe_bitcast[DictEntry[K, V]]()
+                return opt_entry_ref[].value()[]
 
             @parameter
             if forward:
@@ -644,67 +639,39 @@ struct Dict[K: KeyElement, V: CollectionElement](
             return default.value()[]
         raise "KeyError"
 
-    fn __iter__[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictKeyIter[
-        K, V, mutability, self_life
-    ]:
+    fn __iter__(
+        self: Reference[Self, _, _],
+    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
         """Iterate over the dict's keys as immutable references.
-
-        Parameters:
-            mutability: Whether the dict is mutable.
-            self_life: The dict's lifetime.
 
         Returns:
             An iterator of immutable references to the dictionary keys.
         """
-        return _DictKeyIter(
-            _DictEntryIter[K, V, mutability, self_life](0, 0, Reference(self))
-        )
+        return _DictKeyIter(_DictEntryIter(0, 0, self))
 
-    fn keys[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictKeyIter[
-        K, V, mutability, self_life
-    ]:
+    fn keys(
+        self: Reference[Self, _, _]
+    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
         """Iterate over the dict's keys as immutable references.
-
-        Parameters:
-            mutability: Whether the dict is mutable.
-            self_life: The dict's lifetime.
 
         Returns:
             An iterator of immutable references to the dictionary keys.
         """
         return Self.__iter__(self)
 
-    fn values[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictValueIter[K, V, mutability, self_life]:
+    fn values(
+        self: Reference[Self, _, _]
+    ) -> _DictValueIter[K, V, self.is_mutable, self.lifetime]:
         """Iterate over the dict's values as references.
-
-        Parameters:
-            mutability: Whether the dict is mutable.
-            self_life: The dict's lifetime.
 
         Returns:
             An iterator of references to the dictionary values.
         """
-        return _DictValueIter(
-            _DictEntryIter[K, V, mutability, self_life](0, 0, Reference(self))
-        )
+        return _DictValueIter(_DictEntryIter(0, 0, self))
 
-    fn items[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictEntryIter[K, V, mutability, self_life]:
+    fn items(
+        self: Reference[Self, _, _]
+    ) -> _DictEntryIter[K, V, self.is_mutable, self.lifetime]:
         """Iterate over the dict's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
@@ -715,16 +682,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
             print(e[].key, e[].value)
         ```
 
-        Parameters:
-            mutability: Whether the dict is mutable.
-            self_life: The dict's lifetime.
-
         Returns:
             An iterator of immutable references to the dictionary entries.
         """
-        return _DictEntryIter[K, V, mutability, self_life](
-            0, 0, Reference(self)
-        )
+        return _DictEntryIter(0, 0, self)
 
     fn update(inout self, other: Self, /):
         """Update the dictionary with the key/value pairs from other, overwriting existing keys.
@@ -838,23 +799,16 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
         self._n_entries = self.size
 
-    fn __reversed__[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictKeyIter[
-        K, V, mutability, self_life, False
-    ]:
+    fn __reversed__(
+        self: Reference[Self, _, _]
+    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime, False]:
         """Iterate backwards over the dict keys, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the dict keys.
         """
-        var ref = Reference(self)
         return _DictKeyIter(
-            _DictEntryIter[K, V, mutability, self_life, False](
-                ref[]._reserved - 1, 0, ref
-            )
+            _DictEntryIter[forward=False](self[]._reserved - 1, 0, self)
         )
 
 
@@ -970,42 +924,22 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         return self._dict.pop(key, default^)
 
-    fn __iter__[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictKeyIter[
-        Self.key_type, V, mutability, self_life
-    ]:
+    fn __iter__(
+        self: Reference[Self, _, _]
+    ) -> _DictKeyIter[Self.key_type, V, self.is_mutable, self.lifetime]:
         """Iterate over the keyword dict's keys as immutable references.
-
-        Parameters:
-            mutability: Whether the dict is mutable.
-            self_life: The dict's lifetime.
 
         Returns:
             An iterator of immutable references to the dictionary keys.
         """
         # TODO(#36448): Use this instead of the current workaround
         # return self._dict.__iter__()
-        return _DictKeyIter(
-            _DictEntryIter[Self.key_type, V, mutability, self_life](
-                0, 0, Reference(self)[]._dict
-            )
-        )
+        return _DictKeyIter(_DictEntryIter(0, 0, self[]._dict))
 
-    fn keys[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictKeyIter[
-        Self.key_type, V, mutability, self_life
-    ]:
+    fn keys(
+        self: Reference[Self, _, _],
+    ) -> _DictKeyIter[Self.key_type, V, self.is_mutable, self.lifetime]:
         """Iterate over the keyword dict's keys as immutable references.
-
-        Parameters:
-            mutability: Whether the dict is mutable.
-            self_life: The dict's lifetime.
 
         Returns:
             An iterator of immutable references to the dictionary keys.
@@ -1014,33 +948,21 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         # return self._dict.keys()
         return Self.__iter__(self)
 
-    fn values[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictValueIter[Self.key_type, V, mutability, self_life]:
+    fn values(
+        self: Reference[Self, _, _],
+    ) -> _DictValueIter[Self.key_type, V, self.is_mutable, self.lifetime]:
         """Iterate over the keyword dict's values as references.
-
-        Parameters:
-            mutability: Whether the dict is mutable.
-            self_life: The dict's lifetime.
 
         Returns:
             An iterator of references to the dictionary values.
         """
         # TODO(#36448): Use this instead of the current workaround
         # return self._dict.values()
-        return _DictValueIter(
-            _DictEntryIter[Self.key_type, V, mutability, self_life](
-                0, 0, Reference(self)[]._dict
-            )
-        )
+        return _DictValueIter(_DictEntryIter(0, 0, self[]._dict))
 
-    fn items[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictEntryIter[Self.key_type, V, mutability, self_life]:
+    fn items(
+        self: Reference[Self, _, _]
+    ) -> _DictEntryIter[Self.key_type, V, self.is_mutable, self.lifetime]:
         """Iterate over the keyword dictionary's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
@@ -1051,19 +973,13 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
             print(e[].key, e[].value)
         ```
 
-        Parameters:
-            mutability: Whether the dict is mutable.
-            self_life: The dict's lifetime.
-
         Returns:
             An iterator of immutable references to the dictionary entries.
         """
 
         # TODO(#36448): Use this instead of the current workaround
-        # return Reference(self)[]._dict.items()
-        return _DictEntryIter[Self.key_type, V, mutability, self_life](
-            0, 0, Reference(self)[]._dict
-        )
+        # return self[]._dict.items()
+        return _DictEntryIter(0, 0, self[]._dict)
 
     @always_inline("nodebug")
     fn _insert(inout self, owned key: Self.key_type, owned value: V):

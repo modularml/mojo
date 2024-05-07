@@ -10,7 +10,6 @@ This makes Mojo unable to express common patterns like `StringRef` in the LLVM
 APIs because it is a struct containing a reference, and this makes our `Pointer`
 type a massively unsafe API.
 
-
 ## Goals of this document
 
 This document explores the first step in adding lifetimes to Mojo: what changes
@@ -22,11 +21,13 @@ document from January.
 This document is really just the “first step” of lifetimes.  Rust includes a few
 more exotic features, including [subtyping constraints between
 lifetimes](https://discourse.llvm.org/t/rfc-lifetime-annotations-for-c/61377#no-subtyping-constraints-between-lifetimes-15),
-[equality constraints between lifetime parameters](https://discourse.llvm.org/t/rfc-lifetime-annotations-for-c/61377#no-equality-constraints-between-lifetime-parameters-16),
-[unbounded lifetimes](https://doc.rust-lang.org/nomicon/unbounded-lifetimes.html)
-and perhaps other features.  We don't have all the mechanics of a generic system
-and trait system yet to tie into - and it makes sense to lazily add complexity
-based on need - so these are not included in this initial design.
+[equality constraints between lifetime
+parameters](https://discourse.llvm.org/t/rfc-lifetime-annotations-for-c/61377#no-equality-constraints-between-lifetime-parameters-16),
+[unbounded
+lifetimes](https://doc.rust-lang.org/nomicon/unbounded-lifetimes.html) and
+perhaps other features.  We don't have all the mechanics of a generic system and
+trait system yet to tie into - and it makes sense to lazily add complexity based
+on need - so these are not included in this initial design.
 
 ## Context
 
@@ -174,7 +175,7 @@ fn example[life: Lifetime](cond: Bool,
     if cond:
         str_ref = x
     else:
-      	str_ref = y
+        str_ref = y
     print(str_ref)
 ```
 
@@ -187,7 +188,7 @@ lifetimes.  For example, the `borrowed` (which is usually implicit) and `inout`
 argument conventions are sugar that avoids having to explicitly declare
 lifetimes:
 
-```
+```mojo
 // Mojo today
 fn example(inout a: Int, borrowed b: Float32): …
 
@@ -262,20 +263,19 @@ declaring it explicitly like this:
 
 ```mojo
     struct MyExample:
-    	fn method[self_life: Lifetime](self: mutref[self_life] Self)
-    	        -> Pointer[Int, self_life]:
-    		...
+        fn method[self_life: Lifetime](self: mutref[self_life] Self)
+                -> Pointer[Int, self_life]:
+            ...
 
     fn callMethod(x: mutref[life1] MyExample):
-    	use(x.method())
+        use(x.method())
 
-    	var y = MyExample()
-    	use(y.method())
+        var y = MyExample()
+        use(y.method())
 ```
 
-
 `self_life` will bind to the lifetime of whatever lvalue the method is called
-on, which is the `life1 `lifetime in the first example, and the implicit
+on, which is the `life1` lifetime in the first example, and the implicit
 lifetime of y in the second example.  This all composes nicely.
 
 One problem though - this won’t work for var definitions inside the struct,
@@ -284,7 +284,7 @@ it:
 
 ```mojo
     struct IntArray:
-    	var ptr : Pointer[Int, Self_lifetime]
+        var ptr : Pointer[Int, Self_lifetime]
 ```
 
 It isn’t clear to me how the compiler will remap this though.  We’d have to pass
@@ -329,8 +329,8 @@ that it needs to work with as well as element type:
         alias pointer_type = __mlir_type[...]
         var address: pointer_type
 
-   	    fn __init__() -> Self: ...
-        fn __init__(address: pointer_type) -> Self: ...
+           fn __init__(inout self): ...
+        fn __init__(inout self, address: pointer_type): ...
 
         # Should this be an __init__ to allow implicit conversions?
         @static_method
@@ -338,26 +338,26 @@ that it needs to work with as well as element type:
             ...
 
         fn __getitem__(self, offset: Int) -> inout[life] type:
-   	        ...
+               ...
 
         @staticmethod
         fn alloc(count: Int) -> Self: ...
         fn free(self): ...
 
     fn exercise_pointer():
-    	# Allocated untracked data with static/immortal lifetime.
-    	let ptr = MutablePointer[Int, __static_lifetime].alloc(42)
+        # Allocated untracked data with static/immortal lifetime.
+        let ptr = MutablePointer[Int, __static_lifetime].alloc(42)
 
-    	# Use extended getitem through reference to support setter.
-    	ptr[4] = 7
+        # Use extended getitem through reference to support setter.
+        ptr[4] = 7
 
-    	var localInt = 19
-    	let ptr2 = MutablePointer.address_of(localInt)
-    	ptr2[0] += 1  # increment localInt
+        var localInt = 19
+        let ptr2 = MutablePointer.address_of(localInt)
+        ptr2[0] += 1  # increment localInt
 
         # ERROR: Cannot mutate localInt while ptr2 lifetime is live
         localInt += 1
-    	use(ptr2)
+        use(ptr2)
 ```
 
 It’s not clear to me if we need to have a split between `Pointer` and
@@ -374,33 +374,30 @@ Another aspect of the model we should consider is whether we should have an
 completely safe when constructed from language references, which is pretty cool.
 We may also want to wire up the prefix star operator into a dunder method.
 
-
 ### ArraySlice
 
 `ArraySlice` (aka `ArrayRef` in LLVM) should compose on top of this:
 
-```
+```mojo
     @value
     @register_passable("trivial")
     struct MutableArraySlice[type: AnyType, life: Lifetime]:
         var ptr: MutablePointer[type, life]
         var size: Int
 
-    	fn __init__() -> Self:
-        fn __init__(ptr: MutablePointer[type, life], size: Int) -> Self:
+        fn __init__(inout self):
+        fn __init__(inout self, ptr: MutablePointer[type, life], size: Int):
 
         # All the normal slicing operations etc, with bounds checks.
         fn __getitem__(self, offset: Int) -> inout[life] type:
-    	    assert(offset < size)
-    	    return ptr[offset]
+            assert(offset < size)
+            return ptr[offset]
 ```
-
 
 As with `UnsafePointer`, this has to be parameterized based on the underlying
 element type.  `ArraySlice` is just a bound checked pointer, but because of
 lifetimes, it is safe once constructed: the references it produces are bound to
 the lifetime specified so can’t dangle.
-
 
 ### Array / ValueSemanticArray
 
@@ -416,9 +413,9 @@ implemented with `std::vector` style eager copying:
         var size: Int
         var capacity: Int
 
-    	fn __getitem__[life: Lifetime](self: inout[life], start: Int,
+        fn __getitem__[life: Lifetime](self: inout[life], start: Int,
                             stop: Int) -> MutableArraySlice[type, life]:
-    		return MutableArraySlice(ptr, size)
+            return MutableArraySlice(ptr, size)
 ```
 
 By tying the lifetime of the produced slice to the lifetime of the Array `self`,
