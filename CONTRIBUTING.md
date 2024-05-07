@@ -346,20 +346,6 @@ By making a contribution to this project, I certify that:
     this project or the open source license(s) involved.
 ```
 
-### Typos
-
-We have a tool to check for typos. It's included in the `pre-commit`.
-It also runs in the CI.
-If you believe that the spellchecker flagged a word that's correct,
-you can add this word to the list of allowed extras in the `.pre-commit-config.yaml` file.
-
-For example, `inout` (the keyword) and `modul` (the modular domain name) are not known
-by the spellchecker, so we have this line in the `.pre-commit-config.yaml`:
-
-```
-args: ['-L', 'inout,modul']
-```
-
 ### Review time SLA
 
 The team commits to reviewing submitted pull requests within a week of
