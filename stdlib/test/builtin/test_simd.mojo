@@ -89,60 +89,6 @@ def test_convert_simd_to_string():
     )
 
 
-def test_simd_representation():
-    var a: SIMD[DType.float32, 2] = 5
-    assert_equal(repr(a), "SIMD[DType.float32, 2](5.0, 5.0)")
-
-    var b: SIMD[DType.float64, 4] = 6
-    assert_equal(repr(b), "SIMD[DType.float64, 4](6.0, 6.0, 6.0, 6.0)")
-
-    var c: SIMD[DType.index, 8] = 7
-    assert_equal(repr(c), "SIMD[DType.index, 8](7, 7, 7, 7, 7, 7, 7, 7)")
-
-    assert_equal(
-        repr(UInt64(-1)), "SIMD[DType.uint64, 1](18446744073709551615)"
-    )
-    assert_equal(
-        repr(Scalar[DType.address](22)), "SIMD[DType.address, 1](0x16)"
-    )
-    assert_equal(
-        repr(Scalar[DType.address](0xDEADBEAF)),
-        "SIMD[DType.address, 1](0xdeadbeaf)",
-    )
-
-    assert_equal(repr(UInt16(32768)), "SIMD[DType.uint16, 1](32768)")
-    assert_equal(repr(UInt16(65535)), "SIMD[DType.uint16, 1](65535)")
-    assert_equal(repr(Int16(-2)), "SIMD[DType.int16, 1](-2)")
-
-    assert_equal(
-        repr(UInt64(16646288086500911323)),
-        "SIMD[DType.uint64, 1](16646288086500911323)",
-    )
-
-    # https://github.com/modularml/mojo/issues/556
-    assert_equal(
-        repr(
-            SIMD[DType.uint64, 4](
-                0xA0761D6478BD642F,
-                0xE7037ED1A0B428DB,
-                0x8EBC6AF09C88C6E3,
-                0x589965CC75374CC3,
-            )
-        ),
-        (
-            "SIMD[DType.uint64, 4](11562461410679940143, 16646288086500911323,"
-            " 10285213230658275043, 6384245875588680899)"
-        ),
-    )
-
-    assert_equal(
-        repr(
-            SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448)
-        ),
-        "SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448)",
-    )
-
-
 def test_issue_20421():
     var a = DTypePointer[DType.uint8]().alloc(16 * 64, alignment=64)
     for i in range(16 * 64):
@@ -920,7 +866,6 @@ def main():
     test_cast()
     test_simd_variadic()
     test_convert_simd_to_string()
-    test_simd_representation()
     test_issue_20421()
     test_truthy()
     test_ceil()

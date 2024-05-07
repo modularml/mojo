@@ -61,8 +61,6 @@ def test_basic():
 
 
 def test_optional_reg_basic():
-    print("== test_optional_reg_basic")
-
     var val: OptionalReg[Int] = None
     assert_false(val.__bool__())
 
