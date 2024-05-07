@@ -2,14 +2,6 @@
 title: "Mojo Manual"
 sidebar_label: Introduction
 description: A comprehensive guide to the Mojo programming language.
-aliases:
-  - /mojo/programming-manual.html
-css: /static/styles/page-navigation.css
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 ---
 
 Welcome to the Mojo Manual, a complete guide to the Mojo🔥 programming language!

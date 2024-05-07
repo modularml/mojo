@@ -4,12 +4,6 @@ sidebar_label: Decorators
 sidebar_position: 1
 description: A reference of Mojo's built-in decorators
 hide_table_of_contents: true
-css: /static/styles/page-navigation.css
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 listing:
   - id: docs
     contents:

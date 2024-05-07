@@ -2,11 +2,6 @@
 title: Mojo🔥 roadmap & sharp edges
 sidebar_label: Roadmap & sharp edges
 description: A summary of our Mojo plans, including upcoming features and things we need to fix.
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 ---
 
 This document captures the broad plan about how we plan to implement things in
