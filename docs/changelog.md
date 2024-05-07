@@ -45,8 +45,9 @@ what we publish.
           return Self(round(self.re), round(self.im))
   ```
 
-- The `abs, round, min, and max` functions have moved from `math` to `builtin`,
-  so you no longer need to do `from math import abs, round, min, max`.
+- The `abs, round, min, max, and divmod` functions have moved from `math` to
+  `builtin`, so you no longer need to do
+  `from math import abs, round, min, max, divmod`.
 
 - Mojo now allows types to opt in to use the `floor()` and `ceil()` functions in
   the `math` module by implementing the `__floor__()` and `__ceil__()` methods
