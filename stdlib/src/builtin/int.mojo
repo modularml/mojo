@@ -658,25 +658,24 @@ struct Int(
         return mod
 
     @always_inline("nodebug")
-    fn _divmod(self, rhs: Int) -> StaticIntTuple[2]:
+    fn __divmod__(self, rhs: Int) -> Tuple[Int, Int]:
         """Computes both the quotient and remainder using integer division.
 
         Args:
             rhs: The value to divide on.
 
         Returns:
-            The quotient and remainder as a tuple `(self // rhs, self % rhs)`.
+            The quotient and remainder as a `Tuple(self // rhs, self % rhs)`.
         """
         if rhs == 0:
-            # this should raise an exception.
-            return StaticIntTuple[2](0, 0)
+            return 0, 0
         var div: Int = self._positive_div(rhs)
         if rhs > 0 and self > 0:
-            return StaticIntTuple[2](div, self._positive_rem(rhs))
+            return div, self._positive_rem(rhs)
         var mod = self - div * rhs
         if ((rhs < 0) ^ (self < 0)) and mod:
-            return StaticIntTuple[2](div - 1, mod + rhs)
-        return StaticIntTuple[2](div, mod)
+            return div - 1, mod + rhs
+        return div, mod
 
     @always_inline("nodebug")
     fn __pow__(self, rhs: Int) -> Int:
