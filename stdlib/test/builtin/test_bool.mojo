@@ -41,6 +41,7 @@ fn takes_bool(cond: Bool) -> Bool:
 
 def test_convert_from_boolable():
     assert_true(takes_bool(MyTrue()))
+    assert_true(bool(MyTrue()))
 
 
 def test_bool_to_string():

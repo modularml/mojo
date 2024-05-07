@@ -288,3 +288,19 @@ fn bool(value: None) -> Bool:
         The bool representation of the object.
     """
     return False
+
+
+@always_inline
+fn bool[T: Boolable](value: T) -> Bool:
+    """Get the bool representation of the object.
+
+    Parameters:
+        T: The type of the object.
+
+    Args:
+        value: The object to get the bool representation of.
+
+    Returns:
+        The bool representation of the object.
+    """
+    return value.__bool__()
