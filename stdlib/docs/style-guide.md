@@ -304,6 +304,9 @@ fn add_param_arg[foo: Int](bar: Int) -> Int:
     return foo + bar
 ```
 
+For more detailed style guidelines, see the
+[Mojo docstring style guide](docstring-style-guide.md).
+
 ### Testing
 
 #### Unit test filenames
