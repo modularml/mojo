@@ -396,7 +396,7 @@ fn initialize_pointee_move[
     The pointer memory location is assumed to contain uninitialized data,
     and consequently the current contents of this pointer are not destructed
     before writing `value`. Similarly, ownership of `value` is logically
-    transfered into the pointer location.
+    transferred into the pointer location.
 
     When compared to `initialize_pointee_copy`, this avoids an extra copy on
     the caller side when the value is an `owned` rvalue.
@@ -418,7 +418,7 @@ fn initialize_pointee_copy[T: Copyable](ptr: UnsafePointer[T, _], value: T):
     The pointer memory location is assumed to contain uninitialized data,
     and consequently the current contents of this pointer are not destructed
     before writing `value`. Similarly, ownership of `value` is logically
-    transfered into the pointer location.
+    transferred into the pointer location.
 
     When compared to `initialize_pointee_move`, this avoids an extra move on
     the callee side when the value must be copied.
