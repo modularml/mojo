@@ -27,7 +27,7 @@ alias _mIsFloat = UInt8(1 << 6)
 
 @value
 @register_passable("trivial")
-struct DType(Stringable, KeyElement):
+struct DType(Stringable, Representable, KeyElement):
     """Represents DType and provides methods for working with it."""
 
     alias type = __mlir_type.`!kgen.dtype`
@@ -125,6 +125,15 @@ struct DType(Stringable, KeyElement):
         if self == DType.address:
             return "address"
         return "<<unknown>>"
+
+    @always_inline("nodebug")
+    fn __repr__(self) -> String:
+        """Gets the representation of the DType e.g. `"DType.float32"`.
+
+        Returns:
+            The representation of the dtype.
+        """
+        return "DType." + str(self)
 
     @always_inline("nodebug")
     fn get_value(self) -> __mlir_type.`!kgen.dtype`:
