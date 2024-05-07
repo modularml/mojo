@@ -87,6 +87,34 @@ def test_mod():
     assert_equal(1, Int(-3) % Int(2))
 
 
+def test_divmod():
+    var a: Int
+    var b: Int
+    a, b = divmod(7, 3)
+    assert_equal(a, 2)
+    assert_equal(b, 1)
+
+    a, b = divmod(-7, 3)
+    assert_equal(a, -3)
+    assert_equal(b, 2)
+
+    a, b = divmod(-7, -3)
+    assert_equal(a, 2)
+    assert_equal(b, -1)
+
+    a, b = divmod(7, -3)
+    assert_equal(a, -3)
+    assert_equal(b, -2)
+
+    a, b = divmod(0, 5)
+    assert_equal(a, 0)
+    assert_equal(b, 0)
+
+    a, b = divmod(5, 0)
+    assert_equal(a, 0)
+    assert_equal(b, 0)
+
+
 def test_abs():
     assert_equal(abs(Int(-5)), 5)
     assert_equal(abs(Int(2)), 2)
@@ -121,6 +149,7 @@ def main():
     test_round()
     test_floordiv()
     test_mod()
+    test_divmod()
     test_abs()
     test_string_conversion()
     test_int_representation()
