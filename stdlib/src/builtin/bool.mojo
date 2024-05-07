@@ -69,24 +69,6 @@ struct Bool(
         ](value)
 
     @always_inline("nodebug")
-    fn __init__[width: Int](value: SIMD[DType.bool, width]) -> Bool:
-        """Construct a Bool value given a SIMD value.
-
-        If there is more than a single element in the SIMD value, then value is
-        reduced using the and operator.
-
-        Parameters:
-            width: SIMD width.
-
-        Args:
-            value: The initial SIMD value.
-
-        Returns:
-            The constructed Bool value.
-        """
-        return value.__bool__()
-
-    @always_inline("nodebug")
     fn __init__[boolable: Boolable](value: boolable) -> Bool:
         """Implicitly convert a Boolable value to a Bool.
 
