@@ -69,7 +69,7 @@ formatted and consistent with the Mojo style guidelines.
 Note that you should not have any warnings.
 
 ```bash
-> mojo doc --warn-missing-doc-strings -o /dev/null stdlib/src/
+> mojo doc --diagnose-missing-doc-strings --validate-doc-strings -o /dev/null stdlib/src/
 ```
 
 Note that this is also included in the pre-commit. So if you have `pre-commit`

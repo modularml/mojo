@@ -100,6 +100,9 @@ what we publish.
 - `object` now implements all the bitwise operators.
     ([PR #2324](https://github.com/modularml/mojo/pull/2324) by [@LJ-9801](https://github.com/LJ-9801))
 
+- A new `--validate-doc-strings` option has been added to `mojo` to emit errors
+  on invalid doc strings instead of warnings.
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
@@ -107,6 +110,9 @@ what we publish.
 
 - Many functions returning a pointer type have been unified to have a public
   API function of `unsafe_ptr()`.
+
+- The `--warn-missing-doc-strings` flag for `mojo` has been renamed to
+  `--diagnose-missing-doc-strings`.
 
 ### ❌ Removed
 

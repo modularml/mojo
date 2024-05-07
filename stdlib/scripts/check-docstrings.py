@@ -24,7 +24,7 @@ def main():
     command = [
         "mojo",
         "doc",
-        "--warn-missing-doc-strings",
+        "--diagnose-missing-doc-strings",
         "-o",
         "/dev/null",
         "./stdlib/src",
