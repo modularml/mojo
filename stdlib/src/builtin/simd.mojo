@@ -2868,7 +2868,7 @@ fn _format_scalar[dtype: DType](inout writer: Formatter, value: Scalar[dtype]):
 
     var buf = _ArrayMem[Int8, size]()
     # TODO(MOCO-268):
-    #   Remove this rebind(..) once compiler type comparision bug is fixed.
+    #   Remove this rebind(..) once compiler type comparison bug is fixed.
     var buf_ptr: UnsafePointer[Int8] = rebind[UnsafePointer[Int8]](
         buf.unsafe_ptr()
     )

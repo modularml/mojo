@@ -76,7 +76,7 @@ struct StringRef(
         return self
 
     # TODO: #2317 Drop support for this constructor when we have fully
-    # transitionned to UInt8 as the main byte type.
+    # transitioned to UInt8 as the main byte type.
     @always_inline
     fn __init__(ptr: DTypePointer[DType.int8], len: Int) -> StringRef:
         """Construct a StringRef value given a (potentially non-0 terminated
@@ -116,7 +116,7 @@ struct StringRef(
         return Self {data: ptr.bitcast[DType.int8](), length: len}
 
     # TODO: #2317 Drop support for this constructor when we have fully
-    # transitionned to UInt8 as the main byte type.
+    # transitioned to UInt8 as the main byte type.
     @always_inline
     fn __init__(ptr: UnsafePointer[Int8]) -> StringRef:
         """Construct a StringRef value given a null-terminated string.
@@ -148,7 +148,7 @@ struct StringRef(
         return DTypePointer[DType.uint8](ptr)
 
     # TODO: #2317 Drop support for this constructor when we have fully
-    # transitionned to UInt8 as the main byte type.
+    # transitioned to UInt8 as the main byte type.
     @always_inline
     fn __init__(ptr: DTypePointer[DType.int8]) -> StringRef:
         """Construct a StringRef value given a null-terminated string.
@@ -188,7 +188,7 @@ struct StringRef(
         return StringRef(ptr.bitcast[DType.int8](), len)
 
     # TODO: #2317 Drop support for this method when we have fully
-    # transitionned to UInt8 as the main byte type.
+    # transitioned to UInt8 as the main byte type.
     @always_inline
     fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.

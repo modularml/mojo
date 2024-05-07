@@ -25,7 +25,7 @@ from memory.unsafe_pointer import destroy_pointee
 
 @value
 struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
-    """The type of a literal heterogenous list expression.
+    """The type of a literal heterogeneous list expression.
 
     A list consists of zero or more values, separated by commas.
 

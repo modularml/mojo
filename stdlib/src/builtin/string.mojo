@@ -26,7 +26,7 @@ from utils._format import Formattable, Formatter, ToFormatter
 from .io import _snprintf
 
 # ===----------------------------------------------------------------------===#
-# Utilties
+# Utilities
 # ===----------------------------------------------------------------------===#
 
 
@@ -920,7 +920,7 @@ struct String(
 
             # FIXME:
             #   String.__iadd__ currently only accepts a String, meaning this
-            #   RHS will allocate unneccessarily.
+            #   RHS will allocate unnecessarily.
             ptr[] += strref
 
         return Formatter(
@@ -1164,7 +1164,7 @@ struct String(
           new: The substring to replace with.
 
         Returns:
-          The string where all occurences of `old` are replaced with `new`.
+          The string where all occurrences of `old` are replaced with `new`.
         """
         if not old:
             return self._interleave(new)
@@ -1280,7 +1280,7 @@ struct String(
         converted to lowercase.
 
         Returns:
-            A new string where cased letters have been convered to lowercase.
+            A new string where cased letters have been converted to lowercase.
         """
 
         # TODO(#26444):
@@ -1412,7 +1412,7 @@ struct String(
             n : The number of times to concatenate the string.
 
         Returns:
-            The string concantenated `n` times.
+            The string concatenated `n` times.
         """
         if n <= 0:
             return ""
