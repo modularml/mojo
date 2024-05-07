@@ -24,7 +24,7 @@ alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 @always_inline
 fn hex[T: Intable](value: T) -> String:
-    """Returns the hex string represention of the given integer.
+    """Returns the hex string representation of the given integer.
 
     The hexadecimal representation is a base-16 encoding of the integer value.
 

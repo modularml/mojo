@@ -31,7 +31,7 @@ fn _get_global[
 fn _init_global_runtime(
     ignored: UnsafePointer[NoneType],
 ) -> UnsafePointer[NoneType]:
-    """Intialize the global runtime. This is a singleton that handle the common
+    """Initialize the global runtime. This is a singleton that handle the common
     case where the runtime has the same number of threads as the number of cores.
     """
     return external_call[

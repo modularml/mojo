@@ -119,7 +119,7 @@ example would be expressed as:
 fn scalar_param[x: Scalar[dt], dt: DType](): pass
 ```
 
-Where any parameter is inferrable from any previous parameter. The benefits of
+Where any parameter is inferable from any previous parameter. The benefits of
 this approach are that the order of parameters at the callsite match the order
 in the declaration: `scalar_param[Int32()]()`
 

@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements compile time contraints.
+"""Implements compile time constraints.
 
 These are Mojo built-ins, so you don't need to import them.
 """

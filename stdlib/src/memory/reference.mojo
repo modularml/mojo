@@ -120,7 +120,7 @@ struct AddressSpace(EqualityComparable):
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Int):
-        """Initializes the address space from the underlying integeral value.
+        """Initializes the address space from the underlying integral value.
 
         Args:
           value: The address space value.
@@ -129,7 +129,7 @@ struct AddressSpace(EqualityComparable):
 
     @always_inline("nodebug")
     fn __init__(inout self, value: _GPUAddressSpace):
-        """Initializes the address space from the underlying integeral value.
+        """Initializes the address space from the underlying integral value.
 
         Args:
           value: The address space value.

@@ -88,7 +88,7 @@ trait Floorable:
 
 trait CeilDivable:
     """
-    The `CeilDivable` trait describes a type that defines a ceil divison
+    The `CeilDivable` trait describes a type that defines a ceil division
     operation.
 
     Types that conform to `CeilDivable` will work with the `math.ceildiv`
@@ -127,7 +127,7 @@ trait CeilDivable:
 
 trait CeilDivableRaising:
     """
-    The `CeilDivable` trait describes a type that define a floor divison and
+    The `CeilDivable` trait describes a type that define a floor division and
     negation operation that can raise.
 
     Types that conform to `CeilDivableRaising` will work with the `//` operator

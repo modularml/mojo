@@ -249,7 +249,7 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
 
 @value
 struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
-    """A fixed-size sequence of size homogenous elements where size is a constant expression.
+    """A fixed-size sequence of size homogeneous elements where size is a constant expression.
 
     Parameters:
         ElementType: The type of the elements in the array.

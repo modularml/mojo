@@ -242,7 +242,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             T: The type to take.
 
         Returns:
-            The undelying data as an owned value.
+            The underlying data as an owned value.
         """
         debug_assert(
             Self._check[T]() == self._get_state()[], "taking wrong type"

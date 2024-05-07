@@ -63,7 +63,7 @@ modular update mojo
 
 - Improvements to variadic arguments support.
 
-  - Heterogenous variadic pack arguments now work reliably even with memory types,
+  - Heterogeneous variadic pack arguments now work reliably even with memory types,
     and have a more convenient API to use, as defined by the
     [`VariadicPack`](/mojo/stdlib/builtin/builtin_list/VariadicPack) type. For
     example, a simplified version of `print` can be implemented like this:
@@ -1607,7 +1607,7 @@ experience without dedicated sugar.
   `num_physical_cores()`, `num_logical_cores()`, and `num_performance_cores()`
   functions.
 
-- Homogenous variadic arguments consisting of memory-only types, such as
+- Homogeneous variadic arguments consisting of memory-only types, such as
   `String` are more powerful and easier to use. These arguments are projected
   into a
   [`VariadicListMem`](/mojo/stdlib/builtin/builtin_list/VariadicListMem).
@@ -1651,7 +1651,7 @@ experience without dedicated sugar.
           i[] += " world"
   ```
 
-  Heterogenous variadic arguments have not yet been moved to the new model, but
+  Heterogeneous variadic arguments have not yet been moved to the new model, but
   will in future updates.
 
   Note that for variadic arguments of register-passable types like `Int`, the
@@ -2072,7 +2072,7 @@ experience without dedicated sugar.
   ```
 
   Traits can also inherit from other traits, which simply requires that
-  implementors of the child trait also conform to all parent traits.
+  implementers of the child trait also conform to all parent traits.
 
   ```mojo
   trait Parent:
@@ -3980,7 +3980,7 @@ busy this week.
 
 - 📚 Memcpy and memcmp now consistently use count as the byte count.
 
-- 📚 Add a variadic sting join on strings.
+- 📚 Add a variadic string join on strings.
 
 - 📚 Introduce a `reduce_bit_count` method to count the number of 1 across all
   elements in a SIMD vector.

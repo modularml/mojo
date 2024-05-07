@@ -138,7 +138,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         """Returns a string representation of the path.
 
         Returns:
-          A string represntation of the path.
+          A string representation of the path.
         """
         return self.path
 
@@ -147,7 +147,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         """Returns a string representation of the path.
 
         Returns:
-          A string represntation of the path.
+          A string representation of the path.
         """
         return str(self)
 
@@ -155,7 +155,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         """Returns a printable representation of the path.
 
         Returns:
-          A printable represntation of the path.
+          A printable representation of the path.
         """
         return str(self)
 

@@ -244,7 +244,7 @@ struct FileHandle:
         # Skip 2 elements
         _ = file.seek(2 * sizeof[DType.float32](), os.SEEK_CUR)
 
-        # Allocate and load 8 more elements from file hande seek position
+        # Allocate and load 8 more elements from file handle seek position
         var ptr2 = DTypePointer[DType.float32].alloc(8)
         var bytes2 = file.read(ptr2, 8)
 

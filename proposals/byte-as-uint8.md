@@ -9,7 +9,7 @@ hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:`.
 ## Motivation
 
 Logically a byte is an integer value between `0` and `255`. Lots of algorithms
-make use of arithmetics ground by this assumption.  A signed 8 bit integer on
+make use of arithmetic ground by this assumption.  A signed 8 bit integer on
 the contrary represents values between `-128` and `127`. This introduces very
 subtle bugs, when an algorithm written for unsigned 8 bit integer is used on a
 signed 8 bit integer.

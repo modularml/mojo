@@ -353,7 +353,7 @@ struct OptionalReg[T: AnyRegType](Boolable):
         """Return true if the optional has a value.
 
         Returns:
-            True if the optional has a valu and False otherwise.
+            True if the optional has a value and False otherwise.
         """
         return __mlir_op.`kgen.variant.is`[index = Int(0).value](self._value)
 

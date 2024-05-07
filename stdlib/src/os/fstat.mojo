@@ -115,7 +115,7 @@ struct stat_result(Stringable):
         st_rdev: Int,
         st_flags: Int,
     ):
-        """Intialize the stat_result structure.
+        """Initialize the stat_result structure.
 
         Args:
           st_mode: File mode: file type and file mode bits (permissions).
