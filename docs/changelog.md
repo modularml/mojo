@@ -18,6 +18,28 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo now supports adding a `@deprecated` decorator on structs, functions,
+  traits, aliases, and global variables. The decorator marks the attached decl
+  as deprecated and causes a warning to be emitted when the deprecated decl is
+  referenced in user code. The decorator requires a deprecation message to be
+  specified as a string literal.
+
+  ```mojo
+  @deprecated("Foo is deprecated, use Bar instead")
+  struct Foo:
+      pass
+
+  fn outdated_api(x: Foo): # warning: Foo is deprecated, use Bar instead
+      pass
+
+  @deprecated("use another function!")
+  fn bar():
+      pass
+
+  fn techdebt():
+      bar() # warning: use another function!
+  ```
+
 - `int()` can now take a string and a specified base to parse an integer from a
   string: `int("ff", 16)` returns `255`. Additionally, if a base of zero is
   specified, the string will be parsed as if it was an integer literal, with the
