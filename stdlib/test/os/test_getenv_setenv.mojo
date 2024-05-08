@@ -19,8 +19,6 @@ from testing import assert_equal
 
 
 def test_getenv():
-    print("== test_getenv")
-
     assert_equal(getenv("TEST_MYVAR"), "MyValue")
 
     assert_equal(getenv("TEST_MYVAR", "DefaultValue"), "MyValue")
@@ -30,8 +28,6 @@ def test_getenv():
 
 # CHECK-OK-LABEL: test_setenv
 def test_setenv():
-    print("== test_setenv")
-
     assert_equal(setenv("NEW_VAR", "FOO", True), True)
     assert_equal(getenv("NEW_VAR"), "FOO")
 

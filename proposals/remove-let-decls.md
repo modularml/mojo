@@ -1,4 +1,4 @@
-# Simplifying Mojo🔥 - let's get rid of `let`!
+# Simplifying Mojo🔥 - let's get rid of `let`
 
 Chris Lattner, Dec 5, 2023, Status: **Accepted**, [discussion thread](https://github.com/modularml/mojo/discussions/1456#discussioncomment-8358722)
 
@@ -64,16 +64,16 @@ is inconsistent.  Swift has a very complex set of rules for how struct fields
 get initialized that would be nice to not implement for Mojo.  There also isn’t
 a great way to define defaulted field values, e.g.:
 
-```mojo
-struct Thing:
-    # This is not actually supported right now, but imagine it were.
-    let field = 42
-    fn __init__(inout self):
-        self.field = 17  # shouldn't be able to overwrite field?
-```
+   ```mojo
+   struct Thing:
+       # This is not actually supported right now, but imagine it were.
+       let field = 42
+       fn __init__(inout self):
+           self.field = 17  # shouldn't be able to overwrite field?
+   ```
 
 8. Mojo has a notion of ownership and will eventually have a notion of lifetimes
-and safe references (including both mutable and immutable _references_) which
+and safe references (including both mutable and immutable *references*) which
 will be different from (but can compose with) the `let` vs `var` distinction.
 It is unfortunate to have different forms of immutability floating around, and
 we really do need immutable borrows and immutable references.
