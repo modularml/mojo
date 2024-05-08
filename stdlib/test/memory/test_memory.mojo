@@ -129,6 +129,52 @@ def test_memcmp():
     assert_equal(errors2, 0)
 
 
+def test_memcmp_overflow():
+    var p1 = DTypePointer[DType.int8].alloc(1)
+    var p2 = DTypePointer[DType.int8].alloc(1)
+    p1.store(-120)
+    p2.store(120)
+
+    var c = memcmp(p1, p2, 1)
+    assert_equal(c, -1, "-120 is smaller than 120")
+
+    c = memcmp(p2, p1, 1)
+    assert_equal(c, 1, "120 is bigger than -120")
+
+
+def test_memcmp_simd():
+    var length = simdwidthof[DType.int8]() + 10
+
+    var p1 = DTypePointer[DType.int8].alloc(length)
+    var p2 = DTypePointer[DType.int8].alloc(length)
+    memset_zero(p1, length)
+    memset_zero(p2, length)
+    p1.store(120)
+    p1.store(1, 100)
+    p2.store(120)
+    p2.store(1, 90)
+
+    var c = memcmp(p1, p2, length)
+    assert_equal(c, 1, "[120, 100, 0, ...] is bigger than [120, 90, 0, ...]")
+
+    c = memcmp(p2, p1, length)
+    assert_equal(c, -1, "[120, 90, 0, ...] is smaller than [120, 100, 0, ...]")
+
+    memset_zero(p1, length)
+    memset_zero(p2, length)
+
+    p1.store(length - 2, 120)
+    p1.store(length - 1, 100)
+    p2.store(length - 2, 120)
+    p2.store(length - 1, 90)
+
+    c = memcmp(p1, p2, length)
+    assert_equal(c, 1, "[..., 0, 120, 100] is bigger than [..., 0, 120, 90]")
+
+    c = memcmp(p2, p1, length)
+    assert_equal(c, -1, "[..., 0, 120, 90] is smaller than [..., 120, 100]")
+
+
 def test_memcmp_extensive[
     type: DType, extermes: StringLiteral = ""
 ](count: Int):
@@ -413,6 +459,8 @@ def main():
     test_memcpy()
     test_memcpy_dtype()
     test_memcmp()
+    test_memcmp_overflow()
+    test_memcmp_simd()
     test_memcmp_extensive()
     test_memset()
 
