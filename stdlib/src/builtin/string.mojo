@@ -531,7 +531,7 @@ struct String(
         var length = len(str)
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
-        memcpy(rebind[DTypePointer[DType.int8]](buffer.data), str.data, length)
+        memcpy(rebind[DTypePointer[DType.uint8]](buffer.data), str.data, length)
         buffer[length] = 0
         self._buffer = buffer^
 
@@ -983,7 +983,7 @@ struct String(
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.unsafe_ptr(), length: len(self)}
+        return StringRef {data: self.unsafe_uint8_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
@@ -997,7 +997,7 @@ struct String(
     fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
 
-        Note that you should use `_as_uint8_ptr()` if you need to access the
+        Note that you should use `unsafe_uint8_ptr()` if you need to access the
         pointer as we are now storing the bytes as UInt8.
 
         See https://github.com/modularml/mojo/issues/2317 for more information.

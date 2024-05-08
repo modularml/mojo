@@ -301,7 +301,7 @@ struct CPython:
         name: StringRef,
     ) -> PyObjectPtr:
         var r = self.lib.get_function[
-            fn (DTypePointer[DType.int8]) -> PyObjectPtr
+            fn (DTypePointer[DType.uint8]) -> PyObjectPtr
         ]("PyImport_ImportModule")(name.data)
         if self.logging_enabled:
             print(
@@ -325,7 +325,7 @@ struct CPython:
             raised an exception.
         """
         var status = self.lib.get_function[
-            fn (DTypePointer[DType.int8]) -> Int
+            fn (DTypePointer[DType.uint8]) -> Int
         ](StringRef("PyRun_SimpleString"))(strref.data)
         # PyRun_SimpleString returns 0 on success and -1 if an exception was
         # raised.
@@ -341,7 +341,7 @@ struct CPython:
         var result = PyObjectPtr(
             self.lib.get_function[
                 fn (
-                    DTypePointer[DType.int8], Int32, PyObjectPtr, PyObjectPtr
+                    DTypePointer[DType.uint8], Int32, PyObjectPtr, PyObjectPtr
                 ) -> DTypePointer[DType.int8]
             ]("PyRun_String")(strref.data, Int32(run_mode), globals, locals)
         )
@@ -364,7 +364,7 @@ struct CPython:
         name: StringRef,
     ) -> PyObjectPtr:
         var r = self.lib.get_function[
-            fn (PyObjectPtr, DTypePointer[DType.int8]) -> PyObjectPtr
+            fn (PyObjectPtr, DTypePointer[DType.uint8]) -> PyObjectPtr
         ]("PyObject_GetAttrString")(obj, name.data)
         if self.logging_enabled:
             print(
@@ -383,7 +383,7 @@ struct CPython:
         inout self, obj: PyObjectPtr, name: StringRef, new_value: PyObjectPtr
     ) -> Int:
         var r = self.lib.get_function[
-            fn (PyObjectPtr, DTypePointer[DType.int8], PyObjectPtr) -> Int
+            fn (PyObjectPtr, DTypePointer[DType.uint8], PyObjectPtr) -> Int
         ]("PyObject_SetAttrString")(obj, name.data, new_value)
         if self.logging_enabled:
             print(
@@ -493,7 +493,7 @@ struct CPython:
     fn PyString_FromStringAndSize(inout self, strref: StringRef) -> PyObjectPtr:
         var r = self.lib.get_function[
             fn (
-                DTypePointer[DType.int8], Int, DTypePointer[DType.int8]
+                DTypePointer[DType.uint8], Int, DTypePointer[DType.int8]
             ) -> PyObjectPtr
         ](StringRef("PyUnicode_DecodeUTF8"))(
             strref.data, strref.length, "strict".unsafe_ptr()
@@ -532,7 +532,7 @@ struct CPython:
 
     fn PyImport_AddModule(inout self, name: StringRef) -> PyObjectPtr:
         var value = self.lib.get_function[
-            fn (DTypePointer[DType.int8]) -> DTypePointer[DType.int8]
+            fn (DTypePointer[DType.uint8]) -> DTypePointer[DType.int8]
         ]("PyImport_AddModule")(name.data)
         return PyObjectPtr {value: value}
 

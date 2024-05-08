@@ -155,12 +155,14 @@ struct InlinedString(Sized, Stringable, CollectionElement):
             # string.
             var buffer = List[Int8](capacity=total_len)
 
-            var buffer_ptr = rebind[DTypePointer[DType.int8]](buffer.data)
+            var buffer_ptr = rebind[DTypePointer[DType.uint8]](buffer.data)
 
             # Copy the bytes from the current small string layout
             memcpy(
                 buffer_ptr,
-                self._storage.get[_FixedString[Self.SMALL_CAP]]()[].as_ptr(),
+                self._storage.get[
+                    _FixedString[Self.SMALL_CAP]
+                ]()[].as_uint8_ptr(),
                 len(self),
             )
 
@@ -229,6 +231,8 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
         return res
 
+    # TODO: Remove this when we have transitioned to uint8 for bytes.
+    # See https://github.com/modularml/mojo/issues/2317 for details
     fn as_ptr(self) -> DTypePointer[DType.int8]:
         """Returns a pointer to the bytes of string data.
 
@@ -241,6 +245,20 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         else:
             return self._storage.get[String]()[].unsafe_ptr()
 
+    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Returns a pointer to the bytes of string data.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+
+        if self._is_small():
+            return self._storage.get[
+                _FixedString[Self.SMALL_CAP]
+            ]()[].as_uint8_ptr()
+        else:
+            return self._storage.get[String]()[].unsafe_uint8_ptr()
+
     fn _strref_dangerous(self) -> StringRef:
         """
         Returns an inner pointer to the string as a StringRef.
@@ -248,7 +266,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.as_ptr(), length: len(self)}
+        return StringRef {data: self.as_uint8_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
@@ -366,7 +384,11 @@ struct _FixedString[CAP: Int](
             )
 
         # Append the bytes from `strref` at the end of the current string
-        memcpy(self.buffer.as_ptr() + len(self), strref.data, len(strref))
+        memcpy(
+            self.buffer.as_ptr().bitcast[UInt8]() + len(self),
+            strref.data,
+            len(strref),
+        )
 
         self.size = total_len
 
@@ -427,6 +449,8 @@ struct _FixedString[CAP: Int](
 
         return output^
 
+    # TODO: Remove this when we have transitionned to uint8 for bytes.
+    # See https://github.com/modularml/mojo/issues/2317 for details
     fn as_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
 
@@ -435,6 +459,14 @@ struct _FixedString[CAP: Int](
         """
         return self.buffer.as_ptr()
 
+    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.buffer.as_ptr().bitcast[UInt8]()
+
     fn _strref_dangerous(self) -> StringRef:
         """
         Returns an inner pointer to the string as a StringRef.
@@ -442,7 +474,7 @@ struct _FixedString[CAP: Int](
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.as_ptr(), length: len(self)}
+        return StringRef {data: self.as_uint8_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
