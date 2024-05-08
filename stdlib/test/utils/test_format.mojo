@@ -74,4 +74,4 @@ fn test_formatter_of_fixed_string() raises:
     var s1 = _FixedString[100]()
     var s1_fmt = Formatter(s1)
     write_to(s1_fmt, "Hello, World!")
-    assert_equal(s1, "Hello, World!")
+    assert_equal(str(s1), "Hello, World!")
