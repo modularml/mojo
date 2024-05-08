@@ -270,7 +270,7 @@ fn assert_almost_equal[
     if not almost_equal:
         var err = str(lhs) + " is not close to " + str(
             rhs
-        ) + " with a diff of " + abs(lhs - rhs)
+        ) + " with a diff of " + str(abs(lhs - rhs))
 
         if msg:
             err += " (" + msg + ")"
