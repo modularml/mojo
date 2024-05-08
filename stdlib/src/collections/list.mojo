@@ -456,9 +456,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if not self.size:
             raise "Cannot find index of a value in an empty list."
         if normalized_start >= self.size:
-            raise "Given 'start' parameter (" + String(
+            raise "Given 'start' parameter (" + str(
                 normalized_start
-            ) + ") is out of range. List only has " + String(
+            ) + ") is out of range. List only has " + str(
                 self.size
             ) + " elements."
 
