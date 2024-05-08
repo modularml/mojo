@@ -345,13 +345,15 @@ struct UnsafePointer[
 # ===----------------------------------------------------------------------=== #
 # UnsafePointer extensions
 # ===----------------------------------------------------------------------=== #
-# TODO: These should be methods when we have conditional conformance.
+
+# TODO: These should be methods when we have conditional conformance.  None of
+# these can work with pointers in generic address spaces, because they need to
+# invoke methods like del or moveinit or copyinit, which take borrowed arguments
+# in the corresponding traits.
 
 
-# This isn't a method because destructors only work in the default address
-# space.
 @always_inline
-fn destroy_pointee(ptr: UnsafePointer[_, AddressSpace.GENERIC]):
+fn destroy_pointee(ptr: UnsafePointer[_]):
     """Destroy the pointed-to value.
 
     The pointer must not be null, and the pointer memory location is assumed
@@ -364,7 +366,7 @@ fn destroy_pointee(ptr: UnsafePointer[_, AddressSpace.GENERIC]):
 
 
 @always_inline
-fn move_from_pointee[T: Movable](ptr: UnsafePointer[T, _]) -> T:
+fn move_from_pointee[T: Movable](ptr: UnsafePointer[T]) -> T:
     """Move the value at the pointer out.
 
     The pointer must not be null, and the pointer memory location is assumed
@@ -388,9 +390,7 @@ fn move_from_pointee[T: Movable](ptr: UnsafePointer[T, _]) -> T:
 
 
 @always_inline
-fn initialize_pointee_move[
-    T: Movable
-](ptr: UnsafePointer[T, _], owned value: T):
+fn initialize_pointee_move[T: Movable](ptr: UnsafePointer[T], owned value: T):
     """Emplace a new value into the pointer location, moving from `value`.
 
     The pointer memory location is assumed to contain uninitialized data,
@@ -412,7 +412,7 @@ fn initialize_pointee_move[
 
 
 @always_inline
-fn initialize_pointee_copy[T: Copyable](ptr: UnsafePointer[T, _], value: T):
+fn initialize_pointee_copy[T: Copyable](ptr: UnsafePointer[T], value: T):
     """Emplace a copy of `value` into the pointer location.
 
     The pointer memory location is assumed to contain uninitialized data,
@@ -434,7 +434,7 @@ fn initialize_pointee_copy[T: Copyable](ptr: UnsafePointer[T, _], value: T):
 
 
 @always_inline
-fn move_pointee[T: Movable](*, src: UnsafePointer[T, _], dst: UnsafePointer[T]):
+fn move_pointee[T: Movable](*, src: UnsafePointer[T], dst: UnsafePointer[T]):
     """Moves the value `src` points to into the memory location pointed to by
     `dest`.
 
