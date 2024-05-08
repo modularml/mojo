@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import sizeof
 
-from memory import Pointer
+from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------=== #
 # _suspend_async
@@ -97,14 +97,14 @@ struct Coroutine[type: AnyRegType]:
     var _handle: AnyCoroutine
 
     @always_inline
-    fn _get_promise(self) -> Pointer[type]:
+    fn _get_promise(self) -> UnsafePointer[type]:
         """Return the pointer to the beginning of the memory where the async
         function results are stored.
 
         Returns:
             The coroutine promise.
         """
-        var promise: Pointer[Self._promise_type] = __mlir_op.`co.promise`[
+        var promise: UnsafePointer[Self._promise_type] = __mlir_op.`co.promise`[
             _type = __mlir_type[`!kgen.pointer<`, Self._promise_type, `>`]
         ](self._handle)
         return promise.bitcast[type]()
@@ -116,10 +116,10 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The value of the fulfilled promise.
         """
-        return self._get_promise().load()
+        return LegacyPointer(self._get_promise().address).load()
 
     @always_inline
-    fn _get_ctx[ctx_type: AnyRegType](self) -> Pointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyRegType](self) -> UnsafePointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:
@@ -162,7 +162,7 @@ struct Coroutine[type: AnyRegType]:
         @always_inline
         @parameter
         fn await_body(parent_hdl: AnyCoroutine):
-            self._get_ctx[_CoroutineContext]().store(
+            LegacyPointer(self._get_ctx[_CoroutineContext]().address).store(
                 _CoroutineContext {
                     _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
                 }
@@ -174,7 +174,7 @@ struct Coroutine[type: AnyRegType]:
 
     # Never call this method.
     fn _deprecated_direct_resume(self) -> type:
-        self._get_ctx[_CoroutineContext]().store(
+        LegacyPointer(self._get_ctx[_CoroutineContext]().address).store(
             _CoroutineContext {
                 _resume_fn: _coro_resume_noop_callback,
                 _parent_hdl: self._handle,
@@ -207,14 +207,14 @@ struct RaisingCoroutine[type: AnyRegType]:
     var _handle: AnyCoroutine
 
     @always_inline
-    fn _get_promise(self) -> Pointer[Self._var_type]:
+    fn _get_promise(self) -> UnsafePointer[Self._var_type]:
         """Return the pointer to the beginning of the memory where the async
         function results are stored.
 
         Returns:
             The coroutine promise.
         """
-        var promise: Pointer[Self._promise_type] = __mlir_op.`co.promise`[
+        var promise: UnsafePointer[Self._promise_type] = __mlir_op.`co.promise`[
             _type = __mlir_type[`!kgen.pointer<`, Self._promise_type, `>`]
         ](self._handle)
         return promise.bitcast[Self._var_type]()
@@ -226,13 +226,13 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The value of the fulfilled promise.
         """
-        var variant = self._get_promise().load()
+        var variant = LegacyPointer(self._get_promise().address).load()
         if __mlir_op.`kgen.variant.is`[index = Int(0).value](variant):
             raise __mlir_op.`kgen.variant.take`[index = Int(0).value](variant)
         return __mlir_op.`kgen.variant.take`[index = Int(1).value](variant)
 
     @always_inline
-    fn _get_ctx[ctx_type: AnyRegType](self) -> Pointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyRegType](self) -> UnsafePointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:
@@ -272,7 +272,7 @@ struct RaisingCoroutine[type: AnyRegType]:
         @always_inline
         @parameter
         fn await_body(parent_hdl: AnyCoroutine):
-            self._get_ctx[_CoroutineContext]().store(
+            LegacyPointer(self._get_ctx[_CoroutineContext]().address).store(
                 _CoroutineContext {
                     _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
                 }
