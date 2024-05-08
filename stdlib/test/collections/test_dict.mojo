@@ -49,9 +49,9 @@ def test_bool_conversion():
     assert_true(dict)
     dict["b"] = 2
     assert_true(dict)
-    dict.pop("a")
+    _ = dict.pop("a")
     assert_true(dict)
-    dict.pop("b")
+    _ = dict.pop("b")
     assert_false(dict)
 
 
@@ -217,7 +217,7 @@ def test_dict_copy_add_new_item():
     # test there are two copies of dict and
     # they don't share underlying memory
     copy["b"] = 2
-    assert_false(2 in orig)
+    assert_false(str(2) in orig)
 
 
 def test_dict_copy_calls_copy_constructor():
