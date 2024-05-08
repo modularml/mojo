@@ -294,7 +294,7 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
                 _put(", ")
         _put("]")
     else:
-        _put(String(x))
+        _put(str(x))
 
 
 @no_inline
@@ -374,7 +374,7 @@ fn print[
 
     @parameter
     fn print_with_separator[i: Int, T: Stringable](value: T):
-        _put(value)
+        _put(str(value))
 
         @parameter
         if i < values.__len__() - 1:
