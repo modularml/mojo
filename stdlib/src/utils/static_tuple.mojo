@@ -277,6 +277,28 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
+    fn __init__(inout self, *, unsafe_uninitialized: Bool):
+        """Create an InlineArray with uninitialized memory.
+
+        Note that this is highly unsafe and should be used with caution.
+
+        We recommend to use the `InlineList` instead if all the objects
+        are not available when creating the array,
+
+        If despite those workarounds, one still needs an uninitialized array,
+        it is possible with:
+
+        ```mojo
+        var uninitialized_array = InlineArray[Int, 10](unsafe_uninitialized=True)
+        ```
+
+        Args:
+            unsafe_uninitialized: A boolean to indicate if the array should be initialized.
+                Always set to `True`.
+        """
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
     fn __init__(inout self, fill: Self.ElementType):
         """Constructs an empty array where each element is the supplied `fill`.
 
