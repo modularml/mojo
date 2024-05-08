@@ -26,9 +26,9 @@ alias TEST_DIR = env_get_string["TEST_DIR"]()
 fn test_execute_python_string(inout python: Python) -> String:
     try:
         _ = Python.evaluate("print('evaluated by PyRunString')")
-        return Python.evaluate("'a' + 'b'")
+        return str(Python.evaluate("'a' + 'b'"))
     except e:
-        return e
+        return str(e)
 
 
 fn test_local_import(inout python: Python) -> String:
@@ -38,10 +38,10 @@ fn test_local_import(inout python: Python) -> String:
         if my_module:
             var foo = my_module.Foo("apple")
             foo.bar = "orange"
-            return foo.bar
+            return str(foo.bar)
         return "no module, no fruit"
     except e:
-        return e
+        return str(e)
 
 
 fn test_call(inout python: Python) -> String:
@@ -59,7 +59,7 @@ fn test_call(inout python: Python) -> String:
             )
         )
     except e:
-        return e
+        return str(e)
 
 
 def main():
