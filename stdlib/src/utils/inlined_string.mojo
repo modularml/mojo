@@ -302,7 +302,7 @@ struct _FixedString[CAP: Int](
                 "String literal (len="
                 + str(len(literal))
                 + ") is longer than FixedString capacity ("
-                + CAP
+                + str(CAP)
                 + ")"
             )
 
