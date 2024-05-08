@@ -532,7 +532,9 @@ def test_join():
 
 
 def test_interleave():
-    assert_equal(Int32(0).interleave(Int32(1)), SIMD[DType.index, 2](0, 1))
+    assert_equal(
+        str(Int32(0).interleave(Int32(1))), str(SIMD[DType.index, 2](0, 1))
+    )
 
     assert_equal(
         SIMD[DType.index, 2](0, 2).interleave(SIMD[DType.index, 2](1, 3)),
