@@ -944,9 +944,9 @@ struct String(
         """
         if len(elems) == 0:
             return ""
-        var curr = String(elems[0])
+        var curr = str(elems[0])
         for i in range(1, len(elems)):
-            curr += self + String(elems[i])
+            curr += self + str(elems[i])
         return curr
 
     fn join[*Types: Stringable](self, *elems: *Types) -> String:
