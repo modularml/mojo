@@ -13,7 +13,7 @@
 
 from time.time import _CTimeSpec
 
-from utils import StaticIntTuple
+from utils import StaticTuple
 
 from .fstat import stat_result
 
