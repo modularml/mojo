@@ -772,7 +772,7 @@ struct object(IntableRaising, Boolable, Stringable):
         var impl = _ImmutableString(
             UnsafePointer[Int8].alloc(value.length), value.length
         )
-        memcpy(impl.data, value.data, value.length)
+        memcpy(impl.data, value.unsafe_ptr(), value.length)
         self._value = impl
 
     @always_inline

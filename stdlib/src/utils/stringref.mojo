@@ -50,7 +50,7 @@ struct StringRef(
     and a length, which need not be null terminated.
     """
 
-    var data: DTypePointer[DType.int8]
+    var data: DTypePointer[DType.uint8]
     """A pointer to the beginning of the string data being referenced."""
     var length: Int
     """The length of the string being referenced."""
@@ -96,7 +96,7 @@ struct StringRef(
             Constructed `StringRef` object.
         """
 
-        return Self {data: ptr, length: len}
+        return Self {data: ptr.bitcast[DType.uint8](), length: len}
 
     @always_inline
     fn __init__(ptr: DTypePointer[DType.uint8], len: Int) -> StringRef:
@@ -113,7 +113,7 @@ struct StringRef(
             Constructed `StringRef` object.
         """
 
-        return Self {data: ptr.bitcast[DType.int8](), length: len}
+        return Self {data: ptr, length: len}
 
     # TODO: #2317 Drop support for this constructor when we have fully
     # transitioned to UInt8 as the main byte type.
@@ -198,7 +198,7 @@ struct StringRef(
         Returns:
             The DTypePointer to the underlying memory.
         """
-        return self.data
+        return self.data.bitcast[DType.int8]()
 
     @always_inline
     fn unsafe_uint8_ptr(self) -> DTypePointer[DType.uint8]:
@@ -207,7 +207,7 @@ struct StringRef(
         Returns:
             The DTypePointer to the underlying memory.
         """
-        return self.data.bitcast[DType.uint8]()
+        return self.data
 
     @always_inline
     fn __bool__(self) -> Bool:
