@@ -60,15 +60,15 @@ fn round10(x: Float64) -> Float64:
 
 
 def test_round10():
-    assert_equal(round10(FloatLiteral(4.4) % 0.5), 0.4)
-    assert_equal(round10(FloatLiteral(-4.4) % 0.5), 0.1)
-    assert_equal(round10(FloatLiteral(4.4) % -0.5), -0.1)
-    assert_equal(round10(FloatLiteral(-4.4) % -0.5), -0.4)
-    assert_equal(round10(FloatLiteral(3.1) % 1.0), 0.1)
+    assert_equal(round10(4.4 % 0.5), 0.4)
+    assert_equal(round10(-4.4 % 0.5), 0.1)
+    assert_equal(round10(4.4 % -0.5), -0.1)
+    assert_equal(round10(-4.4 % -0.5), -0.4)
+    assert_equal(round10(3.1 % 1.0), 0.1)
 
 
 def test_division():
-    assert_equal(FloatLiteral(4.4) / 0.5, 8.8)
+    assert_equal(4.4 / 0.5, 8.8)
 
     alias f1 = 4.4 // 0.5
     assert_equal(f1, 8.0)
@@ -81,37 +81,37 @@ def test_division():
 
 
 def test_power():
-    assert_almost_equal(FloatLiteral(4.5) ** 2.5, 42.95673695)
-    assert_almost_equal(FloatLiteral(4.5) ** -2.5, 0.023279235)
+    assert_almost_equal(4.5**2.5, 42.95673695)
+    assert_almost_equal(4.5**-2.5, 0.023279235)
     # TODO (https://github.com/modularml/modular/issues/33045): Float64/SIMD has
     # issues with negative numbers raised to fractional powers.
-    # assert_almost_equal(FloatLiteral(-4.5) ** 2.5, -42.95673695)
-    # assert_almost_equal(FloatLiteral(-4.5) ** -2.5, -0.023279235)
+    # assert_almost_equal((-4.5) ** 2.5, -42.95673695)
+    # assert_almost_equal((-4.5) ** -2.5, -0.023279235)
 
 
 def test_int_conversion():
-    assert_equal(int(FloatLiteral(-4.0)), -4)
-    assert_equal(int(FloatLiteral(-4.5)), -4)
-    assert_equal(int(FloatLiteral(-4.3)), -4)
-    assert_equal(int(FloatLiteral(4.5)), 4)
-    assert_equal(int(FloatLiteral(4.0)), 4)
+    assert_equal(int(-4.0), -4)
+    assert_equal(int(-4.5), -4)
+    assert_equal(int(-4.3), -4)
+    assert_equal(int(4.5), 4)
+    assert_equal(int(4.0), 4)
 
 
 def test_boolean_comparable():
-    var f1 = FloatLiteral(0.0)
+    var f1 = 0.0
     assert_false(f1)
 
-    var f2 = FloatLiteral(2.0)
+    var f2 = 2.0
     assert_true(f2)
 
-    var f3 = FloatLiteral(1.0)
+    var f3 = 1.0
     assert_true(f3)
 
 
 def test_equality():
-    var f1 = FloatLiteral(4.4)
-    var f2 = FloatLiteral(4.4)
-    var f3 = FloatLiteral(42.0)
+    var f1 = 4.4
+    var f2 = 4.4
+    var f3 = 42.0
     assert_equal(f1, f2)
     assert_not_equal(f1, f3)
 
@@ -124,9 +124,9 @@ def test_is_special_value():
 
 
 def test_abs():
-    assert_equal(FloatLiteral(-4.4).__abs__(), 4.4)
-    assert_equal(FloatLiteral(4.4).__abs__(), 4.4)
-    assert_equal(FloatLiteral(0.0).__abs__(), 0.0)
+    assert_equal((-4.4).__abs__(), 4.4)
+    assert_equal((4.4).__abs__(), 4.4)
+    assert_equal((0.0).__abs__(), 0.0)
 
     assert_true(FloatLiteral.__abs__(nan).is_nan())
     assert_false(FloatLiteral.__abs__(neg_zero).is_neg_zero())
