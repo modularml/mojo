@@ -129,7 +129,7 @@ def test_file_seek():
         pos = f.seek(-16, os.SEEK_END)
         assert_equal(pos, 938)
 
-        f.read(6)
+        _ = f.read(6)
 
         # Seek from current possition, skip the space
         pos = f.seek(1, os.SEEK_CUR)
@@ -200,12 +200,14 @@ def test_file_read_to_dtype_pointer():
 
     var ptr = DTypePointer[DType.int8].alloc(8)
     var data = f.read(ptr, 8)
-    assert_equal(ptr.load[width=8](0), "[76, 111, 114, 101, 109, 32, 105, 112]")
+    assert_equal(
+        str(ptr.load[width=8](0)), "[76, 111, 114, 101, 109, 32, 105, 112]"
+    )
 
     var ptr2 = DTypePointer[DType.int8].alloc(8)
     var data2 = f.read(ptr2, 8)
     assert_equal(
-        ptr2.load[width=8](0), "[115, 117, 109, 32, 100, 111, 108, 111]"
+        str(ptr2.load[width=8](0)), "[115, 117, 109, 32, 100, 111, 108, 111]"
     )
 
 
