@@ -106,7 +106,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     You can
         - use `isa[T]()` to check what type a variant is
-        - use `take[T]()` to take a value from the variant
+        - use `unsafe_take[T]()` to take a value from the variant
         - use `get[T]()` to get a value out of a variant
             - This currently does an extra copy/move until we have lifetimes
             - It also temporarily requires the value to be mutable
@@ -227,7 +227,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         unroll[each, len(VariadicList(Ts))]()
 
-    fn take[T: CollectionElement](owned self) -> T:
+    fn unsafe_take[T: CollectionElement](owned self) -> T:
         """Take the current value of the variant as the provided type.
 
         The caller takes ownership of the underlying value. The variant
