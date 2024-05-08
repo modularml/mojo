@@ -20,7 +20,7 @@ from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, StaticTuple
+from utils import StringRef, StaticIntTuple
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf

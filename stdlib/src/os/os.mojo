@@ -27,7 +27,7 @@ from memory import (
 )
 from memory.unsafe_pointer import move_from_pointee
 
-from utils import StringRef
+from utils import StringRef, StaticTuple
 
 from .path import isdir
 from .pathlike import PathLike
