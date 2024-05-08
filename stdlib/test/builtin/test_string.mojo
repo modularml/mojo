@@ -35,14 +35,14 @@ struct AString(Stringable):
 
 fn test_stringable() raises:
     assert_equal("hello", str("hello"))
-    assert_equal("0", str(String(0)))
+    assert_equal("0", str(0))
     assert_equal("AAA", str(StringRef("AAA")))
-    assert_equal("a string", str(String(AString())))
+    assert_equal("a string", str(AString()))
 
 
 fn test_representable() raises:
     assert_equal(repr(String("hello")), "'hello'")
-    assert_equal(repr(String(0)), "'0'")
+    assert_equal(repr(str(0)), "'0'")
     # TODO: Add more complex cases with "'", escape characters, etc
     # and make String.__repr__ more robust to handle those cases.
 
@@ -53,12 +53,12 @@ fn test_constructors() raises:
     assert_true(not String())
 
     # Construction from Int
-    var s0 = String(0)
-    assert_equal("0", str(String(0)))
+    var s0 = str(0)
+    assert_equal("0", str(0))
     assert_equal(1, len(s0))
 
-    var s1 = String(123)
-    assert_equal("123", str(String(123)))
+    var s1 = str(123)
+    assert_equal("123", str(123))
     assert_equal(3, len(s1))
 
     # Construction from StringLiteral
@@ -78,7 +78,7 @@ fn test_constructors() raises:
 
 fn test_copy() raises:
     var s0 = String("find")
-    var s1 = String(s0)
+    var s1 = str(s0)
     s1._buffer[3] = ord("e")
     assert_equal("find", s0)
     assert_equal("fine", s1)
@@ -126,7 +126,7 @@ fn test_add() raises:
 
     var s8 = String("abc is ")
     var s9 = AString()
-    assert_equal("abc is a string", s8 + s9)
+    assert_equal("abc is a string", str(s8) + str(s9))
 
 
 fn test_string_join() raises:
