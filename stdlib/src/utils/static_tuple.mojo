@@ -270,10 +270,20 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         constrained[
             False,
             (
-                "Initialize with either a variadic list of arguments or a"
-                " default fill element."
+                "Initialize with either a variadic list of arguments, a default"
+                " fill element or pass the keyword argument 'uninitialized'."
             ),
         ]()
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
+    fn __init__(inout self, *, uninitialized: Bool):
+        """Constructs an empty with uninitized data.
+
+        Args:
+            uninitialized: Unused, exists just to make uninitialized
+                case explicit.
+        """
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
