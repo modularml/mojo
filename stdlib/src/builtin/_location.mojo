@@ -35,7 +35,7 @@ struct _SourceLocation(Stringable):
         Args:
             msg: The message to attach the prefix to.
         """
-        return "At " + str(self) + ": " + msg
+        return "At " + str(self) + ": " + str(msg)
 
 
 @always_inline("nodebug")
