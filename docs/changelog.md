@@ -145,6 +145,9 @@ what we publish.
 - The `--warn-missing-doc-strings` flag for `mojo` has been renamed to
   `--diagnose-missing-doc-strings`.
 
+- The `take` function in `Variant` and `Optional` has been renamed to
+`unsafe_take`.
+
 ### ❌ Removed
 
 - The method `object.print()` has been removed. Since now, `object` has the
