@@ -46,40 +46,22 @@ struct FloatLiteral(
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(value: FloatLiteral) -> Self:
-        """Forwarding constructor.
-
-        Args:
-           value: The FloatLiteral value.
-
-        Returns:
-           The value.
-        """
-        return value
-
-    @always_inline("nodebug")
-    fn __init__(value: Self.fp_type) -> Self:
+    fn __init__(inout self, value: Self.fp_type):
         """Create a FloatLiteral value from a kgen.float_literal value.
 
         Args:
             value: The float value.
-
-        Returns:
-            A FloatLiteral value.
         """
-        return Self {value: value}
+        self.value = value
 
     @always_inline("nodebug")
-    fn __init__(value: IntLiteral) -> Self:
+    fn __init__(inout self, value: IntLiteral):
         """Convert an IntLiteral to a FloatLiteral value.
 
         Args:
             value: The IntLiteral value.
-
-        Returns:
-            The integer value as a FloatLiteral.
         """
-        return Self(__mlir_op.`kgen.int_literal.to_float_literal`(value.value))
+        self.value = __mlir_op.`kgen.int_literal.to_float_literal`(value.value)
 
     alias nan = Self(__mlir_attr.`#kgen.float_literal<nan>`)
     alias infinity = Self(__mlir_attr.`#kgen.float_literal<inf>`)
