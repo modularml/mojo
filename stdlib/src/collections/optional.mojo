@@ -284,35 +284,25 @@ struct OptionalReg[T: AnyRegType](Boolable):
         """Create an optional with a value of None."""
         self = Self(None)
 
-    fn __init__(value: T) -> Self:
+    fn __init__(inout self, value: T):
         """Create an optional with a value.
 
         Args:
             value: The value.
-
-        Returns:
-            The optional.
         """
-        return Self {
-            _value: __mlir_op.`kgen.variant.create`[
-                _type = Self._type, index = Int(0).value
-            ](value)
-        }
+        self._value = __mlir_op.`kgen.variant.create`[
+            _type = Self._type, index = Int(0).value
+        ](value)
 
-    fn __init__(value: NoneType) -> Self:
+    fn __init__(inout self, value: NoneType):
         """Create an optional without a value from a None literal.
 
         Args:
             value: The None value.
-
-        Returns:
-            The optional without a value.
         """
-        return Self {
-            _value: __mlir_op.`kgen.variant.create`[
-                _type = Self._type, index = Int(1).value
-            ](__mlir_attr.false)
-        }
+        self._value = __mlir_op.`kgen.variant.create`[
+            _type = Self._type, index = Int(1).value
+        ](__mlir_attr.false)
 
     @always_inline
     fn value(self) -> T:
