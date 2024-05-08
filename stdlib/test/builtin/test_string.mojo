@@ -678,7 +678,7 @@ fn test_lstrip() raises:
 
 fn test_strip() raises:
     print("start strip")
-    
+
     # with default strip chars
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
