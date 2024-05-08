@@ -131,6 +131,9 @@ what we publish.
   requirement that the decl has documentation (e.g. when used with
   --diagnose-missing-doc-strings).
 
+- `Dict` now implements `get(key)` and `get(key, default)` functions.
+    ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no

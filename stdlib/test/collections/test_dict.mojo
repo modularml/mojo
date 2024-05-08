@@ -394,9 +394,19 @@ def test_owned_kwargs_dict():
     test_taking_owned_kwargs_dict(owned_kwargs^)
 
 
+def test_find_get():
+    var some_dict = Dict[String, Int]()
+    some_dict["key"] = 1
+    assert_equal(some_dict.find("key").take(), 1)
+    assert_equal(some_dict.get("key").take(), 1)
+    assert_equal(some_dict.find("not_key").or_else(0), 0)
+    assert_equal(some_dict.get("not_key", 0), 0)
+
+
 def main():
     test_dict()
     test_dict_string_representation_string_int()
     test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
     test_bool_conversion()
+    test_find_get()
