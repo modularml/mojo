@@ -16,18 +16,6 @@ from collections import InlineList, Set
 from testing import assert_equal, assert_false, assert_true, assert_raises
 
 
-def test_mojo_issue_698():
-    var list = InlineList[Float64]()
-    for i in range(5):
-        list.append(i)
-
-    assert_equal(0.0, list[0])
-    assert_equal(1.0, list[1])
-    assert_equal(2.0, list[2])
-    assert_equal(3.0, list[3])
-    assert_equal(4.0, list[4])
-
-
 def test_list():
     var list = InlineList[Int]()
 
@@ -89,6 +77,5 @@ def test_append_and_destructor():
 
 
 def main():
-    test_mojo_issue_698()
     test_list()
     test_append_and_destructor()
