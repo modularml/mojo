@@ -11,7 +11,7 @@ It doesn't include all internal implementation changes.
 ## Update Mojo
 
 If you don't have Mojo yet, see the [get started
-guide](/mojo/manual/get-started/#get-the-mojo-sdk).
+guide](/mojo/manual/get-started).
 
 To see your Mojo version, run this:
 
@@ -3506,7 +3506,7 @@ All earlier releases were considered version 0.1.
 - You can now share `.ipynb` notebook files in Mojo Playground. Just save a
   file in the `shared` directory, and then right-click the file and select
   **Copy Sharable link**. To open a shared notebook, you must already have
-  [access to Mojo Playground](/mojo/manual/get-started/#develop-in-the-mojo-playground);
+  access to Mojo Playground;
   when you open a shared notebook, click **Import** at the top of the notebook
   to save your own copy. For more details about this feature, see the
   instructions inside the `help` directory, in the Mojo Playground file browser.
