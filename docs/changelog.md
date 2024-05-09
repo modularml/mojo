@@ -146,7 +146,10 @@ what we publish.
   `--diagnose-missing-doc-strings`.
 
 - The `take` function in `Variant` and `Optional` has been renamed to
-`unsafe_take`.
+  `unsafe_take`.
+
+- The `get` function in `Variant` has been replaced by `__refitem__`. That is,
+  `v.get[T]()` should be replaced with `v[T]`.
 
 ### ❌ Removed
 

@@ -114,7 +114,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             A reference to the contained data of the option as a Reference[T].
         """
         debug_assert(self[].__bool__(), ".value() on empty Optional")
-        return self[]._value.get[T]()
+        return self[]._value[T]
 
     @always_inline
     fn _value_copy(self) -> T:
@@ -126,7 +126,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         """
 
         debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value.get[T]()[]
+        return self._value[T]
 
     fn unsafe_take(owned self) -> T:
         """Unsafely move the value out of the Optional.
@@ -155,7 +155,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             The underlying value contained in the Optional or a default value.
         """
         if self.__bool__():
-            return self._value.get[T]()[]
+            return self._value[T]
         return default
 
     fn __is__(self, other: NoneType) -> Bool:

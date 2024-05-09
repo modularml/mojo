@@ -96,19 +96,19 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
     fn __len__(self) -> Int:
         if self._is_small():
-            return len(self._storage.get[_FixedString[Self.SMALL_CAP]]()[])
+            return len(self._storage[_FixedString[Self.SMALL_CAP]])
         else:
             debug_assert(
                 self._storage.isa[String](),
                 "expected non-small string variant to be String",
             )
-            return len(self._storage.get[String]()[])
+            return len(self._storage[String])
 
     fn __str__(self) -> String:
         if self._is_small():
-            return str(self._storage.get[_FixedString[Self.SMALL_CAP]]()[])
+            return str(self._storage[_FixedString[Self.SMALL_CAP]])
         else:
-            return self._storage.get[String]()[]
+            return self._storage[String]
 
     fn __iadd__(inout self, literal: StringLiteral):
         """Appends another string to this string.
@@ -138,10 +138,10 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         #       length is shorter than the small capacity.
 
         if not self._is_small():
-            self._storage.get[String]()[] += strref
+            self._storage[String] += strref
         elif total_len < Self.SMALL_CAP:
             try:
-                self._storage.get[_FixedString[Self.SMALL_CAP]]()[] += strref
+                self._storage[_FixedString[Self.SMALL_CAP]] += strref
             except e:
                 abort(
                     "unreachable: InlinedString append to FixedString failed: "
@@ -160,9 +160,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
             # Copy the bytes from the current small string layout
             memcpy(
                 buffer_ptr,
-                self._storage.get[
-                    _FixedString[Self.SMALL_CAP]
-                ]()[].as_uint8_ptr(),
+                self._storage[_FixedString[Self.SMALL_CAP]].as_uint8_ptr(),
                 len(self),
             )
 
@@ -241,9 +239,9 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         """
 
         if self._is_small():
-            return self._storage.get[_FixedString[Self.SMALL_CAP]]()[].as_ptr()
+            return self._storage[_FixedString[Self.SMALL_CAP]].as_ptr()
         else:
-            return self._storage.get[String]()[].unsafe_ptr()
+            return self._storage[String].unsafe_ptr()
 
     fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
         """Returns a pointer to the bytes of string data.
@@ -253,11 +251,9 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         """
 
         if self._is_small():
-            return self._storage.get[
-                _FixedString[Self.SMALL_CAP]
-            ]()[].as_uint8_ptr()
+            return self._storage[_FixedString[Self.SMALL_CAP]].as_uint8_ptr()
         else:
-            return self._storage.get[String]()[].unsafe_uint8_ptr()
+            return self._storage[String].unsafe_uint8_ptr()
 
     fn _strref_dangerous(self) -> StringRef:
         """
