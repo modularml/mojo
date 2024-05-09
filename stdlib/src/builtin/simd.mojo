@@ -252,7 +252,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
-        ](value.value)
+        ](value._as_scalar_bool())
         self.value = __mlir_op.`pop.simd.splat`[
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
