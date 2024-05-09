@@ -260,6 +260,66 @@ def test_dict_update_empty_origin():
     assert_equal(orig["c"], 4)
 
 
+def test_dict_or():
+    var orig = Dict[String, Int]()
+    var new = Dict[String, Int]()
+
+    new["b"] = 3
+    new["c"] = 4
+    orig["d"] = 5
+    orig["b"] = 8
+
+    var out = orig | new
+
+    assert_equal(out["b"], 3)
+    assert_equal(out["c"], 4)
+    assert_equal(out["d"], 5)
+
+    orig |= new
+
+    assert_equal(orig["b"], 3)
+    assert_equal(orig["c"], 4)
+    assert_equal(orig["d"], 5)
+
+    orig = Dict[String, Int]()
+    new = Dict[String, Int]()
+    new["b"] = 3
+    new["c"] = 4
+
+    orig |= new
+
+    assert_equal(orig["b"], 3)
+    assert_equal(orig["c"], 4)
+
+    orig = Dict[String, Int]()
+    orig["a"] = 1
+    orig["b"] = 2
+
+    new = Dict[String, Int]()
+
+    orig = orig | new
+
+    assert_equal(orig["a"], 1)
+    assert_equal(orig["b"], 2)
+    assert_equal(len(orig), 2)
+
+    orig = Dict[String, Int]()
+    new = Dict[String, Int]()
+    orig["a"] = 1
+    orig["b"] = 2
+    new["c"] = 3
+    new["d"] = 4
+    orig |= new
+    assert_equal(orig["a"], 1)
+    assert_equal(orig["b"], 2)
+    assert_equal(orig["c"], 3)
+    assert_equal(orig["d"], 4)
+
+    orig = Dict[String, Int]()
+    new = Dict[String, Int]()
+    assert_equal(len(orig | new), 0)
+
+
 def test_dict_update_empty_new():
     var orig = Dict[String, Int]()
     orig["a"] = 1
@@ -343,6 +403,7 @@ def test_dict():
     test["test_dict_update_empty_origin", test_dict_update_empty_origin]()
     test["test_dict_update_empty_new", test_dict_update_empty_new]()
     test["test_mojo_issue_1729", test_mojo_issue_1729]()
+    test["test dict or", test_dict_or]()
 
 
 def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
