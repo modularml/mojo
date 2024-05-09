@@ -78,7 +78,7 @@ struct Bool(
 
     @always_inline("nodebug")
     fn __init__(value: __mlir_type.`!pop.scalar<bool>`) -> Bool:
-        """Construct a Bool value given a !pop.scalar<bool> value.
+        """Construct a Bool value given a `!pop.scalar<bool>` value.
 
         Args:
             value: The initial value.
