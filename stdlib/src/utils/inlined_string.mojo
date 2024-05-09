@@ -449,7 +449,7 @@ struct _FixedString[CAP: Int](
 
         return output^
 
-    # TODO: Remove this when we have transitionned to uint8 for bytes.
+    # TODO: Remove this when we have transitioned to uint8 for bytes.
     # See https://github.com/modularml/mojo/issues/2317 for details
     fn as_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.

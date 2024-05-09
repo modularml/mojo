@@ -30,7 +30,7 @@ from sys.ffi import _get_global
 
 from memory import memcpy, memset_zero, stack_allocation
 
-# TODO remove this import onece InlineArray is moved to collections
+# TODO remove this import once InlineArray is moved to collections
 from utils import InlineArray
 
 # ===----------------------------------------------------------------------=== #
