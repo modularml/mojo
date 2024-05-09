@@ -128,16 +128,20 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             self.append(value[])
 
     fn __init__(
-        inout self: Self, data: UnsafePointer[T], *, size: Int, capacity: Int
+        inout self: Self,
+        *,
+        unsafe_pointer: UnsafePointer[T],
+        size: Int,
+        capacity: Int,
     ):
         """Constructs a list from a pointer, its size, and its capacity.
 
         Args:
-            data: The pointer to the data.
+            unsafe_pointer: The pointer to the data.
             size: The number of elements in the list.
             capacity: The capacity of the list.
         """
-        self.data = data
+        self.data = unsafe_pointer
         self.size = size
         self.capacity = capacity
 
@@ -452,9 +456,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if not self.size:
             raise "Cannot find index of a value in an empty list."
         if normalized_start >= self.size:
-            raise "Given 'start' parameter (" + String(
+            raise "Given 'start' parameter (" + str(
                 normalized_start
-            ) + ") is out of range. List only has " + String(
+            ) + ") is out of range. List only has " + str(
                 self.size
             ) + " elements."
 
@@ -671,3 +675,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             if elem[] == value:
                 count += 1
         return count
+
+    @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[T]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The UnsafePointer to the underlying memory.
+        """
+        return self.data

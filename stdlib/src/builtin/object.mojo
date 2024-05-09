@@ -21,7 +21,7 @@ from os import Atomic
 from sys.intrinsics import _type_is_eq
 
 from memory import memcmp, memcpy, DTypePointer
-from memory._arc import Arc
+from memory import Arc
 from memory.unsafe_pointer import move_from_pointee
 
 from utils import StringRef, unroll
@@ -204,7 +204,7 @@ struct _Function:
     fn __init__[FnT: AnyRegType](inout self, value: FnT):
         # FIXME: No "pointer bitcast" for signature function pointers.
         var f = UnsafePointer[Int16]()
-        Reference(f).get_legacy_pointer().bitcast[FnT]().store(value)
+        UnsafePointer.address_of(f).bitcast[FnT]()[] = value
         self.value = f
 
     alias fn0 = fn () raises -> object
@@ -218,40 +218,24 @@ struct _Function:
 
     @always_inline
     fn invoke(owned self) raises -> object:
-        return (
-            Reference(self.value)
-            .get_legacy_pointer()
-            .bitcast[Self.fn0]()
-            .load()()
-        )
+        return UnsafePointer.address_of(self.value).bitcast[Self.fn0]()[]()
 
     @always_inline
     fn invoke(owned self, arg0: object) raises -> object:
-        return (
-            Reference(self.value)
-            .get_legacy_pointer()
-            .bitcast[Self.fn1]()
-            .load()(arg0)
-        )
+        return UnsafePointer.address_of(self.value).bitcast[Self.fn1]()[](arg0)
 
     @always_inline
     fn invoke(owned self, arg0: object, arg1: object) raises -> object:
-        return (
-            Reference(self.value)
-            .get_legacy_pointer()
-            .bitcast[Self.fn2]()
-            .load()(arg0, arg1)
+        return UnsafePointer.address_of(self.value).bitcast[Self.fn2]()[](
+            arg0, arg1
         )
 
     @always_inline
     fn invoke(
         owned self, arg0: object, arg1: object, arg2: object
     ) raises -> object:
-        return (
-            Reference(self.value)
-            .get_legacy_pointer()
-            .bitcast[Self.fn3]()
-            .load()(arg0, arg1, arg2)
+        return UnsafePointer.address_of(self.value).bitcast[Self.fn3]()[](
+            arg0, arg1, arg2
         )
 
 
@@ -788,7 +772,7 @@ struct object(IntableRaising, Boolable, Stringable):
         var impl = _ImmutableString(
             UnsafePointer[Int8].alloc(value.length), value.length
         )
-        memcpy(impl.data, value.data, value.length)
+        memcpy(impl.data, value.unsafe_ptr(), value.length)
         self._value = impl
 
     @always_inline
