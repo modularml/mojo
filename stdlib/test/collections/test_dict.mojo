@@ -49,9 +49,9 @@ def test_bool_conversion():
     assert_true(dict)
     dict["b"] = 2
     assert_true(dict)
-    dict.pop("a")
+    _ = dict.pop("a")
     assert_true(dict)
-    dict.pop("b")
+    _ = dict.pop("b")
     assert_false(dict)
 
 
@@ -217,7 +217,7 @@ def test_dict_copy_add_new_item():
     # test there are two copies of dict and
     # they don't share underlying memory
     copy["b"] = 2
-    assert_false(2 in orig)
+    assert_false(str(2) in orig)
 
 
 def test_dict_copy_calls_copy_constructor():
@@ -394,9 +394,19 @@ def test_owned_kwargs_dict():
     test_taking_owned_kwargs_dict(owned_kwargs^)
 
 
+def test_find_get():
+    var some_dict = Dict[String, Int]()
+    some_dict["key"] = 1
+    assert_equal(some_dict.find("key").unsafe_take(), 1)
+    assert_equal(some_dict.get("key").unsafe_take(), 1)
+    assert_equal(some_dict.find("not_key").or_else(0), 0)
+    assert_equal(some_dict.get("not_key", 0), 0)
+
+
 def main():
     test_dict()
     test_dict_string_representation_string_int()
     test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
     test_bool_conversion()
+    test_find_get()

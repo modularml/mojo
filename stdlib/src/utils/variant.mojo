@@ -106,7 +106,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     You can
         - use `isa[T]()` to check what type a variant is
-        - use `take[T]()` to take a value from the variant
+        - use `unsafe_take[T]()` to take a value from the variant
         - use `get[T]()` to get a value out of a variant
             - This currently does an extra copy/move until we have lifetimes
             - It also temporarily requires the value to be mutable
@@ -187,7 +187,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
                 alias T = Ts[i]
                 initialize_pointee_move(
                     UnsafePointer.address_of(self._impl).bitcast[T](),
-                    Reference(other._impl).unsafe_bitcast[T]()[],
+                    UnsafePointer.address_of(other._impl).bitcast[T]()[],
                 )
 
         unroll[each, len(VariadicList(Ts))]()
@@ -227,7 +227,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         unroll[each, len(VariadicList(Ts))]()
 
-    fn take[T: CollectionElement](owned self) -> T:
+    fn unsafe_take[T: CollectionElement](owned self) -> T:
         """Take the current value of the variant as the provided type.
 
         The caller takes ownership of the underlying value. The variant
@@ -242,7 +242,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             T: The type to take.
 
         Returns:
-            The undelying data as an owned value.
+            The underlying data as an owned value.
         """
         debug_assert(
             Self._check[T]() == self._get_state()[], "taking wrong type"

@@ -50,7 +50,7 @@ def test_basic():
     assert_equal(1, a1)
     assert_equal(2, b1)
 
-    assert_equal(1, (a^).take())
+    assert_equal(1, (a^).unsafe_take())
 
     # TODO: this currently only checks for mutable references.
     # We may want to come back and add an immutable test once

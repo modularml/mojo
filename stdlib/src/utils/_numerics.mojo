@@ -648,6 +648,60 @@ fn isnan[
 
 
 # ===----------------------------------------------------------------------===#
+# inf
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn inf[type: DType]() -> Scalar[type]:
+    """Gets a +inf value for the given dtype.
+
+    Constraints:
+        Can only be used for FP dtypes.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The +inf value of the given dtype.
+    """
+
+    @parameter
+    if type == DType.float16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f16>`],
+                value = __mlir_attr[`#pop.simd<"inf"> : !pop.scalar<f16>`],
+            ]()
+        )
+    elif type == DType.bfloat16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<bf16>`],
+                value = __mlir_attr[`#pop.simd<"inf"> : !pop.scalar<bf16>`],
+            ]()
+        )
+    elif type == DType.float32:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f32>`],
+                value = __mlir_attr[`#pop.simd<"inf"> : !pop.scalar<f32>`],
+            ]()
+        )
+    elif type == DType.float64:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f64>`],
+                value = __mlir_attr[`#pop.simd<"inf"> : !pop.scalar<f64>`],
+            ]()
+        )
+    else:
+        constrained[False, "+inf only support on floating point types"]()
+
+    return 0
+
+
+# ===----------------------------------------------------------------------===#
 # isinf
 # ===----------------------------------------------------------------------===#
 

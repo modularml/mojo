@@ -20,13 +20,13 @@ from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, StaticTuple
+from utils import StringRef, StaticIntTuple
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
 
 # ===----------------------------------------------------------------------===#
-# Utilties
+# Utilities
 # ===----------------------------------------------------------------------===#
 
 
@@ -65,7 +65,7 @@ fn ord(s: String) -> Int:
     # 2: 110aaaaa 10bbbbbb                   -> 00000000 00000000 00000aaa aabbbbbb     a << 6  | b
     # 3: 1110aaaa 10bbbbbb 10cccccc          -> 00000000 00000000 aaaabbbb bbcccccc     a << 12 | b << 6  | c
     # 4: 11110aaa 10bbbbbb 10cccccc 10dddddd -> 00000000 000aaabb bbbbcccc ccdddddd     a << 18 | b << 12 | c << 6 | d
-    var p = s._as_ptr().bitcast[DType.uint8]()
+    var p = s.unsafe_ptr().bitcast[DType.uint8]()
     var b1 = p.load()
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
@@ -171,7 +171,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var is_negative: Bool = False
     var start: Int = 0
     var str_len = len(str_ref)
-    var buff = str_ref._as_ptr()
+    var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
         if isspace(buff[pos]):
@@ -511,7 +511,9 @@ struct String(
         var length = len(impl)
         var capacity = impl.capacity
         self._buffer = List[Int8](
-            impl.steal_data().bitcast[Int8](), size=length, capacity=capacity
+            unsafe_pointer=impl.steal_data().bitcast[Int8](),
+            size=length,
+            capacity=capacity,
         )
 
     @always_inline
@@ -529,7 +531,7 @@ struct String(
         var length = len(str)
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
-        memcpy(rebind[DTypePointer[DType.int8]](buffer.data), str.data, length)
+        memcpy(rebind[DTypePointer[DType.uint8]](buffer.data), str.data, length)
         buffer[length] = 0
         self._buffer = buffer^
 
@@ -574,7 +576,9 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(Self._buffer_type(ptr, size=len, capacity=len))
+        self._buffer = Self._buffer_type(
+            unsafe_pointer=ptr, size=len, capacity=len
+        )
 
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
@@ -589,8 +593,8 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self = Self(
-            Self._buffer_type(ptr.bitcast[Int8](), size=len, capacity=len)
+        self._buffer = Self._buffer_type(
+            unsafe_pointer=ptr.bitcast[Int8](), size=len, capacity=len
         )
 
     @always_inline
@@ -742,7 +746,7 @@ struct String(
         var buffer = Self._buffer_type()
         var adjusted_span_len = len(adjusted_span)
         buffer.resize(adjusted_span_len + 1, 0)
-        var ptr = self._as_ptr()
+        var ptr = self.unsafe_ptr()
         for i in range(adjusted_span_len):
             buffer[i] = ptr[adjusted_span[i]]
         buffer[adjusted_span_len] = 0
@@ -756,7 +760,7 @@ struct String(
             The string length.
         """
         # Avoid returning -1 if the buffer is not initialized
-        if not self._as_ptr():
+        if not self.unsafe_ptr():
             return 0
 
         # The negative 1 is to account for the terminator.
@@ -775,10 +779,10 @@ struct String(
         if len(self) != len(other):
             return False
 
-        if int(self._as_ptr()) == int(other._as_ptr()):
+        if int(self.unsafe_ptr()) == int(other.unsafe_ptr()):
             return True
 
-        return memcmp(self._as_ptr(), other._as_ptr(), len(self)) == 0
+        return memcmp(self.unsafe_ptr(), other.unsafe_ptr(), len(self)) == 0
 
     @always_inline
     fn __ne__(self, other: String) -> Bool:
@@ -813,12 +817,12 @@ struct String(
         buffer.resize(total_len + 1, 0)
         memcpy(
             DTypePointer(buffer.data),
-            self._as_ptr(),
+            self.unsafe_ptr(),
             self_len,
         )
         memcpy(
             DTypePointer(buffer.data + self_len),
-            other._as_ptr(),
+            other.unsafe_ptr(),
             other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
@@ -853,8 +857,8 @@ struct String(
         self._buffer.resize(total_len + 1, 0)
         # Copy the data alongside the terminator.
         memcpy(
-            self._as_uint8_ptr() + self_len,
-            other._as_uint8_ptr(),
+            self.unsafe_uint8_ptr() + self_len,
+            other.unsafe_uint8_ptr(),
             other_len + 1,
         )
 
@@ -916,7 +920,7 @@ struct String(
 
             # FIXME:
             #   String.__iadd__ currently only accepts a String, meaning this
-            #   RHS will allocate unneccessarily.
+            #   RHS will allocate unnecessarily.
             ptr[] += strref
 
         return Formatter(
@@ -940,9 +944,9 @@ struct String(
         """
         if len(elems) == 0:
             return ""
-        var curr = String(elems[0])
+        var curr = str(elems[0])
         for i in range(1, len(elems)):
-            curr += self + String(elems[i])
+            curr += self + str(elems[i])
         return curr
 
     fn join[*Types: Stringable](self, *elems: *Types) -> String:
@@ -979,7 +983,7 @@ struct String(
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self._as_ptr(), length: len(self)}
+        return StringRef {data: self.unsafe_uint8_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
@@ -990,10 +994,10 @@ struct String(
         pass
 
     # TODO: Remove this method when #2317 is done
-    fn _as_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
 
-        Note that you should use `_as_uint8_ptr()` if you need to access the
+        Note that you should use `unsafe_uint8_ptr()` if you need to access the
         pointer as we are now storing the bytes as UInt8.
 
         See https://github.com/modularml/mojo/issues/2317 for more information.
@@ -1003,7 +1007,7 @@ struct String(
         """
         return rebind[DTypePointer[DType.int8]](self._buffer.data)
 
-    fn _as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+    fn unsafe_uint8_ptr(self) -> DTypePointer[DType.uint8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
@@ -1040,7 +1044,7 @@ struct String(
         Returns:
             The pointer to the underlying memory.
         """
-        var ptr = self._as_ptr()
+        var ptr = self.unsafe_ptr()
         self._buffer.data = UnsafePointer[Int8]()
         self._buffer.size = 0
         self._buffer.capacity = 0
@@ -1160,7 +1164,7 @@ struct String(
           new: The substring to replace with.
 
         Returns:
-          The string where all occurences of `old` are replaced with `new`.
+          The string where all occurrences of `old` are replaced with `new`.
         """
         if not old:
             return self._interleave(new)
@@ -1169,9 +1173,9 @@ struct String(
         if occurrences == -1:
             return self
 
-        var self_start = self._as_ptr()
-        var self_ptr = self._as_ptr()
-        var new_ptr = new._as_ptr()
+        var self_start = self.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
+        var new_ptr = new.unsafe_ptr()
 
         var self_len = len(self)
         var old_len = len(old)
@@ -1261,8 +1265,8 @@ struct String(
 
     fn _interleave(self, val: String) -> String:
         var res = List[Int8]()
-        var val_ptr = val._as_ptr()
-        var self_ptr = self._as_ptr()
+        var val_ptr = val.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
@@ -1276,7 +1280,7 @@ struct String(
         converted to lowercase.
 
         Returns:
-            A new string where cased letters have been convered to lowercase.
+            A new string where cased letters have been converted to lowercase.
         """
 
         # TODO(#26444):
@@ -1301,7 +1305,7 @@ struct String(
     fn _toggle_ascii_case[check_case: fn (Int8) -> Bool](self) -> String:
         var copy: String = self
 
-        var char_ptr = copy._as_ptr()
+        var char_ptr = copy.unsafe_ptr()
 
         for i in range(len(self)):
             var char: Int8 = char_ptr[i]
@@ -1408,7 +1412,7 @@ struct String(
             n : The number of times to concatenate the string.
 
         Returns:
-            The string concantenated `n` times.
+            The string concatenated `n` times.
         """
         if n <= 0:
             return ""
@@ -1419,7 +1423,7 @@ struct String(
         for i in range(n):
             memcpy(
                 rebind[DTypePointer[DType.int8]](buf.data) + len_self * i,
-                self._as_ptr(),
+                self.unsafe_ptr(),
                 len_self,
             )
         return String(buf^)

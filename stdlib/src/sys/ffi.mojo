@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements a foreign functions interface (FFI)."""
 
-from memory import DTypePointer, Pointer
+from memory import DTypePointer, LegacyPointer
 
 from utils import StringRef
 
@@ -64,7 +64,7 @@ struct DLHandle(CollectionElement, Boolable):
         @parameter
         if not os_is_windows():
             self.handle = external_call["dlopen", DTypePointer[DType.int8]](
-                path._as_ptr(), flags
+                path.unsafe_ptr(), flags
             )
         else:
             self.handle = DTypePointer[DType.int8]()
@@ -104,7 +104,7 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](name._as_ptr())
+        return self._get_function[result_type](name.unsafe_ptr())
 
     @always_inline
     fn _get_function[
@@ -128,14 +128,9 @@ struct DLHandle(CollectionElement, Boolable):
             var opaque_function_ptr = external_call[
                 "dlsym", DTypePointer[DType.int8]
             ](self.handle.address, name)
-            return (
-                Reference(opaque_function_ptr)
-                .get_legacy_pointer()
-                .bitcast[result_type]()
-                .load()
-            )
+            return UnsafePointer(opaque_function_ptr).bitcast[result_type]()[]
         else:
-            return Pointer[result_type].get_null().load()
+            return abort[result_type]("get_function isn't supported on windows")
 
     @always_inline
     fn _get_function[
@@ -152,7 +147,7 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](func_name.data())
+        return self._get_function[result_type](func_name.unsafe_ptr())
 
 
 # ===----------------------------------------------------------------------===#
@@ -163,11 +158,13 @@ struct DLHandle(CollectionElement, Boolable):
 @always_inline
 fn _get_global[
     name: StringLiteral,
-    init_fn: fn (Pointer[NoneType]) -> Pointer[NoneType],
-    destroy_fn: fn (Pointer[NoneType]) -> None,
-](payload: Pointer[NoneType] = Pointer[NoneType]()) -> Pointer[NoneType]:
+    init_fn: fn (LegacyPointer[NoneType]) -> LegacyPointer[NoneType],
+    destroy_fn: fn (LegacyPointer[NoneType]) -> None,
+](
+    payload: LegacyPointer[NoneType] = LegacyPointer[NoneType]()
+) -> LegacyPointer[NoneType]:
     return external_call[
-        "KGEN_CompilerRT_GetGlobalOrCreate", Pointer[NoneType]
+        "KGEN_CompilerRT_GetGlobalOrCreate", LegacyPointer[NoneType]
     ](StringRef(name), payload, init_fn, destroy_fn)
 
 
@@ -185,18 +182,18 @@ fn _get_global[
 
 
 @always_inline
-fn _get_global_or_null[name: StringLiteral]() -> Pointer[NoneType]:
-    return external_call["KGEN_CompilerRT_GetGlobalOrNull", Pointer[NoneType]](
-        StringRef(name)
-    )
+fn _get_global_or_null[name: StringLiteral]() -> UnsafePointer[NoneType]:
+    return external_call[
+        "KGEN_CompilerRT_GetGlobalOrNull", UnsafePointer[NoneType]
+    ](StringRef(name))
 
 
 @always_inline
 fn _get_dylib[
     name: StringLiteral,
-    init_fn: fn (Pointer[NoneType]) -> Pointer[NoneType],
-    destroy_fn: fn (Pointer[NoneType]) -> None,
-](payload: Pointer[NoneType] = Pointer[NoneType]()) -> DLHandle:
+    init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
+    destroy_fn: fn (UnsafePointer[NoneType]) -> None,
+](payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()) -> DLHandle:
     var ptr = _get_global[name, init_fn, destroy_fn](payload).bitcast[
         DLHandle
     ]()
@@ -207,28 +204,20 @@ fn _get_dylib[
 fn _get_dylib_function[
     name: StringLiteral,
     func_name: StringLiteral,
-    init_fn: fn (Pointer[NoneType]) -> Pointer[NoneType],
-    destroy_fn: fn (Pointer[NoneType]) -> None,
+    init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
+    destroy_fn: fn (UnsafePointer[NoneType]) -> None,
     result_type: AnyRegType,
-](payload: Pointer[NoneType] = Pointer[NoneType]()) -> result_type:
+](payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()) -> result_type:
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
-        return (
-            Reference(func_ptr)
-            .get_legacy_pointer()
-            .bitcast[result_type]()
-            .load()
-        )
+        return UnsafePointer(func_ptr).bitcast[result_type]()[]
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        Reference(new_func)
-        .get_legacy_pointer()
-        .bitcast[Pointer[NoneType]]()
-        .load(),
+        UnsafePointer(new_func).bitcast[Pointer[NoneType]]()[],
     )
 
     return new_func

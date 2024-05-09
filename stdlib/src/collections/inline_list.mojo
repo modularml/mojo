@@ -48,9 +48,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
     @always_inline
     fn __init__(inout self):
         """This constructor creates an empty InlineList."""
-        self._array = InlineArray[ElementType, capacity](
-            unsafe_uninitialized=True
-        )
+        self._array = InlineArray[ElementType, capacity](uninitialized=True)
         self._size = 0
 
     @always_inline
