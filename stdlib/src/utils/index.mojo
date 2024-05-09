@@ -130,7 +130,7 @@ fn _int_tuple_compare[
     fn do_compare[idx: Int]():
         var a_elem: Int = a.__getitem__[idx]()
         var b_elem: Int = b.__getitem__[idx]()
-        c.__setitem__[idx](comp_fn(a_elem, b_elem).value)
+        c.__setitem__[idx](comp_fn(a_elem, b_elem)._as_scalar_bool())
 
     unroll[do_compare, size]()
 
