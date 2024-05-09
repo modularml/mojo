@@ -34,6 +34,7 @@ struct StringLiteral(
     Sized,
     IntableRaising,
     Stringable,
+    Representable,
     KeyElement,
     Boolable,
     Formattable,
@@ -143,6 +144,16 @@ struct StringLiteral(
             A new string.
         """
         return self
+
+    fn __repr__(self) -> String:
+        """Return a representation of the `StringLiteral` instance.
+
+        You don't need to call this method directly, use `repr("...")` instead.
+
+        Returns:
+            A new representation of the string.
+        """
+        return self.__str__().__repr__()
 
     fn format_to(self, inout writer: Formatter):
         """

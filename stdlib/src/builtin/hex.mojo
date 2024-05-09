@@ -23,7 +23,7 @@ alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
 @always_inline
-fn hex[T: Intable](value: T) -> String:
+fn hex[T: Intable](value: T, prefix: StringLiteral = "0x") -> String:
     """Returns the hex string representation of the given integer.
 
     The hexadecimal representation is a base-16 encoding of the integer value.
@@ -36,13 +36,14 @@ fn hex[T: Intable](value: T) -> String:
 
     Args:
         value: The integer value to format.
+        prefix: The prefix of the formatted int.
 
     Returns:
         A string containing the hex representation of the given integer.
     """
 
     try:
-        return _format_int(int(value), 16, prefix="0x")
+        return _format_int(int(value), 16, prefix=prefix)
     except e:
         # This should not be reachable as _format_int only throws if we pass
         # incompatible radix and custom digit chars, which we aren't doing
