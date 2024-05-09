@@ -40,11 +40,25 @@ fn test_stringable() raises:
     assert_equal("a string", str(AString()))
 
 
-fn test_representable() raises:
-    assert_equal(repr(String("hello")), "'hello'")
-    assert_equal(repr(str(0)), "'0'")
-    # TODO: Add more complex cases with "'", escape characters, etc
-    # and make String.__repr__ more robust to handle those cases.
+fn test_repr() raises:
+    # Usual cases
+    assert_equal(String.__repr__("hello"), "'hello'")
+    assert_equal(String.__repr__(str(0)), "'0'")
+
+    # Escape cases
+    assert_equal(String.__repr__("\0"), r"'\x00'")
+    assert_equal(String.__repr__("\x06"), r"'\x06'")
+    assert_equal(String.__repr__("\x09"), r"'\t'")
+    assert_equal(String.__repr__("\n"), r"'\n'")
+    assert_equal(String.__repr__("\x0d"), r"'\r'")
+    assert_equal(String.__repr__("\x0e"), r"'\x0e'")
+    assert_equal(String.__repr__("\x1f"), r"'\x1f'")
+    assert_equal(String.__repr__(" "), "' '")
+    assert_equal(String.__repr__("'"), '"\'"')
+    assert_equal(String.__repr__("A"), "'A'")
+    assert_equal(String.__repr__("\\"), r"'\\'")
+    assert_equal(String.__repr__("~"), "'~'")
+    assert_equal(String.__repr__("\x7f"), r"'\x7f'")
 
 
 fn test_constructors() raises:
@@ -705,7 +719,7 @@ def main():
     test_equality_operators()
     test_add()
     test_stringable()
-    test_representable()
+    test_repr()
     test_string_join()
     test_stringref()
     test_stringref_from_dtypepointer()
