@@ -511,7 +511,7 @@ fn simdbytewidth[
 @always_inline("nodebug")
 fn sizeof[
     type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the size of (in bytes) of the type.
 
     Parameters:
@@ -526,14 +526,14 @@ fn sizeof[
         type,
         `> : !kgen.type,`,
         target,
-        `> : index`,
+        `> : !kgen.int_literal`,
     ]
 
 
 @always_inline("nodebug")
 fn sizeof[
     type: DType, target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the size of (in bytes) of the dtype.
 
     Parameters:
@@ -550,14 +550,14 @@ fn sizeof[
         `>`,
         `> : !kgen.type,`,
         target,
-        `> : index`,
+        `> : !kgen.int_literal`,
     ]
 
 
 @always_inline("nodebug")
 fn alignof[
     type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the align of (in bytes) of the type.
 
     Parameters:
@@ -572,14 +572,14 @@ fn alignof[
         type,
         `> : !kgen.type,`,
         target,
-        `> : index`,
+        `> : !kgen.int_literal`,
     ]
 
 
 @always_inline("nodebug")
 fn alignof[
     type: DType, target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the align of (in bytes) of the dtype.
 
     Parameters:
@@ -596,14 +596,14 @@ fn alignof[
         `>`,
         `> : !kgen.type,`,
         target,
-        `> : index`,
+        `> : !kgen.int_literal`,
     ]
 
 
 @always_inline("nodebug")
 fn bitwidthof[
     type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the size of (in bits) of the type.
 
     Parameters:
@@ -620,7 +620,7 @@ fn bitwidthof[
 @always_inline("nodebug")
 fn bitwidthof[
     type: DType, target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the size of (in bits) of the dtype.
 
     Parameters:
@@ -638,7 +638,7 @@ fn bitwidthof[
 @always_inline("nodebug")
 fn simdwidthof[
     type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the vector size of the type on the host system.
 
     Parameters:
@@ -654,7 +654,7 @@ fn simdwidthof[
 @always_inline("nodebug")
 fn simdwidthof[
     type: DType, target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the vector size of the type on the host system.
 
     Parameters:
