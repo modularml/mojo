@@ -134,6 +134,9 @@ what we publish.
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
 
+- Debugger users can now set breakpoints on function calls in O0 builds even if
+  the call has been inlined by the compiler.
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
