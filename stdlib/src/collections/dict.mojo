@@ -516,7 +516,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         return self.find(key).__bool__()
 
     fn __len__(self) -> Int:
-        """The number of elements currenly stored in the dictionary."""
+        """The number of elements currently stored in the dictionary."""
         return self.size
 
     fn __bool__(self) -> Bool:
@@ -606,6 +606,30 @@ struct Dict[K: KeyElement, V: CollectionElement](
             debug_assert(ev.__bool__(), "entry in index must be full")
             return ev.value()[].value
         return None
+
+    fn get(self, key: K) -> Optional[V]:
+        """Get a value from the dictionary by key.
+
+        Args:
+            key: The key to search for in the dictionary.
+
+        Returns:
+            An optional value containing a copy of the value if it was present,
+            otherwise an empty Optional.
+        """
+        return self.find(key)
+
+    fn get(self, key: K, default: V) -> V:
+        """Get a value from the dictionary by key.
+
+        Args:
+            key: The key to search for in the dictionary.
+            default: Default value to return.
+
+        Returns:
+            A copy of the value if it was present, otherwise default.
+        """
+        return self.find(key).or_else(default)
 
     fn pop(inout self, key: K, owned default: Optional[V] = None) raises -> V:
         """Remove a value from the dictionary by key.
@@ -887,7 +911,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        """The number of elements currenly stored in the keyword dictionary."""
+        """The number of elements currently stored in the keyword dictionary."""
         return len(self._dict)
 
     @always_inline("nodebug")

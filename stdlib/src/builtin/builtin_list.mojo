@@ -25,7 +25,7 @@ from memory.unsafe_pointer import destroy_pointee
 
 @value
 struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
-    """The type of a literal heterogenous list expression.
+    """The type of a literal heterogeneous list expression.
 
     A list consists of zero or more values, separated by commas.
 
@@ -329,8 +329,8 @@ struct VariadicListMem[
             # Otherwise this is a variadic of owned elements, destroy them.  We
             # destroy in backwards order to match how arguments are normally torn
             # down when CheckLifetimes is left to its own devices.
-            for i in range(len(self), 0, -1):
-                destroy_pointee(UnsafePointer.address_of(self[i - 1]))
+            for i in reversed(range(len(self))):
+                destroy_pointee(UnsafePointer.address_of(self[i]))
 
     @always_inline
     fn __len__(self) -> Int:
@@ -538,7 +538,7 @@ struct VariadicPack[
             @parameter
             fn destroy_elt[i: Int]():
                 # destroy the elements in reverse order.
-                destroy_pointee(UnsafePointer(self.get_element[len - i - 1]()))
+                destroy_pointee(UnsafePointer.address_of(self[len - i - 1]))
 
             unroll[destroy_elt, len]()
 
@@ -569,10 +569,8 @@ struct VariadicPack[
         """
         return Self.__len__()
 
-    # TODO: This should be __getitem__ but Mojo doesn't know how to invoke that,
-    # we need this for tuple as well.
     @always_inline
-    fn get_element[
+    fn __refitem__[
         index: Int
     ](self) -> Reference[
         element_types[index.value],
@@ -615,7 +613,7 @@ struct VariadicPack[
 
         @parameter
         fn unrolled[i: Int]():
-            func(self.get_element[i]()[])
+            func(self[i])
 
         unroll[unrolled, Self.__len__()]()
 
@@ -634,6 +632,6 @@ struct VariadicPack[
 
         @parameter
         fn unrolled[i: Int]():
-            func[i, element_types[i.value]](self.get_element[i]()[])
+            func[i, element_types[i.value]](self[i])
 
         unroll[unrolled, Self.__len__()]()

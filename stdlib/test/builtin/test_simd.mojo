@@ -223,6 +223,18 @@ def test_floordiv():
     assert_equal(Float32(99) // Float32(-2), -50)
 
 
+def test_rfloordiv():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(2, 4, -2, -4)
+    assert_equal(i.__rfloordiv__(2), I(1, 0, -1, -1))
+    assert_equal(i.__rfloordiv__(Int32(2)), I(1, 0, -1, -1))
+
+    alias F = SIMD[DType.float32, 4]
+    var f = F(3, -4, 1, 5)
+    assert_equal(f.__rfloordiv__(3), F(1, -1, 3, 0))
+    assert_equal(f.__rfloordiv__(Float32(3)), F(1, -1, 3, 0))
+
+
 def test_mod():
     assert_equal(Int32(99) % Int32(1), 0)
     assert_equal(Int32(99) % Int32(3), 0)
@@ -520,7 +532,9 @@ def test_join():
 
 
 def test_interleave():
-    assert_equal(Int32(0).interleave(Int32(1)), SIMD[DType.index, 2](0, 1))
+    assert_equal(
+        str(Int32(0).interleave(Int32(1))), str(SIMD[DType.index, 2](0, 1))
+    )
 
     assert_equal(
         SIMD[DType.index, 2](0, 2).interleave(SIMD[DType.index, 2](1, 3)),
@@ -873,6 +887,7 @@ def main():
     test_round()
     test_roundeven()
     test_floordiv()
+    test_rfloordiv()
     test_mod()
     test_rotate()
     test_shift()
