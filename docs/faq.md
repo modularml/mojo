@@ -430,13 +430,3 @@ our GitHub channels where you can report issues and discuss new features.
 
 To get in touch with the Mojo team and developer community, use the resources
 on our [Mojo community page](/mojo/community.html).
-
-### Can I share Mojo code from the Mojo Playground?
-
-Yes! You’re welcome and encouraged to share your Mojo code any way you like.
-We've added a feature in the Mojo Playground to make this easier, and you can
-learn more in the Mojo Playground by opening the `help` directory in the file
-browser.
-
-However, the [Mojo SDK is also now available](/mojo/manual/get-started/), so
-you can also share `.mojo` source files and `.ipynb` notebooks to run locally!
