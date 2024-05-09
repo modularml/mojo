@@ -14,6 +14,7 @@
 
 from collections import InlineList, Set
 from testing import assert_equal, assert_false, assert_true, assert_raises
+from test_utils import MoveCounter
 
 
 def test_list():
@@ -44,6 +45,18 @@ def test_list():
     assert_equal(7, list[-1])
 
 
+def test_append_triggers_a_move():
+    var inline_list = InlineList[MoveCounter[Int], capacity=32]()
+
+    var nb_elements_to_add = 8
+    for index in range(nb_elements_to_add):
+        inline_list.append(MoveCounter(index))
+
+    # Using .append() should trigger a move and not a copy+delete.
+    for i in range(nb_elements_to_add):
+        assert_equal(inline_list[i].move_count, 1)
+
+
 @value
 struct ValueToCountDestructor(CollectionElement):
     var value: Int
@@ -53,29 +66,31 @@ struct ValueToCountDestructor(CollectionElement):
         self.destructor_counter[].append(self.value)
 
 
-def test_append_and_destructor():
+def test_destructor():
+    """Ensure we delete the right number of elements."""
     var destructor_counter = List[Int]()
-    var inline_list = InlineList[ValueToCountDestructor, capacity=32]()
+    alias capacity = 32
+    var inline_list = InlineList[ValueToCountDestructor, capacity=capacity]()
 
-    var nb_elements_to_add = 8
-    for index in range(nb_elements_to_add):
+    for index in range(capacity):
         inline_list.append(
             ValueToCountDestructor(index, UnsafePointer(destructor_counter))
         )
 
-    # Using .append() should trigger a move and not a copy+delete.
-    assert_equal(len(destructor_counter), 0)
+    # Private api use here:
+    inline_list._size = 8
 
-    assert_equal(len(inline_list), nb_elements_to_add)
-
-    # this is the last use of the inline list, so it should be destroyed here, along with each element.
-    assert_equal(
-        len(destructor_counter), nb_elements_to_add
-    )  # It's important that it's not 32, which is the capacity.
-    for i in range(nb_elements_to_add):
+    # This is the last use of the inline list, so it should be destroyed here, along with each element.
+    # It's important that we only destroy the first 8 elements, and not the 32 elements.
+    # This is because we assume that the last 24 elements are not initialized (not true in this case,
+    # but if we ever run the destructor on the fake 24 uninitialized elements,
+    # it will be accounted for in destructor_counter).
+    assert_equal(len(destructor_counter), 8)
+    for i in range(8):
         assert_equal(destructor_counter[i], i)
 
 
 def main():
     test_list()
-    test_append_and_destructor()
+    test_append_triggers_a_move()
+    test_destructor()
