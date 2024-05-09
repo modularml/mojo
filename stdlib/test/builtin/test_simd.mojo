@@ -209,18 +209,35 @@ def test_roundeven():
 
 
 def test_floordiv():
-    assert_equal(Int32(2) // Int32(2), 1)
-    assert_equal(Int32(2) // Int32(3), 0)
-    assert_equal(Int32(2) // Int32(-2), -1)
-    assert_equal(Int32(99) // Int32(-2), -50)
+    assert_equal(Int32(2).__floordiv__(2), 1)
+    assert_equal(Int32(2).__floordiv__(Int32(2)), 1)
+    assert_equal(Int32(2).__floordiv__(Int32(3)), 0)
 
-    assert_equal(UInt32(2) // UInt32(2), 1)
-    assert_equal(UInt32(2) // UInt32(3), 0)
+    assert_equal(Int32(2).__floordiv__(-2), -1)
+    assert_equal(Int32(2).__floordiv__(Int32(-2)), -1)
+    assert_equal(Int32(99).__floordiv__(Int32(-2)), -50)
 
-    assert_equal(Float32(2) // Float32(2), 1)
-    assert_equal(Float32(2) // Float32(3), 0)
-    assert_equal(Float32(2) // Float32(-2), -1)
-    assert_equal(Float32(99) // Float32(-2), -50)
+    assert_equal(UInt32(2).__floordiv__(2), 1)
+    assert_equal(UInt32(2).__floordiv__(UInt32(2)), 1)
+    assert_equal(UInt32(2).__floordiv__(UInt32(3)), 0)
+
+    assert_equal(Float32(2).__floordiv__(2), 1)
+    assert_equal(Float32(2).__floordiv__(Float32(2)), 1)
+    assert_equal(Float32(2).__floordiv__(Float32(3)), 0)
+
+    assert_equal(Float32(2).__floordiv__(-2), -1)
+    assert_equal(Float32(2).__floordiv__(Float32(-2)), -1)
+    assert_equal(Float32(99).__floordiv__(Float32(-2)), -50)
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(2, 4, -2, -4)
+    assert_equal(i.__floordiv__(2), I(1, 2, -1, -2))
+    assert_equal(i.__floordiv__(Int32(2)), I(1, 2, -1, -2))
+
+    alias F = SIMD[DType.float32, 4]
+    var f = F(3, -4, 1, 5)
+    assert_equal(f.__floordiv__(3), F(1, -2, 0, 1))
+    assert_equal(f.__floordiv__(Float32(3)), F(1, -2, 0, 1))
 
 
 def test_rfloordiv():
