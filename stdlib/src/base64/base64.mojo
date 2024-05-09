@@ -168,20 +168,20 @@ fn b16encode(str: String) -> String:
       Base16 encoding of the input string.
     """
     alias lookup = "0123456789ABCDEF"
-    var b16chars = lookup.data()
+    var b16chars = lookup.unsafe_ptr()
 
     var length = len(str)
     var out = List[Int8](capacity=length * 2 + 1)
 
     @parameter
     @always_inline
-    fn s(idx: Int) -> Int:
-        return int(str._as_ptr().bitcast[DType.uint8]()[idx])
+    fn str_bytes(idx: Int) -> Int:
+        return int(str.unsafe_ptr().bitcast[DType.uint8]()[idx])
 
     for i in range(length):
-        var si = s(i)
-        var hi = si >> 4
-        var lo = si & 0b1111
+        var str_byte = str_bytes(i)
+        var hi = str_byte >> 4
+        var lo = str_byte & 0b1111
         out.append(b16chars[hi])
         out.append(b16chars[lo])
 
