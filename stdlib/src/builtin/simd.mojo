@@ -25,7 +25,7 @@ from sys import (
     _RegisterPackType,
 )
 
-from builtin._math import Ceilable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable
 from builtin.hash import _hash_simd
 from memory import bitcast
 
@@ -33,11 +33,11 @@ from utils._numerics import FPUtils
 from utils._numerics import isnan as _isnan
 from utils._numerics import nan as _nan
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils import StaticTuple
+from utils.inlined_string import _ArrayMem
 
-from .dtype import _integral_type_of
-from .io import _snprintf_scalar, _snprintf
-from .string import _calc_initial_buffer_size
+from .dtype import _integral_type_of, _get_dtype_printf_format
+from .io import _snprintf_scalar, _snprintf, _printf
+from .string import _calc_initial_buffer_size, _calc_format_buffer_size
 
 # ===------------------------------------------------------------------------===#
 # Type Aliases
@@ -124,6 +124,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Absable,
     Boolable,
     Ceilable,
+    CeilDivable,
     CollectionElement,
     Floorable,
     Hashable,
@@ -143,6 +144,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         type: The data type of SIMD vector elements.
         size: The size of the SIMD vector.
     """
+
+    alias _Mask = SIMD[DType.bool, size]
 
     alias element_type = type
     var value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
@@ -507,38 +510,54 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A string representation.
         """
 
-        # Reserve space for opening and closing brackets, plus each element and
-        # its trailing commas.
-        var buf = String._buffer_type()
-        var initial_buffer_size = 2
-        for i in range(size):
-            initial_buffer_size += _calc_initial_buffer_size(self[i]) + 2
-        buf.reserve(initial_buffer_size)
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this SIMD value to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
 
         # Print an opening `[`.
         @parameter
         if size > 1:
-            buf.size += _snprintf(buf.data, 2, "[")
+            writer.write_str("[")
+
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
+                writer.write_str(", ")
 
-            buf.size += _snprintf_scalar[type](
-                buf.data + buf.size,
-                _calc_initial_buffer_size(element),
-                element,
-            )
+            @parameter
+            if triple_is_nvidia_cuda():
+                # FIXME(MSTDL-406):
+                #   This prints "out of band" with the `Formatter` passed in,
+                #   meaning this will only work if `Formatter` is an unbuffered
+                #   wrapper around printf (which Formatter.stdout currently
+                #   is by default).
+                #
+                #   This is a workaround to permit debug formatting of
+                #   floating-point values on GPU, where printing to stdout is
+                #   the only way the Formatter framework is currently used.
+                var format = _get_dtype_printf_format[type]()
+
+                @parameter
+                if type.is_floating_point():
+                    # get_dtype_printf_format hardcodes 17 digits of precision.
+                    format = "%g"
+
+                _printf(format, element)
+            else:
+                _format_scalar(writer, element)
 
         # Print a closing `]`.
         @parameter
         if size > 1:
-            buf.size += _snprintf(buf.data + buf.size, 2, "]")
-
-        buf.size += 1  # for the null terminator.
-        return String(buf^)
+            writer.write_str("]")
 
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
@@ -582,10 +601,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter
         if type == DType.bool:
-            return (
-                rebind[SIMD[DType.bool, size]](self)
-                & rebind[SIMD[DType.bool, size]](rhs)
-            ).cast[type]()
+            return (rebind[Self._Mask](self) & rebind[Self._Mask](rhs)).cast[
+                type
+            ]()
 
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.mul`(self.value, rhs.value)
@@ -613,7 +631,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             The element type of the SIMD vector must be numeric.
 
         Args:
-            rhs: The value to divide on.
+            rhs: The value to divide with.
 
         Returns:
             `floor(self / rhs)` value.
@@ -638,6 +656,23 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             var mod = self - div * rhs
             var mask = ((rhs < 0) ^ (self < 0)) & (mod != 0)
             return div - mask.cast[type]()
+
+    @always_inline("nodebug")
+    fn __rfloordiv__(self, rhs: Self) -> Self:
+        """Returns the division of rhs and self rounded down to the nearest
+        integer.
+
+        Constraints:
+            The element type of the SIMD vector must be numeric.
+
+        Args:
+            rhs: The value to divide by self.
+
+        Returns:
+            `floor(rhs / self)` value.
+        """
+        constrained[type.is_numeric(), "the type must be numeric"]()
+        return rhs // self
 
     @always_inline("nodebug")
     fn __mod__(self, rhs: Self) -> Self:
@@ -714,7 +749,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return _pow(self, rhs)
 
     @always_inline("nodebug")
-    fn __lt__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __lt__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using less-than comparison.
 
         Args:
@@ -731,7 +766,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __le__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __le__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using less-than-or-equal comparison.
 
         Args:
@@ -748,7 +783,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __eq__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __eq__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using equal-to comparison.
 
         Args:
@@ -771,7 +806,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __ne__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __ne__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using not-equal comparison.
 
         Args:
@@ -794,7 +829,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __gt__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __gt__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using greater-than comparison.
 
         Args:
@@ -811,7 +846,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __ge__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __ge__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using greater-than-or-equal comparison.
 
         Args:
@@ -1084,7 +1119,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn add_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+    fn add_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
         """Computes `self + rhs` and a mask of which indices overflowed.
 
         Args:
@@ -1100,7 +1135,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if type.is_signed():
             var result = llvm_intrinsic[
                 "llvm.sadd.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
@@ -1108,14 +1143,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         else:
             var result = llvm_intrinsic[
                 "llvm.uadd.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
             return (result[0], result[1])
 
     @always_inline
-    fn sub_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+    fn sub_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
         """Computes `self - rhs` and a mask of which indices overflowed.
 
         Args:
@@ -1131,7 +1166,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if type.is_signed():
             var result = llvm_intrinsic[
                 "llvm.ssub.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
@@ -1139,14 +1174,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         else:
             var result = llvm_intrinsic[
                 "llvm.usub.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
             return (result[0], result[1])
 
     @always_inline
-    fn mul_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+    fn mul_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
         """Computes `self * rhs` and a mask of which indices overflowed.
 
         Args:
@@ -1162,7 +1197,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if type.is_signed():
             var result = llvm_intrinsic[
                 "llvm.smul.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
@@ -1170,7 +1205,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         else:
             var result = llvm_intrinsic[
                 "llvm.umul.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
@@ -2216,7 +2251,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_bool(), "the simd dtype must be bool"]()
         return __mlir_op.`pop.simd.select`(
-            rebind[SIMD[DType.bool, size]](self).value,
+            rebind[Self._Mask](self).value,
             true_case.value,
             false_case.value,
         )
@@ -2819,3 +2854,33 @@ fn _simd_apply[
         result[i] = func[x.type, y.type, result_type](x[i], y[i])
 
     return result
+
+
+# ===----------------------------------------------------------------------===#
+# _format_scalar
+# ===----------------------------------------------------------------------===#
+
+
+fn _format_scalar[dtype: DType](inout writer: Formatter, value: Scalar[dtype]):
+    # Stack allocate enough bytes to store any formatted Scalar value of any
+    # type.
+    alias size: Int = _calc_format_buffer_size[dtype]()
+
+    var buf = _ArrayMem[Int8, size]()
+    # TODO(MOCO-268):
+    #   Remove this rebind(..) once compiler type comparison bug is fixed.
+    var buf_ptr: UnsafePointer[Int8] = rebind[UnsafePointer[Int8]](
+        buf.unsafe_ptr()
+    )
+
+    var wrote = _snprintf_scalar[dtype](
+        buf_ptr,
+        size,
+        value,
+    )
+
+    var strref = StringRef(buf_ptr, wrote)
+
+    writer.write_str(strref)
+
+    _ = buf^  # Keep alive

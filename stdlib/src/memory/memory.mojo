@@ -24,7 +24,7 @@ from sys import llvm_intrinsic, sizeof, triple_is_nvidia_cuda
 from builtin.dtype import _integral_type_of
 
 from memory.reference import AddressSpace, _GPUAddressSpace
-from .unsafe import DTypePointer, Pointer
+from .unsafe import DTypePointer, LegacyPointer
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -49,19 +49,28 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         for i in range(count):
             var s1i = s1[i]
             var s2i = s2[i]
-            var diff = s1i - s2i
-            if diff:
-                return 1 if diff > 0 else -1
+            if s1i != s2i:
+                return 1 if s1i > s2i else -1
         return 0
+
+    var iota = llvm_intrinsic[
+        "llvm.experimental.stepvector",
+        SIMD[DType.uint8, simd_width],
+        has_side_effect=False,
+    ]()
 
     var vector_end_simd = _align_down(count, simd_width)
     for i in range(0, vector_end_simd, simd_width):
         var s1i = s1.load[width=simd_width](i)
         var s2i = s2.load[width=simd_width](i)
-        var diff = s1i - s2i
-        if (diff != 0).reduce_or():
-            for j in range(simd_width):
-                return 1 if diff[j] > 0 else -1
+        var diff = s1i != s2i
+        if diff.reduce_or():
+            var index = int(
+                diff.select(
+                    iota, SIMD[DType.uint8, simd_width](255)
+                ).reduce_min()
+            )
+            return -1 if s1i[index] < s2i[index] else 1
 
     var last = count - simd_width
     if last <= 0:
@@ -69,10 +78,12 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
 
     var s1i = s1.load[width=simd_width](last)
     var s2i = s2.load[width=simd_width](last)
-    var diff = s1i - s2i
-    if (diff != 0).reduce_or():
-        for j in range(simd_width):
-            return 1 if diff[j] > 0 else -1
+    var diff = s1i != s2i
+    if diff.reduce_or():
+        var index = int(
+            diff.select(iota, SIMD[DType.uint8, simd_width](255)).reduce_min()
+        )
+        return -1 if s1i[index] < s2i[index] else 1
     return 0
 
 
@@ -115,8 +126,8 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
 fn memcmp[
     type: AnyRegType, address_space: AddressSpace
 ](
-    s1: Pointer[type, address_space],
-    s2: Pointer[type, address_space],
+    s1: LegacyPointer[type, address_space],
+    s2: LegacyPointer[type, address_space],
     count: Int,
 ) -> Int:
     """Compares two buffers. Both strings are assumed to be of the same length.
@@ -154,7 +165,7 @@ fn memcmp[
 
 
 @always_inline
-fn memcpy[count: Int](dest: Pointer, src: __type_of(dest)):
+fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
     """Copies a memory area.
 
     Parameters:
@@ -223,7 +234,7 @@ fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
 
 
 @always_inline
-fn memcpy(dest: Pointer, src: __type_of(dest), count: Int):
+fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
     """Copies a memory area.
 
     Args:
@@ -306,7 +317,7 @@ fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
 @always_inline("nodebug")
 fn _memset_llvm[
     address_space: AddressSpace
-](ptr: Pointer[UInt8, address_space], value: UInt8, count: Int):
+](ptr: UnsafePointer[UInt8, address_space], value: UInt8, count: Int):
     llvm_intrinsic["llvm.memset", NoneType](
         ptr.address, value, count.value, False
     )
@@ -333,7 +344,7 @@ fn memset[
 @always_inline
 fn memset[
     type: AnyRegType, address_space: AddressSpace
-](ptr: Pointer[type, address_space], value: UInt8, count: Int):
+](ptr: UnsafePointer[type, address_space], value: UInt8, count: Int):
     """Fills memory with the given value.
 
     Parameters:
@@ -346,6 +357,24 @@ fn memset[
         count: Number of elements to fill (in elements, not bytes).
     """
     _memset_llvm(ptr.bitcast[UInt8](), value, count * sizeof[type]())
+
+
+@always_inline
+fn memset[
+    type: AnyRegType, address_space: AddressSpace
+](ptr: LegacyPointer[type, address_space], value: UInt8, count: Int):
+    """Fills memory with the given value.
+
+    Parameters:
+        type: The element dtype.
+        address_space: The address space of the pointer.
+
+    Args:
+        ptr: Pointer to the beginning of the memory block to fill.
+        value: The value to fill with.
+        count: Number of elements to fill (in elements, not bytes).
+    """
+    _memset_llvm(ptr.bitcast[UInt8]().address, value, count * sizeof[type]())
 
 
 # ===----------------------------------------------------------------------===#
@@ -373,7 +402,24 @@ fn memset_zero[
 @always_inline
 fn memset_zero[
     type: AnyRegType, address_space: AddressSpace
-](ptr: Pointer[type, address_space], count: Int):
+](ptr: UnsafePointer[type, address_space], count: Int):
+    """Fills memory with zeros.
+
+    Parameters:
+        type: The element type.
+        address_space: The address space of the pointer.
+
+    Args:
+        ptr: Pointer to the beginning of the memory block to fill.
+        count: Number of elements to fill (in elements, not bytes).
+    """
+    memset(ptr, 0, count)
+
+
+@always_inline
+fn memset_zero[
+    type: AnyRegType, address_space: AddressSpace
+](ptr: LegacyPointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
     Parameters:
@@ -489,7 +535,7 @@ fn _malloc[
 
 
 @always_inline
-fn _free(ptr: Pointer):
+fn _free(ptr: UnsafePointer):
     @parameter
     if triple_is_nvidia_cuda():
         constrained[
@@ -504,3 +550,8 @@ fn _free(ptr: Pointer):
 @always_inline
 fn _free(ptr: DTypePointer):
     _free(ptr.address)
+
+
+@always_inline
+fn _free(ptr: LegacyPointer):
+    _free(UnsafePointer(ptr.address))

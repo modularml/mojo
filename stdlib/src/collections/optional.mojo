@@ -100,11 +100,9 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         self = Self()
 
     @always_inline
-    fn value[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
-        T, mutability, self_life
-    ]:
+    fn value(
+        self: Reference[Self, _, _]
+    ) -> Reference[T, self.is_mutable, self.lifetime]:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
@@ -112,17 +110,11 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         eg. by `if my_option:` or without otherwise knowing that it contains a
         value (for instance with `or_else`), you'll get garbage unsafe data out.
 
-        Parameters:
-            mutability: Whether the Optional is mutable.
-            self_life: The Optional's lifetime.
-
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """
-        debug_assert(Reference(self)[].__bool__(), ".value() on empty Optional")
-        alias RefType = Reference[T, mutability, self_life]
-        var ptr = Reference(self)[]._value._get_ptr[T]().address
-        return __mlir_op.`lit.ref.from_pointer`[_type = RefType._mlir_type](ptr)
+        debug_assert(self[].__bool__(), ".value() on empty Optional")
+        return self[]._value.get[T]()
 
     @always_inline
     fn _value_copy(self) -> T:
@@ -136,7 +128,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value.get[T]()[]
 
-    fn take(owned self) -> T:
+    fn unsafe_take(owned self) -> T:
         """Unsafely move the value out of the Optional.
 
         The caller takes ownership over the new value, and the Optional is
@@ -150,8 +142,8 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         Returns:
             The contained data of the option as an owned T value.
         """
-        debug_assert(self.__bool__(), ".take() on empty Optional")
-        return self._value.take[T]()
+        debug_assert(self.__bool__(), ".unsafe_take() on empty Optional")
+        return self._value.unsafe_take[T]()
 
     fn or_else(self, default: T) -> T:
         """Return the underlying value contained in the Optional or a default value if the Optional's underlying value is not present.
@@ -292,35 +284,25 @@ struct OptionalReg[T: AnyRegType](Boolable):
         """Create an optional with a value of None."""
         self = Self(None)
 
-    fn __init__(value: T) -> Self:
+    fn __init__(inout self, value: T):
         """Create an optional with a value.
 
         Args:
             value: The value.
-
-        Returns:
-            The optional.
         """
-        return Self {
-            _value: __mlir_op.`kgen.variant.create`[
-                _type = Self._type, index = Int(0).value
-            ](value)
-        }
+        self._value = __mlir_op.`kgen.variant.create`[
+            _type = Self._type, index = Int(0).value
+        ](value)
 
-    fn __init__(value: NoneType) -> Self:
+    fn __init__(inout self, value: NoneType):
         """Create an optional without a value from a None literal.
 
         Args:
             value: The None value.
-
-        Returns:
-            The optional without a value.
         """
-        return Self {
-            _value: __mlir_op.`kgen.variant.create`[
-                _type = Self._type, index = Int(1).value
-            ](__mlir_attr.false)
-        }
+        self._value = __mlir_op.`kgen.variant.create`[
+            _type = Self._type, index = Int(1).value
+        ](__mlir_attr.false)
 
     @always_inline
     fn value(self) -> T:
@@ -361,7 +343,7 @@ struct OptionalReg[T: AnyRegType](Boolable):
         """Return true if the optional has a value.
 
         Returns:
-            True if the optional has a valu and False otherwise.
+            True if the optional has a value and False otherwise.
         """
         return __mlir_op.`kgen.variant.is`[index = Int(0).value](self._value)
 

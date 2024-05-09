@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import bitwidthof, os_is_windows, triple_is_nvidia_cuda, external_call
+from sys import os_is_windows, triple_is_nvidia_cuda, external_call
 
 from builtin.dtype import _get_dtype_printf_format
 from builtin.builtin_list import _LITRefPackHelper
@@ -23,16 +23,6 @@ from memory import UnsafePointer
 
 from utils import StringRef, unroll
 from utils._format import Formattable, Formatter, write_to
-
-# ===----------------------------------------------------------------------=== #
-# Utilities
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _align_up(value: Int, alignment: Int) -> Int:
-    var div_ceil = (value + alignment - 1)._positive_div(alignment)
-    return div_ceil * alignment
 
 
 # ===----------------------------------------------------------------------=== #
@@ -67,11 +57,11 @@ struct _fdopen:
         @parameter
         if os_is_windows():
             handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id), mode.data()
+                _dup(stream_id), mode.unsafe_ptr()
             )
         else:
             handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id), mode.data()
+                _dup(stream_id), mode.unsafe_ptr()
             )
         self.handle = handle
 
@@ -110,17 +100,23 @@ fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
     # aren't stripped off correctly.
     var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
 
-    with _fdopen(_fdopen.STDOUT) as fd:
-        _ = __mlir_op.`pop.external_call`[
-            func = "KGEN_CompilerRT_fprintf".value,
-            variadicType = __mlir_attr[
-                `(`,
-                `!kgen.pointer<none>,`,
-                `!kgen.pointer<scalar<si8>>`,
-                `) -> !pop.scalar<si32>`,
-            ],
-            _type=Int32,
-        ](fd, fmt.data(), loaded_pack)
+    @parameter
+    if triple_is_nvidia_cuda():
+        _ = external_call["vprintf", Int32](
+            fmt.unsafe_ptr(), UnsafePointer.address_of(loaded_pack)
+        )
+    else:
+        with _fdopen(_fdopen.STDOUT) as fd:
+            _ = __mlir_op.`pop.external_call`[
+                func = "KGEN_CompilerRT_fprintf".value,
+                variadicType = __mlir_attr[
+                    `(`,
+                    `!kgen.pointer<none>,`,
+                    `!kgen.pointer<scalar<si8>>`,
+                    `) -> !pop.scalar<si32>`,
+                ],
+                _type=Int32,
+            ](fd, fmt.unsafe_ptr(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -168,7 +164,7 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.data(), loaded_pack)
+        ](str, size, fmt.unsafe_ptr(), loaded_pack)
     )
 
 
@@ -298,7 +294,7 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
                 _put(", ")
         _put("]")
     else:
-        _put(String(x))
+        _put(str(x))
 
 
 @no_inline
@@ -378,7 +374,7 @@ fn print[
 
     @parameter
     fn print_with_separator[i: Int, T: Stringable](value: T):
-        _put(value)
+        _put(str(value))
 
         @parameter
         if i < values.__len__() - 1:

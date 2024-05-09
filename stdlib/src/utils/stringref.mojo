@@ -25,12 +25,6 @@ from memory import DTypePointer, UnsafePointer
 
 
 @always_inline
-fn _align_up(value: Int, alignment: Int) -> Int:
-    var div_ceil = (value + alignment - 1)._positive_div(alignment)
-    return div_ceil * alignment
-
-
-@always_inline
 fn _align_down(value: Int, alignment: Int) -> Int:
     return value._positive_div(alignment) * alignment
 
@@ -56,7 +50,7 @@ struct StringRef(
     and a length, which need not be null terminated.
     """
 
-    var data: DTypePointer[DType.int8]
+    var data: DTypePointer[DType.uint8]
     """A pointer to the beginning of the string data being referenced."""
     var length: Int
     """The length of the string being referenced."""
@@ -71,7 +65,7 @@ struct StringRef(
         Returns:
             Constructed `StringRef` object.
         """
-        return StringRef(str.data(), len(str))
+        return StringRef(str.unsafe_ptr(), len(str))
 
     fn __str__(self) -> String:
         """Convert the string reference to a string.
@@ -82,7 +76,7 @@ struct StringRef(
         return self
 
     # TODO: #2317 Drop support for this constructor when we have fully
-    # transitionned to UInt8 as the main byte type.
+    # transitioned to UInt8 as the main byte type.
     @always_inline
     fn __init__(ptr: DTypePointer[DType.int8], len: Int) -> StringRef:
         """Construct a StringRef value given a (potentially non-0 terminated
@@ -102,7 +96,7 @@ struct StringRef(
             Constructed `StringRef` object.
         """
 
-        return Self {data: ptr, length: len}
+        return Self {data: ptr.bitcast[DType.uint8](), length: len}
 
     @always_inline
     fn __init__(ptr: DTypePointer[DType.uint8], len: Int) -> StringRef:
@@ -119,10 +113,10 @@ struct StringRef(
             Constructed `StringRef` object.
         """
 
-        return Self {data: ptr.bitcast[DType.int8](), length: len}
+        return Self {data: ptr, length: len}
 
     # TODO: #2317 Drop support for this constructor when we have fully
-    # transitionned to UInt8 as the main byte type.
+    # transitioned to UInt8 as the main byte type.
     @always_inline
     fn __init__(ptr: UnsafePointer[Int8]) -> StringRef:
         """Construct a StringRef value given a null-terminated string.
@@ -154,7 +148,7 @@ struct StringRef(
         return DTypePointer[DType.uint8](ptr)
 
     # TODO: #2317 Drop support for this constructor when we have fully
-    # transitionned to UInt8 as the main byte type.
+    # transitioned to UInt8 as the main byte type.
     @always_inline
     fn __init__(ptr: DTypePointer[DType.int8]) -> StringRef:
         """Construct a StringRef value given a null-terminated string.
@@ -194,26 +188,26 @@ struct StringRef(
         return StringRef(ptr.bitcast[DType.int8](), len)
 
     # TODO: #2317 Drop support for this method when we have fully
-    # transitionned to UInt8 as the main byte type.
+    # transitioned to UInt8 as the main byte type.
     @always_inline
-    fn _as_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
 
-        Prefer to use `_as_uint8_ptr()` instead.
+        Prefer to use `as_uint8_ptr()` instead.
+
+        Returns:
+            The DTypePointer to the underlying memory.
+        """
+        return self.data.bitcast[DType.int8]()
+
+    @always_inline
+    fn unsafe_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Retrieves a pointer to the underlying memory.
 
         Returns:
             The DTypePointer to the underlying memory.
         """
         return self.data
-
-    @always_inline
-    fn _as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
-        """Retrieves a pointer to the underlying memory.
-
-        Returns:
-            The DTypePointer to the underlying memory.
-        """
-        return self.data.bitcast[DType.uint8]()
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -346,16 +340,16 @@ struct StringRef(
         var haystack_str = self._from_start(start)
 
         var loc = _memmem(
-            haystack_str._as_uint8_ptr(),
+            haystack_str.unsafe_uint8_ptr(),
             len(haystack_str),
-            substr._as_uint8_ptr(),
+            substr.unsafe_uint8_ptr(),
             len(substr),
         )
 
         if not loc:
             return -1
 
-        return int(loc) - int(self._as_uint8_ptr())
+        return int(loc) - int(self.unsafe_uint8_ptr())
 
     fn rfind(self, substr: StringRef, start: Int = 0) -> Int:
         """Finds the offset of the last occurrence of `substr` starting at
@@ -379,16 +373,16 @@ struct StringRef(
         var haystack_str = self._from_start(start)
 
         var loc = _memrmem(
-            haystack_str._as_uint8_ptr(),
+            haystack_str.unsafe_uint8_ptr(),
             len(haystack_str),
-            substr._as_uint8_ptr(),
+            substr.unsafe_uint8_ptr(),
             len(substr),
         )
 
         if not loc:
             return -1
 
-        return int(loc) - int(self._as_uint8_ptr())
+        return int(loc) - int(self.unsafe_uint8_ptr())
 
     fn _from_start(self, start: Int) -> StringRef:
         """Gets the StringRef pointing to the substring after the specified slice start position.
@@ -553,7 +547,7 @@ fn _memrmem[
         return DTypePointer[type]()
     if needle_len == 1:
         return _memrchr[type](haystack, needle[0], haystack_len)
-    for i in range(haystack_len - needle_len, -1, -1):
+    for i in reversed(range(haystack_len - needle_len + 1)):
         if haystack[i] != needle[0]:
             continue
         if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:

@@ -59,14 +59,10 @@ struct _ListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__get_ref[list_mutability, list_lifetime](
-                self.index - 1
-            )
+            return self.src[].__get_ref(self.index - 1)
         else:
             self.index -= 1
-            return self.src[].__get_ref[list_mutability, list_lifetime](
-                self.index
-            )
+            return self.src[].__get_ref(self.index)
 
     fn __len__(self) -> Int:
         @parameter
@@ -132,16 +128,20 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             self.append(value[])
 
     fn __init__(
-        inout self: Self, data: UnsafePointer[T], *, size: Int, capacity: Int
+        inout self: Self,
+        *,
+        unsafe_pointer: UnsafePointer[T],
+        size: Int,
+        capacity: Int,
     ):
         """Constructs a list from a pointer, its size, and its capacity.
 
         Args:
-            data: The pointer to the data.
+            unsafe_pointer: The pointer to the data.
             size: The number of elements in the list.
             capacity: The capacity of the list.
         """
-        self.data = data
+        self.data = unsafe_pointer
         self.size = size
         self.capacity = capacity
 
@@ -456,9 +456,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if not self.size:
             raise "Cannot find index of a value in an empty list."
         if normalized_start >= self.size:
-            raise "Given 'start' parameter (" + String(
+            raise "Given 'start' parameter (" + str(
                 normalized_start
-            ) + ") is out of range. List only has " + String(
+            ) + ") is out of range. List only has " + str(
                 self.size
             ) + " elements."
 
@@ -565,12 +565,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return (self.data + normalized_idx)[]
 
     # TODO(30737): Replace __getitem__ with this as __refitem__, but lots of places use it
-    fn __get_ref[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-        i: Int,
-    ) -> Reference[T, mutability, self_life]:
+    fn __get_ref(
+        self: Reference[Self, _, _], i: Int
+    ) -> Reference[T, self.is_mutable, self.lifetime]:
         """Gets a reference to the list element at the given index.
 
         Args:
@@ -581,39 +578,29 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         var normalized_idx = i
         if i < 0:
-            normalized_idx += Reference(self)[].size
+            normalized_idx += self[].size
 
-        var offset_ptr = Reference(self)[].data + normalized_idx
-        return offset_ptr[]
+        return (self[].data + normalized_idx)[]
 
-    fn __iter__[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _ListIter[
-        T, mutability, self_life
-    ]:
+    fn __iter__(
+        self: Reference[Self, _, _],
+    ) -> _ListIter[T, self.is_mutable, self.lifetime]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
             An iterator of immutable references to the list elements.
         """
-        return _ListIter[T, mutability, self_life](0, Reference(self))
+        return _ListIter(0, self)
 
-    fn __reversed__[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _ListIter[
-        T, mutability, self_life, False
-    ]:
+    fn __reversed__(
+        self: Reference[Self, _, _]
+    ) -> _ListIter[T, self.is_mutable, self.lifetime, False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the list elements.
         """
-        var ref = Reference(self)
-        return _ListIter[T, mutability, self_life, False](len(ref[]), ref)
+        return _ListIter[forward=False](len(self[]), self)
 
     @staticmethod
     fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
@@ -688,3 +675,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             if elem[] == value:
                 count += 1
         return count
+
+    @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[T]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The UnsafePointer to the underlying memory.
+        """
+        return self.data

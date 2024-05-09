@@ -10,27 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
-
-from testing import assert_equal
 
 
-fn test_list() raises:
-    assert_equal(len([1, 2.0, 3.14, [-1, -2]]), 4)
+fn divmod(numerator: Int, denominator: Int) -> Tuple[Int, Int]:
+    """Performs integer division and returns the quotient and the remainder.
 
+    Currently supported only for integers. Support for more standard library
+    types like Int8, Int16... is planned.
 
-fn test_variadic_list() raises:
-    @parameter
-    fn check_list(*nums: Int) raises:
-        assert_equal(nums[0], 5)
-        assert_equal(nums[1], 8)
-        assert_equal(nums[2], 6)
+    This method calls `a.__divmod__(b)`, thus, the actual implementation of
+    divmod should go in the `__divmod__` method of the struct of `a`.
 
-        assert_equal(len(nums), 3)
+    Args:
+        numerator: The dividend.
+        denominator: The divisor.
 
-    check_list(5, 8, 6)
-
-
-def main():
-    test_list()
-    test_variadic_list()
+    Returns:
+        A `Tuple` containing the quotient and the remainder.
+    """
+    return numerator.__divmod__(denominator)

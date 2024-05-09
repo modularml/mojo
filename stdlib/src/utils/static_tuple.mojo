@@ -53,9 +53,9 @@ fn _set_array_elem[
         array: the array which is captured by reference.
     """
     var ptr = __mlir_op.`pop.array.gep`(
-        array.get_legacy_pointer().address, index.value
+        UnsafePointer(array).address, index.value
     )
-    Pointer(ptr).store(val)
+    UnsafePointer(ptr)[] = val
 
 
 @always_inline
@@ -249,7 +249,7 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
 
 @value
 struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
-    """A fixed-size sequence of size homogenous elements where size is a constant expression.
+    """A fixed-size sequence of size homogeneous elements where size is a constant expression.
 
     Parameters:
         ElementType: The type of the elements in the array.
@@ -270,10 +270,20 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         constrained[
             False,
             (
-                "Initialize with either a variadic list of arguments or a"
-                " default fill element."
+                "Initialize with either a variadic list of arguments, a default"
+                " fill element or pass the keyword argument 'uninitialized'."
             ),
         ]()
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
+    fn __init__(inout self, *, uninitialized: Bool):
+        """Constructs an empty with uninitized data.
+
+        Args:
+            uninitialized: Unused, exists just to make uninitialized
+                case explicit.
+        """
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
@@ -319,38 +329,28 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         return size
 
     @always_inline("nodebug")
-    fn _get_reference_unsafe[
-        mutability: __mlir_type.i1,
-        self_life: AnyLifetime[mutability].type,
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type, index: Int
-    ) -> Reference[Self.ElementType, mutability, self_life]:
+    fn _get_reference_unsafe(
+        self: Reference[Self, _, _], index: Int
+    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__refitem__` instead of this method.
         """
         var ptr = __mlir_op.`pop.array.gep`(
-            Reference(Reference(self)[]._array).get_legacy_pointer().address,
+            UnsafePointer.address_of(self[]._array).address,
             index.value,
         )
-        return Reference[Self.ElementType, mutability, self_life](
-            UnsafePointer(ptr)[]
-        )
+        return UnsafePointer(ptr)[]
 
     @always_inline("nodebug")
     fn __refitem__[
-        mutability: __mlir_type.i1,
-        self_life: AnyLifetime[mutability].type,
         IntableType: Intable,
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-        index: IntableType,
-    ) -> Reference[Self.ElementType, mutability, self_life]:
+    ](self: Reference[Self, _, _], index: IntableType) -> Reference[
+        Self.ElementType, self.is_mutable, self.lifetime
+    ]:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
-            mutability: The inferred mutability of the reference.
-            self_life: The inferred lifetime of the reference.
             IntableType: The inferred type of an intable argument.
 
         Args:
@@ -364,24 +364,18 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         if normalized_idx < 0:
             normalized_idx += size
 
-        return Reference(self)[]._get_reference_unsafe[mutability, self_life](
-            normalized_idx
-        )
+        return self[]._get_reference_unsafe(normalized_idx)
 
     @always_inline("nodebug")
     fn __refitem__[
-        mutability: __mlir_type.i1,
-        self_life: AnyLifetime[mutability].type,
         IntableType: Intable,
         index: IntableType,
-    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
-        Self.ElementType, mutability, self_life
+    ](self: Reference[Self, _, _]) -> Reference[
+        Self.ElementType, self.is_mutable, self.lifetime
     ]:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
-            mutability: The inferred mutability of the reference.
-            self_life: The inferred lifetime of the reference.
             IntableType: The inferred type of an intable argument.
             index: The index of the item.
 
@@ -397,6 +391,4 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         if i < 0:
             normalized_idx += size
 
-        return Reference(self)[]._get_reference_unsafe[mutability, self_life](
-            normalized_idx
-        )
+        return self[]._get_reference_unsafe(normalized_idx)
