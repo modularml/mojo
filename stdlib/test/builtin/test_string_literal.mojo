@@ -94,6 +94,26 @@ def test_intable():
         _ = int("hi")
 
 
+fn test_representable() raises:
+    # Usual cases
+    assert_equal(repr("hello"), "'hello'")
+
+    # Escape cases
+    assert_equal(repr("\0"), r"'\x00'")
+    assert_equal(repr("\x06"), r"'\x06'")
+    assert_equal(repr("\x09"), r"'\t'")
+    assert_equal(repr("\n"), r"'\n'")
+    assert_equal(repr("\x0d"), r"'\r'")
+    assert_equal(repr("\x0e"), r"'\x0e'")
+    assert_equal(repr("\x1f"), r"'\x1f'")
+    assert_equal(repr(" "), "' '")
+    assert_equal(repr("'"), '"\'"')
+    assert_equal(repr("A"), "'A'")
+    assert_equal(repr("\\"), r"'\\'")
+    assert_equal(repr("~"), "'~'")
+    assert_equal(repr("\x7f"), r"'\x7f'")
+
+
 def main():
     test_basics()
     test_contains()
@@ -101,3 +121,4 @@ def main():
     test_rfind()
     test_hash()
     test_intable()
+    test_representable()

@@ -41,10 +41,24 @@ fn test_stringable() raises:
 
 
 fn test_representable() raises:
+    # Usual cases
     assert_equal(repr(String("hello")), "'hello'")
     assert_equal(repr(str(0)), "'0'")
-    # TODO: Add more complex cases with "'", escape characters, etc
-    # and make String.__repr__ more robust to handle those cases.
+
+    # Escape cases
+    assert_equal(repr(String("\0")), r"'\x00'")
+    assert_equal(repr(String("\x06")), r"'\x06'")
+    assert_equal(repr(String("\x09")), r"'\t'")
+    assert_equal(repr(String("\n")), r"'\n'")
+    assert_equal(repr(String("\x0d")), r"'\r'")
+    assert_equal(repr(String("\x0e")), r"'\x0e'")
+    assert_equal(repr(String("\x1f")), r"'\x1f'")
+    assert_equal(repr(String(" ")), "' '")
+    assert_equal(repr(String("'")), '"\'"')
+    assert_equal(repr(String("A")), "'A'")
+    assert_equal(repr(String("\\")), r"'\\'")
+    assert_equal(repr(String("~")), "'~'")
+    assert_equal(repr(String("\x7f")), r"'\x7f'")
 
 
 fn test_constructors() raises:
