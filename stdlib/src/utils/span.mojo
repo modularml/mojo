@@ -111,6 +111,9 @@ struct Span[
     ](inout self, array: Reference[InlineArray[T, size], is_mutable, lifetime]):
         """Construct a Span from an InlineArray.
 
+        Parameters:
+            size: The size of the InlineArray.
+
         Args:
             array: The array to which the span refers.
         """
@@ -195,13 +198,16 @@ struct Span[
         ref[] = value
 
     @always_inline
-    fn __getitem__(self, span: Slice) -> Self:
+    fn __getitem__(self, slice: Slice) -> Self:
         """Get a new span from a slice of the current span.
+
+        Args:
+            slice: The slice specifying the range of the new subslice.
 
         Returns:
             A new span that points to the same data as the current span.
         """
-        var adjusted_span = self._adjust_span(span)
+        var adjusted_span = self._adjust_span(slice)
         debug_assert(
             0 <= adjusted_span.start < self._len
             and 0 <= adjusted_span.end < self._len,
