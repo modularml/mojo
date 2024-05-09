@@ -721,6 +721,27 @@ struct Dict[K: KeyElement, V: CollectionElement](
         for entry in other.items():
             self[entry[].key] = entry[].value
 
+    fn __or__(self, other: Self) -> Self:
+        """Merge self with other and return the result as a new dict.
+
+        Args:
+            other: The dictionary to merge with.
+
+        Returns:
+            The result of the merge.
+        """
+        var result = Dict(self)
+        result.update(other)
+        return result^
+
+    fn __ior__(inout self, other: Self):
+        """Merge self with other in place.
+
+        Args:
+            other: The dictionary to merge with.
+        """
+        self.update(other)
+
     @staticmethod
     @always_inline
     fn _new_entries(reserved: Int) -> List[Optional[DictEntry[K, V]]]:
