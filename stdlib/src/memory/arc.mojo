@@ -45,6 +45,7 @@ struct _ArcInner[T: Movable]:
         return self.refcount.fetch_sub(1) == 1
 
 
+@register_passable
 struct Arc[T: Movable](CollectionElement):
     """Atomic reference-counted pointer.
 
@@ -85,14 +86,6 @@ struct Arc[T: Movable](CollectionElement):
         # Order here does not matter since `existing` can't be destroyed until
         # sometime after we return.
         existing._inner[].add_ref()
-        self._inner = existing._inner
-
-    fn __moveinit__(inout self, owned existing: Self):
-        """Move an existing reference.
-
-        Args:
-            existing: The existing reference.
-        """
         self._inner = existing._inner
 
     fn __del__(owned self):

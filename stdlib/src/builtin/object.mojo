@@ -621,20 +621,24 @@ struct _ObjectImpl(CollectionElement, Stringable):
 
     @always_inline
     fn list_append(self, value: Self):
-        self.get_list_ptr()[].append(value.value)
+        var ptr = self.get_list_ptr()
+        ptr[].append(value.value)
 
     @always_inline
     fn get_list_length(self) -> Int:
-        return len(self.get_list_ptr()[])
+        var ptr = self.get_list_ptr()
+        return len(ptr[])
 
     @always_inline
     fn get_list_element(self, i: Int) -> _ObjectImpl:
-        return self.get_list_ptr()[][i].copy()
+        var ptr = self.get_list_ptr()
+        return ptr[][i].copy()
 
     @always_inline
     fn set_list_element(self, i: Int, value: _ObjectImpl):
-        self.get_list_ptr()[][i].destroy()
-        self.get_list_ptr()[][i] = value
+        var ptr = self.get_list_ptr()
+        ptr[][i].destroy()
+        ptr[][i] = value
 
     # ===------------------------------------------------------------------=== #
     # Object Attribute Functions
