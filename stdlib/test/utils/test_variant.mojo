@@ -165,7 +165,7 @@ def test_take_doesnt_call_deleter():
         ObservableDel(UnsafePointer.address_of(deleted))
     )
     assert_false(deleted)
-    var v2 = v1.take[ObservableDel]()
+    var v2 = v1.unsafe_take[ObservableDel]()
     assert_false(deleted)
     _ = v2
     assert_true(deleted)

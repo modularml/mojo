@@ -244,7 +244,7 @@ struct FileHandle:
         # Skip 2 elements
         _ = file.seek(2 * sizeof[DType.float32](), os.SEEK_CUR)
 
-        # Allocate and load 8 more elements from file hande seek position
+        # Allocate and load 8 more elements from file handle seek position
         var ptr2 = DTypePointer[DType.float32].alloc(8)
         var bytes2 = file.read(ptr2, 8)
 
@@ -341,7 +341,9 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[Int8](buf, size=int(size_copy), capacity=int(size_copy))
+        var list = List[Int8](
+            unsafe_pointer=buf, size=int(size_copy), capacity=int(size_copy)
+        )
 
         return list
 
@@ -412,7 +414,7 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        self._write(data._as_ptr(), len(data))
+        self._write(data.unsafe_ptr(), len(data))
 
     @always_inline
     fn write(self, data: StringRef) raises:
@@ -421,7 +423,7 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        self._write(data.data, len(data))
+        self._write(data.unsafe_ptr(), len(data))
 
     @always_inline
     fn _write[

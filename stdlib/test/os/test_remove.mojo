@@ -71,7 +71,7 @@ fn test_remove() raises:
     create_file_and_test_delete_path[unlink, "unlink"](my_file_path)
 
     # test with relative path
-    my_file_name = Path("my_relative_file.test")
+    my_file_name = str(Path("my_relative_file.test"))
     create_file_and_test_delete_string[remove, "remove"](my_file_name)
 
 

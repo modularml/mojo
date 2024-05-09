@@ -10,30 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
-
-from testing import assert_equal
 
 
-def raise_an_error():
-    raise Error("MojoError: This is an error!")
+fn divmod(numerator: Int, denominator: Int) -> Tuple[Int, Int]:
+    """Performs integer division and returns the quotient and the remainder.
 
+    Currently supported only for integers. Support for more standard library
+    types like Int8, Int16... is planned.
 
-def test_error_raising():
-    try:
-        raise_an_error()
-    except e:
-        assert_equal(str(e), "MojoError: This is an error!")
+    This method calls `a.__divmod__(b)`, thus, the actual implementation of
+    divmod should go in the `__divmod__` method of the struct of `a`.
 
+    Args:
+        numerator: The dividend.
+        denominator: The divisor.
 
-def test_from_and_to_string():
-    var myString: String = "FOO"
-    var error = Error(myString)
-    assert_equal(str(error), "FOO")
-
-    assert_equal(str(Error("bad")), "bad")
-
-
-def main():
-    test_error_raising()
-    test_from_and_to_string()
+    Returns:
+        A `Tuple` containing the quotient and the remainder.
+    """
+    return numerator.__divmod__(denominator)

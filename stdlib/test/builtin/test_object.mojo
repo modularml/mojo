@@ -193,7 +193,7 @@ def test_function_raises(borrowed a) -> object:
 def test_object_function():
     var a: object = test_function
     assert_true(str(a).startswith("Function at address 0x"))
-    assert_equal(a(1, 2), 3)
+    assert_equal(str(a(1, 2)), str(3))
     a = test_function_raises
     with assert_raises(contains="Error from function type"):
         a(1)
