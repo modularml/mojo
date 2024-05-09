@@ -28,7 +28,7 @@ from utils import InlineArray
 
 # TODO: Provide a smarter default for the capacity.
 struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
-    """A list allocated on the stack with a maximum size knwon at compile time.
+    """A list allocated on the stack with a maximum size known at compile time.
 
     It is backed by an `InlineArray` and an `Int` to represent the size.
     This struct has the same API as a regular `List`, but it is not possible to change the
