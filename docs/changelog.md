@@ -151,6 +151,11 @@ what we publish.
 - The `get` function in `Variant` has been replaced by `__refitem__`. That is,
   `v.get[T]()` should be replaced with `v[T]`.
 
+- Various functions in the `algorithm` module are now moved to be
+  builtin-functions.  This includes `sort`, `swap`, and `partition`.
+  `swap` and `partition` will likely shuffle around as we're reworking
+  our builtnin `sort` function and optimizing it.
+
 ### ❌ Removed
 
 - The method `object.print()` has been removed. Since now, `object` has the
