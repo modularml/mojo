@@ -392,3 +392,17 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             normalized_idx += size
 
         return self[]._get_reference_unsafe(normalized_idx)
+
+    # TODO(#38268): Remove this method when references and parameter expressions
+    # cooperate better.
+    @always_inline("nodebug")
+    fn get[i: Int](self) -> ElementType:
+        """Get a tuple element and rebind to the specified type.
+
+        Parameters:
+            i: The element index.
+
+        Returns:
+            The array element at the requested index.
+        """
+        return self[i]

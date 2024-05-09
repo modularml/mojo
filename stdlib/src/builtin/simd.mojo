@@ -1656,6 +1656,15 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `(self+other)[permutation[i]]`.
         """
 
+        @parameter
+        fn _check[i: Int]():
+            constrained[
+                0 <= mask.get[i]() < 2 * size,
+                "invalid index in the shuffle operation",
+            ]()
+
+        unroll[_check, output_size]()
+
         return __mlir_op.`pop.simd.shuffle`[
             mask = mask._array,
             _type = __mlir_type[
