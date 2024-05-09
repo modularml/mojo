@@ -332,7 +332,7 @@ struct Int(
 
             # Format the integer to the local byte array
             var len = _snprintf(
-                rebind[UnsafePointer[Int8]](buf.as_ptr()),
+                rebind[UnsafePointer[Int8]](buf.unsafe_ptr()),
                 size,
                 "%li",
                 self.value,
@@ -657,17 +657,16 @@ struct Int(
         return mod
 
     @always_inline("nodebug")
-    fn _divmod(self, rhs: Int) -> Tuple[Int, Int]:
+    fn __divmod__(self, rhs: Int) -> Tuple[Int, Int]:
         """Computes both the quotient and remainder using integer division.
 
         Args:
             rhs: The value to divide on.
 
         Returns:
-            The quotient and remainder as a tuple `(self // rhs, self % rhs)`.
+            The quotient and remainder as a `Tuple(self // rhs, self % rhs)`.
         """
         if rhs == 0:
-            # this should raise an exception.
             return 0, 0
         var div: Int = self._positive_div(rhs)
         if rhs > 0 and self > 0:

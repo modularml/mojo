@@ -57,11 +57,11 @@ struct _fdopen:
         @parameter
         if os_is_windows():
             handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id), mode.data()
+                _dup(stream_id), mode.unsafe_ptr()
             )
         else:
             handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id), mode.data()
+                _dup(stream_id), mode.unsafe_ptr()
             )
         self.handle = handle
 
@@ -103,7 +103,7 @@ fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.data(), UnsafePointer.address_of(loaded_pack)
+            fmt.unsafe_ptr(), UnsafePointer.address_of(loaded_pack)
         )
     else:
         with _fdopen(_fdopen.STDOUT) as fd:
@@ -116,7 +116,7 @@ fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
                     `) -> !pop.scalar<si32>`,
                 ],
                 _type=Int32,
-            ](fd, fmt.data(), loaded_pack)
+            ](fd, fmt.unsafe_ptr(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -164,7 +164,7 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.data(), loaded_pack)
+        ](str, size, fmt.unsafe_ptr(), loaded_pack)
     )
 
 
@@ -294,7 +294,7 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
                 _put(", ")
         _put("]")
     else:
-        _put(String(x))
+        _put(str(x))
 
 
 @no_inline
@@ -374,7 +374,7 @@ fn print[
 
     @parameter
     fn print_with_separator[i: Int, T: Stringable](value: T):
-        _put(value)
+        _put(str(value))
 
         @parameter
         if i < values.__len__() - 1:

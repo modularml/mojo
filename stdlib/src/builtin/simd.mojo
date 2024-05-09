@@ -146,6 +146,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         size: The size of the SIMD vector.
     """
 
+    alias _Mask = SIMD[DType.bool, size]
+
     alias element_type = type
     var value: __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
     """The underlying storage for the vector."""
@@ -600,10 +602,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         @parameter
         if type == DType.bool:
-            return (
-                rebind[SIMD[DType.bool, size]](self)
-                & rebind[SIMD[DType.bool, size]](rhs)
-            ).cast[type]()
+            return (rebind[Self._Mask](self) & rebind[Self._Mask](rhs)).cast[
+                type
+            ]()
 
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.mul`(self.value, rhs.value)
@@ -671,6 +672,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             `floor(rhs / self)` value.
         """
+        constrained[type.is_numeric(), "the type must be numeric"]()
         return rhs // self
 
     @always_inline("nodebug")
@@ -748,7 +750,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return _pow(self, rhs)
 
     @always_inline("nodebug")
-    fn __lt__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __lt__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using less-than comparison.
 
         Args:
@@ -765,7 +767,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __le__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __le__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using less-than-or-equal comparison.
 
         Args:
@@ -782,7 +784,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __eq__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __eq__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using equal-to comparison.
 
         Args:
@@ -805,7 +807,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __ne__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __ne__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using not-equal comparison.
 
         Args:
@@ -828,7 +830,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __gt__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __gt__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using greater-than comparison.
 
         Args:
@@ -845,7 +847,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __ge__(self, rhs: Self) -> SIMD[DType.bool, size]:
+    fn __ge__(self, rhs: Self) -> Self._Mask:
         """Compares two SIMD vectors using greater-than-or-equal comparison.
 
         Args:
@@ -1118,7 +1120,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn add_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+    fn add_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
         """Computes `self + rhs` and a mask of which indices overflowed.
 
         Args:
@@ -1134,7 +1136,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if type.is_signed():
             var result = llvm_intrinsic[
                 "llvm.sadd.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
@@ -1142,14 +1144,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         else:
             var result = llvm_intrinsic[
                 "llvm.uadd.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
             return (result[0], result[1])
 
     @always_inline
-    fn sub_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+    fn sub_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
         """Computes `self - rhs` and a mask of which indices overflowed.
 
         Args:
@@ -1165,7 +1167,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if type.is_signed():
             var result = llvm_intrinsic[
                 "llvm.ssub.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
@@ -1173,14 +1175,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         else:
             var result = llvm_intrinsic[
                 "llvm.usub.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
             return (result[0], result[1])
 
     @always_inline
-    fn mul_with_overflow(self, rhs: Self) -> (Self, SIMD[DType.bool, size]):
+    fn mul_with_overflow(self, rhs: Self) -> (Self, Self._Mask):
         """Computes `self * rhs` and a mask of which indices overflowed.
 
         Args:
@@ -1196,7 +1198,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if type.is_signed():
             var result = llvm_intrinsic[
                 "llvm.smul.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
@@ -1204,7 +1206,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         else:
             var result = llvm_intrinsic[
                 "llvm.umul.with.overflow",
-                _RegisterPackType[Self, SIMD[DType.bool, size]],
+                _RegisterPackType[Self, Self._Mask],
                 Self,
                 Self,
             ](self, rhs)
@@ -2241,7 +2243,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_bool(), "the simd dtype must be bool"]()
         return __mlir_op.`pop.simd.select`(
-            rebind[SIMD[DType.bool, size]](self).value,
+            rebind[Self._Mask](self).value,
             true_case.value,
             false_case.value,
         )
@@ -2858,7 +2860,7 @@ fn _format_scalar[dtype: DType](inout writer: Formatter, value: Scalar[dtype]):
 
     var buf = _ArrayMem[Int8, size]()
     # TODO(MOCO-268):
-    #   Remove this rebind(..) once compiler type comparision bug is fixed.
+    #   Remove this rebind(..) once compiler type comparison bug is fixed.
     var buf_ptr: UnsafePointer[Int8] = rebind[UnsafePointer[Int8]](
         buf.unsafe_ptr()
     )
