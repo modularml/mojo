@@ -84,7 +84,7 @@ struct IntLiteral(
         Returns:
             The value as a string.
         """
-        return self
+        return str(Int(self))
 
     @always_inline("nodebug")
     fn __as_mlir_index(self) -> __mlir_type.index:
