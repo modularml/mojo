@@ -19,7 +19,7 @@ If you already installed Mojo, see the [update guide](/max/update).
 
 Mojo is now bundled with MAX, which provides everything to compile,
 run, debug, and package Mojo code ([read
-why](/engine/faq#why-bundle-mojo-with-max)).
+why](/max/faq#why-bundle-mojo-with-max)).
 
 To install Mojo, [see the MAX install guide](/max/install).
 
