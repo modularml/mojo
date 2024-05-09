@@ -475,7 +475,7 @@ fn is_64bit[target: __mlir_type.`!kgen.target` = _current_target()]() -> Bool:
 @always_inline("nodebug")
 fn simdbitwidth[
     target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the vector size (in bits) of the host system.
 
     Parameters:
@@ -488,14 +488,14 @@ fn simdbitwidth[
         `#kgen.param.expr<target_get_field,`,
         target,
         `, "simd_bit_width" : !kgen.string`,
-        `> : index`,
+        `> : !kgen.int_literal`,
     ]
 
 
 @always_inline("nodebug")
 fn simdbytewidth[
     target: __mlir_type.`!kgen.target` = _current_target()
-]() -> Int:
+]() -> IntLiteral:
     """Returns the vector size (in bytes) of the host system.
 
     Parameters:
