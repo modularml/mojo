@@ -176,6 +176,25 @@ struct Span[
         return self._refitem__(index)[]
 
     @always_inline
+    fn __setitem__[
+        IntableType: Intable
+    ](inout self, index: IntableType, value: T):
+        """Get a `Reference` to the element at the given index.
+
+        Parameters:
+            IntableType: The inferred type of an intable argument.
+
+        Args:
+            index: The index of the item.
+            value: The value to set at the given index.
+        """
+        # note that self._refitem__ is already bounds checking
+        var ref = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
+            UnsafePointer(self._refitem__(index))[]
+        )
+        ref[] = value
+
+    @always_inline
     fn __getitem__(self, span: Slice) -> Self:
         """Get a new span from a slice of the current span.
 

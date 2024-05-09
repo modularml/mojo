@@ -31,6 +31,15 @@ def test_span_list_int():
     assert_equal(s2[3], l[5])
     assert_equal(s[-1], l[-1])
 
+    # Test mutation
+    s[0] = 9
+    assert_equal(s[0], 9)
+    assert_equal(l[0], 9)
+
+    s[-1] = 0
+    assert_equal(s[-1], 0)
+    assert_equal(l[-1], 0)
+
 
 def test_span_list_str():
     var l = List[String]("a", "b", "c", "d", "e", "f", "g")
@@ -44,6 +53,15 @@ def test_span_list_str():
     assert_equal(s2[1], l[3])
     assert_equal(s2[2], l[4])
     assert_equal(s2[3], l[5])
+
+    # Test mutation
+    s[0] = "h"
+    assert_equal(s[0], "h")
+    assert_equal(l[0], "h")
+
+    s[-1] = "i"
+    assert_equal(s[-1], "i")
+    assert_equal(l[-1], "i")
 
 
 def test_span_array_int():
@@ -59,6 +77,15 @@ def test_span_array_int():
     assert_equal(s2[2], l[4])
     assert_equal(s2[3], l[5])
 
+    # Test mutation
+    s[0] = 9
+    assert_equal(s[0], 9)
+    assert_equal(l[0], 9)
+
+    s[-1] = 0
+    assert_equal(s[-1], 0)
+    assert_equal(l[-1], 0)
+
 
 def test_span_array_str():
     var l = InlineArray[String, 7]("a", "b", "c", "d", "e", "f", "g")
@@ -72,6 +99,15 @@ def test_span_array_str():
     assert_equal(s2[1], l[3])
     assert_equal(s2[2], l[4])
     assert_equal(s2[3], l[5])
+
+    # Test mutation
+    s[0] = "h"
+    assert_equal(s[0], "h")
+    assert_equal(l[0], "h")
+
+    s[-1] = "i"
+    assert_equal(s[-1], "i")
+    assert_equal(l[-1], "i")
 
 
 def main():
