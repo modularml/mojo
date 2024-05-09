@@ -105,7 +105,7 @@ def test_boolean_comparable():
     assert_true(f2)
 
     var f3 = FloatLiteral(1.0)
-    assert_true(f2)
+    assert_true(f3)
 
 
 def test_equality():

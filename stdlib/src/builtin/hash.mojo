@@ -30,6 +30,9 @@ from sys.ffi import _get_global
 
 from memory import memcpy, memset_zero, stack_allocation
 
+# TODO remove this import onece InlineArray is moved to collections
+from utils import InlineArray
+
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
@@ -195,6 +198,27 @@ fn _hash_int8[size: Int](data: SIMD[DType.uint8, size]) -> Int:
     return int(hash_data) ^ _HASH_SECRET()
 
 
+fn hash(bytes: DTypePointer[DType.uint8], n: Int) -> Int:
+    """Hash a byte array using a SIMD-modified DJBX33A hash algorithm.
+
+    Similar to `hash(bytes: DTypePointer[DType.int8], n: Int) -> Int` but
+    takes a `DTypePointer[DType.uint8]` instead of `DTypePointer[DType.int8]`.
+    See the overload for a complete description of the algorithm.
+
+    Args:
+        bytes: The byte array to hash.
+        n: The length of the byte array.
+
+    Returns:
+        A 64-bit integer hash. This hash is _not_ suitable for
+        cryptographic purposes, but will have good low-bit
+        hash collision statistical properties for common data structures.
+    """
+    return hash(bytes.bitcast[DType.int8](), n)
+
+
+# TODO: Remove this overload once we have finished the transition to uint8
+# for bytes. See https://github.com/modularml/mojo/issues/2317
 fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     """Hash a byte array using a SIMD-modified DJBX33A hash algorithm.
 
@@ -286,7 +310,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     # 3. Copy the tail data (smaller than the SIMD register) into
     #    a final hash state update vector that's stack-allocated.
     if r != 0:
-        var remaining = StaticTuple[Int8, stride]()
+        var remaining = InlineArray[Int8, stride](uninitialized=True)
         var ptr = DTypePointer[DType.int8](
             UnsafePointer.address_of(remaining).bitcast[Int8]()
         )

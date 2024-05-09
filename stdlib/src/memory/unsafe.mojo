@@ -275,7 +275,10 @@ struct LegacyPointer[
         Returns:
             A LegacyPointer struct which contains the address of the argument.
         """
-        return arg.get_legacy_pointer()
+        # Work around AnyRegType vs AnyType.
+        return __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
+            UnsafePointer(arg).address
+        )
 
     @always_inline("nodebug")
     fn __refitem__(self) -> Self._mlir_ref_type:
@@ -711,7 +714,7 @@ struct DTypePointer[
         Returns:
             A DTypePointer struct which contains the address of the argument.
         """
-        return arg.get_legacy_pointer()
+        return LegacyPointer.address_of(arg[])
 
     @always_inline("nodebug")
     fn __getitem__[T: Intable](self, offset: T) -> Scalar[type]:
