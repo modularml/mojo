@@ -810,9 +810,9 @@ struct String(
         var len2 = len(rhs)
 
         if len1 < len2:
-            return memcmp(self._as_ptr(), rhs._as_ptr(), len1) <= 0
+            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
         else:
-            return memcmp(self._as_ptr(), rhs._as_ptr(), len2) < 0
+            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
 
     @always_inline
     fn __le__(self, rhs: String) -> Bool:

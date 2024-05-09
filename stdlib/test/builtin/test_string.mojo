@@ -113,46 +113,46 @@ fn test_comparison_operators() raises:
     var abcd = String("abcd")
 
     # Test less than and greater than
-    assert_true(abc < de)
-    assert_false(de < abc)
-    assert_false(abc < abc)
-    assert_true(ab < abc)
-    assert_true(abc > ab)
-    assert_false(abc > abcd)
+    assert_true(abc.__lt__(de))
+    assert_false(de.__lt__(abc))
+    assert_false(abc.__lt__(abc))
+    assert_true(ab.__lt__(abc))
+    assert_true(abc.__gt__(ab))
+    assert_false(abc.__gt__(abcd))
 
     # Test less than or equal to and greater than or equal to
-    assert_true(abc <= de)
-    assert_true(abc <= abc)
-    assert_false(de <= abc)
-    assert_true(abc >= abc)
-    assert_false(ab >= abc)
-    assert_true(abcd >= abc)
+    assert_true(abc.__le__(de))
+    assert_true(abc.__le__(abc))
+    assert_false(de.__le__(abc))
+    assert_true(abc.__ge__(abc))
+    assert_false(ab.__ge__(abc))
+    assert_true(abcd.__ge__(abc))
 
     # Test case sensitivity in comparison (assuming ASCII order)
-    assert_true(abc > ABC)
-    assert_false(abc <= ABC)
+    assert_true(abc.__gt__(ABC))
+    assert_false(abc.__le__(ABC))
 
     # Testing with implicit conversion
-    assert_true(abc < "defgh")
-    assert_false(abc > "xyz")
-    assert_true(abc >= "abc")
-    assert_false(abc <= "ab")
+    assert_true(abc.__lt__("defgh"))
+    assert_false(abc.__gt__("xyz"))
+    assert_true(abc.__ge__("abc"))
+    assert_false(abc.__le__("ab"))
 
-    # Test against empty strings
-    assert_true(str("") < abc)
-    assert_false(abc < "")
-    assert_true(str("") <= "")
-    assert_true(str("") >= "")
+    # Test comparisons involving empty strings
+    assert_true(str("").__lt__(abc))
+    assert_false(abc.__lt__(""))
+    assert_true(str("").__le__(""))
+    assert_true(str("").__ge__(""))
 
     # Test comparisons involving default constructed empty string
-    assert_true(String() < abc)
-    assert_false(abc < String())
-    assert_true(String() <= abc)
-    assert_false(abc <= String())
-    assert_true(String() <= "")
-    assert_true(String() >= "")
-    assert_false(abc <= String())
-    assert_true(String() >= String())
+    assert_true(String().__lt__(abc))
+    assert_false(abc.__lt__(String()))
+    assert_true(String().__le__(abc))
+    assert_false(abc.__le__(String()))
+    assert_true(String().__le__(""))
+    assert_true(String().__ge__(""))
+    assert_false(abc.__le__(String()))
+    assert_true(String().__ge__(String()))
 
 
 fn test_add() raises:

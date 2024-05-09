@@ -80,30 +80,30 @@ def test_rfind():
 
 fn test_comparison_operators() raises:
     # Test less than and greater than
-    assert_true("abc" < "def")
-    assert_false("def" < "abc")
-    assert_false("abc" < "abc")
-    assert_true("ab" < "abc")
-    assert_true("abc" > "ab")
-    assert_false("abc" > "abcd")
+    assert_true("abc".__lt__("def"))
+    assert_false("def".__lt__("abc"))
+    assert_false("abc".__lt__("abc"))
+    assert_true("ab".__lt__("abc"))
+    assert_true("abc".__gt__("ab"))
+    assert_false("abc".__gt__("abcd"))
 
     # Test less than or equal to and greater than or equal to
-    assert_true("abc" <= "def")
-    assert_true("abc" <= "abc")
-    assert_false("def" <= "abc")
-    assert_true("abc" >= "abc")
-    assert_false("ab" >= "abc")
-    assert_true("abcd" >= "abc")
+    assert_true("abc".__le__("def"))
+    assert_true("abc".__le__("abc"))
+    assert_false("def".__le__("abc"))
+    assert_true("abc".__ge__("abc"))
+    assert_false("ab".__ge__("abc"))
+    assert_true("abcd".__ge__("abc"))
 
     # Test case sensitivity in comparison (assuming ASCII order)
-    assert_true("abc" > "ABC")
-    assert_false("abc" <= "ABC")
+    assert_true("abc".__gt__("ABC"))
+    assert_false("abc".__le__("ABC"))
 
-    # Test against empty strings
-    assert_true("" < "abc")
-    assert_false("abc" < "")
-    assert_true("" <= "")
-    assert_true("" >= "")
+    # Test comparisons involving empty strings
+    assert_true("".__lt__("abc"))
+    assert_false("abc".__lt__(""))
+    assert_true("".__le__(""))
+    assert_true("".__ge__(""))
 
 
 def test_hash():

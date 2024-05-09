@@ -140,9 +140,9 @@ struct StringLiteral(
         var len2 = len(rhs)
 
         if len1 < len2:
-            return _memcmp(self.data(), rhs.data(), len1) <= 0
+            return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
         else:
-            return _memcmp(self.data(), rhs.data(), len2) < 0
+            return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
 
     @always_inline("nodebug")
     fn __le__(self, rhs: StringLiteral) -> Bool:
