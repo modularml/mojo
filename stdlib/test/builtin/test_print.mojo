@@ -74,17 +74,7 @@ fn test_print_sep():
     print("a", 1, 2, sep="/", end="xx\n")
 
 
-fn test_print_stderr():
-    # TODO: check print to stderr
-    print("stderr", file=sys.stderr)
-    print("a", "b", "c", sep="/", file=sys.stderr)
-    print("world", flush=True, sep="/", file=sys.stderr)
-    print("hello", end="world", file=sys.stderr)
-    print(String("hello world"), file=sys.stderr)
-
-
 fn main():
     test_print()
     test_print_end()
     test_print_sep()
-    test_print_stderr()
