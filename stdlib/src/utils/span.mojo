@@ -81,8 +81,8 @@ struct Span[
         lifetime: The lifetime of the Span.
     """
 
-    var data: UnsafePointer[T]
-    var len: Int
+    var _data: UnsafePointer[T]
+    var _len: Int
 
     @always_inline
     fn __init__(inout self, *, data: UnsafePointer[T], len: Int):
@@ -92,8 +92,8 @@ struct Span[
             data: The underlying pointer of the span.
             len: The length of the view.
         """
-        self.data = data
-        self.len = len
+        self._data = data
+        self._len = len
 
     @always_inline
     fn __init__(inout self, list: Reference[List[T], is_mutable, lifetime]):
@@ -102,8 +102,8 @@ struct Span[
         Args:
             list: The list to which the span refers.
         """
-        self.data = list[].data
-        self.len = len(list[])
+        self._data = list[].data
+        self._len = len(list[])
 
     @always_inline
     fn __init__[
@@ -114,8 +114,8 @@ struct Span[
         Args:
             array: The array to which the span refers.
         """
-        self.data = UnsafePointer(array).bitcast[T]()
-        self.len = size
+        self._data = UnsafePointer(array).bitcast[T]()
+        self._len = size
 
     @always_inline
     fn __len__(self) -> Int:
@@ -124,20 +124,20 @@ struct Span[
         Returns:
             The size of the span.
         """
-        return self.len
+        return self._len
 
     @always_inline
     fn _refitem__[
         intable: Intable
     ](self, index: intable) -> Reference[T, is_mutable, lifetime]:
         debug_assert(
-            -self.len <= int(index) < self.len, "index must be within bounds"
+            -self._len <= int(index) < self._len, "index must be within bounds"
         )
 
         var offset = int(index)
         if offset < 0:
             offset += len(self)
-        return (self.data + offset)[]
+        return (self._data + offset)[]
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
@@ -203,11 +203,12 @@ struct Span[
         """
         var adjusted_span = self._adjust_span(span)
         debug_assert(
-            0 <= adjusted_span.start < self.len and 0 <= adjusted_span.end,
+            0 <= adjusted_span.start < self._len
+            and 0 <= adjusted_span.end < self._len,
             "Slice must be within bounds.",
         )
         var res = Self(
-            data=(self.data + adjusted_span.start), len=len(adjusted_span)
+            data=(self._data + adjusted_span.start), len=len(adjusted_span)
         )
 
         return res
