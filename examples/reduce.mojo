@@ -29,7 +29,7 @@ alias size_large: Int = 1 << 27
 
 # Datatype for Tensor/Array
 alias type = DType.float32
-alias scalar = Scalar[DType.float32]
+alias scalar = Scalar[type]
 
 
 # Use the https://en.wikipedia.org/wiki/Kahan_summation_algorithm
@@ -50,9 +50,9 @@ fn stdlib_reduce_sum[size: Int](array: Buffer[type, size]) -> scalar:
     return my_sum
 
 
-fn pretty_print(name: StringLiteral, elements: Int, time: Float64) raises:
-    var py = Python.import_module("builtins")
-    _ = py.print(
+def pretty_print(name: StringLiteral, elements: Int, time: Float64):
+    py = Python.import_module("builtins")
+    py.print(
         py.str("{:<16} {:>11,} {:>8.2f}ms").format(
             String(name) + " elements:", elements, time
         )
@@ -87,8 +87,6 @@ fn main() raises:
 
     var buffer_small = Buffer[type, size_small](ptr_small)
     var buffer_large = Buffer[type, size_large](ptr_large)
-    print(naive_reduce_sum(buffer_small))
-    print(stdlib_reduce_sum(buffer_small))
 
     bench[naive_reduce_sum, size_small, "naive"](buffer_small)
     bench[naive_reduce_sum, size_large, "naive"](buffer_large)
