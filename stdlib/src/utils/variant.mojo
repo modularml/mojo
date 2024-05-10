@@ -140,10 +140,10 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     """
 
     alias _sentinel: Int = -1
-    alias _type = __mlir_type[
+    alias _mlir_type = __mlir_type[
         `!kgen.variant<[rebind(:`, __type_of(Ts), ` `, Ts, `)]>`
     ]
-    var _impl: Self._type
+    var _impl: Self._mlir_type
 
     fn __init__[T: CollectionElement](inout self, owned value: T):
         """Create a variant with one of the types.
@@ -155,7 +155,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             value: The value to initialize the variant with.
         """
-        self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
+        self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
         self._get_state()[] = Self._check[T]()
         initialize_pointee_move(self._get_ptr[T](), value^)
 
@@ -165,7 +165,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             other: The variant to copy from.
         """
-        self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
+        self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
         self._get_state()[] = other._get_state()[]
 
         @parameter
@@ -185,7 +185,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             other: The variant to move.
         """
-        self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
+        self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
         self._get_state()[] = other._get_state()[]
 
         @parameter
