@@ -141,6 +141,8 @@ what we publish.
   using `mkdir` and `rmdir`.
     ([PR #2430](https://github.com/modularml/mojo/pull/2430) by [@artemiogr97](https://github.com/artemiogr97))
 
+- `Dict.__get_ref(key)`, allowing to get references to dictionary values.
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
@@ -190,3 +192,6 @@ what we publish.
   simple trait definitions.
 - [#1787](https://github.com/modularml/mojo/issues/1787) Fix error when using
   `//` on `FloatLiteral` in alias expression.
+- Made several improvements to dictionary performance. Dicts with integer keys
+  are most heavily affected, but large dicts and dicts with large values
+  will also see large improvements.
