@@ -217,8 +217,8 @@ struct OptionalReg[T: AnyRegType](Boolable):
         T: The type of value stored in the Optional.
     """
 
-    alias _type = __mlir_type[`!kgen.variant<`, T, `, i1>`]
-    var _value: Self._type
+    alias _mlir_type = __mlir_type[`!kgen.variant<`, T, `, i1>`]
+    var _value: Self._mlir_type
 
     fn __init__(inout self):
         """Create an optional with a value of None."""
@@ -231,7 +231,7 @@ struct OptionalReg[T: AnyRegType](Boolable):
             value: The value.
         """
         self._value = __mlir_op.`kgen.variant.create`[
-            _type = Self._type, index = Int(0).value
+            _type = Self._mlir_type, index = Int(0).value
         ](value)
 
     fn __init__(inout self, value: NoneType):
@@ -241,7 +241,7 @@ struct OptionalReg[T: AnyRegType](Boolable):
             value: The None value.
         """
         self._value = __mlir_op.`kgen.variant.create`[
-            _type = Self._type, index = Int(1).value
+            _type = Self._mlir_type, index = Int(1).value
         ](__mlir_attr.false)
 
     @always_inline
