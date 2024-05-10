@@ -120,11 +120,7 @@ struct Coroutine[type: AnyRegType]:
         Returns:
             The value of the fulfilled promise.
         """
-        return UnsafePointer(
-            __mlir_op.`co.promise`[
-                _type = __mlir_type[`!kgen.pointer<`, type, `>`]
-            ](self._handle)
-        )[]
+        return __mlir_op.`co.get_results`[_type=type](self._handle)
 
     @always_inline
     fn __init__(handle: AnyCoroutine) -> Coroutine[type]:
@@ -204,11 +200,9 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The value of the fulfilled promise.
         """
-        var variant = UnsafePointer(
-            __mlir_op.`co.promise`[
-                _type = __mlir_type[`!kgen.pointer<`, Self._var_type, `>`]
-            ](self._handle)
-        )[]
+        var variant = __mlir_op.`co.get_results`[_type = Self._var_type](
+            self._handle
+        )
         if __mlir_op.`kgen.variant.is`[index = Int(0).value](variant):
             raise __mlir_op.`kgen.variant.take`[index = Int(0).value](variant)
         return __mlir_op.`kgen.variant.take`[index = Int(1).value](variant)
