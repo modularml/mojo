@@ -137,6 +137,10 @@ what we publish.
 - Debugger users can now set breakpoints on function calls in O0 builds even if
   the call has been inlined by the compiler.
 
+- The `os` module now provides functionalty for adding and removing directories
+  using `mkdir` and `rmdir`.
+    ([PR #2430](https://github.com/modularml/mojo/pull/2430) by [@artemiogr97](https://github.com/artemiogr97))
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
