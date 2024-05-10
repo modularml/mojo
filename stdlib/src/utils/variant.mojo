@@ -145,18 +145,6 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     ]
     var _impl: Self._type
 
-    fn _get_ptr[T: CollectionElement](self) -> UnsafePointer[T]:
-        constrained[
-            Self._check[T]() != Self._sentinel, "not a union element type"
-        ]()
-        return UnsafePointer.address_of(self._impl).bitcast[T]()
-
-    fn _get_state(
-        self: Reference[Self, _, _]
-    ) -> Reference[Int8, self.is_mutable, self.lifetime]:
-        var int8_self = UnsafePointer(self).bitcast[Int8]()
-        return (int8_self + _UnionSize[Ts].compute())[]
-
     fn __init__[T: CollectionElement](inout self, owned value: T):
         """Create a variant with one of the types.
 
@@ -171,7 +159,6 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         self._get_state()[] = Self._check[T]()
         initialize_pointee_move(self._get_ptr[T](), value^)
 
-    @always_inline
     fn __copyinit__(inout self, other: Self):
         """Creates a deep copy of an existing variant.
 
@@ -192,7 +179,6 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         unroll[each, len(VariadicList(Ts))]()
 
-    @always_inline
     fn __moveinit__(inout self, owned other: Self):
         """Move initializer for the variant.
 
@@ -214,6 +200,18 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     fn __del__(owned self):
         """Destroy the variant."""
         self._call_correct_deleter()
+
+    fn _get_ptr[T: CollectionElement](self) -> UnsafePointer[T]:
+        constrained[
+            Self._check[T]() != Self._sentinel, "not a union element type"
+        ]()
+        return UnsafePointer.address_of(self._impl).bitcast[T]()
+
+    fn _get_state(
+        self: Reference[Self, _, _]
+    ) -> Reference[Int8, self.is_mutable, self.lifetime]:
+        var int8_self = UnsafePointer(self).bitcast[Int8]()
+        return (int8_self + _UnionSize[Ts].compute())[]
 
     @always_inline
     fn _call_correct_deleter(inout self):
@@ -247,9 +245,8 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         debug_assert(
             Self._check[T]() == self._get_state()[], "taking wrong type"
         )
-        self._get_state()[] = (
-            Self._sentinel
-        )  # don't call the variant's deleter later
+        # don't call the variant's deleter later
+        self._get_state()[] = Self._sentinel
         return move_from_pointee(self._get_ptr[T]())
 
     fn set[T: CollectionElement](inout self, owned value: T):
