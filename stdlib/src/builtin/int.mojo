@@ -24,7 +24,6 @@ from builtin.io import _snprintf
 from builtin.hex import _try_write_int
 
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils import StaticIntTuple
 from utils._format import Formattable, Formatter
 from utils.inlined_string import _ArrayMem
 
