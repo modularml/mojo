@@ -490,19 +490,33 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Raises:
             "KeyError" if the key isn't present.
         """
-        var value = self.find(key)
-        if value:
-            return value.value()[]
-        raise "KeyError"
+        return self._find_ref(key)[]
 
-    fn __setitem__(inout self, key: K, value: V):
+    # TODO(MSTDL-452): rename to __refitem__
+    fn __get_ref(
+        self: Reference[Self, _, _], key: K
+    ) raises -> Reference[V, self.is_mutable, self.lifetime]:
+        """Retrieve a value out of the dictionary.
+
+        Args:
+            key: The key to retrieve.
+
+        Returns:
+            The value associated with the key, if it's present.
+
+        Raises:
+            "KeyError" if the key isn't present.
+        """
+        return self[]._find_ref(key)
+
+    fn __setitem__(inout self, owned key: K, owned value: V):
         """Set a value in the dictionary by key.
 
         Args:
             key: The key to associate with the specified value.
             value: The data to store in the dictionary.
         """
-        self._insert(key, value)
+        self._insert(key^, value^)
 
     fn __contains__(self, key: K) -> Bool:
         """Check if a given key is in the dictionary or not.
@@ -596,16 +610,34 @@ struct Dict[K: KeyElement, V: CollectionElement](
             An optional value containing a copy of the value if it was present,
             otherwise an empty Optional.
         """
+        try:  # TODO(MOCO-604): push usage through
+            return self._find_ref(key)[]
+        except:
+            return None
+
+    # TODO(MOCO-604): Return Optional[Reference] instead of raising
+    fn _find_ref(
+        self: Reference[Self, _, _], key: K
+    ) raises -> Reference[V, self.is_mutable, self.lifetime]:
+        """Find a value in the dictionary by key.
+
+        Args:
+            key: The key to search for in the dictionary.
+
+        Returns:
+            An optional value containing a reference to the value if it is
+            present, otherwise an empty Optional.
+        """
         var hash = hash(key)
         var found: Bool
         var slot: Int
         var index: Int
-        found, slot, index = self._find_index(hash, key)
+        found, slot, index = self[]._find_index(hash, key)
         if found:
-            var ev = self._entries.__get_ref(index)[]
-            debug_assert(ev.__bool__(), "entry in index must be full")
-            return ev.value()[].value
-        return None
+            var entry = self[]._entries.__get_ref(index)
+            debug_assert(entry[].__bool__(), "entry in index must be full")
+            return Reference(entry[].value()[].value)
+        raise "KeyError"
 
     fn get(self, key: K) -> Optional[V]:
         """Get a value from the dictionary by key.
@@ -654,11 +686,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
         found, slot, index = self._find_index(hash, key)
         if found:
             self._set_index(slot, Self.REMOVED)
-            var entry = self._entries.__get_ref(index)[]
-            self._entries[index] = None
+            var entry = self._entries.__get_ref(index)
+            var entry_value = entry[].unsafe_take()
+            entry[] = None
             self.size -= 1
-            debug_assert(entry.__bool__(), "entry in index must be full")
-            return entry.value()[].value
+            debug_assert(entry[].__bool__(), "entry in index must be full")
+            return entry_value.value^
         elif default:
             return default.value()[]
         raise "KeyError"
@@ -797,10 +830,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
             elif index == Self.REMOVED:
                 return (False, slot, self._n_entries)
             else:
-                var ev = self._entries.__get_ref(index)[]
-                debug_assert(ev.__bool__(), "entry in index must be full")
-                var entry = ev.value()[]
-                if hash == entry.hash and key == entry.key:
+                var entry = self._entries.__get_ref(index)
+                debug_assert(entry[].__bool__(), "entry in index must be full")
+                if (
+                    hash == entry[].value()[].hash
+                    and key == entry[].value()[].key
+                ):
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
 
@@ -823,9 +858,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._entries = self._new_entries(self._reserved)
 
         for i in range(len(old_entries)):
-            var entry = old_entries.__get_ref(i)[]
-            if entry:
-                self._insert(entry.value()[])
+            var entry = old_entries.__get_ref(i)
+            if entry[]:
+                self._insert(entry[].unsafe_take())
 
     fn _compact(inout self):
         self._index = _DictIndex(self._reserved)
@@ -834,13 +869,14 @@ struct Dict[K: KeyElement, V: CollectionElement](
             while not self._entries.__get_ref(right)[]:
                 right += 1
                 debug_assert(right < self._reserved, "Invalid dict state")
-            var entry = self._entries.__get_ref(right)[]
-            debug_assert(entry.__bool__(), "Logic error")
-            var slot = self._find_empty_index(entry.value()[].hash)
+            var entry = self._entries.__get_ref(right)
+            debug_assert(entry[].__bool__(), "Logic error")
+            var slot = self._find_empty_index(entry[].value()[].hash)
             self._set_index(slot, left)
             if left != right:
-                self._entries[left] = entry
-                self._entries[right] = None
+                self._entries[left] = entry[].unsafe_take()
+                entry[] = None
+            right += 1
 
         self._n_entries = self.size
 
