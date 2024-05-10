@@ -15,5 +15,15 @@
 from .atomic import Atomic
 from .env import setenv, getenv
 from .fstat import lstat, stat, stat_result
-from .os import abort, listdir, remove, unlink, SEEK_SET, SEEK_CUR, SEEK_END
+from .os import (
+    abort,
+    listdir,
+    remove,
+    unlink,
+    SEEK_SET,
+    SEEK_CUR,
+    SEEK_END,
+    mkdir,
+    rmdir,
+)
 from .pathlike import PathLike

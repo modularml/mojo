@@ -277,7 +277,7 @@ fn remove(path: String) raises:
       path: The path to the file.
 
     """
-    var error = external_call["unlink", Int](path.unsafe_ptr())
+    var error = external_call["unlink", Int32](path.unsafe_ptr())
 
     if error != 0:
         # TODO get error message, the following code prints it
@@ -327,3 +327,66 @@ fn unlink[pathlike: os.PathLike](path: pathlike) raises:
 
     """
     remove(path.__fspath__())
+
+
+# ===----------------------------------------------------------------------=== #
+# mkdir/rmdir
+# ===----------------------------------------------------------------------=== #
+
+
+fn mkdir(path: String, mode: Int = 0o777) raises:
+    """Creates a directory at the specified path.
+    If the directory can not be created an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+      path: The path to the directory.
+      mode: The mode to create the directory with.
+    """
+
+    var error = external_call["mkdir", Int32](path.unsafe_ptr(), mode)
+    if error != 0:
+        raise Error("Can not create directory: " + path)
+
+
+fn mkdir[pathlike: os.PathLike](path: pathlike, mode: Int = 0o777) raises:
+    """Creates a directory at the specified path.
+    If the directory can not be created an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+      mode: The mode to create the directory with.
+    """
+
+    mkdir(path.__fspath__(), mode)
+
+
+fn rmdir(path: String) raises:
+    """Removes the specified directory.
+    If the path is not a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+      path: The path to the directory.
+    """
+    var error = external_call["rmdir", Int32](path.unsafe_ptr())
+    if error != 0:
+        raise Error("Can not remove directory: " + path)
+
+
+fn rmdir[pathlike: os.PathLike](path: pathlike) raises:
+    """Removes the specified directory.
+    If the path is not a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+    """
+    rmdir(path.__fspath__())
