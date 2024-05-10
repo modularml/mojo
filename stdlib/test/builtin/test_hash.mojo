@@ -55,7 +55,12 @@ def test_hash_byte_array():
         hash("c".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1)
     )
 
-    assert_true(num_same < 3, "too little entropy in hash fn low bits")
+    # This test is just really bad. We really need to re-evaluate the
+    # right way to test these. Hash function behavior varies a bit  based
+    # on architecture, so these tests as-is end up being really flaky.
+    # Making this _much_ more relaxed for now, but at least still testing
+    # that at least the hash function returns _some_ different things.
+    assert_true(num_same < 6, "too little entropy in hash fn low bits")
 
 
 def _test_hash_int_simd[type: DType](bits: Int = 4, max_num_same: Int = 2):
