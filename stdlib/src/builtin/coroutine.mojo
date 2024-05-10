@@ -93,30 +93,7 @@ struct Coroutine[type: AnyRegType]:
         type: Type of value returned upon completion of the coroutine.
     """
 
-    alias _promise_type = __mlir_type[`!kgen.struct<(`, type, `)>`]
     var _handle: AnyCoroutine
-
-    @always_inline
-    fn _get_promise(self) -> UnsafePointer[type]:
-        """Return the pointer to the beginning of the memory where the async
-        function results are stored.
-
-        Returns:
-            The coroutine promise.
-        """
-        var promise: UnsafePointer[Self._promise_type] = __mlir_op.`co.promise`[
-            _type = __mlir_type[`!kgen.pointer<`, Self._promise_type, `>`]
-        ](self._handle)
-        return promise.bitcast[type]()
-
-    @always_inline
-    fn get(self) -> type:
-        """Get the value of the fulfilled coroutine promise.
-
-        Returns:
-            The value of the fulfilled promise.
-        """
-        return LegacyPointer(self._get_promise().address).load()
 
     @always_inline
     fn _get_ctx[ctx_type: AnyRegType](self) -> UnsafePointer[ctx_type]:
@@ -132,7 +109,22 @@ struct Coroutine[type: AnyRegType]:
             sizeof[_CoroutineContext]() == sizeof[ctx_type](),
             "context size must be 16 bytes",
         ]()
-        return self._get_promise().bitcast[ctx_type]() - 1
+        return __mlir_op.`co.get_callback_ptr`[
+            _type = __mlir_type[`!kgen.pointer<`, ctx_type, `>`]
+        ](self._handle)
+
+    @always_inline
+    fn get(self) -> type:
+        """Get the value of the fulfilled coroutine promise.
+
+        Returns:
+            The value of the fulfilled promise.
+        """
+        return UnsafePointer(
+            __mlir_op.`co.promise`[
+                _type = __mlir_type[`!kgen.pointer<`, type, `>`]
+            ](self._handle)
+        )[]
 
     @always_inline
     fn __init__(handle: AnyCoroutine) -> Coroutine[type]:
@@ -203,21 +195,7 @@ struct RaisingCoroutine[type: AnyRegType]:
     """
 
     alias _var_type = __mlir_type[`!kgen.variant<`, Error, `, `, type, `>`]
-    alias _promise_type = __mlir_type[`!kgen.struct<(`, Self._var_type, `)>`]
     var _handle: AnyCoroutine
-
-    @always_inline
-    fn _get_promise(self) -> UnsafePointer[Self._var_type]:
-        """Return the pointer to the beginning of the memory where the async
-        function results are stored.
-
-        Returns:
-            The coroutine promise.
-        """
-        var promise: UnsafePointer[Self._promise_type] = __mlir_op.`co.promise`[
-            _type = __mlir_type[`!kgen.pointer<`, Self._promise_type, `>`]
-        ](self._handle)
-        return promise.bitcast[Self._var_type]()
 
     @always_inline
     fn get(self) raises -> type:
@@ -226,7 +204,11 @@ struct RaisingCoroutine[type: AnyRegType]:
         Returns:
             The value of the fulfilled promise.
         """
-        var variant = LegacyPointer(self._get_promise().address).load()
+        var variant = UnsafePointer(
+            __mlir_op.`co.promise`[
+                _type = __mlir_type[`!kgen.pointer<`, Self._var_type, `>`]
+            ](self._handle)
+        )[]
         if __mlir_op.`kgen.variant.is`[index = Int(0).value](variant):
             raise __mlir_op.`kgen.variant.take`[index = Int(0).value](variant)
         return __mlir_op.`kgen.variant.take`[index = Int(1).value](variant)
@@ -245,7 +227,9 @@ struct RaisingCoroutine[type: AnyRegType]:
             sizeof[_CoroutineContext]() == sizeof[ctx_type](),
             "context size must be 16 bytes",
         ]()
-        return self._get_promise().bitcast[ctx_type]() - 1
+        return __mlir_op.`co.get_callback_ptr`[
+            _type = __mlir_type[`!kgen.pointer<`, ctx_type, `>`]
+        ](self._handle)
 
     @always_inline
     fn __init__(inout self, handle: AnyCoroutine):
