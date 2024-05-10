@@ -23,7 +23,7 @@ struct IntLiteral(
     Boolable,
     Ceilable,
     CeilDivable,
-    EqualityComparable,
+    Comparable,
     Floorable,
     Intable,
     Roundable,

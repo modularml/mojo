@@ -15,7 +15,7 @@
 from .dict import Dict, KeyElement, _DictEntryIter, _DictKeyIter
 
 
-struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
+struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     """A set data type.
 
     O(1) average-case amortized add, remove, and membership check.
