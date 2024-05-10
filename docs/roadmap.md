@@ -85,7 +85,7 @@ structured language evolution features.
 
 ## Mojo SDK known issues
 
-The [Mojo SDK](/mojo/manual/get-started/) is still in early development
+The Mojo SDK is still in early development
 and currently only available for Ubuntu Linux and macOS (Apple silicon)
 systems. Here are some of the notable issues that we plan to fix:
 
