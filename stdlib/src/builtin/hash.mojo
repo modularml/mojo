@@ -25,6 +25,7 @@ There are a few main tools in this module:
     These are useful helpers to specialize for the general bytes implementation.
 """
 
+from builtin.dtype import _uint_type_of_width
 import random
 from sys.ffi import _get_global
 
@@ -126,10 +127,32 @@ fn _djbx33a_hash_update[
     return data * 33 + next
 
 
+# Based on the hash function used by ankerl::unordered_dense::hash
+# https://martin.ankerl.com/2022/08/27/hashmap-bench-01/#ankerl__unordered_dense__hash
+fn _ankerl_init[type: DType, size: Int]() -> SIMD[type, size]:
+    alias int_type = _uint_type_of_width[type.bitwidth()]()
+    alias init = Int64(-7046029254386353131).cast[int_type]()
+    return SIMD[type, size](bitcast[type, 1](init))
+
+
+fn _ankerl_hash_update[
+    type: DType, size: Int
+](data: SIMD[type, size], next: SIMD[type, size]) -> SIMD[type, size]:
+    # compute the hash as though the type is uint
+    alias int_type = _uint_type_of_width[type.bitwidth()]()
+    var data_int = bitcast[int_type, size](data)
+    var next_int = bitcast[int_type, size](next)
+    var result = (data_int * next_int) ^ next_int
+    return bitcast[type, size](result)
+
+
 alias _HASH_INIT = _djbx33a_init
 alias _HASH_UPDATE = _djbx33a_hash_update
 
 
+# This is incrementally better than DJBX33A, in that it fixes some of the
+# performance issue we've been seeing with Dict. It's still not ideal as
+# a long-term hash function.
 @always_inline
 fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     """Hash a SIMD byte vector using direct DJBX33A hash algorithm.
@@ -148,54 +171,26 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
         cryptographic purposes, but will have good low-bit
         hash collision statistical properties for common data structures.
     """
-    # Some types will have non-integer ratios, eg. DType.bool
-    alias int8_size = _div_ceil_positive(
-        type.bitwidth(), DType.uint8.bitwidth()
-    ) * size
-    # Stack allocate bytes for `data` and load it into that memory.
-    # Then reinterpret as int8 and pass to the specialized int8 hash function.
-    # - Ensure that the alignment matches both types, otherwise
-    #   an aligned load or store will be offset and cause
-    #   nondeterminism (read) or memory corruption (write)
-    # TODO(#31160): use math.lcm
-    # Technically this is LCM, but alignments should always be multiples of 2.
-    alias alignment = max(
-        alignof[SIMD[type, size]](), alignof[SIMD[DType.uint8, int8_size]]()
-    )
-    var bytes = stack_allocation[int8_size, DType.uint8, alignment=alignment]()
-    memset_zero(bytes, int8_size)
-    bytes.bitcast[type]().store[width=size](data)
-    return _hash_int8(bytes.load[width=int8_size]())
 
+    @parameter
+    if type == DType.bool:
+        return _hash_simd(data.cast[DType.int8]())
 
-fn _hash_int8[size: Int](data: SIMD[DType.uint8, size]) -> Int:
-    """Hash a SIMD byte vector using direct DJBX33A hash algorithm.
+    var hash_data = _ankerl_init[type, size]()
+    hash_data = _ankerl_hash_update(hash_data, data)
 
-    This naively implements DJBX33A, with a hash secret appended at the end.
-    The hash secret is computed randomly at compile time, so different executions
-    will use different secrets, and thus have different hash outputs. This is
-    useful in preventing DDOS attacks against hash functions using a
-    non-cryptographic hash function like DJBX33A.
+    alias int_type = _uint_type_of_width[type.bitwidth()]()
+    var final_data = bitcast[int_type, 1](hash_data[0]).cast[DType.uint64]()
 
-    See `hash(bytes, n)` documentation for more details.
+    @parameter
+    fn hash_value[i: Int]():
+        final_data = _ankerl_hash_update(
+            final_data,
+            bitcast[int_type, 1](hash_data[i + 1]).cast[DType.uint64](),
+        )
 
-    Parameters:
-        size: The SIMD width of the input data.
-
-    Args:
-        data: The input data to hash.
-
-    Returns:
-        A 64-bit integer hash. This hash is _not_ suitable for
-        cryptographic purposes, but will have good low-bit
-        hash collision statistical properties for common data structures.
-    """
-    var hash_data = _HASH_INIT[DType.int64, 1]()
-    for i in range(size):
-        hash_data = _HASH_UPDATE(hash_data, data[i].cast[DType.int64]())
-    # TODO(27659): 'lit.globalvar.ref' error
-    # return int(hash_data) ^ HASH_SECRET
-    return int(hash_data) ^ _HASH_SECRET()
+    unroll[hash_value, size - 1]()
+    return int(final_data)
 
 
 fn hash(bytes: DTypePointer[DType.uint8], n: Int) -> Int:
@@ -220,37 +215,25 @@ fn hash(bytes: DTypePointer[DType.uint8], n: Int) -> Int:
 # TODO: Remove this overload once we have finished the transition to uint8
 # for bytes. See https://github.com/modularml/mojo/issues/2317
 fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
-    """Hash a byte array using a SIMD-modified DJBX33A hash algorithm.
-
-    The DJBX33A algorithm is commonly used for data structures that rely
-    on well-distributed hashing for performance. The low order bits of the
-    result depend on each byte in the input, meaning that single-byte changes
-    will result in a changed hash even when masking out most bits eg. for small
-    dictionaries.
+    """Hash a byte array using a SIMD-modified hash algorithm.
 
     _This hash function is not suitable for cryptographic purposes._ The
     algorithm is easy to reverse and produce deliberate hash collisions.
-    We _do_ however initialize a random hash secret which is mixed into
-    the final hash output. This can help prevent DDOS attacks on applications
-    which make use of this function for dictionary hashing. As a consequence,
-    hash values are deterministic within an individual runtime instance ie.
-    a value will always hash to the same thing, but in between runs this value
-    will change based on the hash secret.
+    The hash function is designed to have relatively good mixing and statistical
+    properties for use in hash-based data structures.  We _do_ however initialize
+    a random hash secret which is mixed into the final hash output. This can help
+    prevent DDOS attacks on applications which make use of this function for
+    dictionary hashing. As a consequence, hash values are deterministic within an
+    individual runtime instance ie.  a value will always hash to the same thing,
+    but in between runs this value will change based on the hash secret.
 
-    Standard DJBX33A is:
+    We take advantage of Mojo's first-class SIMD support to create a
+    SIMD-vectorized hash function, using some simple hash algorithm as a base.
 
-    - Set _hash_ = 5361
-    - For each byte: _hash_ = 33 * _hash_ + _byte_
-
-    Instead, for all bytes except trailing bytes that don't align
-    to the max SIMD vector width, we:
-
-    - Interpret those bytes as a SIMD vector.
-    - Apply a vectorized hash: _v_ = 33 * _v_ + _bytes_as_simd_value_
-    - Call [`reduce_add()`](/mojo/stdlib/builtin/simd/SIMD#reduce_add) on the
-      final result to get a single hash value.
-    - Use this value in fallback for the remaining suffix bytes
-      with standard DJBX33A.
+    - Interpret those bytes as a SIMD vector, padded with zeros to align
+        to the system SIMD width.
+    - Apply the simple hash function parallelized across SIMD vectors.
+    - Hash the final SIMD vector state to reduce to a single value.
 
     Python uses DJBX33A with a hash secret for smaller strings, and
     then the SipHash algorithm for longer strings. The arguments and tradeoffs
@@ -281,7 +264,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
         cryptographic purposes, but will have good low-bit
         hash collision statistical properties for common data structures.
     """
-    alias type = DType.int64
+    alias type = DType.uint64
     alias type_width = type.bitwidth() // DType.int8.bitwidth()
     alias simd_width = simdwidthof[type]()
     # stride is the byte length of the whole SIMD vector
@@ -296,12 +279,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     # 1. Reinterpret the underlying data as a larger int type
     var simd_data = bytes.bitcast[type]()
 
-    # 2. Compute DJBX33A, but strided across the SIMD vector width.
-    #    This is almost the same as DBJX33A, except:
-    #    - The order in which bytes of data update the hash is permuted
-    #    - For larger inputs, a small constant number of bytes from the
-    #      beginning of the string (3/4 of the first vector load)
-    #      have a slightly different power of 33 as a coefficient.
+    # 2. Compute the hash, but strided across the SIMD vector width.
     var hash_data = _HASH_INIT[type, simd_width]()
     for i in range(k):
         var update = simd_data.load[width=simd_width](i * simd_width)
@@ -319,8 +297,5 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
         var last_value = ptr.bitcast[type]().load[width=simd_width]()
         hash_data = _HASH_UPDATE(hash_data, last_value)
 
-    # Now finally, hash the final SIMD vector state. This will also use
-    # DJBX33A to make sure that higher-order bits of the vector will
-    # mix and impact the low-order bits, and is mathematically necessary
-    # for this function to equate to naive DJBX33A.
+    # Now finally, hash the final SIMD vector state.
     return _hash_simd(hash_data)
