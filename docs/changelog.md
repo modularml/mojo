@@ -134,6 +134,9 @@ what we publish.
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
 
+- Debugger users can now set breakpoints on function calls in O0 builds even if
+  the call has been inlined by the compiler.
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
@@ -146,7 +149,15 @@ what we publish.
   `--diagnose-missing-doc-strings`.
 
 - The `take` function in `Variant` and `Optional` has been renamed to
-`unsafe_take`.
+  `unsafe_take`.
+
+- The `get` function in `Variant` has been replaced by `__refitem__`. That is,
+  `v.get[T]()` should be replaced with `v[T]`.
+
+- Various functions in the `algorithm` module are now moved to be
+  builtin-functions.  This includes `sort`, `swap`, and `partition`.
+  `swap` and `partition` will likely shuffle around as we're reworking
+  our builtnin `sort` function and optimizing it.
 
 ### ❌ Removed
 

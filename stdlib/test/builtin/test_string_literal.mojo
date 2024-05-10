@@ -94,6 +94,26 @@ def test_intable():
         _ = int("hi")
 
 
+fn test_repr() raises:
+    # Usual cases
+    assert_equal(StringLiteral.__repr__("hello"), "'hello'")
+
+    # Escape cases
+    assert_equal(StringLiteral.__repr__("\0"), r"'\x00'")
+    assert_equal(StringLiteral.__repr__("\x06"), r"'\x06'")
+    assert_equal(StringLiteral.__repr__("\x09"), r"'\t'")
+    assert_equal(StringLiteral.__repr__("\n"), r"'\n'")
+    assert_equal(StringLiteral.__repr__("\x0d"), r"'\r'")
+    assert_equal(StringLiteral.__repr__("\x0e"), r"'\x0e'")
+    assert_equal(StringLiteral.__repr__("\x1f"), r"'\x1f'")
+    assert_equal(StringLiteral.__repr__(" "), "' '")
+    assert_equal(StringLiteral.__repr__("'"), '"\'"')
+    assert_equal(StringLiteral.__repr__("A"), "'A'")
+    assert_equal(StringLiteral.__repr__("\\"), r"'\\'")
+    assert_equal(StringLiteral.__repr__("~"), "'~'")
+    assert_equal(StringLiteral.__repr__("\x7f"), r"'\x7f'")
+
+
 def main():
     test_basics()
     test_contains()
@@ -101,3 +121,4 @@ def main():
     test_rfind()
     test_hash()
     test_intable()
+    test_repr()

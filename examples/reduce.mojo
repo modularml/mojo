@@ -17,13 +17,11 @@
 # Reductions and scans are common algorithm patterns in parallel computing.
 
 from time import now
-
 from algorithm import sum
 from benchmark import Unit, benchmark, keep
 from buffer import Buffer
-from tensor import Tensor
 from python import Python
-from tensor import rand
+from random import rand
 
 # Change these numbers to reduce on different sizes
 alias size_small: Int = 1 << 21
@@ -31,24 +29,24 @@ alias size_large: Int = 1 << 27
 
 # Datatype for Tensor/Array
 alias type = DType.float32
+alias scalar = Scalar[DType.float32]
 
 
 # Use the https://en.wikipedia.org/wiki/Kahan_summation_algorithm
 # Simple summation of the array elements
-fn naive_reduce_sum[size: Int](array: Tensor[type]) -> Float32:
-    var A = array
-    var my_sum = array[0]
-    var c: Float32 = 0.0
-    for i in range(array.dim(0)):
-        var y = array[i] - c
+fn naive_reduce_sum[size: Int](buffer: Buffer[type, size]) -> scalar:
+    var my_sum: scalar = 0
+    var c: scalar = 0
+    for i in range(buffer.size):
+        var y = buffer[i] - c
         var t = my_sum + y
         c = (t - my_sum) - y
         my_sum = t
     return my_sum
 
 
-fn stdlib_reduce_sum[size: Int](array: Tensor[type]) -> Float32:
-    var my_sum = sum(array._to_buffer())
+fn stdlib_reduce_sum[size: Int](array: Buffer[type, size]) -> scalar:
+    var my_sum = sum(array)
     return my_sum
 
 
@@ -62,13 +60,13 @@ fn pretty_print(name: StringLiteral, elements: Int, time: Float64) raises:
 
 
 fn bench[
-    func: fn[size: Int] (array: Tensor[type]) -> Float32,
+    func: fn[size: Int] (buffer: Buffer[type, size]) -> scalar,
     size: Int,
     name: StringLiteral,
-](array: Tensor[type]) raises:
+](buffer: Buffer[type, size]) raises:
     @parameter
     fn runner():
-        var result = func[size](array)
+        var result = func[size](buffer)
         keep(result)
 
     var ms = benchmark.run[runner](max_runtime_secs=0.5).mean(Unit.ms)
@@ -80,13 +78,23 @@ fn main() raises:
         "Sum all values in a small array and large array\n"
         "Shows algorithm.sum from stdlib with much better performance\n"
     )
-    # Create two 1-dimensional tensors i.e. arrays
-    var small_array = rand[type](size_small)
-    var large_array = rand[type](size_large)
+    # Allocate and randomize data, then create two buffers
+    var ptr_small = DTypePointer[type].alloc(size_small)
+    var ptr_large = DTypePointer[type].alloc(size_large)
 
-    bench[naive_reduce_sum, size_small, "naive"](small_array)
-    bench[naive_reduce_sum, size_large, "naive"](large_array)
+    rand(ptr_small, size_small)
+    rand(ptr_large, size_large)
 
-    bench[stdlib_reduce_sum, size_small, "stdlib"](small_array)
+    var buffer_small = Buffer[type, size_small](ptr_small)
+    var buffer_large = Buffer[type, size_large](ptr_large)
+    print(naive_reduce_sum(buffer_small))
+    print(stdlib_reduce_sum(buffer_small))
+
+    bench[naive_reduce_sum, size_small, "naive"](buffer_small)
+    bench[naive_reduce_sum, size_large, "naive"](buffer_large)
+    bench[stdlib_reduce_sum, size_small, "stdlib"](buffer_small)
     # CHECK: stdlib elements
-    bench[stdlib_reduce_sum, size_large, "stdlib"](large_array)
+    bench[stdlib_reduce_sum, size_large, "stdlib"](buffer_large)
+
+    ptr_small.free()
+    ptr_large.free()
