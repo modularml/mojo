@@ -933,11 +933,12 @@ struct String(
         """Joins the elements from the tuple using the current string as a
         delimiter.
 
+        Parameters:
+            rank: The size of the tuple.
+
         Args:
             elems: The input tuple.
 
-        Parameters:
-            rank: The size of the tuple.
 
         Returns:
             The joined string.
