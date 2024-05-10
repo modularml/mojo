@@ -278,11 +278,23 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
     @always_inline
     fn __init__(inout self, *, uninitialized: Bool):
-        """Constructs an empty with uninitized data.
+        """Create an InlineArray with uninitialized memory.
+
+        Note that this is highly unsafe and should be used with caution.
+
+        We recommend to use the `InlineList` instead if all the objects
+        are not available when creating the array.
+
+        If despite those workarounds, one still needs an uninitialized array,
+        it is possible with:
+
+        ```mojo
+        var uninitialized_array = InlineArray[Int, 10](uninitialized=True)
+        ```
 
         Args:
-            uninitialized: Unused, exists just to make uninitialized
-                case explicit.
+            uninitialized: A boolean to indicate if the array should be initialized.
+                Always set to `True` (it's not actually used inside the constructor).
         """
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
