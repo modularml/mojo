@@ -24,7 +24,7 @@ from memory import memcmp, memcpy, DTypePointer
 from memory import Arc
 from memory.unsafe_pointer import move_from_pointee
 
-from utils import StringRef, unroll
+from utils import StringRef, unroll, Variant
 
 from .io import _printf, _put
 
@@ -249,25 +249,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
     TODO: These should be BigInt and BigFloat one day.
     """
 
-    alias type = __mlir_type[
-        `!kgen.variant<`,
-        _NoneMarker,
-        `, `,
-        Bool,
-        `, `,
-        Int64,
-        `, `,
-        Float64,
-        `, `,
-        _ImmutableString,
-        `, `,
-        _RefCountedListRef,
-        `, `,
-        _Function,
-        `, `,
-        _RefCountedAttrsDictRef,
-        `>`,
-    ]
+    alias type = Variant[_NoneMarker, Bool, Int64, Float64, _ImmutableString, _RefCountedListRef, _Function, _RefCountedAttrsDictRef]
     """The variant value type."""
     var value: Self.type
     """The value of the object. It is a variant of the possible object values
