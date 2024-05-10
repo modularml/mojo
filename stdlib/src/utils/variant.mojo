@@ -219,9 +219,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias q = Ts[i]
-                __get_address_as_owned_value(
-                    self._get_ptr[q]().address
-                ).__del__()
+                destroy_pointee(self._get_ptr[q]().address)
 
         unroll[each, len(VariadicList(Ts))]()
 
