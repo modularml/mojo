@@ -939,7 +939,6 @@ struct String(
         Args:
             elems: The input tuple.
 
-
         Returns:
             The joined string.
         """
