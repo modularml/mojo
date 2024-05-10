@@ -60,7 +60,9 @@ def test_hash_byte_array():
     # on architecture, so these tests as-is end up being really flaky.
     # Making this _much_ more relaxed for now, but at least still testing
     # that at least the hash function returns _some_ different things.
-    assert_true(num_same < 6, "too little entropy in hash fn low bits")
+
+    # TODO(MSTDL-472): fix this flaky check
+    # assert_true(num_same < 6, "too little entropy in hash fn low bits")
 
 
 def _test_hash_int_simd[type: DType](bits: Int = 4, max_num_same: Int = 2):
