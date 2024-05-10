@@ -393,3 +393,14 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             normalized_idx += size
 
         return self[]._get_reference_unsafe(normalized_idx)
+
+    @always_inline
+    fn unsafe_ptr(
+        self: Reference[Self, _, _]
+    ) -> UnsafePointer[Self.ElementType]:
+        """Returns a reference to the data. Use with caution.
+
+        Returns:
+            A pointer to the data.
+        """
+        return UnsafePointer(self[]._get_reference_unsafe(0))

@@ -88,20 +88,28 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
     """
 
     alias _small_buffer_type = InlineArray[T, _small_buffer_size]
+    alias sbo_enabled = Self._small_buffer_size != 0
+    var _small_buffer: Self._small_buffer_type
     var data: UnsafePointer[T]
     """The underlying storage for the list."""
     var size: Int
     """The number of elements in the list."""
     var capacity: Int
     """The amount of elements that can fit in the list without resizing it."""
-    var _small_buffer: Self._small_buffer_type
 
     fn __init__(inout self):
         """Constructs an empty list."""
-        self.data = UnsafePointer[T]()
-        self.size = 0
-        self.capacity = 0
         self._small_buffer = Self._small_buffer_type(uninitialized=True)
+        self.size = 0
+        # needed to avoid "potential indirect access to uninitialized value 'self.data'"
+        self.data = UnsafePointer[T]()
+
+        @parameter
+        if Self.sbo_enabled:
+            self.capacity = Self._small_buffer_type.size
+            self.data = self._small_buffer.unsafe_ptr()
+        else:
+            self.capacity = 0
 
     fn __init__(inout self, existing: Self):
         """Creates a deep copy of the given list.
@@ -112,7 +120,6 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         self.__init__(capacity=existing.capacity)
         for e in existing:
             self.append(e[])
-        self._small_buffer = Self._small_buffer_type(uninitialized=True)
 
     fn __init__(inout self, *, capacity: Int):
         """Constructs a list with the given capacity.
@@ -120,10 +127,20 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         Args:
             capacity: The requested capacity of the list.
         """
-        self.data = UnsafePointer[T].alloc(capacity)
         self.size = 0
-        self.capacity = capacity
         self._small_buffer = Self._small_buffer_type(uninitialized=True)
+
+        @parameter
+        if Self.sbo_enabled:
+            if capacity <= Self._small_buffer_size:
+                self.capacity = Self._small_buffer_size
+                # needed to avoid "potential indirect access to uninitialized value 'self.data'"
+                self.data = UnsafePointer[T]()
+                self.data = self._small_buffer.unsafe_ptr()
+                return
+
+        self.data = UnsafePointer[T].alloc(capacity)
+        self.capacity = capacity
 
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
@@ -136,7 +153,6 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         self = Self(capacity=len(values))
         for value in values:
             self.append(value[])
-        self._small_buffer = Self._small_buffer_type(uninitialized=True)
 
     fn __init__(
         inout self: Self,
@@ -157,16 +173,32 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         self.capacity = capacity
         self._small_buffer = Self._small_buffer_type(uninitialized=True)
 
+    @always_inline
+    fn _sbo_is_in_use(self) -> Bool:
+        @parameter
+        if not Self.sbo_enabled:
+            return False
+        return self.data == self._small_buffer.unsafe_ptr()
+
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing list into a new one.
 
         Args:
             existing: The existing list.
         """
-        self.data = existing.data
         self.size = existing.size
         self.capacity = existing.capacity
         self._small_buffer = existing._small_buffer
+
+        @parameter
+        if Self.sbo_enabled:
+            if existing._sbo_is_in_use():
+                self.data = UnsafePointer[
+                    T
+                ]()  # needed to avoid "potential indirect access to uninitialized value 'self.data'"
+                self.data = self._small_buffer.unsafe_ptr()
+                return
+        self.data = existing.data
 
     fn __copyinit__(inout self, existing: Self):
         """Creates a deepcopy of the given list.
@@ -177,14 +209,13 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         self = Self(capacity=existing.capacity)
         for i in range(len(existing)):
             self.append(existing[i])
-        self._small_buffer = existing._small_buffer
 
     @always_inline
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             destroy_pointee(self.data + i)
-        if self.data:
+        if self.data and self._sbo_is_in_use():
             self.data.free()
 
     fn __len__(self) -> Int:
@@ -205,15 +236,28 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
 
     @always_inline
     fn _realloc(inout self, new_capacity: Int):
-        var new_data = UnsafePointer[T].alloc(new_capacity)
+        var new_data: UnsafePointer[T]
+        if new_capacity <= Self._small_buffer_size:
+            new_data = self._small_buffer.unsafe_ptr()
+        else:
+            new_data = UnsafePointer[T].alloc(new_capacity)
 
-        for i in range(self.size):
-            move_pointee(src=self.data + i, dst=new_data + i)
+        @parameter
+        if Self.sbo_enabled:
+            if self.data != new_data:
+                for i in range(self.size):
+                    move_pointee(src=self.data + i, dst=new_data + i)
+        else:
+            for i in range(self.size):
+                move_pointee(src=self.data + i, dst=new_data + i)
 
-        if self.data:
+        if self.data and not self._sbo_is_in_use():
             self.data.free()
         self.data = new_data
-        self.capacity = new_capacity
+        if self._sbo_is_in_use():
+            self.capacity = Self._small_buffer_size
+        else:
+            self.capacity = new_capacity
 
     @always_inline
     fn append(inout self, owned value: T):
@@ -493,6 +537,14 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         Returns:
             The underlying data.
         """
+
+        @parameter
+        if Self.sbo_enabled:
+            if self._sbo_is_in_use():
+                # Someone else is going to free the pointer, the data in the buffer will be invalid
+                # We have to give a pointer that will outlive this object.
+                # YOLO, could do better
+                self._realloc(Self._small_buffer_size + 1)
         var ptr = self.data
         self.data = UnsafePointer[T]()
         self.size = 0
