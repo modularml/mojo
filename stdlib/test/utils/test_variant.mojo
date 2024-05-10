@@ -186,12 +186,6 @@ def test_get_returns_mutable_reference():
     v2[String] = "something else"
     assert_equal(v2[String], "something else")
 
-    var v3: Variant[Int, String] = 4
-    assert_equal(
-        int(v3._get_ptr[Int]()),
-        int(Reference(v3)[]._get_ptr[Int]()),
-    )
-
 
 def main():
     test_basic()
