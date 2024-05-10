@@ -929,12 +929,15 @@ struct String(
             UnsafePointer.address_of(self).bitcast[NoneType](),
         )
 
-    fn join(self, *elems: Int) -> String:
+    fn join[rank: Int](self, elems: InlineArray[Int, rank]) -> String:
         """Joins the elements from the tuple using the current string as a
         delimiter.
 
         Args:
             elems: The input tuple.
+
+        Parameters:
+            rank: The size of the tuple.
 
         Returns:
             The joined string.
