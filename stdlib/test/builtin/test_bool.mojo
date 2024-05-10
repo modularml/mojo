@@ -95,9 +95,15 @@ def test_bitwise():
     assert_false(value)
 
 
+def test_neg():
+    assert_equal(-1, -True)
+    assert_equal(0, -False)
+
+
 def main():
     test_bool_cast_to_int()
     test_bool_none()
     test_convert_from_boolable()
     test_bool_to_string()
     test_bitwise()
+    test_neg()

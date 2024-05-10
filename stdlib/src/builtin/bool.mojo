@@ -313,6 +313,15 @@ struct Bool(
         """
         return lhs ^ self
 
+    @always_inline("nodebug")
+    fn __neg__(self) -> Int:
+        """Defines the unary `-` operation.
+
+        Returns:
+            0 for -False and -1 for -True.
+        """
+        return __mlir_op.`index.casts`[_type = __mlir_type.index](self.value)
+
 
 # ===----------------------------------------------------------------------=== #
 #  bool
