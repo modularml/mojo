@@ -227,7 +227,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         unroll[each, len(VariadicList(Ts))]()
 
-    fn unsafe_take[T: CollectionElement](owned self) -> T:
+    fn unsafe_take[T: CollectionElement](inout self) -> T:
         """Take the current value of the variant as the provided type.
 
         The caller takes ownership of the underlying value. The variant

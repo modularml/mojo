@@ -128,7 +128,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value[T]
 
-    fn unsafe_take(owned self) -> T:
+    fn unsafe_take(inout self) -> T:
         """Unsafely move the value out of the Optional.
 
         The caller takes ownership over the new value, and the Optional is

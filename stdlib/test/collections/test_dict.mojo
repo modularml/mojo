@@ -97,6 +97,18 @@ def test_compact():
     assert_equal(0, len(dict))
 
 
+def test_compact_with_elements():
+    var dict = Dict[String, Int]()
+    for i in range(5):
+        var key = "key" + str(i)
+        dict[key] = i + 1
+    for i in range(5, 20):
+        var key = "key" + str(i)
+        dict[key] = i + 1
+        _ = dict.pop(key)
+    assert_equal(5, len(dict))
+
+
 def test_pop_default():
     var dict = Dict[String, Int]()
     dict["a"] = 1
@@ -228,8 +240,10 @@ def test_dict_copy_calls_copy_constructor():
     var copy = Dict(orig)
     # I _may_ have thoughts about where our performance issues
     # are coming from :)
-    assert_equal(4, orig["a"].copy_count)
-    assert_equal(5, copy["a"].copy_count)
+    assert_equal(1, orig["a"].copy_count)
+    assert_equal(2, copy["a"].copy_count)
+    assert_equal(0, orig.__get_ref("a")[].copy_count)
+    assert_equal(1, copy.__get_ref("a")[].copy_count)
 
 
 def test_dict_update_nominal():
@@ -385,6 +399,7 @@ def test_dict():
     test["test_multiple_resizes", test_multiple_resizes]()
     test["test_big_dict", test_big_dict]()
     test["test_compact", test_compact]()
+    test["test_compact_with_elements", test_compact_with_elements]()
     test["test_pop_default", test_pop_default]()
     test["test_key_error", test_key_error]()
     test["test_iter", test_iter]()
@@ -458,8 +473,8 @@ def test_owned_kwargs_dict():
 def test_find_get():
     var some_dict = Dict[String, Int]()
     some_dict["key"] = 1
-    assert_equal(some_dict.find("key").unsafe_take(), 1)
-    assert_equal(some_dict.get("key").unsafe_take(), 1)
+    assert_equal(some_dict.find("key").value()[], 1)
+    assert_equal(some_dict.get("key").value()[], 1)
     assert_equal(some_dict.find("not_key").or_else(0), 0)
     assert_equal(some_dict.get("not_key", 0), 0)
 
