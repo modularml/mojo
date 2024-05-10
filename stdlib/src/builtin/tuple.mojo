@@ -20,6 +20,7 @@ from utils._visualizers import lldb_formatter_wrapping_type
 from memory.unsafe_pointer import (
     initialize_pointee_move,
     initialize_pointee_copy,
+    move_pointee,
 )
 
 # ===----------------------------------------------------------------------===#
@@ -128,9 +129,8 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
         @parameter
         fn initialize_elt[idx: Int]():
             var existing_elt_ptr = UnsafePointer(existing[idx]).address
-            initialize_pointee_move(
-                UnsafePointer(self[idx]),
-                __get_address_as_owned_value(existing_elt_ptr),
+            move_pointee(
+                src=UnsafePointer(existing[idx]), dst=UnsafePointer(self[idx])
             )
 
         unroll[initialize_elt, Self.__len__()]()
