@@ -27,7 +27,7 @@ from memory import (
 )
 from memory.unsafe_pointer import move_from_pointee
 
-from utils import StringRef, StaticTuple
+from utils import StringRef, InlineArray
 
 from .path import isdir
 from .pathlike import PathLike
@@ -52,7 +52,6 @@ alias SEEK_END: UInt8 = 2
 
 
 @value
-@register_passable("trivial")
 struct _dirent_linux:
     alias MAX_NAME_SIZE = 256
     var d_ino: Int64
@@ -63,12 +62,11 @@ struct _dirent_linux:
     """Length of the record."""
     var d_type: Int8
     """Type of file."""
-    var name: StaticTuple[Int8, Self.MAX_NAME_SIZE]
+    var name: InlineArray[Int8, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
 @value
-@register_passable("trivial")
 struct _dirent_macos:
     alias MAX_NAME_SIZE = 1024
     var d_ino: Int64
@@ -81,7 +79,7 @@ struct _dirent_macos:
     """Length of the name."""
     var d_type: Int8
     """Type of file."""
-    var name: StaticTuple[Int8, Self.MAX_NAME_SIZE]
+    var name: InlineArray[Int8, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 

@@ -13,7 +13,7 @@
 
 from time.time import _CTimeSpec
 
-from utils import StaticTuple
+from utils import InlineArray
 
 from .fstat import stat_result
 
@@ -30,7 +30,6 @@ alias blksize_t = Int32
 
 
 @value
-@register_passable("trivial")
 struct _c_stat(Stringable):
     var st_dev: dev_t  #  ID of device containing file
     var st_mode: mode_t  # Mode of file
@@ -49,7 +48,7 @@ struct _c_stat(Stringable):
     var st_flags: UInt32  # user defined flags for file
     var st_gen: UInt32  # file generation number
     var st_lspare: Int32  # RESERVED: DO NOT USE!
-    var st_qspare: StaticTuple[Int64, 2]  # RESERVED: DO NOT USE!
+    var st_qspare: InlineArray[Int64, 2]  # RESERVED: DO NOT USE!
 
     fn __init__(inout self):
         self.st_dev = 0
@@ -69,7 +68,7 @@ struct _c_stat(Stringable):
         self.st_flags = 0
         self.st_gen = 0
         self.st_lspare = 0
-        self.st_qspare = StaticTuple[Int64, 2](0, 0)
+        self.st_qspare = InlineArray[Int64, 2](0, 0)
 
     fn __str__(self) -> String:
         var res = String("{\n")
