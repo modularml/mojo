@@ -19,7 +19,7 @@ If you already installed Mojo, see the [update guide](/max/update).
 
 Mojo is now bundled with MAX, which provides everything to compile,
 run, debug, and package Mojo code ([read
-why](/engine/faq#why-bundle-mojo-with-max)).
+why](/max/faq#why-bundle-mojo-with-max)).
 
 To install Mojo, [see the MAX install guide](/max/install).
 
@@ -88,7 +88,7 @@ Now let's write the code in a Mojo source file and run it with the
 
 If this didn't work for you, double-check your code looks exactly like the code
 in step 1, and make sure you correctly [installed
-Mojo](/mojo/manual/get-started/#install-mojo).
+MAX](/max/install) (it includes Mojo).
 
 ## 4. Build an executable binary
 
