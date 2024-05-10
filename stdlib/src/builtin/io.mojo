@@ -15,7 +15,13 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys import os_is_windows, triple_is_nvidia_cuda, external_call
+from sys import (
+    bitwidthof,
+    os_is_windows,
+    triple_is_nvidia_cuda,
+    external_call,
+    stdout,
+)
 
 from builtin.dtype import _get_dtype_printf_format
 from builtin.builtin_list import _LITRefPackHelper
@@ -79,8 +85,8 @@ struct _fdopen:
 
 
 @no_inline
-fn _flush():
-    with _fdopen(_fdopen.STDOUT) as fd:
+fn _flush(file: Int = stdout):
+    with _fdopen(file) as fd:
         _ = external_call["fflush", Int32](fd)
 
 
@@ -90,7 +96,9 @@ fn _flush():
 
 
 @no_inline
-fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
+fn _printf[
+    *types: AnyType
+](fmt: StringLiteral, *arguments: *types, file: Int = stdout):
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C snprintf call. Load
     # all the members of the pack.
@@ -106,7 +114,7 @@ fn _printf[*types: AnyType](fmt: StringLiteral, *arguments: *types):
             fmt.unsafe_ptr(), UnsafePointer.address_of(loaded_pack)
         )
     else:
-        with _fdopen(_fdopen.STDOUT) as fd:
+        with _fdopen(file) as fd:
             _ = __mlir_op.`pop.external_call`[
                 func = "KGEN_CompilerRT_fprintf".value,
                 variadicType = __mlir_attr[
@@ -231,13 +239,14 @@ fn _float_repr(buffer: UnsafePointer[Int8], size: Int, x: Float64) -> Int:
 
 
 @no_inline
-fn _put(x: Int):
+fn _put(x: Int, file: Int = stdout):
     """Prints a scalar value.
 
     Args:
         x: The value to print.
+        file: The output stream.
     """
-    _printf(_get_dtype_printf_format[DType.index](), x)
+    _printf(_get_dtype_printf_format[DType.index](), x, file=file)
 
 
 @no_inline
@@ -298,13 +307,13 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
 
 
 @no_inline
-fn _put(x: String):
+fn _put(x: String, file: Int = stdout):
     # 'x' is borrowed, so we know it will outlive the call to print.
-    _put(x._strref_dangerous())
+    _put(x._strref_dangerous(), file=file)
 
 
 @no_inline
-fn _put(x: StringRef):
+fn _put(x: StringRef, file: Int = stdout):
     # Avoid printing "(null)" for an empty/default constructed `String`
     var str_len = len(x)
 
@@ -323,26 +332,26 @@ fn _put(x: StringRef):
 
         # The string can be printed, so that's fine.
         if str_len < MAX_STR_LEN:
-            _printf("%.*s", x.length, x.data)
+            _printf("%.*s", x.length, x.data, file=file)
             return
 
         # The string is large, then we need to chunk it.
         var p = x.data
         while str_len:
             var ll = min(str_len, MAX_STR_LEN)
-            _printf("%.*s", ll, p)
+            _printf("%.*s", ll, p, file=file)
             str_len -= ll
             p += ll
 
 
 @no_inline
-fn _put(x: StringLiteral):
-    _put(StringRef(x))
+fn _put(x: StringLiteral, file: Int = stdout):
+    _put(StringRef(x), file=file)
 
 
 @no_inline
-fn _put(x: DType):
-    _put(str(x))
+fn _put(x: DType, file: Int = stdout):
+    _put(str(x), file=file)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -358,6 +367,7 @@ fn print[
     sep: StringLiteral = " ",
     end: StringLiteral = "\n",
     flush: Bool = False,
+    file: Int = stdout,
 ):
     """Prints elements to the text stream. Each element is separated by `sep`
     and followed by `end`.
@@ -370,21 +380,22 @@ fn print[
         sep: The separator used between elements.
         end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
     """
 
     @parameter
     fn print_with_separator[i: Int, T: Stringable](value: T):
-        _put(str(value))
+        _put(str(value), file=file)
 
         @parameter
         if i < values.__len__() - 1:
-            _put(sep)
+            _put(sep, file=file)
 
     values.each_idx[print_with_separator]()
 
-    _put(end)
+    _put(end, file=file)
     if flush:
-        _flush()
+        _flush(file=file)
 
 
 # ===----------------------------------------------------------------------=== #
