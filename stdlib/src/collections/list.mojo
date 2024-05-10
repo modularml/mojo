@@ -32,6 +32,7 @@ from .optional import Optional
 @value
 struct _ListIter[
     T: CollectionElement,
+    _small_buffer_size: Int,
     list_mutability: __mlir_type.`i1`,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
@@ -40,12 +41,13 @@ struct _ListIter[
 
     Parameters:
         T: The type of the elements in the list.
+        _small_buffer_size: The size of the small buffer.
         list_mutability: Whether the reference to the list is mutable.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias list_type = List[T]
+    alias list_type = List[T, _small_buffer_size]
 
     var index: Int
     var src: Reference[Self.list_type, list_mutability, list_lifetime]
@@ -72,7 +74,9 @@ struct _ListIter[
             return self.index
 
 
-struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
+struct List[T: CollectionElement, _small_buffer_size: Int = 0](
+    CollectionElement, Sized, Boolable
+):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -80,20 +84,24 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     Parameters:
         T: The type of the elements.
+        _small_buffer_size: Set if you need small buffer optimization.
     """
 
+    alias _small_buffer_type = InlineArray[T, _small_buffer_size]
     var data: UnsafePointer[T]
     """The underlying storage for the list."""
     var size: Int
     """The number of elements in the list."""
     var capacity: Int
     """The amount of elements that can fit in the list without resizing it."""
+    var _small_buffer: Self._small_buffer_type
 
     fn __init__(inout self):
         """Constructs an empty list."""
         self.data = UnsafePointer[T]()
         self.size = 0
         self.capacity = 0
+        self._small_buffer = Self._small_buffer_type(uninitialized=True)
 
     fn __init__(inout self, existing: Self):
         """Creates a deep copy of the given list.
@@ -104,6 +112,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.__init__(capacity=existing.capacity)
         for e in existing:
             self.append(e[])
+        self._small_buffer = Self._small_buffer_type(uninitialized=True)
 
     fn __init__(inout self, *, capacity: Int):
         """Constructs a list with the given capacity.
@@ -114,6 +123,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.data = UnsafePointer[T].alloc(capacity)
         self.size = 0
         self.capacity = capacity
+        self._small_buffer = Self._small_buffer_type(uninitialized=True)
 
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
@@ -126,6 +136,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self = Self(capacity=len(values))
         for value in values:
             self.append(value[])
+        self._small_buffer = Self._small_buffer_type(uninitialized=True)
 
     fn __init__(
         inout self: Self,
@@ -144,6 +155,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.data = unsafe_pointer
         self.size = size
         self.capacity = capacity
+        self._small_buffer = Self._small_buffer_type(uninitialized=True)
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing list into a new one.
@@ -154,6 +166,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.data = existing.data
         self.size = existing.size
         self.capacity = existing.capacity
+        self._small_buffer = existing._small_buffer
 
     fn __copyinit__(inout self, existing: Self):
         """Creates a deepcopy of the given list.
@@ -164,6 +177,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self = Self(capacity=existing.capacity)
         for i in range(len(existing)):
             self.append(existing[i])
+        self._small_buffer = existing._small_buffer
 
     @always_inline
     fn __del__(owned self):
@@ -584,7 +598,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     fn __iter__(
         self: Reference[Self, _, _],
-    ) -> _ListIter[T, self.is_mutable, self.lifetime]:
+    ) -> _ListIter[T, _small_buffer_size, self.is_mutable, self.lifetime]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -594,7 +608,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     fn __reversed__(
         self: Reference[Self, _, _]
-    ) -> _ListIter[T, self.is_mutable, self.lifetime, False]:
+    ) -> _ListIter[
+        T, _small_buffer_size, self.is_mutable, self.lifetime, False
+    ]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
