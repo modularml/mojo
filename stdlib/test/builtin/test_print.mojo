@@ -16,6 +16,7 @@
 from memory import DTypePointer
 
 from utils import StringRef, StaticIntTuple
+import sys
 
 
 # CHECK-LABEL: test_print
