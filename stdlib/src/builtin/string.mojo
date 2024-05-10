@@ -891,6 +891,60 @@ struct String(
         return not (self == other)
 
     @always_inline
+    fn __lt__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using LT comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is strictly less than the RHS String and False otherwise.
+        """
+        var len1 = len(self)
+        var len2 = len(rhs)
+
+        if len1 < len2:
+            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
+        else:
+            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
+
+    @always_inline
+    fn __le__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using LE comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is less than or equal to the RHS String and False otherwise.
+        """
+        return not (rhs < self)
+
+    @always_inline
+    fn __gt__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using GT comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is strictly greater than the RHS String and False otherwise.
+        """
+        return rhs < self
+
+    @always_inline
+    fn __ge__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using GE comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is greater than or equal to the RHS String and False otherwise.
+        """
+        return not (self < rhs)
+
+    @always_inline
     fn __add__(self, other: String) -> String:
         """Creates a string by appending another string at the end.
 
