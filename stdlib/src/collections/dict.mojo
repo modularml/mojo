@@ -678,28 +678,14 @@ struct Dict[K: KeyElement, V: CollectionElement](
             "KeyError" if the dictionary is empty.
         """
         # Get the last key so we can get the slot and set it to REMOVED
-        for key in Self.__reversed__(self):
-            var hash = hash(key[])
-            var found: Bool
-            var slot: Int
-            var index: Int
-            found, slot, index = self._find_index(hash, key[])
-            debug_assert(
-                found == True,
-                (
-                    "Should found the key, otherwise there is something wrong"
-                    " in reversed or _find_index"
-                ),
-            )
-            self._set_index(slot, Self.REMOVED)
-            var entry = self._entries.__get_ref(index)[]
-            self._entries[index] = None
-            self.size -= 1
-            debug_assert(entry.__bool__(), "entry in index must be full")
-            return entry.value()[]
+        for item in reversed(self.items()):
+            key = item[].key
+            _ self.pop(key)
+            return item[]
 
         # reach here if dict is empty
         raise "KeyError"
+        
     fn __iter__(
         self: Reference[Self, _, _],
     ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
