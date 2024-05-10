@@ -3,11 +3,6 @@ title: Mojo🔥 changelog
 sidebar_label: Changelog
 description: A history of significant Mojo changes.
 toc_max_heading_level: 2
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 ---
 
 This is a running list of significant changes for the Mojo language and tools.
@@ -16,7 +11,7 @@ It doesn't include all internal implementation changes.
 ## Update Mojo
 
 If you don't have Mojo yet, see the [get started
-guide](/mojo/manual/get-started/#get-the-mojo-sdk).
+guide](/mojo/manual/get-started).
 
 To see your Mojo version, run this:
 
@@ -46,7 +41,7 @@ modular update mojo
 
     - [`initialize_pointee_copy`](/mojo/stdlib/memory/unsafe_pointer/initialize_pointee_copy)
     - [`initialize_pointee_move`](/mojo/stdlib/memory/unsafe_pointer/initialize_pointee_move)
-    - [`move_from_pointee()`](/mojo/stdlib/memory/unsafe_pointer/initialize_pointee_move)
+    - [`move_from_pointee()`](/mojo/stdlib/memory/unsafe_pointer/move_from_pointee)
     - [`move_pointee`](/mojo/stdlib/memory/unsafe_pointer/move_pointee)
 
   - A new
@@ -68,7 +63,7 @@ modular update mojo
 
 - Improvements to variadic arguments support.
 
-  - Heterogenous variadic pack arguments now work reliably even with memory types,
+  - Heterogeneous variadic pack arguments now work reliably even with memory types,
     and have a more convenient API to use, as defined by the
     [`VariadicPack`](/mojo/stdlib/builtin/builtin_list/VariadicPack) type. For
     example, a simplified version of `print` can be implemented like this:
@@ -1612,7 +1607,7 @@ experience without dedicated sugar.
   `num_physical_cores()`, `num_logical_cores()`, and `num_performance_cores()`
   functions.
 
-- Homogenous variadic arguments consisting of memory-only types, such as
+- Homogeneous variadic arguments consisting of memory-only types, such as
   `String` are more powerful and easier to use. These arguments are projected
   into a
   [`VariadicListMem`](/mojo/stdlib/builtin/builtin_list/VariadicListMem).
@@ -1656,7 +1651,7 @@ experience without dedicated sugar.
           i[] += " world"
   ```
 
-  Heterogenous variadic arguments have not yet been moved to the new model, but
+  Heterogeneous variadic arguments have not yet been moved to the new model, but
   will in future updates.
 
   Note that for variadic arguments of register-passable types like `Int`, the
@@ -2077,7 +2072,7 @@ experience without dedicated sugar.
   ```
 
   Traits can also inherit from other traits, which simply requires that
-  implementors of the child trait also conform to all parent traits.
+  implementers of the child trait also conform to all parent traits.
 
   ```mojo
   trait Parent:
@@ -3511,7 +3506,7 @@ All earlier releases were considered version 0.1.
 - You can now share `.ipynb` notebook files in Mojo Playground. Just save a
   file in the `shared` directory, and then right-click the file and select
   **Copy Sharable link**. To open a shared notebook, you must already have
-  [access to Mojo Playground](/mojo/manual/get-started/#develop-in-the-mojo-playground);
+  access to Mojo Playground;
   when you open a shared notebook, click **Import** at the top of the notebook
   to save your own copy. For more details about this feature, see the
   instructions inside the `help` directory, in the Mojo Playground file browser.
@@ -3985,7 +3980,7 @@ busy this week.
 
 - 📚 Memcpy and memcmp now consistently use count as the byte count.
 
-- 📚 Add a variadic sting join on strings.
+- 📚 Add a variadic string join on strings.
 
 - 📚 Introduce a `reduce_bit_count` method to count the number of 1 across all
   elements in a SIMD vector.

@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the IntLiteral class."""
 
-from builtin._math import Ceilable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable
 
 
 @value
@@ -22,6 +22,7 @@ struct IntLiteral(
     Absable,
     Boolable,
     Ceilable,
+    CeilDivable,
     EqualityComparable,
     Floorable,
     Intable,
@@ -45,27 +46,18 @@ struct IntLiteral(
     )
 
     @always_inline("nodebug")
-    fn __init__() -> Self:
-        """Default constructor.
-
-        Returns:
-            The constructed IntLiteral object.
-        """
-        return Self {
-            value: __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
-        }
+    fn __init__(inout self):
+        """Default constructor."""
+        self.value = __mlir_attr.`#kgen.int_literal<0> : !kgen.int_literal`
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!kgen.int_literal`) -> Self:
+    fn __init__(inout self, value: __mlir_type.`!kgen.int_literal`):
         """Construct IntLiteral from the given mlir !kgen.int_literal value.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed IntLiteral object.
         """
-        return Self {value: value}
+        self.value = value
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -92,7 +84,7 @@ struct IntLiteral(
         Returns:
             The value as a string.
         """
-        return self
+        return str(Int(self))
 
     @always_inline("nodebug")
     fn __as_mlir_index(self) -> __mlir_type.index:
@@ -582,7 +574,7 @@ struct IntLiteral(
         Returns:
             `value // self`.
         """
-        return self // value
+        return value // self
 
     @always_inline("nodebug")
     fn __rlshift__(self, value: Self) -> Self:

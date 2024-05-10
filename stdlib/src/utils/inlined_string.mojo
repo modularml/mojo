@@ -17,7 +17,7 @@
 
 from sys import sizeof
 
-from memory import memcpy, LegacyPointer
+from memory import memcpy, LegacyPointer, UnsafePointer
 
 from collections import Optional
 
@@ -96,19 +96,19 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
     fn __len__(self) -> Int:
         if self._is_small():
-            return len(self._storage.get[_FixedString[Self.SMALL_CAP]]()[])
+            return len(self._storage[_FixedString[Self.SMALL_CAP]])
         else:
             debug_assert(
                 self._storage.isa[String](),
                 "expected non-small string variant to be String",
             )
-            return len(self._storage.get[String]()[])
+            return len(self._storage[String])
 
     fn __str__(self) -> String:
         if self._is_small():
-            return str(self._storage.get[_FixedString[Self.SMALL_CAP]]()[])
+            return str(self._storage[_FixedString[Self.SMALL_CAP]])
         else:
-            return self._storage.get[String]()[]
+            return self._storage[String]
 
     fn __iadd__(inout self, literal: StringLiteral):
         """Appends another string to this string.
@@ -138,10 +138,10 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         #       length is shorter than the small capacity.
 
         if not self._is_small():
-            self._storage.get[String]()[] += strref
+            self._storage[String] += strref
         elif total_len < Self.SMALL_CAP:
             try:
-                self._storage.get[_FixedString[Self.SMALL_CAP]]()[] += strref
+                self._storage[_FixedString[Self.SMALL_CAP]] += strref
             except e:
                 abort(
                     "unreachable: InlinedString append to FixedString failed: "
@@ -155,12 +155,12 @@ struct InlinedString(Sized, Stringable, CollectionElement):
             # string.
             var buffer = List[Int8](capacity=total_len)
 
-            var buffer_ptr = rebind[DTypePointer[DType.int8]](buffer.data)
+            var buffer_ptr = rebind[DTypePointer[DType.uint8]](buffer.data)
 
             # Copy the bytes from the current small string layout
             memcpy(
                 buffer_ptr,
-                self._storage.get[_FixedString[Self.SMALL_CAP]]()[].as_ptr(),
+                self._storage[_FixedString[Self.SMALL_CAP]].as_uint8_ptr(),
                 len(self),
             )
 
@@ -224,11 +224,13 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
     fn _is_small(self) -> Bool:
         """Returns True if this string is currently in the small-string
-        opimization layout."""
+        optimization layout."""
         var res: Bool = self._storage.isa[_FixedString[Self.SMALL_CAP]]()
 
         return res
 
+    # TODO: Remove this when we have transitioned to uint8 for bytes.
+    # See https://github.com/modularml/mojo/issues/2317 for details
     fn as_ptr(self) -> DTypePointer[DType.int8]:
         """Returns a pointer to the bytes of string data.
 
@@ -237,9 +239,21 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         """
 
         if self._is_small():
-            return self._storage.get[_FixedString[Self.SMALL_CAP]]()[].as_ptr()
+            return self._storage[_FixedString[Self.SMALL_CAP]].as_ptr()
         else:
-            return self._storage.get[String]()[]._as_ptr()
+            return self._storage[String].unsafe_ptr()
+
+    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Returns a pointer to the bytes of string data.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+
+        if self._is_small():
+            return self._storage[_FixedString[Self.SMALL_CAP]].as_uint8_ptr()
+        else:
+            return self._storage[String].unsafe_uint8_ptr()
 
     fn _strref_dangerous(self) -> StringRef:
         """
@@ -248,7 +262,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.as_ptr(), length: len(self)}
+        return StringRef {data: self.as_uint8_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
@@ -302,14 +316,14 @@ struct _FixedString[CAP: Int](
                 "String literal (len="
                 + str(len(literal))
                 + ") is longer than FixedString capacity ("
-                + CAP
+                + str(CAP)
                 + ")"
             )
 
         self.buffer = _ArrayMem[Int8, CAP]()
         self.size = len(literal)
 
-        memcpy(self.buffer.as_ptr(), literal.data(), len(literal))
+        memcpy(self.buffer.as_ptr(), literal.unsafe_ptr(), len(literal))
 
     # ===------------------------------------------------------------------=== #
     # Trait Interfaces
@@ -366,7 +380,11 @@ struct _FixedString[CAP: Int](
             )
 
         # Append the bytes from `strref` at the end of the current string
-        memcpy(self.buffer.as_ptr() + len(self), strref.data, len(strref))
+        memcpy(
+            self.buffer.as_ptr().bitcast[UInt8]() + len(self),
+            strref.data,
+            len(strref),
+        )
 
         self.size = total_len
 
@@ -427,6 +445,8 @@ struct _FixedString[CAP: Int](
 
         return output^
 
+    # TODO: Remove this when we have transitionned to uint8 for bytes.
+    # See https://github.com/modularml/mojo/issues/2317 for details
     fn as_ptr(self) -> DTypePointer[DType.int8]:
         """Retrieves a pointer to the underlying memory.
 
@@ -435,6 +455,14 @@ struct _FixedString[CAP: Int](
         """
         return self.buffer.as_ptr()
 
+    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Retrieves a pointer to the underlying memory.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.buffer.as_ptr().bitcast[UInt8]()
+
     fn _strref_dangerous(self) -> StringRef:
         """
         Returns an inner pointer to the string as a StringRef.
@@ -442,7 +470,7 @@ struct _FixedString[CAP: Int](
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.as_ptr(), length: len(self)}
+        return StringRef {data: self.as_uint8_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
@@ -460,7 +488,7 @@ struct _FixedString[CAP: Int](
 
 @value
 struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
-    """A fixed-sized, homogenous, contiguous, inline collection type.
+    """A fixed-sized, homogeneous, contiguous, inline collection type.
 
     Parameters:
         ElementType: The type of the elements in the array.
@@ -510,3 +538,12 @@ struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
         """
 
         return LegacyPointer.address_of(self.storage).bitcast[ElementType]()
+
+    fn unsafe_ptr(inout self) -> UnsafePointer[ElementType]:
+        """Get a pointer to the elements contained by this array.
+
+        Returns:
+            A pointer to the elements contained by this array.
+        """
+
+        return UnsafePointer.address_of(self.storage).bitcast[ElementType]()

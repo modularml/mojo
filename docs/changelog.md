@@ -19,6 +19,29 @@ what we publish.
 ### ⭐️ New
 
 - `Dict` now support `popitem`, which remove and return the last dict item. ([PR #2542](https://github.com/modularml/mojo/pull/2542) by [@jayzhan211](https://github.com/jayzhan211))
+
+- Mojo now supports adding a `@deprecated` decorator on structs, functions,
+  traits, aliases, and global variables. The decorator marks the attached decl
+  as deprecated and causes a warning to be emitted when the deprecated decl is
+  referenced in user code. The decorator requires a deprecation message to be
+  specified as a string literal.
+
+  ```mojo
+  @deprecated("Foo is deprecated, use Bar instead")
+  struct Foo:
+      pass
+
+  fn outdated_api(x: Foo): # warning: Foo is deprecated, use Bar instead
+      pass
+
+  @deprecated("use another function!")
+  fn bar():
+      pass
+
+  fn techdebt():
+      bar() # warning: use another function!
+  ```
+
 - `int()` can now take a string and a specified base to parse an integer from a
   string: `int("ff", 16)` returns `255`. Additionally, if a base of zero is
   specified, the string will be parsed as if it was an integer literal, with the
@@ -46,8 +69,9 @@ what we publish.
           return Self(round(self.re), round(self.im))
   ```
 
-- The `abs, round, min, and max` functions have moved from `math` to `builtin`,
-  so you no longer need to do `from math import abs, round, min, max`.
+- The `abs, round, min, max, and divmod` functions have moved from `math` to
+  `builtin`, so you no longer need to do
+  `from math import abs, round, min, max, divmod`.
 
 - Mojo now allows types to opt in to use the `floor()` and `ceil()` functions in
   the `math` module by implementing the `__floor__()` and `__ceil__()` methods
@@ -88,10 +112,54 @@ what we publish.
   directory, now outputs a Mojo package to `my-dir/my-package.mojopkg`.
   Previously, this had to be spelled out, as in `-o my-dir/my-package.mojopkg`.
 
+- The Mojo Language Server now reports a warning when a local variable is unused.
+
+- The `math` module now has `CeilDivable` and `CeilDivableRaising` traits that
+  allow users to opt into the `math.ceildiv` function.
+
+- Mojo now allows methods to declare `self` as a `Reference` directly, which
+  can be useful for advanced cases of parametric mutabilty and custom lifetime
+  processing.  Previously it required the use of an internal MLIR type to
+  achieve this.
+
+- `object` now implements all the bitwise operators.
+    ([PR #2324](https://github.com/modularml/mojo/pull/2324) by [@LJ-9801](https://github.com/LJ-9801))
+
+- A new `--validate-doc-strings` option has been added to `mojo` to emit errors
+  on invalid doc strings instead of warnings.
+
+- A new decorator, `@doc_private`, was added that can be used to hide a decl
+  from being generated in the output of `mojo doc`. It also removes the
+  requirement that the decl has documentation (e.g. when used with
+  --diagnose-missing-doc-strings).
+
+- `Dict` now implements `get(key)` and `get(key, default)` functions.
+    ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
+
+- Debugger users can now set breakpoints on function calls in O0 builds even if
+  the call has been inlined by the compiler.
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
   longer need to do `from math import abs, round`.
+
+- Many functions returning a pointer type have been unified to have a public
+  API function of `unsafe_ptr()`.
+
+- The `--warn-missing-doc-strings` flag for `mojo` has been renamed to
+  `--diagnose-missing-doc-strings`.
+
+- The `take` function in `Variant` and `Optional` has been renamed to
+  `unsafe_take`.
+
+- The `get` function in `Variant` has been replaced by `__refitem__`. That is,
+  `v.get[T]()` should be replaced with `v[T]`.
+
+- Various functions in the `algorithm` module are now moved to be
+  builtin-functions.  This includes `sort`, `swap`, and `partition`.
+  `swap` and `partition` will likely shuffle around as we're reworking
+  our builtnin `sort` function and optimizing it.
 
 ### ❌ Removed
 
@@ -110,6 +178,9 @@ what we publish.
 
 - The `math.roundeven` function has been removed from the `math` module. The new
   `SIMD.roundeven` method now provides the identical functionality.
+
+- The `math.div_ceil` function has been removed in favor of the `math.ceildiv`
+  function.
 
 ### 🛠️ Fixed
 

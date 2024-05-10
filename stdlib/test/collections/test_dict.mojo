@@ -217,7 +217,7 @@ def test_dict_copy_add_new_item():
     # test there are two copies of dict and
     # they don't share underlying memory
     copy["b"] = 2
-    assert_false(2 in orig)
+    assert_false(str(2) in orig)
 
 
 def test_dict_copy_calls_copy_constructor():
@@ -258,6 +258,66 @@ def test_dict_update_empty_origin():
 
     assert_equal(orig["b"], 3)
     assert_equal(orig["c"], 4)
+
+
+def test_dict_or():
+    var orig = Dict[String, Int]()
+    var new = Dict[String, Int]()
+
+    new["b"] = 3
+    new["c"] = 4
+    orig["d"] = 5
+    orig["b"] = 8
+
+    var out = orig | new
+
+    assert_equal(out["b"], 3)
+    assert_equal(out["c"], 4)
+    assert_equal(out["d"], 5)
+
+    orig |= new
+
+    assert_equal(orig["b"], 3)
+    assert_equal(orig["c"], 4)
+    assert_equal(orig["d"], 5)
+
+    orig = Dict[String, Int]()
+    new = Dict[String, Int]()
+    new["b"] = 3
+    new["c"] = 4
+
+    orig |= new
+
+    assert_equal(orig["b"], 3)
+    assert_equal(orig["c"], 4)
+
+    orig = Dict[String, Int]()
+    orig["a"] = 1
+    orig["b"] = 2
+
+    new = Dict[String, Int]()
+
+    orig = orig | new
+
+    assert_equal(orig["a"], 1)
+    assert_equal(orig["b"], 2)
+    assert_equal(len(orig), 2)
+
+    orig = Dict[String, Int]()
+    new = Dict[String, Int]()
+    orig["a"] = 1
+    orig["b"] = 2
+    new["c"] = 3
+    new["d"] = 4
+    orig |= new
+    assert_equal(orig["a"], 1)
+    assert_equal(orig["b"], 2)
+    assert_equal(orig["c"], 3)
+    assert_equal(orig["d"], 4)
+
+    orig = Dict[String, Int]()
+    new = Dict[String, Int]()
+    assert_equal(len(orig | new), 0)
 
 
 def test_dict_update_empty_new():
@@ -359,6 +419,7 @@ def test_dict():
     test["test_dict_update_empty_origin", test_dict_update_empty_origin]()
     test["test_dict_update_empty_new", test_dict_update_empty_new]()
     test["test_mojo_issue_1729", test_mojo_issue_1729]()
+    test["test dict or", test_dict_or]()
 
 
 def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
@@ -410,9 +471,19 @@ def test_owned_kwargs_dict():
     test_taking_owned_kwargs_dict(owned_kwargs^)
 
 
+def test_find_get():
+    var some_dict = Dict[String, Int]()
+    some_dict["key"] = 1
+    assert_equal(some_dict.find("key").unsafe_take(), 1)
+    assert_equal(some_dict.get("key").unsafe_take(), 1)
+    assert_equal(some_dict.find("not_key").or_else(0), 0)
+    assert_equal(some_dict.get("not_key", 0), 0)
+
+
 def main():
     test_dict()
     test_dict_string_representation_string_int()
     test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
     test_bool_conversion()
+    test_find_get()

@@ -120,7 +120,7 @@ struct AddressSpace(EqualityComparable):
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Int):
-        """Initializes the address space from the underlying integeral value.
+        """Initializes the address space from the underlying integral value.
 
         Args:
           value: The address space value.
@@ -129,7 +129,7 @@ struct AddressSpace(EqualityComparable):
 
     @always_inline("nodebug")
     fn __init__(inout self, value: _GPUAddressSpace):
-        """Initializes the address space from the underlying integeral value.
+        """Initializes the address space from the underlying integral value.
 
         Args:
           value: The address space value.
@@ -248,41 +248,3 @@ struct Reference[
             The MLIR reference for the Mojo compiler to use.
         """
         return self.value
-
-    # ===------------------------------------------------------------------===#
-    # Methods
-    # ===------------------------------------------------------------------===#
-
-    # FIXME: This should be on Pointer, but can't due to AnyRefType vs AnyType
-    # disagreement.  Use UnsafePointer instead!
-    @always_inline("nodebug")
-    fn get_legacy_pointer(self) -> Pointer[type, address_space]:
-        """Constructs a Pointer from a safe reference.
-
-        Returns:
-            Constructed Pointer object.
-        """
-        # Work around AnyRegType vs AnyType.
-        return __mlir_op.`pop.pointer.bitcast`[
-            _type = Pointer[type, address_space]._mlir_type
-        ](UnsafePointer(self).address)
-
-    @always_inline("nodebug")
-    fn unsafe_bitcast[
-        new_element_type: AnyType = type,
-        /,
-        address_space: AddressSpace = Self.address_space,
-    ](self) -> Reference[new_element_type, is_mutable, lifetime, address_space]:
-        """Cast the reference to one of another element type and AddressSpace,
-        but the same lifetime and mutability.
-
-        Parameters:
-            new_element_type: The result type.
-            address_space: The address space of the result.
-
-        Returns:
-            The new reference.
-        """
-        # We don't have a `lit.ref.cast`` operation, so convert through a KGEN
-        # pointer.
-        return UnsafePointer(self).bitcast[new_element_type, address_space]()[]

@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
-from builtin._math import Ceilable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable
 from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
@@ -197,6 +197,7 @@ struct Int(
     Absable,
     Boolable,
     Ceilable,
+    CeilDivable,
     Floorable,
     Formattable,
     Intable,
@@ -216,103 +217,79 @@ struct Int(
     """Returns the minimum value of type."""
 
     @always_inline("nodebug")
-    fn __init__() -> Self:
-        """Default constructor.
-
-        Returns:
-            The constructed Int object.
-        """
-        return Self {
-            value: __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
-        }
+    fn __init__(inout self):
+        """Default constructor that produces zero."""
+        self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.index) -> Self:
+    fn __init__(inout self, value: __mlir_type.index):
         """Construct Int from the given index value.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed Int object.
         """
-        return Self {value: value}
+        self.value = value
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<si16>`) -> Self:
+    fn __init__(inout self, value: __mlir_type.`!pop.scalar<si16>`):
         """Construct Int from the given Int16 value.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed Int object.
         """
-        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<si32>`) -> Self:
+    fn __init__(inout self, value: __mlir_type.`!pop.scalar<si32>`):
         """Construct Int from the given Int32 value.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed Int object.
         """
-        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<si64>`) -> Self:
+    fn __init__(inout self, value: __mlir_type.`!pop.scalar<si64>`):
         """Construct Int from the given Int64 value.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed Int object.
         """
-        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<index>`) -> Self:
+    fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
         """Construct Int from the given Index value.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed Int object.
         """
-        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
+        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
             __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
                 value
             )
         )
 
     @always_inline("nodebug")
-    fn __init__(value: IntLiteral) -> Self:
+    fn __init__(inout self, value: IntLiteral):
         """Construct Int from the given IntLiteral value.
 
         Args:
             value: The init value.
-
-        Returns:
-            The constructed Int object.
         """
-        return value.__int__()
+        self = value.__int__()
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -356,7 +333,7 @@ struct Int(
 
             # Format the integer to the local byte array
             var len = _snprintf(
-                rebind[UnsafePointer[Int8]](buf.as_ptr()),
+                rebind[UnsafePointer[Int8]](buf.unsafe_ptr()),
                 size,
                 "%li",
                 self.value,
@@ -681,25 +658,24 @@ struct Int(
         return mod
 
     @always_inline("nodebug")
-    fn _divmod(self, rhs: Int) -> StaticIntTuple[2]:
+    fn __divmod__(self, rhs: Int) -> Tuple[Int, Int]:
         """Computes both the quotient and remainder using integer division.
 
         Args:
             rhs: The value to divide on.
 
         Returns:
-            The quotient and remainder as a tuple `(self // rhs, self % rhs)`.
+            The quotient and remainder as a `Tuple(self // rhs, self % rhs)`.
         """
         if rhs == 0:
-            # this should raise an exception.
-            return StaticIntTuple[2](0, 0)
+            return 0, 0
         var div: Int = self._positive_div(rhs)
         if rhs > 0 and self > 0:
-            return StaticIntTuple[2](div, self._positive_rem(rhs))
+            return div, self._positive_rem(rhs)
         var mod = self - div * rhs
         if ((rhs < 0) ^ (self < 0)) and mod:
-            return StaticIntTuple[2](div - 1, mod + rhs)
-        return StaticIntTuple[2](div, mod)
+            return div - 1, mod + rhs
+        return div, mod
 
     @always_inline("nodebug")
     fn __pow__(self, rhs: Int) -> Int:

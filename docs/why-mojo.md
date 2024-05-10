@@ -2,11 +2,6 @@
 title: Why Mojo🔥
 sidebar_label: Why Mojo
 description: A backstory and rationale for why we created the Mojo language.
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 ---
 
 When we started Modular, we had no intention of building a new programming

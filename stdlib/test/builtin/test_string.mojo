@@ -35,16 +35,30 @@ struct AString(Stringable):
 
 fn test_stringable() raises:
     assert_equal("hello", str("hello"))
-    assert_equal("0", str(String(0)))
+    assert_equal("0", str(0))
     assert_equal("AAA", str(StringRef("AAA")))
-    assert_equal("a string", str(String(AString())))
+    assert_equal("a string", str(AString()))
 
 
-fn test_representable() raises:
-    assert_equal(repr(String("hello")), "'hello'")
-    assert_equal(repr(String(0)), "'0'")
-    # TODO: Add more complex cases with "'", escape characters, etc
-    # and make String.__repr__ more robust to handle those cases.
+fn test_repr() raises:
+    # Usual cases
+    assert_equal(String.__repr__("hello"), "'hello'")
+    assert_equal(String.__repr__(str(0)), "'0'")
+
+    # Escape cases
+    assert_equal(String.__repr__("\0"), r"'\x00'")
+    assert_equal(String.__repr__("\x06"), r"'\x06'")
+    assert_equal(String.__repr__("\x09"), r"'\t'")
+    assert_equal(String.__repr__("\n"), r"'\n'")
+    assert_equal(String.__repr__("\x0d"), r"'\r'")
+    assert_equal(String.__repr__("\x0e"), r"'\x0e'")
+    assert_equal(String.__repr__("\x1f"), r"'\x1f'")
+    assert_equal(String.__repr__(" "), "' '")
+    assert_equal(String.__repr__("'"), '"\'"')
+    assert_equal(String.__repr__("A"), "'A'")
+    assert_equal(String.__repr__("\\"), r"'\\'")
+    assert_equal(String.__repr__("~"), "'~'")
+    assert_equal(String.__repr__("\x7f"), r"'\x7f'")
 
 
 fn test_constructors() raises:
@@ -53,12 +67,12 @@ fn test_constructors() raises:
     assert_true(not String())
 
     # Construction from Int
-    var s0 = String(0)
-    assert_equal("0", str(String(0)))
+    var s0 = str(0)
+    assert_equal("0", str(0))
     assert_equal(1, len(s0))
 
-    var s1 = String(123)
-    assert_equal("123", str(String(123)))
+    var s1 = str(123)
+    assert_equal("123", str(123))
     assert_equal(3, len(s1))
 
     # Construction from StringLiteral
@@ -78,7 +92,7 @@ fn test_constructors() raises:
 
 fn test_copy() raises:
     var s0 = String("find")
-    var s1 = String(s0)
+    var s1 = str(s0)
     s1._buffer[3] = ord("e")
     assert_equal("find", s0)
     assert_equal("fine", s1)
@@ -126,7 +140,7 @@ fn test_add() raises:
 
     var s8 = String("abc is ")
     var s9 = AString()
-    assert_equal("abc is a string", s8 + s9)
+    assert_equal("abc is a string", str(s8) + str(s9))
 
 
 fn test_string_join() raises:
@@ -558,7 +572,7 @@ fn test_upper() raises:
 
 
 fn test_isspace() raises:
-    print("checking true cases")
+    # checking true cases
     assert_true(isspace(ord(" ")))
     assert_true(isspace(ord("\n")))
     assert_true(isspace(ord("\t")))
@@ -566,7 +580,7 @@ fn test_isspace() raises:
     assert_true(isspace(ord("\v")))
     assert_true(isspace(ord("\f")))
 
-    print("Checking false cases")
+    # Checking false cases
     assert_false(isspace(ord("a")))
     assert_false(isspace(ord("u")))
     assert_false(isspace(ord("s")))
@@ -612,7 +626,6 @@ fn test_lstrip() raises:
 
 
 fn test_strip() raises:
-    print("start strip")
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
 
@@ -706,7 +719,7 @@ def main():
     test_equality_operators()
     test_add()
     test_stringable()
-    test_representable()
+    test_repr()
     test_string_join()
     test_stringref()
     test_stringref_from_dtypepointer()

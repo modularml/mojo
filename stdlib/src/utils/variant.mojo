@@ -20,9 +20,9 @@ from utils import Variant
 alias IntOrString = Variant[Int, String]
 fn to_string(inout x: IntOrString) -> String:
   if x.isa[String]():
-    return x.get[String]()[]
+    return x[String][]
   # x.isa[Int]()
-  return str(x.get[Int]())[]
+  return str(x[Int])[]
 
 # They have to be mutable for now, and implement CollectionElement
 var an_int = IntOrString(4)
@@ -47,7 +47,7 @@ from memory.unsafe_pointer import (
     move_from_pointee,
     move_pointee,
 )
-from utils import unroll, StaticTuple
+from utils import unroll
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -106,8 +106,8 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     You can
         - use `isa[T]()` to check what type a variant is
-        - use `take[T]()` to take a value from the variant
-        - use `get[T]()` to get a value out of a variant
+        - use `unsafe_take[T]()` to take a value from the variant
+        - use `[T]` to get a value out of a variant
             - This currently does an extra copy/move until we have lifetimes
             - It also temporarily requires the value to be mutable
         - use `set[T](owned new_value: T)` to reset the variant to a new value
@@ -118,9 +118,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     alias IntOrString = Variant[Int, String]
     fn to_string(inout x: IntOrString) -> String:
         if x.isa[String]():
-            return x.get[String]()[]
+            return x[String][]
         # x.isa[Int]()
-        return str(x.get[Int]()[])
+        return str(x[Int][])
 
     # They have to be mutable for now, and implement CollectionElement
     var an_int = IntOrString(4)
@@ -151,12 +151,10 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         ]()
         return UnsafePointer.address_of(self._impl).bitcast[T]()
 
-    fn _get_state[
-        is_mut: __mlir_type.i1, lt: __mlir_type[`!lit.lifetime<`, is_mut, `>`]
-    ](self: Reference[Self, is_mut, lt]._mlir_type) -> Reference[
-        Int8, is_mut, lt
-    ]:
-        var int8_self = UnsafePointer.address_of(self).bitcast[Int8]()
+    fn _get_state(
+        self: Reference[Self, _, _]
+    ) -> Reference[Int8, self.is_mutable, self.lifetime]:
+        var int8_self = UnsafePointer(self).bitcast[Int8]()
         return (int8_self + _UnionSize[Ts].compute())[]
 
     fn __init__[T: CollectionElement](inout self, owned value: T):
@@ -189,7 +187,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
                 alias T = Ts[i]
                 initialize_pointee_move(
                     UnsafePointer.address_of(self._impl).bitcast[T](),
-                    Reference(other._impl).unsafe_bitcast[T]()[],
+                    UnsafePointer.address_of(other._impl).bitcast[T]()[],
                 )
 
         unroll[each, len(VariadicList(Ts))]()
@@ -229,7 +227,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         unroll[each, len(VariadicList(Ts))]()
 
-    fn take[T: CollectionElement](owned self) -> T:
+    fn unsafe_take[T: CollectionElement](owned self) -> T:
         """Take the current value of the variant as the provided type.
 
         The caller takes ownership of the underlying value. The variant
@@ -244,7 +242,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             T: The type to take.
 
         Returns:
-            The undelying data as an owned value.
+            The underlying data as an owned value.
         """
         debug_assert(
             Self._check[T]() == self._get_state()[], "taking wrong type"
@@ -282,12 +280,10 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         alias idx = Self._check[T]()
         return self._get_state()[] == idx
 
-    fn get[
-        T: CollectionElement,
-        mutability: __mlir_type.i1,
-        self_life: AnyLifetime[mutability].type,
-    ](self: Reference[Self, mutability, self_life]._mlir_type) -> Reference[
-        T, mutability, self_life
+    fn __refitem__[
+        T: CollectionElement
+    ](self: Reference[Self, _, _]) -> Reference[
+        T, self.is_mutable, self.lifetime
     ]:
         """Get the value out of the variant as a type-checked type.
 
@@ -301,14 +297,12 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         Parameters:
             T: The type of the value to get out.
-            mutability: The inferred mutability of the variant type.
-            self_life: The inferred lifetime of the variant type.
 
         Returns:
             The internal data represented as a `Reference[T]`.
         """
-        debug_assert(Reference(self)[].isa[T](), "get: wrong variant type")
-        return Reference(self)[]._get_ptr[T]()[]
+        debug_assert(self[].isa[T](), "get: wrong variant type")
+        return self[]._get_ptr[T]()[]
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:

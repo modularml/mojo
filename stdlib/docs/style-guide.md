@@ -69,7 +69,7 @@ formatted and consistent with the Mojo style guidelines.
 Note that you should not have any warnings.
 
 ```bash
-> mojo doc --warn-missing-doc-strings -o /dev/null stdlib/src/
+> mojo doc --diagnose-missing-doc-strings --validate-doc-strings -o /dev/null stdlib/src/
 ```
 
 Note that this is also included in the pre-commit. So if you have `pre-commit`
@@ -303,6 +303,9 @@ fn add_param_arg[foo: Int](bar: Int) -> Int:
     constrained[foo > 0]()
     return foo + bar
 ```
+
+For more detailed style guidelines, see the
+[Mojo docstring style guide](docstring-style-guide.md).
 
 ### Testing
 

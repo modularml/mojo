@@ -130,7 +130,7 @@ fn _int_tuple_compare[
     fn do_compare[idx: Int]():
         var a_elem: Int = a.__getitem__[idx]()
         var b_elem: Int = b.__getitem__[idx]()
-        c.__setitem__[idx](comp_fn(a_elem, b_elem).value)
+        c.__setitem__[idx](comp_fn(a_elem, b_elem)._as_scalar_bool())
 
     unroll[do_compare, size]()
 
@@ -456,11 +456,11 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         }
 
     @always_inline
-    fn __floordiv__(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
+    fn __floordiv__(self, rhs: Self) -> Self:
         """Performs element-wise integer floor division.
 
         Args:
-            rhs: Right hand side operand.
+            rhs: The elementwise divisor.
 
         Returns:
             The resulting index tuple.
@@ -473,6 +473,18 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         return Self {
             data: _int_tuple_binary_apply[size, apply_fn](self.data, rhs.data)
         }
+
+    @always_inline
+    fn __rfloordiv__(self, rhs: Self) -> Self:
+        """Floor divides rhs by this object.
+
+        Args:
+            rhs: The value to elementwise divide by self.
+
+        Returns:
+            The resulting index tuple.
+        """
+        return rhs // self
 
     @always_inline
     fn remu(self, rhs: StaticIntTuple[size]) -> StaticIntTuple[size]:
@@ -712,7 +724,7 @@ fn Index[
     Args:
         x: The 1st initial value.
         y: The 2nd initial value.
-        z: The 3nd initial value.
+        z: The 3rd initial value.
 
     Returns:
         The constructed StaticIntTuple.
@@ -735,7 +747,7 @@ fn Index[
     Args:
         x: The 1st initial value.
         y: The 2nd initial value.
-        z: The 3nd initial value.
+        z: The 3rd initial value.
         w: The 4th initial value.
 
     Returns:
@@ -760,7 +772,7 @@ fn Index[
     Args:
         x: The 1st initial value.
         y: The 2nd initial value.
-        z: The 3nd initial value.
+        z: The 3rd initial value.
         w: The 4th initial value.
         v: The 5th initial value.
 

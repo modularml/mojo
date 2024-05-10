@@ -283,28 +283,16 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
         """
         self.symmetric_difference_update(other)
 
-    fn __iter__[
-        mutability: __mlir_type.i1, self_life: AnyLifetime[mutability].type
-    ](
-        self: Reference[Self, mutability, self_life]._mlir_type,
-    ) -> _DictKeyIter[
-        T, NoneType, mutability, self_life
-    ]:
+    fn __iter__(
+        self: Reference[Self, _, _],
+    ) -> _DictKeyIter[T, NoneType, self.is_mutable, self.lifetime]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
             An iterator of immutable references to the set elements.
         """
-        # self._data has its own lifetime that's not self_lifetime
         # here we rely on Set being a trivial wrapper of a Dict
-        return _DictKeyIter(
-            _DictEntryIter[
-                T,
-                NoneType,
-                mutability,
-                self_life,
-            ](0, 0, Reference(self).unsafe_bitcast[Dict[T, NoneType]]())
-        )
+        return _DictKeyIter(_DictEntryIter(0, 0, self[]._data))
 
     fn add(inout self, t: T):
         """Add an element to the set.
