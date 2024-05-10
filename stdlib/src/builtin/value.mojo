@@ -169,6 +169,18 @@ trait ComparableCollectionElement(CollectionElement, EqualityComparable):
     pass
 
 
+trait OrderComparableCollectionElement(
+    ComparableCollectionElement, OrderComparable
+):
+    """
+    This trait is a temporary solution to enable sorting of collection elements.
+    This approach will be revised with the introduction of conditional trait
+    conformances.
+    """
+
+    pass
+
+
 trait RepresentableCollectionElement(CollectionElement, Representable):
     """The RepresentableCollectionElement trait denotes a trait composition
     of the `CollectionElement` and `Representable` traits.

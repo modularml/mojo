@@ -142,6 +142,16 @@ fn test_repr() raises:
     assert_equal(StringLiteral.__repr__("\x7f"), r"'\x7f'")
 
 
+def test_compare():
+    assert_true("a" < "aa")
+    assert_true("a" < "b")
+    assert_true("a" <= "a")
+    assert_true("a" <= "aa")
+    assert_true("aa" > "a")
+    assert_true("aa" >= "a")
+    assert_true("aa" >= "aa")
+
+
 def main():
     test_basics()
     test_contains()
@@ -151,3 +161,4 @@ def main():
     test_hash()
     test_intable()
     test_repr()
+    test_compare()
