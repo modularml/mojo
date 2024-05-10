@@ -687,10 +687,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
         if found:
             self._set_index(slot, Self.REMOVED)
             var entry = self._entries.__get_ref(index)
+            debug_assert(entry[].__bool__(), "entry in index must be full")
             var entry_value = entry[].unsafe_take()
             entry[] = None
             self.size -= 1
-            debug_assert(entry[].__bool__(), "entry in index must be full")
             return entry_value.value^
         elif default:
             return default.value()[]
@@ -828,7 +828,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             if index == Self.EMPTY:
                 return (False, slot, self._n_entries)
             elif index == Self.REMOVED:
-                return (False, slot, self._n_entries)
+                pass
             else:
                 var entry = self._entries.__get_ref(index)
                 debug_assert(entry[].__bool__(), "entry in index must be full")
