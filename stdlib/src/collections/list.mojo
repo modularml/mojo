@@ -244,6 +244,75 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             later_idx -= 1
 
     @always_inline
+    fn __mul(inout self, x: Int):
+        """Appends the original elements of this list x-1 times.
+
+        ```mojo
+        var a = List[Int](1, 2)
+        a.__mul(2) # a = [1, 2, 1, 2]
+        ```
+
+        Args:
+            x: The multiplier number.
+        """
+        if x == 0:
+            self.clear()
+            return
+        var orig = List(self)
+        self.reserve(len(self) * x)
+        for i in range(x - 1):
+            self.extend(orig)
+
+    @always_inline("nodebug")
+    fn __mul__(self, x: Int) -> Self:
+        """Multiplies the list by x and returns a new list.
+
+        Args:
+            x: The multiplier number.
+
+        Returns:
+            The new list.
+        """
+        # avoid the copy since it would be cleared immediately anyways
+        if x == 0:
+            return Self()
+        var result = List(self)
+        result.__mul(x)
+        return result^
+
+    @always_inline("nodebug")
+    fn __imul__(inout self, x: Int):
+        """Multiplies the list by x in place.
+
+        Args:
+            x: The multiplier number.
+        """
+        self.__mul(x)
+
+    @always_inline("nodebug")
+    fn __add__(self, owned other: Self) -> Self:
+        """Concatenates self with other and returns the result as a new list.
+
+        Args:
+            other: List whose elements will be combined with the elements of self.
+
+        Returns:
+            The newly created list.
+        """
+        var result = List(self)
+        result.extend(other^)
+        return result^
+
+    @always_inline("nodebug")
+    fn __iadd__(inout self, owned other: Self):
+        """Appends the elements of other into self.
+
+        Args:
+            other: List whose elements will be appended to self.
+        """
+        self.extend(other^)
+
+    @always_inline
     fn extend(inout self, owned other: List[T]):
         """Extends this list by consuming the elements of `other`.
 

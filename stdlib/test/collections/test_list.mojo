@@ -689,6 +689,58 @@ def test_list_count():
     assert_equal(0, __type_of(list2).count(list2, 1))
 
 
+def test_list_add():
+    var a = List[Int](1, 2, 3)
+    var b = List[Int](4, 5, 6)
+    var c = a + b
+    assert_equal(len(c), 6)
+    # check that original values aren't modified
+    assert_equal(len(a), 3)
+    assert_equal(len(b), 3)
+    assert_equal(__type_of(c).__str__(c), "[1, 2, 3, 4, 5, 6]")
+
+    a += b
+    assert_equal(len(a), 6)
+    assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(len(b), 3)
+
+    a = List[Int](1, 2, 3)
+    a += b^
+    assert_equal(len(a), 6)
+    assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 4, 5, 6]")
+
+    var d = List[Int](1, 2, 3)
+    var e = List[Int](4, 5, 6)
+    var f = d + e^
+    assert_equal(len(f), 6)
+    assert_equal(__type_of(f).__str__(f), "[1, 2, 3, 4, 5, 6]")
+
+    var l = List[Int](1, 2, 3)
+    l += List[Int]()
+    assert_equal(len(l), 3)
+
+
+def test_list_mult():
+    var a = List[Int](1, 2, 3)
+    var b = a * 2
+    assert_equal(len(b), 6)
+    assert_equal(__type_of(b).__str__(b), "[1, 2, 3, 1, 2, 3]")
+    b = a * 3
+    assert_equal(len(b), 9)
+    assert_equal(__type_of(b).__str__(b), "[1, 2, 3, 1, 2, 3, 1, 2, 3]")
+    a *= 2
+    assert_equal(len(a), 6)
+    assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 1, 2, 3]")
+
+    var l = List[Int](1, 2)
+    l *= 1
+    assert_equal(len(l), 2)
+
+    l *= 0
+    assert_equal(len(l), 0)
+    assert_equal(len(List[Int](1, 2, 3) * 0), 0)
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -714,3 +766,5 @@ def main():
     test_constructor_from_other_list_through_pointer()
     test_converting_list_to_string()
     test_list_count()
+    test_list_add()
+    test_list_mult()
