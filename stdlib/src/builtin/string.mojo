@@ -1401,15 +1401,12 @@ struct String(
 
         return self[l_idx:]
 
-    fn __hash__(self) -> Int:
-        """Hash the underlying buffer using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return hash(self._strref_dangerous())
+    fn __hash__[H: Hasher](self, inout hasher: H):
+        """Update hasher with string length and the underlying buffer."""
+        var size = len(self)
+        size.__hash__(hasher)
+        # hasher.update(size)
+        hasher._update_with_bytes(self.unsafe_uint8_ptr(), size)
 
     fn _interleave(self, val: String) -> String:
         var res = List[Int8]()

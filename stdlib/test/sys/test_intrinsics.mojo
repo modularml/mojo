@@ -21,7 +21,7 @@ from sys import (
 )
 
 from testing import assert_equal
-from memory import DTypePointer
+from memory import DTypePointer, memset_zero
 
 
 fn test_strided_load() raises:

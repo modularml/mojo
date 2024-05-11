@@ -18,42 +18,29 @@
 # These tests aren't _great_. They're platform specific, and implementation
 # specific. But for now they test behavior and reproducibility.
 
-from builtin.hash import _hash_simd
 from testing import assert_equal, assert_not_equal, assert_true
 
 
-def same_low_bits(i1: Int, i2: Int, bits: Int = 5) -> Int:
+def same_low_bits(i1: UInt64, i2: UInt64, bits: Int = 5) -> Int:
     var mask = (1 << bits) - 1
     return int(not (i1 ^ i2) & mask)
 
 
 def test_hash_byte_array():
     # Test that values hash deterministically
-    assert_equal(hash("a".unsafe_ptr(), 1), hash("a".unsafe_ptr(), 1))
-    assert_equal(hash("b".unsafe_ptr(), 1), hash("b".unsafe_ptr(), 1))
-    assert_equal(hash("c".unsafe_ptr(), 1), hash("c".unsafe_ptr(), 1))
-    assert_equal(hash("d".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1))
+    assert_equal(hash("a"), hash("a"))
+    assert_equal(hash("b"), hash("b"))
+    assert_equal(hash("c"), hash("c"))
+    assert_equal(hash("d"), hash("d"))
 
     # Test that low bits are different
     var num_same = 0
-    num_same += same_low_bits(
-        hash("a".unsafe_ptr(), 1), hash("b".unsafe_ptr(), 1)
-    )
-    num_same += same_low_bits(
-        hash("a".unsafe_ptr(), 1), hash("c".unsafe_ptr(), 1)
-    )
-    num_same += same_low_bits(
-        hash("a".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1)
-    )
-    num_same += same_low_bits(
-        hash("b".unsafe_ptr(), 1), hash("c".unsafe_ptr(), 1)
-    )
-    num_same += same_low_bits(
-        hash("b".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1)
-    )
-    num_same += same_low_bits(
-        hash("c".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1)
-    )
+    num_same += same_low_bits(hash("a"), hash("b"))
+    num_same += same_low_bits(hash("a"), hash("c"))
+    num_same += same_low_bits(hash("a"), hash("d"))
+    num_same += same_low_bits(hash("b"), hash("c"))
+    num_same += same_low_bits(hash("b"), hash("d"))
+    num_same += same_low_bits(hash("c"), hash("d"))
 
     # This test is just really bad. We really need to re-evaluate the
     # right way to test these. Hash function behavior varies a bit  based
@@ -72,19 +59,19 @@ def _test_hash_int_simd[type: DType](bits: Int = 4, max_num_same: Int = 2):
     var d = Scalar[type](-1)
 
     # Test that values hash deterministically
-    assert_equal(_hash_simd(a), _hash_simd(a))
-    assert_equal(_hash_simd(b), _hash_simd(b))
-    assert_equal(_hash_simd(c), _hash_simd(c))
-    assert_equal(_hash_simd(d), _hash_simd(d))
+    assert_equal(hash(a), hash(a))
+    assert_equal(hash(b), hash(b))
+    assert_equal(hash(c), hash(c))
+    assert_equal(hash(d), hash(d))
 
     # Test that low bits are different
     var num_same = 0
-    num_same += same_low_bits(_hash_simd(a), _hash_simd(b), bits)
-    num_same += same_low_bits(_hash_simd(a), _hash_simd(c), bits)
-    num_same += same_low_bits(_hash_simd(a), _hash_simd(d), bits)
-    num_same += same_low_bits(_hash_simd(b), _hash_simd(c), bits)
-    num_same += same_low_bits(_hash_simd(b), _hash_simd(d), bits)
-    num_same += same_low_bits(_hash_simd(c), _hash_simd(d), bits)
+    num_same += same_low_bits(hash(a), hash(b), bits)
+    num_same += same_low_bits(hash(a), hash(c), bits)
+    num_same += same_low_bits(hash(a), hash(d), bits)
+    num_same += same_low_bits(hash(b), hash(c), bits)
+    num_same += same_low_bits(hash(b), hash(d), bits)
+    num_same += same_low_bits(hash(c), hash(d), bits)
 
     assert_true(
         num_same < max_num_same, "too little entropy in hash fn low bits"
@@ -105,32 +92,32 @@ def test_hash_simd():
 
     # Test a couple other random things
     assert_not_equal(
-        _hash_simd(Float32(3.14159)),
-        _hash_simd(Float32(1e10)),
+        hash(Float32(3.14159)),
+        hash(Float32(1e10)),
     )
     assert_equal(
-        _hash_simd(Scalar[DType.bool](True)),
-        _hash_simd(Scalar[DType.bool](True)),
+        hash(Scalar[DType.bool](True)),
+        hash(Scalar[DType.bool](True)),
     )
     assert_equal(
-        _hash_simd(Scalar[DType.bool](False)),
-        _hash_simd(Scalar[DType.bool](False)),
+        hash(Scalar[DType.bool](False)),
+        hash(Scalar[DType.bool](False)),
     )
     assert_not_equal(
-        _hash_simd(Scalar[DType.bool](True)),
-        _hash_simd(Scalar[DType.bool](False)),
+        hash(Scalar[DType.bool](True)),
+        hash(Scalar[DType.bool](False)),
     )
     assert_equal(
-        _hash_simd(SIMD[DType.bool, 2](True)),
-        _hash_simd(SIMD[DType.bool, 2](True)),
+        hash(SIMD[DType.bool, 2](True)),
+        hash(SIMD[DType.bool, 2](True)),
     )
     assert_equal(
-        _hash_simd(SIMD[DType.bool, 2](False)),
-        _hash_simd(SIMD[DType.bool, 2](False)),
+        hash(SIMD[DType.bool, 2](False)),
+        hash(SIMD[DType.bool, 2](False)),
     )
     assert_not_equal(
-        _hash_simd(SIMD[DType.bool, 2](True)),
-        _hash_simd(SIMD[DType.bool, 2](False)),
+        hash(SIMD[DType.bool, 2](True)),
+        hash(SIMD[DType.bool, 2](False)),
     )
 
 

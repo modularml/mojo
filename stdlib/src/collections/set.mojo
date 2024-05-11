@@ -15,7 +15,9 @@
 from .dict import Dict, KeyElement, _DictEntryIter, _DictKeyIter
 
 
-struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
+struct Set[T: KeyElement, hasher: Hasher = DefaultHasher](
+    Sized, Comparable, Hashable, Boolable
+):
     """A set data type.
 
     O(1) average-case amortized add, remove, and membership check.
@@ -39,9 +41,10 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
 
     Parameters:
         T: The element type of the set. Must implement KeyElement.
+        hasher: The haser to use with hash function.
     """
 
-    var _data: Dict[T, NoneType]
+    var _data: Dict[T, NoneType, hasher]
 
     fn __init__(inout self, *ts: T):
         """Construct a set from initial elements.
@@ -49,7 +52,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             ts: Variadic of elements to add to the set.
         """
-        self._data = Dict[T, NoneType]()
+        self._data = Dict[T, NoneType, hasher]()
         for t in ts:
             self.add(t[])
 
@@ -135,20 +138,13 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         return not (self == other)
 
-    fn __hash__(self) -> Int:
-        """A hash value of the elements in the set.
-
-        The hash value is order independent, so s1 == s2 -> hash(s1) == hash(s2).
-
-        Returns:
-            A hash value of the set suitable for non-cryptographic purposes.
-        """
-        var hash_value = 0
-        # Hash combination needs to be commutative so iteration order
-        # doesn't impact the hash value.
+    fn __hash__[H: Hasher](self, inout hasher: H):
+        """Update hasher with set length and set elements."""
+        # hasher.update(len(self))
+        len(self).__hash__(hasher)
         for e in self:
-            hash_value ^= hash(e[])
-        return hash_value
+            # hasher.update(e[])
+            e[].__hash__(hasher)
 
     fn __and__(self, other: Self) -> Self:
         """The set intersection operator.
@@ -285,7 +281,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
 
     fn __iter__(
         self: Reference[Self, _, _],
-    ) -> _DictKeyIter[T, NoneType, self.is_mutable, self.lifetime]:
+    ) -> _DictKeyIter[T, NoneType, hasher, self.is_mutable, self.lifetime]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
@@ -359,7 +355,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             A new set containing only the elements which appear in both
             this set and the `other` set.
         """
-        var result = Set[T]()
+        var result = Set[T, hasher]()
         for v in self:
             if v[] in other:
                 result.add(v[])
@@ -376,7 +372,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             A new set containing elements that are in this set but not in
             the `other` set.
         """
-        var result = Set[T]()
+        var result = Set[T, hasher]()
         for e in self:
             if e[] not in other:
                 result.add(e[])
@@ -482,7 +478,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Returns:
             A new set containing the symmetric difference of the two sets.
         """
-        var result = Set[T]()
+        var result = Set[T, hasher]()
 
         for element in self:
             if element[] not in other:

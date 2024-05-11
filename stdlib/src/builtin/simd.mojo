@@ -26,7 +26,6 @@ from sys import (
 )
 
 from builtin._math import Ceilable, CeilDivable, Floorable
-from builtin.hash import _hash_simd
 from memory import bitcast
 
 from utils._numerics import FPUtils
@@ -1751,15 +1750,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             self.value, val, idx.value
         )
 
-    fn __hash__(self) -> Int:
-        """Hash the value using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return _hash_simd(self)
+    fn __hash__[H: Hasher](self, inout hasher: H):
+        """Update hasher with this value using."""
+        hasher._update_with_simd(self)
 
     @always_inline("nodebug")
     fn slice[

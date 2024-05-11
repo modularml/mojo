@@ -423,17 +423,14 @@ struct PythonObject(
             raise Error("object has no len()")
         return result
 
-    fn __hash__(self) -> Int:
-        """Returns the length of the object.
-
-        Returns:
-            The length of the object.
-        """
+    fn __hash__[H: Hasher](self, inout hasher: H):
+        """Update hasher with the hash of the object."""
         var cpython = _get_global_python_itf().cpython()
         var result = cpython.PyObject_Length(self.py_object)
         # TODO: make this function raise when we can raise parametrically.
         debug_assert(result != -1, "object is not hashable")
-        return result
+        # hasher.update(result)
+        result.__hash__(hasher)
 
     fn __getitem__(self, *args: PythonObject) raises -> PythonObject:
         """Return the value for the given key or keys.

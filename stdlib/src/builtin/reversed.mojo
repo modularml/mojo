@@ -102,10 +102,11 @@ fn reversed[
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
+    hasher: Hasher,
 ](
-    value: Reference[Dict[K, V], _, _],
+    value: Reference[Dict[K, V, hasher], _, _],
 ) -> _DictKeyIter[
-    K, V, value.is_mutable, value.lifetime, False
+    K, V, hasher, value.is_mutable, value.lifetime, False
 ]:
     """Get a reversed iterator of the input dict.
 
@@ -114,6 +115,7 @@ fn reversed[
     Parameters:
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
+        hasher: Hasher to use with hash function.
 
     Args:
         value: The dict to get the reversed iterator of.

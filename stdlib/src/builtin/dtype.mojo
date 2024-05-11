@@ -191,8 +191,9 @@ struct DType(Stringable, Representable, KeyElement):
             self._as_i8(), rhs._as_i8()
         )
 
-    fn __hash__(self) -> Int:
-        return hash(UInt8(self._as_i8()))
+    @always_inline
+    fn __hash__[H: Hasher](self, inout hasher: H):
+        hasher._update_with_simd(UInt8(self._as_i8()))
 
     @always_inline("nodebug")
     fn isa[other: DType](self) -> Bool:

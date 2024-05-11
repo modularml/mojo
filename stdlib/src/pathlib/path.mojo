@@ -181,14 +181,10 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         """
         return not self == other
 
-    fn __hash__(self) -> Int:
-        """Hash the underlying path string using builtin hash.
-
-        Returns:
-            An integer value containing the hash of the path string.
-        """
-
-        return hash(self.path)
+    fn __hash__[H: Hasher](self, inout hasher: H):
+        """Update hasher with the underlying path string."""
+        # hasher.update(self.path)
+        self.path.__hash__(hasher)
 
     fn stat(self) raises -> stat_result:
         """Returns the stat information on the path.
