@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import List, KeyElement
+from collections import List, KeyElement, InlineList
 from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
@@ -1760,8 +1760,8 @@ struct _InlineBytesList[capacity: Int](Sized, CollectionElement):
             self.length = new_size
 
     @always_inline
-    fn get_storage_unsafe_pointer(self) -> UnsafePointer[Int8]:
-        return self.data.get_storage_unsafe_pointer()
+    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
+        return self.data.unsafe_ptr()
 
 
 @value
@@ -1771,7 +1771,7 @@ struct _BytesListWithSmallSizeOptimization[inline_size: Int = 24](
     """This type looks like a list of bytes, but is stack-allocated if the size is small.
     """
 
-    alias static_storage = _InlineBytesList[Self.inline_size]
+    alias static_storage = InlineList[Int8, Self.inline_size]
     alias dynamic_storage = List[Int8]
 
     var values: Variant[Self.static_storage, Self.dynamic_storage]
@@ -1814,7 +1814,7 @@ struct _BytesListWithSmallSizeOptimization[inline_size: Int = 24](
         var new_storage = Self.dynamic_storage(capacity=target_capacity)
         memcpy(
             new_storage.data,
-            self.values[Self.static_storage].get_storage_unsafe_pointer(),
+            self.values[Self.static_storage].unsafe_ptr(),
             len(self),
         )
         new_storage.size = len(self)
@@ -1847,7 +1847,7 @@ struct _BytesListWithSmallSizeOptimization[inline_size: Int = 24](
     @always_inline
     fn get_storage_unsafe_pointer(self) -> UnsafePointer[Int8]:
         if self._use_sso():
-            return self.values[Self.static_storage].get_storage_unsafe_pointer()
+            return self.values[Self.static_storage].unsafe_ptr()
         else:
             return self.values[Self.dynamic_storage].data
 

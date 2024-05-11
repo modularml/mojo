@@ -27,7 +27,9 @@ from utils import InlineArray
 
 
 # TODO: Provide a smarter default for the capacity.
-struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
+struct InlineList[ElementType: CollectionElement, capacity: Int = 16](
+    Sized, CollectionElement
+):
     """A list allocated on the stack with a maximum size known at compile time.
 
     It is backed by an `InlineArray` and an `Int` to represent the size.
@@ -50,6 +52,24 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         """This constructor creates an empty InlineList."""
         self._array = InlineArray[ElementType, capacity](uninitialized=True)
         self._size = 0
+
+    fn __moveinit__(inout self, owned other: Self):
+        """Move constructor.
+
+        Args:
+            other: The InlineList to move from.
+        """
+        self._array = other._array
+        self._size = other._size
+
+    fn __copyinit__(inout self, other: Self, /) -> None:
+        """Copy constructor.
+
+        Args:
+            other: The InlineList to copy from.
+        """
+        self._array = other._array
+        self._size = other._size
 
     @always_inline
     fn __len__(self) -> Int:
@@ -96,3 +116,44 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         """Destroy all the elements in the list and free the memory."""
         for i in range(self._size):
             destroy_pointee(UnsafePointer(self._array[i]))
+
+    @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[ElementType]:
+        """Returns a pointer to the first element in the list.
+
+        Returns:
+            A pointer to the first element in the list.
+        """
+        return self._array.unsafe_ptr()
+
+    @always_inline
+    fn resize(inout self, new_size: Int, value: ElementType):
+        """Resizes the list to the new size.
+
+        If the new size is greater than the current size, the list is extended with the given
+        value. If the new size is smaller, the list is truncated.
+
+        Args:
+            new_size: The new size of the list.
+            value: The value to append if the list is extended.
+        """
+        if new_size > self._size:
+            for i in range(self._size, new_size):
+                self.append(value)
+        else:
+            # Destroy in reverse order
+            for i in range(new_size, self._size):
+                _ = self.pop()
+            self._size = new_size
+
+    @always_inline
+    fn pop(inout self) -> ElementType:
+        """Removes and returns the last element from the list.
+
+        Returns:
+            The last element in the list.
+        """
+        debug_assert(self._size > 0, "pop from empty list")
+        var value_to_pop = self._array[self._size - 1]
+        self._size -= 1
+        return value_to_pop

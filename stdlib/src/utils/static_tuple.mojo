@@ -405,7 +405,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         return self[]._get_reference_unsafe(normalized_idx)
 
-    fn get_storage_unsafe_pointer(self) -> UnsafePointer[ElementType]:
+    fn unsafe_ptr(self) -> UnsafePointer[ElementType]:
         """Get an `UnsafePointer` to the underlying storage of the array.
 
         Returns:
