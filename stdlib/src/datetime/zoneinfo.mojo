@@ -191,7 +191,6 @@ struct ZoneInfoFile:
     """Zoneinfo that lives in a file. Smallest memory footprint
     but only supports 256 DST timezones (there are ~ 60 or 70)."""
 
-    var _zones: Dict[StringLiteral, UInt8]
     var index: UInt8
     alias BIT_WIDTH = 32
     alias BIT_MASK = 0xFFFFFFFF  # 32 full bits
@@ -199,26 +198,26 @@ struct ZoneInfoFile:
 
     fn __init__(inout self) raises:
         self.file = Path(cwd()) / "zoneinfo_dump"
-        self._zones = Dict[StringLiteral, UInt8]()
         self.index = 0
 
-    fn add(inout self, key: StringLiteral, value: ZoneDST) raises:
+    fn add(inout self, key: StringLiteral, value: ZoneDST) raises -> UInt8:
+        _ = key
         with open(self.file, "rb") as f:
             _ = f.seek(self.BIT_WIDTH * (self.index).cast[DType.uint64]())
             f.write(value.buf << (32 - self.BIT_WIDTH))
-        self._zones[key] = self.index
-        self.index += 1
         if self.index > UInt8.MAX_FINITE:
             self.index = 0
+        else:
+            self.index += 1
+        return self.index 
 
-    fn get(self, key: StringLiteral) raises -> Optional[ZoneDST]:
-        var index = self._zones.find(key)
-        if not index:
+    fn get(self, index: UInt8) raises -> Optional[ZoneDST]:
+        if self.index > UInt8.MAX_FINITE:
             return None
         var value: UInt32
         with open(self.file, "rb") as f:
             _ = f.seek(
-                self.BIT_WIDTH * index.unsafe_take().cast[DType.uint64]()
+                self.BIT_WIDTH * index.cast[DType.uint64]()
             )
             var bufs = f.read_bytes(4)
             value = (

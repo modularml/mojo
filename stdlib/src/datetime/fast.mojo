@@ -14,19 +14,15 @@
 years.
 
 - `DateTime64`:
-    This is a "normal" `DateTime` with milisecond resolution.
-
+    - This is a "normal" `DateTime` with milisecond resolution.
 - `DateTime32`:
-    This is a "normal" `DateTime` with minute resolution.
-
+    - This is a "normal" `DateTime` with minute resolution.
 - `DateTime16`:
-    This is a `DateTime` with hour resolution, it can be used as a 
+    - This is a `DateTime` with hour resolution, it can be used as a 
     year, dayofyear, hour representation.
-
 - `DateTime8`:
-    This is a `DateTime` with hour resolution, it can be used as a 
+    - This is a `DateTime` with hour resolution, it can be used as a 
     dayofweek, hour representation.
-
 - Notes:
     - The caveats of each implementation are better explained in 
     each struct's docstrings.

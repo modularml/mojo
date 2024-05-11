@@ -55,6 +55,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     var year: UInt16
     var month: UInt8
     var day: UInt8
+    # TODO: tz and calendar should be references
     var tz: TimeZone[iana]
     var calendar: Calendar
 
