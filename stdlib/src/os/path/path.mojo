@@ -29,6 +29,7 @@ from .._linux_x86 import _lstat as _lstat_linux_x86
 from .._linux_x86 import _stat as _stat_linux_x86
 from .._macos import _lstat as _lstat_macos
 from .._macos import _stat as _stat_macos
+from ..fstat import stat
 
 
 # ===----------------------------------------------------------------------=== #
@@ -250,3 +251,35 @@ fn lexists[pathlike: os.PathLike](path: pathlike) -> Bool:
       Returns True if the path exists or is a broken symbolic link.
     """
     return exists(path.__fspath__())
+
+
+# ===----------------------------------------------------------------------=== #
+# getsize
+# ===----------------------------------------------------------------------=== #
+
+
+fn getsize(path: String) raises -> Int:
+    """Return the size, in bytes, of the specified path.
+
+    Args:
+      path: The path to the file.
+
+    Returns:
+      The size of the path in bytes.
+    """
+    return stat(path).st_size
+
+
+fn getsize[pathlike: os.PathLike](path: pathlike) raises -> Int:
+    """Return the size, in bytes, of the specified path.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the file.
+
+    Returns:
+      The size of the path in bytes.
+    """
+    return getsize(path.__fspath__())

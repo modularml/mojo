@@ -10,5 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo %s
 
-from .path import exists, isdir, isfile, islink, lexists, getsize
+import os
+from os.path import getsize
+from builtin._location import __source_location
+
+from testing import assert_equal, assert_false
+
+
+fn main() raises:
+    alias file_name = "test_file"
+    assert_false(os.path.exists(file_name), "File should not exist")
+    with open(file_name, "w"):
+        pass
+    assert_equal(getsize(file_name), 0)
+    with open(file_name, "w") as my_file:
+        my_file.write("test")
+    assert_equal(getsize(file_name), 4)
+    os.remove(file_name)
