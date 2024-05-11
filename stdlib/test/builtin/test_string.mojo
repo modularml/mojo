@@ -119,6 +119,46 @@ fn test_equality_operators() raises:
     assert_not_equal(s0, "notabc")
 
 
+fn test_comparison_operators() raises:
+    var abc = String("abc")
+    var de = String("de")
+    var ABC = String("ABC")
+    var ab = String("ab")
+    var abcd = String("abcd")
+
+    # Test less than and greater than
+    assert_true(String.__lt__(abc, de))
+    assert_false(String.__lt__(de, abc))
+    assert_false(String.__lt__(abc, abc))
+    assert_true(String.__lt__(ab, abc))
+    assert_true(String.__gt__(abc, ab))
+    assert_false(String.__gt__(abc, abcd))
+
+    # Test less than or equal to and greater than or equal to
+    assert_true(String.__le__(abc, de))
+    assert_true(String.__le__(abc, abc))
+    assert_false(String.__le__(de, abc))
+    assert_true(String.__ge__(abc, abc))
+    assert_false(String.__ge__(ab, abc))
+    assert_true(String.__ge__(abcd, abc))
+
+    # Test case sensitivity in comparison (assuming ASCII order)
+    assert_true(String.__gt__(abc, ABC))
+    assert_false(String.__le__(abc, ABC))
+
+    # Testing with implicit conversion
+    assert_true(String.__lt__(abc, "defgh"))
+    assert_false(String.__gt__(abc, "xyz"))
+    assert_true(String.__ge__(abc, "abc"))
+    assert_false(String.__le__(abc, "ab"))
+
+    # Test comparisons involving empty strings
+    assert_true(String.__lt__("", abc))
+    assert_false(String.__lt__(abc, ""))
+    assert_true(String.__le__("", ""))
+    assert_true(String.__ge__("", ""))
+
+
 fn test_add() raises:
     var s1 = String("123")
     var s2 = String("abc")
@@ -717,6 +757,7 @@ def main():
     test_constructors()
     test_copy()
     test_equality_operators()
+    test_comparison_operators()
     test_add()
     test_stringable()
     test_repr()
