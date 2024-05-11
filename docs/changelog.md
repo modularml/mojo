@@ -311,6 +311,9 @@ what we publish.
 - Added `atof()` function which can convert a `String` to a `float64`.
   ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))
 
+- Added `fromkeys` method to `Dict`.
+  ([PR 2622](https://github.com/modularml/mojo/pull/2622) by [@artemiogr97](https://github.com/artemiogr97))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
