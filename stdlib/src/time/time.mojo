@@ -126,7 +126,8 @@ fn _realtime_nanoseconds() -> Int:
         )
         return ft.as_nanoseconds()
     else:
-        return _gettime_as_nsec_unix(_CLOCK_REALTIME)
+        # return _gettime_as_nsec_unix(_CLOCK_REALTIME)
+        return _gettime_as_nsec_unix(_CLOCK_MONOTONIC)
 
 
 @always_inline
@@ -176,9 +177,9 @@ fn _thread_cputime_nanoseconds() -> Int:
 @parameter
 fn now[monotonic: Bool = True]() -> Int:
     """Returns the current time in nanoseconds. This function
-    queries the current platform's monotonic (default) or 
-    realtime clock, making it useful for measuring time 
-    differences, but the significance of the returned value 
+    queries the current platform's monotonic (default) or
+    realtime clock, making it useful for measuring time
+    differences, but the significance of the returned value
     varies depending on the underlying implementation.
 
     Parameters:
