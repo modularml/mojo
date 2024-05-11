@@ -117,7 +117,16 @@ fn _gettime_as_nsec_unix(clockid: Int) -> Int:
 @always_inline
 fn _realtime_nanoseconds() -> Int:
     """Returns the current realtime time in nanoseconds"""
-    return _gettime_as_nsec_unix(_CLOCK_REALTIME)
+
+    @parameter
+    if os_is_windows():
+        var ft = _FILETIME()
+        external_call["GetSystemTimePreciseAsFileTime", NoneType](
+            UnsafePointer.address_of(ft)
+        )
+        return ft.as_nanoseconds()
+    else:
+        return _gettime_as_nsec_unix(_CLOCK_REALTIME)
 
 
 @always_inline
@@ -127,6 +136,7 @@ fn _monotonic_nanoseconds() -> Int:
     @parameter
     if os_is_windows():
         var ft = _FILETIME()
+        # TODO: maybe use [QueryPerformanceCounter](https://learn.microsoft.com/en-us/windows/win32/api/profileapi/nf-profileapi-queryperformancecounter)
         external_call["GetSystemTimePreciseAsFileTime", NoneType](
             UnsafePointer.address_of(ft)
         )
@@ -163,16 +173,24 @@ fn _thread_cputime_nanoseconds() -> Int:
 
 
 @always_inline
-fn now() -> Int:
-    """Returns the current monotonic time time in nanoseconds. This function
-    queries the current platform's monotonic clock, making it useful for
-    measuring time differences, but the significance of the returned value
+@parameter
+fn now[monotonic: Bool = True]() -> Int:
+    """Returns the current time in nanoseconds. This function
+    queries the current platform's monotonic (default) or 
+    realtime clock, making it useful for measuring time 
+    differences, but the significance of the returned value 
     varies depending on the underlying implementation.
+
+    Parameters:
+        monotonic: Whether the monotonic clock or the realtime clock is used.
 
     Returns:
         The current time in ns.
     """
-    return _monotonic_nanoseconds()
+    if monotonic:
+        return _monotonic_nanoseconds()
+    else:
+        return _realtime_nanoseconds()
 
 
 # ===----------------------------------------------------------------------===#
