@@ -363,6 +363,7 @@ alias tz_list = List(
     "Pacific/Tongatapu",
     "WET",
 )
+"""List of tz_str."""
 alias leapsecs = List(
     (1, 1, 1972),
     (1, 7, 1972),
@@ -393,3 +394,4 @@ alias leapsecs = List(
     (1, 7, 2015),
     (1, 1, 2017),
 )
+"""List of leap seconds. (day, month, year)."""

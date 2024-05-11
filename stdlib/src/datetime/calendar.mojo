@@ -219,6 +219,8 @@ trait _Calendarized:
 
 @register_passable("trivial")
 struct Calendar(_Calendarized):
+    """`Calendar` interface."""
+
     var max_year: UInt16
     """Maximum value of years."""
     var max_typical_days_in_year: UInt16
@@ -391,6 +393,7 @@ struct Calendar(_Calendarized):
         m_second: UInt8,
     ) -> UInt64:
         """Miliseconds since the begining of the calendar's epoch."""
+        _ = m_second
         return self._implementation.seconds_since_epoch(
             year, month, day, hour, minute, second
         )
@@ -417,6 +420,7 @@ struct Calendar(_Calendarized):
     @staticmethod
     @always_inline
     fn from_year(year: UInt16) -> Self:
+        """Get a Calendar with min_year=year."""
         return Calendar.from_year[Gregorian](year)
 
     @staticmethod
@@ -424,6 +428,7 @@ struct Calendar(_Calendarized):
     fn from_year[
         T: Variant[Gregorian, UTCFast] = Gregorian
     ](year: UInt16) -> Self:
+        """Get a Calendar with min_year=year."""
         if T.isa[Gregorian]():
             return Self(Gregorian().from_year(year))
         elif T.isa[UTCFast]():
@@ -455,11 +460,14 @@ struct Calendar(_Calendarized):
     fn from_hash[
         cal_hash: CalendarHashes = CalendarHashes()
     ](self, value: Int) -> _date:
+        """Build a date from a hashed value."""
         return self._implementation.from_hash[cal_hash](value)
 
 
 @register_passable("trivial")
 struct Gregorian(_Calendarized):
+    """`Gregorian` Calendar."""
+
     var max_year: UInt16
     alias max_typical_days_in_year: UInt16 = 365
     alias max_possible_days_in_year: UInt16 = 366
@@ -502,6 +510,7 @@ struct Gregorian(_Calendarized):
             - dayofweek: Day of the week.
             - dayofmonth: Day of the month.
         """
+        _ = self, year, month
         # TODO
         return UInt8(0), UInt8(0)
 
@@ -545,12 +554,16 @@ struct Gregorian(_Calendarized):
         """
         var total: UInt16 = 1 if self.is_leapyear(year) else 0
         for i in range(month):
-            total += self._monthdays[i].cast[DType.uint16]()
+            var amnt_days = self._monthdays[i].cast[DType.uint16]()
+            total += (
+                amnt_days if (i + 1) != int(month) else day.cast[DType.uint16]()
+            )
         return total
 
     @always_inline
     fn is_leapyear(self, year: UInt16) -> Bool:
         """Whether the year is a leap year."""
+        _ = self
         return Gregorian.is_leapyear(year)
 
     @always_inline
@@ -564,6 +577,7 @@ struct Gregorian(_Calendarized):
         second: UInt8,
     ) -> Bool:
         """Whether the second is a leap second."""
+        _ = self, year, month, day, hour, minute, second
         # TODO: use hardcoded list in _lists ?
         return False
 
@@ -571,6 +585,7 @@ struct Gregorian(_Calendarized):
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
         """Cumulative leap seconds since the calendar's epoch start."""
+        _ = self, month, day
         if year < 1972:
             return 0
         # TODO: use hardcoded list in _lists ?
@@ -637,6 +652,7 @@ struct Gregorian(_Calendarized):
         m_second: UInt8,
     ) -> UInt64:
         """Miliseconds since the begining of the calendar's epoch."""
+        _ = m_second
         alias sec_to_mili = 1000
         alias min_to_mili = 60 * sec_to_mili
         alias hours_to_mili = 60 * min_to_mili
@@ -757,6 +773,7 @@ struct Gregorian(_Calendarized):
         """Hash the given values according to the calendar's component
         lengths bitshifted, BigEndian (i.e. yyyymmdd...).
         """
+        _ = self, n_second
         if cal_h.selected == cal_h.UINT8:
             pass
         elif cal_h.selected == cal_h.UINT16:
@@ -782,6 +799,8 @@ struct Gregorian(_Calendarized):
     fn from_hash[
         cal_h: CalendarHashes = CalendarHashes()
     ](self, value: Int) -> _date:
+        """Build a date from a hashed value."""
+        _ = self
         var num8 = UInt8(0)
         var num16 = UInt16(0)
         var result = (num16, num8, num8, num8, num8, num8, num16, num16)
@@ -808,16 +827,20 @@ struct Gregorian(_Calendarized):
     @always_inline
     @staticmethod
     fn is_leapyear(year: UInt16) -> Bool:
+        """Whether the year is a leap year."""
         return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
     @staticmethod
     @always_inline
     fn from_year(year: UInt16) -> Self:
+        """Get a Ca."""
         return Self(min_year=year)
 
 
 @register_passable("trivial")
 struct UTCFast(_Calendarized):
+    """`UTCFast` Calendar."""
+
     var max_year: UInt16
     alias max_typical_days_in_year: UInt16 = 365
     alias max_possible_days_in_year: UInt16 = 365
@@ -848,28 +871,54 @@ struct UTCFast(_Calendarized):
 
     @always_inline
     fn monthrange(self, year: UInt16, month: UInt8) -> (UInt8, UInt8):
+        """Calculates the day of the week and the day of the month
+        that a month in a given year ends.
+
+        Returns:
+            - dayofweek: Day of the week.
+            - dayofmonth: Day of the month.
+        """
+        _ = self, year, month
         return UInt8(0), UInt8(0)
 
     @always_inline
     fn max_second(
         self, year: UInt16, month: UInt8, day: UInt8, hour: UInt8, minute: UInt8
     ) -> UInt8:
+        """The maximum amount of seconds in a minute (usually 59)."""
+        _ = self, year, month, day, hour, minute
         return 59
 
     @always_inline
     fn max_days_in_month(self, year: UInt16, month: UInt8) -> UInt8:
+        """The maximum amount of days in a given month."""
+        _ = self, year, month
         return 0
 
     @always_inline
     fn dayofweek(self, year: UInt16, month: UInt8, day: UInt8) -> UInt8:
+        """Calculates the day of the week for a given date.
+
+        Returns:
+            - day: Day of the week: [0, 6] (monday - sunday).
+        """
+        _ = self, year, month, day
         return 0
 
     @always_inline
     fn dayofyear(self, year: UInt16, month: UInt8, day: UInt8) -> UInt16:
+        """Calculates the day of the year for a given date.
+
+        Returns:
+            - day: Day of the year.
+        """
+        _ = self, year, month, day
         return 0
 
     @always_inline
     fn is_leapyear(self, year: UInt16) -> Bool:
+        """Is year a leap year."""
+        _ = self, year
         return False
 
     @always_inline
@@ -882,16 +931,22 @@ struct UTCFast(_Calendarized):
         minute: UInt8,
         second: UInt8,
     ) -> Bool:
+        """Whether the second is a leap second."""
+        _ = self, year, month, day, hour, minute, second
         return False
 
     fn leapsecs_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
+        """Cumulative leap seconds since the calendar's epoch start."""
+        _ = self, year, month, day
         return 0
 
     fn leapdays_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
+        """Cumulative leap days since the calendar's epoch start."""
+        _ = self, year, month, day
         return 0
 
     fn seconds_since_epoch(
@@ -904,6 +959,7 @@ struct UTCFast(_Calendarized):
         second: UInt8,
     ) -> UInt64:
         """Seconds since the begining of the calendar's epoch."""
+        _ = self
         alias min_to_sec: UInt64 = 60
         alias hours_to_sec: UInt64 = 60 * min_to_sec
         alias days_to_sec: UInt64 = 24 * hours_to_sec
@@ -929,6 +985,7 @@ struct UTCFast(_Calendarized):
         m_second: UInt8,
     ) -> UInt64:
         """Miliseconds since the begining of the calendar's epoch."""
+        _ = self
         alias sec_to_mili = 1000
         alias min_to_mili = 60 * sec_to_mili
         alias hours_to_mili = 60 * min_to_mili
@@ -963,6 +1020,7 @@ struct UTCFast(_Calendarized):
         Notes:
             Can only represent up to ~ 580 years since epoch start.
         """
+        _ = self
         alias sec_to_nano = 1000_000_000
         alias min_to_nano = 60 * sec_to_nano
         alias hours_to_nano = 60 * min_to_nano
@@ -999,6 +1057,7 @@ struct UTCFast(_Calendarized):
         """Hash the given values according to the calendar's component
         lengths bitshifted, BigEndian (i.e. yyyymmdd...).
         """
+        _ = self, u_second, n_second
         if cal_h.selected == cal_h.UINT8:
             return int(
                 (UInt8(day) << cal_h.shift_8_d)
@@ -1034,6 +1093,8 @@ struct UTCFast(_Calendarized):
     fn from_hash[
         cal_h: CalendarHashes = CalendarHashes()
     ](self, value: Int) -> _date:
+        """Build a date from a hashed value."""
+        _ = self
         var num8 = UInt8(0)
         var num16 = UInt16(0)
         var result = (num16, num8, num8, num8, num8, num8, num16, num16)
@@ -1082,9 +1143,12 @@ struct UTCFast(_Calendarized):
     @always_inline
     @staticmethod
     fn is_leapyear(year: UInt16) -> Bool:
+        """Whether year is a leap year."""
+        _ = year
         return False
 
     @staticmethod
     @always_inline
     fn from_year(year: UInt16) -> Self:
+        """Get a Calendar with min_year=year."""
         return Self(min_year=year)

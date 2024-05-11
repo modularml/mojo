@@ -68,17 +68,28 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     """
 
     var year: UInt16
+    """Year."""
     var month: UInt8
+    """Month."""
     var day: UInt8
+    """Day."""
     var hour: UInt8
+    """Hour."""
     var minute: UInt8
+    """Minute."""
     var second: UInt8
+    """Second."""
     var m_second: UInt16
+    """M_second."""
     var u_second: UInt16
+    """U_second."""
     var n_second: UInt16
+    """N_second."""
     # TODO: tz and calendar should be references
     var tz: TimeZone[iana]
+    """Tz."""
     var calendar: Calendar
+    """Calendar."""
 
     fn __init__(
         inout self,
@@ -210,6 +221,22 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         tz: Optional[TimeZone[iana]] = None,
         calendar: Optional[Calendar] = None,
     ) -> Self:
+        """Replace with give value/s.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: Milisecond.
+            u_second: Microsecond.
+            n_second: Nanosecond.
+            tz: Tz.
+            calendar: Calendar.
+        """
+
         var new_self = self
         if year:
             new_self.year = year.unsafe_take()
@@ -365,6 +392,17 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """Recursively evaluated function to build a valid `DateTime`
         according to its calendar.
 
+        Args:
+            years: Years.
+            months: Months.
+            days: Days.
+            hours: Hours.
+            minutes: Minutes.
+            seconds: Seconds.
+            m_seconds: Miliseconds.
+            u_seconds: Microseconds.
+            n_seconds: Nanoseconds.
+
         Notes:
             On overflow, the `DateTime` starts from the beginning of the
             calendar's epoch and keeps evaluating until valid
@@ -417,6 +455,17 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     ) -> Self:
         """Recursively evaluated function to build a valid `DateTime`
         according to its calendar.
+
+        Args:
+            years: Years.
+            months: Months.
+            days: Days.
+            hours: Hours.
+            minutes: Minutes.
+            seconds: Seconds.
+            m_seconds: Miliseconds.
+            u_seconds: Microseconds.
+            n_seconds: Nanoseconds.
 
         Notes:
             On overflow, the `DateTime` goes to the end of the
@@ -492,6 +541,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn add(owned self, other: Self) -> Self:
         """Adds another `DateTime`.
 
+        Args:
+            other: Self.
+
         Returns:
             A `DateTime` with the `TimeZone` and `Calendar` of `self`.
         """
@@ -501,6 +553,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
     fn subtract(owned self, other: Self) -> Self:
         """Subtracts another `DateTime`.
+
+        Args:
+            other: Self.
 
         Returns:
             A `DateTime` with the `TimeZone` and `Calendar` of `self`.
@@ -706,6 +761,11 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         Parameters:
             add_leap: Whether to add the leap seconds and leap days
                 since the start of the calendar's epoch.
+
+        Args:
+            seconds: Seconds.
+            tz: Tz.
+            calendar: Calendar.
         """
         var minutes = seconds // int(calendar.max_typical_second + 1)
         var dt = DateTime[iana]._from_minutes(minutes, tz, calendar)
@@ -787,6 +847,10 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         Parameters:
             add_leap: Whether to add the leap seconds and leap days
                 since the start of the calendar's epoch.
+
+        Args:
+            seconds: Seconds.
+            tz: Tz.
         """
         return DateTime[iana].from_seconds[add_leap](
             seconds, tz=tz, calendar=UTCCalendar
@@ -796,7 +860,12 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn now(
         tz: TimeZone[iana] = TimeZone[iana](), calendar: Calendar = _calendar
     ) -> Self:
-        """Construct a datetime from `time.now()`."""
+        """Construct a datetime from `time.now()`.
+
+        Args:
+            tz: `TimeZone` to replace UTC.
+            calendar: Calendar to replace the UTCCalendar with.
+        """
         var ns = time.now()
         var us: UInt16 = ns // 1_000
         var ms: UInt16 = ns // 1_000_000
@@ -819,6 +888,12 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn strftime(self, fmt: String) -> String:
         """Formats time into a `String`.
 
+        Args:
+            fmt: Format string.
+
+        Returns:
+            string: The formatted string.
+
         - TODO
             - localization.
         """
@@ -838,8 +913,12 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     @parameter
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYY_MM_DD_T_MM_HH_SSTimeZone[iana]()D`.
-        e.g. `1970-01-01T00:00:00+00:00` ."""
+        compliant `String` in the form `IsoFormat.YYYY_MM_DD_T_MM_HH_TZD`.
+        e.g. `1970-01-01T00:00:00+00:00` .
+
+        Parameters:
+            iso: The IsoFormat chosen.
+        """
         var date = (int(self.year), int(self.month), int(self.day))
         var hour = (int(self.hour), int(self.minute), int(self.second))
         var time = dt_str.to_iso(
@@ -853,7 +932,11 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     ](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
         compliant `String` in the form `IsoFormat.YYYYMMDDMMHHSS`.
-        e.g. `19700101000000` . The `DateTime` is first converted to UTC."""
+        e.g. `19700101000000` . The `DateTime` is first converted to UTC.
+
+        Parameters:
+            iso: The IsoFormat chosen.
+        """
         var utc_s = self.to_utc()
         var date = (int(utc_s.year), int(utc_s.month), int(utc_s.day))
         var hour = (int(utc_s.hour), int(utc_s.minute), int(utc_s.second))
@@ -867,8 +950,17 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         format_str: StringLiteral,
         tz: TimeZone[iana] = TimeZone[iana](),
         calendar: Calendar = _calendar,
-    ](s: String,) -> Optional[Self]:
-        """Parse a `DateTime` from a  `String`."""
+    ](s: String) -> Optional[Self]:
+        """Parse a `DateTime` from a  `String`.
+
+        Parameters:
+            format_str: The format string.
+            tz: The `TimeZone` to cast the result to.
+            calendar: The Calendar to cast the result to.
+
+        Args:
+            s: The string.
+        """
         var parsed = dt_str.strptime[format_str](s)
         if not parsed:
             return None
@@ -929,7 +1021,13 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `DateTime` from a hash made by it.
-        Nanoseconds are set to the calendar's minimum."""
+        Nanoseconds are set to the calendar's minimum.
+
+        Args:
+            value: The value to parse.
+            tz: The `TimeZone` to designate to the result.
+            calendar: The Calendar to designate to the result.
+        """
         var d = calendar.from_hash(value)
         return DateTime[iana](
             d[0],

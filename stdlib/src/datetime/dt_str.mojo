@@ -79,6 +79,20 @@ fn _get_strings(
 fn to_iso_compact(
     year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int
 ) -> String:
+    """Build an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
+    `String`.
+
+    Args:
+        year: Year.
+        month: Month.
+        day: Day.
+        hour: Hour.
+        minute: Minute.
+        second: Second.
+
+    Returns:
+        The string.
+    """
     var s = _get_strings(year, month, day, hour, minute, second)
     return s[0] + s[1] + s[2] + s[3] + s[4] + s[5]
 
@@ -86,6 +100,20 @@ fn to_iso_compact(
 fn to_iso(
     year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int
 ) -> String:
+    """Build an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
+    `String`.
+
+    Args:
+        year: Year.
+        month: Month.
+        day: Day.
+        hour: Hour.
+        minute: Minute.
+        second: Second.
+
+    Returns:
+        The string.
+    """
     var s = _get_strings(year, month, day, hour, minute, second)
     return s[0] + "-" + s[1] + "-" + s[2] + "T" + s[3] + ":" + s[4] + ":" + s[5]
 
@@ -102,7 +130,18 @@ fn from_iso[
     UInt8,
     TimeZone[iana],
 ):
-    """Parses a string expecting given format."""
+    """Parses a string expecting given format.
+
+    Parameters:
+        iso: The chosen IsoFormat.
+        iana: The IANA timezones to support.
+
+    Args:
+        s: The string.
+
+    Returns:
+        A tuple with the result.
+    """
     var result = UInt16(atol(s[:4])), UInt8(0), UInt8(0), UInt8(0), UInt8(
         0
     ), UInt8(0), TimeZone[iana]()
@@ -155,7 +194,17 @@ fn strptime[
         UInt16,
     )
 ]:
-    """Parses time from a `String`."""
+    """Parses time from a `String`.
+
+    Parameters:
+        format_str: The chosen format.
+
+    Args:
+        s: The string.
+
+    Returns:
+        An optional tuple with the result.
+    """
     # TODO: native
     try:
         from python import Python
@@ -189,6 +238,20 @@ fn strftime[
 ) -> String:
     """Formats time into a `String`.
 
+    Parameters:
+        format_str: The chosen format.
+
+    Args:
+        year: Year.
+        month: Month.
+        day: Day.
+        hour: Hour.
+        minute: Minute.
+        second: Second.
+
+    Returns:
+        The string.
+
     - TODO
         - localization.
     """
@@ -214,6 +277,18 @@ fn strftime(
     second: UInt8,
 ) -> String:
     """Formats time into a `String`.
+
+    Args:
+        format_str: Format_str.
+        year: Year.
+        month: Month.
+        day: Day.
+        hour: Hour.
+        minute: Minute.
+        second: Second.
+
+    Returns:
+        The string.
 
     - TODO
         - localization.

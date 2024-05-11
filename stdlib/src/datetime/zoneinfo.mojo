@@ -28,11 +28,24 @@ struct Offset:
         https://es.wikipedia.org/wiki/Base_Troll ))."""
 
     var buf: UInt8
+    """Buffer."""
 
     fn __init__(inout self, buf: UInt8):
+        """Construct an `Offset` from a buffer.
+
+        Args:
+            buf: The buffer.
+        """
         self.buf = buf
 
     fn __init__(inout self, hour: Int, minute: Int, sign: Int):
+        """Construct an `Offset` from values.
+
+        Args:
+            hour: Hour.
+            minute: Minute.
+            sign: Sign.
+        """
         self.buf = (sign << 7) | (hour << 3) | (minute << 1) | 0
 
     fn __init__(
@@ -40,7 +53,7 @@ struct Offset:
         iso_tzd_std: String = "+00:00",
         iso_tzd_dst: String = "+00:00",
     ):
-        """Construct a TzDT buffer (9 bits total) for DST start/end.
+        """Construct an `Offset` (8 bits total) for DST start/end.
 
         Args:
             iso_tzd_std: String with the full ISO8601 TZD (i.e. +00:00).
@@ -95,9 +108,17 @@ struct Offset:
 
 @register_passable("trivial")
 struct TzDT:
+    """`TzDT` stores the rules for DST start/end."""
+
     var buf: UInt16
+    """Buffer."""
 
     fn __init__(inout self, buf: UInt16):
+        """Construct a `TzDT` from a buffer.
+
+        Args:
+            buf: The buffer.
+        """
         self.buf = buf
 
     fn __init__(
@@ -108,7 +129,7 @@ struct TzDT:
         week: UInt16 = 0,
         hour: UInt16 = 0,
     ):
-        """Construct a TzDT buffer (12 bits total) for DST start/end.
+        """Construct a `TzDT` buffer (12 bits total) for DST start/end.
 
         Args:
             month: Month: [1, 12].
@@ -159,9 +180,20 @@ struct TzDT:
 
 @register_passable("trivial")
 struct ZoneDST:
+    """`ZoneDST` stores both start and end dates, and
+    the offset for a timezone with DST."""
+
     var buf: UInt32
+    """Buffer."""
 
     fn __init__(inout self, dst_start: TzDT, dst_end: TzDT, offset: Offset):
+        """Construct a `ZoneDST` from values.
+
+        Args:
+            dst_start: TzDT.
+            dst_end: TzDT.
+            offset: Offset.
+        """
         self.buf = (
             (dst_start.buf.cast[DType.uint32]() << 20)
             | (dst_end.buf.cast[DType.uint32]() << 12)
@@ -169,6 +201,11 @@ struct ZoneDST:
         )
 
     fn __init__(inout self, buf: UInt32):
+        """Construct a `ZoneDST` from a buffer.
+
+        Args:
+            buf: The buffer.
+        """
         self.buf = buf
 
     fn from_hash(self) -> (TzDT, TzDT, Offset):
@@ -191,40 +228,61 @@ struct ZoneInfoFile:
     """Zoneinfo that lives in a file. Smallest memory footprint
     but only supports 256 timezones (there are ~ 418)."""
 
-    var index: UInt8
-    var BIT_WIDTH: UInt8
-    var BIT_MASK: UInt32
-    var file: Path
+    var _index: UInt8
+    var _BIT_WIDTH: UInt8
+    var _BIT_MASK: UInt32
+    var _file: Path
 
     fn __init__(inout self, BIT_WIDTH: UInt8, BIT_MASK: UInt32):
+        """Construct a `ZoneInfoFile`.
+
+        Args:
+            BIT_WIDTH: Bit width of the values.
+            BIT_MASK: Bit mask for the values.
+        """
         try:
-            self.file = Path(cwd()) / "zoneinfo_dump"
+            self._file = Path(cwd()) / "zoneinfo_dump"
         except:
-            self.file = "./zoneinfo_dump"
-        self.index = 0
-        self.BIT_WIDTH = BIT_WIDTH
-        self.BIT_MASK = BIT_MASK
+            self._file = "./zoneinfo_dump"
+        self._index = 0
+        self._BIT_WIDTH = BIT_WIDTH
+        self._BIT_MASK = BIT_MASK
 
     fn add(inout self, key: StringLiteral, buf: UInt32) raises -> UInt8:
+        """Add a value to the file.
+
+        Args:
+            key: The tz_str.
+            buf: The buffer with the hash.
+
+        Returns:
+            The index in the file.
+        """
         _ = key
-        var b_width64 = self.BIT_WIDTH.cast[DType.uint64]()
-        var b_width32 = self.BIT_WIDTH.cast[DType.uint32]()
-        with open(self.file, "rb") as f:
-            _ = f.seek(b_width64 * (self.index).cast[DType.uint64]())
+        var b_width64 = self._BIT_WIDTH.cast[DType.uint64]()
+        var b_width32 = self._BIT_WIDTH.cast[DType.uint32]()
+        with open(self._file, "rb") as f:
+            _ = f.seek(b_width64 * (self._index).cast[DType.uint64]())
             f.write(buf << (32 - b_width32))
-        if self.index > UInt8.MAX_FINITE:
-            self.index = 0
+        if self._index > UInt8.MAX_FINITE:
+            self._index = 0
         else:
-            self.index += 1
-        return self.index
+            self._index += 1
+        return self._index
 
     fn get(self, index: UInt8) raises -> Optional[ZoneDST]:
-        if self.index > UInt8.MAX_FINITE:
+        """Get a value from the file.
+
+        Args:
+            index: The index in the file.
+        """
+        if self._index > UInt8.MAX_FINITE:
             return None
         var value: UInt32
-        with open(self.file, "rb") as f:
+        with open(self._file, "rb") as f:
             _ = f.seek(
-                self.BIT_WIDTH.cast[DType.uint64]() * index.cast[DType.uint64]()
+                self._BIT_WIDTH.cast[DType.uint64]()
+                * index.cast[DType.uint64]()
             )
             var bufs = f.read_bytes(4)
             value = (
@@ -233,13 +291,14 @@ struct ZoneInfoFile:
                 | (bufs[2].cast[DType.uint32]() << 8)
                 | bufs[3].cast[DType.uint32]()
             )
-        return ZoneDST(value & self.BIT_MASK)
+        return ZoneDST(value & self._BIT_MASK)
 
     fn __del__(owned self):
+        """Delete the file."""
         try:
             import os
 
-            os.remove(self.file)
+            os.remove(self._file)
         except:
             pass
 
@@ -249,6 +308,7 @@ alias ZoneInfoFile32 = ZoneInfoFile(32, 0xFFFFFFFF)
 alias ZoneInfoFile8 = ZoneInfoFile(8, 0xFF)
 """ZoneInfoFile to store Offset of tz with no DST"""
 
+
 @value
 struct ZoneInfoMem32:
     """`ZoneInfo` that lives in memory. For zones that have DST."""
@@ -256,12 +316,27 @@ struct ZoneInfoMem32:
     var _zones: Dict[StringLiteral, UInt32]
 
     fn __init__(inout self):
+        """Construct a `ZoneInfoMem32`."""
+
         self._zones = Dict[StringLiteral, UInt32]()
 
     fn add(inout self, key: StringLiteral, value: ZoneDST):
+        """Add a value to `ZoneInfoMem32`.
+
+        Args:
+            key: The tz_str.
+            value: Offset.
+        """
+
         self._zones[key] = value.buf
 
     fn get(self, key: StringLiteral) -> Optional[ZoneDST]:
+        """Get value from `ZoneInfoMem32`.
+
+        Args:
+            key: The tz_str.
+        """
+
         var value = self._zones.find(key)
         if not value:
             return None
@@ -275,19 +350,31 @@ struct ZoneInfoMem8:
     var _zones: Dict[StringLiteral, UInt8]
 
     fn __init__(inout self):
+        """Construct a `ZoneInfoMem8`."""
         self._zones = Dict[StringLiteral, UInt8]()
 
     fn add(inout self, key: StringLiteral, value: Offset):
+        """Add a value to `ZoneInfoMem8`.
+
+        Args:
+            key: The tz_str.
+            value: Offset.
+        """
         self._zones[key] = value.buf
 
     fn get(self, key: StringLiteral) -> Optional[Offset]:
+        """Get value from `ZoneInfoMem8`.
+
+        Args:
+            key: The tz_str.
+        """
         var value = self._zones.find(key)
         if not value:
             return None
         return Offset(value.unsafe_take())
 
 
-fn parse_iana_leapsecs(
+fn _parse_iana_leapsecs(
     text: PythonObject,
 ) raises -> List[(UInt8, UInt8, UInt16)]:
     var leaps = List[(UInt8, UInt8, UInt16)]()
@@ -314,6 +401,11 @@ fn parse_iana_leapsecs(
 
 
 fn get_leapsecs() -> Optional[List[(UInt8, UInt8, UInt16)]]:
+    """Get the leap seconds added to UTC.
+
+    Returns:
+        A list of tuples (day, month, year) of leapseconds.
+    """
     try:
         # TODO: maybe some policy that only if x amount
         # of years have passed since latest hardcoded value
@@ -323,7 +415,7 @@ fn get_leapsecs() -> Optional[List[(UInt8, UInt8, UInt16)]]:
         var secs = requests.get(
             "https://raw.githubusercontent.com/eggert/tz/main/leap-seconds.list"
         )
-        var leapsecs = parse_iana_leapsecs(secs.text)
+        var leapsecs = _parse_iana_leapsecs(secs.text)
         return leapsecs
     except:
         pass
@@ -348,6 +440,9 @@ fn get_zoneinfo() -> Optional[ZoneInfo]:
     """Get all zoneinfo available. First tries to get it
     from the OS, then from the internet, then falls back
     on hardcoded values.
+
+    Returns:
+        Optional ZoneInfo.
 
     - TODO: this should get zoneinfo from the OS it's compiled in
     - TODO: should have a fallback to hardcoded
@@ -400,6 +495,7 @@ fn get_zoneinfo() -> Optional[ZoneInfo]:
             var dst_start: PythonObject = ""
             var dst_end: PythonObject = ""
             if not data["hasDayLightSaving"]:
+                _ = h, m, sign
                 # TODO: somehow force cast python object to StringLiteral
                 # no_dst_zones.add(
                 #     str(item[]), Offset(abs(h), abs(m), sign)
@@ -422,6 +518,21 @@ fn get_zoneinfo() -> Optional[ZoneInfo]:
             var h_end = UInt16(dt_end.hour)
             var dow_end = UInt16(dt_end.weekday())
             var eom_end = UInt16(0 if dt_end <= 15 else 1)
+
+            _ = (
+                dt_start,
+                month_start,
+                dow_start,
+                eom_start,
+                week_start,
+                h_start,
+                dt_end,
+                month_end,
+                week_end,
+                h_end,
+                dow_end,
+                eom_end,
+            )
 
             # TODO: somehow force cast python object to StringLiteral
             # dst_zones.add(
@@ -454,6 +565,9 @@ fn offset_no_dst_tz(
 ) -> Optional[(UInt8, UInt8, UInt8)]:
     """Return the UTC offset for the `TimeZone` if it has no DST.
 
+    Args:
+        no_dst: Optional zone with no dst.
+
     Returns:
         - offset_h: Offset for the hour: [0, 15].
         - offset_m: Offset for the minute: {0, 30, 45}.
@@ -483,6 +597,15 @@ fn offset_at(
 ) -> Optional[(UInt8, UInt8, UInt8)]:
     """Return the UTC offset for the `TimeZone` at the given date
     if it has DST.
+
+    Args:
+        with_dst: Optional zone with DST.
+        year: Year.
+        month: Month.
+        day: Day.
+        hour: Hour.
+        minute: Minute.
+        second: Second.
 
     Returns:
         - offset_h: Offset for the hour: [0, 15].

@@ -53,11 +53,16 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     """
 
     var year: UInt16
+    """Year."""
     var month: UInt8
+    """Month."""
     var day: UInt8
+    """Day."""
     # TODO: tz and calendar should be references
     var tz: TimeZone[iana]
+    """Tz."""
     var calendar: Calendar
+    """Calendar."""
 
     fn __init__(
         inout self,
@@ -128,6 +133,15 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         owned tz: Optional[TimeZone[iana]] = None,
         owned calendar: Optional[Calendar] = None,
     ) -> Self:
+        """Replace with give value/s.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            tz: Tz.
+            calendar: Calendar.
+        """
         var new_self = self
         if year:
             new_self.year = year.unsafe_take()
@@ -583,7 +597,11 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
         compliant `String` in the form `IsoFormat.YYYY_MM_DD`.
-        e.g. `1970-01-01` . The `Date` is first converted to UTC."""
+        e.g. `1970-01-01` . The `Date` is first converted to UTC.
+
+        Parameters:
+            iso: The IsoFormat chosen.
+        """
         var date = (int(self.year), int(self.month), int(self.day))
         var time = dt_str.to_iso(date[0], date[1], date[2], 0, 0, 0)
         return time[:10]
@@ -593,7 +611,11 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     ](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
         compliant `String` in the form `IsoFormat.YYYYMMDD`.
-        e.g. `19700101` . The `Date` is first converted to UTC."""
+        e.g. `19700101` . The `Date` is first converted to UTC.
+
+        Parameters:
+            iso: The IsoFormat chosen.
+        """
         var utc_s = self.to_utc()
         var date = (int(utc_s.year), int(utc_s.month), int(utc_s.day))
         var time = dt_str.to_iso_compact(date[0], date[1], date[2], 0, 0, 0)
@@ -606,7 +628,16 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         tz: TimeZone[iana] = TimeZone[iana](),
         calendar: Calendar = _calendar,
     ](s: String) -> Optional[Self]:
-        """Parse a `Date` from a  `String`."""
+        """Parse a `Date` from a  `String`.
+
+        Parameters:
+            format_str: The format string.
+            tz: The `TimeZone` to cast the result to.
+            calendar: The Calendar to cast the result to.
+
+        Args:
+            s: The string.
+        """
         var parsed = dt_str.strptime[format_str](s)
         if not parsed:
             return None
@@ -652,6 +683,12 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         tz: TimeZone[iana] = TimeZone[iana](),
         calendar: Calendar = _calendar,
     ) -> Self:
-        """Construct a `Date` from a hash made by it."""
+        """Construct a `Date` from a hash made by it.
+
+        Args:
+            value: The value to parse.
+            tz: The `TimeZone` to designate to the result.
+            calendar: The Calendar to designate to the result.
+        """
         var d = calendar.from_hash[_cal_hash](int(value))
         return Date[iana](d[0], d[1], d[2], tz=tz, calendar=calendar)

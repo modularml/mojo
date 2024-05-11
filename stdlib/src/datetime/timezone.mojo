@@ -76,7 +76,16 @@ struct TimeZone[
         sign: UInt8 = 1,
         has_dst: Bool = True,
     ):
-        """Construct a `TimeZone`."""
+        """Construct a `TimeZone`.
+
+        Args:
+            tz_str: The [`TZ identifier`](
+                https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
+            offset_h: Offset for the hour.
+            offset_m: Offset for the minute.
+            sign: Sign: {1, -1}.
+            has_dst: Whether the `TimeZone` has Daylight Saving Time.
+        """
         debug_assert(
             offset_h < 100 and offset_m < 100 and (sign == 1 or sign == -1),
             msg=(
@@ -115,6 +124,14 @@ struct TimeZone[
         second: UInt8,
     ) -> (UInt8, UInt8, UInt8):
         """Return the UTC offset for the `TimeZone` at the given date.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
 
         Returns:
             - offset_h: Offset for the hour: [0, 15].
@@ -178,5 +195,16 @@ struct TimeZone[
         offset_m: UInt8,
         sign: UInt8,
     ) -> Self:
+        """Build a UTC TZ string from the offset.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            offset_h: Offset for the hour.
+            offset_m: Offset for the minute.
+            sign: Sign: {1, -1}.
+        """
+        _ = year, month, day, offset_h, offset_m, sign
         # TODO: it should create an Etc/UTC-X TimeZone
         return TimeZone[iana, pyzoneinfo, native]()
