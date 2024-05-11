@@ -677,6 +677,11 @@ fn test_ascii_aliases() raises:
     for i in range(len(text)):
         assert_true(text[i] in String.PRINTABLE)
 
+    # non-ASCII letter checks
+    var russian_text = String("моджо")  # 'mojo'
+    for i in range(len(russian_text)):
+        assert_false(russian_text[i] in String.PRINTABLE)
+
 
 fn test_rstrip() raises:
     # with default rstrip chars
@@ -731,8 +736,6 @@ fn test_lstrip() raises:
 
 
 fn test_strip() raises:
-    print("start strip")
-
     # with default strip chars
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
