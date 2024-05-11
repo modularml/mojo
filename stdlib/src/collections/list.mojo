@@ -215,7 +215,12 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             destroy_pointee(self.data + i)
-        if self.data and self._sbo_is_in_use():
+        self._free_data()
+
+    @always_inline
+    fn _free_data(inout self):
+        """Free the memory of the list."""
+        if self.data and not self._sbo_is_in_use():
             self.data.free()
 
     fn __len__(self) -> Int:
@@ -251,8 +256,8 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
             for i in range(self.size):
                 move_pointee(src=self.data + i, dst=new_data + i)
 
-        if self.data and not self._sbo_is_in_use():
-            self.data.free()
+        self._free_data()
+
         self.data = new_data
         if self._sbo_is_in_use():
             self.capacity = Self._small_buffer_size
@@ -316,7 +321,7 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         if x == 0:
             self.clear()
             return
-        var orig = List(self)
+        var orig = List[_small_buffer_size = Self._small_buffer_size](self)
         self.reserve(len(self) * x)
         for i in range(x - 1):
             self.extend(orig)
@@ -371,7 +376,9 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         self.extend(other^)
 
     @always_inline
-    fn extend(inout self, owned other: List[T]):
+    fn extend(
+        inout self, owned other: List[T, _small_buffer_size=_small_buffer_size]
+    ):
         """Extends this list by consuming the elements of `other`.
 
         Args:

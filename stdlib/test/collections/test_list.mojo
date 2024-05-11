@@ -741,6 +741,58 @@ def test_list_mult():
     assert_equal(len(List[Int](1, 2, 3) * 0), 0)
 
 
+def test_bytes_with_small_size_optimization():
+    var small_list = List[Int8, _small_buffer_size=3]()
+    assert_equal(len(small_list), 0)
+    small_list.append(0)
+    small_list.append(10)
+    small_list.append(20)
+
+    assert_equal(len(small_list), 3)
+
+    assert_equal(small_list[0], 0)
+    assert_equal(small_list[1], 10)
+    assert_equal(small_list[2], 20)
+
+    # We should still be on the stack
+    assert_true(small_list._sbo_is_in_use())
+
+    # We check that the pointer makes sense
+    var pointer = small_list.unsafe_ptr()
+    assert_equal(pointer[0], 0)
+    assert_equal(pointer[1], 10)
+    assert_equal(pointer[2], 20)
+
+    small_list.append(30)
+    assert_equal(small_list[0], 0)
+    assert_equal(small_list[1], 10)
+    assert_equal(small_list[2], 20)
+    assert_equal(small_list[3], 30)
+    assert_false(small_list._sbo_is_in_use())
+    assert_equal(len(small_list), 4)
+
+    small_list[1] = 100
+    assert_equal(small_list[1], 100)
+
+    small_list[3] = 13
+    assert_equal(small_list[3], 13)
+
+    small_list.append(42)
+    assert_equal(small_list[4], 42)
+    assert_equal(len(small_list), 5)
+
+    # We check that the pointer makes sense
+    pointer = small_list.unsafe_ptr()
+    assert_equal(pointer[0], 0)
+    assert_equal(pointer[1], 100)
+    assert_equal(pointer[2], 20)
+    assert_equal(pointer[3], 13)
+    assert_equal(pointer[4], 42)
+
+    # Otherwise, everything is destroyed before we had the chance to check the pointer
+    _ = small_list
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -768,3 +820,4 @@ def main():
     test_list_count()
     test_list_add()
     test_list_mult()
+    test_bytes_with_small_size_optimization()
