@@ -250,7 +250,6 @@ struct Int(
     Formattable,
     Intable,
     KeyElement,
-    OrderComparable,
     Roundable,
     Stringable,
     Truncable,

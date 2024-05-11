@@ -157,23 +157,11 @@ trait StringableCollectionElement(CollectionElement, Stringable):
     pass
 
 
-trait ComparableCollectionElement(CollectionElement, EqualityComparable):
+trait ComparableCollectionElement(CollectionElement, Comparable):
     """
     This trait is a temporary solution to enable comparison of
     collection elements as utilized in the `index` and `count` methods of
     a list.
-    This approach will be revised with the introduction of conditional trait
-    conformances.
-    """
-
-    pass
-
-
-trait OrderComparableCollectionElement(
-    ComparableCollectionElement, OrderComparable
-):
-    """
-    This trait is a temporary solution to enable sorting of collection elements.
     This approach will be revised with the introduction of conditional trait
     conformances.
     """

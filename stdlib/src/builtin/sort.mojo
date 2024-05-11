@@ -365,7 +365,7 @@ fn sort[D: DType](inout list: List[Scalar[D]]):
 
 
 @always_inline
-fn insertion_sort[D: OrderComparableCollectionElement](inout list: List[D]):
+fn insertion_sort[D: ComparableCollectionElement](inout list: List[D]):
     """Sort list of the order comparable elements in place with insertion sort algorithm.
 
     Parameters:
@@ -384,7 +384,7 @@ fn insertion_sort[D: OrderComparableCollectionElement](inout list: List[D]):
 
 
 fn _quick_sort[
-    D: OrderComparableCollectionElement
+    D: ComparableCollectionElement
 ](inout list: List[D], low: Int, high: Int):
     """Sort section of the list, between low and high, with quick sort algorithm inplace.
 
@@ -416,7 +416,7 @@ fn _quick_sort[
 
 
 @always_inline
-fn quick_sort[D: OrderComparableCollectionElement](inout list: List[D]):
+fn quick_sort[D: ComparableCollectionElement](inout list: List[D]):
     """Sort list of the order comparable elements in place with quick sort algorithm.
 
     Parameters:
@@ -428,7 +428,7 @@ fn quick_sort[D: OrderComparableCollectionElement](inout list: List[D]):
     _quick_sort(list, 0, len(list) - 1)
 
 
-fn sort[D: OrderComparableCollectionElement](inout list: List[D]):
+fn sort[D: ComparableCollectionElement](inout list: List[D]):
     """Sort list of the order comparable elements in place. This function picks the best algorithm based on the list length.
 
     Parameters:

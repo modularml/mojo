@@ -36,8 +36,7 @@ struct UnsafePointer[
     CollectionElement,
     Stringable,
     Intable,
-    EqualityComparable,
-    OrderComparable,
+    Comparable,
 ):
     """This is a pointer type that can point to any generic value that is movable.
 

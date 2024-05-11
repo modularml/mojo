@@ -180,9 +180,7 @@ fn _bool_tuple_reduce[
 
 @value
 @register_passable("trivial")
-struct StaticIntTuple[size: Int](
-    Sized, Stringable, EqualityComparable, OrderComparable
-):
+struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
     """A base struct that implements size agnostic index functions.
 
     Parameters:
