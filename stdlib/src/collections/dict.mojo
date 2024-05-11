@@ -56,6 +56,7 @@ trait RepresentableKeyElement(KeyElement, Representable):
 struct _DictEntryIter[
     K: KeyElement,
     V: CollectionElement,
+    hasher: Hasher,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
@@ -65,6 +66,7 @@ struct _DictEntryIter[
     Parameters:
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
+        hasher: The hasher used with hash function.
         dict_mutability: Whether the reference to the dictionary is mutable.
         dict_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
@@ -74,12 +76,12 @@ struct _DictEntryIter[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
     alias ref_type = Reference[
-        DictEntry[K, V], __mlir_attr.`0: i1`, Self.imm_dict_lifetime
+        DictEntry[K, V, hasher], __mlir_attr.`0: i1`, Self.imm_dict_lifetime
     ]
 
     var index: Int
     var seen: Int
-    var src: Reference[Dict[K, V], dict_mutability, dict_lifetime]
+    var src: Reference[Dict[K, V, hasher], dict_mutability, dict_lifetime]
 
     fn __iter__(self) -> Self:
         return self
@@ -122,6 +124,7 @@ struct _DictEntryIter[
 struct _DictKeyIter[
     K: KeyElement,
     V: CollectionElement,
+    hasher: Hasher,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
@@ -131,6 +134,7 @@ struct _DictKeyIter[
     Parameters:
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
+        hasher: The hasher to use with hash function.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
@@ -142,7 +146,7 @@ struct _DictKeyIter[
     alias ref_type = Reference[K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime]
 
     alias dict_entry_iter = _DictEntryIter[
-        K, V, dict_mutability, dict_lifetime, forward
+        K, V, hasher, dict_mutability, dict_lifetime, forward
     ]
 
     var iter: Self.dict_entry_iter
@@ -161,6 +165,7 @@ struct _DictKeyIter[
 struct _DictValueIter[
     K: KeyElement,
     V: CollectionElement,
+    hasher: Hasher,
     dict_mutability: __mlir_type.`i1`,
     dict_lifetime: AnyLifetime[dict_mutability].type,
 ]:
@@ -170,13 +175,14 @@ struct _DictValueIter[
     Parameters:
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
+        hasher: Hasher to use with hash function.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
     """
 
     alias ref_type = Reference[V, dict_mutability, dict_lifetime]
 
-    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
+    var iter: _DictEntryIter[K, V, hasher, dict_mutability, dict_lifetime]
 
     fn __iter__(self) -> Self:
         return self
@@ -192,15 +198,18 @@ struct _DictValueIter[
 
 
 @value
-struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
+struct DictEntry[K: KeyElement, V: CollectionElement, hasher: Hasher](
+    CollectionElement
+):
     """Store a key-value pair entry inside a dictionary.
 
     Parameters:
         K: The key type of the dict. Must be Hashable+EqualityComparable.
         V: The value type of the dict.
+        hasher:The type of the hasher to use with hash function.
     """
 
-    var hash: Int
+    var hash: UInt64
     """`key.__hash__()`, stored so hashing isn't re-computed during dict lookup."""
     var key: K
     """The unique key for the entry."""
@@ -214,7 +223,7 @@ struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
             key: The key of the entry.
             value: The value of the entry.
         """
-        self.hash = hash(key)
+        self.hash = hash[hasher_type=hasher](key)
         self.key = key^
         self.value = value^
 
@@ -315,9 +324,9 @@ struct _DictIndex:
         self.data.free()
 
 
-struct Dict[K: KeyElement, V: CollectionElement](
-    Sized, CollectionElement, Boolable
-):
+struct Dict[
+    K: KeyElement, V: CollectionElement, hasher: Hasher = DefaultHasher
+](Sized, CollectionElement, Boolable):
     """A container that stores key-value pairs.
 
     The key type and value type must be specified statically, unlike a Python
@@ -346,6 +355,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         K: The type of the dictionary key. Must be Hashable and EqualityComparable
            so we can find the key in the map.
         V: The value type of the dictionary. Currently must be CollectionElement.
+        hasher: The hasher used in hash function.
     """
 
     # Implementation:
@@ -430,7 +440,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
     """The current reserved size of the dictionary."""
 
     var _index: _DictIndex
-    var _entries: List[Optional[DictEntry[K, V]]]
+    var _entries: List[Optional[DictEntry[K, V, hasher]]]
 
     @always_inline
     fn __init__(inout self):
@@ -628,11 +638,11 @@ struct Dict[K: KeyElement, V: CollectionElement](
             An optional value containing a reference to the value if it is
             present, otherwise an empty Optional.
         """
-        var hash = hash(key)
+        var hash = hash[hasher_type=hasher](key)
         var found: Bool
         var slot: Int
         var index: Int
-        found, slot, index = self[]._find_index(hash, key)
+        found, slot, index = self[]._find_index(int(hash), key)
         if found:
             var entry = self[]._entries.__get_ref(index)
             debug_assert(entry[].__bool__(), "entry in index must be full")
@@ -679,7 +689,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             "KeyError" if the key was not present in the dictionary and no
             default value was provided.
         """
-        var hash = hash(key)
+        var hash = hash[hasher_type=hasher](key)
         var found: Bool
         var slot: Int
         var index: Int
@@ -698,7 +708,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn __iter__(
         self: Reference[Self, _, _],
-    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
+    ) -> _DictKeyIter[K, V, hasher, self.is_mutable, self.lifetime]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -708,7 +718,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn keys(
         self: Reference[Self, _, _]
-    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
+    ) -> _DictKeyIter[K, V, hasher, self.is_mutable, self.lifetime]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -718,7 +728,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn values(
         self: Reference[Self, _, _]
-    ) -> _DictValueIter[K, V, self.is_mutable, self.lifetime]:
+    ) -> _DictValueIter[K, V, hasher, self.is_mutable, self.lifetime]:
         """Iterate over the dict's values as references.
 
         Returns:
@@ -728,7 +738,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn items(
         self: Reference[Self, _, _]
-    ) -> _DictEntryIter[K, V, self.is_mutable, self.lifetime]:
+    ) -> _DictEntryIter[K, V, Self.hasher, self.is_mutable, self.lifetime]:
         """Iterate over the dict's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
@@ -777,16 +787,16 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     @staticmethod
     @always_inline
-    fn _new_entries(reserved: Int) -> List[Optional[DictEntry[K, V]]]:
-        var entries = List[Optional[DictEntry[K, V]]](capacity=reserved)
+    fn _new_entries(reserved: Int) -> List[Optional[DictEntry[K, V, hasher]]]:
+        var entries = List[Optional[DictEntry[K, V, hasher]]](capacity=reserved)
         for i in range(reserved):
             entries.append(None)
         return entries
 
     fn _insert(inout self, owned key: K, owned value: V):
-        self._insert(DictEntry[K, V](key^, value^))
+        self._insert(DictEntry[K, V, hasher](key^, value^))
 
-    fn _insert(inout self, owned entry: DictEntry[K, V]):
+    fn _insert(inout self, owned entry: DictEntry[K, V, hasher]):
         self._maybe_resize()
         var found: Bool
         var slot: Int
@@ -810,19 +820,19 @@ struct Dict[K: KeyElement, V: CollectionElement](
         perturb >>= PERTURB_SHIFT
         slot = ((5 * slot) + int(perturb + 1)) % self._reserved
 
-    fn _find_empty_index(self, hash: Int) -> Int:
-        var slot = hash % self._reserved
-        var perturb = bitcast[DType.uint64](Int64(hash))
+    fn _find_empty_index(self, hash: UInt64) -> Int:
+        var slot = int(hash % self._reserved)
+        var perturb = hash
         while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
                 return slot
             self._next_index_slot(slot, perturb)
 
-    fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
+    fn _find_index(self, hash: UInt64, key: K) -> (Bool, Int, Int):
         # Return (found, slot, index)
-        var slot = hash % self._reserved
-        var perturb = bitcast[DType.uint64](Int64(hash))
+        var slot = int(hash % self._reserved)
+        var perturb = hash
         while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
@@ -882,14 +892,16 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn __reversed__(
         self: Reference[Self, _, _]
-    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime, False]:
+    ) -> _DictKeyIter[K, V, hasher, self.is_mutable, self.lifetime, False]:
         """Iterate backwards over the dict keys, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the dict keys.
         """
         return _DictKeyIter(
-            _DictEntryIter[forward=False](self[]._reserved - 1, 0, self)
+            _DictEntryIter[hasher=hasher, forward=False](
+                self[]._reserved - 1, 0, self
+            )
         )
 
 
@@ -1007,7 +1019,9 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     fn __iter__(
         self: Reference[Self, _, _]
-    ) -> _DictKeyIter[Self.key_type, V, self.is_mutable, self.lifetime]:
+    ) -> _DictKeyIter[
+        Self.key_type, V, DefaultHasher, self.is_mutable, self.lifetime
+    ]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -1019,7 +1033,9 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     fn keys(
         self: Reference[Self, _, _],
-    ) -> _DictKeyIter[Self.key_type, V, self.is_mutable, self.lifetime]:
+    ) -> _DictKeyIter[
+        Self.key_type, V, DefaultHasher, self.is_mutable, self.lifetime
+    ]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -1031,7 +1047,9 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     fn values(
         self: Reference[Self, _, _],
-    ) -> _DictValueIter[Self.key_type, V, self.is_mutable, self.lifetime]:
+    ) -> _DictValueIter[
+        Self.key_type, V, DefaultHasher, self.is_mutable, self.lifetime
+    ]:
         """Iterate over the keyword dict's values as references.
 
         Returns:
@@ -1043,7 +1061,9 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     fn items(
         self: Reference[Self, _, _]
-    ) -> _DictEntryIter[Self.key_type, V, self.is_mutable, self.lifetime]:
+    ) -> _DictEntryIter[
+        Self.key_type, V, DefaultHasher, self.is_mutable, self.lifetime
+    ]:
         """Iterate over the keyword dictionary's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can

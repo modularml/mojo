@@ -181,15 +181,13 @@ struct StringLiteral(
         """
         return not (self < rhs)
 
-    fn __hash__(self) -> Int:
-        """Hash the underlying buffer using builtin hash.
-
-        Returns:
-            A 64-bit hash value. This value is _not_ suitable for cryptographic
-            uses. Its intended usage is for data structures. See the `hash`
-            builtin documentation for more details.
-        """
-        return hash(self.unsafe_ptr(), len(self))
+    fn __hash__[H: Hasher](self, inout hasher: H):
+        """Update hasher with this string literal value."""
+        var size = len(self)
+        size.__hash__(hasher)
+        hasher._update_with_bytes(
+            self.unsafe_ptr().bitcast[DType.uint8](), size
+        )
 
     fn __str__(self) -> String:
         """Convert the string literal to a string.

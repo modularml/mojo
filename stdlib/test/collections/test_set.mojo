@@ -252,7 +252,7 @@ def test_pop_insertion_order():
     assert_equal(s, Set[Int]())
 
     with assert_raises():
-        s.pop()  # pop from empty set raises
+        _ = s.pop()  # pop from empty set raises
 
 
 def test_issubset():

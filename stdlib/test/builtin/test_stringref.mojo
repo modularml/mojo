@@ -38,7 +38,7 @@ def test_intable():
     assert_equal(int(StringRef("123")), 123)
 
     with assert_raises():
-        int(StringRef("hi"))
+        _ = int(StringRef("hi"))
 
 
 def main():
