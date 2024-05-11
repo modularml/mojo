@@ -143,6 +143,11 @@ what we publish.
 
 - `Dict.__get_ref(key)`, allowing to get references to dictionary values.
 
+- `String.strip()`, `lstrip()` and `rstrip()` can now remove custom characters
+  other than whitespace.  In addition, there are now several useful aliases for
+  whitespace, ASCII lower/uppercase, and so on.
+    ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
