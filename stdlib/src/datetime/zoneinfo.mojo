@@ -189,27 +189,34 @@ struct ZoneDST:
 @value
 struct ZoneInfoFile:
     """Zoneinfo that lives in a file. Smallest memory footprint
-    but only supports 256 DST timezones (there are ~ 60 or 70)."""
+    but only supports 256 timezones (there are ~ 418)."""
 
     var index: UInt8
-    alias BIT_WIDTH = 32
-    alias BIT_MASK = 0xFFFFFFFF  # 32 full bits
+    var BIT_WIDTH: UInt8
+    var BIT_MASK: UInt32
     var file: Path
 
-    fn __init__(inout self) raises:
-        self.file = Path(cwd()) / "zoneinfo_dump"
+    fn __init__(inout self, BIT_WIDTH: UInt8, BIT_MASK: UInt32):
+        try:
+            self.file = Path(cwd()) / "zoneinfo_dump"
+        except:
+            self.file = "./zoneinfo_dump"
         self.index = 0
+        self.BIT_WIDTH = BIT_WIDTH
+        self.BIT_MASK = BIT_MASK
 
-    fn add(inout self, key: StringLiteral, value: ZoneDST) raises -> UInt8:
+    fn add(inout self, key: StringLiteral, buf: UInt32) raises -> UInt8:
         _ = key
+        var b_width64 = self.BIT_WIDTH.cast[DType.uint64]()
+        var b_width32 = self.BIT_WIDTH.cast[DType.uint32]()
         with open(self.file, "rb") as f:
-            _ = f.seek(self.BIT_WIDTH * (self.index).cast[DType.uint64]())
-            f.write(value.buf << (32 - self.BIT_WIDTH))
+            _ = f.seek(b_width64 * (self.index).cast[DType.uint64]())
+            f.write(buf << (32 - b_width32))
         if self.index > UInt8.MAX_FINITE:
             self.index = 0
         else:
             self.index += 1
-        return self.index 
+        return self.index
 
     fn get(self, index: UInt8) raises -> Optional[ZoneDST]:
         if self.index > UInt8.MAX_FINITE:
@@ -217,7 +224,7 @@ struct ZoneInfoFile:
         var value: UInt32
         with open(self.file, "rb") as f:
             _ = f.seek(
-                self.BIT_WIDTH * index.cast[DType.uint64]()
+                self.BIT_WIDTH.cast[DType.uint64]() * index.cast[DType.uint64]()
             )
             var bufs = f.read_bytes(4)
             value = (
@@ -236,6 +243,11 @@ struct ZoneInfoFile:
         except:
             pass
 
+
+alias ZoneInfoFile32 = ZoneInfoFile(32, 0xFFFFFFFF)
+"""ZoneInfoFile to store Offset of tz with DST"""
+alias ZoneInfoFile8 = ZoneInfoFile(8, 0xFFFF)
+"""ZoneInfoFile to store Offset of tz with no DST"""
 
 @value
 struct ZoneInfoMem32:
