@@ -126,6 +126,7 @@ fn _realtime_nanoseconds() -> Int:
         )
         return ft.as_nanoseconds()
     else:
+        # FIXME: This is failing in macos-14 during pull request
         # return _gettime_as_nsec_unix(_CLOCK_REALTIME)
         return _gettime_as_nsec_unix(_CLOCK_MONOTONIC)
 

@@ -307,7 +307,7 @@ struct Calendar(_Calendarized):
         self.min_nanosecond = imp.min_nanosecond
         self._implementation = imp
 
-    @always_inline
+    @always_inline("nodebug")
     fn dayofweek(self, year: UInt16, month: UInt8, day: UInt8) -> UInt8:
         """Calculates the day of the week for a given date.
 
@@ -321,7 +321,7 @@ struct Calendar(_Calendarized):
         """
         return self._implementation.dayofweek(year, month, day)
 
-    @always_inline
+    @always_inline("nodebug")
     fn dayofyear(self, year: UInt16, month: UInt8, day: UInt8) -> UInt16:
         """Calculates the day of the year for a given date.
 
@@ -335,7 +335,7 @@ struct Calendar(_Calendarized):
         """
         return self._implementation.dayofyear(year, month, day)
 
-    @always_inline
+    @always_inline("nodebug")
     fn max_days_in_month(self, year: UInt16, month: UInt8) -> UInt8:
         """The maximum amount of days in a given month.
 
@@ -348,7 +348,7 @@ struct Calendar(_Calendarized):
         """
         return self._implementation.max_days_in_month(year, month)
 
-    @always_inline
+    @always_inline("nodebug")
     fn monthrange(self, year: UInt16, month: UInt8) -> (UInt8, UInt8):
         """Calculates the day of the week and the day of the month
         that a month in a given year ends.
@@ -363,7 +363,7 @@ struct Calendar(_Calendarized):
         """
         return self._implementation.monthrange(year, month)
 
-    @always_inline
+    @always_inline("nodebug")
     fn max_second(
         self, year: UInt16, month: UInt8, day: UInt8, hour: UInt8, minute: UInt8
     ) -> UInt8:
@@ -381,7 +381,7 @@ struct Calendar(_Calendarized):
         """
         return self._implementation.max_second(year, month, day, hour, minute)
 
-    @always_inline
+    @always_inline("nodebug")
     fn is_leapyear(self, year: UInt16) -> Bool:
         """Whether the year is a leap year.
 
@@ -393,7 +393,7 @@ struct Calendar(_Calendarized):
         """
         return self._implementation.is_leapyear(year)
 
-    @always_inline
+    @always_inline("nodebug")
     fn is_leapsec(
         self,
         year: UInt16,
@@ -420,7 +420,7 @@ struct Calendar(_Calendarized):
             year, month, day, hour, minute, second
         )
 
-    @always_inline
+    @always_inline("nodebug")
     fn leapsecs_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
@@ -436,7 +436,7 @@ struct Calendar(_Calendarized):
         """
         return self._implementation.leapsecs_since_epoch(year, month, day)
 
-    @always_inline
+    @always_inline("nodebug")
     fn leapdays_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
@@ -452,7 +452,7 @@ struct Calendar(_Calendarized):
         """
         return self._implementation.leapdays_since_epoch(year, month, day)
 
-    @always_inline
+    @always_inline("nodebug")
     fn seconds_since_epoch(
         self,
         year: UInt16,
@@ -479,6 +479,7 @@ struct Calendar(_Calendarized):
             year, month, day, hour, minute, second
         )
 
+    @always_inline("nodebug")
     fn m_seconds_since_epoch(
         self,
         year: UInt16,
@@ -508,7 +509,7 @@ struct Calendar(_Calendarized):
             year, month, day, hour, minute, second
         )
 
-    @always_inline
+    @always_inline("nodebug")
     fn n_seconds_since_epoch(
         self,
         year: UInt16,
@@ -543,7 +544,7 @@ struct Calendar(_Calendarized):
         )
 
     @staticmethod
-    @always_inline
+    @always_inline("nodebug")
     fn from_year(year: UInt16) -> Self:
         """Get a Calendar with min_year=year.
 
@@ -556,7 +557,7 @@ struct Calendar(_Calendarized):
         return Calendar.from_year[Gregorian](year)
 
     @staticmethod
-    @always_inline
+    @always_inline("nodebug")
     fn from_year[
         T: Variant[Gregorian, UTCFast] = Gregorian
     ](year: UInt16) -> Self:
@@ -577,6 +578,7 @@ struct Calendar(_Calendarized):
             return Self(UTCFast().from_year(year))
         return Self()
 
+    @always_inline("nodebug")
     fn hash[
         cal_hash: CalendarHashes = CalendarHashes()
     ](
@@ -615,7 +617,7 @@ struct Calendar(_Calendarized):
             year, month, day, hour, minute, second, m_second, u_second, n_second
         )
 
-    @always_inline
+    @always_inline("nodebug")
     fn from_hash[
         cal_hash: CalendarHashes = CalendarHashes()
     ](self, value: Int) -> _date:
@@ -698,7 +700,6 @@ struct Gregorian(_Calendarized):
         self.max_year = max_year
         self.min_year = min_year
 
-    @always_inline
     fn monthrange(self, year: UInt16, month: UInt8) -> (UInt8, UInt8):
         """Calculates the day of the week and the day of the month
         that a month in a given year ends.
@@ -715,7 +716,7 @@ struct Gregorian(_Calendarized):
         # TODO
         return UInt8(0), UInt8(0)
 
-    @always_inline
+    @always_inline("nodebug")
     fn max_second(
         self, year: UInt16, month: UInt8, day: UInt8, hour: UInt8, minute: UInt8
     ) -> UInt8:
@@ -737,7 +738,7 @@ struct Gregorian(_Calendarized):
             return 60
         return 59
 
-    @always_inline
+    @always_inline("nodebug")
     fn max_days_in_month(self, year: UInt16, month: UInt8) -> UInt8:
         """The maximum amount of days in a given month.
 
@@ -753,7 +754,7 @@ struct Gregorian(_Calendarized):
             return days + 1
         return days
 
-    @always_inline
+    @always_inline("nodebug")
     fn dayofweek(self, year: UInt16, month: UInt8, day: UInt8) -> UInt8:
         """Calculates the day of the week for a given date.
 
@@ -770,7 +771,7 @@ struct Gregorian(_Calendarized):
         var days_before_year = y * 365 + y // 4 - y // 100 + y // 400
         return (days_before_year + days + 6) % 7
 
-    @always_inline
+    @always_inline("nodebug")
     fn dayofyear(self, year: UInt16, month: UInt8, day: UInt8) -> UInt16:
         """Calculates the day of the year for a given date.
 
@@ -790,7 +791,7 @@ struct Gregorian(_Calendarized):
             )
         return total
 
-    @always_inline
+    @always_inline("nodebug")
     fn is_leapyear(self, year: UInt16) -> Bool:
         """Whether the year is a leap year.
 
@@ -803,7 +804,6 @@ struct Gregorian(_Calendarized):
         _ = self
         return Gregorian.is_leapyear(year)
 
-    @always_inline
     fn is_leapsec(
         self,
         year: UInt16,
@@ -1057,7 +1057,7 @@ struct Gregorian(_Calendarized):
             y_d + mon_d + d_d + h_d + min_d + s_d + ms_d + us_d + ns_d + leaps
         )
 
-    @always_inline
+    @always_inline("nodebug")
     fn hash[
         cal_h: CalendarHashes = CalendarHashes()
     ](
@@ -1114,7 +1114,7 @@ struct Gregorian(_Calendarized):
             )
         return 0
 
-    @always_inline
+    @always_inline("nodebug")
     fn from_hash[
         cal_h: CalendarHashes = CalendarHashes()
     ](self, value: Int) -> _date:
@@ -1153,8 +1153,8 @@ struct Gregorian(_Calendarized):
             result[7] = int(((value & cal_h.mask_64_us) >> cal_h.shift_64_us))
         return result
 
-    @always_inline
     @staticmethod
+    @always_inline("nodebug")
     fn is_leapyear(year: UInt16) -> Bool:
         """Whether the year is a leap year.
 
@@ -1167,7 +1167,7 @@ struct Gregorian(_Calendarized):
         return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
     @staticmethod
-    @always_inline
+    @always_inline("nodebug")
     fn from_year(year: UInt16) -> Self:
         """Get a Calendar with min_year=year.
 
@@ -1240,7 +1240,6 @@ struct UTCFast(_Calendarized):
         self.max_year = max_year
         self.min_year = min_year
 
-    @always_inline
     fn monthrange(self, year: UInt16, month: UInt8) -> (UInt8, UInt8):
         """Calculates the day of the week and the day of the month
         that a month in a given year ends.
@@ -1256,7 +1255,7 @@ struct UTCFast(_Calendarized):
         _ = self, year, month
         return UInt8(0), UInt8(0)
 
-    @always_inline
+    @always_inline("nodebug")
     fn max_second(
         self, year: UInt16, month: UInt8, day: UInt8, hour: UInt8, minute: UInt8
     ) -> UInt8:
@@ -1275,7 +1274,7 @@ struct UTCFast(_Calendarized):
         _ = self, year, month, day, hour, minute
         return 59
 
-    @always_inline
+    @always_inline("nodebug")
     fn max_days_in_month(self, year: UInt16, month: UInt8) -> UInt8:
         """The maximum amount of days in a given month.
 
@@ -1289,7 +1288,7 @@ struct UTCFast(_Calendarized):
         _ = self, year, month
         return 0
 
-    @always_inline
+    @always_inline("nodebug")
     fn dayofweek(self, year: UInt16, month: UInt8, day: UInt8) -> UInt8:
         """Calculates the day of the week for a given date.
 
@@ -1304,7 +1303,7 @@ struct UTCFast(_Calendarized):
         _ = self, year, month, day
         return 0
 
-    @always_inline
+    @always_inline("nodebug")
     fn dayofyear(self, year: UInt16, month: UInt8, day: UInt8) -> UInt16:
         """Calculates the day of the year for a given date.
 
@@ -1319,7 +1318,7 @@ struct UTCFast(_Calendarized):
         _ = self, year, month, day
         return 0
 
-    @always_inline
+    @always_inline("nodebug")
     fn is_leapyear(self, year: UInt16) -> Bool:
         """Whether the year is a leap year.
 
@@ -1332,7 +1331,7 @@ struct UTCFast(_Calendarized):
         _ = self, year
         return False
 
-    @always_inline
+    @always_inline("nodebug")
     fn is_leapsec(
         self,
         year: UInt16,
@@ -1358,6 +1357,7 @@ struct UTCFast(_Calendarized):
         _ = self, year, month, day, hour, minute, second
         return False
 
+    @always_inline("nodebug")
     fn leapsecs_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
@@ -1374,6 +1374,7 @@ struct UTCFast(_Calendarized):
         _ = self, year, month, day
         return 0
 
+    @always_inline("nodebug")
     fn leapdays_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
@@ -1517,7 +1518,7 @@ struct UTCFast(_Calendarized):
             + UInt64(n_second)
         )
 
-    @always_inline
+    @always_inline("nodebug")
     fn hash[
         cal_h: CalendarHashes = CalendarHashes()
     ](
@@ -1584,7 +1585,7 @@ struct UTCFast(_Calendarized):
             )
         return 0
 
-    @always_inline
+    @always_inline("nodebug")
     fn from_hash[
         cal_h: CalendarHashes = CalendarHashes()
     ](self, value: Int) -> _date:
@@ -1645,8 +1646,8 @@ struct UTCFast(_Calendarized):
             result[6] = int(value & cal_h.mask_64_ms)
         return result
 
-    @always_inline
     @staticmethod
+    @always_inline("nodebug")
     fn is_leapyear(year: UInt16) -> Bool:
         """Whether the year is a leap year.
 
@@ -1660,7 +1661,7 @@ struct UTCFast(_Calendarized):
         return False
 
     @staticmethod
-    @always_inline
+    @always_inline("nodebug")
     fn from_year(year: UInt16) -> Self:
         """Get a Calendar with min_year=year.
 

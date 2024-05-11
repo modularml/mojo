@@ -244,7 +244,6 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         )
         return new_self.add(seconds=leapsecs).replace(tz=tz)
 
-    @always_inline
     fn seconds_since_epoch(self) -> UInt64:
         """Seconds since the begining of the calendar's epoch.
 
@@ -380,6 +379,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             )
         return dt
 
+    @always_inline("nodebug")
     fn add(owned self, other: Self) -> Self:
         """Adds another `Date`.
 
@@ -393,6 +393,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         var result = int(delta[0] + delta[1])
         return self.add(seconds=result)
 
+    @always_inline("nodebug")
     fn subtract(owned self, other: Self) -> Self:
         """Subtracts another `Date`.
 
@@ -406,6 +407,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         var result = int(delta[0] - delta[1])
         return self.subtract(seconds=result)
 
+    @always_inline("nodebug")
     fn __add__(owned self, other: Self) -> Self:
         """Add.
 
@@ -417,6 +419,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return self.add(other)
 
+    @always_inline("nodebug")
     fn __sub__(owned self, other: Self) -> Self:
         """Subtract.
 
@@ -428,6 +431,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return self.subtract(other)
 
+    @always_inline("nodebug")
     fn __iadd__(inout self, owned other: Self):
         """Add Immediate.
 
@@ -436,6 +440,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         self = self.add(other)
 
+    @always_inline("nodebug")
     fn __isub__(inout self, owned other: Self):
         """Subtract Immediate.
 
@@ -444,6 +449,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         self = self.subtract(other)
 
+    @always_inline("nodebug")
     fn dayofweek(self) -> UInt8:
         """Calculates the day of the week for a `Date`.
 
@@ -477,6 +483,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return self.calendar.hash[_cal_hash](self.year, self.month, self.day)
 
+    @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
         """Eq.
 
@@ -488,6 +495,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) == hash(other)
 
+    @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
         """Ne.
 
@@ -499,6 +507,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) != hash(other)
 
+    @always_inline("nodebug")
     fn __gt__(self, other: Self) -> Bool:
         """Gt.
 
@@ -510,6 +519,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) > hash(other)
 
+    @always_inline("nodebug")
     fn __ge__(self, other: Self) -> Bool:
         """Ge.
 
@@ -521,6 +531,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) >= hash(other)
 
+    @always_inline("nodebug")
     fn __le__(self, other: Self) -> Bool:
         """Le.
 
@@ -532,6 +543,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) <= hash(other)
 
+    @always_inline("nodebug")
     fn __lt__(self, other: Self) -> Bool:
         """Lt.
 
@@ -543,6 +555,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) < hash(other)
 
+    @always_inline("nodebug")
     fn __and__(self, other: Self) -> UInt32:
         """And.
 
@@ -554,6 +567,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) & hash(other)
 
+    @always_inline("nodebug")
     fn __or__(self, other: Self) -> UInt32:
         """Or.
 
@@ -565,6 +579,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) | hash(other)
 
+    @always_inline("nodebug")
     fn __xor__(self, other: Self) -> UInt32:
         """Xor.
 
@@ -576,6 +591,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) ^ hash(other)
 
+    @always_inline("nodebug")
     fn __int__(self) -> UInt32:
         """Int.
 
@@ -584,6 +600,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self)
 
+    @always_inline("nodebug")
     fn __str__(self) -> String:
         """str.
 

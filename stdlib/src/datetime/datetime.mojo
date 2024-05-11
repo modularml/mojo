@@ -359,7 +359,6 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         )
         return new_self.add(seconds=leapsecs).replace(tz=tz)
 
-    @always_inline
     fn n_seconds_since_epoch(self) -> UInt64:
         """Nanoseconds since the begining of the calendar's epoch.
         Can only represent up to ~ 580 years since epoch start.
@@ -379,7 +378,6 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             self.n_second,
         )
 
-    @always_inline
     fn seconds_since_epoch(self) -> UInt64:
         """Seconds since the begining of the calendar's epoch.
 
@@ -597,6 +595,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             )
         return dt
 
+    @always_inline("nodebug")
     fn add(owned self, other: Self) -> Self:
         """Adds another `DateTime`.
 
@@ -610,6 +609,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         var result = int(delta[0] + delta[1])
         return self.add(years=int(delta[2]), seconds=result)
 
+    @always_inline("nodebug")
     fn subtract(owned self, other: Self) -> Self:
         """Subtracts another `DateTime`.
 
@@ -623,6 +623,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         var result = int(delta[0] - delta[1])
         return self.subtract(years=int(delta[2]), seconds=result)
 
+    @always_inline("nodebug")
     fn __add__(owned self, other: Self) -> Self:
         """Add.
 
@@ -634,6 +635,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return self.add(other)
 
+    @always_inline("nodebug")
     fn __sub__(owned self, other: Self) -> Self:
         """Subtract.
 
@@ -645,6 +647,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return self.subtract(other)
 
+    @always_inline("nodebug")
     fn __iadd__(inout self, owned other: Self):
         """Add Immediate.
 
@@ -653,6 +656,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         self = self.add(other)
 
+    @always_inline("nodebug")
     fn __isub__(inout self, owned other: Self):
         """Subtract Immediate.
 
@@ -661,6 +665,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         self = self.subtract(other)
 
+    @always_inline("nodebug")
     fn dayofweek(self) -> UInt8:
         """Calculates the day of the week for a `DateTime`.
 
@@ -704,6 +709,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             self.n_second,
         )
 
+    @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
         """Eq.
 
@@ -715,6 +721,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) == hash(other)
 
+    @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
         """Ne.
 
@@ -726,6 +733,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) != hash(other)
 
+    @always_inline("nodebug")
     fn __gt__(self, other: Self) -> Bool:
         """Gt.
 
@@ -737,6 +745,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) > hash(other)
 
+    @always_inline("nodebug")
     fn __ge__(self, other: Self) -> Bool:
         """Ge.
 
@@ -748,6 +757,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) >= hash(other)
 
+    @always_inline("nodebug")
     fn __le__(self, other: Self) -> Bool:
         """Le.
 
@@ -759,6 +769,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) <= hash(other)
 
+    @always_inline("nodebug")
     fn __lt__(self, other: Self) -> Bool:
         """Lt.
 
@@ -770,6 +781,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) < hash(other)
 
+    @always_inline("nodebug")
     fn __and__(self, other: Self) -> UInt64:
         """And.
 
@@ -781,6 +793,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) & hash(other)
 
+    @always_inline("nodebug")
     fn __or__(self, other: Self) -> UInt64:
         """Or.
 
@@ -792,6 +805,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) | hash(other)
 
+    @always_inline("nodebug")
     fn __xor__(self, other: Self) -> UInt64:
         """Xor.
 
@@ -803,6 +817,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self) ^ hash(other)
 
+    @always_inline("nodebug")
     fn __int__(self) -> UInt64:
         """Int.
 
@@ -811,6 +826,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return hash(self)
 
+    @always_inline("nodebug")
     fn __str__(self) -> String:
         """Str.
 
@@ -834,6 +850,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         return DateTime[iana]._from_years(calendar.min_year - delta)
 
     @staticmethod
+    @always_inline("nodebug")
     fn _from_months(
         months: Int,
         tz: TimeZone[iana] = TimeZone[iana](),
@@ -999,6 +1016,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         return dt.replace(u_second=UInt16(rest))
 
     @staticmethod
+    @always_inline("nodebug")
     fn _from_n_seconds(
         n_seconds: Int,
         tz: TimeZone[iana] = TimeZone[iana](),
@@ -1016,6 +1034,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         return dt.replace(n_second=UInt16(rest))
 
     @staticmethod
+    @always_inline("nodebug")
     fn from_unix_epoch[
         add_leap: Bool = False
     ](seconds: Int, tz: TimeZone[iana] = TimeZone[iana]()) -> Self:
@@ -1039,6 +1058,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         )
 
     @staticmethod
+    @always_inline("nodebug")
     fn now(
         tz: TimeZone[iana] = TimeZone[iana](), calendar: Calendar = _calendar
     ) -> Self:
@@ -1060,6 +1080,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         )
         return dt.replace(m_second=ms, u_second=us, n_second=UInt16(ns))
 
+    @always_inline("nodebug")
     fn strftime[format_str: StringLiteral](self) -> String:
         """Formats time into a `String`.
 
@@ -1076,6 +1097,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             self.year, self.month, self.day, self.hour, self.minute, self.second
         )
 
+    @always_inline("nodebug")
     fn strftime(self, fmt: String) -> String:
         """Formats time into a `String`.
 
@@ -1098,6 +1120,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             self.second,
         )
 
+    @always_inline("nodebug")
     fn __format__(self, fmt: String) -> String:
         """Format.
 
@@ -1109,7 +1132,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return self.strftime(fmt)
 
-    @parameter
+    @always_inline("nodebug")
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
         compliant `String` in the form `IsoFormat.YYYY_MM_DD_T_MM_HH_TZD`.
@@ -1128,7 +1151,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         )
         return time + self.tz.to_iso()
 
-    @parameter
+    @always_inline("nodebug")
     fn to_iso_compact[
         iso: dt_str.IsoFormat = dt_str.IsoFormat()
     ](self) -> String:
@@ -1151,6 +1174,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         return time
 
     @staticmethod
+    @always_inline("nodebug")
     fn strptime[
         format_str: StringLiteral,
         tz: TimeZone[iana] = TimeZone[iana](),
@@ -1188,7 +1212,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         )
 
     @staticmethod
-    @parameter
+    @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
         tz: Optional[TimeZone[iana]] = None,
@@ -1226,6 +1250,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             return None
 
     @staticmethod
+    @always_inline("nodebug")
     fn from_hash(
         value: Int,
         tz: TimeZone[iana] = TimeZone[iana](),

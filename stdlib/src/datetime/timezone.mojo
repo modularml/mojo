@@ -160,6 +160,7 @@ struct TimeZone[
                 pass
         return self.offset_h, self.offset_m, self.sign
 
+    @always_inline("nodebug")
     fn __str__(self) -> StringLiteral:
         """Str.
 
@@ -168,6 +169,7 @@ struct TimeZone[
         """
         return self.tz_str
 
+    @always_inline("nodebug")
     fn __repr__(self) -> StringLiteral:
         """Repr.
 
@@ -176,6 +178,7 @@ struct TimeZone[
         """
         return self.__str__()
 
+    @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
         """Eq.
 
@@ -191,6 +194,7 @@ struct TimeZone[
             and self.offset_m == other.offset_m
         )
 
+    @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
         """Ne.
 
@@ -202,6 +206,7 @@ struct TimeZone[
         """
         return not (self == other)
 
+    @always_inline("nodebug")
     fn to_iso(self) -> String:
         """Return the Offset's ISO8601 representation.
 

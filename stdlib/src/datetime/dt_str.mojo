@@ -124,7 +124,6 @@ fn to_iso(
     return s[0] + "-" + s[1] + "-" + s[2] + "T" + s[3] + ":" + s[4] + ":" + s[5]
 
 
-@parameter
 fn from_iso[
     iso: IsoFormat = IsoFormat(), iana: Optional[ZoneInfo] = all_zones
 ](s: String) raises -> (

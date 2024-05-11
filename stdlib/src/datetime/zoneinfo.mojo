@@ -81,6 +81,7 @@ struct Offset:
         except:
             self.buf = 0
 
+    @always_inline("nodebug")
     fn from_hash(self) -> (UInt8, UInt8, UInt8, UInt8):
         """Get the values from hash.
 
@@ -152,6 +153,7 @@ struct TzDT:
 
         self.buf = (month << 8) | (dow << 5) | (eomon << 4) | (week << 3) | h
 
+    @always_inline("nodebug")
     fn from_hash(self) -> (UInt8, UInt8, UInt8, UInt8, UInt8):
         """Get the values from hash.
 
@@ -171,6 +173,7 @@ struct TzDT:
             (self.buf & 0b111).cast[DType.uint8](),
         )
 
+    @always_inline("nodebug")
     fn __bool__(self) -> Bool:
         """If self.buf == 0.
 
@@ -179,6 +182,7 @@ struct TzDT:
         """
         return self.buf == 0
 
+    @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
         """Eq.
 
@@ -336,6 +340,7 @@ struct ZoneInfoMem32:
 
         self._zones = Dict[StringLiteral, UInt32]()
 
+    @always_inline
     fn add(inout self, key: StringLiteral, value: ZoneDST):
         """Add a value to `ZoneInfoMem32`.
 
@@ -346,6 +351,7 @@ struct ZoneInfoMem32:
 
         self._zones[key] = value.buf
 
+    @always_inline
     fn get(self, key: StringLiteral) -> Optional[ZoneDST]:
         """Get value from `ZoneInfoMem32`.
 
@@ -372,6 +378,7 @@ struct ZoneInfoMem8:
         """Construct a `ZoneInfoMem8`."""
         self._zones = Dict[StringLiteral, UInt8]()
 
+    @always_inline
     fn add(inout self, key: StringLiteral, value: Offset):
         """Add a value to `ZoneInfoMem8`.
 
@@ -381,6 +388,7 @@ struct ZoneInfoMem8:
         """
         self._zones[key] = value.buf
 
+    @always_inline
     fn get(self, key: StringLiteral) -> Optional[Offset]:
         """Get value from `ZoneInfoMem8`.
 
@@ -396,6 +404,7 @@ struct ZoneInfoMem8:
         return Offset(value.unsafe_take())
 
 
+@always_inline
 fn _parse_iana_leapsecs(
     text: PythonObject,
 ) raises -> List[(UInt8, UInt8, UInt16)]:
@@ -422,6 +431,7 @@ fn _parse_iana_leapsecs(
     return leaps
 
 
+@always_inline
 fn get_leapsecs() -> Optional[List[(UInt8, UInt8, UInt16)]]:
     """Get the leap seconds added to UTC.
 
@@ -458,6 +468,7 @@ alias ZoneInfo = (ZoneInfoMem32, ZoneInfoMem8)
 """ZoneInfo."""
 
 
+@always_inline
 fn get_zoneinfo() -> Optional[ZoneInfo]:
     """Get all zoneinfo available. First tries to get it
     from the OS, then from the internet, then falls back
