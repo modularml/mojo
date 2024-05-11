@@ -105,7 +105,21 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         tz: TimeZone[iana] = TimeZone[iana](),
         calendar: Calendar = _calendar,
     ):
-        """Construct a `DateTime` from valid values."""
+        """Construct a `DateTime` from valid values.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: M_second.
+            u_second: U_second.
+            n_second: N_second.
+            tz: Tz.
+            calendar: Calendar.
+        """
         self.year = year.or_else(int(calendar.min_year))
         self.month = month.or_else(int(calendar.min_month))
         self.day = day.or_else(int(calendar.min_day))
@@ -132,7 +146,21 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         tz: TimeZone[iana] = TimeZone[iana](),
         calendar: Calendar = _calendar,
     ):
-        """Construct a `DateTime` from valid values."""
+        """Construct a `DateTime` from valid values.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: M_second.
+            u_second: U_second.
+            n_second: N_second.
+            tz: Tz.
+            calendar: Calendar.
+        """
         self.year = year.or_else(calendar.min_year)
         self.month = month.or_else(calendar.min_month)
         self.day = day.or_else(calendar.min_day)
@@ -235,6 +263,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             n_second: Nanosecond.
             tz: Tz.
             calendar: Calendar.
+
+        Returns:
+            Self.
         """
 
         var new_self = self
@@ -279,7 +310,11 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
     fn to_utc(owned self) -> Self:
         """Returns a new instance of `Self` transformed to UTC. If
-        `self.tz` is UTC it returns early."""
+        `self.tz` is UTC it returns early.
+
+        Returns:
+            Self.
+        """
         alias TZ_UTC = TimeZone[iana]()
         if self.tz == TZ_UTC:
             return self
@@ -297,7 +332,14 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
     fn from_utc(owned self, tz: TimeZone[iana]) -> Self:
         """Translate `TimeZone` from UTC. If `self.tz` is UTC
-        it returns early."""
+        it returns early.
+
+        Args:
+            tz: Timezone to cast to.
+
+        Returns:
+            Self.
+        """
         if tz == TimeZone[iana]():
             return self
         var offset = tz.offset_at(
@@ -320,7 +362,11 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     @always_inline
     fn n_seconds_since_epoch(self) -> UInt64:
         """Nanoseconds since the begining of the calendar's epoch.
-        Can only represent up to ~ 580 years since epoch start."""
+        Can only represent up to ~ 580 years since epoch start.
+
+        Returns:
+            The amount.
+        """
         return self.calendar.n_seconds_since_epoch(
             self.year,
             self.month,
@@ -335,7 +381,11 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
     @always_inline
     fn seconds_since_epoch(self) -> UInt64:
-        """Seconds since the begining of the calendar's epoch."""
+        """Seconds since the begining of the calendar's epoch.
+
+        Returns:
+            The amount.
+        """
         return self.calendar.seconds_since_epoch(
             self.year, self.month, self.day, self.hour, self.minute, self.second
         )
@@ -343,6 +393,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn delta_ns(self, other: Self) -> (UInt64, UInt64, UInt16, UInt8):
         """Calculates the nanoseconds for `self` and other, creating
         a reference calendar to keep nanosecond resolution.
+
+        Args:
+            other: Other.
 
         Returns:
             - self_ns: Nanoseconds from `self` to created temp calendar.
@@ -403,9 +456,12 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             u_seconds: Microseconds.
             n_seconds: Nanoseconds.
 
+        Returns:
+            Self.
+
         Notes:
             On overflow, the `DateTime` starts from the beginning of the
-            calendar's epoch and keeps evaluating until valid
+            calendar's epoch and keeps evaluating until valid.
         """
         var dt = self._from_overflow(
             int(self.year + years),
@@ -467,9 +523,12 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             u_seconds: Microseconds.
             n_seconds: Nanoseconds.
 
+        Returns:
+            Self.
+
         Notes:
             On overflow, the `DateTime` goes to the end of the
-            calendar's epoch and keeps evaluating until valid
+            calendar's epoch and keeps evaluating until valid.
         """
         var dt = self._from_overflow(
             int(self.year - years),
@@ -542,7 +601,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """Adds another `DateTime`.
 
         Args:
-            other: Self.
+            other: Other.
 
         Returns:
             A `DateTime` with the `TimeZone` and `Calendar` of `self`.
@@ -555,7 +614,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """Subtracts another `DateTime`.
 
         Args:
-            other: Self.
+            other: Other.
 
         Returns:
             A `DateTime` with the `TimeZone` and `Calendar` of `self`.
@@ -565,15 +624,41 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         return self.subtract(years=int(delta[2]), seconds=result)
 
     fn __add__(owned self, other: Self) -> Self:
+        """Add.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.add(other)
 
     fn __sub__(owned self, other: Self) -> Self:
+        """Subtract.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.subtract(other)
 
     fn __iadd__(inout self, owned other: Self):
+        """Add Immediate.
+
+        Args:
+            other: Other.
+        """
         self = self.add(other)
 
     fn __isub__(inout self, owned other: Self):
+        """Subtract Immediate.
+
+        Args:
+            other: Other.
+        """
         self = self.subtract(other)
 
     fn dayofweek(self) -> UInt8:
@@ -593,11 +678,20 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         return self.calendar.dayofyear(self.year, self.month, self.day)
 
     fn leapsecs_since_epoch(self) -> UInt32:
-        """Cumulative leap seconds since the calendar's epoch start."""
+        """Cumulative leap seconds since the calendar's epoch start.
+
+        Returns:
+            The amount.
+        """
         var dt = self.to_utc()
         return dt.calendar.leapsecs_since_epoch(dt.year, dt.month, dt.day)
 
     fn __hash__(self) -> Int:
+        """Hash.
+
+        Returns:
+            Result.
+        """
         return self.calendar.hash[_cal_hash](
             self.year,
             self.month,
@@ -611,36 +705,118 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         )
 
     fn __eq__(self, other: Self) -> Bool:
+        """Eq.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return hash(self) == hash(other)
 
     fn __ne__(self, other: Self) -> Bool:
+        """Ne.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return hash(self) != hash(other)
 
     fn __gt__(self, other: Self) -> Bool:
+        """Gt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return hash(self) > hash(other)
 
     fn __ge__(self, other: Self) -> Bool:
+        """Ge.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return hash(self) >= hash(other)
 
     fn __le__(self, other: Self) -> Bool:
+        """Le.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return hash(self) <= hash(other)
 
     fn __lt__(self, other: Self) -> Bool:
+        """Lt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return hash(self) < hash(other)
 
     fn __and__(self, other: Self) -> UInt64:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return hash(self) & hash(other)
 
     fn __or__(self, other: Self) -> UInt64:
+        """Or.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return hash(self) | hash(other)
 
     fn __xor__(self, other: Self) -> UInt64:
+        """Xor.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return hash(self) ^ hash(other)
 
     fn __int__(self) -> UInt64:
+        """Int.
+
+        Returns:
+            Result.
+        """
         return hash(self)
 
     fn __str__(self) -> String:
+        """Str.
+
+        Returns:
+            String.
+        """
         return self.to_iso()
 
     @staticmethod
@@ -766,6 +942,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             seconds: Seconds.
             tz: Tz.
             calendar: Calendar.
+
+        Returns:
+            Self.
         """
         var minutes = seconds // int(calendar.max_typical_second + 1)
         var dt = DateTime[iana]._from_minutes(minutes, tz, calendar)
@@ -851,6 +1030,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         Args:
             seconds: Seconds.
             tz: Tz.
+
+        Returns:
+            Self.
         """
         return DateTime[iana].from_seconds[add_leap](
             seconds, tz=tz, calendar=UTCCalendar
@@ -865,6 +1047,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         Args:
             tz: `TimeZone` to replace UTC.
             calendar: Calendar to replace the UTCCalendar with.
+
+        Returns:
+            Self.
         """
         var ns = time.now()
         var us: UInt16 = ns // 1_000
@@ -877,6 +1062,12 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
     fn strftime[format_str: StringLiteral](self) -> String:
         """Formats time into a `String`.
+
+        Parameters:
+            format_str: Format string.
+
+        Returns:
+            The formatted string.
 
         - TODO
             - localization.
@@ -892,7 +1083,7 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             fmt: Format string.
 
         Returns:
-            string: The formatted string.
+            The formatted string.
 
         - TODO
             - localization.
@@ -908,6 +1099,14 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         )
 
     fn __format__(self, fmt: String) -> String:
+        """Format.
+
+        Args:
+            fmt: Format string.
+
+        Returns:
+            String.
+        """
         return self.strftime(fmt)
 
     @parameter
@@ -918,6 +1117,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
         Parameters:
             iso: The IsoFormat chosen.
+
+        Returns:
+            String.
         """
         var date = (int(self.year), int(self.month), int(self.day))
         var hour = (int(self.hour), int(self.minute), int(self.second))
@@ -936,6 +1138,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
         Parameters:
             iso: The IsoFormat chosen.
+
+        Returns:
+            String.
         """
         var utc_s = self.to_utc()
         var date = (int(utc_s.year), int(utc_s.month), int(utc_s.day))
@@ -960,6 +1165,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
         Args:
             s: The string.
+
+        Returns:
+            An Optional Self.
         """
         var parsed = dt_str.strptime[format_str](s)
         if not parsed:
@@ -1000,6 +1208,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             s: The `String` to parse; it's assumed that it is properly formatted
                 i.e. no leading whitespaces or anything different to the selected
                 IsoFormat.
+
+        Returns:
+            An Optional Self.
         """
         try:
             var p = dt_str.from_iso[iso, iana](s)
@@ -1027,6 +1238,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             value: The value to parse.
             tz: The `TimeZone` to designate to the result.
             calendar: The Calendar to designate to the result.
+
+        Returns:
+            Self.
         """
         var d = calendar.from_hash(value)
         return DateTime[iana](

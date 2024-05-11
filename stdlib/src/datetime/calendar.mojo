@@ -31,10 +31,15 @@ struct CalendarHashes:
     override with its own definitions."""
 
     alias UINT8 = 8
+    """Hash width UINT8"""
     alias UINT16 = 16
+    """Hash width UINT16"""
     alias UINT32 = 32
+    """Hash width UINT32"""
     alias UINT64 = 64
+    """Hash width UINT64"""
     var selected: Int
+    """What hash width was selected."""
 
     alias _10b = 0b1111111111
     alias _9b = 0b111111111
@@ -102,6 +107,11 @@ struct CalendarHashes:
     alias mask_8_h: UInt8 = CalendarHashes._5b << CalendarHashes.shift_8_h
 
     fn __init__(inout self, selected: Int = 64):
+        """Construct a `CalendarHashes`.
+
+        Args:
+            selected: The selected hash bit width.
+        """
         debug_assert(
             selected == self.UINT8
             or selected == self.UINT16
@@ -269,6 +279,11 @@ struct Calendar(_Calendarized):
     fn __init__(
         inout self, owned impl: Variant[Gregorian, UTCFast] = Gregorian()
     ):
+        """Construct a `Calendar`.
+
+        Args:
+            impl: Calendar implementation.
+        """
         var imp = impl.unsafe_take[Gregorian]()
         self.max_year = imp.max_year
         self.max_typical_days_in_year = imp.max_typical_days_in_year
@@ -296,6 +311,11 @@ struct Calendar(_Calendarized):
     fn dayofweek(self, year: UInt16, month: UInt8, day: UInt8) -> UInt8:
         """Calculates the day of the week for a given date.
 
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+
         Returns:
             - day: Day of the week: [0, 6] (monday - sunday).
         """
@@ -305,20 +325,37 @@ struct Calendar(_Calendarized):
     fn dayofyear(self, year: UInt16, month: UInt8, day: UInt8) -> UInt16:
         """Calculates the day of the year for a given date.
 
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+
         Returns:
-            - day: Day of the year.
+            - day: Day of the year: [1, 366] (for gregorian calendar).
         """
         return self._implementation.dayofyear(year, month, day)
 
     @always_inline
     fn max_days_in_month(self, year: UInt16, month: UInt8) -> UInt8:
-        """The maximum amount of days in a given month."""
+        """The maximum amount of days in a given month.
+
+        Args:
+            year: Year.
+            month: Month.
+
+        Returns:
+            The amount of days.
+        """
         return self._implementation.max_days_in_month(year, month)
 
     @always_inline
     fn monthrange(self, year: UInt16, month: UInt8) -> (UInt8, UInt8):
         """Calculates the day of the week and the day of the month
         that a month in a given year ends.
+
+        Args:
+            year: Year.
+            month: Month.
 
         Returns:
             - dayofweek: Day of the week.
@@ -330,12 +367,30 @@ struct Calendar(_Calendarized):
     fn max_second(
         self, year: UInt16, month: UInt8, day: UInt8, hour: UInt8, minute: UInt8
     ) -> UInt8:
-        """The maximum amount of seconds in a minute (usually 59)."""
+        """The maximum amount of seconds in a minute (usually 59).
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+
+        Returns:
+            The amount.
+        """
         return self._implementation.max_second(year, month, day, hour, minute)
 
     @always_inline
     fn is_leapyear(self, year: UInt16) -> Bool:
-        """Whether the year is a leap year."""
+        """Whether the year is a leap year.
+
+        Args:
+            year: Year.
+
+        Returns:
+            Bool.
+        """
         return self._implementation.is_leapyear(year)
 
     @always_inline
@@ -348,7 +403,19 @@ struct Calendar(_Calendarized):
         minute: UInt8,
         second: UInt8,
     ) -> Bool:
-        """Whether the second is a leap second."""
+        """Whether the second is a leap second.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+
+        Returns:
+            Bool.
+        """
         return self._implementation.is_leapsec(
             year, month, day, hour, minute, second
         )
@@ -357,14 +424,32 @@ struct Calendar(_Calendarized):
     fn leapsecs_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
-        """Cumulative leap seconds since the calendar's epoch start."""
+        """Cumulative leap seconds since the calendar's epoch start.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+
+        Returns:
+            The amount.
+        """
         return self._implementation.leapsecs_since_epoch(year, month, day)
 
     @always_inline
     fn leapdays_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
-        """Cumulative leap days since the calendar's epoch start."""
+        """Cumulative leap days since the calendar's epoch start.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+
+        Returns:
+            The amount.
+        """
         return self._implementation.leapdays_since_epoch(year, month, day)
 
     @always_inline
@@ -377,7 +462,19 @@ struct Calendar(_Calendarized):
         minute: UInt8,
         second: UInt8,
     ) -> UInt64:
-        """Seconds since the begining of the calendar's epoch."""
+        """Seconds since the begining of the calendar's epoch.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+
+        Returns:
+            The amount.
+        """
         return self._implementation.seconds_since_epoch(
             year, month, day, hour, minute, second
         )
@@ -392,7 +489,20 @@ struct Calendar(_Calendarized):
         second: UInt8,
         m_second: UInt8,
     ) -> UInt64:
-        """Miliseconds since the begining of the calendar's epoch."""
+        """Miliseconds since the begining of the calendar's epoch.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: Milisecond.
+
+        Returns:
+            The amount.
+        """
         _ = m_second
         return self._implementation.seconds_since_epoch(
             year, month, day, hour, minute, second
@@ -412,7 +522,22 @@ struct Calendar(_Calendarized):
         n_second: UInt16,
     ) -> UInt64:
         """Nanoseconds since the begining of the calendar's epoch.
-        Can only represent up to ~ 580 years since epoch start."""
+        Can only represent up to ~ 580 years since epoch start.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: M_second.
+            u_second: U_second.
+            n_second: N_second.
+
+        Returns:
+            The amount.
+        """
         return self._implementation.n_seconds_since_epoch(
             year, month, day, hour, minute, second, m_second, u_second, n_second
         )
@@ -420,7 +545,14 @@ struct Calendar(_Calendarized):
     @staticmethod
     @always_inline
     fn from_year(year: UInt16) -> Self:
-        """Get a Calendar with min_year=year."""
+        """Get a Calendar with min_year=year.
+
+        Args:
+            year: The year.
+
+        Returns:
+            Self.
+        """
         return Calendar.from_year[Gregorian](year)
 
     @staticmethod
@@ -428,7 +560,17 @@ struct Calendar(_Calendarized):
     fn from_year[
         T: Variant[Gregorian, UTCFast] = Gregorian
     ](year: UInt16) -> Self:
-        """Get a Calendar with min_year=year."""
+        """Get a Calendar with min_year=year.
+
+        Parameters:
+            T: The type of Calendar.
+
+        Args:
+            year: The year.
+
+        Returns:
+            Self.
+        """
         if T.isa[Gregorian]():
             return Self(Gregorian().from_year(year))
         elif T.isa[UTCFast]():
@@ -451,6 +593,23 @@ struct Calendar(_Calendarized):
     ) -> Int:
         """Hash the given values according to the calendar's component
         lengths bitshifted, BigEndian (i.e. yyyymmdd...).
+
+        Parameters:
+            cal_hash: The hashing schema (CalendarHashes).
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: M_second.
+            u_second: U_second.
+            n_second: N_second.
+
+        Returns:
+            The hash.
         """
         return self._implementation.hash[cal_hash](
             year, month, day, hour, minute, second, m_second, u_second, n_second
@@ -460,7 +619,17 @@ struct Calendar(_Calendarized):
     fn from_hash[
         cal_hash: CalendarHashes = CalendarHashes()
     ](self, value: Int) -> _date:
-        """Build a date from a hashed value."""
+        """Build a date from a hashed value.
+
+        Parameters:
+            cal_hash: The hashing schema (CalendarHashes).
+
+        Args:
+            value: The Hash.
+
+        Returns:
+            Tuple containing date data.
+        """
         return self._implementation.from_hash[cal_hash](value)
 
 
@@ -469,28 +638,50 @@ struct Gregorian(_Calendarized):
     """`Gregorian` Calendar."""
 
     var max_year: UInt16
+    """Maximum value of years."""
     alias max_typical_days_in_year: UInt16 = 365
+    """Maximum typical value of days in a year (no leaps)."""
     alias max_possible_days_in_year: UInt16 = 366
+    """Maximum possible value of days in a year (with leaps)."""
     alias max_month: UInt8 = 12
+    """Maximum value of months in a year."""
     alias max_hour: UInt8 = 23
+    """Maximum value of hours in a day."""
     alias max_minute: UInt8 = 59
+    """Maximum value of minutes in an hour."""
     alias max_typical_second: UInt8 = 59
+    """Maximum typical value of seconds in a minute (no leaps)."""
     alias max_possible_second: UInt8 = 60
+    """Maximum possible value of seconds in a minute (with leaps)."""
     alias max_milisecond: UInt8 = 999
+    """Maximum value of miliseconds in a second."""
     alias max_microsecond: UInt8 = 999
+    """Maximum value of microseconds in a second."""
     alias max_nanosecond: UInt8 = 999
+    """Maximum value of nanoseconds in a second."""
     var min_year: UInt16
+    """Default minimum year in the calendar."""
     alias min_month: UInt8 = 1
+    """Default minimum month."""
     alias min_day: UInt8 = 1
+    """Default minimum day."""
     alias min_hour: UInt8 = 0
+    """Default minimum hour."""
     alias min_minute: UInt8 = 0
+    """Default minimum minute."""
     alias min_second: UInt8 = 0
+    """Default minimum second."""
     alias min_milisecond: UInt16 = 0
+    """Default minimum milisecond."""
     alias min_microsecond: UInt16 = 0
+    """Default minimum microsecond."""
     alias min_nanosecond: UInt16 = 0
+    """Default minimum nanosecond."""
     alias _monthdays: List[UInt8] = List[UInt8](
         31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
     )
+    """An array with the amount of days each month contains without 
+    leap values. It's assumed that `len(monthdays) == max_month`."""
 
     fn __init__(
         inout self,
@@ -506,6 +697,10 @@ struct Gregorian(_Calendarized):
         """Calculates the day of the week and the day of the month
         that a month in a given year ends.
 
+        Args:
+            year: Year.
+            month: Month.
+
         Returns:
             - dayofweek: Day of the week.
             - dayofmonth: Day of the month.
@@ -520,14 +715,33 @@ struct Gregorian(_Calendarized):
     ) -> UInt8:
         """The maximum amount of seconds that a minute lasts (usually 59).
         Some years its 60 when a leap second is added. The spec also lists
-        the posibility of 58 seconds but it stil hasn't ben done."""
+        the posibility of 58 seconds but it stil hasn't ben done.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+
+        Returns:
+            The amount.
+        """
         if self.is_leapsec(year, month, day, hour, minute, 60):
             return 60
         return 59
 
     @always_inline
     fn max_days_in_month(self, year: UInt16, month: UInt8) -> UInt8:
-        """The maximum amount of days in a given month."""
+        """The maximum amount of days in a given month.
+
+        Args:
+            year: Year.
+            month: Month.
+
+        Returns:
+            The amount of days.
+        """
         var days = self._monthdays[int(month) - 1]
         if month == 2 and self.is_leapyear(year):
             return days + 1
@@ -536,6 +750,11 @@ struct Gregorian(_Calendarized):
     @always_inline
     fn dayofweek(self, year: UInt16, month: UInt8, day: UInt8) -> UInt8:
         """Calculates the day of the week for a given date.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
 
         Returns:
             - day: Day of the week: [0, 6] (monday - sunday).
@@ -548,6 +767,11 @@ struct Gregorian(_Calendarized):
     @always_inline
     fn dayofyear(self, year: UInt16, month: UInt8, day: UInt8) -> UInt16:
         """Calculates the day of the year for a given date.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
 
         Returns:
             - day: Day of the year: [1, 366] (for gregorian calendar).
@@ -562,7 +786,14 @@ struct Gregorian(_Calendarized):
 
     @always_inline
     fn is_leapyear(self, year: UInt16) -> Bool:
-        """Whether the year is a leap year."""
+        """Whether the year is a leap year.
+
+        Args:
+            year: Year.
+
+        Returns:
+            Bool.
+        """
         _ = self
         return Gregorian.is_leapyear(year)
 
@@ -576,7 +807,19 @@ struct Gregorian(_Calendarized):
         minute: UInt8,
         second: UInt8,
     ) -> Bool:
-        """Whether the second is a leap second."""
+        """Whether the second is a leap second.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+
+        Returns:
+            Bool.
+        """
         _ = self, year, month, day, hour, minute, second
         # TODO: use hardcoded list in _lists ?
         return False
@@ -584,7 +827,16 @@ struct Gregorian(_Calendarized):
     fn leapsecs_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
-        """Cumulative leap seconds since the calendar's epoch start."""
+        """Cumulative leap seconds since the calendar's epoch start.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+
+        Returns:
+            The amount.
+        """
         _ = self, month, day
         if year < 1972:
             return 0
@@ -594,7 +846,16 @@ struct Gregorian(_Calendarized):
     fn leapdays_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
-        """Cumulative leap seconds since the calendar's epoch start."""
+        """Cumulative leap days since the calendar's epoch start.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+
+        Returns:
+            The amount.
+        """
         var leapdays: UInt32 = 0
         for i in range(self.min_year, year):
             if self.is_leapyear(i):
@@ -614,8 +875,19 @@ struct Gregorian(_Calendarized):
         second: UInt8,
     ) -> UInt64:
         """Seconds since the begining of the calendar's epoch.
-        unsafe_Takes leap seconds added to UTC up to the given datetime into
+        Takes leap seconds added to UTC up to the given datetime into
         account.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+
+        Returns:
+            The amount.
         """
         alias min_to_sec: UInt64 = 60
         alias hours_to_sec: UInt64 = 60 * min_to_sec
@@ -651,7 +923,20 @@ struct Gregorian(_Calendarized):
         second: UInt8,
         m_second: UInt8,
     ) -> UInt64:
-        """Miliseconds since the begining of the calendar's epoch."""
+        """Miliseconds since the begining of the calendar's epoch.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: Milisecond.
+
+        Returns:
+            The amount.
+        """
         _ = m_second
         alias sec_to_mili = 1000
         alias min_to_mili = 60 * sec_to_mili
@@ -704,10 +989,21 @@ struct Gregorian(_Calendarized):
     ) -> UInt64:
         """Nanoseconds since the begining of the calendar's epoch.
         unsafe_Takes leap seconds added to UTC up to the given datetime into
-        account.
+        account. Can only represent up to ~ 580 years since epoch start.
 
-        Notes:
-            Can only represent up to ~ 580 years since epoch start.
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: M_second.
+            u_second: U_second.
+            n_second: N_second.
+
+        Returns:
+            The amount.
         """
         alias sec_to_nano = 1000_000_000
         alias min_to_nano = 60 * sec_to_nano
@@ -772,6 +1068,23 @@ struct Gregorian(_Calendarized):
     ) -> Int:
         """Hash the given values according to the calendar's component
         lengths bitshifted, BigEndian (i.e. yyyymmdd...).
+
+        Parameters:
+            cal_h: The hashing schema (CalendarHashes).
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: M_second.
+            u_second: U_second.
+            n_second: N_second.
+
+        Returns:
+            The hash.
         """
         _ = self, n_second
         if cal_h.selected == cal_h.UINT8:
@@ -799,7 +1112,17 @@ struct Gregorian(_Calendarized):
     fn from_hash[
         cal_h: CalendarHashes = CalendarHashes()
     ](self, value: Int) -> _date:
-        """Build a date from a hashed value."""
+        """Build a date from a hashed value.
+
+        Parameters:
+            cal_h: The hashing schema (CalendarHashes).
+
+        Args:
+            value: The Hash.
+
+        Returns:
+            Tuple containing date data.
+        """
         _ = self
         var num8 = UInt8(0)
         var num16 = UInt16(0)
@@ -827,13 +1150,27 @@ struct Gregorian(_Calendarized):
     @always_inline
     @staticmethod
     fn is_leapyear(year: UInt16) -> Bool:
-        """Whether the year is a leap year."""
+        """Whether the year is a leap year.
+
+        Args:
+            year: Year.
+
+        Returns:
+            Bool.
+        """
         return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
     @staticmethod
     @always_inline
     fn from_year(year: UInt16) -> Self:
-        """Get a Ca."""
+        """Get a Calendar with min_year=year.
+
+        Args:
+            year: The year.
+
+        Returns:
+            Self.
+        """
         return Self(min_year=year)
 
 
@@ -842,26 +1179,48 @@ struct UTCFast(_Calendarized):
     """`UTCFast` Calendar."""
 
     var max_year: UInt16
+    """Maximum value of years."""
     alias max_typical_days_in_year: UInt16 = 365
+    """Maximum typical value of days in a year (no leaps)."""
     alias max_possible_days_in_year: UInt16 = 365
+    """Maximum possible value of days in a year (with leaps)."""
     alias max_month: UInt8 = 12
+    """Maximum value of months in a year."""
     alias max_hour: UInt8 = 23
+    """Maximum value of hours in a day."""
     alias max_minute: UInt8 = 59
+    """Maximum value of minutes in an hour."""
     alias max_typical_second: UInt8 = 59
+    """Maximum typical value of seconds in a minute (no leaps)."""
     alias max_possible_second: UInt8 = 59
+    """Maximum possible value of seconds in a minute (with leaps)."""
     alias max_milisecond: UInt8 = 999
+    """Maximum value of miliseconds in a second."""
     alias max_microsecond: UInt8 = 999
+    """Maximum value of microseconds in a second."""
     alias max_nanosecond: UInt8 = 999
+    """Maximum value of nanoseconds in a second."""
     var min_year: UInt16
+    """Default minimum year in the calendar."""
     alias min_month: UInt8 = 1
+    """Default minimum month."""
     alias min_day: UInt8 = 1
+    """Default minimum day."""
     alias min_hour: UInt8 = 0
+    """Default minimum hour."""
     alias min_minute: UInt8 = 0
+    """Default minimum minute."""
     alias min_second: UInt8 = 0
+    """Default minimum second."""
     alias min_milisecond: UInt16 = 0
+    """Default minimum milisecond."""
     alias min_microsecond: UInt16 = 0
+    """Default minimum microsecond."""
     alias min_nanosecond: UInt16 = 0
+    """Default minimum nanosecond."""
     alias _monthdays: List[UInt8] = List[UInt8]()
+    """An array with the amount of days each month contains without 
+    leap values. It's assumed that `len(monthdays) == max_month`."""
 
     fn __init__(
         inout self, *, max_year: UInt16 = 9999, min_year: UInt16 = 1970
@@ -874,6 +1233,10 @@ struct UTCFast(_Calendarized):
         """Calculates the day of the week and the day of the month
         that a month in a given year ends.
 
+        Args:
+            year: Year.
+            month: Month.
+
         Returns:
             - dayofweek: Day of the week.
             - dayofmonth: Day of the month.
@@ -885,19 +1248,43 @@ struct UTCFast(_Calendarized):
     fn max_second(
         self, year: UInt16, month: UInt8, day: UInt8, hour: UInt8, minute: UInt8
     ) -> UInt8:
-        """The maximum amount of seconds in a minute (usually 59)."""
+        """The maximum amount of seconds in a minute (usually 59).
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+
+        Returns:
+            The amount.
+        """
         _ = self, year, month, day, hour, minute
         return 59
 
     @always_inline
     fn max_days_in_month(self, year: UInt16, month: UInt8) -> UInt8:
-        """The maximum amount of days in a given month."""
+        """The maximum amount of days in a given month.
+
+        Args:
+            year: Year.
+            month: Month.
+
+        Returns:
+            The amount of days.
+        """
         _ = self, year, month
         return 0
 
     @always_inline
     fn dayofweek(self, year: UInt16, month: UInt8, day: UInt8) -> UInt8:
         """Calculates the day of the week for a given date.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
 
         Returns:
             - day: Day of the week: [0, 6] (monday - sunday).
@@ -909,15 +1296,27 @@ struct UTCFast(_Calendarized):
     fn dayofyear(self, year: UInt16, month: UInt8, day: UInt8) -> UInt16:
         """Calculates the day of the year for a given date.
 
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+
         Returns:
-            - day: Day of the year.
+            - day: Day of the year: [1, 366] (for gregorian calendar).
         """
         _ = self, year, month, day
         return 0
 
     @always_inline
     fn is_leapyear(self, year: UInt16) -> Bool:
-        """Is year a leap year."""
+        """Whether the year is a leap year.
+
+        Args:
+            year: Year.
+
+        Returns:
+            Bool.
+        """
         _ = self, year
         return False
 
@@ -931,21 +1330,51 @@ struct UTCFast(_Calendarized):
         minute: UInt8,
         second: UInt8,
     ) -> Bool:
-        """Whether the second is a leap second."""
+        """Whether the second is a leap second.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+
+        Returns:
+            Bool.
+        """
         _ = self, year, month, day, hour, minute, second
         return False
 
     fn leapsecs_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
-        """Cumulative leap seconds since the calendar's epoch start."""
+        """Cumulative leap seconds since the calendar's epoch start.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+
+        Returns:
+            The amount.
+        """
         _ = self, year, month, day
         return 0
 
     fn leapdays_since_epoch(
         self, year: UInt16, month: UInt8, day: UInt8
     ) -> UInt32:
-        """Cumulative leap days since the calendar's epoch start."""
+        """Cumulative leap days since the calendar's epoch start.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+
+        Returns:
+            The amount.
+        """
         _ = self, year, month, day
         return 0
 
@@ -958,7 +1387,19 @@ struct UTCFast(_Calendarized):
         minute: UInt8,
         second: UInt8,
     ) -> UInt64:
-        """Seconds since the begining of the calendar's epoch."""
+        """Seconds since the begining of the calendar's epoch.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+
+        Returns:
+            The amount.
+        """
         _ = self
         alias min_to_sec: UInt64 = 60
         alias hours_to_sec: UInt64 = 60 * min_to_sec
@@ -984,7 +1425,20 @@ struct UTCFast(_Calendarized):
         second: UInt8,
         m_second: UInt8,
     ) -> UInt64:
-        """Miliseconds since the begining of the calendar's epoch."""
+        """Miliseconds since the begining of the calendar's epoch.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: Milisecond.
+
+        Returns:
+            The amount.
+        """
         _ = self
         alias sec_to_mili = 1000
         alias min_to_mili = 60 * sec_to_mili
@@ -1016,9 +1470,21 @@ struct UTCFast(_Calendarized):
     ) -> UInt64:
         """Nanoseconds since the begining of the calendar's epoch.
         Assumes every year has 365 days and all months have 30 days.
+        Can only represent up to ~ 580 years since epoch start.
 
-        Notes:
-            Can only represent up to ~ 580 years since epoch start.
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: M_second.
+            u_second: U_second.
+            n_second: N_second.
+
+        Returns:
+            The amount.
         """
         _ = self
         alias sec_to_nano = 1000_000_000
@@ -1056,6 +1522,23 @@ struct UTCFast(_Calendarized):
     ) -> Int:
         """Hash the given values according to the calendar's component
         lengths bitshifted, BigEndian (i.e. yyyymmdd...).
+
+        Parameters:
+            cal_h: The hashing schema (CalendarHashes).
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: M_second.
+            u_second: U_second.
+            n_second: N_second.
+
+        Returns:
+            The hash.
         """
         _ = self, u_second, n_second
         if cal_h.selected == cal_h.UINT8:
@@ -1093,7 +1576,17 @@ struct UTCFast(_Calendarized):
     fn from_hash[
         cal_h: CalendarHashes = CalendarHashes()
     ](self, value: Int) -> _date:
-        """Build a date from a hashed value."""
+        """Build a date from a hashed value.
+
+        Parameters:
+            cal_h: The hashing schema (CalendarHashes).
+
+        Args:
+            value: The Hash.
+
+        Returns:
+            Tuple containing date data.
+        """
         _ = self
         var num8 = UInt8(0)
         var num16 = UInt16(0)
@@ -1143,12 +1636,26 @@ struct UTCFast(_Calendarized):
     @always_inline
     @staticmethod
     fn is_leapyear(year: UInt16) -> Bool:
-        """Whether year is a leap year."""
+        """Whether the year is a leap year.
+
+        Args:
+            year: Year.
+
+        Returns:
+            Bool.
+        """
         _ = year
         return False
 
     @staticmethod
     @always_inline
     fn from_year(year: UInt16) -> Self:
-        """Get a Calendar with min_year=year."""
+        """Get a Calendar with min_year=year.
+
+        Args:
+            year: The year.
+
+        Returns:
+            Self.
+        """
         return Self(min_year=year)

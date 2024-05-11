@@ -172,9 +172,19 @@ struct TzDT:
         )
 
     fn __bool__(self) -> Bool:
+        """If self.buf == 0.
+
+        Returns:
+            Bool.
+        """
         return self.buf == 0
 
     fn __eq__(self, other: Self) -> Bool:
+        """Eq.
+
+        Returns:
+            Bool.
+        """
         return self.buf == other.buf
 
 
@@ -275,6 +285,9 @@ struct ZoneInfoFile:
 
         Args:
             index: The index in the file.
+
+        Returns:
+            An Optional `ZoneDST`.
         """
         if self._index > UInt8.MAX_FINITE:
             return None
@@ -335,6 +348,9 @@ struct ZoneInfoMem32:
 
         Args:
             key: The tz_str.
+
+        Returns:
+            An Optional `ZoneDST`.
         """
 
         var value = self._zones.find(key)
@@ -367,6 +383,9 @@ struct ZoneInfoMem8:
 
         Args:
             key: The tz_str.
+
+        Returns:
+            An Optional `Offset`.
         """
         var value = self._zones.find(key)
         if not value:

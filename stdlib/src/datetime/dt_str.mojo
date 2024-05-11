@@ -37,10 +37,16 @@ struct IsoFormat:
     """e.g. 1970-01-01T00:00:00+0000"""
     alias TZD_REGEX = "+|-[0-9]{2}:?[0-9]{2}"
     var selected: StringLiteral
+    """The selected IsoFormat."""
 
     fn __init__(
         inout self, selected: StringLiteral = self.YYYY_MM_DD_T_MM_HH_SS
     ):
+        """Construct an IsoFormat with selected fmt string.
+
+        Args:
+            selected: The selected IsoFormat.
+        """
         debug_assert(
             selected == self.YYYYMMDD
             or selected == self.YYYY_MM_DD
@@ -91,7 +97,7 @@ fn to_iso_compact(
         second: Second.
 
     Returns:
-        The string.
+        String.
     """
     var s = _get_strings(year, month, day, hour, minute, second)
     return s[0] + s[1] + s[2] + s[3] + s[4] + s[5]
@@ -112,7 +118,7 @@ fn to_iso(
         second: Second.
 
     Returns:
-        The string.
+        String.
     """
     var s = _get_strings(year, month, day, hour, minute, second)
     return s[0] + "-" + s[1] + "-" + s[2] + "T" + s[3] + ":" + s[4] + ":" + s[5]
@@ -203,7 +209,7 @@ fn strptime[
         s: The string.
 
     Returns:
-        An optional tuple with the result.
+        An Optional tuple with the result.
     """
     # TODO: native
     try:
@@ -250,7 +256,7 @@ fn strftime[
         second: Second.
 
     Returns:
-        The string.
+        String.
 
     - TODO
         - localization.
@@ -288,7 +294,7 @@ fn strftime(
         second: Second.
 
     Returns:
-        The string.
+        String.
 
     - TODO
         - localization.

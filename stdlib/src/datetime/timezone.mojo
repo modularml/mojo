@@ -161,12 +161,30 @@ struct TimeZone[
         return self.offset_h, self.offset_m, self.sign
 
     fn __str__(self) -> StringLiteral:
+        """Str.
+
+        Returns:
+            String.
+        """
         return self.tz_str
 
     fn __repr__(self) -> StringLiteral:
+        """Repr.
+
+        Returns:
+            String.
+        """
         return self.__str__()
 
     fn __eq__(self, other: Self) -> Bool:
+        """Eq.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return (
             self.tz_str == other.tz_str
             and self.offset_h == other.offset_h
@@ -174,9 +192,22 @@ struct TimeZone[
         )
 
     fn __ne__(self, other: Self) -> Bool:
+        """Ne.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return not (self == other)
 
     fn to_iso(self) -> String:
+        """Return the Offset's ISO8601 representation.
+
+        Returns:
+            String.
+        """
         var sign = "+" if self.sign == 1 else "-"
         var hh = self.offset_h if self.offset_h > 9 else "0" + str(
             self.offset_h
@@ -204,6 +235,9 @@ struct TimeZone[
             offset_h: Offset for the hour.
             offset_m: Offset for the minute.
             sign: Sign: {1, -1}.
+
+        Returns:
+            Self.
         """
         _ = year, month, day, offset_h, offset_m, sign
         # TODO: it should create an Etc/UTC-X TimeZone

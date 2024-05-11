@@ -85,7 +85,7 @@ struct DateTime64(Hashable, Stringable):
     ):
         """Construct a `DateTime64` from valid values.
         UTCCalendar is the default.
-        
+
         Args:
             year: Year.
             month: Month.
@@ -262,57 +262,175 @@ struct DateTime64(Hashable, Stringable):
         return self.m_second
 
     fn __add__(owned self, owned other: Self) -> Self:
+        """Add.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Self.
+        """
         self.m_second += other.m_second
         return self
 
     fn __sub__(owned self, owned other: Self) -> Self:
+        """Subtract.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Self.
+        """
         self.m_second -= other.m_second
         return self
 
     fn __iadd__(inout self, owned other: Self):
+        """Add Immediate.
+
+        Args:
+            other: Other.
+        """
         self.m_second += other.m_second
 
     fn __isub__(inout self, owned other: Self):
+        """Subtract Immediate.
+
+        Args:
+            other: Other.
+        """
         self.m_second -= other.m_second
 
     fn __hash__(self) -> Int:
+        """Hash.
+
+        Returns:
+            Result.
+        """
         return int(self.hash)
 
     fn __eq__(self, other: Self) -> Bool:
+        """Eq.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.m_second == other.m_second
 
     fn __ne__(self, other: Self) -> Bool:
+        """Ne.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.m_second != other.m_second
 
     fn __gt__(self, other: Self) -> Bool:
+        """Gt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.m_second > other.m_second
 
     fn __ge__(self, other: Self) -> Bool:
+        """Ge.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.m_second >= other.m_second
 
     fn __le__(self, other: Self) -> Bool:
+        """Le.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.m_second <= other.m_second
 
     fn __lt__(self, other: Self) -> Bool:
+        """Lt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.m_second < other.m_second
 
     fn __invert__(owned self) -> Self:
+        """Invert.
+
+        Returns:
+            Self.
+        """
         self.hash = ~self.hash
         return self
 
     fn __and__(self, other: Self) -> UInt64:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash & other.hash
 
     fn __or__(self, other: Self) -> UInt64:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash | other.hash
 
     fn __xor__(self, other: Self) -> UInt64:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash ^ other.hash
 
     fn __int__(self) -> UInt64:
+        """Int.
+
+        Returns:
+            Result.
+        """
         return self.m_second
 
     fn __str__(self) -> String:
+        """Str.
+
+        Returns:
+            String.
+        """
         return self.to_iso()
 
     fn add(owned self, seconds: Int = 0, m_seconds: Int = 0) -> Self:
@@ -515,15 +633,13 @@ struct DateTime32(Hashable, Stringable):
     ):
         """Construct a `DateTime32 ` from valid values.
         UTCCalendar is the default.
-        
+
         Args:
             year: Year.
             month: Month.
             day: Day.
             hour: Hour.
             minute: Minute.
-            second: Second.
-            m_second: M_second.
             calendar: Calendar.
             hash_val: Hash_val.
         """
@@ -624,57 +740,175 @@ struct DateTime32(Hashable, Stringable):
         return s
 
     fn __add__(owned self, owned other: Self) -> Self:
+        """Add.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Self.
+        """
         self.minute += other.minute
         return self
 
     fn __sub__(owned self, owned other: Self) -> Self:
+        """Subtract.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Self.
+        """
         self.minute -= other.minute
         return self
 
     fn __iadd__(inout self, owned other: Self):
+        """Add Immediate.
+
+        Args:
+            other: Other.
+        """
         self.minute += other.minute
 
     fn __isub__(inout self, owned other: Self):
+        """Subtract Immediate.
+
+        Args:
+            other: Other.
+        """
         self.minute -= other.minute
 
     fn __hash__(self) -> Int:
+        """Hash.
+
+        Returns:
+            Result.
+        """
         return int(self.hash)
 
-    fn __invert__(owned self) -> Self:
-        self.hash = ~self.hash
-        return self
-
     fn __eq__(self, other: Self) -> Bool:
+        """Eq.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.minute == other.minute
 
     fn __ne__(self, other: Self) -> Bool:
+        """Ne.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.minute != other.minute
 
     fn __gt__(self, other: Self) -> Bool:
+        """Gt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.minute > other.minute
 
     fn __ge__(self, other: Self) -> Bool:
+        """Ge.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.minute >= other.minute
 
     fn __le__(self, other: Self) -> Bool:
+        """Le.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.minute <= other.minute
 
     fn __lt__(self, other: Self) -> Bool:
+        """Lt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.minute < other.minute
 
+    fn __invert__(owned self) -> Self:
+        """Invert.
+
+        Returns:
+            Self.
+        """
+        self.hash = ~self.hash
+        return self
+
     fn __and__(self, other: Self) -> UInt32:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash & other.hash
 
     fn __or__(self, other: Self) -> UInt32:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash | other.hash
 
     fn __xor__(self, other: Self) -> UInt32:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash ^ other.hash
 
     fn __int__(self) -> UInt32:
+        """Int.
+
+        Returns:
+            Result.
+        """
         return self.minute
 
     fn __str__(self) -> String:
+        """Str.
+
+        Returns:
+            String.
+        """
         return self.to_iso()
 
     fn add(owned self, minutes: Int = 0, seconds: Int = 0) -> Self:
@@ -879,7 +1113,7 @@ struct DateTime16(Hashable, Stringable):
     ):
         """Construct a `DateTime16` from valid values.
         UTCCalendar is the default.
-        
+
         Args:
             year: Year.
             month: Month.
@@ -976,57 +1210,175 @@ struct DateTime16(Hashable, Stringable):
         return self.hour.cast[DType.uint32]() * 60 * 60
 
     fn __add__(owned self, owned other: Self) -> Self:
+        """Add.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Self.
+        """
         self.hour += other.hour
         return self
 
     fn __sub__(owned self, owned other: Self) -> Self:
+        """Subtract.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Self.
+        """
         self.hour -= other.hour
         return self
 
     fn __iadd__(inout self, owned other: Self):
+        """Add Immediate.
+
+        Args:
+            other: Other.
+        """
         self.hour += other.hour
 
     fn __isub__(inout self, owned other: Self):
+        """Subtract Immediate.
+
+        Args:
+            other: Other.
+        """
         self.hour -= other.hour
 
     fn __hash__(self) -> Int:
+        """Hash.
+
+        Returns:
+            Result.
+        """
         return int(self.hash)
 
-    fn __invert__(owned self) -> Self:
-        self.hash = ~self.hash
-        return self
-
     fn __eq__(self, other: Self) -> Bool:
+        """Eq.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour == other.hour
 
     fn __ne__(self, other: Self) -> Bool:
+        """Ne.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour != other.hour
 
     fn __gt__(self, other: Self) -> Bool:
+        """Gt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour > other.hour
 
     fn __ge__(self, other: Self) -> Bool:
+        """Ge.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour >= other.hour
 
     fn __le__(self, other: Self) -> Bool:
+        """Le.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour <= other.hour
 
     fn __lt__(self, other: Self) -> Bool:
+        """Lt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour < other.hour
 
+    fn __invert__(owned self) -> Self:
+        """Invert.
+
+        Returns:
+            Self.
+        """
+        self.hash = ~self.hash
+        return self
+
     fn __and__(self, other: Self) -> UInt16:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash & other.hash
 
     fn __or__(self, other: Self) -> UInt16:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash | other.hash
 
     fn __xor__(self, other: Self) -> UInt16:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash ^ other.hash
 
     fn __int__(self) -> UInt16:
+        """Int.
+
+        Returns:
+            Result.
+        """
         return self.hour
 
     fn __str__(self) -> String:
+        """Str.
+
+        Returns:
+            String.
+        """
         return self.to_iso()
 
     fn add(owned self, hours: Int = 0, seconds: Int = 0) -> Self:
@@ -1218,7 +1570,7 @@ struct DateTime8(Hashable, Stringable):
     ):
         """Construct a `DateTime8 ` from valid values.
         UTCCalendar is the default.
-        
+
         Args:
             year: Year.
             month: Month.
@@ -1307,57 +1659,175 @@ struct DateTime8(Hashable, Stringable):
         return self.hour.cast[DType.uint16]() * 60 * 60
 
     fn __add__(owned self, owned other: Self) -> Self:
+        """Add.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Self.
+        """
         self.hour += other.hour
         return self
 
     fn __sub__(owned self, owned other: Self) -> Self:
+        """Subtract.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Self.
+        """
         self.hour -= other.hour
         return self
 
     fn __iadd__(inout self, owned other: Self):
+        """Add Immediate.
+
+        Args:
+            other: Other.
+        """
         self.hour += other.hour
 
     fn __isub__(inout self, owned other: Self):
+        """Subtract Immediate.
+
+        Args:
+            other: Other.
+        """
         self.hour -= other.hour
 
     fn __hash__(self) -> Int:
+        """Hash.
+
+        Returns:
+            Result.
+        """
         return int(self.hash)
 
-    fn __invert__(owned self) -> Self:
-        self.hash = ~self.hash
-        return self
-
     fn __eq__(self, other: Self) -> Bool:
+        """Eq.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour == other.hour
 
     fn __ne__(self, other: Self) -> Bool:
+        """Ne.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour != other.hour
 
     fn __gt__(self, other: Self) -> Bool:
+        """Gt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour > other.hour
 
     fn __ge__(self, other: Self) -> Bool:
+        """Ge.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour >= other.hour
 
     fn __le__(self, other: Self) -> Bool:
+        """Le.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour <= other.hour
 
     fn __lt__(self, other: Self) -> Bool:
+        """Lt.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Bool.
+        """
         return self.hour < other.hour
 
+    fn __invert__(owned self) -> Self:
+        """Invert.
+
+        Returns:
+            Self.
+        """
+        self.hash = ~self.hash
+        return self
+
     fn __and__(self, other: Self) -> UInt8:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash & other.hash
 
     fn __or__(self, other: Self) -> UInt8:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash | other.hash
 
     fn __xor__(self, other: Self) -> UInt8:
+        """And.
+
+        Args:
+            other: Other.
+
+        Returns:
+            Result.
+        """
         return self.hash ^ other.hash
 
     fn __int__(self) -> UInt8:
+        """Int.
+
+        Returns:
+            Result.
+        """
         return self.hour
 
     fn __str__(self) -> String:
+        """Str.
+
+        Returns:
+            String.
+        """
         return self.to_iso()
 
     fn add(owned self, hours: Int = 0, seconds: Int = 0) -> Self:
