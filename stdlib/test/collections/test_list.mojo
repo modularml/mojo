@@ -744,18 +744,20 @@ def test_list_mult():
 def test_bytes_with_small_size_optimization():
     var small_list = List[Int8, _small_buffer_size=3]()
     assert_equal(len(small_list), 0)
+
     small_list.append(0)
     small_list.append(10)
     small_list.append(20)
 
     assert_equal(len(small_list), 3)
+    assert_equal(small_list.capacity, 3)
+
+    # We should still be on the stack
+    assert_true(small_list._sbo_is_in_use())
 
     assert_equal(small_list[0], 0)
     assert_equal(small_list[1], 10)
     assert_equal(small_list[2], 20)
-
-    # We should still be on the stack
-    assert_true(small_list._sbo_is_in_use())
 
     # We check that the pointer makes sense
     var pointer = small_list.unsafe_ptr()
