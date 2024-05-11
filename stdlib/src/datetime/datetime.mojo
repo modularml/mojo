@@ -13,7 +13,7 @@
 """Nanosecond resolution `DateTime` module.
 
 Notes:
-    Optional extra: [`TimeZone` and DST data sources](
+    - IANA is supported: [`TimeZone` and DST data sources](
         http://www.iana.org/time-zones/repository/tz-link.html).
         [List of TZ identifiers (`tz_str`)](
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
@@ -44,7 +44,9 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     Parameters:
         iana: What timezones from the [IANA database](
             http://www.iana.org/time-zones/repository/tz-link.html)
-            are used. If None, defaults to only using the offsets
+            are used. [List of TZ identifiers (`tz_str`)](
+            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+            ). If None, defaults to only using the offsets
             as is, no daylight saving or special exceptions.
 
     - Max Resolution:
@@ -63,10 +65,6 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         - The default hash that is used for logical and bitwise
             operations has only microsecond resolution.
         - The Default `DateTime` hash has only Microsecond resolution.
-        - Optional extra: [`TimeZone` and DST data sources](
-            http://www.iana.org/time-zones/repository/tz-link.html).
-            [List of TZ identifiers (`tz_str`)](
-            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
     """
 
     var year: UInt16

@@ -13,7 +13,7 @@
 """`Date` module.
 
 - Notes:
-    - Optional extra: [`TimeZone` and DST data sources](
+    - IANA is supported: [`TimeZone` and DST data sources](
         http://www.iana.org/time-zones/repository/tz-link.html).
         [List of TZ identifiers (`tz_str`)](
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
@@ -40,7 +40,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     Parameters:
         iana: What timezones from the [IANA database](
             http://www.iana.org/time-zones/repository/tz-link.html)
-            are used. If None, defaults to only using the offsets
+            are used. [List of TZ identifiers (`tz_str`)](
+            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+            ). If None, defaults to only using the offsets
             as is, no daylight saving or special exceptions.
 
     - Max Resolution:
@@ -48,12 +50,6 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         - month: Up to month 256.
         - day: Up to day 256.
         - hash: 32 bits.
-
-    - Notes:
-        - Optional extra: [`TimeZone` and DST data sources](
-            http://www.iana.org/time-zones/repository/tz-link.html).
-            [List of TZ identifiers (`tz_str`)](
-            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
     """
 
     var year: UInt16

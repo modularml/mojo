@@ -13,7 +13,9 @@
 """`TimeZone` module.
 
 - Notes:
-    - [List of TZ identifiers (`tz_str`)](
+    - IANA is supported: [`TimeZone` and DST data sources](
+        http://www.iana.org/time-zones/repository/tz-link.html).
+        [List of TZ identifiers (`tz_str`)](
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 """
 
