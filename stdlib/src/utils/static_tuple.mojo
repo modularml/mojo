@@ -415,4 +415,5 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Returns:
             A pointer to the data.
         """
-        return UnsafePointer(self[]._get_reference_unsafe(0))
+        # YOLO, we're crazy people. This is highly unsafe.
+        return UnsafePointer(self).bitcast[Self.ElementType]()

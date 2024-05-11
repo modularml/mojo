@@ -162,9 +162,42 @@ def test_array_str():
     assert_equal(arr3[0], "hi")
 
 
+def test_array_int_pointer():
+    var arr = InlineArray[Int, 5](0, 10, 20, 30, 40)
+
+    var ptr = arr.unsafe_ptr()
+    assert_equal(ptr[0], 0)
+    assert_equal(ptr[1], 10)
+    assert_equal(ptr[2], 20)
+    assert_equal(ptr[3], 30)
+    assert_equal(ptr[4], 40)
+
+    ptr[0] = 0
+    ptr[1] = 1
+    ptr[2] = 2
+    ptr[3] = 3
+    ptr[4] = 4
+
+    assert_equal(arr[0], 0)
+    assert_equal(arr[1], 1)
+    assert_equal(arr[2], 2)
+    assert_equal(arr[3], 3)
+    assert_equal(arr[4], 4)
+
+    assert_equal(ptr[0], 0)
+    assert_equal(ptr[1], 1)
+    assert_equal(ptr[2], 2)
+    assert_equal(ptr[3], 3)
+    assert_equal(ptr[4], 4)
+
+    # We make sure it lives long enough
+    _ = arr
+
+
 def main():
     test_static_tuple()
     test_static_int_tuple()
     test_tuple_literal()
     test_array_int()
     test_array_str()
+    test_array_int_pointer()
