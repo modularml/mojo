@@ -16,7 +16,7 @@
 
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol
-from memory import DTypePointer, UnsafePointer
+from memory import DTypePointer, UnsafePointer, memcmp
 
 
 # ===----------------------------------------------------------------------=== #
@@ -237,12 +237,7 @@ struct StringRef(
         Returns:
           True if the strings match and False otherwise.
         """
-        if len(self) != len(rhs):
-            return False
-        for i in range(len(self)):
-            if self.data.load(i) != rhs.data.load(i):
-                return False
-        return True
+        return not (self != rhs)
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: StringRef) -> Bool:
@@ -254,7 +249,61 @@ struct StringRef(
         Returns:
           True if the strings do not match and False otherwise.
         """
-        return not (self == rhs)
+        return len(self) != len(rhs) or memcmp(self.data, rhs.data, len(self))
+
+    @always_inline("nodebug")
+    fn __lt__(self, rhs: StringRef) -> Bool:
+        """Compare this StringRef to the RHS using LT comparison.
+
+        Args:
+            rhs: The other StringRef to compare against.
+
+        Returns:
+            True if this string is strictly less than the RHS string and False otherwise.
+        """
+        var len1 = len(self)
+        var len2 = len(rhs)
+
+        if len1 < len2:
+            return memcmp(self.data, rhs.data, len1) <= 0
+        else:
+            return memcmp(self.data, rhs.data, len2) < 0
+
+    @always_inline("nodebug")
+    fn __le__(self, rhs: StringRef) -> Bool:
+        """Compare this StringRef to the RHS using LE comparison.
+
+        Args:
+            rhs: The other StringRef to compare against.
+
+        Returns:
+            True if this string is less than or equal to the RHS string and False otherwise.
+        """
+        return not (rhs < self)
+
+    @always_inline("nodebug")
+    fn __gt__(self, rhs: StringRef) -> Bool:
+        """Compare this StringRef to the RHS using GT comparison.
+
+        Args:
+            rhs: The other StringRef to compare against.
+
+        Returns:
+            True if this string is strictly greater than the RHS string and False otherwise.
+        """
+        return rhs < self
+
+    @always_inline("nodebug")
+    fn __ge__(self, rhs: StringRef) -> Bool:
+        """Compare this StringRef to the RHS using GE comparison.
+
+        Args:
+            rhs: The other StringRef to compare against.
+
+        Returns:
+            True if this string is greater than or equal to the RHS string and False otherwise.
+        """
+        return not (self < rhs)
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> StringRef:
