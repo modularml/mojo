@@ -10,16 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the utils package."""
-
-from .index import (
-    StaticIntTuple,
-    Index,
-    product,
-)
-from .inlined_string import InlinedString
-from .loop import unroll
-from .span import Span
-from .static_tuple import StaticTuple, InlineArray
-from .stringref import StringRef
-from .variant import Variant
+"""IO constants and functions."""
+alias stdout: Int = 1
+alias stderr: Int = 2
