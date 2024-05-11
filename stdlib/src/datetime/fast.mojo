@@ -13,22 +13,22 @@
 """Fast implementations of `DateTime` module. All assume no leap seconds or
 years.
 
-`DateTime64`:
+- `DateTime64`:
     This is a "normal" `DateTime` with milisecond resolution.
 
-`DateTime32`:
+- `DateTime32`:
     This is a "normal" `DateTime` with minute resolution.
 
-`DateTime16`:
+- `DateTime16`:
     This is a `DateTime` with hour resolution, it can be used as a 
     year, dayofyear, hour representation.
 
-`DateTime8`:
+- `DateTime8`:
     This is a `DateTime` with hour resolution, it can be used as a 
     dayofweek, hour representation.
 
-Notes:
-    The caveats of each implementation are better explained in 
+- Notes:
+    - The caveats of each implementation are better explained in 
     each struct's docstrings.
 """
 from time import time
@@ -52,20 +52,20 @@ struct DateTime64(Hashable, Stringable):
     timezone and epoch and that there are no leap
     seconds or days. UTCCalendar is the default.
 
-    Hash Resolution:
-        year: Up to year 134_217_728.
-        month: Up to month 32.
-        day: Up to day 32.
-        hour: Up to hour 32.
-        minute: Up to minute 64.
-        second: Up to second 64.
-        m_second: Up to m_second 1024.
+    - Hash Resolution:
+        - year: Up to year 134_217_728.
+        - month: Up to month 32.
+        - day: Up to day 32.
+        - hour: Up to hour 32.
+        - minute: Up to minute 64.
+        - second: Up to second 64.
+        - m_second: Up to m_second 1024.
 
-    Milisecond Resolution (Gregorian as reference):
-        year: Up to year 584_942_417 since calendar epoch.
+    - Milisecond Resolution (Gregorian as reference):
+        - year: Up to year 584_942_417 since calendar epoch.
 
-    Notes:
-        Once methods that alter the underlying m_seconds
+    - Notes:
+        - Once methods that alter the underlying m_seconds
             are used, the hash and binary operations thereof
             shouldn't be used since they are invalid.
     """
@@ -372,18 +372,18 @@ struct DateTime32(Hashable, Stringable):
     the same timezone and epoch and that there are no leap
     seconds or days. UTCCalendar is the default.
 
-    Hash Resolution:
-        year: Up to year 4_096.
-        month: Up to month 16.
-        day: Up to day 32.
-        hour: Up to hour 32.
-        minute: Up to minute 64.
+    - Hash Resolution:
+        - year: Up to year 4_096.
+        - month: Up to month 16.
+        - day: Up to day 32.
+        - hour: Up to hour 32.
+        - minute: Up to minute 64.
 
-    Minute Resolution (Gregorian as reference):
-        year: Up to year 8_171 since calendar epoch.
+    - Minute Resolution (Gregorian as reference):
+        - year: Up to year 8_171 since calendar epoch.
 
-    Notes:
-        Once methods that alter the underlying minutes
+    - Notes:
+        - Once methods that alter the underlying minutes
             are used, the hash and binary operations thereof
             shouldn't be used since they are invalid.
     """
@@ -667,16 +667,16 @@ struct DateTime16(Hashable, Stringable):
     the same timezone and epoch and that there are no leap
     seconds or days. UTCCalendar is the default.
 
-    Hash Resolution:
+    - Hash Resolution:
         year: Up to year 4.
         day: Up to day 512.
         hour: Up to hour 32.
 
-    Hour Resolution (Gregorian as reference):
-        year: Up to year 7 since calendar epoch.
+    - Hour Resolution (Gregorian as reference):
+        - year: Up to year 7 since calendar epoch.
 
-    Notes:
-        Once methods that alter the underlying m_seconds
+    - Notes:
+        - Once methods that alter the underlying m_seconds
             are used, the hash and binary operations thereof
             shouldn't be used since they are invalid.
     """
@@ -932,15 +932,15 @@ struct DateTime8(Hashable, Stringable):
     the same timezone and epoch and that there are no leap
     seconds or days. UTCCalendar is the default.
 
-    Hash Resolution:
-        day: Up to day 8.
-        hour: Up to hour 32.
+    - Hash Resolution:
+        - day: Up to day 8.
+        - hour: Up to hour 32.
 
-    Hour Resolution (Gregorian as reference):
-        hour: Up to hour 256 (~ 10 days) since calendar epoch.
+    - Hour Resolution (Gregorian as reference):
+        - hour: Up to hour 256 (~ 10 days) since calendar epoch.
 
-    Notes:
-        Once methods that alter the underlying m_seconds
+    - Notes:
+        - Once methods that alter the underlying m_seconds
             are used, the hash and binary operations thereof
             shouldn't be used since they are invalid.
     """

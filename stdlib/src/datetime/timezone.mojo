@@ -12,8 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 """`TimeZone` module.
 
-Notes:
-    [List of TZ identifiers (`tz_str`)](
+- Notes:
+    - [List of TZ identifiers (`tz_str`)](
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 """
 

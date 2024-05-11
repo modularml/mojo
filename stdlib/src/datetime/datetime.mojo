@@ -47,23 +47,23 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             are used. If None, defaults to only using the offsets
             as is, no daylight saving or special exceptions.
 
-    Max Resolution:
-        year: Up to year 65_536.
-        month: Up to month 256.
-        day: Up to day 256.
-        hour: Up to hour 256.
-        minute: Up to minute 256.
-        second: Up to second 256.
-        m_second: Up to m_second 65_536.
-        u_second: Up to u_second 65_536.
-        n_second: Up to n_second 65_536.
-        hash: 64 bits.
+    - Max Resolution:
+        - year: Up to year 65_536.
+        - month: Up to month 256.
+        - day: Up to day 256.
+        - hour: Up to hour 256.
+        - minute: Up to minute 256.
+        - second: Up to second 256.
+        - m_second: Up to m_second 65_536.
+        - u_second: Up to u_second 65_536.
+        - n_second: Up to n_second 65_536.
+        - hash: 64 bits.
 
-    Notes:
-        The default hash that is used for logical and bitwise
+    - Notes:
+        - The default hash that is used for logical and bitwise
             operations has only microsecond resolution.
-        The Default `DateTime` hash has only Microsecond resolution.
-        Optional extra: [`TimeZone` and DST data sources](
+        - The Default `DateTime` hash has only Microsecond resolution.
+        - Optional extra: [`TimeZone` and DST data sources](
             http://www.iana.org/time-zones/repository/tz-link.html).
             [List of TZ identifiers (`tz_str`)](
             https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).

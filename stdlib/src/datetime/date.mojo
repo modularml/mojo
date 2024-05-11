@@ -12,8 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 """`Date` module.
 
-Notes:
-    Optional extra: [`TimeZone` and DST data sources](
+- Notes:
+    - Optional extra: [`TimeZone` and DST data sources](
         http://www.iana.org/time-zones/repository/tz-link.html).
         [List of TZ identifiers (`tz_str`)](
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
@@ -43,14 +43,14 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             are used. If None, defaults to only using the offsets
             as is, no daylight saving or special exceptions.
 
-    Max Resolution:
-        year: Up to year 65_536.
-        month: Up to month 256.
-        day: Up to day 256.
-        hash: 32 bits.
+    - Max Resolution:
+        - year: Up to year 65_536.
+        - month: Up to month 256.
+        - day: Up to day 256.
+        - hash: 32 bits.
 
-    Notes:
-        Optional extra: [`TimeZone` and DST data sources](
+    - Notes:
+        - Optional extra: [`TimeZone` and DST data sources](
             http://www.iana.org/time-zones/repository/tz-link.html).
             [List of TZ identifiers (`tz_str`)](
             https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
