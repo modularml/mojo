@@ -520,6 +520,17 @@ struct String(
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
+    """ Useful string aliases. """
+    alias WHITESPACE = String(" \n\t\r\f\v")
+    alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
+    alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
+    alias DIGITS = String("0123456789")
+    alias HEX_DIGITS = String.DIGITS + String("abcdef") + String("ABCDEF")
+    alias OCT_DIGITS = String("01234567")
+    alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
+    alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
+
     @always_inline
     fn __str__(self) -> String:
         return self
@@ -1360,43 +1371,46 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self) -> String:
-        """Return a copy of the string with leading and trailing whitespace characters removed.
+    fn strip(self, chars: String = String.WHITESPACE) -> String:
+        """Return a copy of the string with leading and trailing characters removed.
 
-        See `isspace` for a list of whitespace characters
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no leading or trailing whitespace characters.
+          A copy of the string with no leading or trailing characters.
         """
 
-        return self.lstrip().rstrip()
+        return self.lstrip(chars).rstrip(chars)
 
-    fn rstrip(self) -> String:
-        """Return a copy of the string with trailing whitespace characters removed.
+    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
+        """Return a copy of the string with trailing characters removed.
 
-        See `isspace` for a list of whitespace characters
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no trailing whitespace characters.
+          A copy of the string with no trailing characters.
         """
 
         var r_idx = len(self)
-        while r_idx > 0 and isspace(ord(self[r_idx - 1])):
+        while r_idx > 0 and self[r_idx - 1] in chars:
             r_idx -= 1
 
         return self[:r_idx]
 
-    fn lstrip(self) -> String:
-        """Return a copy of the string with leading whitespace characters removed.
+    fn lstrip(self, chars: String = String.WHITESPACE) -> String:
+        """Return a copy of the string with leading characters removed.
 
-        See `isspace` for a list of whitespace characters
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no leading whitespace characters.
+          A copy of the string with no leading characters.
         """
 
         var l_idx = 0
-        while l_idx < len(self) and isspace(ord(self[l_idx])):
+        while l_idx < len(self) and self[l_idx] in chars:
             l_idx += 1
 
         return self[l_idx:]
