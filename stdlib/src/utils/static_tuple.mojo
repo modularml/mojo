@@ -404,3 +404,11 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             normalized_idx += size
 
         return self[]._get_reference_unsafe(normalized_idx)
+
+    fn get_storage_unsafe_pointer(self) -> UnsafePointer[ElementType]:
+        """Get an `UnsafePointer` to the underlying storage of the array.
+
+        Returns:
+            An `UnsafePointer` to the underlying storage.
+        """
+        return UnsafePointer(self._array).bitcast[ElementType]()

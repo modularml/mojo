@@ -645,32 +645,35 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         """
         # Reserve space for opening and closing parentheses, plus each element
         # and its trailing commas.
-        var buf = String._buffer_type()
         var initial_buffer_size = 2
         for i in range(size):
             initial_buffer_size += _calc_initial_buffer_size(self[i]) + 2
-        buf.reserve(initial_buffer_size)
+        var string_buffer = String._buffer_type(capacity=initial_buffer_size)
+        string_buffer.resize(initial_buffer_size, 0)
+        var buf_data = string_buffer.get_storage_unsafe_pointer()
+        var buffer_size = 0
 
         # Print an opening `(`.
-        buf.size += _snprintf(buf.data, 2, "(")
+        buffer_size += _snprintf(buf_data, 2, "(")
         for i in range(size):
             # Print separators between each element.
             if i != 0:
-                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
-            buf.size += _snprintf(
-                buf.data + buf.size,
+                buffer_size += _snprintf(buf_data + buffer_size, 3, ", ")
+            buffer_size += _snprintf(
+                buf_data + buffer_size,
                 _calc_initial_buffer_size(self[i]),
                 _get_dtype_printf_format[DType.index](),
                 self[i],
             )
         # Single element tuples should be printed with a trailing comma.
         if size == 1:
-            buf.size += _snprintf(buf.data + buf.size, 2, ",")
+            buffer_size += _snprintf(buf_data + buffer_size, 2, ",")
         # Print a closing `)`.
-        buf.size += _snprintf(buf.data + buf.size, 2, ")")
+        buffer_size += _snprintf(buf_data + buffer_size, 2, ")")
 
-        buf.size += 1  # for the null terminator.
-        return buf^
+        buffer_size += 1  # for the null terminator.
+        string_buffer.resize(buffer_size, 0)
+        return String(_buffer=string_buffer^)
 
 
 # ===----------------------------------------------------------------------===#

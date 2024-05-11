@@ -25,6 +25,7 @@ from testing import (
 )
 
 from utils import StringRef
+from builtin.string import _BytesListWithSmallSizeOptimization
 
 
 @value
@@ -753,6 +754,58 @@ def test_string_mul():
     assert_equal(String("ab") * 5, "ababababab")
 
 
+def test_bytes_with_small_size_optimization():
+    var small_list = _BytesListWithSmallSizeOptimization[3]()
+    assert_equal(len(small_list), 0)
+    small_list.append(0)
+    small_list.append(10)
+    small_list.append(20)
+
+    assert_equal(len(small_list), 3)
+
+    assert_equal(small_list[0], 0)
+    assert_equal(small_list[1], 10)
+    assert_equal(small_list[2], 20)
+
+    # We should still be on the stack
+    assert_true(small_list._use_sso())
+
+    # We check that the pointer makes sense
+    var pointer = small_list.get_storage_unsafe_pointer()
+    assert_equal(pointer[0], 0)
+    assert_equal(pointer[1], 10)
+    assert_equal(pointer[2], 20)
+
+    small_list.append(30)
+    assert_equal(small_list[0], 0)
+    assert_equal(small_list[1], 10)
+    assert_equal(small_list[2], 20)
+    assert_equal(small_list[3], 30)
+    assert_false(small_list._use_sso())
+    assert_equal(len(small_list), 4)
+
+    small_list[1] = 100
+    assert_equal(small_list[1], 100)
+
+    small_list[3] = 13
+    assert_equal(small_list[3], 13)
+
+    small_list.append(42)
+    assert_equal(small_list[4], 42)
+    assert_equal(len(small_list), 5)
+
+    # We check that the pointer makes sense
+    pointer = small_list.get_storage_unsafe_pointer()
+    assert_equal(pointer[0], 0)
+    assert_equal(pointer[1], 100)
+    assert_equal(pointer[2], 20)
+    assert_equal(pointer[3], 13)
+    assert_equal(pointer[4], 42)
+
+    # Otherwise, everything is destroyed before we had the chance to check the pointer
+    _ = small_list
+
+
 def main():
     test_constructors()
     test_copy()
@@ -794,3 +847,4 @@ def main():
     test_removesuffix()
     test_intable()
     test_string_mul()
+    test_bytes_with_small_size_optimization()
