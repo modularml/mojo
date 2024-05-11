@@ -182,6 +182,9 @@ struct TzDT:
     fn __eq__(self, other: Self) -> Bool:
         """Eq.
 
+        Args:
+            other: Other.
+
         Returns:
             Bool.
         """

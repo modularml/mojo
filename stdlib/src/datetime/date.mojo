@@ -298,7 +298,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
         Notes:
             On overflow, the `Date` starts from the beginning of the
-            calendar's epoch and keeps evaluating until valid
+            calendar's epoch and keeps evaluating until valid.
         """
         var dt = self._from_overflow(
             int(self.year + years),
@@ -343,7 +343,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
         Notes:
             On overflow, the `Date` goes to the end of the
-            calendar's epoch and keeps evaluating until valid
+            calendar's epoch and keeps evaluating until valid.
         """
         var dt = self._from_overflow(
             int(self.year) - years,
@@ -480,6 +480,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn __eq__(self, other: Self) -> Bool:
         """Eq.
 
+        Args:
+            other: Other.
+
         Returns:
             Bool.
         """
@@ -487,6 +490,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
     fn __ne__(self, other: Self) -> Bool:
         """Ne.
+
+        Args:
+            other: Other.
 
         Returns:
             Bool.
@@ -496,6 +502,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn __gt__(self, other: Self) -> Bool:
         """Gt.
 
+        Args:
+            other: Other.
+
         Returns:
             Bool.
         """
@@ -503,6 +512,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
     fn __ge__(self, other: Self) -> Bool:
         """Ge.
+
+        Args:
+            other: Other.
 
         Returns:
             Bool.
@@ -512,6 +524,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn __le__(self, other: Self) -> Bool:
         """Le.
 
+        Args:
+            other: Other.
+
         Returns:
             Bool.
         """
@@ -519,6 +534,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
     fn __lt__(self, other: Self) -> Bool:
         """Lt.
+
+        Args:
+            other: Other.
 
         Returns:
             Bool.
@@ -528,6 +546,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn __and__(self, other: Self) -> UInt32:
         """And.
 
+        Args:
+            other: Other.
+
         Returns:
             Bool.
         """
@@ -536,6 +557,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     fn __or__(self, other: Self) -> UInt32:
         """Or.
 
+        Args:
+            other: Other.
+
         Returns:
             Bool.
         """
@@ -543,6 +567,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
 
     fn __xor__(self, other: Self) -> UInt32:
         """Xor.
+
+        Args:
+            other: Other.
 
         Returns:
             Bool.

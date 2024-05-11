@@ -115,7 +115,7 @@ struct DateTime64(Hashable, Stringable):
         """Get the year assuming the hash is valid.
 
         Returns:
-            The element.
+            The item.
         """
         return (self.hash & _cal_h64.mask_64_y) >> _cal_h64.shift_64_y
 
@@ -123,7 +123,7 @@ struct DateTime64(Hashable, Stringable):
         """Get the month assuming the hash is valid.
 
         Returns:
-            The element.
+            The item.
         """
         return (self.hash & _cal_h64.mask_64_mon) >> _cal_h64.shift_64_mon
 
@@ -131,7 +131,7 @@ struct DateTime64(Hashable, Stringable):
         """Get the day assuming the hash is valid.
 
         Returns:
-            The element.
+            The item.
         """
         return (self.hash & _cal_h64.mask_64_d) >> _cal_h64.shift_64_d
 
@@ -139,7 +139,7 @@ struct DateTime64(Hashable, Stringable):
         """Get the hour assuming the hash is valid.
 
         Returns:
-            The element.
+            The item.
         """
         return (self.hash & _cal_h64.mask_64_h) >> _cal_h64.shift_64_h
 
@@ -147,7 +147,7 @@ struct DateTime64(Hashable, Stringable):
         """Get the minute assuming the hash is valid.
 
         Returns:
-            The element.
+            The item.
         """
         return (self.hash & _cal_h64.mask_64_m) >> _cal_h64.shift_64_m
 
@@ -155,7 +155,7 @@ struct DateTime64(Hashable, Stringable):
         """Get the second assuming the hash is valid.
 
         Returns:
-            The element.
+            The item.
         """
         return (self.hash & _cal_h64.mask_64_s) >> _cal_h64.shift_64_s
 
@@ -163,7 +163,7 @@ struct DateTime64(Hashable, Stringable):
         """Get the m_second assuming the hash is valid.
 
         Returns:
-            The element.
+            The item.
         """
         return (self.hash & _cal_h64.mask_64_ms) >> _cal_h64.shift_64_ms
 
@@ -174,7 +174,7 @@ struct DateTime64(Hashable, Stringable):
         assuming the hash is valid.
 
         Returns:
-            The elements.
+            The items.
         """
         return (
             self.get_year(),
@@ -657,30 +657,54 @@ struct DateTime32(Hashable, Stringable):
         self.hash = hash_val.or_else(calendar.hash[_cal_h32](y, mon, d, h, m))
 
     fn get_year(self) -> UInt32:
-        """Get the year assuming the hash is valid."""
+        """Get the year assuming the hash is valid.
+
+        Returns:
+            The item.
+        """
         return (self.hash & _cal_h32.mask_32_y) >> _cal_h32.shift_32_y
 
     fn get_month(self) -> UInt32:
-        """Get the month assuming the hash is valid."""
+        """Get the month assuming the hash is valid.
+
+        Returns:
+            The item.
+        """
         return (self.hash & _cal_h32.mask_32_mon) >> _cal_h32.shift_32_mon
 
     fn get_day(self) -> UInt32:
-        """Get the day assuming the hash is valid."""
+        """Get the day assuming the hash is valid.
+
+        Returns:
+            The item.
+        """
         return (self.hash & _cal_h32.mask_32_d) >> _cal_h32.shift_32_d
 
     fn get_hour(self) -> UInt32:
-        """Get the hour assuming the hash is valid."""
+        """Get the hour assuming the hash is valid.
+
+        Returns:
+            The item.
+        """
         return (self.hash & _cal_h32.mask_32_h) >> _cal_h32.shift_32_h
 
     fn get_minute(self) -> UInt32:
-        """Get the minute assuming the hash is valid."""
+        """Get the minute assuming the hash is valid.
+
+        Returns:
+            The item.
+        """
         return (self.hash & _cal_h32.mask_32_m) >> _cal_h32.shift_32_m
 
     fn get_attrs(
         self,
     ) -> (UInt32, UInt32, UInt32, UInt32, UInt32):
         """Get the year, month, day, hour, minute, second
-        assuming the hash is valid."""
+        assuming the hash is valid.
+
+        Returns:
+            The items.
+        """
         return (
             self.get_year(),
             self.get_month(),
@@ -691,7 +715,11 @@ struct DateTime32(Hashable, Stringable):
 
     @always_inline
     fn seconds_since_epoch(self) -> UInt64:
-        """Seconds since the begining of the calendar's epoch."""
+        """Seconds since the begining of the calendar's epoch.
+
+        Returns:
+            Seconds since epoch.
+        """
         return self.minute.cast[DType.uint64]() * 60
 
     @always_inline
@@ -943,6 +971,9 @@ struct DateTime32(Hashable, Stringable):
     fn from_unix_epoch(seconds: Int) -> Self:
         """Construct a `DateTime32 ` from the seconds since the Unix Epoch
         1970-01-01.
+
+        Args:
+            seconds: Seconds.
 
         Returns:
             Self.
@@ -1414,6 +1445,12 @@ struct DateTime16(Hashable, Stringable):
         """Construct a `DateTime16 ` from the seconds since the Unix Epoch
         1970-01-01.
 
+        Args:
+            seconds: Seconds.
+
+        Returns:
+            Self.
+
         Notes:
             This builds an instance with a hash set to default UTC epoch start.
         """
@@ -1422,6 +1459,9 @@ struct DateTime16(Hashable, Stringable):
     @staticmethod
     fn now() -> Self:
         """Construct a `DateTime16 ` from `time.now()`.
+
+        Returns:
+            Self.
 
         Notes:
             This builds an instance with a hash set to default UTC epoch start.
@@ -1521,6 +1561,9 @@ struct DateTime16(Hashable, Stringable):
         Args:
             value: The hash.
             calendar: The Calendar to parse the hash with.
+
+        Returns:
+            Self.
         """
         var d = calendar.from_hash[_cal_h16](int(value))
         return DateTime16(
@@ -1555,7 +1598,9 @@ struct DateTime8(Hashable, Stringable):
     """
 
     var hour: UInt8
+    """Hour."""
     var hash: UInt8
+    """Hash."""
 
     fn __init__(
         inout self,
@@ -1863,6 +1908,9 @@ struct DateTime8(Hashable, Stringable):
         """Construct a `DateTime8 ` from the seconds since the Unix Epoch
         1970-01-01.
 
+        Args:
+            seconds: Seconds.
+
         Returns:
             Self.
 
@@ -1976,6 +2024,9 @@ struct DateTime8(Hashable, Stringable):
         Args:
             value: The hash.
             calendar: The Calendar to parse the hash with.
+
+        Returns:
+            Self.
         """
         var d = calendar.from_hash[_cal_h8](int(value))
         return DateTime8(

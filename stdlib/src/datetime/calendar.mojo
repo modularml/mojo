@@ -689,6 +689,12 @@ struct Gregorian(_Calendarized):
         max_year: UInt16 = 9999,
         min_year: UInt16 = 1,
     ):
+        """Construct a `Gregorian` Calendar from values.
+        
+        Args:
+            max_year: Max year (epoch end).
+            min_year: Min year (epoch start).
+        """
         self.max_year = max_year
         self.min_year = min_year
 
@@ -1225,6 +1231,12 @@ struct UTCFast(_Calendarized):
     fn __init__(
         inout self, *, max_year: UInt16 = 9999, min_year: UInt16 = 1970
     ):
+        """Construct a `UTCFast` Calendar from values.
+        
+        Args:
+            max_year: Max year (epoch end).
+            min_year: Min year (epoch start).
+        """
         self.max_year = max_year
         self.min_year = min_year
 
