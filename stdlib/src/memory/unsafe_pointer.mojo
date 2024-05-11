@@ -319,7 +319,7 @@ struct UnsafePointer[
     @always_inline
     fn __refitem__(
         self,
-    ) -> Self._ref_type._mlir_type:
+    ) -> Self._ref_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Returns:
@@ -330,7 +330,7 @@ struct UnsafePointer[
         ](self.address)
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self._ref_type._mlir_type:
+    fn __refitem__(self, offset: Int) -> Self._ref_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Args:
