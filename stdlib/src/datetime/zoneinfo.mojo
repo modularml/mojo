@@ -246,7 +246,7 @@ struct ZoneInfoFile:
 
 alias ZoneInfoFile32 = ZoneInfoFile(32, 0xFFFFFFFF)
 """ZoneInfoFile to store Offset of tz with DST"""
-alias ZoneInfoFile8 = ZoneInfoFile(8, 0xFFFF)
+alias ZoneInfoFile8 = ZoneInfoFile(8, 0xFF)
 """ZoneInfoFile to store Offset of tz with no DST"""
 
 @value
@@ -338,7 +338,7 @@ fn get_leapsecs() -> Optional[List[(UInt8, UInt8, UInt16)]]:
     return List[(UInt8, UInt8, UInt16)]()
 
 
-# TODO: get_zoneinfo should be able to return a ZoneInfoMem32
+# TODO: get_zoneinfo should be able to return a ZoneInfoMem
 # or ZoneInfoFile according to parameter
 alias ZoneInfo = (ZoneInfoMem32, ZoneInfoMem8)
 """ZoneInfo."""
