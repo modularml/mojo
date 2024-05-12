@@ -639,67 +639,83 @@ def test_list_copy_constructor_issue_1493():
 
 
 def test_list_iter():
-    var vs = List[Int]()
-    vs.append(1)
-    vs.append(2)
-    vs.append(3)
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var vs = List[Int, sbo_size]()
+        vs.append(1)
+        vs.append(2)
+        vs.append(3)
 
-    # Borrow immutably
-    fn sum(vs: List[Int]) -> Int:
-        var sum = 0
-        for v in vs:
-            sum += v[]
-        return sum
+        # Borrow immutably
+        fn sum(vs: List[Int]) -> Int:
+            var sum = 0
+            for v in vs:
+                sum += v[]
+            return sum
 
-    assert_equal(6, sum(vs))
+        assert_equal(6, sum(vs))
+
+    unroll[test_function, 10]()
 
 
 def test_list_iter_mutable():
-    var vs = List[Int](1, 2, 3)
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var vs = List[Int, sbo_size](1, 2, 3)
 
-    for v in vs:
-        v[] += 1
+        for v in vs:
+            v[] += 1
 
-    var sum = 0
-    for v in vs:
-        sum += v[]
+        var sum = 0
+        for v in vs:
+            sum += v[]
 
-    assert_equal(9, sum)
+        assert_equal(9, sum)
+
+    unroll[test_function, 10]()
 
 
 def test_list_span():
-    var vs = List[Int](1, 2, 3)
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var vs = List[Int, sbo_size](1, 2, 3)
 
-    var es = vs[1:]
-    assert_equal(es[0], 2)
-    assert_equal(es[1], 3)
-    assert_equal(len(es), 2)
+        var es = vs[1:]
+        assert_equal(es[0], 2)
+        assert_equal(es[1], 3)
+        assert_equal(len(es), 2)
 
-    es = vs[:-1]
-    assert_equal(es[0], 1)
-    assert_equal(es[1], 2)
-    assert_equal(len(es), 2)
+        es = vs[:-1]
+        assert_equal(es[0], 1)
+        assert_equal(es[1], 2)
+        assert_equal(len(es), 2)
 
-    es = vs[1:-1:1]
-    assert_equal(es[0], 2)
-    assert_equal(len(es), 1)
+        es = vs[1:-1:1]
+        assert_equal(es[0], 2)
+        assert_equal(len(es), 1)
 
-    es = vs[::-1]
-    assert_equal(es[0], 3)
-    assert_equal(es[1], 2)
-    assert_equal(es[2], 1)
-    assert_equal(len(es), 3)
+        es = vs[::-1]
+        assert_equal(es[0], 3)
+        assert_equal(es[1], 2)
+        assert_equal(es[2], 1)
+        assert_equal(len(es), 3)
 
-    es = vs[:]
-    assert_equal(es[0], 1)
-    assert_equal(es[1], 2)
-    assert_equal(es[2], 3)
-    assert_equal(len(es), 3)
+        es = vs[:]
+        assert_equal(es[0], 1)
+        assert_equal(es[1], 2)
+        assert_equal(es[2], 3)
+        assert_equal(len(es), 3)
+
+    unroll[test_function, 10]()
 
 
 def test_list_boolable():
-    assert_true(List[Int](1))
-    assert_false(List[Int]())
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        assert_true(List[Int, sbo_size](1))
+        assert_false(List[Int, sbo_size]())
+
+    unroll[test_function, 10]()
 
 
 def test_constructor_from_pointer():
@@ -766,34 +782,40 @@ def test_list_count():
 
 
 def test_list_add():
-    var a = List[Int](1, 2, 3)
-    var b = List[Int](4, 5, 6)
-    var c = a + b
-    assert_equal(len(c), 6)
-    # check that original values aren't modified
-    assert_equal(len(a), 3)
-    assert_equal(len(b), 3)
-    assert_equal(__type_of(c).__str__(c), "[1, 2, 3, 4, 5, 6]")
+    """We test add with many different sbo sizes."""
 
-    a += b
-    assert_equal(len(a), 6)
-    assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 4, 5, 6]")
-    assert_equal(len(b), 3)
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var a = List[Int, sbo_size](1, 2, 3)
+        var b = List[Int, sbo_size + 1](4, 5, 6)
+        var c = a + b
+        assert_equal(len(c), 6)
+        # check that original values aren't modified
+        assert_equal(len(a), 3)
+        assert_equal(len(b), 3)
+        assert_equal(__type_of(c).__str__(c), "[1, 2, 3, 4, 5, 6]")
 
-    a = List[Int](1, 2, 3)
-    a += b^
-    assert_equal(len(a), 6)
-    assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 4, 5, 6]")
+        a += b
+        assert_equal(len(a), 6)
+        assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 4, 5, 6]")
+        assert_equal(len(b), 3)
 
-    var d = List[Int](1, 2, 3)
-    var e = List[Int](4, 5, 6)
-    var f = d + e^
-    assert_equal(len(f), 6)
-    assert_equal(__type_of(f).__str__(f), "[1, 2, 3, 4, 5, 6]")
+        a = List[Int, sbo_size](1, 2, 3)
+        a += b^
+        assert_equal(len(a), 6)
+        assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 4, 5, 6]")
 
-    var l = List[Int](1, 2, 3)
-    l += List[Int]()
-    assert_equal(len(l), 3)
+        var d = List[Int, sbo_size + 2](1, 2, 3)
+        var e = List[Int, sbo_size + 3](4, 5, 6)
+        var f = d + e^
+        assert_equal(len(f), 6)
+        assert_equal(__type_of(f).__str__(f), "[1, 2, 3, 4, 5, 6]")
+
+        var l = List[Int, sbo_size + 4](1, 2, 3)
+        l += List[Int, sbo_size + 5]()
+        assert_equal(len(l), 3)
+
+    unroll[test_function, 10]()
 
 
 def test_list_mult():
