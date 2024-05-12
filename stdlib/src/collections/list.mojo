@@ -542,7 +542,7 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
     fn index[
         C: ComparableCollectionElement
     ](
-        self: List[C], value: C, start: Int = 0, end: Optional[Int] = None
+        self: List[C, _], value: C, start: Int = 0, end: Optional[Int] = None
     ) raises -> Int:
         """
         Returns the index of the first occurrence of a value in a list, starting from the specified
@@ -745,7 +745,7 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         return _ListIter[forward=False](len(self[]), self)
 
     @staticmethod
-    fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
+    fn __str__[U: RepresentableCollectionElement](self: List[U, _]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -788,7 +788,7 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         return result
 
     @staticmethod
-    fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
+    fn count[T: ComparableCollectionElement](self: List[T, _], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below.
