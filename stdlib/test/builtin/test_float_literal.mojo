@@ -55,10 +55,10 @@ def test_floor():
 
 
 def test_round():
-    assert_equal(FloatLiteral.__round__(1.5), 2.0)
-    assert_equal(FloatLiteral.__round__(1.4), 1.0)
-    assert_equal(FloatLiteral.__round__(-1.5), -2.0)
-    assert_equal(FloatLiteral.__round__(-3.4), -3.0)
+    assert_equal(FloatLiteral.__round__(1.5), 1.0)
+    assert_equal(FloatLiteral.__round__(1.6), 2.0)
+    assert_equal(FloatLiteral.__round__(-1.5), -1.0)
+    assert_equal(FloatLiteral.__round__(-3.6), -4.0)
     assert_equal(FloatLiteral.__round__(3.0), 3.0)
     assert_equal(FloatLiteral.__round__(0.0), 0.0)
 
@@ -67,6 +67,8 @@ def test_round():
     assert_equal(FloatLiteral.__round__(inf), inf)
     assert_equal(FloatLiteral.__round__(neg_inf), neg_inf)
 
+    assert_equal(FloatLiteral.__round__(1.5, 0), 1.0)
+    assert_equal(FloatLiteral.__round__(1.6, 0), 2.0)
     assert_equal(FloatLiteral.__round__(1.5, 1), 1.5)
     assert_equal(FloatLiteral.__round__(1.123, 1), 1.1)
     assert_equal(FloatLiteral.__round__(1.198, 2), 1.2)
