@@ -516,7 +516,7 @@ struct String(
 ):
     """Represents a mutable string."""
 
-    alias _buffer_type = List[Int8, 24]
+    alias _buffer_type = List[Int8, 16]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
