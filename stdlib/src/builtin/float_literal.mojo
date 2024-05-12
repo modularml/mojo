@@ -245,6 +245,7 @@ struct FloatLiteral(
 
         Args:
             ndigits: The number of digits to round to. Defaults to 0.
+
         Returns:
             The rounded value.
         """
