@@ -111,7 +111,7 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         else:
             self.capacity = 0
 
-    fn __init__(inout self, existing: Self):
+    fn __init__(inout self, existing: List[T, _]):
         """Creates a deep copy of the given list.
 
         Args:

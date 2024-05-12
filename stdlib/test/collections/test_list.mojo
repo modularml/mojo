@@ -897,6 +897,21 @@ def test_list_move_constructor():
     unroll[test_function, 10]()
 
 
+def test_constructor_from_another_list():
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var vec = List[UInt8, sbo_size](0, 10, 20, 30)
+
+        var vec_copy = List[UInt8, sbo_size + 1](vec)
+        assert_equal(len(vec_copy), 4)
+        assert_equal(vec_copy[0], 0)
+        assert_equal(vec_copy[1], 10)
+        assert_equal(vec_copy[2], 20)
+        assert_equal(vec_copy[3], 30)
+
+    unroll[test_function, 10]()
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -927,3 +942,4 @@ def main():
     test_bytes_with_small_size_optimization()
     test_list_copy_constructor()
     test_list_move_constructor()
+    test_constructor_from_another_list()
