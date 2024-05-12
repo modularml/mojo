@@ -355,10 +355,10 @@ fn test_bitwise64() raises:
     assert_true(ref & DateTime64(1970, 1, 1) == 0)
     assert_true(ref & DateTime64(1969, 12, 31) == 0)
 
-    assert_true(ref ^ DateTime64(1970, 1, 2) != 0)
-    assert_true(ref | (DateTime64(1970, 1, 2) & 0) == hash(ref))
-    assert_true(ref & ~ref == 0)
-    assert_true(ref ^ ~ref == UInt64.MAX_FINITE)
+    assert_true((ref ^ DateTime64(1970, 1, 2)) != 0)
+    assert_true((ref | (DateTime64(1970, 1, 2) & 0)) == hash(ref))
+    assert_true((ref & ~ref) == 0)
+    assert_true((ref ^ ~ref) == UInt64.MAX_FINITE)
 
 
 fn test_bitwise32() raises:
@@ -367,10 +367,10 @@ fn test_bitwise32() raises:
     assert_true(ref & DateTime32(1970, 1, 1) == 0)
     assert_true(ref & DateTime32(1969, 12, 31) == 0)
 
-    assert_true(ref ^ DateTime32(1970, 1, 2) != 0)
-    assert_true(ref | (DateTime32(1970, 1, 2) & 0) == hash(ref))
-    assert_true(ref & ~ref == 0)
-    assert_true(ref ^ ~ref == UInt32.MAX_FINITE)
+    assert_true((ref ^ DateTime32(1970, 1, 2)) != 0)
+    assert_true((ref | (DateTime32(1970, 1, 2) & 0)) == hash(ref))
+    assert_true((ref & ~ref) == 0)
+    assert_true((ref ^ ~ref) == UInt32.MAX_FINITE)
 
 
 fn test_bitwise16() raises:
@@ -379,10 +379,10 @@ fn test_bitwise16() raises:
     assert_true(ref & DateTime16(1970, 1, 1) == 0)
     assert_true(ref & DateTime16(1969, 12, 31) == 0)
 
-    assert_true(ref ^ DateTime16(1970, 1, 2) != 0)
-    assert_true(ref | (DateTime16(1970, 1, 2) & 0) == hash(ref))
-    assert_true(ref & ~ref == 0)
-    assert_true(ref ^ ~ref == UInt16.MAX_FINITE)
+    assert_true((ref ^ DateTime16(1970, 1, 2)) != 0)
+    assert_true((ref | (DateTime16(1970, 1, 2) & 0)) == hash(ref))
+    assert_true((ref & ~ref) == 0)
+    assert_true((ref ^ ~ref) == UInt16.MAX_FINITE)
 
 
 fn test_bitwise8() raises:
@@ -391,10 +391,10 @@ fn test_bitwise8() raises:
     assert_true(ref & DateTime8(1970, 1, 1) == 0)
     assert_true(ref & DateTime8(1969, 12, 31) == 0)
 
-    assert_true(ref ^ DateTime8(1970, 1, 2) != 0)
-    assert_true(ref | (DateTime8(1970, 1, 2) & 0) == hash(ref))
-    assert_true(ref & ~ref == 0)
-    assert_true(ref ^ ~ref == UInt32.MAX_FINITE)
+    assert_true((ref ^ DateTime8(1970, 1, 2)) != 0)
+    assert_true((ref | (DateTime8(1970, 1, 2) & 0)) == hash(ref))
+    assert_true((ref & ~ref) == 0)
+    assert_true((ref ^ ~ref) == UInt32.MAX_FINITE)
 
 
 fn test_iso64() raises:
@@ -416,7 +416,7 @@ fn test_iso64() raises:
 
     iso_str = "19700101T000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_true(ref == Date.from_iso[fmt4](iso_str).value()[])
+    assert_true(ref == DateTime64.from_iso[fmt4](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
@@ -449,7 +449,7 @@ fn test_iso32() raises:
 
     iso_str = "19700101T000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_true(ref == Date.from_iso[fmt4](iso_str).value()[])
+    assert_true(ref == DateTime32.from_iso[fmt4](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
@@ -482,7 +482,7 @@ fn test_iso16() raises:
 
     iso_str = "19700101T000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_true(ref == Date.from_iso[fmt4](iso_str).value()[])
+    assert_true(ref == DateTime16.from_iso[fmt4](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
@@ -515,7 +515,7 @@ fn test_iso8() raises:
 
     iso_str = "19700101T000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_true(ref == Date.from_iso[fmt4](iso_str).value()[])
+    assert_true(ref == DateTime8.from_iso[fmt4](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"

@@ -232,12 +232,12 @@ fn test_bitwise(
     assert_true(ref & DateTime(1970, 1, 1, tz=tz_1, calendar=unixcal) == 0)
     assert_true(ref & DateTime(1969, 12, 31, tz=tz1_, calendar=pycal) == 0)
 
-    assert_true(ref ^ DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal) != 0)
+    assert_true((ref ^ DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal)) != 0)
     assert_true(
-        ref | (DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal) & 0) == hash(ref)
+        (ref | (DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal) & 0)) == hash(ref)
     )
-    assert_true(ref & ~ref == 0)
-    assert_true(ref ^ ~ref == UInt64.MAX_FINITE)
+    assert_true((ref & ~ref) == 0)
+    assert_true((ref ^ ~ref) == UInt64.MAX_FINITE)
 
 
 fn test_iso(pycal: Calendar, tz_0_: TZ) raises:

@@ -330,9 +330,16 @@ struct Date[
             calendar's epoch and keeps evaluating until valid.
         """
         var dt = self._from_overflow(
-            int(self.year + years),
-            int(self.month + months),
-            int(self.day + days) + seconds * 24 * 60 * 60,
+            int(self.year) + years,
+            int(self.month) + months,
+            int(self.day)
+            + days
+            + seconds
+            // int(
+                (self.calendar.max_hour + 1)
+                * (self.calendar.max_minute + 1)
+                * (self.calendar.max_typical_second + 1)
+            ),
             self.tz,
             self.calendar,
         )

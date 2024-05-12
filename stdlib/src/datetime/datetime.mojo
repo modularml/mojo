@@ -500,15 +500,15 @@ struct DateTime[
             calendar's epoch and keeps evaluating until valid.
         """
         var dt = self._from_overflow(
-            int(self.year + years),
-            int(self.month + months),
-            int(self.day + days),
-            int(self.hour + hours),
-            int(self.minute + minutes),
-            int(self.second + seconds),
-            int(self.m_second + m_seconds),
-            int(self.u_second + u_seconds),
-            int(self.n_second + n_seconds),
+            int(self.year) + years,
+            int(self.month) + months,
+            int(self.day) + days,
+            int(self.hour) + hours,
+            int(self.minute) + minutes,
+            int(self.second) + seconds,
+            int(self.m_second) + m_seconds,
+            int(self.u_second) + u_seconds,
+            int(self.n_second) + n_seconds,
             self.tz,
             self.calendar,
         )
@@ -567,15 +567,15 @@ struct DateTime[
             calendar's epoch and keeps evaluating until valid.
         """
         var dt = self._from_overflow(
-            int(self.year - years),
-            int(self.month - months),
-            int(self.day - days),
-            int(self.hour - hours),
-            int(self.minute - minutes),
-            int(self.second - seconds),
-            int(self.m_second - m_seconds),
-            int(self.u_second - u_seconds),
-            int(self.n_second - n_seconds),
+            int(self.year) - years,
+            int(self.month) - months,
+            int(self.day) - days,
+            int(self.hour) - hours,
+            int(self.minute) - minutes,
+            int(self.second) - seconds,
+            int(self.m_second) - m_seconds,
+            int(self.u_second) - u_seconds,
+            int(self.n_second) - n_seconds,
             self.tz,
             self.calendar,
         )
