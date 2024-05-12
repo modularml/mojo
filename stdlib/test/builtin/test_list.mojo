@@ -32,7 +32,8 @@ fn test_variadic_list() raises:
 
 
 fn test_repr_list() raises:
-    assert_equal(repr(List(1, 2, 3)), "[1, 2, 3]")
+    var l = List(1, 2, 3)
+    assert_equal(__type_of(l).__repr__(l), "[1, 2, 3]")
 
 
 def main():
