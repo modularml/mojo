@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %mojo -debug-level full %s
 
 
 from testing import assert_equal, assert_false, assert_raises, assert_true
@@ -21,7 +21,7 @@ from datetime.fast import DateTime64, DateTime32, DateTime16, DateTime8
 from datetime.dt_str import IsoFormat
 
 
-fn test_add64():
+fn test_add64() raises:
     # test february leapyear
     var result = DateTime64(2024, 3, 1) + DateTime64(0, 0, 1)
     var offset_0 = DateTime64(2024, 2, 29)
@@ -91,7 +91,7 @@ fn test_add64():
     assert_true(result.m_second == add_seconds.m_second)
 
 
-fn test_add32():
+fn test_add32() raises:
     # test february leapyear
     var result = DateTime32(2024, 3, 1) + DateTime32(0, 0, 1)
     var offset_0 = DateTime32(2024, 2, 29)
@@ -161,7 +161,7 @@ fn test_add32():
     assert_true(result.minute == add_seconds.minute)
 
 
-fn test_subtract64():
+fn test_subtract64() raises:
     # test february leapyear
     var result = DateTime64(2024, 3, 1) - DateTime64(0, 0, 1)
     var offset_0 = DateTime64(2024, 2, 29)
@@ -231,7 +231,7 @@ fn test_subtract64():
     assert_true(result.m_second == sub_seconds.m_second)
 
 
-fn test_subtract32():
+fn test_subtract32() raises:
     # test february leapyear
     var result = DateTime32(2024, 3, 1) - DateTime32(0, 0, 1)
     var offset_0 = DateTime32(2024, 2, 29)
@@ -301,7 +301,7 @@ fn test_subtract32():
     assert_true(result.minute == sub_seconds.minute)
 
 
-fn test_logic64():
+fn test_logic64() raises:
     var ref = DateTime64(1970, 1, 1)
     assert_true(ref == DateTime64(1970, 1, 1))
     assert_true(ref == DateTime64(1970, 1, 1))
@@ -313,7 +313,7 @@ fn test_logic64():
     assert_true(ref >= DateTime64(1969, 12, 31))
 
 
-fn test_logic32():
+fn test_logic32() raises:
     var ref = DateTime32(1970, 1, 1)
     assert_true(ref == DateTime32(1970, 1, 1))
     assert_true(ref == DateTime32(1970, 1, 1))
@@ -325,7 +325,7 @@ fn test_logic32():
     assert_true(ref >= DateTime32(1969, 12, 31))
 
 
-fn test_logic16():
+fn test_logic16() raises:
     var ref = DateTime16(1970, 1, 1)
     assert_true(ref == DateTime16(1970, 1, 1))
     assert_true(ref == DateTime16(1970, 1, 1))
@@ -337,7 +337,7 @@ fn test_logic16():
     assert_true(ref >= DateTime16(1969, 12, 31))
 
 
-fn test_logic8():
+fn test_logic8() raises:
     var ref = DateTime8(1970, 1, 1)
     assert_true(ref == DateTime8(1970, 1, 1))
     assert_true(ref == DateTime8(1970, 1, 1))
@@ -349,7 +349,7 @@ fn test_logic8():
     assert_true(ref >= DateTime8(1969, 12, 31))
 
 
-fn test_bitwise64():
+fn test_bitwise64() raises:
     var ref = DateTime64(1970, 1, 1)
     assert_true(ref & DateTime64(1970, 1, 1) == 0)
     assert_true(ref & DateTime64(1970, 1, 1) == 0)
@@ -361,7 +361,7 @@ fn test_bitwise64():
     assert_true(ref ^ ~ref == UInt64.MAX_FINITE)
 
 
-fn test_bitwise32():
+fn test_bitwise32() raises:
     var ref = DateTime32(1970, 1, 1)
     assert_true(ref & DateTime32(1970, 1, 1) == 0)
     assert_true(ref & DateTime32(1970, 1, 1) == 0)
@@ -373,7 +373,7 @@ fn test_bitwise32():
     assert_true(ref ^ ~ref == UInt32.MAX_FINITE)
 
 
-fn test_bitwise16():
+fn test_bitwise16() raises:
     var ref = DateTime16(1970, 1, 1)
     assert_true(ref & DateTime16(1970, 1, 1) == 0)
     assert_true(ref & DateTime16(1970, 1, 1) == 0)
@@ -385,7 +385,7 @@ fn test_bitwise16():
     assert_true(ref ^ ~ref == UInt16.MAX_FINITE)
 
 
-fn test_bitwise8():
+fn test_bitwise8() raises:
     var ref = DateTime8(1970, 1, 1)
     assert_true(ref & DateTime8(1970, 1, 1) == 0)
     assert_true(ref & DateTime8(1970, 1, 1) == 0)
@@ -397,7 +397,7 @@ fn test_bitwise8():
     assert_true(ref ^ ~ref == UInt32.MAX_FINITE)
 
 
-fn test_iso64():
+fn test_iso64() raises:
     var ref = DateTime64(1970, 1, 1)
     var iso_str = "1970-01-01T00:00:00+00:00"
     var iso_format = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS_TZD)
@@ -430,7 +430,7 @@ fn test_iso64():
     assert_equal(iso_str, ref.to_iso[iso_format]())
 
 
-fn test_iso32():
+fn test_iso32() raises:
     var ref = DateTime32(1970, 1, 1)
     var iso_str = "1970-01-01T00:00:00+00:00"
     var iso_format = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS_TZD)
@@ -463,7 +463,7 @@ fn test_iso32():
     assert_equal(iso_str, ref.to_iso[iso_format]())
 
 
-fn test_iso16():
+fn test_iso16() raises:
     var ref = DateTime16(1970, 1, 1)
     var iso_str = "1970-01-01T00:00:00+00:00"
     var iso_format = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS_TZD)
@@ -496,7 +496,7 @@ fn test_iso16():
     assert_equal(iso_str, ref.to_iso[iso_format]())
 
 
-fn test_iso8():
+fn test_iso8() raises:
     var ref = DateTime8(1970, 1, 1)
     var iso_str = "1970-01-01T00:00:00+00:00"
     var iso_format = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS_TZD)
@@ -529,38 +529,35 @@ fn test_iso8():
     assert_equal(iso_str, ref.to_iso[iso_format]())
 
 
-fn test_time64():
-    try:
-        var start = DateTime64.now()
-        time.sleep(1e-3)  # milisecond resolution
-        var end = DateTime64.now()
-        assert_true(start != end)
-    except:
-        assert_true(False)
+fn test_time64() raises:
+    var start = DateTime64.now()
+    time.sleep(1e-3)  # milisecond resolution
+    var end = DateTime64.now()
+    assert_true(start != end)
 
 
-fn test_hash64():
+fn test_hash64() raises:
     var ref = DateTime64(1970, 1, 1)
     var data = hash(ref)
     var parsed = DateTime64.from_hash(data)
     assert_true(ref == parsed)
 
 
-fn test_hash32():
+fn test_hash32() raises:
     var ref = DateTime32(1970, 1, 1)
     var data = hash(ref)
     var parsed = DateTime32.from_hash(data)
     assert_true(ref == parsed)
 
 
-fn test_hash16():
+fn test_hash16() raises:
     var ref = DateTime16(1970, 1, 1)
     var data = hash(ref)
     var parsed = DateTime16.from_hash(data)
     assert_true(ref == parsed)
 
 
-fn test_hash8():
+fn test_hash8() raises:
     var ref = DateTime8(0, 23)
     var data = hash(ref)
     var parsed = DateTime8.from_hash(data)

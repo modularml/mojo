@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %mojo -debug-level full %s
 
 
 from testing import assert_equal, assert_false, assert_raises, assert_true
@@ -26,7 +26,9 @@ alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
 alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
 
-fn test_add(pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ):
+fn test_add(
+    pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ
+) raises:
     # test february leapyear
     var result = DateTime(2024, 3, 1, tz_0_, pycal) + DateTime(
         0, 0, 1, tz_0_, unixcal
@@ -108,7 +110,7 @@ fn test_add(pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ):
 
 fn test_subtract(
     pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ
-):
+) raises:
     # test february leapyear
     var result = DateTime(2024, 3, 1, tz_0_, pycal) - DateTime(
         0, 0, 1, tz_0_, unixcal
@@ -186,7 +188,7 @@ fn test_subtract(
 
 fn test_logic(
     pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ
-):
+) raises:
     var ref = DateTime(1970, 1, 1, tz_0_, pycal)
     assert_true(ref == DateTime(1970, 1, 1, tz_0_, unixcal))
     assert_true(ref == DateTime(1970, 1, 1, tz_1, unixcal))
@@ -200,7 +202,7 @@ fn test_logic(
 
 fn test_bitwise(
     pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ
-):
+) raises:
     var ref = DateTime(1970, 1, 1, tz_0_, pycal)
     assert_true(ref & DateTime(1970, 1, 1, tz_0_, unixcal) == 0)
     assert_true(ref & DateTime(1970, 1, 1, tz_1, unixcal) == 0)
@@ -212,7 +214,7 @@ fn test_bitwise(
     assert_true(ref ^ ~ref == UInt64.MAX_FINITE)
 
 
-fn test_iso(pycal: Calendar, tz_0_: TZ):
+fn test_iso(pycal: Calendar, tz_0_: TZ) raises:
     var ref = DateTime(1970, 1, 1, tz_0_, pycal)
     var iso_str = "1970-01-01T00:00:00+00:00"
     var iso_format = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS_TZD)
@@ -245,17 +247,14 @@ fn test_iso(pycal: Calendar, tz_0_: TZ):
     assert_equal(iso_str, ref.to_iso[iso_format]())
 
 
-fn test_time():
-    try:
-        var start = DateTime.now()
-        time.sleep(1e-9)  # nanosecond resolution
-        var end = DateTime.now()
-        assert_true(start != end)
-    except:
-        assert_true(False)
+fn test_time() raises:
+    var start = DateTime.now()
+    time.sleep(1e-9)  # nanosecond resolution
+    var end = DateTime.now()
+    assert_true(start != end)
 
 
-fn test_hash():
+fn test_hash() raises:
     var ref = DateTime(1970, 1, 1)
     var data = hash(ref)
     var parsed = DateTime.from_hash(data)
