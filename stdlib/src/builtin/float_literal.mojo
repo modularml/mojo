@@ -33,6 +33,7 @@ struct FloatLiteral(
     Comparable,
     Floorable,
     Intable,
+    Roundable,
     Stringable,
 ):
     """Mojo floating point literal type."""
@@ -222,7 +223,28 @@ struct FloatLiteral(
         return truncated + 1
 
     @always_inline("nodebug")
-    fn __round__(self, ndigits: IntLiteral = 0) -> Self:
+    fn __round__(self) -> Self:
+        """Return the rounded value of the FloatLiteral.
+
+        Returns:
+            The rounded value.
+        """
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        var truncated: IntLiteral = self.__int_literal__()  # 119.0
+        var result: Self
+        if abs(self) - abs(truncated) < 0.5:
+            result = Self(truncated)
+        elif self > 0:
+            result = Self(truncated + 1)
+        else:
+            result = Self(truncated - 1)
+        return result
+
+    @always_inline("nodebug")
+    fn __round__(self, ndigits: IntLiteral) -> Self:
         """Return the rounded value of the FloatLiteral.
 
         Args:
