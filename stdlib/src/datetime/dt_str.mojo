@@ -27,20 +27,20 @@ struct IsoFormat:
     """e.g. 000000"""
     alias HH_MM_SS = "%H:%M:%S"
     """e.g. 00:00:00"""
-    alias YYYYMMDDMMHHSS = "%Y%m%d" + "%H%M%S"
+    alias YYYYMMDDHHMMSS = "%Y%m%d" + "%H%M%S"
     """e.g. 19700101000000"""
-    alias YYYY_MM_DD___MM_HH_SS = "%Y-%m-%d" + " " + "%H:%M:%S"
+    alias YYYY_MM_DD___HH_MM_SS = "%Y-%m-%d" + " " + "%H:%M:%S"
     """e.g. 1970-01-01 00:00:00"""
-    alias YYYY_MM_DD_T_MM_HH_SS = "%Y-%m-%d" + "T" + "%H:%M:%S"
+    alias YYYY_MM_DD_T_HH_MM_SS = "%Y-%m-%d" + "T" + "%H:%M:%S"
     """e.g. 1970-01-01T00:00:00"""
-    alias YYYY_MM_DD_T_MM_HH_SS_TZD = "%Y-%m-%d" + "T" + "%H:%M:%S"
+    alias YYYY_MM_DD_T_HH_MM_SS_TZD = "%Y-%m-%d" + "T" + "%H:%M:%S"
     """e.g. 1970-01-01T00:00:00+0000"""
     alias TZD_REGEX = "+|-[0-9]{2}:?[0-9]{2}"
     var selected: StringLiteral
     """The selected IsoFormat."""
 
     fn __init__(
-        inout self, selected: StringLiteral = self.YYYY_MM_DD_T_MM_HH_SS_TZD
+        inout self, selected: StringLiteral = self.YYYY_MM_DD_T_HH_MM_SS_TZD
     ):
         """Construct an IsoFormat with selected fmt string.
 
@@ -52,10 +52,10 @@ struct IsoFormat:
             or selected == self.YYYY_MM_DD
             or selected == self.HHMMSS
             or selected == self.HH_MM_SS
-            or selected == self.YYYYMMDDMMHHSS
-            or selected == self.YYYY_MM_DD___MM_HH_SS
-            or selected == self.YYYY_MM_DD_T_MM_HH_SS
-            or selected == self.YYYY_MM_DD_T_MM_HH_SS_TZD,
+            or selected == self.YYYYMMDDHHMMSS
+            or selected == self.YYYY_MM_DD___HH_MM_SS
+            or selected == self.YYYY_MM_DD_T_HH_MM_SS
+            or selected == self.YYYY_MM_DD_T_HH_MM_SS_TZD,
             msg="that ISO8601 string format is not supported yet",
         )
         self.selected = selected
@@ -107,7 +107,7 @@ fn to_iso[
     var s = _get_strings(year, month, day, hour, minute, second)
     var yyyy_mm_dd = s[0] + "-" + s[1] + "-" + s[2]
     var hh_mm_ss = s[3] + ":" + s[4] + ":" + s[5]
-    if iso.YYYY_MM_DD___MM_HH_SS == iso.selected:
+    if iso.YYYY_MM_DD___HH_MM_SS == iso.selected:
         return yyyy_mm_dd + " " + hh_mm_ss
     elif iso.YYYYMMDD in iso.selected:
         return s[0] + s[1] + s[2] + s[3] + s[4] + s[5]
@@ -176,7 +176,7 @@ fn from_iso[
         result[4] = atol(s[2:4])
         result[5] = atol(s[4:6])
 
-    if iso.selected == iso.YYYY_MM_DD_T_MM_HH_SS_TZD:
+    if iso.selected == iso.YYYY_MM_DD_T_HH_MM_SS_TZD:
         var sign = 1
         if s[19] == "-":
             sign = -1

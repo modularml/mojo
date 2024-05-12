@@ -450,13 +450,13 @@ struct DateTime64(Hashable, Stringable):
         return self.hash ^ int(other)
 
     @always_inline("nodebug")
-    fn __int__(self) -> UInt64:
+    fn __int__(self) -> Int:
         """Int.
 
         Returns:
             Result.
         """
-        return self.m_second
+        return int(self.m_second)
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
@@ -528,10 +528,13 @@ struct DateTime64(Hashable, Stringable):
         return DateTime64.from_unix_epoch(s).add(m_seconds=ms)
 
     @always_inline("nodebug")
-    fn to_iso(self) -> String:
+    fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYY_MM_DD_T_MM_HH_SS`.
-        e.g. `1970-01-01T00:00:00` .
+        compliant `String` e.g. `IsoFormat.YYYY_MM_DD_T_MM_HH_SS`.
+        -> `1970-01-01T00:00:00` .
+
+        Parameters:
+            iso: The `IsoFormat`.
 
         Returns:
             String.
@@ -540,7 +543,7 @@ struct DateTime64(Hashable, Stringable):
             This is done assuming the current hash is valid.
         """
         var s = self.get_attrs()
-        var time = dt_str.to_iso(
+        var time = dt_str.to_iso[iso](
             int(s[0]), int(s[1]), int(s[2]), int(s[3]), int(s[4]), int(s[5])
         )
         return time[:19]
@@ -556,7 +559,7 @@ struct DateTime64(Hashable, Stringable):
         `String`.
 
         Parameters:
-            iso: The IsoFormat to parse.
+            iso: The `IsoFormat` to parse.
             calendar: The calendar to which the result will belong.
 
         Args:
@@ -969,13 +972,13 @@ struct DateTime32(Hashable, Stringable):
         return self.hash ^ int(other)
 
     @always_inline("nodebug")
-    fn __int__(self) -> UInt32:
+    fn __int__(self) -> Int:
         """Int.
 
         Returns:
             Result.
         """
-        return self.minute
+        return int(self.minute)
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
@@ -1046,10 +1049,13 @@ struct DateTime32(Hashable, Stringable):
         return DateTime32.from_unix_epoch(time.now() // 1_000_000_000)
 
     @always_inline("nodebug")
-    fn to_iso(self) -> String:
+    fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYY_MM_DD_T_MM_HH_SS`.
-        e.g. `1970-01-01T00:00:00` .
+        compliant `String` e.g. `IsoFormat.YYYY_MM_DD_T_MM_HH_SS`.
+        -> `1970-01-01T00:00:00` .
+
+        Parameters:
+            iso: The `IsoFormat`.
 
         Returns:
             String.
@@ -1078,7 +1084,7 @@ struct DateTime32(Hashable, Stringable):
         `String`.
 
         Parameters:
-            iso: The IsoFormat to parse.
+            iso: The `IsoFormat` to parse.
             calendar: The calendar to which the result will belong.
 
         Args:
@@ -1449,13 +1455,13 @@ struct DateTime16(Hashable, Stringable):
         return self.hash ^ int(other)
 
     @always_inline("nodebug")
-    fn __int__(self) -> UInt16:
+    fn __int__(self) -> Int:
         """Int.
 
         Returns:
             Result.
         """
-        return self.hour
+        return int(self.hour)
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
@@ -1526,10 +1532,13 @@ struct DateTime16(Hashable, Stringable):
         return DateTime16.from_unix_epoch(time.now() // 1_000_000_000)
 
     @always_inline("nodebug")
-    fn to_iso(self) -> String:
+    fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYY_MM_DD_T_MM_HH_SS`.
-        e.g. `1970-01-01T00:00:00` .
+        compliant `String` e.g. `IsoFormat.YYYY_MM_DD_T_MM_HH_SS`.
+        -> `1970-01-01T00:00:00` .
+
+        Parameters:
+            iso: The `IsoFormat`.
 
         Returns:
             String.
@@ -1537,7 +1546,7 @@ struct DateTime16(Hashable, Stringable):
         Notes:
             This is done assuming the current hash is valid.
         """
-        var time = dt_str.to_iso(
+        var time = dt_str.to_iso[iso](
             int(self.get_year()),
             int(_calendar.min_month),
             int(self.get_day()),
@@ -1558,7 +1567,7 @@ struct DateTime16(Hashable, Stringable):
         `String`.
 
         Parameters:
-            iso: The IsoFormat to parse.
+            iso: The `IsoFormat` to parse.
             calendar: The calendar to which the result will belong.
 
         Args:
@@ -1918,13 +1927,13 @@ struct DateTime8(Hashable, Stringable):
         return self.hash ^ int(other)
 
     @always_inline("nodebug")
-    fn __int__(self) -> UInt8:
+    fn __int__(self) -> Int:
         """Int.
 
         Returns:
             Result.
         """
-        return self.hour
+        return int(self.hour)
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
@@ -1995,10 +2004,13 @@ struct DateTime8(Hashable, Stringable):
         return DateTime8.from_unix_epoch(time.now() // 1_000_000_000)
 
     @always_inline("nodebug")
-    fn to_iso(self) -> String:
+    fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYY_MM_DD_T_MM_HH_SS`.
-        e.g. `1970-01-01T00:00:00` .
+        compliant `String` e.g. `IsoFormat.YYYY_MM_DD_T_MM_HH_SS`.
+        -> `1970-01-01T00:00:00` .
+
+        Parameters:
+            iso: The `IsoFormat`.
 
         Returns:
             String.
@@ -2006,7 +2018,7 @@ struct DateTime8(Hashable, Stringable):
         Notes:
             This is done assuming the current hash is valid.
         """
-        var time = dt_str.to_iso(
+        var time = dt_str.to_iso[iso](
             int(_calendar.min_year),
             int(_calendar.min_month),
             int(self.get_day()),
@@ -2027,7 +2039,7 @@ struct DateTime8(Hashable, Stringable):
         `String`.
 
         Parameters:
-            iso: The IsoFormat to parse.
+            iso: The `IsoFormat` to parse.
             calendar: The calendar to which the result will belong.
 
         Args:

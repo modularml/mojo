@@ -640,7 +640,7 @@ struct Date[
         return hash(self) ^ int(other)
 
     @always_inline("nodebug")
-    fn __int__(self) -> UInt32:
+    fn __int__(self) -> Int:
         """Int.
 
         Returns:
@@ -914,7 +914,7 @@ struct Date[
             String.
         """
         var date = (int(self.year), int(self.month), int(self.day))
-        var time = dt_str.to_iso(date[0], date[1], date[2], 0, 0, 0)
+        var time = dt_str.to_iso[iso](date[0], date[1], date[2], 0, 0, 0)
         return time[:10]
 
     @staticmethod

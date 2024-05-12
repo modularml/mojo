@@ -874,7 +874,7 @@ struct DateTime[
         return hash(self) ^ int(other)
 
     @always_inline("nodebug")
-    fn __int__(self) -> UInt64:
+    fn __int__(self) -> Int:
         """Int.
 
         Returns:
@@ -1260,7 +1260,7 @@ struct DateTime[
         """
         var date = (int(self.year), int(self.month), int(self.day))
         var hour = (int(self.hour), int(self.minute), int(self.second))
-        var time = dt_str.to_iso(
+        var time = dt_str.to_iso[iso](
             date[0], date[1], date[2], hour[0], hour[1], hour[2]
         )
         return time + self.tz.to_iso()
