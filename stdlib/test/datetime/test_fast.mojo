@@ -18,6 +18,7 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 from time import time
 
 from datetime.fast import DateTime64, DateTime32, DateTime16, DateTime8
+from datetime.dt_str import IsoFormat
 
 
 fn test_add64():
@@ -529,38 +530,41 @@ fn test_iso8():
 
 
 fn test_time64():
-    var start = DateTime64.now()
-    time.sleep(1e-3)  # milisecond resolution
-    var end = DateTime64.now()
-    assert_true(start != end)
+    try:
+        var start = DateTime64.now()
+        time.sleep(1e-3)  # milisecond resolution
+        var end = DateTime64.now()
+        assert_true(start != end)
+    except:
+        assert_true(False)
 
 
 fn test_hash64():
     var ref = DateTime64(1970, 1, 1)
     var data = hash(ref)
     var parsed = DateTime64.from_hash(data)
-    assert_equal(ref, parsed)
+    assert_true(ref == parsed)
 
 
 fn test_hash32():
     var ref = DateTime32(1970, 1, 1)
     var data = hash(ref)
     var parsed = DateTime32.from_hash(data)
-    assert_equal(ref, parsed)
+    assert_true(ref == parsed)
 
 
 fn test_hash16():
     var ref = DateTime16(1970, 1, 1)
     var data = hash(ref)
     var parsed = DateTime16.from_hash(data)
-    assert_equal(ref, parsed)
+    assert_true(ref == parsed)
 
 
 fn test_hash8():
     var ref = DateTime8(0, 23)
     var data = hash(ref)
     var parsed = DateTime8.from_hash(data)
-    assert_equal(ref, parsed)
+    assert_true(ref == parsed)
 
 
 fn main():

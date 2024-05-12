@@ -17,11 +17,13 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from time import time
 
-from datetime.date import Date
+from datetime.date import Date as dt
 from datetime.calendar import Calendar, PythonCalendar, UTCCalendar
 from datetime.timezone import TimeZone
+from datetime.dt_str import IsoFormat
 
 alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+alias Date = dt[iana=None, pyzoneinfo=False, native=False]
 
 
 fn test_add(pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ):
@@ -197,17 +199,20 @@ fn test_iso(pycal: Calendar, tz_0_: TZ):
 
 
 fn test_time():
-    var start = Date.now()
-    time.sleep(0.1)
-    var end = Date.now()
-    assert_equal(start, end)
+    try:
+        var start = Date.now()
+        time.sleep(0.1)
+        var end = Date.now()
+        assert_equal(start, end)
+    except:
+        assert_true(False)
 
 
 fn test_hash():
-    var ref = Date(1970, 1, 1, tz_0_, pycal)
+    var ref = Date(1970, 1, 1)
     var data = hash(ref)
     var parsed = Date.from_hash(data)
-    assert_equal(ref, parsed)
+    assert_true(ref == parsed)
 
 
 fn main():

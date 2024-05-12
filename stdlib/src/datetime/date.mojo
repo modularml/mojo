@@ -30,7 +30,11 @@ alias _cal_hash = CalendarHashes(32)
 
 
 @register_passable("trivial")
-struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
+struct Date[
+    iana: Optional[ZoneInfo] = all_zones,
+    pyzoneinfo: Bool = True,
+    native: Bool = False,
+](Hashable, Stringable):
     """Custom `Calendar` and `TimeZone` may be passed in.
     By default uses `PythonCalendar` which is a proleptic
     Gregorian calendar with its given epoch and max years:
@@ -44,6 +48,15 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
             ). If None, defaults to only using the offsets
             as is, no daylight saving or special exceptions.
+        pyzoneinfo: Whether to use python's zoneinfo and
+            datetime to get full IANA support.
+        native: (fast, partial IANA support) Whether to use a native Dict
+            with the current timezones from the [List of TZ identifiers](
+            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+            at the time of compilation (for now they're hardcoded
+            at stdlib release time, in the future it should get them
+            from the OS). If it fails at compile time, it defaults to
+            using the given offsets when the timezone was constructed.
 
     - Max Resolution:
         - year: Up to year 65_536.
@@ -68,7 +81,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     var day: UInt8
     """Day."""
     # TODO: tz and calendar should be references
-    var tz: TimeZone[iana]
+    var tz: TimeZone[iana, pyzoneinfo, native]
     """Tz."""
     var calendar: Calendar
     """Calendar."""
@@ -78,7 +91,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         year: Optional[Int] = None,
         month: Optional[Int] = None,
         day: Optional[Int] = None,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ):
         """Construct a `Date` from valid values.
@@ -101,7 +116,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         year: Optional[UInt16] = None,
         month: Optional[UInt8] = None,
         day: Optional[UInt8] = None,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ):
         """Construct a `Date` from valid values.
@@ -128,13 +145,17 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         years: Int = 0,
         months: Int = 0,
         days: Int = 0,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from possibly overflowing values."""
-        var d = Date[iana]._from_days(days, tz, calendar)
-        var mon = Date[iana]._from_months(months, tz, calendar)
-        var y = Date[iana]._from_years(years, tz, calendar)
+        var d = Date[iana, pyzoneinfo, native]._from_days(days, tz, calendar)
+        var mon = Date[iana, pyzoneinfo, native]._from_months(
+            months, tz, calendar
+        )
+        var y = Date[iana, pyzoneinfo, native]._from_years(years, tz, calendar)
 
         y.year = 0 if years == 0 else y.year
 
@@ -154,7 +175,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         owned year: Optional[UInt16] = None,
         owned month: Optional[UInt8] = None,
         owned day: Optional[UInt8] = None,
-        owned tz: Optional[TimeZone[iana]] = None,
+        owned tz: Optional[TimeZone[iana, pyzoneinfo, native]] = None,
         owned calendar: Optional[Calendar] = None,
     ) -> Self:
         """Replace with give value/s.
@@ -205,10 +226,10 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         Returns:
             Self with tz casted to UTC.
         """
-        alias TZ_UTC = TimeZone[iana]()
+        alias TZ_UTC = TimeZone[iana, pyzoneinfo, native]()
         if self.tz == TZ_UTC:
             return self
-        var new_self: Date[iana]
+        var new_self = self
         var offset = self.tz.offset_at(self.year, self.month, self.day, 0, 0, 0)
         var of_h = int(offset[0])
         var of_m = int(offset[1])
@@ -223,7 +244,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             new_self = self.subtract(seconds=amnt)
         return new_self.replace(tz=TZ_UTC)
 
-    fn from_utc(owned self, tz: TimeZone[iana]) -> Self:
+    fn from_utc(owned self, tz: TimeZone[iana, pyzoneinfo, native]) -> Self:
         """Translate `TimeZone` from UTC. If `self.tz` is UTC
         it returns early.
 
@@ -233,7 +254,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         Returns:
             Self with tz casted to given tz.
         """
-        if tz == TimeZone[iana]():
+        if tz == TimeZone[iana, pyzoneinfo, native]():
             return self
         var maxmin = self.calendar.max_minute
         var maxsec = self.calendar.max_typical_second
@@ -241,7 +262,7 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         var of_h = int(offset[0])
         var of_m = int(offset[1])
         var amnt = int(of_h * maxmin * maxsec + of_m * maxsec)
-        var new_self: Date[iana]
+        var new_self = self
         if offset[2] == 1:
             new_self = self.add(seconds=amnt)
         else:
@@ -621,38 +642,50 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     @staticmethod
     fn _from_years(
         years: UInt16,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from years."""
         var delta = calendar.max_year - years
         if delta > 0:
             if years > calendar.min_year:
-                return Date[iana](year=years, tz=tz, calendar=calendar)
-            return Date[iana]._from_years(delta)
-        return Date[iana]._from_years(calendar.min_year - delta)
+                return Date[iana, pyzoneinfo, native](
+                    year=years, tz=tz, calendar=calendar
+                )
+            return Date[iana, pyzoneinfo, native]._from_years(delta)
+        return Date[iana, pyzoneinfo, native]._from_years(
+            calendar.min_year - delta
+        )
 
     @staticmethod
     fn _from_months(
         months: Int,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from months."""
         if months <= int(calendar.max_month):
-            return Date[iana](month=UInt8(months), tz=tz, calendar=calendar)
+            return Date[iana, pyzoneinfo, native](
+                month=UInt8(months), tz=tz, calendar=calendar
+            )
         var mon = calendar.max_month
-        var dt_y = Date[iana]._from_years(
+        var dt_y = Date[iana, pyzoneinfo, native]._from_years(
             months // int(calendar.max_month), tz, calendar
         )
         var rest = months - dt_y.year * calendar.max_month.cast[DType.uint16]()
-        var dt = Date[iana](
+        var dt = Date[iana, pyzoneinfo, native](
             year=dt_y.year,
             month=mon,
             tz=tz,
             calendar=calendar,
         )
-        dt += Date[iana](month=UInt8(rest), tz=tz, calendar=calendar)
+        dt += Date[iana, pyzoneinfo, native](
+            month=UInt8(rest), tz=tz, calendar=calendar
+        )
         return dt
 
     @staticmethod
@@ -660,24 +693,28 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         add_leap: Bool = False
     ](
         days: Int,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from days."""
         var maxtdays = int(calendar.max_typical_days_in_year)
         var maxposdays = int(calendar.max_possible_days_in_year)
         var years = days // maxtdays
-        var dt = Date[iana]._from_years(years, tz, calendar)
+        var dt = Date[iana, pyzoneinfo, native]._from_years(years, tz, calendar)
         var maxdays = maxtdays if calendar.is_leapyear(dt.year) else maxposdays
         if days <= maxdays:
             var mindays = calendar.max_days_in_month(
                 calendar.min_year, calendar.min_month
             )
             if days <= int(mindays):
-                return Date[iana](day=days, tz=tz, calendar=calendar)
-            return Date[iana](calendar.min_year, tz=tz, calendar=calendar).add(
-                days=days
-            )
+                return Date[iana, pyzoneinfo, native](
+                    day=days, tz=tz, calendar=calendar
+                )
+            return Date[iana, pyzoneinfo, native](
+                calendar.min_year, tz=tz, calendar=calendar
+            ).add(days=days)
         var numerator = (days - maxdays)
         if add_leap:
             var leapdays = calendar.leapdays_since_epoch(
@@ -685,44 +722,60 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             )
             numerator += int(leapdays)
         var y = numerator // maxdays
-        return Date[iana]._from_years(UInt16(y), tz, calendar)
+        return Date[iana, pyzoneinfo, native]._from_years(
+            UInt16(y), tz, calendar
+        )
 
     @staticmethod
     fn _from_hours[
         add_leap: Bool = False
     ](
         hours: Int,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from hours."""
         var h = int(calendar.max_hour)
         if hours <= h:
-            return Date[iana](calendar.min_year, tz=tz, calendar=calendar)
+            return Date[iana, pyzoneinfo, native](
+                calendar.min_year, tz=tz, calendar=calendar
+            )
         var d = (hours - h) // (h + 1)
-        return Date[iana]._from_days[add_leap](d, tz, calendar)
+        return Date[iana, pyzoneinfo, native]._from_days[add_leap](
+            d, tz, calendar
+        )
 
     @staticmethod
     fn _from_minutes[
         add_leap: Bool = False
     ](
         minutes: Int,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from minutes."""
         var m = int(calendar.max_minute)
         if minutes < m:
-            return Date[iana](calendar.min_year, tz=tz, calendar=calendar)
+            return Date[iana, pyzoneinfo, native](
+                calendar.min_year, tz=tz, calendar=calendar
+            )
         var h = (minutes - m) // (m + 1)
-        return Date[iana]._from_hours[add_leap](h, tz, calendar)
+        return Date[iana, pyzoneinfo, native]._from_hours[add_leap](
+            h, tz, calendar
+        )
 
     @staticmethod
     fn from_seconds[
         add_leap: Bool = False
     ](
         seconds: Int,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from seconds.
@@ -740,7 +793,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             Self.
         """
         var minutes = seconds // int(calendar.max_typical_second + 1)
-        var dt = Date[iana]._from_minutes(minutes, tz, calendar)
+        var dt = Date[iana, pyzoneinfo, native]._from_minutes(
+            minutes, tz, calendar
+        )
         if not add_leap:
             return dt
         var max_second = calendar.max_second(
@@ -749,12 +804,17 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         var leapsecs = calendar.leapsecs_since_epoch(dt.year, dt.month, dt.day)
         var numerator = (seconds + int(leapsecs) - max_second)
         var m = int(numerator // (max_second + 1))
-        return Date[iana]._from_minutes(m, tz, calendar)
+        return Date[iana, pyzoneinfo, native]._from_minutes(m, tz, calendar)
 
     @staticmethod
     fn from_unix_epoch[
         add_leap: Bool = False
-    ](seconds: Int, tz: TimeZone[iana] = TimeZone[iana]()) -> Self:
+    ](
+        seconds: Int,
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
+    ) -> Self:
         """Construct a `Date` from the seconds since the Unix Epoch
         1970-01-01. Adding the cumulative leap seconds since 1972
         to the given date.
@@ -770,13 +830,16 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         Returns:
             Self.
         """
-        return Date[iana].from_seconds[add_leap](
+        return Date[iana, pyzoneinfo, native].from_seconds[add_leap](
             seconds, tz=tz, calendar=UTCCalendar
         )
 
     @staticmethod
     fn now(
-        tz: TimeZone[iana] = TimeZone[iana](), calendar: Calendar = _calendar
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
+        calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a date from `time.now()`.
 
@@ -840,7 +903,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     @parameter
     fn strptime[
         format_str: StringLiteral,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ](s: String) -> Optional[Self]:
         """Parse a `Date` from a  `String`.
@@ -860,13 +925,15 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         if not parsed:
             return None
         var p = parsed.unsafe_take()
-        return Date[iana](p[0], p[1], p[2], tz=tz, calendar=calendar)
+        return Date[iana, pyzoneinfo, native](
+            p[0], p[1], p[2], tz=tz, calendar=calendar
+        )
 
     @staticmethod
     @parameter
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-        tz: Optional[TimeZone[iana]] = None,
+        tz: Optional[TimeZone[iana, pyzoneinfo, native]] = None,
         calendar: Calendar = _calendar,
     ](s: String) -> Optional[Self]:
         """Construct a date from an
@@ -888,8 +955,10 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             An Optional Self.
         """
         try:
-            var p = dt_str.from_iso[iso, iana](s)
-            var dt = Date[iana](p[0], p[1], p[2], tz=p[6], calendar=calendar)
+            var p = dt_str.from_iso[iso, iana, pyzoneinfo, native](s)
+            var dt = Date[iana, pyzoneinfo, native](
+                p[0], p[1], p[2], tz=p[6], calendar=calendar
+            )
             if tz:
                 var t = tz.value()[]
                 if t != dt.tz:
@@ -901,7 +970,9 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     @staticmethod
     fn from_hash(
         value: UInt32,
-        tz: TimeZone[iana] = TimeZone[iana](),
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from a hash made by it.
@@ -915,4 +986,6 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             Self.
         """
         var d = calendar.from_hash[_cal_hash](int(value))
-        return Date[iana](d[0], d[1], d[2], tz=tz, calendar=calendar)
+        return Date[iana, pyzoneinfo, native](
+            d[0], d[1], d[2], tz=tz, calendar=calendar
+        )

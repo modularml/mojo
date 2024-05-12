@@ -119,7 +119,10 @@ fn to_iso[
 
 
 fn from_iso[
-    iso: IsoFormat = IsoFormat(), iana: Optional[ZoneInfo] = all_zones
+    iso: IsoFormat = IsoFormat(),
+    iana: Optional[ZoneInfo] = all_zones,
+    pyzoneinfo: Bool = True,
+    native: Bool = False,
 ](s: String) raises -> (
     UInt16,
     UInt8,
@@ -127,13 +130,15 @@ fn from_iso[
     UInt8,
     UInt8,
     UInt8,
-    TimeZone[iana],
+    TimeZone[iana, pyzoneinfo, native],
 ):
     """Parses a string expecting given format.
 
     Parameters:
         iso: The chosen IsoFormat.
         iana: The IANA timezones to support.
+        pyzoneinfo: Whether to use pyzoneinfo.
+        native: Whether to use native support.
 
     Args:
         s: The string.
@@ -143,7 +148,7 @@ fn from_iso[
     """
     var result = UInt16(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(
         0
-    ), TimeZone[iana]()
+    ), TimeZone[iana, pyzoneinfo, native]()
     if iso.YYYYMMDD in iso.selected:
         result[0] = atol(s[:4])
         result[1] = atol(s[4:6])
@@ -181,7 +186,7 @@ fn from_iso[
             m = atol(s[23:25])
         else:
             m = atol(s[22:24])
-        result[6] = TimeZone[iana].from_offset(
+        result[6] = TimeZone[iana, pyzoneinfo, native].from_offset(
             result[0], result[1], result[2], h, m, sign
         )
 
