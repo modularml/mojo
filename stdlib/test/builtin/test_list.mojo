@@ -31,6 +31,11 @@ fn test_variadic_list() raises:
     check_list(5, 8, 6)
 
 
+fn test_repr_list() raises:
+    assert_equal(repr(List(1, 2, 3)), "[1, 2, 3]")
+
+
 def main():
     test_list()
     test_variadic_list()
+    test_repr_list()
