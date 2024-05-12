@@ -37,41 +37,49 @@ def test_mojo_issue_698():
 
 
 def test_list():
-    var list = List[Int]()
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var list = List[Int, sbo_size]()
 
-    for i in range(5):
-        list.append(i)
+        for i in range(5):
+            list.append(i)
 
-    assert_equal(5, len(list))
-    assert_equal(0, list[0])
-    assert_equal(1, list[1])
-    assert_equal(2, list[2])
-    assert_equal(3, list[3])
-    assert_equal(4, list[4])
+        assert_equal(5, len(list))
+        assert_equal(0, list[0])
+        assert_equal(1, list[1])
+        assert_equal(2, list[2])
+        assert_equal(3, list[3])
+        assert_equal(4, list[4])
 
-    assert_equal(0, list[-5])
-    assert_equal(3, list[-2])
-    assert_equal(4, list[-1])
+        assert_equal(0, list[-5])
+        assert_equal(3, list[-2])
+        assert_equal(4, list[-1])
 
-    list[2] = -2
-    assert_equal(-2, list[2])
+        list[2] = -2
+        assert_equal(-2, list[2])
 
-    list[-5] = 5
-    assert_equal(5, list[-5])
-    list[-2] = 3
-    assert_equal(3, list[-2])
-    list[-1] = 7
-    assert_equal(7, list[-1])
+        list[-5] = 5
+        assert_equal(5, list[-5])
+        list[-2] = 3
+        assert_equal(3, list[-2])
+        list[-1] = 7
+        assert_equal(7, list[-1])
+
+    unroll[test_function, 10]()
 
 
 def test_list_clear():
-    var list = List[Int](1, 2, 3)
-    assert_equal(len(list), 3)
-    assert_equal(list.capacity, 3)
-    list.clear()
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var list = List[Int, sbo_size](1, 2, 3)
+        assert_equal(len(list), 3)
+        assert_equal(list.capacity, max(3, sbo_size))
+        list.clear()
 
-    assert_equal(len(list), 0)
-    assert_equal(list.capacity, 3)
+        assert_equal(len(list), 0)
+        assert_equal(list.capacity, max(3, sbo_size))
+
+    unroll[test_function, 10]()
 
 
 def test_list_to_bool_conversion():
@@ -246,113 +254,121 @@ def test_list_reverse():
 
 
 def test_list_reverse_move_count():
-    # Create this vec with enough capacity to avoid moves due to resizing.
-    var vec = List[MoveCounter[Int]](capacity=5)
-    vec.append(MoveCounter(1))
-    vec.append(MoveCounter(2))
-    vec.append(MoveCounter(3))
-    vec.append(MoveCounter(4))
-    vec.append(MoveCounter(5))
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        # Create this vec with enough capacity to avoid moves due to resizing.
+        var vec = List[MoveCounter[Int], sbo_size](capacity=5)
+        vec.append(MoveCounter(1))
+        vec.append(MoveCounter(2))
+        vec.append(MoveCounter(3))
+        vec.append(MoveCounter(4))
+        vec.append(MoveCounter(5))
 
-    assert_equal(len(vec), 5)
-    assert_equal(vec.data[0].value, 1)
-    assert_equal(vec.data[1].value, 2)
-    assert_equal(vec.data[2].value, 3)
-    assert_equal(vec.data[3].value, 4)
-    assert_equal(vec.data[4].value, 5)
+        assert_equal(len(vec), 5)
+        assert_equal(vec.data[0].value, 1)
+        assert_equal(vec.data[1].value, 2)
+        assert_equal(vec.data[2].value, 3)
+        assert_equal(vec.data[3].value, 4)
+        assert_equal(vec.data[4].value, 5)
 
-    assert_equal(vec.data[0].move_count, 1)
-    assert_equal(vec.data[1].move_count, 1)
-    assert_equal(vec.data[2].move_count, 1)
-    assert_equal(vec.data[3].move_count, 1)
-    assert_equal(vec.data[4].move_count, 1)
+        assert_equal(vec.data[0].move_count, 1)
+        assert_equal(vec.data[1].move_count, 1)
+        assert_equal(vec.data[2].move_count, 1)
+        assert_equal(vec.data[3].move_count, 1)
+        assert_equal(vec.data[4].move_count, 1)
 
-    vec.reverse()
+        vec.reverse()
 
-    assert_equal(len(vec), 5)
-    assert_equal(vec.data[0].value, 5)
-    assert_equal(vec.data[1].value, 4)
-    assert_equal(vec.data[2].value, 3)
-    assert_equal(vec.data[3].value, 2)
-    assert_equal(vec.data[4].value, 1)
+        assert_equal(len(vec), 5)
+        assert_equal(vec.data[0].value, 5)
+        assert_equal(vec.data[1].value, 4)
+        assert_equal(vec.data[2].value, 3)
+        assert_equal(vec.data[3].value, 2)
+        assert_equal(vec.data[4].value, 1)
 
-    # NOTE:
-    # Earlier elements went through 2 moves and later elements went through 3
-    # moves because the implementation of List.reverse arbitrarily
-    # chooses to perform the swap of earlier and later elements by moving the
-    # earlier element to a temporary (+1 move), directly move the later element
-    # into the position the earlier element was in, and then move from the
-    # temporary into the later position (+1 move).
-    assert_equal(vec.data[0].move_count, 2)
-    assert_equal(vec.data[1].move_count, 2)
-    assert_equal(vec.data[2].move_count, 1)
-    assert_equal(vec.data[3].move_count, 3)
-    assert_equal(vec.data[4].move_count, 3)
+        # NOTE:
+        # Earlier elements went through 2 moves and later elements went through 3
+        # moves because the implementation of List.reverse arbitrarily
+        # chooses to perform the swap of earlier and later elements by moving the
+        # earlier element to a temporary (+1 move), directly move the later element
+        # into the position the earlier element was in, and then move from the
+        # temporary into the later position (+1 move).
+        assert_equal(vec.data[0].move_count, 2)
+        assert_equal(vec.data[1].move_count, 2)
+        assert_equal(vec.data[2].move_count, 1)
+        assert_equal(vec.data[3].move_count, 3)
+        assert_equal(vec.data[4].move_count, 3)
 
-    # Keep vec alive until after we've done the last `vec.data + N` read.
-    _ = vec^
+        # Keep vec alive until after we've done the last `vec.data + N` read.
+        _ = vec^
+
+    unroll[test_function, 10]()
 
 
 def test_list_insert():
-    #
-    # Test the list [1, 2, 3] created with insert
-    #
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        #
+        # Test the list [1, 2, 3] created with insert
+        #
 
-    v1 = List[Int]()
-    v1.insert(len(v1), 1)
-    v1.insert(len(v1), 3)
-    v1.insert(1, 2)
+        var v1 = List[Int, sbo_size]()
+        v1.insert(len(v1), 1)
+        v1.insert(len(v1), 3)
+        v1.insert(1, 2)
 
-    assert_equal(len(v1), 3)
-    assert_equal(v1[0], 1)
-    assert_equal(v1[1], 2)
-    assert_equal(v1[2], 3)
+        assert_equal(len(v1), 3)
+        assert_equal(v1[0], 1)
+        assert_equal(v1[1], 2)
+        assert_equal(v1[2], 3)
 
-    #
-    # Test the list [1, 2, 3, 4, 5] created with negative and positive index
-    #
+        #
+        # Test the list [1, 2, 3, 4, 5] created with negative and positive index
+        #
 
-    v2 = List[Int]()
-    v2.insert(-1729, 2)
-    v2.insert(len(v2), 3)
-    v2.insert(len(v2), 5)
-    v2.insert(-1, 4)
-    v2.insert(-len(v2), 1)
+        var v2 = List[Int, sbo_size]()
+        v2.insert(-1729, 2)
+        v2.insert(len(v2), 3)
+        v2.insert(len(v2), 5)
+        v2.insert(-1, 4)
+        v2.insert(-len(v2), 1)
 
-    assert_equal(len(v2), 5)
-    assert_equal(v2[0], 1)
-    assert_equal(v2[1], 2)
-    assert_equal(v2[2], 3)
-    assert_equal(v2[3], 4)
-    assert_equal(v2[4], 5)
+        assert_equal(len(v2), 5)
+        assert_equal(v2[0], 1)
+        assert_equal(v2[1], 2)
+        assert_equal(v2[2], 3)
+        assert_equal(v2[3], 4)
+        assert_equal(v2[4], 5)
 
-    #
-    # Test the list [1, 2, 3, 4] created with negative index
-    #
+        #
+        # Test the list [1, 2, 3, 4] created with negative index
+        #
 
-    v3 = List[Int]()
-    v3.insert(-11, 4)
-    v3.insert(-13, 3)
-    v3.insert(-17, 2)
-    v3.insert(-19, 1)
+        var v3 = List[Int, sbo_size]()
+        v3.insert(-11, 4)
+        v3.insert(-13, 3)
+        v3.insert(-17, 2)
+        v3.insert(-19, 1)
 
-    assert_equal(len(v3), 4)
-    assert_equal(v3[0], 1)
-    assert_equal(v3[1], 2)
-    assert_equal(v3[2], 3)
-    assert_equal(v3[3], 4)
+        assert_equal(len(v3), 4)
+        assert_equal(v3[0], 1)
+        assert_equal(v3[1], 2)
+        assert_equal(v3[2], 3)
+        assert_equal(v3[3], 4)
 
-    #
-    # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
-    #
+        #
+        # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
+        #
 
-    v4 = List[Int]()
-    for i in range(4):
-        v4.insert(0, 4 - i)
-        v4.insert(len(v4), 4 + i + 1)
+        var v4 = List[Int, sbo_size]()
+        for i in range(4):
+            v4.insert(0, 4 - i)
+            v4.insert(len(v4), 4 + i + 1)
 
-    for i in range(len(v4)):
-        assert_equal(v4[i], i + 1)
+        for i in range(len(v4)):
+            assert_equal(v4[i], i + 1)
+
+    unroll[test_function, 10]()
 
 
 def test_list_index():
@@ -573,7 +589,7 @@ def test_list_explicit_copy():
 # Ensure correct behavior of __copyinit__
 # as reported in GH issue 27875 internally and
 # https://github.com/modularml/mojo/issues/1493
-def test_list_copy_constructor():
+def test_list_copy_constructor_issue_1493():
     var vec = List[Int](capacity=1)
     var vec_copy = vec
     vec_copy.append(1)  # Ensure copy constructor doesn't crash
@@ -801,290 +817,55 @@ def test_bytes_with_small_size_optimization():
     _ = small_list
 
 
-def test_list_with_sbo():
-    var list = List[Int, 2]()
+def test_list_copy_constructor():
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var vec = List[Int, sbo_size](3, 2, 1)
+        var vec_copy = vec
+        assert_not_equal(vec.data, vec_copy.data)
+        vec_copy.append(1)  # Ensure copy constructor doesn't crash
+        vec_copy[0] = 0
+        assert_equal(len(vec), 3)
+        assert_equal(len(vec_copy), 4)
+        assert_equal(vec[0], 3)
+        assert_equal(vec_copy[0], 0)
+        assert_not_equal(vec.data, vec_copy.data)
 
-    for i in range(5):
-        list.append(i)
+        _ = vec^  # To ensure previous one doesn't invoke move constuctor
 
-    assert_equal(5, len(list))
-    assert_equal(0, list[0])
-    assert_equal(1, list[1])
-    assert_equal(2, list[2])
-    assert_equal(3, list[3])
-    assert_equal(4, list[4])
-
-    assert_equal(0, list[-5])
-    assert_equal(3, list[-2])
-    assert_equal(4, list[-1])
-
-    list[2] = -2
-    assert_equal(-2, list[2])
-
-    list[-5] = 5
-    assert_equal(5, list[-5])
-    list[-2] = 3
-    assert_equal(3, list[-2])
-    list[-1] = 7
-    assert_equal(7, list[-1])
-
-
-def test_list_with_sbo_big_enough():
-    var list = List[Int, 10]()
-
-    for i in range(5):
-        list.append(i)
-
-    assert_equal(5, len(list))
-    assert_equal(0, list[0])
-    assert_equal(1, list[1])
-    assert_equal(2, list[2])
-    assert_equal(3, list[3])
-    assert_equal(4, list[4])
-
-    assert_equal(0, list[-5])
-    assert_equal(3, list[-2])
-    assert_equal(4, list[-1])
-
-    list[2] = -2
-    assert_equal(-2, list[2])
-
-    list[-5] = 5
-    assert_equal(5, list[-5])
-    list[-2] = 3
-    assert_equal(3, list[-2])
-    list[-1] = 7
-    assert_equal(7, list[-1])
-
-
-def test_list_clear_with_sbo():
-    var list = List[Int, 2](1, 2, 3)
-    assert_equal(len(list), 3)
-    assert_equal(list.capacity, 3)
-    list.clear()
-
-    assert_equal(len(list), 0)
-    assert_equal(list.capacity, 3)
-
-
-def test_list_clear_with_sbo_big_enough():
-    var list = List[Int, 4](1, 2, 3)
-    assert_equal(len(list), 3)
-    assert_equal(list.capacity, 4)
-    list.clear()
-
-    assert_equal(len(list), 0)
-    assert_equal(list.capacity, 4)
-
-
-def test_list_reverse_move_count_with_sbo():
-    # Create this vec with enough capacity to avoid moves due to resizing.
-    var vec = List[MoveCounter[Int], 3](capacity=5)
-    vec.append(MoveCounter(1))
-    vec.append(MoveCounter(2))
-    vec.append(MoveCounter(3))
-    vec.append(MoveCounter(4))
-    vec.append(MoveCounter(5))
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec.data[0].value, 1)
-    assert_equal(vec.data[1].value, 2)
-    assert_equal(vec.data[2].value, 3)
-    assert_equal(vec.data[3].value, 4)
-    assert_equal(vec.data[4].value, 5)
-
-    assert_equal(vec.data[0].move_count, 1)
-    assert_equal(vec.data[1].move_count, 1)
-    assert_equal(vec.data[2].move_count, 1)
-    assert_equal(vec.data[3].move_count, 1)
-    assert_equal(vec.data[4].move_count, 1)
-
-    vec.reverse()
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec.data[0].value, 5)
-    assert_equal(vec.data[1].value, 4)
-    assert_equal(vec.data[2].value, 3)
-    assert_equal(vec.data[3].value, 2)
-    assert_equal(vec.data[4].value, 1)
-
-    # NOTE:
-    # Earlier elements went through 2 moves and later elements went through 3
-    # moves because the implementation of List.reverse arbitrarily
-    # chooses to perform the swap of earlier and later elements by moving the
-    # earlier element to a temporary (+1 move), directly move the later element
-    # into the position the earlier element was in, and then move from the
-    # temporary into the later position (+1 move).
-    assert_equal(vec.data[0].move_count, 2)
-    assert_equal(vec.data[1].move_count, 2)
-    assert_equal(vec.data[2].move_count, 1)
-    assert_equal(vec.data[3].move_count, 3)
-    assert_equal(vec.data[4].move_count, 3)
-
-    # Keep vec alive until after we've done the last `vec.data + N` read.
-    _ = vec^
-
-
-def test_list_reverse_move_count_with_sbo_big_enough():
-    # Create this vec with enough capacity to avoid moves due to resizing.
-    var vec = List[MoveCounter[Int], 7](capacity=5)
-    vec.append(MoveCounter(1))
-    vec.append(MoveCounter(2))
-    vec.append(MoveCounter(3))
-    vec.append(MoveCounter(4))
-    vec.append(MoveCounter(5))
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec.data[0].value, 1)
-    assert_equal(vec.data[1].value, 2)
-    assert_equal(vec.data[2].value, 3)
-    assert_equal(vec.data[3].value, 4)
-    assert_equal(vec.data[4].value, 5)
-
-    assert_equal(vec.data[0].move_count, 1)
-    assert_equal(vec.data[1].move_count, 1)
-    assert_equal(vec.data[2].move_count, 1)
-    assert_equal(vec.data[3].move_count, 1)
-    assert_equal(vec.data[4].move_count, 1)
-
-    vec.reverse()
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec.data[0].value, 5)
-    assert_equal(vec.data[1].value, 4)
-    assert_equal(vec.data[2].value, 3)
-    assert_equal(vec.data[3].value, 2)
-    assert_equal(vec.data[4].value, 1)
-
-    # NOTE:
-    # Earlier elements went through 2 moves and later elements went through 3
-    # moves because the implementation of List.reverse arbitrarily
-    # chooses to perform the swap of earlier and later elements by moving the
-    # earlier element to a temporary (+1 move), directly move the later element
-    # into the position the earlier element was in, and then move from the
-    # temporary into the later position (+1 move).
-    assert_equal(vec.data[0].move_count, 2)
-    assert_equal(vec.data[1].move_count, 2)
-    assert_equal(vec.data[2].move_count, 1)
-    assert_equal(vec.data[3].move_count, 3)
-    assert_equal(vec.data[4].move_count, 3)
-
-    # Keep vec alive until after we've done the last `vec.data + N` read.
-    _ = vec^
-
-
-def test_list_copy_constructor_with_sbo():
-    var vec = List[Int, 2](3, 2, 1)
-    var vec_copy = vec
-    assert_not_equal(vec.data, vec_copy.data)
-    vec_copy.append(1)  # Ensure copy constructor doesn't crash
-    vec_copy[0] = 0
-    assert_equal(len(vec), 3)
-    assert_equal(len(vec_copy), 4)
-    assert_equal(vec[0], 3)
-    assert_equal(vec_copy[0], 0)
-    assert_not_equal(vec.data, vec_copy.data)
-
-    _ = vec^  # To ensure previous one doesn't invoke move constuctor
-
-
-def test_list_copy_constructor_with_sbo_big_enough():
-    var vec = List[Int, 5](3, 2, 1)
-    var vec_copy = vec
-    assert_not_equal(vec.data, vec_copy.data)
-    vec_copy.append(1)  # Ensure copy constructor doesn't crash
-    vec_copy[0] = 0
-    assert_equal(len(vec), 3)
-    assert_equal(len(vec_copy), 4)
-    assert_equal(vec[0], 3)
-    assert_equal(vec_copy[0], 0)
-
-    assert_not_equal(vec.data, vec_copy.data)
-    _ = vec^  # To ensure previous one doesn't invoke move constuctor
+    unroll[test_function, 10]()
 
 
 def test_list_move_constructor():
-    var vec = List[UInt8](0, 10, 20, 30)
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var vec = List[UInt8, sbo_size](0, 10, 20, 30)
 
-    var vec_moved = vec^
-    assert_equal(len(vec_moved), 4)
-    assert_equal(vec_moved[0], 0)
-    assert_equal(vec_moved[1], 10)
-    assert_equal(vec_moved[2], 20)
-    assert_equal(vec_moved[3], 30)
+        var vec_moved = vec^
+        assert_equal(len(vec_moved), 4)
+        assert_equal(vec_moved[0], 0)
+        assert_equal(vec_moved[1], 10)
+        assert_equal(vec_moved[2], 20)
+        assert_equal(vec_moved[3], 30)
 
-    vec_moved.append(40)
-    assert_equal(len(vec_moved), 5)
-    assert_equal(vec_moved[4], 40)
+        vec_moved.append(40)
+        assert_equal(len(vec_moved), 5)
+        assert_equal(vec_moved[4], 40)
 
-    vec_moved[0] = 1
-    assert_equal(vec_moved[0], 1)
+        vec_moved[0] = 1
+        assert_equal(vec_moved[0], 1)
 
-    # Verify the pointer
-    var pointer = vec_moved.unsafe_ptr()
-    assert_equal(pointer[0], 1)
-    assert_equal(pointer[1], 10)
-    assert_equal(pointer[2], 20)
-    assert_equal(pointer[3], 30)
-    assert_equal(pointer[4], 40)
+        # Verify the pointer
+        var pointer = vec_moved.unsafe_ptr()
+        assert_equal(pointer[0], 1)
+        assert_equal(pointer[1], 10)
+        assert_equal(pointer[2], 20)
+        assert_equal(pointer[3], 30)
+        assert_equal(pointer[4], 40)
 
-    _ = vec_moved  # Keep the list alive for pointer tests
+        _ = vec_moved  # Keep the list alive for pointer tests
 
-
-def test_list_move_constructor_with_sbo_too_small():
-    var vec = List[UInt8, 3](0, 10, 20, 30)
-
-    var vec_moved = vec^
-    assert_equal(len(vec_moved), 4)
-    assert_equal(vec_moved[0], 0)
-    assert_equal(vec_moved[1], 10)
-    assert_equal(vec_moved[2], 20)
-    assert_equal(vec_moved[3], 30)
-
-    vec_moved.append(40)
-    assert_equal(len(vec_moved), 5)
-    assert_equal(vec_moved[4], 40)
-
-    vec_moved[0] = 1
-    assert_equal(vec_moved[0], 1)
-
-    # Verify the pointer
-    var pointer = vec_moved.unsafe_ptr()
-    assert_equal(pointer[0], 1)
-    assert_equal(pointer[1], 10)
-    assert_equal(pointer[2], 20)
-    assert_equal(pointer[3], 30)
-    assert_equal(pointer[4], 40)
-
-    _ = vec_moved  # Keep the list alive for pointer tests
-
-
-def test_list_move_constructor_with_sbo_big_enough():
-    var vec = List[UInt8, 10](0, 10, 20, 30)
-
-    var vec_moved = vec^
-    assert_equal(len(vec_moved), 4)
-    assert_equal(vec_moved[0], 0)
-    assert_equal(vec_moved[1], 10)
-    assert_equal(vec_moved[2], 20)
-    assert_equal(vec_moved[3], 30)
-
-    vec_moved.append(40)
-    assert_equal(len(vec_moved), 5)
-    assert_equal(vec_moved[4], 40)
-
-    vec_moved[0] = 1
-    assert_equal(vec_moved[0], 1)
-
-    # Verify the pointer
-    var pointer = vec_moved.unsafe_ptr()
-    assert_equal(pointer[0], 1)
-    assert_equal(pointer[1], 10)
-    assert_equal(pointer[2], 20)
-    assert_equal(pointer[3], 30)
-    assert_equal(pointer[4], 40)
-
-    _ = vec_moved  # Keep the list alive for pointer tests
+    unroll[test_function, 10]()
 
 
 def main():
@@ -1102,7 +883,7 @@ def main():
     test_list_extend()
     test_list_extend_non_trivial()
     test_list_explicit_copy()
-    test_list_copy_constructor()
+    test_list_copy_constructor_issue_1493()
     test_2d_dynamic_list()
     test_list_iter()
     test_list_iter_mutable()
@@ -1115,14 +896,5 @@ def main():
     test_list_add()
     test_list_mult()
     test_bytes_with_small_size_optimization()
-    test_list_with_sbo()
-    test_list_with_sbo_big_enough()
-    test_list_clear_with_sbo()
-    test_list_clear_with_sbo_big_enough()
-    test_list_reverse_move_count_with_sbo()
-    test_list_reverse_move_count_with_sbo_big_enough()
-    test_list_copy_constructor_with_sbo()
-    test_list_copy_constructor_with_sbo_big_enough()
+    test_list_copy_constructor()
     test_list_move_constructor()
-    test_list_move_constructor_with_sbo_too_small()
-    test_list_move_constructor_with_sbo_big_enough()
