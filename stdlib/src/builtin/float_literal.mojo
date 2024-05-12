@@ -260,6 +260,7 @@ struct FloatLiteral(
         alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
         alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
         var multiplier = one
+        # TODO: Use IntLiteral.__pow__() when it's implemented.
         for _ in range(ndigits):
             multiplier = __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
