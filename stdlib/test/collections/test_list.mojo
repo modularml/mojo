@@ -83,174 +83,194 @@ def test_list_clear():
 
 
 def test_list_to_bool_conversion():
-    assert_false(List[String]())
-    assert_true(List[String]("a"))
-    assert_true(List[String]("", "a"))
-    assert_true(List[String](""))
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        assert_false(List[String, sbo_size]())
+        assert_true(List[String, sbo_size]("a"))
+        assert_true(List[String, sbo_size]("", "a"))
+        assert_true(List[String, sbo_size](""))
+
+    unroll[test_function, 10]()
 
 
 def test_list_pop():
-    var list = List[Int]()
-    # Test pop with index
-    for i in range(6):
-        list.append(i)
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var list = List[Int, sbo_size]()
+        # Test pop with index
+        for i in range(6):
+            list.append(i)
 
-    # try poping from index 3 for 3 times
-    for i in range(3, 6):
-        assert_equal(i, list.pop(3))
+        # try poping from index 3 for 3 times
+        for i in range(3, 6):
+            assert_equal(i, list.pop(3))
 
-    # list should have 3 elements now
-    assert_equal(3, len(list))
-    assert_equal(0, list[0])
-    assert_equal(1, list[1])
-    assert_equal(2, list[2])
+        # list should have 3 elements now
+        assert_equal(3, len(list))
+        assert_equal(0, list[0])
+        assert_equal(1, list[1])
+        assert_equal(2, list[2])
 
-    # Test pop with negative index
-    for i in range(0, 2):
-        assert_equal(i, list.pop(-len(list)))
+        # Test pop with negative index
+        for i in range(0, 2):
+            assert_equal(i, list.pop(-len(list)))
 
-    # test default index as well
-    assert_equal(2, list.pop())
-    list.append(2)
-    assert_equal(2, list.pop())
+        # test default index as well
+        assert_equal(2, list.pop())
+        list.append(2)
+        assert_equal(2, list.pop())
 
-    # list should be empty now
-    assert_equal(0, len(list))
-    # capacity should be 1 according to shrink_to_fit behavior
-    assert_equal(1, list.capacity)
+        # list should be empty now
+        assert_equal(0, len(list))
+        # capacity should be 1 according to shrink_to_fit behavior
+        assert_equal(list.capacity, max(1, sbo_size))
+
+    unroll[test_function, 10]()
 
 
 def test_list_variadic_constructor():
-    var l = List[Int](2, 4, 6)
-    assert_equal(3, len(l))
-    assert_equal(2, l[0])
-    assert_equal(4, l[1])
-    assert_equal(6, l[2])
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var l = List[Int, sbo_size](2, 4, 6)
+        assert_equal(3, len(l))
+        assert_equal(2, l[0])
+        assert_equal(4, l[1])
+        assert_equal(6, l[2])
 
-    l.append(8)
-    assert_equal(4, len(l))
-    assert_equal(8, l[3])
+        l.append(8)
+        assert_equal(4, len(l))
+        assert_equal(8, l[3])
+
+    unroll[test_function, 10]()
 
 
 def test_list_resize():
-    var l = List[Int](1)
-    assert_equal(1, len(l))
-    l.resize(2, 0)
-    assert_equal(2, len(l))
-    assert_equal(l[1], 0)
-    l.resize(0)
-    assert_equal(len(l), 0)
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        var l = List[Int, sbo_size](1)
+        assert_equal(1, len(l))
+        l.resize(2, 0)
+        assert_equal(2, len(l))
+        assert_equal(l[1], 0)
+        l.resize(0)
+        assert_equal(len(l), 0)
+
+    unroll[test_function, 10]()
 
 
 def test_list_reverse():
-    #
-    # Test reversing the list []
-    #
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        #
+        # Test reversing the list []
+        #
 
-    var vec = List[Int]()
+        var vec = List[Int, sbo_size]()
 
-    assert_equal(len(vec), 0)
+        assert_equal(len(vec), 0)
 
-    vec.reverse()
+        vec.reverse()
 
-    assert_equal(len(vec), 0)
+        assert_equal(len(vec), 0)
 
-    #
-    # Test reversing the list [123]
-    #
+        #
+        # Test reversing the list [123]
+        #
 
-    vec = List[Int]()
+        vec = List[Int, sbo_size]()
 
-    vec.append(123)
+        vec.append(123)
 
-    assert_equal(len(vec), 1)
-    assert_equal(vec[0], 123)
+        assert_equal(len(vec), 1)
+        assert_equal(vec[0], 123)
 
-    vec.reverse()
+        vec.reverse()
 
-    assert_equal(len(vec), 1)
-    assert_equal(vec[0], 123)
+        assert_equal(len(vec), 1)
+        assert_equal(vec[0], 123)
 
-    #
-    # Test reversing the list ["one", "two", "three"]
-    #
+        #
+        # Test reversing the list ["one", "two", "three"]
+        #
 
-    vec2 = List[String]("one", "two", "three")
+        var vec2 = List[String, sbo_size]("one", "two", "three")
 
-    assert_equal(len(vec2), 3)
-    assert_equal(vec2[0], "one")
-    assert_equal(vec2[1], "two")
-    assert_equal(vec2[2], "three")
+        assert_equal(len(vec2), 3)
+        assert_equal(vec2[0], "one")
+        assert_equal(vec2[1], "two")
+        assert_equal(vec2[2], "three")
 
-    vec2.reverse()
+        vec2.reverse()
 
-    assert_equal(len(vec2), 3)
-    assert_equal(vec2[0], "three")
-    assert_equal(vec2[1], "two")
-    assert_equal(vec2[2], "one")
+        assert_equal(len(vec2), 3)
+        assert_equal(vec2[0], "three")
+        assert_equal(vec2[1], "two")
+        assert_equal(vec2[2], "one")
 
-    #
-    # Test reversing the list [5, 10]
-    #
+        #
+        # Test reversing the list [5, 10]
+        #
 
-    vec = List[Int]()
-    vec.append(5)
-    vec.append(10)
+        vec = List[Int, sbo_size]()
+        vec.append(5)
+        vec.append(10)
 
-    assert_equal(len(vec), 2)
-    assert_equal(vec[0], 5)
-    assert_equal(vec[1], 10)
+        assert_equal(len(vec), 2)
+        assert_equal(vec[0], 5)
+        assert_equal(vec[1], 10)
 
-    vec.reverse()
+        vec.reverse()
 
-    assert_equal(len(vec), 2)
-    assert_equal(vec[0], 10)
-    assert_equal(vec[1], 5)
+        assert_equal(len(vec), 2)
+        assert_equal(vec[0], 10)
+        assert_equal(vec[1], 5)
 
-    #
-    # Test reversing the list [1, 2, 3, 4, 5] starting at the 3rd position
-    # to produce [1, 2, 5, 4, 3]
-    #
+        #
+        # Test reversing the list [1, 2, 3, 4, 5] starting at the 3rd position
+        # to produce [1, 2, 5, 4, 3]
+        #
 
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-    vec.append(4)
-    vec.append(5)
+        vec = List[Int, sbo_size]()
+        vec.append(1)
+        vec.append(2)
+        vec.append(3)
+        vec.append(4)
+        vec.append(5)
 
-    assert_equal(len(vec), 5)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 4)
-    assert_equal(vec[4], 5)
+        assert_equal(len(vec), 5)
+        assert_equal(vec[0], 1)
+        assert_equal(vec[1], 2)
+        assert_equal(vec[2], 3)
+        assert_equal(vec[3], 4)
+        assert_equal(vec[4], 5)
 
-    vec._reverse(start=2)
+        vec._reverse(start=2)
 
-    assert_equal(len(vec), 5)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 5)
-    assert_equal(vec[3], 4)
-    assert_equal(vec[4], 3)
+        assert_equal(len(vec), 5)
+        assert_equal(vec[0], 1)
+        assert_equal(vec[1], 2)
+        assert_equal(vec[2], 5)
+        assert_equal(vec[3], 4)
+        assert_equal(vec[4], 3)
 
-    #
-    # Test edge case of reversing the list [1, 2, 3] but starting after the
-    # last element.
-    #
+        #
+        # Test edge case of reversing the list [1, 2, 3] but starting after the
+        # last element.
+        #
 
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
+        vec = List[Int, sbo_size]()
+        vec.append(1)
+        vec.append(2)
+        vec.append(3)
 
-    vec._reverse(start=len(vec))
+        vec._reverse(start=len(vec))
 
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
+        assert_equal(len(vec), 3)
+        assert_equal(vec[0], 1)
+        assert_equal(vec[1], 2)
+        assert_equal(vec[2], 3)
+
+    unroll[test_function, 10]()
 
 
 def test_list_reverse_move_count():
@@ -465,78 +485,87 @@ def test_list_index():
 
 
 def test_list_extend():
-    #
-    # Test extending the list [1, 2, 3] with itself
-    #
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        #
+        # Test extending the list [1, 2, 3] with itself
+        #
 
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
+        var vec = List[Int, sbo_size]()
+        vec.append(1)
+        vec.append(2)
+        vec.append(3)
 
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
+        assert_equal(len(vec), 3)
+        assert_equal(vec[0], 1)
+        assert_equal(vec[1], 2)
+        assert_equal(vec[2], 3)
 
-    var copy = vec
-    vec.extend(copy)
+        var copy = vec
+        vec.extend(copy)
 
-    # vec == [1, 2, 3, 1, 2, 3]
-    assert_equal(len(vec), 6)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 1)
-    assert_equal(vec[4], 2)
-    assert_equal(vec[5], 3)
+        # vec == [1, 2, 3, 1, 2, 3]
+        assert_equal(len(vec), 6)
+        assert_equal(vec[0], 1)
+        assert_equal(vec[1], 2)
+        assert_equal(vec[2], 3)
+        assert_equal(vec[3], 1)
+        assert_equal(vec[4], 2)
+        assert_equal(vec[5], 3)
 
-    vec._reverse(start=3)
+        vec._reverse(start=3)
 
-    # vec == [1, 2, 3, 3, 2, 1]
-    assert_equal(len(vec), 6)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 3)
-    assert_equal(vec[4], 2)
-    assert_equal(vec[5], 1)
+        # vec == [1, 2, 3, 3, 2, 1]
+        assert_equal(len(vec), 6)
+        assert_equal(vec[0], 1)
+        assert_equal(vec[1], 2)
+        assert_equal(vec[2], 3)
+        assert_equal(vec[3], 3)
+        assert_equal(vec[4], 2)
+        assert_equal(vec[5], 1)
+
+    unroll[test_function, 10]()
 
 
 def test_list_extend_non_trivial():
-    # Tests three things:
-    #   - extend() for non-plain-old-data types
-    #   - extend() with mixed-length self and other lists
-    #   - extend() using optimal number of __moveinit__() calls
+    @parameter
+    fn test_function[sbo_size: Int]() raises:
+        # Tests three things:
+        #   - extend() for non-plain-old-data types
+        #   - extend() with mixed-length self and other lists
+        #   - extend() using optimal number of __moveinit__() calls
 
-    # Preallocate with enough capacity to avoid reallocation making the
-    # move count checks below flaky.
-    var v1 = List[MoveCounter[String]](capacity=5)
-    v1.append(MoveCounter[String]("Hello"))
-    v1.append(MoveCounter[String]("World"))
+        # Preallocate with enough capacity to avoid reallocation making the
+        # move count checks below flaky.
+        var v1 = List[MoveCounter[String], sbo_size](capacity=5)
+        v1.append(MoveCounter[String]("Hello"))
+        v1.append(MoveCounter[String]("World"))
 
-    var v2 = List[MoveCounter[String]](capacity=3)
-    v2.append(MoveCounter[String]("Foo"))
-    v2.append(MoveCounter[String]("Bar"))
-    v2.append(MoveCounter[String]("Baz"))
+        # We check that it's possible with different buffer sizes
+        var v2 = List[MoveCounter[String], sbo_size + 1](capacity=3)
+        v2.append(MoveCounter[String]("Foo"))
+        v2.append(MoveCounter[String]("Bar"))
+        v2.append(MoveCounter[String]("Baz"))
 
-    v1.extend(v2)
+        v1.extend(v2)
 
-    assert_equal(len(v1), 5)
-    assert_equal(v1[0].value, "Hello")
-    assert_equal(v1[1].value, "World")
-    assert_equal(v1[2].value, "Foo")
-    assert_equal(v1[3].value, "Bar")
-    assert_equal(v1[4].value, "Baz")
+        assert_equal(len(v1), 5)
+        assert_equal(v1[0].value, "Hello")
+        assert_equal(v1[1].value, "World")
+        assert_equal(v1[2].value, "Foo")
+        assert_equal(v1[3].value, "Bar")
+        assert_equal(v1[4].value, "Baz")
 
-    assert_equal(v1.data[0].move_count, 1)
-    assert_equal(v1.data[1].move_count, 1)
-    assert_equal(v1.data[2].move_count, 2)
-    assert_equal(v1.data[3].move_count, 2)
-    assert_equal(v1.data[4].move_count, 2)
+        assert_equal(v1.data[0].move_count, 1)
+        assert_equal(v1.data[1].move_count, 1)
+        assert_equal(v1.data[2].move_count, 2)
+        assert_equal(v1.data[3].move_count, 2)
+        assert_equal(v1.data[4].move_count, 2)
 
-    # Keep v1 alive until after we've done the last `vec.data + N` read.
-    _ = v1^
+        # Keep v1 alive until after we've done the last `vec.data + N` read.
+        _ = v1^
+
+    unroll[test_function, 10]()
 
 
 def test_2d_dynamic_list():

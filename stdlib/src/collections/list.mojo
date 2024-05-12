@@ -376,9 +376,7 @@ struct List[T: CollectionElement, _small_buffer_size: Int = 0](
         self.extend(other^)
 
     @always_inline
-    fn extend(
-        inout self, owned other: List[T, _small_buffer_size=_small_buffer_size]
-    ):
+    fn extend(inout self, owned other: List[T, _]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
