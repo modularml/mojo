@@ -53,6 +53,18 @@ fn setenv(name: String, value: String, overwrite: Bool = True) -> Bool:
 
 
 fn getenv(name: String) -> String:
+    """Returns the value of the given environment variable.
+
+    Constraints:
+      The function only works on macOS or Linux and returns an empty string
+      otherwise. The default is an empty string.
+
+    Args:
+      name: The name of the environment variable.
+
+    Returns:
+      The value of the environment variable.
+    """
     return getenv(name, "")
 
 

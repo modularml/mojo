@@ -146,6 +146,7 @@ def test_hash_string_struct():
     assert_not_equal(hash(a), hash(c))
     assert_not_equal(hash(b), hash(c))
 
+
 def main():
     test_hash_byte_array()
     test_hash_simd()

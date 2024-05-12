@@ -73,6 +73,15 @@ fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
 
 @always_inline
 fn assert_true(val: Bool) raises:
+    """Asserts that the input value is True. If it is not then an
+    Error is raised.
+
+    Args:
+        val: The value to assert to be True.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
     if not val:
         raise _assert_error(
             "condition was unexpectedly False", __call_location()
@@ -97,6 +106,15 @@ fn assert_true(val: Bool, msg: String) raises:
 
 @always_inline
 fn assert_false(val: Bool) raises:
+    """Asserts that the input value is False. If it is not then an Error is
+    raised.
+
+    Args:
+        val: The value to assert to be False.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
     if val:
         raise _assert_error(
             "condition was unexpectedly True", __call_location()
@@ -128,6 +146,19 @@ trait Testable(EqualityComparable, Stringable):
 
 @always_inline
 fn assert_equal[T: Testable](lhs: T, rhs: T) raises:
+    """Asserts that the input values are equal. If it is not then an Error
+    is raised.
+
+    Parameters:
+        T: A Testable type.
+
+    Args:
+        lhs: The lhs of the equality.
+        rhs: The rhs of the equality.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
     if lhs != rhs:
         raise _assert_equal_error(str(lhs), str(rhs), "", __call_location())
 
@@ -154,6 +185,16 @@ fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String) raises:
 
 @always_inline
 fn assert_equal(lhs: String, rhs: String) raises:
+    """Asserts that the input values are equal. If it is not then an Error
+    is raised.
+
+    Args:
+        lhs: The lhs of the equality.
+        rhs: The rhs of the equality.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
     assert_equal(lhs, rhs, "")
 
 
@@ -179,6 +220,20 @@ fn assert_equal(lhs: String, rhs: String, msg: String) raises:
 fn assert_equal[
     type: DType, size: Int
 ](lhs: SIMD[type, size], rhs: SIMD[type, size]) raises:
+    """Asserts that the input values are equal. If it is not then an
+    Error is raised.
+
+    Parameters:
+        type: The dtype of the left- and right-hand-side SIMD vectors.
+        size: The width of the left- and right-hand-side SIMD vectors.
+
+    Args:
+        lhs: The lhs of the equality.
+        rhs: The rhs of the equality.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
     assert_equal(lhs, rhs, "")
 
 
@@ -209,6 +264,19 @@ fn assert_equal[
 
 @always_inline("nodebug")
 fn assert_not_equal[T: Testable](lhs: T, rhs: T) raises:
+    """Asserts that the input values are not equal. If it is not then an
+    Error is raised.
+
+    Parameters:
+        T: A Testable type.
+
+    Args:
+        lhs: The lhs of the inequality.
+        rhs: The rhs of the inequality.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
     assert_not_equal(lhs, rhs, "")
 
 
@@ -236,6 +304,16 @@ fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String) raises:
 
 @always_inline("nodebug")
 fn assert_not_equal(lhs: String, rhs: String) raises:
+    """Asserts that the input values are not equal. If it is not then an
+    an Error is raised.
+
+    Args:
+        lhs: The lhs of the inequality.
+        rhs: The rhs of the inequality.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
     assert_not_equal(lhs, rhs, "")
 
 
@@ -260,6 +338,20 @@ fn assert_not_equal(lhs: String, rhs: String, msg: String) raises:
 fn assert_not_equal[
     type: DType, size: Int
 ](lhs: SIMD[type, size], rhs: SIMD[type, size]) raises:
+    """Asserts that the input values are not equal. If it is not then an
+    Error is raised.
+
+    Parameters:
+        type: The dtype of the left- and right-hand-side SIMD vectors.
+        size: The width of the left- and right-hand-side SIMD vectors.
+
+    Args:
+        lhs: The lhs of the inequality.
+        rhs: The rhs of the inequality.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
     assert_not_equal(lhs, rhs, "")
 
 
