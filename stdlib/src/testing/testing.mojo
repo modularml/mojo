@@ -135,7 +135,7 @@ fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
 
 
 # TODO: Remove the String and SIMD overloads once we have more powerful traits.
-# @always_inline
+@always_inline
 fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
@@ -148,10 +148,8 @@ fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    print("hello!")
-    # if lhs != rhs:
-    #    raise _assert_equal_error(lhs, rhs, msg, __call_location())
-    print("here")
+    if lhs != rhs:
+        raise _assert_equal_error(lhs, rhs, msg, __call_location())
 
 
 @always_inline
