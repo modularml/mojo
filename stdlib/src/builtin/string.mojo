@@ -644,6 +644,7 @@ struct String(
     fn __init__(inout self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
+        self._buffer.append(0)
 
     @always_inline
     fn __init__(inout self, str: StringRef):

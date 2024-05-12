@@ -52,7 +52,11 @@ fn setenv(name: String, value: String, overwrite: Bool = True) -> Bool:
     return status == 0
 
 
-fn getenv(name: String, default: String = "") -> String:
+fn getenv(name: String) -> String:
+    return getenv(name, "")
+
+
+fn getenv(name: String, default: String) -> String:
     """Returns the value of the given environment variable.
 
     Constraints:

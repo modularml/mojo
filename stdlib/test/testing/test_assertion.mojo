@@ -96,7 +96,7 @@ def test_assert_almost_equal():
         rtol: Scalar[type] = 0,
         equal_nan: Bool = False,
     ):
-        var msg = "`test_assert_almost_equal` should have succeeded"
+        var msg: String = "`test_assert_almost_equal` should have succeeded"
         assert_almost_equal(
             lhs, rhs, msg=msg, atol=atol, rtol=rtol, equal_nan=equal_nan
         )
@@ -133,7 +133,7 @@ def test_assert_almost_equal():
         rtol: Scalar[type] = 0,
         equal_nan: Bool = False,
     ):
-        var msg = "`test_assert_almost_equal` should have failed"
+        var msg: String = "`test_assert_almost_equal` should have failed"
         with assert_raises(contains=msg):
             assert_almost_equal(
                 lhs, rhs, msg=msg, atol=atol, rtol=rtol, equal_nan=equal_nan

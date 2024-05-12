@@ -72,9 +72,15 @@ fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
 
 
 @always_inline
-fn assert_true(
-    val: Bool, msg: String = "condition was unexpectedly False"
-) raises:
+fn assert_true(val: Bool) raises:
+    if not val:
+        raise _assert_error(
+            "condition was unexpectedly False", __call_location()
+        )
+
+
+@always_inline
+fn assert_true(val: Bool, msg: String) raises:
     """Asserts that the input value is True. If it is not then an
     Error is raised.
 
@@ -90,9 +96,15 @@ fn assert_true(
 
 
 @always_inline
-fn assert_false(
-    val: Bool, msg: String = "condition was unexpectedly True"
-) raises:
+fn assert_false(val: Bool) raises:
+    if val:
+        raise _assert_error(
+            "condition was unexpectedly True", __call_location()
+        )
+
+
+@always_inline
+fn assert_false(val: Bool, msg: String) raises:
     """Asserts that the input value is False. If it is not then an Error is
     raised.
 
@@ -115,7 +127,13 @@ trait Testable(EqualityComparable, Stringable):
 
 
 @always_inline
-fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
+fn assert_equal[T: Testable](lhs: T, rhs: T) raises:
+    if lhs != rhs:
+        raise _assert_equal_error(str(lhs), str(rhs), "", __call_location())
+
+
+@always_inline
+fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String) raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
 
@@ -134,9 +152,14 @@ fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
         raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
 
 
+@always_inline
+fn assert_equal(lhs: String, rhs: String) raises:
+    assert_equal(lhs, rhs, "")
+
+
 # TODO: Remove the String and SIMD overloads once we have more powerful traits.
 @always_inline
-fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
+fn assert_equal(lhs: String, rhs: String, msg: String) raises:
     """Asserts that the input values are equal. If it is not then an Error
     is raised.
 
@@ -152,10 +175,17 @@ fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
         raise _assert_equal_error(lhs, rhs, msg, __call_location())
 
 
+@always_inline("nodebug")
+fn assert_equal[
+    type: DType, size: Int
+](lhs: SIMD[type, size], rhs: SIMD[type, size]) raises:
+    assert_equal(lhs, rhs, "")
+
+
 @always_inline
 fn assert_equal[
     type: DType, size: Int
-](lhs: SIMD[type, size], rhs: SIMD[type, size], msg: String = "") raises:
+](lhs: SIMD[type, size], rhs: SIMD[type, size], msg: String) raises:
     """Asserts that the input values are equal. If it is not then an
     Error is raised.
 
@@ -177,8 +207,13 @@ fn assert_equal[
         raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
 
 
+@always_inline("nodebug")
+fn assert_not_equal[T: Testable](lhs: T, rhs: T) raises:
+    assert_not_equal(lhs, rhs, "")
+
+
 @always_inline
-fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
+fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String) raises:
     """Asserts that the input values are not equal. If it is not then an
     Error is raised.
 
@@ -199,8 +234,13 @@ fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
         )
 
 
+@always_inline("nodebug")
+fn assert_not_equal(lhs: String, rhs: String) raises:
+    assert_not_equal(lhs, rhs, "")
+
+
 @always_inline
-fn assert_not_equal(lhs: String, rhs: String, msg: String = "") raises:
+fn assert_not_equal(lhs: String, rhs: String, msg: String) raises:
     """Asserts that the input values are not equal. If it is not then an
     an Error is raised.
 
@@ -216,10 +256,17 @@ fn assert_not_equal(lhs: String, rhs: String, msg: String = "") raises:
         raise _assert_not_equal_error(lhs, rhs, msg, __call_location())
 
 
+@always_inline("nodebug")
+fn assert_not_equal[
+    type: DType, size: Int
+](lhs: SIMD[type, size], rhs: SIMD[type, size]) raises:
+    assert_not_equal(lhs, rhs, "")
+
+
 @always_inline
 fn assert_not_equal[
     type: DType, size: Int
-](lhs: SIMD[type, size], rhs: SIMD[type, size], msg: String = "") raises:
+](lhs: SIMD[type, size], rhs: SIMD[type, size], msg: String) raises:
     """Asserts that the input values are not equal. If it is not then an
     Error is raised.
 
@@ -249,7 +296,7 @@ fn assert_almost_equal[
     rhs: SIMD[type, size],
     /,
     *,
-    msg: String = "",
+    msg: Optional[String] = None,
     atol: Scalar[type] = 1e-08,
     rtol: Scalar[type] = 1e-05,
     equal_nan: Bool = False,
@@ -297,7 +344,7 @@ fn assert_almost_equal[
             err += " with a diff of " + str(abs(lhs - rhs))
 
         if msg:
-            err += " (" + msg + ")"
+            err += " (" + msg.value()[] + ")"
 
         raise _assert_error(err, __call_location())
 
