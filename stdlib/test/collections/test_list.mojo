@@ -795,6 +795,82 @@ def test_bytes_with_small_size_optimization():
     _ = small_list
 
 
+def test_list_with_sbo():
+    var list = List[Int, 2]()
+
+    for i in range(5):
+        list.append(i)
+
+    assert_equal(5, len(list))
+    assert_equal(0, list[0])
+    assert_equal(1, list[1])
+    assert_equal(2, list[2])
+    assert_equal(3, list[3])
+    assert_equal(4, list[4])
+
+    assert_equal(0, list[-5])
+    assert_equal(3, list[-2])
+    assert_equal(4, list[-1])
+
+    list[2] = -2
+    assert_equal(-2, list[2])
+
+    list[-5] = 5
+    assert_equal(5, list[-5])
+    list[-2] = 3
+    assert_equal(3, list[-2])
+    list[-1] = 7
+    assert_equal(7, list[-1])
+
+
+def test_list_with_sbo_big_enough():
+    var list = List[Int, 10]()
+
+    for i in range(5):
+        list.append(i)
+
+    assert_equal(5, len(list))
+    assert_equal(0, list[0])
+    assert_equal(1, list[1])
+    assert_equal(2, list[2])
+    assert_equal(3, list[3])
+    assert_equal(4, list[4])
+
+    assert_equal(0, list[-5])
+    assert_equal(3, list[-2])
+    assert_equal(4, list[-1])
+
+    list[2] = -2
+    assert_equal(-2, list[2])
+
+    list[-5] = 5
+    assert_equal(5, list[-5])
+    list[-2] = 3
+    assert_equal(3, list[-2])
+    list[-1] = 7
+    assert_equal(7, list[-1])
+
+
+def test_list_clear_with_sbo():
+    var list = List[Int, 2](1, 2, 3)
+    assert_equal(len(list), 3)
+    assert_equal(list.capacity, 3)
+    list.clear()
+
+    assert_equal(len(list), 0)
+    assert_equal(list.capacity, 3)
+
+
+def test_list_clear_with_sbo_big_enough():
+    var list = List[Int, 4](1, 2, 3)
+    assert_equal(len(list), 3)
+    assert_equal(list.capacity, 4)
+    list.clear()
+
+    assert_equal(len(list), 0)
+    assert_equal(list.capacity, 4)
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -823,3 +899,7 @@ def main():
     test_list_add()
     test_list_mult()
     test_bytes_with_small_size_optimization()
+    test_list_with_sbo()
+    test_list_with_sbo_big_enough()
+    test_list_clear_with_sbo()
+    test_list_clear_with_sbo_big_enough()
