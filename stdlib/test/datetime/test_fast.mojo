@@ -356,7 +356,7 @@ fn test_bitwise64() raises:
     assert_true(ref & DateTime64(1969, 12, 31) == 0)
 
     assert_true(ref ^ DateTime64(1970, 1, 2) != 0)
-    assert_true(ref | (DateTime64(1970, 1, 2) & 0) == ref)
+    assert_true(ref | (DateTime64(1970, 1, 2) & 0) == hash(ref))
     assert_true(ref & ~ref == 0)
     assert_true(ref ^ ~ref == UInt64.MAX_FINITE)
 
@@ -368,7 +368,7 @@ fn test_bitwise32() raises:
     assert_true(ref & DateTime32(1969, 12, 31) == 0)
 
     assert_true(ref ^ DateTime32(1970, 1, 2) != 0)
-    assert_true(ref | (DateTime32(1970, 1, 2) & 0) == ref)
+    assert_true(ref | (DateTime32(1970, 1, 2) & 0) == hash(ref))
     assert_true(ref & ~ref == 0)
     assert_true(ref ^ ~ref == UInt32.MAX_FINITE)
 
@@ -380,7 +380,7 @@ fn test_bitwise16() raises:
     assert_true(ref & DateTime16(1969, 12, 31) == 0)
 
     assert_true(ref ^ DateTime16(1970, 1, 2) != 0)
-    assert_true(ref | (DateTime16(1970, 1, 2) & 0) == ref)
+    assert_true(ref | (DateTime16(1970, 1, 2) & 0) == hash(ref))
     assert_true(ref & ~ref == 0)
     assert_true(ref ^ ~ref == UInt16.MAX_FINITE)
 
@@ -392,7 +392,7 @@ fn test_bitwise8() raises:
     assert_true(ref & DateTime8(1969, 12, 31) == 0)
 
     assert_true(ref ^ DateTime8(1970, 1, 2) != 0)
-    assert_true(ref | (DateTime8(1970, 1, 2) & 0) == ref)
+    assert_true(ref | (DateTime8(1970, 1, 2) & 0) == hash(ref))
     assert_true(ref & ~ref == 0)
     assert_true(ref ^ ~ref == UInt32.MAX_FINITE)
 
@@ -401,32 +401,32 @@ fn test_iso64() raises:
     var ref = DateTime64(1970, 1, 1)
     var iso_str = "1970-01-01T00:00:00+00:00"
     alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
-    assert_equal(ref, DateTime64.from_iso[fmt1](iso_str))
+    assert_true(ref == DateTime64.from_iso[fmt1](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt1]())
 
     iso_str = "1970-01-01 00:00:00+00:00"
     alias fmt2 = IsoFormat(IsoFormat.YYYY_MM_DD___HH_MM_SS)
-    assert_equal(ref, DateTime64.from_iso[fmt2](iso_str))
+    assert_true(ref == DateTime64.from_iso[fmt2](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt2]())
 
     iso_str = "1970-01-01T00:00:00"
     alias fmt3 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS)
-    assert_equal(ref, DateTime64.from_iso[fmt3](iso_str))
+    assert_true(ref == DateTime64.from_iso[fmt3](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt3]())
 
     iso_str = "19700101T000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_equal(ref, Date.from_iso[fmt4](iso_str))
+    assert_true(ref == Date.from_iso[fmt4](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
     alias fmt5 = IsoFormat(IsoFormat.HH_MM_SS)
-    assert_equal(ref, DateTime64.from_iso[fmt5](iso_str))
+    assert_true(ref == DateTime64.from_iso[fmt5](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt5]())
 
     iso_str = "000000"
     alias fmt6 = IsoFormat(IsoFormat.HHMMSS)
-    assert_equal(ref, DateTime64.from_iso[fmt6](iso_str))
+    assert_true(ref == DateTime64.from_iso[fmt6](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt6]())
 
 
@@ -434,32 +434,32 @@ fn test_iso32() raises:
     var ref = DateTime32(1970, 1, 1)
     var iso_str = "1970-01-01T00:00:00+00:00"
     alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
-    assert_equal(ref, DateTime32.from_iso[fmt1](iso_str))
+    assert_true(ref == DateTime32.from_iso[fmt1](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt1]())
 
     iso_str = "1970-01-01 00:00:00+00:00"
     alias fmt2 = IsoFormat(IsoFormat.YYYY_MM_DD___HH_MM_SS)
-    assert_equal(ref, DateTime32.from_iso[fmt2](iso_str))
+    assert_true(ref == DateTime32.from_iso[fmt2](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt2]())
 
     iso_str = "1970-01-01T00:00:00"
     alias fmt3 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS)
-    assert_equal(ref, DateTime32.from_iso[fmt3](iso_str))
+    assert_true(ref == DateTime32.from_iso[fmt3](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt3]())
 
     iso_str = "19700101T000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_equal(ref, Date.from_iso[fmt4](iso_str))
+    assert_true(ref == Date.from_iso[fmt4](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
     alias fmt5 = IsoFormat(IsoFormat.HH_MM_SS)
-    assert_equal(ref, DateTime32.from_iso[fmt5](iso_str))
+    assert_true(ref == DateTime32.from_iso[fmt5](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt5]())
 
     iso_str = "000000"
     alias fmt6 = IsoFormat(IsoFormat.HHMMSS)
-    assert_equal(ref, DateTime32.from_iso[fmt6](iso_str))
+    assert_true(ref == DateTime32.from_iso[fmt6](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt6]())
 
 
@@ -467,32 +467,32 @@ fn test_iso16() raises:
     var ref = DateTime16(1970, 1, 1)
     var iso_str = "1970-01-01T00:00:00+00:00"
     alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
-    assert_equal(ref, DateTime16.from_iso[fmt1](iso_str))
+    assert_true(ref == DateTime16.from_iso[fmt1](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt1]())
 
     iso_str = "1970-01-01 00:00:00+00:00"
     alias fmt2 = IsoFormat(IsoFormat.YYYY_MM_DD___HH_MM_SS)
-    assert_equal(ref, DateTime16.from_iso[fmt2](iso_str))
+    assert_true(ref == DateTime16.from_iso[fmt2](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt2]())
 
     iso_str = "1970-01-01T00:00:00"
     alias fmt3 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS)
-    assert_equal(ref, DateTime16.from_iso[fmt3](iso_str))
+    assert_true(ref == DateTime16.from_iso[fmt3](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt3]())
 
     iso_str = "19700101T000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_equal(ref, Date.from_iso[fmt4](iso_str))
+    assert_true(ref == Date.from_iso[fmt4](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
     alias fmt5 = IsoFormat(IsoFormat.HH_MM_SS)
-    assert_equal(ref, DateTime16.from_iso[fmt5](iso_str))
+    assert_true(ref == DateTime16.from_iso[fmt5](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt5]())
 
     iso_str = "000000"
     alias fmt6 = IsoFormat(IsoFormat.HHMMSS)
-    assert_equal(ref, DateTime16.from_iso[fmt6](iso_str))
+    assert_true(ref == DateTime16.from_iso[fmt6](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt6]())
 
 
@@ -500,32 +500,32 @@ fn test_iso8() raises:
     var ref = DateTime8(1970, 1, 1)
     var iso_str = "1970-01-01T00:00:00+00:00"
     alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
-    assert_equal(ref, DateTime8.from_iso[fmt1](iso_str))
+    assert_true(ref == DateTime8.from_iso[fmt1](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt1]())
 
     iso_str = "1970-01-01 00:00:00+00:00"
     alias fmt2 = IsoFormat(IsoFormat.YYYY_MM_DD___HH_MM_SS)
-    assert_equal(ref, DateTime8.from_iso[fmt2](iso_str))
+    assert_true(ref == DateTime8.from_iso[fmt2](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt2]())
 
     iso_str = "1970-01-01T00:00:00"
     alias fmt3 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS)
-    assert_equal(ref, DateTime8.from_iso[fmt3](iso_str))
+    assert_true(ref == DateTime8.from_iso[fmt3](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt3]())
 
     iso_str = "19700101T000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_equal(ref, Date.from_iso[fmt4](iso_str))
+    assert_true(ref == Date.from_iso[fmt4](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
     alias fmt5 = IsoFormat(IsoFormat.HH_MM_SS)
-    assert_equal(ref, DateTime8.from_iso[fmt5](iso_str))
+    assert_true(ref == DateTime8.from_iso[fmt5](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt5]())
 
     iso_str = "000000"
     alias fmt6 = IsoFormat(IsoFormat.HHMMSS)
-    assert_equal(ref, DateTime8.from_iso[fmt6](iso_str))
+    assert_true(ref == DateTime8.from_iso[fmt6](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt6]())
 
 

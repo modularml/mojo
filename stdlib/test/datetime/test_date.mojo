@@ -181,7 +181,7 @@ fn test_bitwise(
     assert_true(ref & Date(1969, 12, 31, tz1_, pycal) == 0)
 
     assert_true(ref ^ Date(1970, 1, 2, tz_0_, pycal) != 0)
-    assert_true(ref | (Date(1970, 1, 2, tz_0_, pycal) & 0) == ref)
+    assert_true(ref | (Date(1970, 1, 2, tz_0_, pycal) & 0) == hash(ref))
     assert_true(ref & ~ref == 0)
     assert_true(ref ^ ~ref == UInt32.MAX_FINITE)
 
@@ -190,32 +190,32 @@ fn test_iso(pycal: Calendar, tz_0_: TZ) raises:
     var ref = Date(1970, 1, 1, tz_0_, pycal)
     var iso_str = "1970-01-01T00:00:00+00:00"
     alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
-    assert_equal(ref, Date.from_iso[fmt1](iso_str))
+    assert_true(ref == Date.from_iso[fmt1](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt1]())
 
     iso_str = "1970-01-01 00:00:00+00:00"
     alias fmt2 = IsoFormat(IsoFormat.YYYY_MM_DD___HH_MM_SS)
-    assert_equal(ref, Date.from_iso[fmt2](iso_str))
+    assert_true(ref == Date.from_iso[fmt2](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt2]())
 
     iso_str = "1970-01-01T00:00:00"
     alias fmt3 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS)
-    assert_equal(ref, Date.from_iso[fmt3](iso_str))
+    assert_true(ref == Date.from_iso[fmt3](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt3]())
 
     iso_str = "19700101000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_equal(ref, Date.from_iso[fmt4](iso_str))
+    assert_true(ref == Date.from_iso[fmt4](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
     alias fmt5 = IsoFormat(IsoFormat.HH_MM_SS)
-    assert_equal(ref, Date.from_iso[fmt5](iso_str))
+    assert_true(ref == Date.from_iso[fmt5](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt5]())
 
     iso_str = "000000"
     alias fmt6 = IsoFormat(IsoFormat.HHMMSS)
-    assert_equal(ref, Date.from_iso[fmt6](iso_str))
+    assert_true(ref == Date.from_iso[fmt6](iso_str).unsafe_take())
     assert_equal(iso_str, ref.to_iso[fmt6]())
 
 
