@@ -234,7 +234,8 @@ fn test_bitwise(
 
     assert_true((ref ^ DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal)) != 0)
     assert_true(
-        (ref | (DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal) & 0)) == hash(ref)
+        (ref | (DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal) & 0))
+        == hash(ref)
     )
     assert_true((ref & ~ref) == 0)
     assert_true((ref ^ ~ref) == UInt64.MAX_FINITE)
