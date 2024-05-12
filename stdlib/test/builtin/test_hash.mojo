@@ -138,7 +138,16 @@ fn test_issue_31111():
     _ = hash(Int(1))
 
 
+def test_hash_string_struct():
+    var a = String("hello")
+    var b = String("world")
+    var c = String("very very very very very very long string")
+    assert_not_equal(hash(a), hash(b))
+    assert_not_equal(hash(a), hash(c))
+    assert_not_equal(hash(b), hash(c))
+
 def main():
     test_hash_byte_array()
     test_hash_simd()
     test_issue_31111()
+    test_hash_string_struct()
