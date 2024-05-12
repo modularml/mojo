@@ -49,7 +49,9 @@ fn test_add(
     offset_0 = DateTime(2023, 2, 28, tz=tz_0_, calendar=unixcal)
     offset_p_1 = DateTime(2023, 2, 28, tz=tz_1, calendar=unixcal)
     offset_n_1 = DateTime(2023, 3, 1, tz=tz1_, calendar=unixcal)
-    add_seconds = DateTime(2023, 3, 1, tz=tz_0_, calendar=unixcal).add(seconds=24 * 3600)
+    add_seconds = DateTime(2023, 3, 1, tz=tz_0_, calendar=unixcal).add(
+        seconds=24 * 3600
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
@@ -60,7 +62,9 @@ fn test_add(
     offset_0 = DateTime(2024, 6, 1, tz=tz_0_, calendar=unixcal)
     offset_p_1 = DateTime(2024, 6, 1, tz=tz_1, calendar=unixcal)
     offset_n_1 = DateTime(2024, 5, 31, tz=tz1_, calendar=unixcal)
-    add_seconds = DateTime(2024, 5, 31, tz=tz_0_, calendar=unixcal).add(seconds=24 * 3600)
+    add_seconds = DateTime(2024, 5, 31, tz=tz_0_, calendar=unixcal).add(
+        seconds=24 * 3600
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
@@ -71,7 +75,9 @@ fn test_add(
     offset_0 = DateTime(2025, 1, 1, tz=tz_0_, calendar=unixcal)
     offset_p_1 = DateTime(2025, 1, 1, tz=tz_1, calendar=unixcal)
     offset_n_1 = DateTime(2024, 12, 31, tz=tz1_, calendar=unixcal)
-    add_seconds = DateTime(2024, 12, 31, tz=tz_0_, calendar=unixcal).add(seconds=24 * 3600)
+    add_seconds = DateTime(2024, 12, 31, tz=tz_0_, calendar=unixcal).add(
+        seconds=24 * 3600
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
@@ -92,7 +98,9 @@ fn test_add(
     offset_0 = DateTime(1, 1, 1, tz=tz_0_, calendar=pycal)
     offset_p_1 = DateTime(1, 1, 1, tz=tz_1, calendar=pycal)
     offset_n_1 = DateTime(1, 1, 1, tz=tz1_, calendar=pycal)
-    add_seconds = DateTime(9999, 12, 31, tz=tz_0_, calendar=pycal).add(seconds=24 * 3600)
+    add_seconds = DateTime(9999, 12, 31, tz=tz_0_, calendar=pycal).add(
+        seconds=24 * 3600
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
@@ -103,7 +111,9 @@ fn test_add(
     offset_0 = DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal)
     offset_p_1 = DateTime(1970, 1, 1, tz=tz_1, calendar=unixcal)
     offset_n_1 = DateTime(1970, 1, 1, tz=tz1_, calendar=unixcal)
-    add_seconds = DateTime(9999, 12, 31, tz=tz_0_, calendar=unixcal).add(seconds=24 * 3600)
+    add_seconds = DateTime(9999, 12, 31, tz=tz_0_, calendar=unixcal).add(
+        seconds=24 * 3600
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
@@ -118,7 +128,9 @@ fn test_subtract(
     var offset_0 = DateTime(2024, 2, 29, tz=tz_0_, calendar=unixcal)
     var offset_p_1 = DateTime(2024, 2, 29, tz=tz_1, calendar=unixcal)
     var offset_n_1 = DateTime(2024, 3, 1, tz=tz1_, calendar=unixcal)
-    var sub_seconds = DateTime(2024, 3, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
+    var sub_seconds = DateTime(2024, 3, 1, tz=tz_0_, calendar=unixcal).subtract(
+        seconds=1
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
@@ -129,7 +141,9 @@ fn test_subtract(
     offset_0 = DateTime(2023, 2, 28, tz=tz_0_, calendar=unixcal)
     offset_p_1 = DateTime(2023, 2, 28, tz=tz_1, calendar=unixcal)
     offset_n_1 = DateTime(2023, 3, 1, tz=tz1_, calendar=unixcal)
-    sub_seconds = DateTime(2023, 3, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
+    sub_seconds = DateTime(2023, 3, 1, tz=tz_0_, calendar=unixcal).subtract(
+        seconds=1
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
@@ -140,7 +154,9 @@ fn test_subtract(
     offset_0 = DateTime(2024, 5, 31, tz=tz_0_, calendar=unixcal)
     offset_p_1 = DateTime(2024, 5, 31, tz=tz_1, calendar=unixcal)
     offset_n_1 = DateTime(2024, 6, 1, tz=tz1_, calendar=unixcal)
-    sub_seconds = DateTime(2024, 6, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
+    sub_seconds = DateTime(2024, 6, 1, tz=tz_0_, calendar=unixcal).subtract(
+        seconds=1
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
@@ -151,7 +167,9 @@ fn test_subtract(
     offset_0 = DateTime(2024, 12, 31, tz=tz_0_, calendar=unixcal)
     offset_p_1 = DateTime(2024, 12, 31, tz=tz_1, calendar=unixcal)
     offset_n_1 = DateTime(2025, 1, 1, tz=tz1_, calendar=unixcal)
-    sub_seconds = DateTime(2025, 1, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
+    sub_seconds = DateTime(2025, 1, 1, tz=tz_0_, calendar=unixcal).subtract(
+        seconds=1
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
@@ -166,11 +184,15 @@ fn test_subtract(
     assert_true(result == offset_n_1)
 
     # test negative overflow pycal
-    result = DateTime(1, 1, 1, tz=tz_0_, calendar=pycal) - DateTime(0, 0, 1, tz=tz_0_, calendar=pycal)
+    result = DateTime(1, 1, 1, tz=tz_0_, calendar=pycal) - DateTime(
+        0, 0, 1, tz=tz_0_, calendar=pycal
+    )
     offset_0 = DateTime(9999, 12, 31, tz=tz_0_, calendar=pycal)
     offset_p_1 = DateTime(9999, 12, 31, tz=tz_1, calendar=pycal)
     offset_n_1 = DateTime(9999, 12, 31, tz=tz1_, calendar=pycal)
-    sub_seconds = DateTime(1, 1, 1, tz=tz_0_, calendar=pycal).subtract(seconds=1)
+    sub_seconds = DateTime(1, 1, 1, tz=tz_0_, calendar=pycal).subtract(
+        seconds=1
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
@@ -181,7 +203,9 @@ fn test_subtract(
     offset_0 = DateTime(9999, 12, 31, tz=tz_0_, calendar=unixcal)
     offset_p_1 = DateTime(9999, 12, 31, tz=tz_1, calendar=unixcal)
     offset_n_1 = DateTime(9999, 12, 31, tz=tz1_, calendar=unixcal)
-    sub_seconds = DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
+    sub_seconds = DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal).subtract(
+        seconds=1
+    )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
@@ -209,7 +233,9 @@ fn test_bitwise(
     assert_true(ref & DateTime(1969, 12, 31, tz=tz1_, calendar=pycal) == 0)
 
     assert_true(ref ^ DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal) != 0)
-    assert_true(ref | (DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal) & 0) == ref)
+    assert_true(
+        ref | (DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal) & 0) == ref
+    )
     assert_true(ref & ~ref == 0)
     assert_true(ref ^ ~ref == UInt64.MAX_FINITE)
 
@@ -256,7 +282,7 @@ fn test_time() raises:
 
 fn test_hash() raises:
     var ref = DateTime(1970, 1, 1)
-    var dcalendar=ata = hash(ref)
+    var dcalendar = ata = hash(ref)
     var parsed = DateTime.from_hash(data)
     assert_true(ref == parsed)
 
