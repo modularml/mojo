@@ -186,14 +186,33 @@ fn test_bitwise(
 
 fn test_iso(pycal: Calendar, tz_0_: TZ):
     var ref = Date(1970, 1, 1, tz_0_, pycal)
-    var iso_str = "1970-01-01"
-    var iso_format = IsoFormat(IsoFormat.YYYY_MM_DD)
+    var iso_str = "1970-01-01T00:00:00+00:00"
+    var iso_format = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS_TZD)
     assert_equal(ref, Date.from_iso[iso_format]())
     assert_equal(iso_str, ref.to_iso[iso_format]())
 
-    ref = Date(1970, 1, 1, tz_0_, pycal)
-    iso_str = "19700101"
-    iso_format = IsoFormat(IsoFormat.YYYYMMDD)
+    iso_str = "1970-01-01 00:00:00+00:00"
+    iso_format = IsoFormat(IsoFormat.YYYY_MM_DD___MM_HH_SS_TZD)
+    assert_equal(ref, Date.from_iso[iso_format]())
+    assert_equal(iso_str, ref.to_iso[iso_format]())
+
+    iso_str = "1970-01-01T00:00:00"
+    iso_format = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS)
+    assert_equal(ref, Date.from_iso[iso_format]())
+    assert_equal(iso_str, ref.to_iso[iso_format]())
+
+    iso_str = "19700101000000"
+    iso_format = IsoFormat(IsoFormat.YYYYMMDDMMHHSS)
+    assert_equal(ref, Date.from_iso[iso_format]())
+    assert_equal(iso_str, ref.to_iso[iso_format]())
+
+    iso_str = "00:00:00"
+    iso_format = IsoFormat(IsoFormat.MM_HH_SS)
+    assert_equal(ref, Date.from_iso[iso_format]())
+    assert_equal(iso_str, ref.to_iso[iso_format]())
+
+    iso_str = "000000"
+    iso_format = IsoFormat(IsoFormat.MMHHSS)
     assert_equal(ref, Date.from_iso[iso_format]())
     assert_equal(iso_str, ref.to_iso[iso_format]())
 

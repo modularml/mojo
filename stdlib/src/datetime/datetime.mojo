@@ -104,7 +104,6 @@ struct DateTime[
     var calendar: Calendar
     """Calendar."""
 
-
     fn __init__(
         inout self,
         year: Optional[Int] = None,
