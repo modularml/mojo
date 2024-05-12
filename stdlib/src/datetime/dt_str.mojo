@@ -40,7 +40,7 @@ struct IsoFormat:
     """The selected IsoFormat."""
 
     fn __init__(
-        inout self, selected: StringLiteral = self.YYYY_MM_DD_T_MM_HH_SS
+        inout self, selected: StringLiteral = self.YYYY_MM_DD_T_MM_HH_SS_TZD
     ):
         """Construct an IsoFormat with selected fmt string.
 
@@ -82,7 +82,9 @@ fn _get_strings(
     return yyyy, mm, dd, hh, m_str, ss
 
 
-fn to_iso_compact(
+fn to_iso[
+    iso: IsoFormat = IsoFormat()
+](
     year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int
 ) -> String:
     """Build an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
@@ -100,28 +102,17 @@ fn to_iso_compact(
         String.
     """
     var s = _get_strings(year, month, day, hour, minute, second)
-    return s[0] + s[1] + s[2] + s[3] + s[4] + s[5]
-
-
-fn to_iso(
-    year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int
-) -> String:
-    """Build an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
-    `String`.
-
-    Args:
-        year: Year.
-        month: Month.
-        day: Day.
-        hour: Hour.
-        minute: Minute.
-        second: Second.
-
-    Returns:
-        String.
-    """
-    var s = _get_strings(year, month, day, hour, minute, second)
-    return s[0] + "-" + s[1] + "-" + s[2] + "T" + s[3] + ":" + s[4] + ":" + s[5]
+    var yyyy_mm_dd = s[0] + "-" + s[1] + "-" + s[2]
+    var hh_mm_ss = s[3] + ":" + s[4] + ":" + s[5]
+    if iso.YYYY_MM_DD___MM_HH_SS == iso.selected:
+        return yyyy_mm_dd + " " + hh_mm_ss
+    elif iso.YYYYMMDD in iso.selected:
+        return s[0] + s[1] + s[2] + s[3] + s[4] + s[5]
+    elif iso.HH_MM_SS == iso.selected:
+        return s[3] + ":" + s[4] + ":" + s[5]
+    elif iso.HHMMSS == iso.selected:
+        return s[3] + s[4] + s[5]
+    return yyyy_mm_dd + "T" + hh_mm_ss
 
 
 fn from_iso[
@@ -147,10 +138,11 @@ fn from_iso[
     Returns:
         A tuple with the result.
     """
-    var result = UInt16(atol(s[:4])), UInt8(0), UInt8(0), UInt8(0), UInt8(
+    var result = UInt16(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(
         0
-    ), UInt8(0), TimeZone[iana]()
+    ), TimeZone[iana]()
     if iso.YYYYMMDD in iso.selected:
+        result[0] = atol(s[:4])
         result[1] = atol(s[4:6])
         if iso.selected == iso.YYYYMMDD:
             return result
@@ -159,6 +151,7 @@ fn from_iso[
         result[4] = atol(s[10:12])
         result[5] = atol(s[12:14])
     elif iso.YYYY_MM_DD in iso.selected:
+        result[0] = atol(s[:4])
         result[1] = atol(s[5:7])
         if iso.selected == iso.YYYY_MM_DD:
             return result
@@ -166,6 +159,14 @@ fn from_iso[
         result[3] = atol(s[11:13])
         result[4] = atol(s[14:16])
         result[5] = atol(s[17:19])
+    elif iso.HH_MM_SS == iso.selected:
+        result[3] = atol(s[:2])
+        result[4] = atol(s[3:5])
+        result[5] = atol(s[6:8])
+    elif iso.HHMMSS == iso.selected:
+        result[3] = atol(s[:2])
+        result[4] = atol(s[2:4])
+        result[5] = atol(s[4:6])
 
     if iso.selected == iso.YYYY_MM_DD_T_MM_HH_SS_TZD:
         var sign = 1

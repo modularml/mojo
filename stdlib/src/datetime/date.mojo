@@ -50,6 +50,15 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         - month: Up to month 256.
         - day: Up to day 256.
         - hash: 32 bits.
+
+    - Notes:
+        - By default, PythonCalendar has min_hour set to 0,
+            that means if you have timezones that have one or more
+            hours less than UTC they will be set a day before
+            in most calculations. If that is a problem, a custom
+            Gregorian calendar with min_hour=12 can be passed
+            in the constructor and most timezones will be inside
+            the same day.
     """
 
     var year: UInt16
@@ -811,13 +820,14 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         """
         return dt_str.strftime(fmt, self.year, self.month, self.day, 0, 0, 0)
 
+    @always_inline("nodebug")
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYY_MM_DD`.
-        e.g. `1970-01-01` . The `Date` is first converted to UTC.
+        compliant formatted`String` e.g. `IsoFormat.YYYY_MM_DD` ->
+         `1970-01-01` . The `Date` is first converted to UTC.
 
         Parameters:
-            iso: The IsoFormat chosen.
+            iso: The IsoFormat.
 
         Returns:
             String.
@@ -825,24 +835,6 @@ struct Date[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
         var date = (int(self.year), int(self.month), int(self.day))
         var time = dt_str.to_iso(date[0], date[1], date[2], 0, 0, 0)
         return time[:10]
-
-    fn to_iso_compact[
-        iso: dt_str.IsoFormat = dt_str.IsoFormat()
-    ](self) -> String:
-        """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYYMMDD`.
-        e.g. `19700101` . The `Date` is first converted to UTC.
-
-        Parameters:
-            iso: The IsoFormat chosen.
-
-        Returns:
-            String.
-        """
-        var utc_s = self.to_utc()
-        var date = (int(utc_s.year), int(utc_s.month), int(utc_s.day))
-        var time = dt_str.to_iso_compact(date[0], date[1], date[2], 0, 0, 0)
-        return time[:8]
 
     @staticmethod
     @parameter

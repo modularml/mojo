@@ -87,7 +87,11 @@ struct TimeZone[
             has_dst: Whether the `TimeZone` has Daylight Saving Time.
         """
         debug_assert(
-            offset_h < 100 and offset_m < 100 and (sign == 1 or sign == -1),
+            offset_h < 100
+            and offset_h >= 0
+            and offset_m < 100
+            and offset_m >= 0
+            and (sign == 1 or sign == -1),
             msg=(
                 "utc offsets can't have a member bigger than 100, "
                 "and sign must be either 1 or -1"

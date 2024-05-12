@@ -1135,11 +1135,11 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
     @always_inline("nodebug")
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYY_MM_DD_T_MM_HH_TZD`.
-        e.g. `1970-01-01T00:00:00+00:00` .
+        compliant formatted `String` e.g. `IsoFormat.YYYY_MM_DD_T_MM_HH_TZD`
+        -> `1970-01-01T00:00:00+00:00` .
 
         Parameters:
-            iso: The IsoFormat chosen.
+            iso: The IsoFormat.
 
         Returns:
             String.
@@ -1150,28 +1150,6 @@ struct DateTime[iana: Optional[ZoneInfo] = all_zones](Hashable, Stringable):
             date[0], date[1], date[2], hour[0], hour[1], hour[2]
         )
         return time + self.tz.to_iso()
-
-    @always_inline("nodebug")
-    fn to_iso_compact[
-        iso: dt_str.IsoFormat = dt_str.IsoFormat()
-    ](self) -> String:
-        """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYYMMDDMMHHSS`.
-        e.g. `19700101000000` . The `DateTime` is first converted to UTC.
-
-        Parameters:
-            iso: The IsoFormat chosen.
-
-        Returns:
-            String.
-        """
-        var utc_s = self.to_utc()
-        var date = (int(utc_s.year), int(utc_s.month), int(utc_s.day))
-        var hour = (int(utc_s.hour), int(utc_s.minute), int(utc_s.second))
-        var time = dt_str.to_iso_compact(
-            date[0], date[1], date[2], hour[0], hour[1], hour[2]
-        )
-        return time
 
     @staticmethod
     @always_inline("nodebug")

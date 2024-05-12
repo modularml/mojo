@@ -536,29 +536,6 @@ struct DateTime64(Hashable, Stringable):
         )
         return time[:19]
 
-    @always_inline("nodebug")
-    fn to_iso_compact[
-        iso: dt_str.IsoFormat = dt_str.IsoFormat()
-    ](self) -> String:
-        """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYYMMDDMMHHSS`.
-        e.g. `19700101000000` .
-
-        Parameters:
-            iso: The chosen IsoFormat.
-
-        Returns:
-            String.
-
-        Notes:
-            This is done assuming the current hash is valid.
-        """
-        var s = self.get_attrs()
-        var time = dt_str.to_iso_compact(
-            int(s[0]), int(s[1]), int(s[2]), int(s[3]), int(s[4]), int(s[5])
-        )
-        return time[:14]
-
     @staticmethod
     @always_inline("nodebug")
     fn from_iso[
@@ -1072,33 +1049,6 @@ struct DateTime32(Hashable, Stringable):
         )
         return time[:19]
 
-    @always_inline("nodebug")
-    fn to_iso_compact[
-        iso: dt_str.IsoFormat = dt_str.IsoFormat()
-    ](self) -> String:
-        """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYYMMDDMMHHSS`.
-        e.g. `19700101000000` .
-
-        Parameters:
-            iso: The chosen IsoFormat.
-
-        Returns:
-            String.
-
-        Notes:
-            This is done assuming the current hash is valid.
-        """
-        var time = dt_str.to_iso_compact(
-            int(self.get_year()),
-            int(self.get_month()),
-            int(self.get_day()),
-            int(self.get_hour()),
-            int(self.get_minute()),
-            int(_calendar.min_second),
-        )
-        return time[:14]
-
     @staticmethod
     @always_inline("nodebug")
     fn from_iso[
@@ -1570,33 +1520,6 @@ struct DateTime16(Hashable, Stringable):
         )
         return time[:19]
 
-    @always_inline("nodebug")
-    fn to_iso_compact[
-        iso: dt_str.IsoFormat = dt_str.IsoFormat()
-    ](self) -> String:
-        """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYYMMDDMMHHSS`.
-        e.g. `19700101000000` .
-
-        Parameters:
-            iso: The chosen IsoFormat.
-
-        Returns:
-            String.
-
-        Notes:
-            This is done assuming the current hash is valid.
-        """
-        var time = dt_str.to_iso_compact(
-            int(self.get_year()),
-            int(_calendar.min_month),
-            int(self.get_day()),
-            int(self.get_hour()),
-            int(_calendar.min_minute),
-            int(_calendar.min_second),
-        )
-        return time[:14]
-
     @staticmethod
     @always_inline("nodebug")
     fn from_iso[
@@ -2056,33 +1979,6 @@ struct DateTime8(Hashable, Stringable):
             int(_calendar.min_second),
         )
         return time[:19]
-
-    @always_inline("nodebug")
-    fn to_iso_compact[
-        iso: dt_str.IsoFormat = dt_str.IsoFormat()
-    ](self) -> String:
-        """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
-        compliant `String` in the form `IsoFormat.YYYYMMDDMMHHSS`.
-        e.g. `19700101000000` .
-
-        Parameters:
-            iso: The chosen IsoFormat.
-
-        Returns:
-            String.
-
-        Notes:
-            This is done assuming the current hash is valid.
-        """
-        var time = dt_str.to_iso_compact(
-            int(_calendar.min_year),
-            int(_calendar.min_month),
-            int(self.get_day()),
-            int(self.get_hour()),
-            int(_calendar.min_minute),
-            int(_calendar.min_second),
-        )
-        return time[:14]
 
     @staticmethod
     @always_inline("nodebug")
