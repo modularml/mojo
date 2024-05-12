@@ -19,6 +19,7 @@ Notes:
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 """
 from time import time
+from utils import Variant
 
 from .timezone import TimeZone, ZoneInfo, all_zones
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
@@ -819,40 +820,49 @@ struct DateTime[
         return hash(self) < hash(other)
 
     @always_inline("nodebug")
-    fn __and__(self, other: Self) -> UInt64:
+    fn __invert__(owned self) -> UInt32:
+        """Invert.
+
+        Returns:
+            Self.
+        """
+        return ~hash(self)
+
+    @always_inline("nodebug")
+    fn __and__[T: Intable](self, other: T) -> UInt64:
         """And.
 
         Args:
             other: Other.
 
         Returns:
-            Bool.
+            Result.
         """
-        return hash(self) & hash(other)
+        return hash(self) & int(other)
 
     @always_inline("nodebug")
-    fn __or__(self, other: Self) -> UInt64:
+    fn __or__[T: Intable](self, other: T) -> UInt64:
         """Or.
 
         Args:
             other: Other.
 
         Returns:
-            Bool.
+            Result.
         """
-        return hash(self) | hash(other)
+        return hash(self) | int(other)
 
     @always_inline("nodebug")
-    fn __xor__(self, other: Self) -> UInt64:
+    fn __xor__[T: Intable](self, other: T) -> UInt64:
         """Xor.
 
         Args:
             other: Other.
 
         Returns:
-            Bool.
+            Result.
         """
-        return hash(self) ^ hash(other)
+        return hash(self) ^ int(other)
 
     @always_inline("nodebug")
     fn __int__(self) -> UInt64:

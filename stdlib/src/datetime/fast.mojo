@@ -405,7 +405,7 @@ struct DateTime64(Hashable, Stringable):
         return self
 
     @always_inline("nodebug")
-    fn __and__(self, other: Self) -> UInt64:
+    fn __and__[T: Intable](self, other: T) -> UInt64:
         """And.
 
         Args:
@@ -414,10 +414,10 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash & other.hash
+        return self.hash & int(other)
 
     @always_inline("nodebug")
-    fn __or__(self, other: Self) -> UInt64:
+    fn __or__[T: Intable](self, other: T) -> UInt64:
         """And.
 
         Args:
@@ -426,10 +426,10 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash | other.hash
+        return self.hash | int(other)
 
     @always_inline("nodebug")
-    fn __xor__(self, other: Self) -> UInt64:
+    fn __xor__[T: Intable](self, other: T) -> UInt64:
         """And.
 
         Args:
@@ -438,7 +438,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash ^ other.hash
+        return self.hash ^ int(other)
 
     @always_inline("nodebug")
     fn __int__(self) -> UInt64:
@@ -915,7 +915,7 @@ struct DateTime32(Hashable, Stringable):
         return self
 
     @always_inline("nodebug")
-    fn __and__(self, other: Self) -> UInt32:
+    fn __and__[T: Intable](self, other: T) -> UInt32:
         """And.
 
         Args:
@@ -924,10 +924,10 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash & other.hash
+        return self.hash & int(other)
 
     @always_inline("nodebug")
-    fn __or__(self, other: Self) -> UInt32:
+    fn __or__[T: Intable](self, other: T) -> UInt32:
         """And.
 
         Args:
@@ -936,10 +936,10 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash | other.hash
+        return self.hash | int(other)
 
     @always_inline("nodebug")
-    fn __xor__(self, other: Self) -> UInt32:
+    fn __xor__[T: Intable](self, other: T) -> UInt32:
         """And.
 
         Args:
@@ -948,7 +948,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash ^ other.hash
+        return self.hash ^ int(other)
 
     @always_inline("nodebug")
     fn __int__(self) -> UInt32:
@@ -1386,7 +1386,7 @@ struct DateTime16(Hashable, Stringable):
         return self
 
     @always_inline("nodebug")
-    fn __and__(self, other: Self) -> UInt16:
+    fn __and__[T: Intable](self, other: T) -> UInt16:
         """And.
 
         Args:
@@ -1395,10 +1395,10 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash & other.hash
+        return self.hash & int(other)
 
     @always_inline("nodebug")
-    fn __or__(self, other: Self) -> UInt16:
+    fn __or__[T: Intable](self, other: T) -> UInt16:
         """And.
 
         Args:
@@ -1407,10 +1407,10 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash | other.hash
+        return self.hash | int(other)
 
     @always_inline("nodebug")
-    fn __xor__(self, other: Self) -> UInt16:
+    fn __xor__[T: Intable](self, other: T) -> UInt16:
         """And.
 
         Args:
@@ -1419,7 +1419,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash ^ other.hash
+        return self.hash ^ int(other)
 
     @always_inline("nodebug")
     fn __int__(self) -> UInt16:
@@ -1846,7 +1846,7 @@ struct DateTime8(Hashable, Stringable):
         return self
 
     @always_inline("nodebug")
-    fn __and__(self, other: Self) -> UInt8:
+    fn __and__[T: Intable](self, other: T) -> UInt8:
         """And.
 
         Args:
@@ -1855,10 +1855,10 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash & other.hash
+        return self.hash & int(other)
 
     @always_inline("nodebug")
-    fn __or__(self, other: Self) -> UInt8:
+    fn __or__[T: Intable](self, other: T) -> UInt8:
         """And.
 
         Args:
@@ -1867,10 +1867,10 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash | other.hash
+        return self.hash | int(other)
 
     @always_inline("nodebug")
-    fn __xor__(self, other: Self) -> UInt8:
+    fn __xor__[T: Intable](self, other: T) -> UInt8:
         """And.
 
         Args:
@@ -1879,7 +1879,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash ^ other.hash
+        return self.hash ^ int(other)
 
     @always_inline("nodebug")
     fn __int__(self) -> UInt8:

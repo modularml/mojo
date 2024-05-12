@@ -586,40 +586,49 @@ struct Date[
         return hash(self) < hash(other)
 
     @always_inline("nodebug")
-    fn __and__(self, other: Self) -> UInt32:
+    fn __invert__(owned self) -> UInt32:
+        """Invert.
+
+        Returns:
+            Self.
+        """
+        return ~hash(self)
+
+    @always_inline("nodebug")
+    fn __and__[T: Intable](self, other: T) -> UInt32:
         """And.
 
         Args:
             other: Other.
 
         Returns:
-            Bool.
+            Result.
         """
-        return hash(self) & hash(other)
+        return hash(self) & int(other)
 
     @always_inline("nodebug")
-    fn __or__(self, other: Self) -> UInt32:
+    fn __or__[T: Intable](self, other: T) -> UInt32:
         """Or.
 
         Args:
             other: Other.
 
         Returns:
-            Bool.
+            Result.
         """
-        return hash(self) | hash(other)
+        return hash(self) | int(other)
 
     @always_inline("nodebug")
-    fn __xor__(self, other: Self) -> UInt32:
+    fn __xor__[T: Intable](self, other: T) -> UInt32:
         """Xor.
 
         Args:
             other: Other.
 
         Returns:
-            Bool.
+            Result.
         """
-        return hash(self) ^ hash(other)
+        return hash(self) ^ int(other)
 
     @always_inline("nodebug")
     fn __int__(self) -> UInt32:

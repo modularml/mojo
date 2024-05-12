@@ -189,34 +189,34 @@ fn test_bitwise(
 fn test_iso(pycal: Calendar, tz_0_: TZ) raises:
     var ref = Date(1970, 1, 1, tz_0_, pycal)
     var iso_str = "1970-01-01T00:00:00+00:00"
-    var iso_format = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS_TZD)
-    assert_equal(ref, Date.from_iso[iso_format]())
-    assert_equal(iso_str, ref.to_iso[iso_format]())
+    alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS_TZD)
+    assert_equal(ref, Date.from_iso[fmt1]())
+    assert_equal(iso_str, ref.to_iso[fmt1]())
 
     iso_str = "1970-01-01 00:00:00+00:00"
-    iso_format = IsoFormat(IsoFormat.YYYY_MM_DD___MM_HH_SS_TZD)
-    assert_equal(ref, Date.from_iso[iso_format]())
-    assert_equal(iso_str, ref.to_iso[iso_format]())
+    alias fmt2 = IsoFormat(IsoFormat.YYYY_MM_DD___MM_HH_SS_TZD)
+    assert_equal(ref, Date.from_iso[fmt2]())
+    assert_equal(iso_str, ref.to_iso[fmt2]())
 
     iso_str = "1970-01-01T00:00:00"
-    iso_format = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS)
-    assert_equal(ref, Date.from_iso[iso_format]())
-    assert_equal(iso_str, ref.to_iso[iso_format]())
+    alias fmt3 = IsoFormat(IsoFormat.YYYY_MM_DD_T_MM_HH_SS)
+    assert_equal(ref, Date.from_iso[fmt3]())
+    assert_equal(iso_str, ref.to_iso[fmt3]())
 
     iso_str = "19700101000000"
-    iso_format = IsoFormat(IsoFormat.YYYYMMDDMMHHSS)
-    assert_equal(ref, Date.from_iso[iso_format]())
-    assert_equal(iso_str, ref.to_iso[iso_format]())
+    alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDMMHHSS)
+    assert_equal(ref, Date.from_iso[fmt4]())
+    assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
-    iso_format = IsoFormat(IsoFormat.MM_HH_SS)
-    assert_equal(ref, Date.from_iso[iso_format]())
-    assert_equal(iso_str, ref.to_iso[iso_format]())
+    alias fmt5 = IsoFormat(IsoFormat.MM_HH_SS)
+    assert_equal(ref, Date.from_iso[fmt5]())
+    assert_equal(iso_str, ref.to_iso[fmt5]())
 
     iso_str = "000000"
-    iso_format = IsoFormat(IsoFormat.MMHHSS)
-    assert_equal(ref, Date.from_iso[iso_format]())
-    assert_equal(iso_str, ref.to_iso[iso_format]())
+    alias fmt6 = IsoFormat(IsoFormat.MMHHSS)
+    assert_equal(ref, Date.from_iso[fmt6]())
+    assert_equal(iso_str, ref.to_iso[fmt6]())
 
 
 fn test_time() raises:
@@ -233,7 +233,7 @@ fn test_hash() raises:
     assert_true(ref == parsed)
 
 
-fn main():
+fn main() raises:
     var tz_0_ = TZ("", 0, 0)
     var tz_1 = TZ("", 1, 0)
     var tz1_ = TZ("", 1, 0, 1)
