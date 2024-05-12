@@ -871,6 +871,102 @@ def test_list_clear_with_sbo_big_enough():
     assert_equal(list.capacity, 4)
 
 
+def test_list_reverse_move_count_with_sbo():
+    # Create this vec with enough capacity to avoid moves due to resizing.
+    var vec = List[MoveCounter[Int], 3](capacity=5)
+    vec.append(MoveCounter(1))
+    vec.append(MoveCounter(2))
+    vec.append(MoveCounter(3))
+    vec.append(MoveCounter(4))
+    vec.append(MoveCounter(5))
+
+    assert_equal(len(vec), 5)
+    assert_equal(vec.data[0].value, 1)
+    assert_equal(vec.data[1].value, 2)
+    assert_equal(vec.data[2].value, 3)
+    assert_equal(vec.data[3].value, 4)
+    assert_equal(vec.data[4].value, 5)
+
+    assert_equal(vec.data[0].move_count, 1)
+    assert_equal(vec.data[1].move_count, 1)
+    assert_equal(vec.data[2].move_count, 1)
+    assert_equal(vec.data[3].move_count, 1)
+    assert_equal(vec.data[4].move_count, 1)
+
+    vec.reverse()
+
+    assert_equal(len(vec), 5)
+    assert_equal(vec.data[0].value, 5)
+    assert_equal(vec.data[1].value, 4)
+    assert_equal(vec.data[2].value, 3)
+    assert_equal(vec.data[3].value, 2)
+    assert_equal(vec.data[4].value, 1)
+
+    # NOTE:
+    # Earlier elements went through 2 moves and later elements went through 3
+    # moves because the implementation of List.reverse arbitrarily
+    # chooses to perform the swap of earlier and later elements by moving the
+    # earlier element to a temporary (+1 move), directly move the later element
+    # into the position the earlier element was in, and then move from the
+    # temporary into the later position (+1 move).
+    assert_equal(vec.data[0].move_count, 2)
+    assert_equal(vec.data[1].move_count, 2)
+    assert_equal(vec.data[2].move_count, 1)
+    assert_equal(vec.data[3].move_count, 3)
+    assert_equal(vec.data[4].move_count, 3)
+
+    # Keep vec alive until after we've done the last `vec.data + N` read.
+    _ = vec^
+
+
+def test_list_reverse_move_count_with_sbo_big_enough():
+    # Create this vec with enough capacity to avoid moves due to resizing.
+    var vec = List[MoveCounter[Int], 7](capacity=5)
+    vec.append(MoveCounter(1))
+    vec.append(MoveCounter(2))
+    vec.append(MoveCounter(3))
+    vec.append(MoveCounter(4))
+    vec.append(MoveCounter(5))
+
+    assert_equal(len(vec), 5)
+    assert_equal(vec.data[0].value, 1)
+    assert_equal(vec.data[1].value, 2)
+    assert_equal(vec.data[2].value, 3)
+    assert_equal(vec.data[3].value, 4)
+    assert_equal(vec.data[4].value, 5)
+
+    assert_equal(vec.data[0].move_count, 1)
+    assert_equal(vec.data[1].move_count, 1)
+    assert_equal(vec.data[2].move_count, 1)
+    assert_equal(vec.data[3].move_count, 1)
+    assert_equal(vec.data[4].move_count, 1)
+
+    vec.reverse()
+
+    assert_equal(len(vec), 5)
+    assert_equal(vec.data[0].value, 5)
+    assert_equal(vec.data[1].value, 4)
+    assert_equal(vec.data[2].value, 3)
+    assert_equal(vec.data[3].value, 2)
+    assert_equal(vec.data[4].value, 1)
+
+    # NOTE:
+    # Earlier elements went through 2 moves and later elements went through 3
+    # moves because the implementation of List.reverse arbitrarily
+    # chooses to perform the swap of earlier and later elements by moving the
+    # earlier element to a temporary (+1 move), directly move the later element
+    # into the position the earlier element was in, and then move from the
+    # temporary into the later position (+1 move).
+    assert_equal(vec.data[0].move_count, 2)
+    assert_equal(vec.data[1].move_count, 2)
+    assert_equal(vec.data[2].move_count, 1)
+    assert_equal(vec.data[3].move_count, 3)
+    assert_equal(vec.data[4].move_count, 3)
+
+    # Keep vec alive until after we've done the last `vec.data + N` read.
+    _ = vec^
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -903,3 +999,5 @@ def main():
     test_list_with_sbo_big_enough()
     test_list_clear_with_sbo()
     test_list_clear_with_sbo_big_enough()
+    test_list_reverse_move_count_with_sbo()
+    test_list_reverse_move_count_with_sbo_big_enough()
