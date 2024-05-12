@@ -233,7 +233,7 @@ struct FloatLiteral(
         if not self._is_normal():
             return self
 
-        var truncated: IntLiteral = self.__int_literal__()  # 119.0
+        var truncated: IntLiteral = self.__int_literal__()
         var result: Self
         if abs(self) - abs(truncated) < 0.5:
             result = Self(truncated)
@@ -265,8 +265,8 @@ struct FloatLiteral(
             multiplier = __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
             ](multiplier, ten)
-        var target: Self = self * Self(multiplier)  # 119.8
-        var truncated: IntLiteral = target.__int_literal__()  # 119.0
+        var target: Self = self * Self(multiplier)
+        var truncated: IntLiteral = target.__int_literal__()
         var result: Self
         if abs(target) - abs(truncated) < 0.5:
             result = Self(truncated)
