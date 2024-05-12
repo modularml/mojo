@@ -13,6 +13,7 @@
 """Implements the collections package."""
 
 from .dict import Dict, KeyElement
+from .inline_list import InlineList
 from .list import List
 from .optional import Optional, OptionalReg
 from .set import Set

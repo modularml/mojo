@@ -49,19 +49,28 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         for i in range(count):
             var s1i = s1[i]
             var s2i = s2[i]
-            var diff = s1i - s2i
-            if diff:
-                return 1 if diff > 0 else -1
+            if s1i != s2i:
+                return 1 if s1i > s2i else -1
         return 0
+
+    var iota = llvm_intrinsic[
+        "llvm.experimental.stepvector",
+        SIMD[DType.uint8, simd_width],
+        has_side_effect=False,
+    ]()
 
     var vector_end_simd = _align_down(count, simd_width)
     for i in range(0, vector_end_simd, simd_width):
         var s1i = s1.load[width=simd_width](i)
         var s2i = s2.load[width=simd_width](i)
-        var diff = s1i - s2i
-        if (diff != 0).reduce_or():
-            for j in range(simd_width):
-                return 1 if diff[j] > 0 else -1
+        var diff = s1i != s2i
+        if diff.reduce_or():
+            var index = int(
+                diff.select(
+                    iota, SIMD[DType.uint8, simd_width](255)
+                ).reduce_min()
+            )
+            return -1 if s1i[index] < s2i[index] else 1
 
     var last = count - simd_width
     if last <= 0:
@@ -69,10 +78,12 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
 
     var s1i = s1.load[width=simd_width](last)
     var s2i = s2.load[width=simd_width](last)
-    var diff = s1i - s2i
-    if (diff != 0).reduce_or():
-        for j in range(simd_width):
-            return 1 if diff[j] > 0 else -1
+    var diff = s1i != s2i
+    if diff.reduce_or():
+        var index = int(
+            diff.select(iota, SIMD[DType.uint8, simd_width](255)).reduce_min()
+        )
+        return -1 if s1i[index] < s2i[index] else 1
     return 0
 
 

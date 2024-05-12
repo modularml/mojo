@@ -31,7 +31,7 @@ def test_array_mem():
     # Test pointer operations
     # ==================================
 
-    var ptr = array.as_ptr()
+    var ptr = array.unsafe_ptr()
     assert_equal(ptr[0], 1)
     assert_equal(ptr[1], 1)
     assert_equal(ptr[2], 1)

@@ -34,6 +34,7 @@ struct StringLiteral(
     Sized,
     IntableRaising,
     Stringable,
+    Representable,
     KeyElement,
     Boolable,
     Formattable,
@@ -69,7 +70,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    fn data(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
         """Get raw pointer to the underlying data.
 
         Returns:
@@ -112,7 +113,7 @@ struct StringLiteral(
         if length != len(rhs):
             return False
 
-        return _memcmp(self.data(), rhs.data(), length) == 0
+        return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), length) == 0
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: StringLiteral) -> Bool:
@@ -126,6 +127,60 @@ struct StringLiteral(
         """
         return not self == rhs
 
+    @always_inline("nodebug")
+    fn __lt__(self, rhs: StringLiteral) -> Bool:
+        """Compare this StringLiteral to the RHS using LT comparison.
+
+        Args:
+            rhs: The other StringLiteral to compare against.
+
+        Returns:
+            True if this StringLiteral is strictly less than the RHS StringLiteral and False otherwise.
+        """
+        var len1 = len(self)
+        var len2 = len(rhs)
+
+        if len1 < len2:
+            return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
+        else:
+            return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
+
+    @always_inline("nodebug")
+    fn __le__(self, rhs: StringLiteral) -> Bool:
+        """Compare this StringLiteral to the RHS using LE comparison.
+
+        Args:
+            rhs: The other StringLiteral to compare against.
+
+        Returns:
+            True if this StringLiteral is less than or equal to the RHS StringLiteral and False otherwise.
+        """
+        return not (rhs < self)
+
+    @always_inline("nodebug")
+    fn __gt__(self, rhs: StringLiteral) -> Bool:
+        """Compare this StringLiteral to the RHS using GT comparison.
+
+        Args:
+            rhs: The other StringLiteral to compare against.
+
+        Returns:
+            True if this StringLiteral is strictly greater than the RHS StringLiteral and False otherwise.
+        """
+        return rhs < self
+
+    @always_inline("nodebug")
+    fn __ge__(self, rhs: StringLiteral) -> Bool:
+        """Compare this StringLiteral to the RHS using GE comparison.
+
+        Args:
+            rhs: The other StringLiteral to compare against.
+
+        Returns:
+            True if this StringLiteral is greater than or equal to the RHS StringLiteral and False otherwise.
+        """
+        return not (self < rhs)
+
     fn __hash__(self) -> Int:
         """Hash the underlying buffer using builtin hash.
 
@@ -134,7 +189,7 @@ struct StringLiteral(
             uses. Its intended usage is for data structures. See the `hash`
             builtin documentation for more details.
         """
-        return hash(self.data(), len(self))
+        return hash(self.unsafe_ptr(), len(self))
 
     fn __str__(self) -> String:
         """Convert the string literal to a string.
@@ -143,6 +198,16 @@ struct StringLiteral(
             A new string.
         """
         return self
+
+    fn __repr__(self) -> String:
+        """Return a representation of the `StringLiteral` instance.
+
+        You don't need to call this method directly, use `repr("...")` instead.
+
+        Returns:
+            A new representation of the string.
+        """
+        return self.__str__().__repr__()
 
     fn format_to(self, inout writer: Formatter):
         """

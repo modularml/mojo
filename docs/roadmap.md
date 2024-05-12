@@ -2,11 +2,6 @@
 title: Mojo🔥 roadmap & sharp edges
 sidebar_label: Roadmap & sharp edges
 description: A summary of our Mojo plans, including upcoming features and things we need to fix.
-website:
-  open-graph:
-    image: /static/images/mojo-social-card.png
-  twitter-card:
-    image: /static/images/mojo-social-card.png
 ---
 
 This document captures the broad plan about how we plan to implement things in
@@ -90,7 +85,7 @@ structured language evolution features.
 
 ## Mojo SDK known issues
 
-The [Mojo SDK](/mojo/manual/get-started/) is still in early development
+The Mojo SDK is still in early development
 and currently only available for Ubuntu Linux and macOS (Apple silicon)
 systems. Here are some of the notable issues that we plan to fix:
 

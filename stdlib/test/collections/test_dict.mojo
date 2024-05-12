@@ -49,9 +49,9 @@ def test_bool_conversion():
     assert_true(dict)
     dict["b"] = 2
     assert_true(dict)
-    dict.pop("a")
+    _ = dict.pop("a")
     assert_true(dict)
-    dict.pop("b")
+    _ = dict.pop("b")
     assert_false(dict)
 
 
@@ -95,6 +95,18 @@ def test_compact():
         dict[key] = i + 1
         _ = dict.pop(key)
     assert_equal(0, len(dict))
+
+
+def test_compact_with_elements():
+    var dict = Dict[String, Int]()
+    for i in range(5):
+        var key = "key" + str(i)
+        dict[key] = i + 1
+    for i in range(5, 20):
+        var key = "key" + str(i)
+        dict[key] = i + 1
+        _ = dict.pop(key)
+    assert_equal(5, len(dict))
 
 
 def test_pop_default():
@@ -217,7 +229,7 @@ def test_dict_copy_add_new_item():
     # test there are two copies of dict and
     # they don't share underlying memory
     copy["b"] = 2
-    assert_false(2 in orig)
+    assert_false(str(2) in orig)
 
 
 def test_dict_copy_calls_copy_constructor():
@@ -228,8 +240,10 @@ def test_dict_copy_calls_copy_constructor():
     var copy = Dict(orig)
     # I _may_ have thoughts about where our performance issues
     # are coming from :)
-    assert_equal(4, orig["a"].copy_count)
-    assert_equal(5, copy["a"].copy_count)
+    assert_equal(1, orig["a"].copy_count)
+    assert_equal(2, copy["a"].copy_count)
+    assert_equal(0, orig.__get_ref("a")[].copy_count)
+    assert_equal(1, copy.__get_ref("a")[].copy_count)
 
 
 def test_dict_update_nominal():
@@ -258,6 +272,66 @@ def test_dict_update_empty_origin():
 
     assert_equal(orig["b"], 3)
     assert_equal(orig["c"], 4)
+
+
+def test_dict_or():
+    var orig = Dict[String, Int]()
+    var new = Dict[String, Int]()
+
+    new["b"] = 3
+    new["c"] = 4
+    orig["d"] = 5
+    orig["b"] = 8
+
+    var out = orig | new
+
+    assert_equal(out["b"], 3)
+    assert_equal(out["c"], 4)
+    assert_equal(out["d"], 5)
+
+    orig |= new
+
+    assert_equal(orig["b"], 3)
+    assert_equal(orig["c"], 4)
+    assert_equal(orig["d"], 5)
+
+    orig = Dict[String, Int]()
+    new = Dict[String, Int]()
+    new["b"] = 3
+    new["c"] = 4
+
+    orig |= new
+
+    assert_equal(orig["b"], 3)
+    assert_equal(orig["c"], 4)
+
+    orig = Dict[String, Int]()
+    orig["a"] = 1
+    orig["b"] = 2
+
+    new = Dict[String, Int]()
+
+    orig = orig | new
+
+    assert_equal(orig["a"], 1)
+    assert_equal(orig["b"], 2)
+    assert_equal(len(orig), 2)
+
+    orig = Dict[String, Int]()
+    new = Dict[String, Int]()
+    orig["a"] = 1
+    orig["b"] = 2
+    new["c"] = 3
+    new["d"] = 4
+    orig |= new
+    assert_equal(orig["a"], 1)
+    assert_equal(orig["b"], 2)
+    assert_equal(orig["c"], 3)
+    assert_equal(orig["d"], 4)
+
+    orig = Dict[String, Int]()
+    new = Dict[String, Int]()
+    assert_equal(len(orig | new), 0)
 
 
 def test_dict_update_empty_new():
@@ -325,6 +399,7 @@ def test_dict():
     test["test_multiple_resizes", test_multiple_resizes]()
     test["test_big_dict", test_big_dict]()
     test["test_compact", test_compact]()
+    test["test_compact_with_elements", test_compact_with_elements]()
     test["test_pop_default", test_pop_default]()
     test["test_key_error", test_key_error]()
     test["test_iter", test_iter]()
@@ -343,6 +418,7 @@ def test_dict():
     test["test_dict_update_empty_origin", test_dict_update_empty_origin]()
     test["test_dict_update_empty_new", test_dict_update_empty_new]()
     test["test_mojo_issue_1729", test_mojo_issue_1729]()
+    test["test dict or", test_dict_or]()
 
 
 def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
@@ -394,9 +470,19 @@ def test_owned_kwargs_dict():
     test_taking_owned_kwargs_dict(owned_kwargs^)
 
 
+def test_find_get():
+    var some_dict = Dict[String, Int]()
+    some_dict["key"] = 1
+    assert_equal(some_dict.find("key").value()[], 1)
+    assert_equal(some_dict.get("key").value()[], 1)
+    assert_equal(some_dict.find("not_key").or_else(0), 0)
+    assert_equal(some_dict.get("not_key", 0), 0)
+
+
 def main():
     test_dict()
     test_dict_string_representation_string_int()
     test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
     test_bool_conversion()
+    test_find_get()

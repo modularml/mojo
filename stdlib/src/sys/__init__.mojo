@@ -14,6 +14,7 @@
 
 from .arg import argv
 from .debug import breakpointhook
+from ._io import stderr, stdout
 from .ffi import RTLD, DEFAULT_RTLD, DLHandle, external_call
 from .info import (
     is_x86,

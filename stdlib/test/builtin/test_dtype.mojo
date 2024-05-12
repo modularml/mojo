@@ -22,6 +22,14 @@ fn test_stringable() raises:
     assert_equal("int64", str(DType.int64))
 
 
+fn test_representable() raises:
+    assert_equal(repr(DType.float32), "DType.float32")
+    assert_equal(repr(DType.int64), "DType.int64")
+    assert_equal(repr(DType.bool), "DType.bool")
+    assert_equal(repr(DType.address), "DType.address")
+    assert_equal(repr(DType.index), "DType.index")
+
+
 fn test_key_element() raises:
     var set = Set[DType]()
     set.add(DType.bool)
@@ -33,4 +41,5 @@ fn test_key_element() raises:
 
 fn main() raises:
     test_stringable()
+    test_representable()
     test_key_element()
