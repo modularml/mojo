@@ -30,7 +30,7 @@ struct FloatLiteral(
     Boolable,
     Ceilable,
     CeilDivable,
-    EqualityComparable,
+    Comparable,
     Floorable,
     Intable,
     Stringable,
