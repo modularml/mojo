@@ -90,6 +90,9 @@ fn to_iso[
     """Build an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
     `String`.
 
+    Parameters:
+        iso: The chosen IsoFormat.
+
     Args:
         year: Year.
         month: Month.
