@@ -598,6 +598,9 @@ struct Date[
     fn __and__[T: Intable](self, other: T) -> UInt32:
         """And.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -610,6 +613,9 @@ struct Date[
     fn __or__[T: Intable](self, other: T) -> UInt32:
         """Or.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -621,6 +627,9 @@ struct Date[
     @always_inline("nodebug")
     fn __xor__[T: Intable](self, other: T) -> UInt32:
         """Xor.
+
+        Parameters:
+            T: Any Intable type.
 
         Args:
             other: Other.

@@ -408,6 +408,9 @@ struct DateTime64(Hashable, Stringable):
     fn __and__[T: Intable](self, other: T) -> UInt64:
         """And.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -420,6 +423,9 @@ struct DateTime64(Hashable, Stringable):
     fn __or__[T: Intable](self, other: T) -> UInt64:
         """And.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -431,6 +437,9 @@ struct DateTime64(Hashable, Stringable):
     @always_inline("nodebug")
     fn __xor__[T: Intable](self, other: T) -> UInt64:
         """And.
+
+        Parameters:
+            T: Any Intable type.
 
         Args:
             other: Other.
@@ -918,6 +927,9 @@ struct DateTime32(Hashable, Stringable):
     fn __and__[T: Intable](self, other: T) -> UInt32:
         """And.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -930,6 +942,9 @@ struct DateTime32(Hashable, Stringable):
     fn __or__[T: Intable](self, other: T) -> UInt32:
         """And.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -941,6 +956,9 @@ struct DateTime32(Hashable, Stringable):
     @always_inline("nodebug")
     fn __xor__[T: Intable](self, other: T) -> UInt32:
         """And.
+
+        Parameters:
+            T: Any Intable type.
 
         Args:
             other: Other.
@@ -1389,6 +1407,9 @@ struct DateTime16(Hashable, Stringable):
     fn __and__[T: Intable](self, other: T) -> UInt16:
         """And.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -1401,6 +1422,9 @@ struct DateTime16(Hashable, Stringable):
     fn __or__[T: Intable](self, other: T) -> UInt16:
         """And.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -1412,6 +1436,9 @@ struct DateTime16(Hashable, Stringable):
     @always_inline("nodebug")
     fn __xor__[T: Intable](self, other: T) -> UInt16:
         """And.
+
+        Parameters:
+            T: Any Intable type.
 
         Args:
             other: Other.
@@ -1849,6 +1876,9 @@ struct DateTime8(Hashable, Stringable):
     fn __and__[T: Intable](self, other: T) -> UInt8:
         """And.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -1861,6 +1891,9 @@ struct DateTime8(Hashable, Stringable):
     fn __or__[T: Intable](self, other: T) -> UInt8:
         """And.
 
+        Parameters:
+            T: Any Intable type.
+
         Args:
             other: Other.
 
@@ -1872,6 +1905,9 @@ struct DateTime8(Hashable, Stringable):
     @always_inline("nodebug")
     fn __xor__[T: Intable](self, other: T) -> UInt8:
         """And.
+
+        Parameters:
+            T: Any Intable type.
 
         Args:
             other: Other.
