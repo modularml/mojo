@@ -109,9 +109,9 @@ def test_power():
 
 
 def test_mod():
-    assert_equal(FloatLiteral(4.5).__mod__(2), 0.5)
-    assert_equal(FloatLiteral(-4.5).__mod__(2), 1.5)
-    assert_equal(FloatLiteral(6).__mod__(2.5), 1.0)
+    assert_equal(4.5 % 2, 0.5)
+    assert_equal(-4.5 % 2, 1.5)
+    assert_equal(6 % 2.5, 1.0)
 
 
 def test_div_mod():
