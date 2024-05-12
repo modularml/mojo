@@ -30,7 +30,7 @@ def test_reversed_dict():
     dict["b"] = 2
     dict["c"] = 3
     dict["d"] = 4
-    dict["a"] = 5
+    dict["a"] = 1
 
     var keys = String("")
     for key in reversed(dict):
@@ -38,10 +38,26 @@ def test_reversed_dict():
 
     assert_equal(keys, "dcba")
 
+    var check: Int = 4
+    for val in reversed(dict.values()):
+        assert_equal(val[], check)
+        check -= 1
+
+    keys = String("")
+    check = 4
+    for item in reversed(dict.items()):
+        keys += item[].key
+        assert_equal(item[].value, check)
+        check -= 1
+
+    assert_equal(keys, "dcba")
+
     # Order preserved
 
     _ = dict.pop("a")
     _ = dict.pop("c")
+
+    # dict: {'b': 2, 'd': 4}
 
     keys = String("")
     for key in dict:
@@ -55,29 +71,63 @@ def test_reversed_dict():
 
     assert_equal(keys, "db")
 
-    # Empty dict is iterable
-
-    _ = dict.pop("b")
-    _ = dict.pop("d")
+    # got 4 and 2
+    check = 4
+    for val in reversed(dict.values()):
+        assert_equal(val[], check)
+        check -= 2
 
     keys = String("")
-    for key in reversed(dict):
+    check = 4
+    for item in reversed(dict.items()):
+        keys += item[].key
+        assert_equal(item[].value, check)
+        check -= 2
+
+    assert_equal(keys, "db")
+
+    # Refill dict
+    dict["c"] = 2
+    dict["a"] = 1
+    dict["b"] = 4
+    dict["d"] = 3
+
+    # dict: {'b': 4, 'd': 3, 'c': 2, 'a': 1}
+
+    keys = String("")
+    check = 1
+    for item in reversed(dict.items()):
+        keys += item[].key
+        assert_equal(item[].value, check)
+        check += 1
+
+    assert_equal(keys, "acdb")
+
+    # Empty dict is iterable
+
+    var empty_dict = Dict[String, Int]()
+
+    keys = String("")
+    for key in reversed(empty_dict):
         keys += key[]
 
     assert_equal(keys, "")
 
-    # Refill dict
+    check = 0
+    for val in reversed(empty_dict.values()):
+        # values is empty, should not reach here
+        check += 1
 
-    dict["d"] = 4
-    dict["a"] = 1
-    dict["b"] = 2
-    dict["e"] = 3
+    assert_equal(check, 0)
 
     keys = String("")
-    for key in reversed(dict):
-        keys += key[]
+    check = 0
+    for item in reversed(empty_dict.items()):
+        keys += item[].key
+        check += item[].value
 
-    assert_equal(keys, "ebad")
+    assert_equal(keys, "")
+    assert_equal(check, 0)
 
 
 def main():

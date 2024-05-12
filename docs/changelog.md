@@ -148,6 +148,9 @@ what we publish.
   whitespace, ASCII lower/uppercase, and so on.
     ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
 
+- `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
+    ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
+
 ### 🦋 Changed
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
