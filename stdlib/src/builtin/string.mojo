@@ -107,10 +107,7 @@ fn chr(c: Int) -> String:
     # 4: 00000000 000aaabb bbbbcccc ccdddddd -> 11110aaa 10bbbbbb 10cccccc 10dddddd     a >> 18 | 0b11110000, b >> 12 | 0b10000000, c >> 6 | 0b10000000, d | 0b10000000
 
     if (c >> 7) == 0:  # This is 1 byte ASCII char
-        var p = DTypePointer[DType.int8].alloc(2)
-        p.store(c)
-        p.store(1, 0)
-        return String(p, 2)
+        return _chr_ascii(c)
 
     @always_inline
     fn _utf8_len(val: Int) -> Int:
@@ -133,6 +130,71 @@ fn chr(c: Int) -> String:
         p.store(i, ((c >> shift) & 0b00111111) | 0b10000000)
     p.store(num_bytes, 0)
     return String(p.bitcast[DType.int8](), num_bytes + 1)
+
+
+# ===----------------------------------------------------------------------===#
+# ascii
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn _chr_ascii(c: Int8) -> String:
+    """Returns a string based on the given ASCII code point.
+
+    Args:
+        c: An integer that represents a code point.
+
+    Returns:
+        A string containing a single character based on the given code point.
+    """
+    return String(String._buffer_type(c, 0))
+
+
+@always_inline("nodebug")
+fn _repr_ascii(c: Int8) -> String:
+    """Returns a printable representation of the given ASCII code point.
+
+    Args:
+        c: An integer that represents a code point.
+
+    Returns:
+        A string containing a representation of the given code point.
+    """
+    alias ord_tab = ord("\t")
+    alias ord_new_line = ord("\n")
+    alias ord_carriage_return = ord("\r")
+    alias ord_back_slash = ord("\\")
+
+    if c == ord_back_slash:
+        return r"\\"
+    elif isprintable(c):
+        return _chr_ascii(c)
+    elif c == ord_tab:
+        return r"\t"
+    elif c == ord_new_line:
+        return r"\n"
+    elif c == ord_carriage_return:
+        return r"\r"
+    else:
+        var uc = c.cast[DType.uint8]()
+        if uc < 16:
+            return hex(uc, r"\x0")
+        else:
+            return hex(uc, r"\x")
+
+
+# TODO: This is currently the same as repr, should change with unicode strings
+@always_inline("nodebug")
+fn ascii(value: String) -> String:
+    """Get the ASCII representation of the object.
+
+    Args:
+        value: The object to get the ASCII representation of.
+
+    Returns:
+        A string containing the ASCII representation of the object.
+    """
+    return value.__repr__()
 
 
 # ===----------------------------------------------------------------------===#
@@ -421,11 +483,31 @@ fn isspace(c: Int8) -> Bool:
 
 
 # ===----------------------------------------------------------------------===#
+# isprintable
+# ===----------------------------------------------------------------------===#
+
+
+fn isprintable(c: Int8) -> Bool:
+    """Determines whether the given character is a printable character.
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is a printable character, otherwise False.
+    """
+    alias ord_space = ord(" ")
+    alias ord_tilde = ord("~")
+    return ord_space <= int(c) <= ord_tilde
+
+
+# ===----------------------------------------------------------------------===#
 # String
 # ===----------------------------------------------------------------------===#
 struct String(
     Sized,
     Stringable,
+    Representable,
     IntableRaising,
     KeyElement,
     Boolable,
@@ -447,11 +529,23 @@ struct String(
         """Return a Mojo-compatible representation of the `String` instance.
 
         You don't need to call this method directly, use `repr(my_string)` instead.
+
+        Returns:
+            A new representation of the string.
         """
-        if "'" in self:
-            return '"' + self + "'"
+        alias ord_squote = ord("'")
+        var result = String()
+        var use_dquote = False
+
+        for idx in range(len(self._buffer) - 1):
+            var char = self._buffer[idx]
+            result += _repr_ascii(char)
+            use_dquote = use_dquote or (char == ord_squote)
+
+        if use_dquote:
+            return '"' + result + '"'
         else:
-            return "'" + self + "'"
+            return "'" + result + "'"
 
     # ===------------------------------------------------------------------===#
     # Initializers
@@ -795,6 +889,60 @@ struct String(
             True if the Strings are not equal and False otherwise.
         """
         return not (self == other)
+
+    @always_inline
+    fn __lt__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using LT comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is strictly less than the RHS String and False otherwise.
+        """
+        var len1 = len(self)
+        var len2 = len(rhs)
+
+        if len1 < len2:
+            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
+        else:
+            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
+
+    @always_inline
+    fn __le__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using LE comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is less than or equal to the RHS String and False otherwise.
+        """
+        return not (rhs < self)
+
+    @always_inline
+    fn __gt__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using GT comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is strictly greater than the RHS String and False otherwise.
+        """
+        return rhs < self
+
+    @always_inline
+    fn __ge__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using GE comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is greater than or equal to the RHS String and False otherwise.
+        """
+        return not (self < rhs)
 
     @always_inline
     fn __add__(self, other: String) -> String:

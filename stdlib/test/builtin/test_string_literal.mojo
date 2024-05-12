@@ -78,6 +78,34 @@ def test_rfind():
     assert_equal(-1, "abc".rfind("abcd"))
 
 
+fn test_comparison_operators() raises:
+    # Test less than and greater than
+    assert_true(StringLiteral.__lt__("abc", "def"))
+    assert_false(StringLiteral.__lt__("def", "abc"))
+    assert_false(StringLiteral.__lt__("abc", "abc"))
+    assert_true(StringLiteral.__lt__("ab", "abc"))
+    assert_true(StringLiteral.__gt__("abc", "ab"))
+    assert_false(StringLiteral.__gt__("abc", "abcd"))
+
+    # Test less than or equal to and greater than or equal to
+    assert_true(StringLiteral.__le__("abc", "def"))
+    assert_true(StringLiteral.__le__("abc", "abc"))
+    assert_false(StringLiteral.__le__("def", "abc"))
+    assert_true(StringLiteral.__ge__("abc", "abc"))
+    assert_false(StringLiteral.__ge__("ab", "abc"))
+    assert_true(StringLiteral.__ge__("abcd", "abc"))
+
+    # Test case sensitivity in comparison (assuming ASCII order)
+    assert_true(StringLiteral.__gt__("abc", "ABC"))
+    assert_false(StringLiteral.__le__("abc", "ABC"))
+
+    # Test comparisons involving empty strings
+    assert_true(StringLiteral.__lt__("", "abc"))
+    assert_false(StringLiteral.__lt__("abc", ""))
+    assert_true(StringLiteral.__le__("", ""))
+    assert_true(StringLiteral.__ge__("", ""))
+
+
 def test_hash():
     # Test a couple basic hash behaviors.
     # `test_hash.test_hash_bytes` has more comprehensive tests.
@@ -94,10 +122,32 @@ def test_intable():
         _ = int("hi")
 
 
+fn test_repr() raises:
+    # Usual cases
+    assert_equal(StringLiteral.__repr__("hello"), "'hello'")
+
+    # Escape cases
+    assert_equal(StringLiteral.__repr__("\0"), r"'\x00'")
+    assert_equal(StringLiteral.__repr__("\x06"), r"'\x06'")
+    assert_equal(StringLiteral.__repr__("\x09"), r"'\t'")
+    assert_equal(StringLiteral.__repr__("\n"), r"'\n'")
+    assert_equal(StringLiteral.__repr__("\x0d"), r"'\r'")
+    assert_equal(StringLiteral.__repr__("\x0e"), r"'\x0e'")
+    assert_equal(StringLiteral.__repr__("\x1f"), r"'\x1f'")
+    assert_equal(StringLiteral.__repr__(" "), "' '")
+    assert_equal(StringLiteral.__repr__("'"), '"\'"')
+    assert_equal(StringLiteral.__repr__("A"), "'A'")
+    assert_equal(StringLiteral.__repr__("\\"), r"'\\'")
+    assert_equal(StringLiteral.__repr__("~"), "'~'")
+    assert_equal(StringLiteral.__repr__("\x7f"), r"'\x7f'")
+
+
 def main():
     test_basics()
     test_contains()
     test_find()
     test_rfind()
+    test_comparison_operators()
     test_hash()
     test_intable()
+    test_repr()

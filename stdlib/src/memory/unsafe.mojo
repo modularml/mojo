@@ -405,7 +405,7 @@ struct LegacyPointer[
         # Store a simd value into the pointer. The address must be properly
         # aligned, 64B for avx512, 32B for avx2, and 16B for avx.
         __mlir_op.`pop.store`[
-            alignment = (8 * simdwidthof[type]()).value,
+            alignment = int(8 * simdwidthof[type]()).value,
             nonTemporal = __mlir_attr.unit,
         ](value, self.address)
 
