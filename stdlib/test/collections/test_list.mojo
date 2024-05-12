@@ -15,7 +15,13 @@
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
-from testing import assert_equal, assert_false, assert_true, assert_raises
+from testing import (
+    assert_equal,
+    assert_not_equal,
+    assert_false,
+    assert_true,
+    assert_raises,
+)
 
 
 def test_mojo_issue_698():
@@ -967,6 +973,120 @@ def test_list_reverse_move_count_with_sbo_big_enough():
     _ = vec^
 
 
+def test_list_copy_constructor_with_sbo():
+    var vec = List[Int, 2](3, 2, 1)
+    var vec_copy = vec
+    assert_not_equal(vec.data, vec_copy.data)
+    vec_copy.append(1)  # Ensure copy constructor doesn't crash
+    vec_copy[0] = 0
+    assert_equal(len(vec), 3)
+    assert_equal(len(vec_copy), 4)
+    assert_equal(vec[0], 3)
+    assert_equal(vec_copy[0], 0)
+    assert_not_equal(vec.data, vec_copy.data)
+
+    _ = vec^  # To ensure previous one doesn't invoke move constuctor
+
+
+def test_list_copy_constructor_with_sbo_big_enough():
+    var vec = List[Int, 5](3, 2, 1)
+    var vec_copy = vec
+    assert_not_equal(vec.data, vec_copy.data)
+    vec_copy.append(1)  # Ensure copy constructor doesn't crash
+    vec_copy[0] = 0
+    assert_equal(len(vec), 3)
+    assert_equal(len(vec_copy), 4)
+    assert_equal(vec[0], 3)
+    assert_equal(vec_copy[0], 0)
+
+    assert_not_equal(vec.data, vec_copy.data)
+    _ = vec^  # To ensure previous one doesn't invoke move constuctor
+
+
+def test_list_move_constructor():
+    var vec = List[UInt8](0, 10, 20, 30)
+
+    var vec_moved = vec^
+    assert_equal(len(vec_moved), 4)
+    assert_equal(vec_moved[0], 0)
+    assert_equal(vec_moved[1], 10)
+    assert_equal(vec_moved[2], 20)
+    assert_equal(vec_moved[3], 30)
+
+    vec_moved.append(40)
+    assert_equal(len(vec_moved), 5)
+    assert_equal(vec_moved[4], 40)
+
+    vec_moved[0] = 1
+    assert_equal(vec_moved[0], 1)
+
+    # Verify the pointer
+    var pointer = vec_moved.unsafe_ptr()
+    assert_equal(pointer[0], 1)
+    assert_equal(pointer[1], 10)
+    assert_equal(pointer[2], 20)
+    assert_equal(pointer[3], 30)
+    assert_equal(pointer[4], 40)
+
+    _ = vec_moved  # Keep the list alive for pointer tests
+
+
+def test_list_move_constructor_with_sbo_too_small():
+    var vec = List[UInt8, 3](0, 10, 20, 30)
+
+    var vec_moved = vec^
+    assert_equal(len(vec_moved), 4)
+    assert_equal(vec_moved[0], 0)
+    assert_equal(vec_moved[1], 10)
+    assert_equal(vec_moved[2], 20)
+    assert_equal(vec_moved[3], 30)
+
+    vec_moved.append(40)
+    assert_equal(len(vec_moved), 5)
+    assert_equal(vec_moved[4], 40)
+
+    vec_moved[0] = 1
+    assert_equal(vec_moved[0], 1)
+
+    # Verify the pointer
+    var pointer = vec_moved.unsafe_ptr()
+    assert_equal(pointer[0], 1)
+    assert_equal(pointer[1], 10)
+    assert_equal(pointer[2], 20)
+    assert_equal(pointer[3], 30)
+    assert_equal(pointer[4], 40)
+
+    _ = vec_moved  # Keep the list alive for pointer tests
+
+
+def test_list_move_constructor_with_sbo_big_enough():
+    var vec = List[UInt8, 10](0, 10, 20, 30)
+
+    var vec_moved = vec^
+    assert_equal(len(vec_moved), 4)
+    assert_equal(vec_moved[0], 0)
+    assert_equal(vec_moved[1], 10)
+    assert_equal(vec_moved[2], 20)
+    assert_equal(vec_moved[3], 30)
+
+    vec_moved.append(40)
+    assert_equal(len(vec_moved), 5)
+    assert_equal(vec_moved[4], 40)
+
+    vec_moved[0] = 1
+    assert_equal(vec_moved[0], 1)
+
+    # Verify the pointer
+    var pointer = vec_moved.unsafe_ptr()
+    assert_equal(pointer[0], 1)
+    assert_equal(pointer[1], 10)
+    assert_equal(pointer[2], 20)
+    assert_equal(pointer[3], 30)
+    assert_equal(pointer[4], 40)
+
+    _ = vec_moved  # Keep the list alive for pointer tests
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -1001,3 +1121,8 @@ def main():
     test_list_clear_with_sbo_big_enough()
     test_list_reverse_move_count_with_sbo()
     test_list_reverse_move_count_with_sbo_big_enough()
+    test_list_copy_constructor_with_sbo()
+    test_list_copy_constructor_with_sbo_big_enough()
+    test_list_move_constructor()
+    test_list_move_constructor_with_sbo_too_small()
+    test_list_move_constructor_with_sbo_big_enough()
