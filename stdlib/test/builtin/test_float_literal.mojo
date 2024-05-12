@@ -178,30 +178,6 @@ def test_div_mod():
     assert_equal(t[1], 1.0)
 
 
-def test_mod():
-    assert_equal(FloatLiteral(4.5).__mod__(2), 0.5)
-    assert_equal(FloatLiteral(-4.5).__mod__(2), 1.5)
-    assert_equal(FloatLiteral(6).__mod__(2.5), 1.0)
-
-
-def test_div_mod():
-    var a: FloatLiteral
-    var b: FloatLiteral
-
-    a, b = FloatLiteral(4.5).__divmod__(2.0)
-    assert_equal(a, 2.0)
-    assert_equal(b, 0.5)
-    a, b = FloatLiteral(-4.5).__divmod__(2.0)
-    assert_equal(a, -3.0)
-    assert_equal(b, 1.5)
-    a, b = FloatLiteral(4.5).__divmod__(-2.0)
-    assert_equal(a, -3.0)
-    assert_equal(b, -1.5)
-    a, b = FloatLiteral(6).__divmod__(2.5)
-    assert_equal(a, 2.0)
-    assert_equal(b, 1.0)
-
-
 def test_int_conversion():
     assert_equal(int(-4.0), -4)
     assert_equal(int(-4.5), -4)
