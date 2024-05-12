@@ -24,7 +24,6 @@ from builtin.io import _snprintf
 from builtin.hex import _try_write_int
 
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils import StaticIntTuple
 from utils._format import Formattable, Formatter
 from utils.inlined_string import _ArrayMem
 
@@ -198,6 +197,7 @@ struct Int(
     Boolable,
     Ceilable,
     CeilDivable,
+    Comparable,
     Floorable,
     Formattable,
     Intable,
@@ -333,7 +333,7 @@ struct Int(
 
             # Format the integer to the local byte array
             var len = _snprintf(
-                rebind[UnsafePointer[Int8]](buf.as_ptr()),
+                rebind[UnsafePointer[Int8]](buf.unsafe_ptr()),
                 size,
                 "%li",
                 self.value,
@@ -658,25 +658,24 @@ struct Int(
         return mod
 
     @always_inline("nodebug")
-    fn _divmod(self, rhs: Int) -> StaticIntTuple[2]:
+    fn __divmod__(self, rhs: Int) -> Tuple[Int, Int]:
         """Computes both the quotient and remainder using integer division.
 
         Args:
             rhs: The value to divide on.
 
         Returns:
-            The quotient and remainder as a tuple `(self // rhs, self % rhs)`.
+            The quotient and remainder as a `Tuple(self // rhs, self % rhs)`.
         """
         if rhs == 0:
-            # this should raise an exception.
-            return StaticIntTuple[2](0, 0)
+            return 0, 0
         var div: Int = self._positive_div(rhs)
         if rhs > 0 and self > 0:
-            return StaticIntTuple[2](div, self._positive_rem(rhs))
+            return div, self._positive_rem(rhs)
         var mod = self - div * rhs
         if ((rhs < 0) ^ (self < 0)) and mod:
-            return StaticIntTuple[2](div - 1, mod + rhs)
-        return StaticIntTuple[2](div, mod)
+            return div - 1, mod + rhs
+        return div, mod
 
     @always_inline("nodebug")
     fn __pow__(self, rhs: Int) -> Int:
@@ -1027,4 +1026,5 @@ struct Int(
             uses. Its intended usage is for data structures. See the `hash`
             builtin documentation for more details.
         """
-        return _hash_simd(Scalar[DType.index](self))
+        # TODO(MOCO-636): switch to DType.index
+        return _hash_simd(Scalar[DType.int64](self))

@@ -53,9 +53,9 @@ fn _set_array_elem[
         array: the array which is captured by reference.
     """
     var ptr = __mlir_op.`pop.array.gep`(
-        array.get_legacy_pointer().address, index.value
+        UnsafePointer(array).address, index.value
     )
-    Pointer(ptr).store(val)
+    UnsafePointer(ptr)[] = val
 
 
 @always_inline
@@ -249,7 +249,7 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
 
 @value
 struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
-    """A fixed-size sequence of size homogenous elements where size is a constant expression.
+    """A fixed-size sequence of size homogeneous elements where size is a constant expression.
 
     Parameters:
         ElementType: The type of the elements in the array.
@@ -270,10 +270,32 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         constrained[
             False,
             (
-                "Initialize with either a variadic list of arguments or a"
-                " default fill element."
+                "Initialize with either a variadic list of arguments, a default"
+                " fill element or pass the keyword argument 'uninitialized'."
             ),
         ]()
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
+    fn __init__(inout self, *, uninitialized: Bool):
+        """Create an InlineArray with uninitialized memory.
+
+        Note that this is highly unsafe and should be used with caution.
+
+        We recommend to use the `InlineList` instead if all the objects
+        are not available when creating the array.
+
+        If despite those workarounds, one still needs an uninitialized array,
+        it is possible with:
+
+        ```mojo
+        var uninitialized_array = InlineArray[Int, 10](uninitialized=True)
+        ```
+
+        Args:
+            uninitialized: A boolean to indicate if the array should be initialized.
+                Always set to `True` (it's not actually used inside the constructor).
+        """
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline

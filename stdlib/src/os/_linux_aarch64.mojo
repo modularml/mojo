@@ -13,7 +13,7 @@
 
 from time.time import _CTimeSpec
 
-from utils import StaticIntTuple
+from utils import InlineArray
 
 from .fstat import stat_result
 
@@ -29,7 +29,6 @@ alias blksize_t = Int32
 
 
 @value
-@register_passable("trivial")
 struct _c_stat(Stringable):
     var st_dev: dev_t  #  ID of device containing file
     var st_ino: Int64  # File serial number
@@ -47,7 +46,7 @@ struct _c_stat(Stringable):
     var st_mtimespec: _CTimeSpec  # time of last data modification
     var st_ctimespec: _CTimeSpec  # time of last status change
     var st_birthtimespec: _CTimeSpec  # time of file creation(birth)
-    var unused: StaticTuple[Int64, 2]  # RESERVED: DO NOT USE!
+    var unused: InlineArray[Int64, 2]  # RESERVED: DO NOT USE!
 
     fn __init__(inout self):
         self.st_dev = 0
@@ -66,7 +65,7 @@ struct _c_stat(Stringable):
         self.st_mtimespec = _CTimeSpec()
         self.st_ctimespec = _CTimeSpec()
         self.st_birthtimespec = _CTimeSpec()
-        self.unused = StaticTuple[Int64, 2](0, 0)
+        self.unused = InlineArray[Int64, 2](0, 0)
 
     fn __str__(self) -> String:
         var res = String("{\n")
@@ -110,7 +109,7 @@ struct _c_stat(Stringable):
 fn _stat(path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__xstat", Int32](
-        Int32(0), path._as_ptr(), UnsafePointer.address_of(stat)
+        Int32(0), path.unsafe_ptr(), UnsafePointer.address_of(stat)
     )
     if err == -1:
         raise "unable to stat '" + path + "'"
@@ -121,7 +120,7 @@ fn _stat(path: String) raises -> _c_stat:
 fn _lstat(path: String) raises -> _c_stat:
     var stat = _c_stat()
     var err = external_call["__lxstat", Int32](
-        Int32(0), path._as_ptr(), UnsafePointer.address_of(stat)
+        Int32(0), path.unsafe_ptr(), UnsafePointer.address_of(stat)
     )
     if err == -1:
         raise "unable to lstat '" + path + "'"

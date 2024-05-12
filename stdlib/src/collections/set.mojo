@@ -15,7 +15,7 @@
 from .dict import Dict, KeyElement, _DictEntryIter, _DictKeyIter
 
 
-struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
+struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     """A set data type.
 
     O(1) average-case amortized add, remove, and membership check.
@@ -292,9 +292,7 @@ struct Set[T: KeyElement](Sized, EqualityComparable, Hashable, Boolable):
             An iterator of immutable references to the set elements.
         """
         # here we rely on Set being a trivial wrapper of a Dict
-        return _DictKeyIter(
-            _DictEntryIter(0, 0, self.unsafe_bitcast[Dict[T, NoneType]]())
-        )
+        return _DictKeyIter(_DictEntryIter(0, 0, self[]._data))
 
     fn add(inout self, t: T):
         """Add an element to the set.

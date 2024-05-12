@@ -20,9 +20,9 @@ from utils import Variant
 alias IntOrString = Variant[Int, String]
 fn to_string(inout x: IntOrString) -> String:
   if x.isa[String]():
-    return x.get[String]()[]
+    return x[String][]
   # x.isa[Int]()
-  return str(x.get[Int]())[]
+  return str(x[Int])[]
 
 # They have to be mutable for now, and implement CollectionElement
 var an_int = IntOrString(4)
@@ -106,8 +106,8 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     You can
         - use `isa[T]()` to check what type a variant is
-        - use `take[T]()` to take a value from the variant
-        - use `get[T]()` to get a value out of a variant
+        - use `unsafe_take[T]()` to take a value from the variant
+        - use `[T]` to get a value out of a variant
             - This currently does an extra copy/move until we have lifetimes
             - It also temporarily requires the value to be mutable
         - use `set[T](owned new_value: T)` to reset the variant to a new value
@@ -118,9 +118,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     alias IntOrString = Variant[Int, String]
     fn to_string(inout x: IntOrString) -> String:
         if x.isa[String]():
-            return x.get[String]()[]
+            return x[String][]
         # x.isa[Int]()
-        return str(x.get[Int]()[])
+        return str(x[Int][])
 
     # They have to be mutable for now, and implement CollectionElement
     var an_int = IntOrString(4)
@@ -140,22 +140,10 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     """
 
     alias _sentinel: Int = -1
-    alias _type = __mlir_type[
+    alias _mlir_type = __mlir_type[
         `!kgen.variant<[rebind(:`, __type_of(Ts), ` `, Ts, `)]>`
     ]
-    var _impl: Self._type
-
-    fn _get_ptr[T: CollectionElement](self) -> UnsafePointer[T]:
-        constrained[
-            Self._check[T]() != Self._sentinel, "not a union element type"
-        ]()
-        return UnsafePointer.address_of(self._impl).bitcast[T]()
-
-    fn _get_state(
-        self: Reference[Self, _, _]
-    ) -> Reference[Int8, self.is_mutable, self.lifetime]:
-        var int8_self = UnsafePointer(self).bitcast[Int8]()
-        return (int8_self + _UnionSize[Ts].compute())[]
+    var _impl: Self._mlir_type
 
     fn __init__[T: CollectionElement](inout self, owned value: T):
         """Create a variant with one of the types.
@@ -167,18 +155,17 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             value: The value to initialize the variant with.
         """
-        self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
+        self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
         self._get_state()[] = Self._check[T]()
         initialize_pointee_move(self._get_ptr[T](), value^)
 
-    @always_inline
     fn __copyinit__(inout self, other: Self):
         """Creates a deep copy of an existing variant.
 
         Args:
             other: The variant to copy from.
         """
-        self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
+        self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
         self._get_state()[] = other._get_state()[]
 
         @parameter
@@ -187,19 +174,18 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
                 alias T = Ts[i]
                 initialize_pointee_move(
                     UnsafePointer.address_of(self._impl).bitcast[T](),
-                    Reference(other._impl).unsafe_bitcast[T]()[],
+                    UnsafePointer.address_of(other._impl).bitcast[T]()[],
                 )
 
         unroll[each, len(VariadicList(Ts))]()
 
-    @always_inline
     fn __moveinit__(inout self, owned other: Self):
         """Move initializer for the variant.
 
         Args:
             other: The variant to move.
         """
-        self._impl = __mlir_attr[`#kgen.unknown : `, self._type]
+        self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
         self._get_state()[] = other._get_state()[]
 
         @parameter
@@ -215,19 +201,29 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """Destroy the variant."""
         self._call_correct_deleter()
 
+    fn _get_ptr[T: CollectionElement](self) -> UnsafePointer[T]:
+        constrained[
+            Self._check[T]() != Self._sentinel, "not a union element type"
+        ]()
+        return UnsafePointer.address_of(self._impl).bitcast[T]()
+
+    fn _get_state(
+        self: Reference[Self, _, _]
+    ) -> Reference[Int8, self.is_mutable, self.lifetime]:
+        var int8_self = UnsafePointer(self).bitcast[Int8]()
+        return (int8_self + _UnionSize[Ts].compute())[]
+
     @always_inline
     fn _call_correct_deleter(inout self):
         @parameter
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias q = Ts[i]
-                __get_address_as_owned_value(
-                    self._get_ptr[q]().address
-                ).__del__()
+                destroy_pointee(self._get_ptr[q]().address)
 
         unroll[each, len(VariadicList(Ts))]()
 
-    fn take[T: CollectionElement](owned self) -> T:
+    fn unsafe_take[T: CollectionElement](inout self) -> T:
         """Take the current value of the variant as the provided type.
 
         The caller takes ownership of the underlying value. The variant
@@ -242,14 +238,13 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             T: The type to take.
 
         Returns:
-            The undelying data as an owned value.
+            The underlying data as an owned value.
         """
         debug_assert(
             Self._check[T]() == self._get_state()[], "taking wrong type"
         )
-        self._get_state()[] = (
-            Self._sentinel
-        )  # don't call the variant's deleter later
+        # don't call the variant's deleter later
+        self._get_state()[] = Self._sentinel
         return move_from_pointee(self._get_ptr[T]())
 
     fn set[T: CollectionElement](inout self, owned value: T):
@@ -280,7 +275,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         alias idx = Self._check[T]()
         return self._get_state()[] == idx
 
-    fn get[
+    fn __refitem__[
         T: CollectionElement
     ](self: Reference[Self, _, _]) -> Reference[
         T, self.is_mutable, self.lifetime

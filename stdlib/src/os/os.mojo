@@ -27,7 +27,7 @@ from memory import (
 )
 from memory.unsafe_pointer import move_from_pointee
 
-from utils import StringRef
+from utils import StringRef, InlineArray
 
 from .path import isdir
 from .pathlike import PathLike
@@ -52,7 +52,6 @@ alias SEEK_END: UInt8 = 2
 
 
 @value
-@register_passable("trivial")
 struct _dirent_linux:
     alias MAX_NAME_SIZE = 256
     var d_ino: Int64
@@ -63,12 +62,11 @@ struct _dirent_linux:
     """Length of the record."""
     var d_type: Int8
     """Type of file."""
-    var name: StaticTuple[Int8, Self.MAX_NAME_SIZE]
+    var name: InlineArray[Int8, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
 @value
-@register_passable("trivial")
 struct _dirent_macos:
     alias MAX_NAME_SIZE = 1024
     var d_ino: Int64
@@ -81,7 +79,7 @@ struct _dirent_macos:
     """Length of the name."""
     var d_type: Int8
     """Type of file."""
-    var name: StaticTuple[Int8, Self.MAX_NAME_SIZE]
+    var name: InlineArray[Int8, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
@@ -111,7 +109,7 @@ struct _DirHandle:
             raise "the directory '" + path + "' does not exist"
 
         self._handle = external_call["opendir", UnsafePointer[NoneType]](
-            path._as_ptr()
+            path.unsafe_ptr()
         )
 
         if not self._handle:
@@ -277,12 +275,12 @@ fn remove(path: String) raises:
       path: The path to the file.
 
     """
-    var error = external_call["unlink", Int](path._as_ptr())
+    var error = external_call["unlink", Int32](path.unsafe_ptr())
 
     if error != 0:
         # TODO get error message, the following code prints it
         # var error_str = String("Something went wrong")
-        # _ = external_call["perror", UnsafePointer[NoneType]](error_str._as_ptr())
+        # _ = external_call["perror", UnsafePointer[NoneType]](error_str.unsafe_ptr())
         # _ = error_str
         raise Error("Can not remove file: " + path)
 
@@ -327,3 +325,66 @@ fn unlink[pathlike: os.PathLike](path: pathlike) raises:
 
     """
     remove(path.__fspath__())
+
+
+# ===----------------------------------------------------------------------=== #
+# mkdir/rmdir
+# ===----------------------------------------------------------------------=== #
+
+
+fn mkdir(path: String, mode: Int = 0o777) raises:
+    """Creates a directory at the specified path.
+    If the directory can not be created an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+      path: The path to the directory.
+      mode: The mode to create the directory with.
+    """
+
+    var error = external_call["mkdir", Int32](path.unsafe_ptr(), mode)
+    if error != 0:
+        raise Error("Can not create directory: " + path)
+
+
+fn mkdir[pathlike: os.PathLike](path: pathlike, mode: Int = 0o777) raises:
+    """Creates a directory at the specified path.
+    If the directory can not be created an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+      mode: The mode to create the directory with.
+    """
+
+    mkdir(path.__fspath__(), mode)
+
+
+fn rmdir(path: String) raises:
+    """Removes the specified directory.
+    If the path is not a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+      path: The path to the directory.
+    """
+    var error = external_call["rmdir", Int32](path.unsafe_ptr())
+    if error != 0:
+        raise Error("Can not remove directory: " + path)
+
+
+fn rmdir[pathlike: os.PathLike](path: pathlike) raises:
+    """Removes the specified directory.
+    If the path is not a directory or it can not be deleted, an error is raised.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+    """
+    rmdir(path.__fspath__())
