@@ -516,7 +516,7 @@ struct String(
 ):
     """Represents a mutable string."""
 
-    alias _buffer_type = List[Int8]
+    alias _buffer_type = List[Int8, 24]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -581,6 +581,36 @@ struct String(
         self._buffer = impl^
 
     @always_inline
+    fn __init__(inout self, owned impl: List[Int8]):
+        """Construct a string from a buffer of bytes.
+
+        The buffer must be terminated with a null byte:
+
+        ```mojo
+        var buf = List[Int8]()
+        buf.append(ord('H'))
+        buf.append(ord('i'))
+        buf.append(0)
+        var hi = String(buf)
+        ```
+
+        Args:
+            impl: The buffer.
+        """
+        debug_assert(
+            impl[-1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
+        # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
+        var length = len(impl)
+        var capacity = impl.capacity
+        self._buffer = Self._buffer_type(
+            unsafe_pointer=impl.steal_data(),
+            size=length,
+            capacity=capacity,
+        )
+
+    @always_inline
     fn __init__(inout self, owned impl: List[UInt8]):
         """Construct a string from a buffer of bytes.
 
@@ -636,7 +666,6 @@ struct String(
         Args:
             str: The input constant string.
         """
-
         self = String(StringRef(str))
 
     fn __init__[stringable: Stringable](inout self, value: stringable):
@@ -1165,7 +1194,7 @@ struct String(
             self._buffer.data.bitcast[UInt8]()
         )
 
-    fn as_bytes(self) -> List[Int8]:
+    fn as_bytes(self) -> Self._buffer_type:
         """Retrieves the underlying byte sequence encoding the characters in
         this string.
 
@@ -1329,7 +1358,7 @@ struct String(
         var old_len = len(old)
         var new_len = len(new)
 
-        var res = List[Int8]()
+        var res = Self._buffer_type()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
 
         for _ in range(occurrences):
@@ -1412,7 +1441,7 @@ struct String(
         return hash(self._strref_dangerous())
 
     fn _interleave(self, val: String) -> String:
-        var res = List[Int8]()
+        var res = Self._buffer_type()
         var val_ptr = val.unsafe_ptr()
         var self_ptr = self.unsafe_ptr()
         res.reserve(len(val) * len(self) + 1)
