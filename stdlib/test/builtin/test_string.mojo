@@ -631,7 +631,55 @@ fn test_isspace() raises:
     assert_false(isspace(ord(".")))
 
 
+fn test_ascii_aliases() raises:
+    var whitespaces = String(" \n\t\r\f\v")
+    for i in range(len(whitespaces)):
+        assert_true(whitespaces[i] in String.WHITESPACE)
+
+    assert_true(String("a") in String.ASCII_LOWERCASE)
+    assert_true(String("b") in String.ASCII_LOWERCASE)
+    assert_true(String("y") in String.ASCII_LOWERCASE)
+    assert_true(String("z") in String.ASCII_LOWERCASE)
+
+    assert_true(String("A") in String.ASCII_UPPERCASE)
+    assert_true(String("B") in String.ASCII_UPPERCASE)
+    assert_true(String("Y") in String.ASCII_UPPERCASE)
+    assert_true(String("Z") in String.ASCII_UPPERCASE)
+
+    assert_true(String("a") in String.ASCII_LETTERS)
+    assert_true(String("b") in String.ASCII_LETTERS)
+    assert_true(String("y") in String.ASCII_LETTERS)
+    assert_true(String("z") in String.ASCII_LETTERS)
+    assert_true(String("A") in String.ASCII_LETTERS)
+    assert_true(String("B") in String.ASCII_LETTERS)
+    assert_true(String("Y") in String.ASCII_LETTERS)
+    assert_true(String("Z") in String.ASCII_LETTERS)
+
+    assert_true(String("0") in String.DIGITS)
+    assert_true(String("9") in String.DIGITS)
+
+    assert_true(String("0") in String.HEX_DIGITS)
+    assert_true(String("9") in String.HEX_DIGITS)
+    assert_true(String("A") in String.HEX_DIGITS)
+    assert_true(String("F") in String.HEX_DIGITS)
+
+    assert_true(String("7") in String.OCT_DIGITS)
+    assert_false(String("8") in String.OCT_DIGITS)
+
+    assert_true(String(",") in String.PUNCTUATION)
+    assert_true(String(".") in String.PUNCTUATION)
+    assert_true(String("\\") in String.PUNCTUATION)
+    assert_true(String("@") in String.PUNCTUATION)
+    assert_true(String('"') in String.PUNCTUATION)
+    assert_true(String("'") in String.PUNCTUATION)
+
+    var text = String("I love my Mom and Dad so much!!!\n")
+    for i in range(len(text)):
+        assert_true(text[i] in String.PRINTABLE)
+
+
 fn test_rstrip() raises:
+    # with default rstrip chars
     var empty_string = String("")
     assert_true(empty_string.rstrip() == "")
 
@@ -647,8 +695,17 @@ fn test_rstrip() raises:
     var str2 = String("something \t\n\t\v\f")
     assert_true(str2.rstrip() == "something")
 
+    # with custom chars for rstrip
+    var str3 = String("mississippi")
+    assert_true(str3.rstrip("sip") == "m")
+
+    var str4 = String("mississippimississippi \n ")
+    assert_true(str4.rstrip("sip ") == "mississippimississippi \n")
+    assert_true(str4.rstrip("sip \n") == "mississippim")
+
 
 fn test_lstrip() raises:
+    # with default lstrip chars
     var empty_string = String("")
     assert_true(empty_string.lstrip() == "")
 
@@ -664,8 +721,17 @@ fn test_lstrip() raises:
     var str2 = String(" \t\n\t\v\fsomething")
     assert_true(str2.lstrip() == "something")
 
+    # with custom chars for lstrip
+    var str3 = String("mississippi")
+    assert_true(str3.lstrip("mis") == "ppi")
+
+    var str4 = String(" \n mississippimississippi")
+    assert_true(str4.lstrip("mis ") == "\n mississippimississippi")
+    assert_true(str4.lstrip("mis \n") == "ppimississippi")
+
 
 fn test_strip() raises:
+    # with default strip chars
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
 
@@ -680,6 +746,15 @@ fn test_strip() raises:
 
     var str2 = String(" \t\n\t\v\fsomething \t\n\t\v\f")
     assert_true(str2.strip() == "something")
+
+    # with custom strip chars
+    var str3 = String("mississippi")
+    assert_true(str3.strip("mips") == "")
+    assert_true(str3.strip("mip") == "ssiss")
+
+    var str4 = String(" \n mississippimississippi \n ")
+    assert_true(str4.strip(" ") == "\n mississippimississippi \n")
+    assert_true(str4.strip("\nmip ") == "ssissippimississ")
 
 
 fn test_hash() raises:
@@ -784,6 +859,7 @@ def main():
     # TODO(37393): Re-enable once we debug why we are depending on some debug behavior
     # on graviton.  Showing an error in our O3 LLVM pipeline; could be a bug in LLVM.
     # test_isspace()
+    test_ascii_aliases()
     test_rstrip()
     test_lstrip()
     test_strip()

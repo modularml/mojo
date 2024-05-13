@@ -143,7 +143,19 @@ what we publish.
 
 - `Dict.__get_ref(key)`, allowing to get references to dictionary values.
 
+- `String.strip()`, `lstrip()` and `rstrip()` can now remove custom characters
+  other than whitespace.  In addition, there are now several useful aliases for
+  whitespace, ASCII lower/uppercase, and so on.
+    ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
+
+- `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
+    ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
+
 ### 🦋 Changed
+
+- The `let` keyword has been completely removed from the language. We previously
+  removed `let` declarations but still provided an error message to users. Now,
+  it is completely gone from the grammar. Long live `var`!
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
   longer need to do `from math import abs, round`.
