@@ -29,6 +29,10 @@ alias _calendar = PythonCalendar
 alias _cal_hash = CalendarHashes(32)
 
 
+trait _IntableCollectable(Intable, CollectionElement):
+    ...
+
+
 @value
 @register_passable("trivial")
 struct Date[
@@ -87,11 +91,13 @@ struct Date[
     var calendar: Calendar
     """Calendar."""
 
-    fn __init__(
+    fn __init__[
+        T: _IntableCollectable
+    ](
         inout self,
-        year: Optional[Int] = None,
-        month: Optional[Int] = None,
-        day: Optional[Int] = None,
+        year: Optional[T] = None,
+        month: Optional[T] = None,
+        day: Optional[T] = None,
         tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
             iana, pyzoneinfo, native
         ](),
@@ -106,9 +112,9 @@ struct Date[
             tz: Tz.
             calendar: Calendar.
         """
-        self.year = year.or_else(int(calendar.min_year))
-        self.month = month.or_else(int(calendar.min_month))
-        self.day = day.or_else(int(calendar.min_day))
+        self.year = int(year.value()[]) if year else int(calendar.min_year)
+        self.month = int(month.value()[]) if month else int(calendar.min_month)
+        self.day = int(day.value()[]) if day else int(calendar.min_day)
         self.tz = tz
         self.calendar = calendar
 
