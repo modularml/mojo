@@ -28,9 +28,7 @@ import .dt_str
 alias _calendar = PythonCalendar
 alias _cal_hash = CalendarHashes(64)
 
-alias _max_delta = UInt16(
-    UInt64.MAX_FINITE // (365 * 24 * 60 * 60 * 1_000_000_000)
-)
+alias _max_delta = UInt16(~UInt64(0) // (365 * 24 * 60 * 60 * 1_000_000_000))
 """Maximum year delta that fits in a UInt64 for a 
 Gregorian calendar with year = 365 d * 24 h, 60 min, 60 s, 10^9 ns"""
 
@@ -426,7 +424,7 @@ struct DateTime[
             self.year, self.month, self.day, self.hour, self.minute, self.second
         )
 
-    fn delta_ns(self, other: Self) -> Tuple[UInt64, UInt64, UInt16, UInt8]:
+    fn delta_ns(self, other: Self) -> (UInt64, UInt64, UInt16, UInt8):
         """Calculates the nanoseconds for `self` and other, creating
         a reference calendar to keep nanosecond resolution.
 
@@ -465,7 +463,7 @@ struct DateTime[
         var self_ns = s.n_seconds_since_epoch()
         o.calendar = cal
         var other_ns = o.n_seconds_since_epoch()
-        return Tuple(self_ns, other_ns, overflow, sign)
+        return self_ns, other_ns, overflow, sign
 
     fn add(
         owned self,
