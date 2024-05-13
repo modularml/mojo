@@ -633,6 +633,7 @@ struct DateTime[
             )
         return dt
 
+    @always_inline("nodebug")
     fn add(owned self, other: Self) -> Self:
         """Adds another `DateTime`.
 
@@ -642,10 +643,19 @@ struct DateTime[
         Returns:
             A `DateTime` with the `TimeZone` and `Calendar` of `self`.
         """
-        var delta = self.delta_ns(other)
-        var result = int(delta[0] + delta[1])
-        return self.add(years=int(delta[2]), seconds=result)
+        return self.add(
+            years=int(other.year),
+            months=int(other.month),
+            days=int(other.day),
+            hours=int(other.hour),
+            minutes=int(other.minute),
+            seconds=int(other.second),
+            m_seconds=int(other.m_second),
+            u_seconds=int(other.u_second),
+            n_seconds=int(other.n_second),
+        )
 
+    @always_inline("nodebug")
     fn subtract(owned self, other: Self) -> Self:
         """Subtracts another `DateTime`.
 
@@ -655,9 +665,17 @@ struct DateTime[
         Returns:
             A `DateTime` with the `TimeZone` and `Calendar` of `self`.
         """
-        var delta = self.delta_ns(other)
-        var result = int(delta[0] - delta[1])
-        return self.subtract(years=int(delta[2]), seconds=result)
+        return self.subtract(
+            years=int(other.year),
+            months=int(other.month),
+            days=int(other.day),
+            hours=int(other.hour),
+            minutes=int(other.minute),
+            seconds=int(other.second),
+            m_seconds=int(other.m_second),
+            u_seconds=int(other.u_second),
+            n_seconds=int(other.n_second),
+        )
 
     @always_inline("nodebug")
     fn __add__(owned self, other: Self) -> Self:
