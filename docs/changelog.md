@@ -153,6 +153,10 @@ what we publish.
 
 ### 🦋 Changed
 
+- The `let` keyword has been completely removed from the language. We previously
+  removed `let` declarations but still provided an error message to users. Now,
+  it is completely gone from the grammar. Long live `var`!
+
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
   longer need to do `from math import abs, round`.
 
