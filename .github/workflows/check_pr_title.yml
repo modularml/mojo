@@ -16,6 +16,7 @@ jobs:
       pull-requests: write
 
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - uses: morrisoncole/pr-lint-action@51f3cfabaf5d46f94e54524214e45685f0401b2a
