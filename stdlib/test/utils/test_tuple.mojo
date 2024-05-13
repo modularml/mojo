@@ -163,7 +163,7 @@ def test_array_str():
 
 
 def test_array_int_pointer():
-    var arr = InlineArray[Int, 5](0, 10, 20, 30, 40)
+    var arr = InlineArray[Int, 3](0, 10, 20)
 
     var ptr = arr.unsafe_ptr()
     assert_equal(ptr[0], 0)
