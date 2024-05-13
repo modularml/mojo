@@ -411,8 +411,8 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     ) -> UnsafePointer[Self.ElementType]:
         """Get an `UnsafePointer` to the underlying array.
 
-        That the pointer is unsafe but can be used to read or write to the array.
-        Be careful when using this. As opposed to a pointer to a list,
+        That pointer is unsafe but can be used to read or write to the array.
+        Be careful when using this. As opposed to a pointer to a `List`,
         this pointer becomes invalid when the `InlineArray` is moved.
 
         Make sure to refresh your pointer every time the `InlineArray` is moved.
