@@ -266,14 +266,14 @@ struct FloatLiteral(
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
             ](multiplier, ten)
         var target: Self = self * Self(multiplier)
-        var truncated: IntLiteral = target.__int_literal__()
+        var truncated: Self = target.__int_literal__()
         var result: Self
         if abs(target) - abs(truncated) <= 0.5:
-            result = Self(truncated)
+            result = truncated
         elif self > 0:
-            result = Self(truncated + 1)
+            result = truncated + 1
         else:
-            result = Self(truncated - 1)
+            result = truncated - 1
         if ndigits > 0:
             result /= Self(multiplier)
         return result
