@@ -15,9 +15,13 @@
 from pathlib import Path, cwd
 from utils import Variant
 
+from .calendar import PythonCalendar
 
-@value
-# @register_passable("trivial")
+alias _cal = PythonCalendar
+
+
+# @value
+@register_passable("trivial")
 struct Offset:
     """Only supports hour offsets less than 16 hours and minute offsets
     that are in (00, 30, 45). Offset sign and minute are assumed
@@ -108,8 +112,8 @@ struct Offset:
         )
 
 
-@value
-# @register_passable("trivial")
+# @value
+@register_passable("trivial")
 struct TzDT:
     """`TzDT` stores the rules for DST start/end."""
 
@@ -197,8 +201,8 @@ struct TzDT:
         return self.buf == other.buf
 
 
-@value
-# @register_passable("trivial")
+# @value
+@register_passable("trivial")
 struct ZoneDST:
     """`ZoneDST` stores both start and end dates, and
     the offset for a timezone with DST."""
@@ -244,7 +248,7 @@ struct ZoneDST:
 
 
 @value
-struct ZoneInfoFile:
+struct ZoneInfoFile(CollectionElement):
     """Zoneinfo that lives in a file. Smallest memory footprint
     but only supports 256 timezones (there are ~ 418)."""
 
@@ -333,7 +337,7 @@ alias ZoneInfoFile8 = ZoneInfoFile(8, 0xFF)
 
 
 @value
-struct ZoneInfoMem32:
+struct ZoneInfoMem32(CollectionElement):
     """`ZoneInfo` that lives in memory. For zones that have DST."""
 
     var _zones: Dict[StringLiteral, UInt32]
@@ -372,7 +376,7 @@ struct ZoneInfoMem32:
 
 
 @value
-struct ZoneInfoMem8:
+struct ZoneInfoMem8(CollectionElement):
     """`ZoneInfo` that lives in memory. For zones that have no DST."""
 
     var _zones: Dict[StringLiteral, UInt8]
@@ -419,32 +423,32 @@ struct ZoneInfoMem8:
 # ) raises:
 #     pass
 
+# TODO
+# @always_inline
+# fn _parse_iana_leapsecs(
+#     text: PythonObject,
+# ) raises -> List[(UInt8, UInt8, UInt16)]:
+#     var leaps = List[(UInt8, UInt8, UInt16)]()
+#     var index = 0
+#     while True:
+#         var found = text.find("      #", index)
+#         if found == -1:
+#             break
 
-@always_inline
-fn _parse_iana_leapsecs(
-    text: PythonObject,
-) raises -> List[(UInt8, UInt8, UInt16)]:
-    var leaps = List[(UInt8, UInt8, UInt16)]()
-    var index = 0
-    while True:
-        var found = text.find("      #", index)
-        if found == -1:
-            break
+#         var endday = text.find(" ", found + 2)
+#         var day: UInt8 = atol(text.__getitem__(found + 2, endday))
 
-        var endday = text.find(" ", found + 2)
-        var day: UInt8 = atol(text.__getitem__(found + 2, endday))
+#         var month: UInt8 = 0
+#         if text.__getitem__(endday, endday + 3) == "Jan":
+#             month = 1
+#         elif text.__getitem__(endday, endday + 3) == "Jul":
+#             month = 7
+#         if month == 0:
+#             raise Error("month not found")
 
-        var month: UInt8 = 0
-        if text.__getitem__(endday, endday + 3) == "Jan":
-            month = 1
-        elif text.__getitem__(endday, endday + 3) == "Jul":
-            month = 7
-        if month == 0:
-            raise Error("month not found")
-
-        var year: UInt16 = atol(text.__getitem__(endday + 3, endday + 7))
-        leaps.append((day, month, year))
-    return leaps
+#         var year: UInt16 = atol(text.__getitem__(endday + 3, endday + 7))
+#         leaps.append((day, month, year))
+#     return leaps
 
 
 @always_inline
@@ -583,9 +587,6 @@ fn get_zoneinfo() -> Optional[ZoneInfo]:
     return None
 
 
-from .calendar import PythonCalendar
-
-alias _cal = PythonCalendar
 # alias all_zones = get_zoneinfo()
 # """All timezones available at compile time."""
 
