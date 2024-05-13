@@ -19,12 +19,12 @@
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 """
 
-from .zoneinfo import all_zones, ZoneInfo, offset_at, offset_no_dst_tz
+from .zoneinfo import ZoneInfo, offset_at, offset_no_dst_tz, get_zoneinfo
 
 
 @register_passable("trivial")
 struct TimeZone[
-    iana: Optional[ZoneInfo] = all_zones,
+    iana: Optional[ZoneInfo] = get_zoneinfo(),
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ]:

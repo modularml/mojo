@@ -21,7 +21,7 @@ Notes:
 from time import time
 from utils import Variant
 
-from .timezone import TimeZone, ZoneInfo, all_zones
+from .timezone import TimeZone, ZoneInfo, get_zoneinfo
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
 import .dt_str
 
@@ -37,7 +37,7 @@ Gregorian calendar with year = 365 d * 24 h, 60 min, 60 s, 10^9 ns"""
 
 @register_passable("trivial")
 struct DateTime[
-    iana: Optional[ZoneInfo] = all_zones,
+    iana: Optional[ZoneInfo] = get_zoneinfo(),
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](Hashable, Stringable):
@@ -442,7 +442,10 @@ struct DateTime[
             - sign: {1, -1} if the overflow was added or subtracted.
         """
         var s = self
-        var o = other.replace(calendar=self.calendar)
+        var o = other
+        if s.tz != o.tz:
+            s = s.to_utc()
+            o = o.to_utc()
 
         var overflow: UInt16 = 0
         var sign: UInt8 = 1
@@ -457,12 +460,11 @@ struct DateTime[
                 year -= _max_delta
                 overflow += _max_delta
 
-        if s.tz != o.tz:
-            s = s.to_utc()
-            o = o.to_utc()
         var cal = Calendar.from_year(year)
-        var self_ns = s.replace(calendar=cal).n_seconds_since_epoch()
-        var other_ns = o.replace(calendar=cal).n_seconds_since_epoch()
+        s.calendar = cal
+        var self_ns = s.n_seconds_since_epoch()
+        o.calendar = cal
+        var other_ns = o.n_seconds_since_epoch()
         return self_ns, other_ns, overflow, sign
 
     fn add(
