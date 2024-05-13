@@ -133,10 +133,9 @@ struct Date[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from possibly overflowing values."""
-        alias date = Date[iana, pyzoneinfo, native]
-        var d = date._from_days(days, tz, calendar)
-        var mon = date._from_months(months, tz, calendar)
-        var y = date._from_years(years, tz, calendar)
+        var d = Self._from_days(days, tz, calendar)
+        var mon = Self._from_months(months, tz, calendar)
+        var y = Self._from_years(years, tz, calendar)
 
         y.year = 0 if years == 0 else y.year
 
@@ -654,13 +653,12 @@ struct Date[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from years."""
-        alias date = Date[iana, pyzoneinfo, native]
         var delta = calendar.max_year - years
         if delta > 0:
             if years > calendar.min_year:
-                return date(year=years, tz=tz, calendar=calendar)
-            return date._from_years(delta)
-        return date._from_years(calendar.max_year - delta)
+                return Self(year=years, tz=tz, calendar=calendar)
+            return Self._from_years(delta)
+        return Self._from_years(calendar.max_year - delta)
 
     @staticmethod
     fn _from_months(
@@ -671,12 +669,11 @@ struct Date[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from months."""
-        alias date = Date[iana, pyzoneinfo, native]
         if months <= int(calendar.max_month):
-            return date(month=UInt8(months), tz=tz, calendar=calendar)
+            return Self(month=UInt8(months), tz=tz, calendar=calendar)
         var y = months // int(calendar.max_month)
         var rest = months % int(calendar.max_month)
-        var dt = date._from_years(y, tz, calendar)
+        var dt = Self._from_years(y, tz, calendar)
         dt.month = rest
         return dt
 
@@ -691,14 +688,13 @@ struct Date[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from days."""
-        alias date = Date[iana, pyzoneinfo, native]
         var minyear = calendar.min_year
-        var dt = date(minyear, tz=tz, calendar=calendar)
+        var dt = Self(minyear, tz=tz, calendar=calendar)
         var maxtdays = int(calendar.max_typical_days_in_year)
         var maxposdays = int(calendar.max_possible_days_in_year)
         var years = days // maxtdays
         if years > int(minyear):
-            dt = date._from_years(years, tz, calendar)
+            dt = Self._from_years(years, tz, calendar)
         var maxydays = maxposdays if calendar.is_leapyear(dt.year) else maxtdays
         var day = days
         if add_leap:
@@ -709,7 +705,7 @@ struct Date[
         if day > maxydays:
             var y = day // maxydays
             day = day % maxydays
-            var dt2 = date._from_years(UInt16(y), tz, calendar)
+            var dt2 = Self._from_years(UInt16(y), tz, calendar)
             dt.year += dt2.year
         var maxmondays = int(calendar.max_days_in_month(dt.year, dt.month))
         while day > maxmondays:
@@ -730,12 +726,11 @@ struct Date[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from hours."""
-        alias date = Date[iana, pyzoneinfo, native]
         var h = int(calendar.max_hour)
         if hours <= h:
-            return date(calendar.min_year, tz=tz, calendar=calendar)
+            return Self(calendar.min_year, tz=tz, calendar=calendar)
         var d = hours // (h + 1)
-        return date._from_days[add_leap](d, tz, calendar)
+        return Self._from_days[add_leap](d, tz, calendar)
 
     @staticmethod
     fn _from_minutes[
@@ -748,12 +743,11 @@ struct Date[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from minutes."""
-        alias date = Date[iana, pyzoneinfo, native]
         var m = int(calendar.max_minute)
         if minutes < m:
-            return date(calendar.min_year, tz=tz, calendar=calendar)
+            return Self(calendar.min_year, tz=tz, calendar=calendar)
         var h = minutes // (m + 1)
-        return date._from_hours[add_leap](h, tz, calendar)
+        return Self._from_hours[add_leap](h, tz, calendar)
 
     @staticmethod
     fn from_seconds[
@@ -779,9 +773,8 @@ struct Date[
         Returns:
             Self.
         """
-        alias date = Date[iana, pyzoneinfo, native]
         var minutes = seconds // (int(calendar.max_typical_second) + 1)
-        var dt = date._from_minutes(minutes, tz, calendar)
+        var dt = Self._from_minutes(minutes, tz, calendar)
         if not add_leap:
             return dt
         var max_second = calendar.max_second(
@@ -794,7 +787,7 @@ struct Date[
             )
             numerator += int(leapsecs)
         var m = numerator // (int(max_second) + 1)
-        return date._from_minutes(m, tz, calendar)
+        return Self._from_minutes(m, tz, calendar)
 
     @staticmethod
     fn from_unix_epoch[

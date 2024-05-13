@@ -100,7 +100,7 @@ fn test_add32() raises:
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
     var add_seconds = DateTime32(2024, 2, 29).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result.minute == add_seconds.minute)
 
     # test february not leapyear
     result = DateTime32(2023, 2, 28) + DateTime32(0, 0, 1)
@@ -110,7 +110,7 @@ fn test_add32() raises:
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
     add_seconds = DateTime32(2023, 2, 28).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result.minute == add_seconds.minute)
 
     # test normal month
     result = DateTime32(2024, 5, 31) + DateTime32(0, 0, 1)
@@ -120,7 +120,7 @@ fn test_add32() raises:
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
     add_seconds = DateTime32(2024, 5, 31).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result.minute == add_seconds.minute)
 
     # test december
     result = DateTime32(2024, 12, 31) + DateTime32(0, 0, 1)
@@ -130,7 +130,7 @@ fn test_add32() raises:
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
     add_seconds = DateTime32(2024, 12, 31).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result.minute == add_seconds.minute)
 
     # test year and month add
     result = DateTime32(2022, 6, 1) + DateTime32(3, 6, 31)
@@ -148,7 +148,7 @@ fn test_add32() raises:
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
     add_seconds = DateTime32(9999, 12, 31).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result.minute == add_seconds.minute)
 
     # test positive overflow unixcal
     result = DateTime32(9999, 12, 31) + DateTime32(0, 0, 1)
@@ -158,7 +158,7 @@ fn test_add32() raises:
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
     add_seconds = DateTime32(9999, 12, 31).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result.minute == add_seconds.minute)
 
 
 fn test_subtract64() raises:
