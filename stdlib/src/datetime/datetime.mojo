@@ -633,7 +633,6 @@ struct DateTime[
             )
         return dt
 
-    @always_inline("nodebug")
     fn add(owned self, other: Self) -> Self:
         """Adds another `DateTime`.
 
@@ -647,7 +646,6 @@ struct DateTime[
         var result = int(delta[0] + delta[1])
         return self.add(years=int(delta[2]), seconds=result)
 
-    @always_inline("nodebug")
     fn subtract(owned self, other: Self) -> Self:
         """Subtracts another `DateTime`.
 

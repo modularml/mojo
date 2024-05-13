@@ -416,7 +416,6 @@ struct Date[
             )
         return dt
 
-    @always_inline("nodebug")
     fn add(owned self, other: Self) -> Self:
         """Adds another `Date`.
 
@@ -430,7 +429,6 @@ struct Date[
         var result = int(delta[0] + delta[1])
         return self.add(seconds=result)
 
-    @always_inline("nodebug")
     fn subtract(owned self, other: Self) -> Self:
         """Subtracts another `Date`.
 
@@ -441,7 +439,7 @@ struct Date[
             A `Date` with the `TimeZone` and `Calendar` of `self`.
         """
         var delta = self.delta_s(other)
-        var result = int(delta[0] - delta[1])
+        var result = int(delta[0] + delta[1])
         return self.subtract(seconds=result)
 
     @always_inline("nodebug")
