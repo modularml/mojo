@@ -426,7 +426,7 @@ struct DateTime[
             self.year, self.month, self.day, self.hour, self.minute, self.second
         )
 
-    fn delta_ns(self, other: Self) -> (UInt64, UInt64, UInt16, UInt8):
+    fn delta_ns(self, other: Self) -> Tuple[UInt64, UInt64, UInt16, UInt8]:
         """Calculates the nanoseconds for `self` and other, creating
         a reference calendar to keep nanosecond resolution.
 
@@ -465,7 +465,7 @@ struct DateTime[
         var self_ns = s.n_seconds_since_epoch()
         o.calendar = cal
         var other_ns = o.n_seconds_since_epoch()
-        return self_ns, other_ns, overflow, sign
+        return Tuple(self_ns, other_ns, overflow, sign)
 
     fn add(
         owned self,

@@ -22,13 +22,17 @@ from datetime.calendar import Calendar, PythonCalendar, UTCCalendar
 from datetime.timezone import TimeZone
 from datetime.dt_str import IsoFormat
 
-alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
-alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
+fn test_add() raises:
+    # when using python and unix calendar there should be no difference in results
+    var pycal = PythonCalendar
+    var unixcal = UTCCalendar
+    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    var tz_0_ = TZ("", 0, 0)
+    var tz_1 = TZ("", 1, 0)
+    var tz1_ = TZ("", 1, 0, 1)
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
-fn test_add(
-    pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ
-) raises:
     # test february leapyear
     var result = DateTime(2024, 3, 1, tz=tz_0_, calendar=pycal) + DateTime(
         0, 0, 1, tz=tz_0_, calendar=unixcal
@@ -118,9 +122,16 @@ fn test_add(
     assert_true(result == offset_n_1 and result == add_seconds)
 
 
-fn test_subtract(
-    pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ
-) raises:
+fn test_subtract() raises:
+    # when using python and unix calendar there should be no difference in results
+    var pycal = PythonCalendar
+    var unixcal = UTCCalendar
+    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    var tz_0_ = TZ("", 0, 0)
+    var tz_1 = TZ("", 1, 0)
+    var tz1_ = TZ("", 1, 0, 1)
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+
     # test february leapyear
     var result = DateTime(2024, 3, 1, tz=tz_0_, calendar=pycal) - DateTime(
         0, 0, 1, tz=tz_0_, calendar=unixcal
@@ -210,9 +221,16 @@ fn test_subtract(
     assert_true(result == offset_n_1 and result == sub_seconds)
 
 
-fn test_logic(
-    pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ
-) raises:
+fn test_logic() raises:
+    # when using python and unix calendar there should be no difference in results
+    var pycal = PythonCalendar
+    var unixcal = UTCCalendar
+    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    var tz_0_ = TZ("", 0, 0)
+    var tz_1 = TZ("", 1, 0)
+    var tz1_ = TZ("", 1, 0, 1)
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
     assert_true(ref == DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal))
     assert_true(ref == DateTime(1970, 1, 1, tz=tz_1, calendar=unixcal))
@@ -224,9 +242,16 @@ fn test_logic(
     assert_true(ref >= DateTime(1969, 12, 31, tz=tz_0_, calendar=pycal))
 
 
-fn test_bitwise(
-    pycal: Calendar, unixcal: Calendar, tz1_: TZ, tz_0_: TZ, tz_1: TZ
-) raises:
+fn test_bitwise() raises:
+    # when using python and unix calendar there should be no difference in results
+    var pycal = PythonCalendar
+    var unixcal = UTCCalendar
+    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    var tz_0_ = TZ("", 0, 0)
+    var tz_1 = TZ("", 1, 0)
+    var tz1_ = TZ("", 1, 0, 1)
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
     assert_true(ref & DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal) == 0)
     assert_true(ref & DateTime(1970, 1, 1, tz=tz_1, calendar=unixcal) == 0)
@@ -241,7 +266,12 @@ fn test_bitwise(
     assert_true(~(ref ^ ~ref) == 0)
 
 
-fn test_iso(pycal: Calendar, tz_0_: TZ) raises:
+fn test_iso() raises:
+    var pycal = PythonCalendar
+    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    var tz_0_ = TZ("", 0, 0)
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
     var iso_str = "1970-01-01T00:00:00+00:00"
     alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
@@ -275,6 +305,8 @@ fn test_iso(pycal: Calendar, tz_0_: TZ) raises:
 
 
 fn test_time() raises:
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+
     var start = DateTime.now()
     time.sleep(1e-9)  # nanosecond resolution
     var end = DateTime.now()
@@ -282,6 +314,8 @@ fn test_time() raises:
 
 
 fn test_hash() raises:
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+
     var ref = DateTime(1970, 1, 1)
     var data = hash(ref)
     var parsed = DateTime.from_hash(data)
@@ -289,17 +323,10 @@ fn test_hash() raises:
 
 
 fn main() raises:
-    var tz_0_ = TZ("", 0, 0)
-    var tz_1 = TZ("", 1, 0)
-    var tz1_ = TZ("", 1, 0, 1)
-    # when using python and unix calendar there
-    # should be no difference in results
-    var pycal = PythonCalendar
-    var unixcal = UTCCalendar
-    test_add(pycal, unixcal, tz1_, tz_0_, tz_1)
-    test_subtract(pycal, unixcal, tz1_, tz_0_, tz_1)
-    test_logic(pycal, unixcal, tz1_, tz_0_, tz_1)
-    test_bitwise(pycal, unixcal, tz1_, tz_0_, tz_1)
-    test_iso(pycal, tz_0_)
+    test_add()
+    test_subtract()
+    test_logic()
+    test_bitwise()
+    test_iso()
     test_time()
     test_hash()

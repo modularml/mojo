@@ -438,28 +438,26 @@ fn get_leapsecs() -> Optional[List[(UInt8, UInt8, UInt16)]]:
     Returns:
         A list of tuples (day, month, year) of leapseconds.
     """
-    try:
-        # TODO: maybe some policy that only if x amount
-        # of years have passed since latest hardcoded value
-        # from python import Python
+    # try:
+    #     # TODO: maybe some policy that only if x amount
+    #     of years have passed since latest hardcoded value
+    #     from python import Python
 
-        # var requests = Python.import_module("requests")
-        # var secs = requests.get(
-        #     "https://raw.githubusercontent.com/eggert/tz/main/leap-seconds.list"
-        # )
-        # var leapsecs = _parse_iana_leapsecs(secs.text)
-        # return leapsecs
-        raise Error()
-    except:
-        pass
-        # TODO: fallback to hardcoded
-        # from ._lists import leapsecs
+    #     var requests = Python.import_module("requests")
+    #     var secs = requests.get(
+    #         "https://raw.githubusercontent.com/eggert/tz/main/leap-seconds.list"
+    #     )
+    #     var leapsecs = _parse_iana_leapsecs(secs.text)
+    #     return leapsecs
+    # except:
+    #     # TODO: fallback to hardcoded
+    #     from ._lists import leapsecs
 
-        # return List[(UInt8, UInt8, UInt16)](
-        #     unsafe_pointer=leapsecs.data.address,
-        #     capacity=leapsecs.capacity,
-        #     size=leapsecs.size,
-        # )
+    #     return List[(UInt8, UInt8, UInt16)](
+    #         unsafe_pointer=leapsecs.data.address,
+    #         capacity=leapsecs.capacity,
+    #         size=leapsecs.size,
+    #     )
     return List[(UInt8, UInt8, UInt16)]()
 
 
@@ -496,77 +494,74 @@ fn get_zoneinfo() -> Optional[ZoneInfo]:
         Meanwhile 2 public APIs can be used https://worldtimeapi.org/api
         and https://timeapi.io/swagger/index.html .
     """
-    try:
-        # TODO: this should get zoneinfo from the OS it's compiled in
-        # for Linux the files are under /usr/share/zoneinfo
-        # no idea where they're for Windows or MacOS
-        raise Error()
-    except:
-        pass
-    try:
-        # TODO
-        raise Error()
-        # var dst_zones = ZoneInfoMem32()
-        # var no_dst_zones = ZoneInfoMem8()
-        # from python import Python
+    # try:
+    #     # TODO: this should get zoneinfo from the OS it's compiled in
+    #     for Linux the files are under /usr/share/zoneinfo
+    #     no idea where they're for Windows or MacOS
+    # except:
+    #     pass
+    # try:
+    #     var dst_zones = ZoneInfoMem32()
+    #     var no_dst_zones = ZoneInfoMem8()
+    #     from python import Python
 
-        # var json = Python.import_module("json")
-        # var requests = Python.import_module("requests")
-        # var datetime = Python.import_module("datetime")
-        # var text = requests.get("https://worldtimeapi.org/api/timezone").text
-        # var tz_list = json.loads(text)
+    #     var json = Python.import_module("json")
+    #     var requests = Python.import_module("requests")
+    #     var datetime = Python.import_module("datetime")
+    #     var text = requests.get("https://worldtimeapi.org/api/timezone").text
+    #     var tz_list = json.loads(text)
 
-        # for item in tz_list:
-        #     var tz = requests.get(
-        #         "https://timeapi.io/TimeZone/" + String(item[])
-        #     ).text
-        #     var data = json.loads(tz)
-        #     var utc_offset = data["standardUtcOffset"]["seconds"] // 60
-        #     var h = int(utc_offset // 60)
-        #     var m = int(utc_offset % 60)
-        #     var sign = 1 if utc_offset >= 0 else -1
+    #     for item in tz_list:
+    #         var tz = requests.get(
+    #             "https://timeapi.io/TimeZone/" + String(item[])
+    #         ).text
+    #         var data = json.loads(tz)
+    #         var utc_offset = data["standardUtcOffset"]["seconds"] // 60
+    #         var h = int(utc_offset // 60)
+    #         var m = int(utc_offset % 60)
+    #         var sign = 1 if utc_offset >= 0 else -1
 
-        #     var dst_start: PythonObject = ""
-        #     var dst_end: PythonObject = ""
-        #     if not data["hasDayLightSaving"]:
-        #         _ = h, m, sign
-        #         # TODO: somehow force cast python object to StringLiteral
-        #         # no_dst_zones.add(
-        #         #     str(item[]), Offset(abs(h), abs(m), sign)
-        #         # )
-        #         continue
-        #     # -1 is to avoid Z timezone designation that
-        #     # python's datetime doesn't like
-        #     dst_start = data["dstInterval"]["dstStart"].__getitem__(0, -1)
-        #     dst_end = data["dstInterval"]["dstEnd"].__getitem__(0, -1)
+    #         var dst_start: PythonObject = ""
+    #         var dst_end: PythonObject = ""
+    #         if not data["hasDayLightSaving"]:
+    #             _ = h, m, sign
+    #             # TODO: somehow force cast python object to StringLiteral
+    #             no_dst_zones.add(
+    #                 str(item[]), Offset(abs(h), abs(m), sign)
+    #             )
+    #             continue
+    #         # -1 is to avoid Z timezone designation that
+    #         # python's datetime doesn't like
+    #         dst_start = data["dstInterval"]["dstStart"].__getitem__(0, -1)
+    #         dst_end = data["dstInterval"]["dstEnd"].__getitem__(0, -1)
 
-        #     var dt_start = datetime.datetime(dst_start)
-        #     var month_start = UInt16(dst_start.month)
-        #     var dow_start = UInt16(dt_start.weekday())
-        #     var eom_start = UInt16(0 if dt_start <= 15 else 1)
-        #     var week_start = 0  # TODO
-        #     var h_start = UInt16(dt_start.hour)
-        #     var dt_end = datetime.datetime(dst_end)
-        #     var month_end = UInt16(dst_end.month)
-        #     var week_end = 0  # TODO
-        #     var h_end = UInt16(dt_end.hour)
-        #     var dow_end = UInt16(dt_end.weekday())
-        #     var eom_end = UInt16(0 if dt_end <= 15 else 1)
+    #         var dt_start = datetime.datetime(dst_start)
+    #         var month_start = UInt16(dst_start.month)
+    #         var dow_start = UInt16(dt_start.weekday())
+    #         var eom_start = UInt16(0 if dt_start <= 15 else 1)
+    #         var week_start = 0  # TODO
+    #         var h_start = UInt16(dt_start.hour)
+    #         var dt_end = datetime.datetime(dst_end)
+    #         var month_end = UInt16(dst_end.month)
+    #         var week_end = 0  # TODO
+    #         var h_end = UInt16(dt_end.hour)
+    #         var dow_end = UInt16(dt_end.weekday())
+    #         var eom_end = UInt16(0 if dt_end <= 15 else 1)
 
-        #     # TODO: somehow force cast python object to StringLiteral
-        #     dst_zones.add(
-        #         item[],
-        #         ZoneDST(
-        #             TzDT(
-        #                 month_start, dow_start, eom_start, week_start, h_start
-        #             ),
-        #             TzDT(month_end, dow_end, eom_end, week_end, h_end),
-        #             Offset(abs(h), abs(m), sign),
-        #         ),
-        #     )
-        # return dst_zones, no_dst_zones
-    except:
-        pass
+    #         # TODO: somehow force cast python object to StringLiteral
+    #         dst_zones.add(
+    #             item[],
+    #             ZoneDST(
+    #                 TzDT(
+    #                     month_start, dow_start, eom_start, week_start, h_start
+    #                 ),
+    #                 TzDT(month_end, dow_end, eom_end, week_end, h_end),
+    #                 Offset(abs(h), abs(m), sign),
+    #             ),
+    #         )
+    #     return dst_zones, no_dst_zones
+    # except:
+    #     pass
     # TODO: fallback to hardcoded
     # from ._lists import tz_list
     return None
