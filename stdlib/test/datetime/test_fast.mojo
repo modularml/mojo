@@ -358,7 +358,7 @@ fn test_bitwise64() raises:
     assert_true((ref ^ DateTime64(1970, 1, 2)) != 0)
     assert_true((ref | (DateTime64(1970, 1, 2) & 0)) == hash(ref))
     assert_true((ref & ~ref) == 0)
-    assert_true((ref ^ ~ref) == UInt64.MAX_FINITE)
+    assert_true(~(ref ^ ~ref) == 0)
 
 
 fn test_bitwise32() raises:
@@ -370,7 +370,7 @@ fn test_bitwise32() raises:
     assert_true((ref ^ DateTime32(1970, 1, 2)) != 0)
     assert_true((ref | (DateTime32(1970, 1, 2) & 0)) == hash(ref))
     assert_true((ref & ~ref) == 0)
-    assert_true((ref ^ ~ref) == UInt32.MAX_FINITE)
+    assert_true(~(ref ^ ~ref) == 0)
 
 
 fn test_bitwise16() raises:
@@ -382,7 +382,7 @@ fn test_bitwise16() raises:
     assert_true((ref ^ DateTime16(1970, 1, 2)) != 0)
     assert_true((ref | (DateTime16(1970, 1, 2) & 0)) == hash(ref))
     assert_true((ref & ~ref) == 0)
-    assert_true((ref ^ ~ref) == UInt16.MAX_FINITE)
+    assert_true(~(ref ^ ~ref) == 0)
 
 
 fn test_bitwise8() raises:
@@ -394,7 +394,7 @@ fn test_bitwise8() raises:
     assert_true((ref ^ DateTime8(1970, 1, 2)) != 0)
     assert_true((ref | (DateTime8(1970, 1, 2) & 0)) == hash(ref))
     assert_true((ref & ~ref) == 0)
-    assert_true((ref ^ ~ref) == UInt32.MAX_FINITE)
+    assert_true(~(ref ^ ~ref) == 0)
 
 
 fn test_iso64() raises:

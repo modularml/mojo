@@ -900,16 +900,13 @@ struct DateTime[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `DateTime` from years."""
+        alias date = DateTime[iana, pyzoneinfo, native]
         var delta = calendar.max_year - years
         if delta > 0:
             if years > calendar.min_year:
-                return DateTime[iana, pyzoneinfo, native](
-                    year=years, tz=tz, calendar=calendar
-                )
-            return DateTime[iana, pyzoneinfo, native]._from_years(delta)
-        return DateTime[iana, pyzoneinfo, native]._from_years(
-            calendar.min_year - delta
-        )
+                return date(year=years, tz=tz, calendar=calendar)
+            return date._from_years(delta)
+        return date._from_years(calendar.max_year - delta)
 
     @staticmethod
     @always_inline("nodebug")
@@ -921,24 +918,13 @@ struct DateTime[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `DateTime` from months."""
+        alias date = DateTime[iana, pyzoneinfo, native]
         if months <= int(calendar.max_month):
-            return DateTime[iana, pyzoneinfo, native](
-                month=UInt8(months), tz=tz, calendar=calendar
-            )
-        var mon = calendar.max_month
-        var dt_y = DateTime[iana, pyzoneinfo, native]._from_years(
-            months // int(calendar.max_month), tz, calendar
-        )
-        var rest = months - dt_y.year * calendar.max_month.cast[DType.uint16]()
-        var dt = DateTime[iana, pyzoneinfo, native](
-            year=dt_y.year,
-            month=mon,
-            tz=tz,
-            calendar=calendar,
-        )
-        dt += DateTime[iana, pyzoneinfo, native](
-            month=UInt8(rest), tz=tz, calendar=calendar
-        )
+            return date(month=UInt8(months), tz=tz, calendar=calendar)
+        var y = months // int(calendar.max_month)
+        var rest = months % int(calendar.max_month)
+        var dt = date._from_years(y, tz, calendar)
+        dt.month = rest
         return dt
 
     @staticmethod
@@ -952,36 +938,33 @@ struct DateTime[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `DateTime` from days."""
+        alias date = DateTime[iana, pyzoneinfo, native]
+        var minyear = calendar.min_year
+        var dt = date(minyear, tz=tz, calendar=calendar)
         var maxtdays = int(calendar.max_typical_days_in_year)
         var maxposdays = int(calendar.max_possible_days_in_year)
         var years = days // maxtdays
-        var dt = DateTime[iana, pyzoneinfo, native]._from_years(
-            years, tz, calendar
-        )
-        var maxdays = maxtdays if calendar.is_leapyear(dt.year) else maxposdays
-        if days <= maxdays:
-            var mindays = calendar.max_days_in_month(
-                calendar.min_year, calendar.min_month
-            )
-            if days <= int(mindays):
-                return DateTime[iana, pyzoneinfo, native](
-                    day=days, tz=tz, calendar=calendar
-                )
-            return DateTime[iana, pyzoneinfo, native](
-                calendar.min_year, tz=tz, calendar=calendar
-            ).add(days=days)
-        var numerator = (days - maxdays)
+        if years > int(minyear):
+            dt = date._from_years(years, tz, calendar)
+        var maxydays = maxposdays if calendar.is_leapyear(dt.year) else maxtdays
+        var day = days
         if add_leap:
             var leapdays = calendar.leapdays_since_epoch(
                 dt.year, dt.month, dt.day
             )
-            numerator += int(leapdays)
-        var y = numerator // maxdays
-        var rest = numerator % maxdays
-        dt = DateTime[iana, pyzoneinfo, native]._from_years(
-            UInt16(y), tz, calendar
-        )
-        return dt.replace(day=UInt8(rest))
+            day += int(leapdays)
+        if day > maxydays:
+            var y = day // maxydays
+            day = day % maxydays
+            var dt2 = date._from_years(UInt16(y), tz, calendar)
+            dt.year += dt2.year
+        var maxmondays = int(calendar.max_days_in_month(dt.year, dt.month))
+        while day > maxmondays:
+            day -= maxmondays
+            dt.month += 1
+            maxmondays = int(calendar.max_days_in_month(dt.year, dt.month))
+        dt.day = day
+        return dt
 
     @staticmethod
     fn _from_hours[
@@ -994,17 +977,15 @@ struct DateTime[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `DateTime` from hours."""
+        alias date = DateTime[iana, pyzoneinfo, native]
         var h = int(calendar.max_hour)
         if hours <= h:
-            return DateTime[iana, pyzoneinfo, native](
-                hour=UInt8(hours), tz=tz, calendar=calendar
-            )
-        var d = (hours - h) // (h + 1)
-        var rest = (hours - h) % (h + 1)
-        var dt = DateTime[iana, pyzoneinfo, native]._from_days[add_leap](
-            d, tz, calendar
-        )
-        return dt.replace(hour=UInt8(rest))
+            return date(hour=UInt8(hours), tz=tz, calendar=calendar)
+        var d = hours // (h + 1)
+        var rest = hours % (h + 1)
+        var dt = date._from_days[add_leap](d, tz, calendar)
+        dt.hour = rest
+        return dt
 
     @staticmethod
     fn _from_minutes[
@@ -1017,17 +998,15 @@ struct DateTime[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `DateTime` from minutes."""
+        alias date = DateTime[iana, pyzoneinfo, native]
         var m = int(calendar.max_minute)
         if minutes < m:
-            return DateTime[iana, pyzoneinfo, native](
-                minute=minutes, tz=tz, calendar=calendar
-            )
-        var h = (minutes - m) // (m + 1)
-        var rest = (minutes - m) % (m + 1)
-        var dt = DateTime[iana, pyzoneinfo, native]._from_hours[add_leap](
-            h, tz, calendar
-        )
-        return dt.replace(minute=UInt8(rest))
+            return date(minute=minutes, tz=tz, calendar=calendar)
+        var h = minutes // (m + 1)
+        var rest = minutes % (m + 1)
+        var dt = date._from_hours[add_leap](h, tz, calendar)
+        dt.minute = rest
+        return dt
 
     @staticmethod
     fn from_seconds[
@@ -1053,27 +1032,32 @@ struct DateTime[
         Returns:
             Self.
         """
-        var minutes = seconds // int(calendar.max_typical_second + 1)
-        var dt = DateTime[iana, pyzoneinfo, native]._from_minutes(
-            minutes, tz, calendar
-        )
-        var max_second = calendar.max_second(
-            dt.year, dt.month, dt.day, dt.hour, dt.minute
-        )
-        if dt.second <= max_second:
-            return dt.replace(second=UInt8(seconds))
-        var numerator = (seconds - max_second)
+        alias date = DateTime[iana, pyzoneinfo, native]
+        var s = int(calendar.max_typical_second)
+        var minutes = seconds // (s + 1)
+        var dt = date._from_minutes(minutes, tz, calendar)
+        var numerator = seconds
         if add_leap:
             var leapsecs = calendar.leapsecs_since_epoch(
                 dt.year, dt.month, dt.day
             )
             numerator += int(leapsecs)
-        var m = numerator // (max_second + 1)
-        var rest = numerator % (max_second + 1)
-        dt = DateTime[iana, pyzoneinfo, native]._from_minutes(
-            int(m), tz, calendar
+        var m = numerator // (s + 1)
+        var rest = numerator % (s + 1)
+        dt = date._from_minutes(m, tz, calendar)
+        var max_second = int(
+            calendar.max_second(dt.year, dt.month, dt.day, dt.hour, dt.minute)
         )
-        return dt.replace(second=rest)
+        while rest > max_second:
+            rest -= max_second
+            dt.minute += 1
+            max_second = int(
+                calendar.max_second(
+                    dt.year, dt.month, dt.day, dt.hour, dt.minute
+                )
+            )
+        dt.second = rest
+        return dt
 
     @staticmethod
     fn _from_m_seconds(
@@ -1089,12 +1073,13 @@ struct DateTime[
             return DateTime[iana, pyzoneinfo, native](
                 m_second=UInt16(m_seconds), tz=tz, calendar=calendar
             )
-        var s = (m_seconds - ms) // (ms + 1)
-        var rest = (m_seconds - ms) % (ms + 1)
+        var s = m_seconds // (ms + 1)
+        var rest = m_seconds % (ms + 1)
         var dt = DateTime[iana, pyzoneinfo, native].from_seconds(
             s, tz, calendar
         )
-        return dt.replace(m_second=UInt16(rest))
+        dt.m_second = rest
+        return dt
 
     @staticmethod
     fn _from_u_seconds(
@@ -1110,12 +1095,13 @@ struct DateTime[
             return DateTime[iana, pyzoneinfo, native](
                 u_second=UInt16(u_seconds), tz=tz, calendar=calendar
             )
-        var ms = (u_seconds - us) // (us + 1)
-        var rest = (u_seconds - us) % (us + 1)
+        var ms = u_seconds // (us + 1)
+        var rest = u_seconds % (us + 1)
         var dt = DateTime[iana, pyzoneinfo, native]._from_m_seconds(
             ms, tz, calendar
         )
-        return dt.replace(u_second=UInt16(rest))
+        dt.u_second = rest
+        return dt
 
     @staticmethod
     @always_inline("nodebug")
@@ -1132,12 +1118,13 @@ struct DateTime[
             return DateTime[iana, pyzoneinfo, native](
                 n_second=UInt16(n_seconds), tz=tz, calendar=calendar
             )
-        var us = (n_seconds - ns) // (ns + 1)
-        var rest = (n_seconds - ns) % (ns + 1)
+        var us = n_seconds // (ns + 1)
+        var rest = n_seconds % (ns + 1)
         var dt = DateTime[iana, pyzoneinfo, native]._from_u_seconds(
             us, tz, calendar
         )
-        return dt.replace(n_second=UInt16(rest))
+        dt.n_second = rest
+        return dt
 
     @staticmethod
     @always_inline("nodebug")

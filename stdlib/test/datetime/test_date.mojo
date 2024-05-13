@@ -183,7 +183,7 @@ fn test_bitwise(
     assert_true((ref ^ Date(1970, 1, 2, tz_0_, pycal)) != 0)
     assert_true((ref | (Date(1970, 1, 2, tz_0_, pycal) & 0)) == hash(ref))
     assert_true((ref & ~ref) == 0)
-    assert_true((ref ^ ~ref) == UInt32.MAX_FINITE)
+    assert_true(~(ref ^ ~ref) == 0)
 
 
 fn test_iso(pycal: Calendar, tz_0_: TZ) raises:

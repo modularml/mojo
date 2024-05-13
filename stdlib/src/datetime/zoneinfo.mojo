@@ -278,13 +278,13 @@ struct ZoneInfoFile:
         _ = key
         var b_width64 = self._BIT_WIDTH.cast[DType.uint64]()
         var b_width32 = self._BIT_WIDTH.cast[DType.uint32]()
-        with open(self._file, "rb") as f:
-            _ = f.seek(b_width64 * (self._index).cast[DType.uint64]())
-            f.write(buf << (32 - b_width32))
-        if self._index > UInt8.MAX_FINITE:
+        if self._index > 0xFF:
             self._index = 0
         else:
             self._index += 1
+        with open(self._file, "rb") as f:
+            _ = f.seek(b_width64 * (self._index).cast[DType.uint64]())
+            f.write(buf << (32 - b_width32))
         return self._index
 
     fn get(self, index: UInt8) raises -> Optional[ZoneDST]:

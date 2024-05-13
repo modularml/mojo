@@ -238,7 +238,7 @@ fn test_bitwise(
         == hash(ref)
     )
     assert_true((ref & ~ref) == 0)
-    assert_true((ref ^ ~ref) == UInt64.MAX_FINITE)
+    assert_true(~(ref ^ ~ref) == 0)
 
 
 fn test_iso(pycal: Calendar, tz_0_: TZ) raises:
