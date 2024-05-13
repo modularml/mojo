@@ -105,6 +105,7 @@ struct TimeZone[
                 iana.value()[][0].get(tz_str) or iana.value()[][1].get(tz_str),
                 msg="that timezone is not in the given IANA ZoneInfo",
             )
+
         self.tz_str = tz_str
         self.offset_h = offset_h
         self.offset_m = offset_m
