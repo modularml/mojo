@@ -20,7 +20,7 @@
 """
 from time import time
 
-from .timezone import TimeZone, ZoneInfo, get_zoneinfo
+from .timezone import TimeZone, ZoneInfo, all_zones
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
 import .dt_str
 
@@ -31,7 +31,7 @@ alias _cal_hash = CalendarHashes(32)
 
 @register_passable("trivial")
 struct Date[
-    iana: Optional[ZoneInfo] = get_zoneinfo(),
+    iana: Optional[ZoneInfo] = all_zones,
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](Hashable, Stringable):

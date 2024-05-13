@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """`DateTime` and `Date` String parsing module."""
 
-from .timezone import TimeZone, ZoneInfo, get_zoneinfo
+from .timezone import TimeZone, ZoneInfo, all_zones
 
 
 struct IsoFormat:
@@ -120,7 +120,7 @@ fn to_iso[
 
 fn from_iso[
     iso: IsoFormat = IsoFormat(),
-    iana: Optional[ZoneInfo] = get_zoneinfo(),
+    iana: Optional[ZoneInfo] = all_zones,
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](s: String) raises -> (

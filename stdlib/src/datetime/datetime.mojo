@@ -21,7 +21,7 @@ Notes:
 from time import time
 from utils import Variant
 
-from .timezone import TimeZone, ZoneInfo, get_zoneinfo
+from .timezone import TimeZone, ZoneInfo, all_zones
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
 import .dt_str
 
@@ -37,7 +37,7 @@ Gregorian calendar with year = 365 d * 24 h, 60 min, 60 s, 10^9 ns"""
 
 @register_passable("trivial")
 struct DateTime[
-    iana: Optional[ZoneInfo] = get_zoneinfo(),
+    iana: Optional[ZoneInfo] = all_zones,
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](Hashable, Stringable):
