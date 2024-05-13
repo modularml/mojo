@@ -29,6 +29,10 @@ alias _calendar = PythonCalendar
 alias _cal_hash = CalendarHashes(32)
 
 
+trait _IntCollect(Intable, CollectionElement):
+    ...
+
+
 @value
 @register_passable("trivial")
 struct Date[
@@ -87,17 +91,23 @@ struct Date[
     var calendar: Calendar
     """Calendar."""
 
-    fn __init__(
+    fn __init__[
+        T: _IntCollect = Int, A: _IntCollect = Int
+    ](
         inout self,
-        year: Optional[Int] = None,
-        month: Optional[Int] = None,
-        day: Optional[Int] = None,
+        year: Optional[T] = None,
+        month: Optional[A] = None,
+        day: Optional[A] = None,
         tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
             iana, pyzoneinfo, native
         ](),
         calendar: Calendar = _calendar,
     ):
         """Construct a `Date` from valid values.
+
+        Parameters:
+            T: Any Intable Collectable type.
+            A: Any Intable Collectable type.
 
         Args:
             year: Year.
@@ -106,63 +116,9 @@ struct Date[
             tz: Tz.
             calendar: Calendar.
         """
-        self.year = year.or_else(int(calendar.min_year))
-        self.month = month.or_else(int(calendar.min_month))
-        self.day = day.or_else(int(calendar.min_day))
-        self.tz = tz
-        self.calendar = calendar
-
-    fn __init__(
-        inout self,
-        year: Optional[IntLiteral] = None,
-        month: Optional[IntLiteral] = None,
-        day: Optional[IntLiteral] = None,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
-        calendar: Calendar = _calendar,
-    ):
-        """Construct a `Date` from valid values.
-
-        Args:
-            year: Year.
-            month: Month.
-            day: Day.
-            tz: Tz.
-            calendar: Calendar.
-        """
-        self.year = UInt16(year) if year else calendar.min_year
-        self.month = UInt8(month) if month else calendar.min_month
-        self.day = UInt8(day) if day else calendar.min_day
-        self.tz = tz
-        self.calendar = calendar
-
-    fn __init__(
-        inout self,
-        year: Optional[UInt16] = None,
-        month: Optional[UInt8] = None,
-        day: Optional[UInt8] = None,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
-        calendar: Calendar = _calendar,
-    ):
-        """Construct a `Date` from valid values.
-
-        Args:
-            year: Year.
-            month: Month.
-            day: Day.
-            tz: Tz.
-            calendar: Calendar.
-
-        Notes:
-            Optional extra: [`TimeZone` and DST data sources](
-            http://www.iana.org/time-zones/repository/tz-link.html).
-        """
-        self.year = year.or_else(calendar.min_year)
-        self.month = month.or_else(calendar.min_month)
-        self.day = day.or_else(calendar.min_day)
+        self.year = int(year.value()[]) if year else int(calendar.min_year)
+        self.month = int(month.value()[]) if month else int(calendar.min_month)
+        self.day = int(day.value()[]) if day else int(calendar.min_day)
         self.tz = tz
         self.calendar = calendar
 
