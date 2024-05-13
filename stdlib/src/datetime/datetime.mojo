@@ -108,7 +108,7 @@ struct DateTime[
     """Calendar."""
 
     fn __init__[
-        T: _IntCollect = Int, A: _IntCollect = Int
+        T: _IntCollect = UInt16, A: _IntCollect = UInt8
     ](
         inout self,
         year: Optional[T] = None,

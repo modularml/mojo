@@ -93,6 +93,11 @@ struct DateTime64(Hashable, Stringable):
         """Construct a `DateTime64` from valid values.
         UTCCalendar is the default.
 
+        Parameters:
+            T: Any Intable Collectable type.
+            A: Any Intable Collectable type.
+            B: Any Intable Collectable type.
+
         Args:
             year: Year.
             month: Month.
@@ -656,6 +661,11 @@ struct DateTime32(Hashable, Stringable):
         """Construct a `DateTime32 ` from valid values.
         UTCCalendar is the default.
 
+        Parameters:
+            T: Any Intable Collectable type.
+            A: Any Intable Collectable type.
+            B: Any Intable Collectable type.
+
         Args:
             year: Year.
             month: Month.
@@ -1168,6 +1178,10 @@ struct DateTime16(Hashable, Stringable):
         """Construct a `DateTime16` from valid values.
         UTCCalendar is the default.
 
+        Parameters:
+            T: Any Intable Collectable type.
+            A: Any Intable Collectable type.
+
         Args:
             year: Year.
             month: Month.
@@ -1644,6 +1658,10 @@ struct DateTime8(Hashable, Stringable):
     ):
         """Construct a `DateTime8 ` from valid values.
         UTCCalendar is the default.
+
+        Parameters:
+            T: Any Intable Collectable type.
+            A: Any Intable Collectable type.
 
         Args:
             year: Year.
