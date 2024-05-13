@@ -37,7 +37,7 @@ trait _IntCollect(Intable, CollectionElement):
 
 
 @value
-@register_passable("trivial")
+# @register_passable("trivial")
 struct DateTime[
     iana: Optional[ZoneInfo] = all_zones,
     pyzoneinfo: Bool = True,

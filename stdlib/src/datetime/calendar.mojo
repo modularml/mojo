@@ -227,7 +227,7 @@ trait _Calendarized:
         ...
 
 
-@register_passable("trivial")
+@value
 struct Calendar(_Calendarized):
     """`Calendar` interface."""
 
@@ -635,7 +635,7 @@ struct Calendar(_Calendarized):
         return self._implementation.from_hash[cal_hash](value)
 
 
-@register_passable("trivial")
+@value
 struct Gregorian(_Calendarized):
     """`Gregorian` Calendar."""
 
@@ -1180,7 +1180,7 @@ struct Gregorian(_Calendarized):
         return Self(min_year=year)
 
 
-@register_passable("trivial")
+@value
 struct UTCFast(_Calendarized):
     """`UTCFast` Calendar."""
 
