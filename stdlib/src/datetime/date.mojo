@@ -29,6 +29,7 @@ alias _calendar = PythonCalendar
 alias _cal_hash = CalendarHashes(32)
 
 
+@value
 @register_passable("trivial")
 struct Date[
     iana: Optional[ZoneInfo] = all_zones,

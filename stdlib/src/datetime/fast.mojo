@@ -39,6 +39,7 @@ alias _cal_h16 = CalendarHashes(16)
 alias _cal_h8 = CalendarHashes(8)
 
 
+@value
 @register_passable("trivial")
 struct DateTime64(Hashable, Stringable):
     """Fast `DateTime64` struct. This is a "normal"
@@ -610,6 +611,7 @@ struct DateTime64(Hashable, Stringable):
         )
 
 
+@value
 @register_passable("trivial")
 struct DateTime32(Hashable, Stringable):
     """Fast `DateTime32 ` struct. This is a "normal" `DateTime`
@@ -1133,6 +1135,7 @@ struct DateTime32(Hashable, Stringable):
         )
 
 
+@value
 @register_passable("trivial")
 struct DateTime16(Hashable, Stringable):
     """Fast `DateTime16 ` struct. This is a `DateTime` with
@@ -1615,6 +1618,7 @@ struct DateTime16(Hashable, Stringable):
         )
 
 
+@value
 @register_passable("trivial")
 struct DateTime8(Hashable, Stringable):
     """Fast `DateTime8 ` struct. This is a `DateTime`

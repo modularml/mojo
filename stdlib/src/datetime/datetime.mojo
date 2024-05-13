@@ -33,6 +33,7 @@ alias _max_delta = UInt16(~UInt64(0) // (365 * 24 * 60 * 60 * 1_000_000_000))
 Gregorian calendar with year = 365 d * 24 h, 60 min, 60 s, 10^9 ns"""
 
 
+@value
 @register_passable("trivial")
 struct DateTime[
     iana: Optional[ZoneInfo] = all_zones,
