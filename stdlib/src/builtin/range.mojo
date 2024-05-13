@@ -65,7 +65,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange):
     @always_inline("nodebug")
     fn __init__(inout self, end: Int):
         self.curr = max(0, end)
-        self.end = end
+        self.end = self.curr
 
     @always_inline("nodebug")
     fn __iter__(self) -> Self:
