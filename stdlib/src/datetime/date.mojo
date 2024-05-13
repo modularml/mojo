@@ -133,11 +133,10 @@ struct Date[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from possibly overflowing values."""
-        var d = Date[iana, pyzoneinfo, native]._from_days(days, tz, calendar)
-        var mon = Date[iana, pyzoneinfo, native]._from_months(
-            months, tz, calendar
-        )
-        var y = Date[iana, pyzoneinfo, native]._from_years(years, tz, calendar)
+        alias date = Date[iana, pyzoneinfo, native]
+        var d = date._from_days(days, tz, calendar)
+        var mon = date._from_months(months, tz, calendar)
+        var y = date._from_years(years, tz, calendar)
 
         y.year = 0 if years == 0 else y.year
 

@@ -22,8 +22,8 @@
 from .zoneinfo import ZoneInfo, offset_at, offset_no_dst_tz
 
 
-@value
-# @register_passable("trivial")
+# @value
+@register_passable("trivial")
 struct TimeZone[
     iana: Optional[ZoneInfo] = None,
     pyzoneinfo: Bool = True,

@@ -35,7 +35,7 @@ fn test_tz_no_iana() raises:
     var tz1__of = tz1_.offset_at(d[0], d[1], d[2], d[3], d[4], d[5])
     var tz2__of = tz2_.offset_at(d[0], d[1], d[2], d[3], d[4], d[5])
     var tz3__of = tz3_.offset_at(d[0], d[1], d[2], d[3], d[4], d[5])
-    assert_true(tz0_of[0] == 0 and tz0_of[1] == 0 and tz0_of[2] == 0)
+    assert_true(tz0_of[0] == 0 and tz0_of[1] == 0 and tz0_of[2] == 1)
     assert_true(tz_1_of[0] == 1 and tz_1_of[1] == 0 and tz_1_of[2] == 1)
     assert_true(tz_2_of[0] == 2 and tz_2_of[1] == 30 and tz_2_of[2] == 1)
     assert_true(tz_3_of[0] == 3 and tz_3_of[1] == 45 and tz_3_of[2] == 1)

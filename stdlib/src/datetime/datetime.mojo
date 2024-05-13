@@ -183,33 +183,16 @@ struct DateTime[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `DateTime` from possibly overflowing values."""
-        var ns = DateTime[iana, pyzoneinfo, native]._from_n_seconds(
-            n_seconds, tz, calendar
-        )
-        var us = DateTime[iana, pyzoneinfo, native]._from_u_seconds(
-            u_seconds, tz, calendar
-        )
-        var ms = DateTime[iana, pyzoneinfo, native]._from_m_seconds(
-            m_seconds, tz, calendar
-        )
-        var s = DateTime[iana, pyzoneinfo, native].from_seconds(
-            seconds, tz, calendar
-        )
-        var m = DateTime[iana, pyzoneinfo, native]._from_minutes(
-            minutes, tz, calendar
-        )
-        var h = DateTime[iana, pyzoneinfo, native]._from_hours(
-            hours, tz, calendar
-        )
-        var d = DateTime[iana, pyzoneinfo, native]._from_days(
-            days, tz, calendar
-        )
-        var mon = DateTime[iana, pyzoneinfo, native]._from_months(
-            months, tz, calendar
-        )
-        var y = DateTime[iana, pyzoneinfo, native]._from_years(
-            years, tz, calendar
-        )
+        alias date = DateTime[iana, pyzoneinfo, native]
+        var ns = date._from_n_seconds(n_seconds, tz, calendar)
+        var us = date._from_u_seconds(u_seconds, tz, calendar)
+        var ms = date._from_m_seconds(m_seconds, tz, calendar)
+        var s = date.from_seconds(seconds, tz, calendar)
+        var m = date._from_minutes(minutes, tz, calendar)
+        var h = date._from_hours(hours, tz, calendar)
+        var d = date._from_days(days, tz, calendar)
+        var mon = date._from_months(months, tz, calendar)
+        var y = date._from_years(years, tz, calendar)
 
         y.year = 0 if years == 0 else y.year
 
@@ -354,7 +337,7 @@ struct DateTime[
             Self.
         """
         if tz == TimeZone[iana, pyzoneinfo, native]():
-            return self
+            return self^
         var offset = tz.offset_at(
             self.year, self.month, self.day, self.hour, self.minute, self.second
         )
@@ -436,10 +419,8 @@ struct DateTime[
                 overflow += _max_delta
 
         var cal = Calendar.from_year(year)
-        s.calendar = cal
-        var self_ns = s.n_seconds_since_epoch()
-        o.calendar = cal
-        var other_ns = o.n_seconds_since_epoch()
+        var self_ns = s.replace(calendar=cal).n_seconds_since_epoch()
+        var other_ns = o.replace(calendar=cal).n_seconds_since_epoch()
         return self_ns, other_ns, overflow, sign
 
     fn add(
