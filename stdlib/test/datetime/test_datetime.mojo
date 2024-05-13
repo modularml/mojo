@@ -25,8 +25,8 @@ from datetime.dt_str import IsoFormat
 
 fn test_add() raises:
     # when using python and unix calendar there should be no difference in results
-    var pycal = PythonCalendar
-    var unixcal = UTCCalendar
+    alias pycal = PythonCalendar
+    alias unixcal = UTCCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
     var tz_0_ = TZ("", 0, 0)
     var tz_1 = TZ("", 1, 0)
@@ -124,8 +124,8 @@ fn test_add() raises:
 
 fn test_subtract() raises:
     # when using python and unix calendar there should be no difference in results
-    var pycal = PythonCalendar
-    var unixcal = UTCCalendar
+    alias pycal = PythonCalendar
+    alias unixcal = UTCCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
     var tz_0_ = TZ("", 0, 0)
     var tz_1 = TZ("", 1, 0)
@@ -223,8 +223,8 @@ fn test_subtract() raises:
 
 fn test_logic() raises:
     # when using python and unix calendar there should be no difference in results
-    var pycal = PythonCalendar
-    var unixcal = UTCCalendar
+    alias pycal = PythonCalendar
+    alias unixcal = UTCCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
     var tz_0_ = TZ("", 0, 0)
     var tz_1 = TZ("", 1, 0)
@@ -244,8 +244,8 @@ fn test_logic() raises:
 
 fn test_bitwise() raises:
     # when using python and unix calendar there should be no difference in results
-    var pycal = PythonCalendar
-    var unixcal = UTCCalendar
+    alias pycal = PythonCalendar
+    alias unixcal = UTCCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
     var tz_0_ = TZ("", 0, 0)
     var tz_1 = TZ("", 1, 0)
@@ -267,39 +267,39 @@ fn test_bitwise() raises:
 
 
 fn test_iso() raises:
-    var pycal = PythonCalendar
+    alias pycal = PythonCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
     var tz_0_ = TZ("", 0, 0)
     alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
     var iso_str = "1970-01-01T00:00:00+00:00"
-    alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
+    var fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
     assert_true(ref == DateTime.from_iso[fmt1](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt1]())
 
     iso_str = "1970-01-01 00:00:00+00:00"
-    alias fmt2 = IsoFormat(IsoFormat.YYYY_MM_DD___HH_MM_SS)
+    var fmt2 = IsoFormat(IsoFormat.YYYY_MM_DD___HH_MM_SS)
     assert_true(ref == DateTime.from_iso[fmt2](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt2]())
 
     iso_str = "1970-01-01T00:00:00"
-    alias fmt3 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS)
+    var fmt3 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS)
     assert_true(ref == DateTime.from_iso[fmt3](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt3]())
 
     iso_str = "19700101000000"
-    alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
+    var fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
     assert_true(ref == DateTime.from_iso[fmt4](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
-    alias fmt5 = IsoFormat(IsoFormat.HH_MM_SS)
+    var fmt5 = IsoFormat(IsoFormat.HH_MM_SS)
     assert_true(ref == DateTime.from_iso[fmt5](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt5]())
 
     iso_str = "000000"
-    alias fmt6 = IsoFormat(IsoFormat.HHMMSS)
+    var fmt6 = IsoFormat(IsoFormat.HHMMSS)
     assert_true(ref == DateTime.from_iso[fmt6](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt6]())
 
