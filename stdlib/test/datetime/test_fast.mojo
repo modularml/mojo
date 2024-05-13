@@ -23,282 +23,198 @@ from datetime.dt_str import IsoFormat
 
 fn test_add64() raises:
     # test february leapyear
-    var result = DateTime64(2024, 2, 29) + DateTime64(0, 0, 1)
+    var result = (DateTime64(2024, 2, 29) + DateTime64(0, 0, 1))
     var offset_0 = DateTime64(2024, 3, 1)
-    var offset_p_1 = DateTime64(2024, 3, 1)
-    var offset_n_1 = DateTime64(2024, 2, 29)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     var add_seconds = DateTime64(2024, 2, 29).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result == add_seconds)
 
     # test february not leapyear
     result = DateTime64(2023, 2, 28) + DateTime64(0, 0, 1)
     offset_0 = DateTime64(2023, 3, 1)
-    offset_p_1 = DateTime64(2023, 3, 1)
-    offset_n_1 = DateTime64(2023, 2, 28)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime64(2023, 2, 28).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result == add_seconds)
 
     # test normal month
     result = DateTime64(2024, 5, 31) + DateTime64(0, 0, 1)
     offset_0 = DateTime64(2024, 6, 1)
-    offset_p_1 = DateTime64(2024, 6, 1)
-    offset_n_1 = DateTime64(2024, 5, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime64(2024, 5, 31).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result == add_seconds)
 
     # test december
     result = DateTime64(2024, 12, 31) + DateTime64(0, 0, 1)
     offset_0 = DateTime64(2025, 1, 1)
-    offset_p_1 = DateTime64(2025, 1, 1)
-    offset_n_1 = DateTime64(2024, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime64(2024, 12, 31).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result == add_seconds)
 
     # test year and month add
     result = DateTime64(2022, 6, 1) + DateTime64(3, 6, 31)
     offset_0 = DateTime64(2025, 1, 1)
-    offset_p_1 = DateTime64(2025, 1, 1)
-    offset_n_1 = DateTime64(2024, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
 
     # test positive overflow pycal
     result = DateTime64(9999, 12, 31) + DateTime64(0, 0, 1)
     offset_0 = DateTime64(1, 1, 1)
-    offset_p_1 = DateTime64(1, 1, 1)
-    offset_n_1 = DateTime64(1, 1, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime64(9999, 12, 31).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result == add_seconds)
 
     # test positive overflow unixcal
     result = DateTime64(9999, 12, 31) + DateTime64(0, 0, 1)
     offset_0 = DateTime64(1970, 1, 1)
-    offset_p_1 = DateTime64(1970, 1, 1)
-    offset_n_1 = DateTime64(9999, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime64(9999, 12, 31).add(seconds=24 * 3600)
-    assert_true(result.m_second == add_seconds.m_second)
+    assert_true(result == add_seconds)
 
 
 fn test_add32() raises:
     # test february leapyear
     var result = DateTime32(2024, 2, 29) + DateTime32(0, 0, 1)
     var offset_0 = DateTime32(2024, 3, 1)
-    var offset_p_1 = DateTime32(2024, 3, 1)
-    var offset_n_1 = DateTime32(2024, 2, 29)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     var add_seconds = DateTime32(2024, 2, 29).add(seconds=24 * 3600)
-    assert_true(result.minute == add_seconds.minute)
+    assert_true(result == add_seconds)
 
     # test february not leapyear
     result = DateTime32(2023, 2, 28) + DateTime32(0, 0, 1)
     offset_0 = DateTime32(2023, 3, 1)
-    offset_p_1 = DateTime32(2023, 3, 1)
-    offset_n_1 = DateTime32(2023, 2, 28)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime32(2023, 2, 28).add(seconds=24 * 3600)
-    assert_true(result.minute == add_seconds.minute)
+    assert_true(result == add_seconds)
 
     # test normal month
     result = DateTime32(2024, 5, 31) + DateTime32(0, 0, 1)
     offset_0 = DateTime32(2024, 6, 1)
-    offset_p_1 = DateTime32(2024, 6, 1)
-    offset_n_1 = DateTime32(2024, 5, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime32(2024, 5, 31).add(seconds=24 * 3600)
-    assert_true(result.minute == add_seconds.minute)
+    assert_true(result == add_seconds)
 
     # test december
     result = DateTime32(2024, 12, 31) + DateTime32(0, 0, 1)
     offset_0 = DateTime32(2025, 1, 1)
-    offset_p_1 = DateTime32(2025, 1, 1)
-    offset_n_1 = DateTime32(2024, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime32(2024, 12, 31).add(seconds=24 * 3600)
-    assert_true(result.minute == add_seconds.minute)
+    assert_true(result == add_seconds)
 
     # test year and month add
     result = DateTime32(2022, 6, 1) + DateTime32(3, 6, 31)
     offset_0 = DateTime32(2025, 1, 1)
-    offset_p_1 = DateTime32(2025, 1, 1)
-    offset_n_1 = DateTime32(2024, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
 
     # test positive overflow pycal
     result = DateTime32(9999, 12, 31) + DateTime32(0, 0, 1)
     offset_0 = DateTime32(1, 1, 1)
-    offset_p_1 = DateTime32(1, 1, 1)
-    offset_n_1 = DateTime32(1, 1, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime32(9999, 12, 31).add(seconds=24 * 3600)
-    assert_true(result.minute == add_seconds.minute)
+    assert_true(result == add_seconds)
 
     # test positive overflow unixcal
     result = DateTime32(9999, 12, 31) + DateTime32(0, 0, 1)
     offset_0 = DateTime32(1970, 1, 1)
-    offset_p_1 = DateTime32(1970, 1, 1)
-    offset_n_1 = DateTime32(9999, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     add_seconds = DateTime32(9999, 12, 31).add(seconds=24 * 3600)
-    assert_true(result.minute == add_seconds.minute)
+    assert_true(result == add_seconds)
 
 
 fn test_subtract64() raises:
     # test february leapyear
     var result = DateTime64(2024, 3, 1) - DateTime64(0, 0, 1)
     var offset_0 = DateTime64(2024, 2, 29)
-    var offset_p_1 = DateTime64(2024, 2, 29)
-    var offset_n_1 = DateTime64(2024, 3, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     var sub_seconds = DateTime64(2024, 3, 1).subtract(seconds=1)
-    assert_true(result.m_second == sub_seconds.m_second)
+    assert_true(result == sub_seconds)
 
     # test february not leapyear
     result = DateTime64(2023, 3, 1) - DateTime64(0, 0, 1)
     offset_0 = DateTime64(2023, 2, 28)
-    offset_p_1 = DateTime64(2023, 2, 28)
-    offset_n_1 = DateTime64(2023, 3, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime64(2023, 3, 1).subtract(seconds=1)
-    assert_true(result.m_second == sub_seconds.m_second)
+    assert_true(result == sub_seconds)
 
     # test normal month
     result = DateTime64(2024, 6, 1) - DateTime64(0, 0, 1)
     offset_0 = DateTime64(2024, 5, 31)
-    offset_p_1 = DateTime64(2024, 5, 31)
-    offset_n_1 = DateTime64(2024, 6, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime64(2024, 6, 1).subtract(seconds=1)
-    assert_true(result.m_second == sub_seconds.m_second)
+    assert_true(result == sub_seconds)
 
     # test december
     result = DateTime64(2025, 1, 1) - DateTime64(0, 0, 1)
     offset_0 = DateTime64(2024, 12, 31)
-    offset_p_1 = DateTime64(2024, 12, 31)
-    offset_n_1 = DateTime64(2025, 1, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime64(2025, 1, 1).subtract(seconds=1)
-    assert_true(result.m_second == sub_seconds.m_second)
+    assert_true(result == sub_seconds)
 
     # test year and month subtract
     result = DateTime64(2025, 1, 1) - DateTime64(3, 6, 31)
     offset_0 = DateTime64(2022, 6, 1)
-    offset_p_1 = DateTime64(2022, 6, 1)
-    offset_n_1 = DateTime64(2022, 5, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
 
     # test negative overflow pycal
     result = DateTime64(1, 1, 1) - DateTime64(0, 0, 1)
     offset_0 = DateTime64(9999, 12, 31)
-    offset_p_1 = DateTime64(9999, 12, 31)
-    offset_n_1 = DateTime64(9999, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime64(1, 1, 1).subtract(seconds=1)
-    assert_true(result.m_second == sub_seconds.m_second)
+    assert_true(result == sub_seconds)
 
     # test negative overflow unixcal
     result = DateTime64(1970, 1, 1) - DateTime64(0, 0, 1)
     offset_0 = DateTime64(9999, 12, 31)
-    offset_p_1 = DateTime64(9999, 12, 31)
-    offset_n_1 = DateTime64(9999, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime64(1970, 1, 1).subtract(seconds=1)
-    assert_true(result.m_second == sub_seconds.m_second)
+    assert_true(result == sub_seconds)
 
 
 fn test_subtract32() raises:
     # test february leapyear
     var result = DateTime32(2024, 3, 1) - DateTime32(0, 0, 1)
     var offset_0 = DateTime32(2024, 2, 29)
-    var offset_p_1 = DateTime32(2024, 2, 29)
-    var offset_n_1 = DateTime32(2024, 3, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     var sub_seconds = DateTime32(2024, 3, 1).subtract(seconds=1)
-    assert_true(result.minute == sub_seconds.minute)
+    assert_true(result == sub_seconds)
 
     # test february not leapyear
     result = DateTime32(2023, 3, 1) - DateTime32(0, 0, 1)
     offset_0 = DateTime32(2023, 2, 28)
-    offset_p_1 = DateTime32(2023, 2, 28)
-    offset_n_1 = DateTime32(2023, 3, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime32(2023, 3, 1).subtract(seconds=1)
-    assert_true(result.minute == sub_seconds.minute)
+    assert_true(result == sub_seconds)
 
     # test normal month
     result = DateTime32(2024, 6, 1) - DateTime32(0, 0, 1)
     offset_0 = DateTime32(2024, 5, 31)
-    offset_p_1 = DateTime32(2024, 5, 31)
-    offset_n_1 = DateTime32(2024, 6, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime32(2024, 6, 1).subtract(seconds=1)
-    assert_true(result.minute == sub_seconds.minute)
+    assert_true(result == sub_seconds)
 
     # test december
     result = DateTime32(2025, 1, 1) - DateTime32(0, 0, 1)
     offset_0 = DateTime32(2024, 12, 31)
-    offset_p_1 = DateTime32(2024, 12, 31)
-    offset_n_1 = DateTime32(2025, 1, 1)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime32(2025, 1, 1).subtract(seconds=1)
-    assert_true(result.minute == sub_seconds.minute)
+    assert_true(result == sub_seconds)
 
     # test year and month subtract
     result = DateTime32(2025, 1, 1) - DateTime32(3, 6, 31)
     offset_0 = DateTime32(2022, 6, 1)
-    offset_p_1 = DateTime32(2022, 6, 1)
-    offset_n_1 = DateTime32(2022, 5, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
 
     # test negative overflow pycal
     result = DateTime32(1, 1, 1) - DateTime32(0, 0, 1)
     offset_0 = DateTime32(9999, 12, 31)
-    offset_p_1 = DateTime32(9999, 12, 31)
-    offset_n_1 = DateTime32(9999, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime32(1, 1, 1).subtract(seconds=1)
-    assert_true(result.minute == sub_seconds.minute)
+    assert_true(result == sub_seconds)
 
     # test negative overflow unixcal
     result = DateTime32(1970, 1, 1) - DateTime32(0, 0, 1)
     offset_0 = DateTime32(9999, 12, 31)
-    offset_p_1 = DateTime32(9999, 12, 31)
-    offset_n_1 = DateTime32(9999, 12, 31)
-    assert_true(result == offset_0 and result == offset_p_1)
-    assert_true(result == offset_n_1)
+    assert_true(result == offset_0)
     sub_seconds = DateTime32(1970, 1, 1).subtract(seconds=1)
-    assert_true(result.minute == sub_seconds.minute)
+    assert_true(result == sub_seconds)
 
 
 fn test_logic64() raises:

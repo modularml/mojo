@@ -310,7 +310,7 @@ struct DateTime[
         Returns:
             Self.
         """
-        alias TZ_UTC = TimeZone[iana, pyzoneinfo, native]()
+        var TZ_UTC = TimeZone[iana, pyzoneinfo, native]()
         if self.tz == TZ_UTC:
             return self
         var new_self = self
