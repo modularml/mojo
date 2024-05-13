@@ -105,6 +105,10 @@ struct Date[
     ):
         """Construct a `Date` from valid values.
 
+        Parameters:
+            T: Any type that can be made an int and be inside
+                an Optional.
+
         Args:
             year: Year.
             month: Month.
