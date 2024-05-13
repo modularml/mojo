@@ -33,10 +33,6 @@ alias _max_delta = UInt16(~UInt64(0) // (365 * 24 * 60 * 60 * 1_000_000_000))
 Gregorian calendar with year = 365 d * 24 h, 60 min, 60 s, 10^9 ns"""
 
 
-trait _IntableCollectable(Intable, CollectionElement):
-    ...
-
-
 @value
 @register_passable("trivial")
 struct DateTime[
@@ -108,29 +104,23 @@ struct DateTime[
     var calendar: Calendar
     """Calendar."""
 
-    fn __init__[
-        T: _IntableCollectable
-    ](
+    fn __init__(
         inout self,
-        year: Optional[T] = None,
-        month: Optional[T] = None,
-        day: Optional[T] = None,
-        hour: Optional[T] = None,
-        minute: Optional[T] = None,
-        second: Optional[T] = None,
-        m_second: Optional[T] = None,
-        u_second: Optional[T] = None,
-        n_second: Optional[T] = None,
+        year: Optional[Int] = None,
+        month: Optional[Int] = None,
+        day: Optional[Int] = None,
+        hour: Optional[Int] = None,
+        minute: Optional[Int] = None,
+        second: Optional[Int] = None,
+        m_second: Optional[Int] = None,
+        u_second: Optional[Int] = None,
+        n_second: Optional[Int] = None,
         tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
             iana, pyzoneinfo, native
         ](),
         calendar: Calendar = _calendar,
     ):
         """Construct a `DateTime` from valid values.
-
-        Parameters:
-            T: Any type that can be made an int and be inside
-                an Optional.
 
         Args:
             year: Year.
@@ -145,25 +135,64 @@ struct DateTime[
             tz: Tz.
             calendar: Calendar.
         """
-        self.year = int(year.value()[]) if year else int(calendar.min_year)
-        self.month = int(month.value()[]) if month else int(calendar.min_month)
-        self.day = int(day.value()[]) if day else int(calendar.min_day)
-        self.hour = int(hour.value()[]) if hour else int(calendar.min_hour)
-        self.minute = int(minute.value()[]) if minute else int(
-            calendar.min_minute
-        )
-        self.second = int(second.value()[]) if second else int(
-            calendar.min_second
-        )
-        self.m_second = int(m_second.value()[]) if m_second else int(
-            calendar.min_milisecond
-        )
-        self.u_second = int(u_second.value()[]) if u_second else int(
-            calendar.min_microsecond
-        )
-        self.n_second = int(n_second.value()[]) if n_second else int(
-            calendar.min_nanosecond
-        )
+        self.year = year.or_else(int(calendar.min_year))
+        self.month = month.or_else(int(calendar.min_month))
+        self.day = day.or_else(int(calendar.min_day))
+        self.hour = hour.or_else(int(calendar.min_hour))
+        self.minute = minute.or_else(int(calendar.min_minute))
+        self.second = second.or_else(int(calendar.min_second))
+        self.m_second = m_second.or_else(int(calendar.min_milisecond))
+        self.u_second = u_second.or_else(int(calendar.min_microsecond))
+        self.n_second = n_second.or_else(int(calendar.min_nanosecond))
+        self.tz = tz
+        self.calendar = calendar
+
+    fn __init__(
+        inout self,
+        year: Optional[IntLiteral] = None,
+        month: Optional[IntLiteral] = None,
+        day: Optional[IntLiteral] = None,
+        hour: Optional[IntLiteral] = None,
+        minute: Optional[IntLiteral] = None,
+        second: Optional[IntLiteral] = None,
+        m_second: Optional[IntLiteral] = None,
+        u_second: Optional[IntLiteral] = None,
+        n_second: Optional[IntLiteral] = None,
+        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
+            iana, pyzoneinfo, native
+        ](),
+        calendar: Calendar = _calendar,
+    ):
+        """Construct a `DateTime` from valid values.
+
+        Args:
+            year: Year.
+            month: Month.
+            day: Day.
+            hour: Hour.
+            minute: Minute.
+            second: Second.
+            m_second: M_second.
+            u_second: U_second.
+            n_second: N_second.
+            tz: Tz.
+            calendar: Calendar.
+        """
+        self.year = UInt16(year.value()[]) if year else calendar.min_year
+        self.month = UInt8(month.value()[]) if month else calendar.min_month
+        self.day = UInt8(day.value()[]) if day else calendar.min_day
+        self.hour = UInt8(hour.value()[]) if hour else calendar.min_hour
+        self.minute = UInt8(minute.value()[]) if minute else calendar.min_minute
+        self.second = UInt8(second.value()[]) if second else calendar.min_second
+        self.m_second = UInt16(
+            m_second.value()[]
+        ) if m_second else calendar.min_milisecond
+        self.u_second = UInt16(
+            u_second.value()[]
+        ) if u_second else calendar.min_microsecond
+        self.n_second = UInt16(
+            n_second.value()[]
+        ) if n_second else calendar.min_nanosecond
         self.tz = tz
         self.calendar = calendar
 
