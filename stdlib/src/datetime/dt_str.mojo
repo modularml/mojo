@@ -15,6 +15,7 @@
 from .timezone import TimeZone, ZoneInfo, all_zones
 
 
+@value
 struct IsoFormat:
     """Available formats to parse from and to
     [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)."""

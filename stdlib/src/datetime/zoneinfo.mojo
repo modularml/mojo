@@ -16,7 +16,8 @@ from pathlib import Path, cwd
 from utils import Variant
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct Offset:
     """Only supports hour offsets less than 16 hours and minute offsets
     that are in (00, 30, 45). Offset sign and minute are assumed
@@ -107,7 +108,8 @@ struct Offset:
         )
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct TzDT:
     """`TzDT` stores the rules for DST start/end."""
 
@@ -195,7 +197,8 @@ struct TzDT:
         return self.buf == other.buf
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct ZoneDST:
     """`ZoneDST` stores both start and end dates, and
     the offset for a timezone with DST."""
