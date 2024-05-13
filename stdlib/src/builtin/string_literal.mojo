@@ -197,7 +197,22 @@ struct StringLiteral(
         Returns:
             A new string.
         """
-        return self
+        var string = String()
+        var length: Int = __mlir_op.`pop.string.size`(self.value)
+        var buffer = String._buffer_type()
+        var new_capacity = length + 1
+        buffer._realloc(new_capacity)
+        buffer.size = new_capacity
+        var uint8Ptr = __mlir_op.`pop.pointer.bitcast`[
+            _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
+        ](__mlir_op.`pop.string.address`(self.value))
+        var data: DTypePointer[DType.uint8] = DTypePointer[DType.uint8](
+            uint8Ptr
+        )
+        memcpy(rebind[DTypePointer[DType.uint8]](buffer.data), data, length)
+        initialize_pointee_move(buffer.data + length, 0)
+        string._buffer = buffer^
+        return string
 
     fn __repr__(self) -> String:
         """Return a representation of the `StringLiteral` instance.

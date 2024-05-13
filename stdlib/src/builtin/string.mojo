@@ -641,14 +641,13 @@ struct String(
         self._buffer = buffer^
 
     @always_inline
-    fn __init__(inout self, str: StringLiteral):
+    fn __init__(inout self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 
         Args:
-            str: The input constant string.
+            literal: The input constant string.
         """
-
-        self = String(StringRef(str))
+        self = literal.__str__()
 
     fn __init__[stringable: Stringable](inout self, value: stringable):
         """Creates a string from a value that conforms to Stringable trait.
