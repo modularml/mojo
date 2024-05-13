@@ -586,8 +586,8 @@ fn get_zoneinfo() -> Optional[ZoneInfo]:
 from .calendar import PythonCalendar
 
 alias _cal = PythonCalendar
-alias all_zones = get_zoneinfo()
-"""All timezones available at compile time."""
+# alias all_zones = get_zoneinfo()
+# """All timezones available at compile time."""
 
 
 fn offset_no_dst_tz(

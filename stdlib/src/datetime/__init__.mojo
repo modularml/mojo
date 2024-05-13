@@ -28,6 +28,7 @@
     - The caveats of each implementation are better explained in each struct's docstrings.
 """
 
+from .zoneinfo import get_zoneinfo
 from .timezone import TimeZone
 from .dt_str import IsoFormat
 from .datetime import DateTime

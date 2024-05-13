@@ -21,7 +21,7 @@ Notes:
 from time import time
 from utils import Variant
 
-from .timezone import TimeZone, ZoneInfo, all_zones
+from .timezone import TimeZone, ZoneInfo
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
 import .dt_str
 
@@ -39,7 +39,7 @@ trait _IntCollect(Intable, CollectionElement):
 @value
 # @register_passable("trivial")
 struct DateTime[
-    iana: Optional[ZoneInfo] = all_zones,
+    iana: Optional[ZoneInfo] = None,
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](Hashable, Stringable):
