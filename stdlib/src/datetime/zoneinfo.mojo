@@ -404,6 +404,19 @@ struct ZoneInfoMem8:
         return Offset(value.unsafe_take())
 
 
+# TODO
+# fn _parse_iana_zonenow(
+#     inout dst_zones: ZoneInfoMem32, inout no_dst_zones: ZoneInfoMem8
+# ) raises:
+#     pass
+
+# TODO
+# fn _parse_iana_dst_transitions(
+#     inout dst_zones: ZoneInfoMem32, inout no_dst_zones: ZoneInfoMem8
+# ) raises:
+#     pass
+
+
 @always_inline
 fn _parse_iana_leapsecs(
     text: PythonObject,
