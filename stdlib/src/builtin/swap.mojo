@@ -10,16 +10,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the utils package."""
+"""Implements the built-in `swap` function.
 
-from .index import (
-    StaticIntTuple,
-    Index,
-    product,
-)
-from .inlined_string import InlinedString
-from .loop import unroll
-from .span import Span
-from .static_tuple import StaticTuple, InlineArray
-from .stringref import StringRef
-from .variant import Variant
+These are Mojo built-ins, so you don't need to import them.
+"""
+
+
+@always_inline
+fn swap[T: Movable](inout lhs: T, inout rhs: T):
+    """Swaps the two given arguments.
+
+    Parameters:
+       T: Constrained to Copyable types.
+
+    Args:
+        lhs: Argument value swapped with rhs.
+        rhs: Argument value swapped with lhs.
+    """
+    var tmp = lhs^
+    lhs = rhs^
+    rhs = tmp^

@@ -134,7 +134,28 @@ what we publish.
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
 
+- Debugger users can now set breakpoints on function calls in O0 builds even if
+  the call has been inlined by the compiler.
+
+- The `os` module now provides functionalty for adding and removing directories
+  using `mkdir` and `rmdir`.
+    ([PR #2430](https://github.com/modularml/mojo/pull/2430) by [@artemiogr97](https://github.com/artemiogr97))
+
+- `Dict.__get_ref(key)`, allowing to get references to dictionary values.
+
+- `String.strip()`, `lstrip()` and `rstrip()` can now remove custom characters
+  other than whitespace.  In addition, there are now several useful aliases for
+  whitespace, ASCII lower/uppercase, and so on.
+    ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
+
+- `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
+    ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
+
 ### 🦋 Changed
+
+- The `let` keyword has been completely removed from the language. We previously
+  removed `let` declarations but still provided an error message to users. Now,
+  it is completely gone from the grammar. Long live `var`!
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
   longer need to do `from math import abs, round`.
@@ -146,7 +167,15 @@ what we publish.
   `--diagnose-missing-doc-strings`.
 
 - The `take` function in `Variant` and `Optional` has been renamed to
-`unsafe_take`.
+  `unsafe_take`.
+
+- The `get` function in `Variant` has been replaced by `__refitem__`. That is,
+  `v.get[T]()` should be replaced with `v[T]`.
+
+- Various functions in the `algorithm` module are now moved to be
+  builtin-functions.  This includes `sort`, `swap`, and `partition`.
+  `swap` and `partition` will likely shuffle around as we're reworking
+  our builtnin `sort` function and optimizing it.
 
 ### ❌ Removed
 
@@ -175,3 +204,6 @@ what we publish.
   simple trait definitions.
 - [#1787](https://github.com/modularml/mojo/issues/1787) Fix error when using
   `//` on `FloatLiteral` in alias expression.
+- Made several improvements to dictionary performance. Dicts with integer keys
+  are most heavily affected, but large dicts and dicts with large values
+  will also see large improvements.

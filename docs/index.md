@@ -8,7 +8,7 @@ anchor-sections: false
 listing:
   - id: docs
     contents:
-      - manual/get-started/index.md
+      - manual/get-started.md
       - why-mojo.md
       - manual/basics.ipynb
       - lib.md

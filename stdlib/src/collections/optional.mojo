@@ -114,7 +114,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             A reference to the contained data of the option as a Reference[T].
         """
         debug_assert(self[].__bool__(), ".value() on empty Optional")
-        return self[]._value.get[T]()
+        return self[]._value[T]
 
     @always_inline
     fn _value_copy(self) -> T:
@@ -126,9 +126,9 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         """
 
         debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value.get[T]()[]
+        return self._value[T]
 
-    fn unsafe_take(owned self) -> T:
+    fn unsafe_take(inout self) -> T:
         """Unsafely move the value out of the Optional.
 
         The caller takes ownership over the new value, and the Optional is
@@ -155,7 +155,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             The underlying value contained in the Optional or a default value.
         """
         if self.__bool__():
-            return self._value.get[T]()[]
+            return self._value[T]
         return default
 
     fn __is__(self, other: NoneType) -> Bool:
@@ -200,66 +200,6 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         """
         return not self
 
-    fn __and__[type: Boolable](self, other: type) -> Bool:
-        """Return true if self has a value and the other value is coercible to
-        True.
-
-        Parameters:
-            type: Type coercible to Bool.
-
-        Args:
-            other: Value to compare to.
-
-        Returns:
-            True if both inputs are True after boolean coercion.
-        """
-        return self.__bool__() and other.__bool__()
-
-    fn __rand__[type: Boolable](self, other: type) -> Bool:
-        """Return true if self has a value and the other value is coercible to
-        True.
-
-        Parameters:
-            type: Type coercible to Bool.
-
-        Args:
-            other: Value to compare to.
-
-        Returns:
-            True if both inputs are True after boolean coercion.
-        """
-        return self.__bool__() and other.__bool__()
-
-    fn __or__[type: Boolable](self, other: type) -> Bool:
-        """Return true if self has a value or the other value is coercible to
-        True.
-
-        Parameters:
-            type: Type coercible to Bool.
-
-        Args:
-            other: Value to compare to.
-
-        Returns:
-            True if either inputs is True after boolean coercion.
-        """
-        return self.__bool__() or other.__bool__()
-
-    fn __ror__[type: Boolable](self, other: type) -> Bool:
-        """Return true if self has a value or the other value is coercible to
-        True.
-
-        Parameters:
-            type: Type coercible to Bool.
-
-        Args:
-            other: Value to compare to.
-
-        Returns:
-            True if either inputs is True after boolean coercion.
-        """
-        return self.__bool__() or other.__bool__()
-
 
 # ===----------------------------------------------------------------------===#
 # OptionalReg
@@ -277,8 +217,8 @@ struct OptionalReg[T: AnyRegType](Boolable):
         T: The type of value stored in the Optional.
     """
 
-    alias _type = __mlir_type[`!kgen.variant<`, T, `, i1>`]
-    var _value: Self._type
+    alias _mlir_type = __mlir_type[`!kgen.variant<`, T, `, i1>`]
+    var _value: Self._mlir_type
 
     fn __init__(inout self):
         """Create an optional with a value of None."""
@@ -291,7 +231,7 @@ struct OptionalReg[T: AnyRegType](Boolable):
             value: The value.
         """
         self._value = __mlir_op.`kgen.variant.create`[
-            _type = Self._type, index = Int(0).value
+            _type = Self._mlir_type, index = Int(0).value
         ](value)
 
     fn __init__(inout self, value: NoneType):
@@ -301,7 +241,7 @@ struct OptionalReg[T: AnyRegType](Boolable):
             value: The None value.
         """
         self._value = __mlir_op.`kgen.variant.create`[
-            _type = Self._type, index = Int(1).value
+            _type = Self._mlir_type, index = Int(1).value
         ](__mlir_attr.false)
 
     @always_inline
@@ -346,71 +286,3 @@ struct OptionalReg[T: AnyRegType](Boolable):
             True if the optional has a value and False otherwise.
         """
         return __mlir_op.`kgen.variant.is`[index = Int(0).value](self._value)
-
-    fn __invert__(self) -> Bool:
-        """Return False if the optional has a value.
-
-        Returns:
-            False if the optional has a value and True otherwise.
-        """
-        return not self.__bool__()
-
-    fn __and__[type: Boolable](self, other: type) -> Bool:
-        """Return true if self has a value and the other value is coercible to
-        True.
-
-        Parameters:
-            type: Type coercible to Bool.
-
-        Args:
-            other: Value to compare to.
-
-        Returns:
-            True if both inputs are True after boolean coercion.
-        """
-        return self.__bool__() and other.__bool__()
-
-    fn __rand__[type: Boolable](self, other: type) -> Bool:
-        """Return true if self has a value and the other value is coercible to
-        True.
-
-        Parameters:
-            type: Type coercible to Bool.
-
-        Args:
-            other: Value to compare to.
-
-        Returns:
-            True if both inputs are True after boolean coercion.
-        """
-        return self.__bool__() and other.__bool__()
-
-    fn __or__[type: Boolable](self, other: type) -> Bool:
-        """Return true if self has a value or the other value is coercible to
-        True.
-
-        Parameters:
-            type: Type coercible to Bool.
-
-        Args:
-            other: Value to compare to.
-
-        Returns:
-            True if either inputs is True after boolean coercion.
-        """
-        return self.__bool__() or other.__bool__()
-
-    fn __ror__[type: Boolable](self, other: type) -> Bool:
-        """Return true if self has a value or the other value is coercible to
-        True.
-
-        Parameters:
-            type: Type coercible to Bool.
-
-        Args:
-            other: Value to compare to.
-
-        Returns:
-            True if either inputs is True after boolean coercion.
-        """
-        return self.__bool__() or other.__bool__()
