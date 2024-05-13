@@ -23,7 +23,7 @@ from datetime.zoneinfo import (
     ZoneInfoMem8,
     get_zoneinfo,
     get_leapsecs,
-    _parse_iana_leapsecs,
+    # _parse_iana_leapsecs,
     # _parse_iana_zonenow,
     # _parse_iana_dst_transitions,
 )

@@ -1092,7 +1092,8 @@ struct Gregorian(_Calendarized):
         Returns:
             The hash.
         """
-        _ = self, n_second
+
+        @parameter
         if cal_h.selected == cal_h.UINT8:
             pass
         elif cal_h.selected == cal_h.UINT16:
@@ -1112,6 +1113,7 @@ struct Gregorian(_Calendarized):
                 | UInt64(m_second) << cal_h.shift_64_ms
                 | UInt64(u_second) << cal_h.shift_64_us
             )
+        _ = self, n_second
         return 0
 
     @always_inline("nodebug")
@@ -1129,11 +1131,11 @@ struct Gregorian(_Calendarized):
         Returns:
             Tuple containing date data.
         """
-        _ = self
         var num8 = UInt8(0)
         var num16 = UInt16(0)
         var result = (num16, num8, num8, num8, num8, num8, num16, num16)
 
+        @parameter
         if cal_h.selected == cal_h.UINT8:
             pass
         elif cal_h.selected == cal_h.UINT16:
@@ -1151,6 +1153,7 @@ struct Gregorian(_Calendarized):
             result[5] = int(((value & cal_h.mask_64_s) >> cal_h.shift_64_s))
             result[6] = int(((value & cal_h.mask_64_ms) >> cal_h.shift_64_ms))
             result[7] = int(((value & cal_h.mask_64_us) >> cal_h.shift_64_us))
+        _ = self
         return result
 
     @staticmethod
@@ -1553,7 +1556,8 @@ struct UTCFast(_Calendarized):
         Returns:
             The hash.
         """
-        _ = self, u_second, n_second
+
+        @parameter
         if cal_h.selected == cal_h.UINT8:
             return int(
                 (UInt8(day) << cal_h.shift_8_d)
@@ -1583,6 +1587,7 @@ struct UTCFast(_Calendarized):
                 | (UInt64(second) << (cal_h.shift_64_s - cal_h.shift_64_ms))
                 | UInt64(m_second)
             )
+        _ = self, u_second, n_second
         return 0
 
     @always_inline("nodebug")
@@ -1605,6 +1610,7 @@ struct UTCFast(_Calendarized):
         var num16 = UInt16(0)
         var result = (num16, num8, num8, num8, num8, num8, num16, num16)
 
+        @parameter
         if cal_h.selected == cal_h.UINT8:
             result[2] = int(((value & cal_h.mask_8_d) >> cal_h.shift_8_d))
             result[3] = int(((value & cal_h.mask_8_h) >> cal_h.shift_8_h))

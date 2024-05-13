@@ -108,6 +108,8 @@ fn to_iso[
     var s = _get_strings(year, month, day, hour, minute, second)
     var yyyy_mm_dd = s[0] + "-" + s[1] + "-" + s[2]
     var hh_mm_ss = s[3] + ":" + s[4] + ":" + s[5]
+
+    @parameter
     if iso.YYYY_MM_DD___HH_MM_SS == iso.selected:
         return yyyy_mm_dd + " " + hh_mm_ss
     elif iso.YYYYMMDD in iso.selected:
@@ -116,7 +118,8 @@ fn to_iso[
         return s[3] + ":" + s[4] + ":" + s[5]
     elif iso.HHMMSS == iso.selected:
         return s[3] + s[4] + s[5]
-    return yyyy_mm_dd + "T" + hh_mm_ss
+    else:
+        return yyyy_mm_dd + "T" + hh_mm_ss
 
 
 fn from_iso[
@@ -150,6 +153,8 @@ fn from_iso[
     var result = UInt16(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(
         0
     ), TimeZone[iana, pyzoneinfo, native]()
+
+    @parameter
     if iso.YYYYMMDD in iso.selected:
         result[0] = atol(s[:4])
         result[1] = atol(s[4:6])
@@ -177,6 +182,7 @@ fn from_iso[
         result[4] = atol(s[2:4])
         result[5] = atol(s[4:6])
 
+    @parameter
     if iso.selected == iso.YYYY_MM_DD_T_HH_MM_SS_TZD:
         var sign = 1
         if s[19] == "-":
@@ -221,24 +227,26 @@ fn strptime[
         An Optional tuple with the result.
     """
     # TODO: native
-    try:
-        from python import Python
+    # try:
+    #     from python import Python
 
-        var dt = Python.import_module("datetime")
-        var date = dt.datetime.strptime(s, format_str)
-        return (
-            UInt16(date.year),
-            UInt8(date.month),
-            UInt8(date.day),
-            UInt8(date.hour),
-            UInt8(date.minute),
-            UInt8(date.second),
-            UInt16(0),
-            UInt16(0),
-            UInt16(0),
-        )
-    except:
-        return None
+    #     var dt = Python.import_module("datetime")
+    #     var date = dt.datetime.strptime(s, format_str)
+    #     return (
+    #         UInt16(date.year),
+    #         UInt8(date.month),
+    #         UInt8(date.day),
+    #         UInt8(date.hour),
+    #         UInt8(date.minute),
+    #         UInt8(date.second),
+    #         UInt16(0),
+    #         UInt16(0),
+    #         UInt16(0),
+    #     )
+    # except:
+    #     pass
+    _ = s
+    return None
 
 
 fn strftime[
@@ -272,14 +280,16 @@ fn strftime[
     """
     # TODO: native
     # TODO: localization
-    try:
-        from python import Python
+    # try:
+    #     from python import Python
 
-        var dt = Python.import_module("datetime")
-        var date = dt.datetime(year, month, day, hour, minute, second)
-        return date.strftime(format_str)
-    except:
-        return ""
+    #     var dt = Python.import_module("datetime")
+    #     var date = dt.datetime(year, month, day, hour, minute, second)
+    #     return date.strftime(format_str)
+    # except:
+    #     pass
+    _ = year, month, day, hour, minute, second
+    return ""
 
 
 fn strftime(
@@ -310,11 +320,13 @@ fn strftime(
     """
     # TODO: native
     # TODO: localization
-    try:
-        from python import Python
+    # try:
+    #     from python import Python
 
-        var dt = Python.import_module("datetime")
-        var date = dt.datetime(year, month, day, hour, minute, second)
-        return date.strftime(format_str)
-    except:
-        return ""
+    #     var dt = Python.import_module("datetime")
+    #     var date = dt.datetime(year, month, day, hour, minute, second)
+    #     return date.strftime(format_str)
+    # except:
+    #     pass
+    _ = format_str, year, month, day, hour, minute, second
+    return ""

@@ -98,6 +98,8 @@ struct TimeZone[
                 "and sign must be either 1 or -1"
             ),
         )
+
+        @parameter
         if iana:
             debug_assert(
                 iana.value()[][0].get(tz_str) or iana.value()[][1].get(tz_str),
@@ -109,7 +111,10 @@ struct TimeZone[
         self.sign = sign
         self.has_dst = has_dst
 
-        if iana and not has_dst:
+        @parameter
+        if iana:
+            if has_dst:
+                return
             var tz = iana.value()[][1].get(tz_str)
             var val = offset_no_dst_tz(tz)
             if not val:
@@ -143,11 +148,16 @@ struct TimeZone[
             - offset_m: Offset for the minute: {0, 30, 45}.
             - sign: Sign of the offset: {1, -1}.
         """
-        if iana and native and self.has_dst:
-            var dst = iana.value()[][0].get(self.tz_str)
-            var offset = offset_at(dst, year, month, day, hour, minute, second)
-            if offset:
-                return offset.unsafe_take()
+
+        @parameter
+        if iana and native:
+            if self.has_dst:
+                var dst = iana.value()[][0].get(self.tz_str)
+                var offset = offset_at(
+                    dst, year, month, day, hour, minute, second
+                )
+                if offset:
+                    return offset.unsafe_take()
         elif iana and pyzoneinfo:
             try:
                 from python import Python
