@@ -157,7 +157,9 @@ struct Date[
             month: Month.
             day: Day.
             tz: Tz.
-            calendar: Calendar.
+            calendar: Calendar to change to, distance from epoch
+                is calculated and the new Self has that same
+                distance from the new Calendar's epoch.
 
         Returns:
             Self.
@@ -173,13 +175,12 @@ struct Date[
             new_self.tz = tz.value()
         if calendar:
             var cal = calendar.value()
-            new_self.year -= self.calendar.min_year
-            new_self.year += cal.min_year
-            new_self.month -= self.calendar.min_month
-            new_self.month += cal.min_month
-            new_self.day -= self.calendar.min_day
-            new_self.day += cal.min_day
+            var s = self.seconds_since_epoch()
+            new_self.year = cal.min_year
+            new_self.month = cal.min_month
+            new_self.day = cal.min_day
             new_self.calendar = cal
+            new_self = new_self.add(years=int(self.year), seconds=int(s))
         return new_self
 
     fn to_utc(owned self) -> Self:

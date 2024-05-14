@@ -247,7 +247,9 @@ struct DateTime[
             u_second: Microsecond.
             n_second: Nanosecond.
             tz: Tz.
-            calendar: Calendar.
+            calendar: Calendar to change to, distance from epoch
+                is calculated and the new Self has that same
+                distance from the new Calendar's epoch.
 
         Returns:
             Self.
@@ -276,25 +278,17 @@ struct DateTime[
             new_self.tz = tz.value()
         if calendar:
             var cal = calendar.value()
-            new_self.year -= self.calendar.min_year
-            new_self.year += cal.min_year
-            new_self.month -= self.calendar.min_month
-            new_self.month += cal.min_month
-            new_self.day -= self.calendar.min_day
-            new_self.day += cal.min_day
-            new_self.hour -= self.calendar.min_hour
-            new_self.hour += cal.min_hour
-            new_self.minute -= self.calendar.min_minute
-            new_self.minute += cal.min_minute
-            new_self.second -= self.calendar.min_second
-            new_self.second += cal.min_second
-            new_self.m_second -= self.calendar.min_milisecond
-            new_self.m_second += cal.min_milisecond
-            new_self.u_second -= self.calendar.min_microsecond
-            new_self.u_second += cal.min_microsecond
-            new_self.n_second -= self.calendar.min_nanosecond
-            new_self.n_second += cal.min_nanosecond
+            var tmpcal = self.calendar.from_year(self.year)
+            new_self.calendar = tmpcal
+            var ns = new_self.n_seconds_since_epoch()
+            new_self.year = cal.min_year
+            new_self.month = cal.min_month
+            new_self.day = cal.min_day
+            new_self.hour = cal.min_hour
+            new_self.minute = cal.min_minute
+            new_self.second = cal.min_second
             new_self.calendar = cal
+            new_self = new_self.add(years=int(self.year), n_seconds=int(ns))
         return new_self
 
     fn to_utc(owned self) -> Self:

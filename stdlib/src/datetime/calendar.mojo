@@ -1095,17 +1095,20 @@ struct Gregorian(_Calendarized):
             The hash.
         """
 
+        _ = self, n_second
+        var result: Int = 0
+
         @parameter
         if cal_h.selected == cal_h.UINT8:
             pass
         elif cal_h.selected == cal_h.UINT16:
             pass
         elif cal_h.selected == cal_h.UINT32:  # hash for `Date`
-            return int(
+            result = int(
                 (UInt32(year) << (5 + 5)) | (UInt32(month) << 5) | UInt32(day)
             )
         elif cal_h.selected == cal_h.UINT64:  # hash for `DateTime`
-            return int(
+            result = int(
                 UInt64(year) << cal_h.shift_64_y
                 | UInt64(month) << cal_h.shift_64_mon
                 | UInt64(day) << cal_h.shift_64_d
@@ -1115,8 +1118,7 @@ struct Gregorian(_Calendarized):
                 | UInt64(m_second) << cal_h.shift_64_ms
                 | UInt64(u_second) << cal_h.shift_64_us
             )
-        _ = self, n_second
-        return 0
+        return result
 
     @always_inline("nodebug")
     fn from_hash[
@@ -1133,6 +1135,7 @@ struct Gregorian(_Calendarized):
         Returns:
             Tuple containing date data.
         """
+        _ = self
         var num8 = UInt8(0)
         var num16 = UInt16(0)
         var result = (num16, num8, num8, num8, num8, num8, num16, num16)
@@ -1155,7 +1158,6 @@ struct Gregorian(_Calendarized):
             result[5] = int(((value & cal_h.mask_64_s) >> cal_h.shift_64_s))
             result[6] = int(((value & cal_h.mask_64_ms) >> cal_h.shift_64_ms))
             result[7] = int(((value & cal_h.mask_64_us) >> cal_h.shift_64_us))
-        _ = self
         return result
 
     @staticmethod
@@ -1259,8 +1261,8 @@ struct UTCFast(_Calendarized):
             - dayofweek: Day of the week.
             - dayofmonth: Day of the month.
         """
-        _ = self, year, month
-        return UInt8(0), UInt8(0)
+        var day = self._monthdays[int(month) - 1]
+        return self.dayofweek(year, month, day), day
 
     @always_inline("nodebug")
     fn max_second(
@@ -1307,6 +1309,7 @@ struct UTCFast(_Calendarized):
         Returns:
             - day: Day of the week: [0, 6] (monday - sunday).
         """
+        # TODO
         _ = self, year, month, day
         return 0
 
@@ -1322,6 +1325,7 @@ struct UTCFast(_Calendarized):
         Returns:
             - day: Day of the year: [1, 366] (for gregorian calendar).
         """
+        # TODO
         _ = self, year, month, day
         return 0
 
@@ -1581,20 +1585,23 @@ struct UTCFast(_Calendarized):
             The hash.
         """
 
+        _ = self, u_second, n_second
+        var result: Int = 0
+
         @parameter
         if cal_h.selected == cal_h.UINT8:
-            return int(
+            result = int(
                 (UInt8(day) << cal_h.shift_8_d)
                 | (UInt8(hour) << cal_h.shift_8_h)
             )
         elif cal_h.selected == cal_h.UINT16:
-            return int(
+            result = int(
                 (UInt16(year) << cal_h.shift_16_y)
                 | (UInt16(day) << cal_h.shift_16_d)
                 | (UInt16(hour) << cal_h.shift_16_h)
             )
         elif cal_h.selected == cal_h.UINT32:
-            return int(
+            result = int(
                 (UInt32(year) << cal_h.shift_32_y)
                 | (UInt32(month) << cal_h.shift_32_mon)
                 | (UInt32(day) << cal_h.shift_32_d)
@@ -1602,7 +1609,7 @@ struct UTCFast(_Calendarized):
                 | (UInt32(minute) << cal_h.shift_32_m)
             )
         elif cal_h.selected == cal_h.UINT64:
-            return int(
+            result = int(
                 (UInt64(year) << (cal_h.shift_64_y - cal_h.shift_64_ms))
                 | (UInt64(month) << (cal_h.shift_64_mon - cal_h.shift_64_ms))
                 | (UInt64(day) << (cal_h.shift_64_d - cal_h.shift_64_ms))
@@ -1611,8 +1618,7 @@ struct UTCFast(_Calendarized):
                 | (UInt64(second) << (cal_h.shift_64_s - cal_h.shift_64_ms))
                 | UInt64(m_second)
             )
-        _ = self, u_second, n_second
-        return 0
+        return result
 
     @always_inline("nodebug")
     fn from_hash[
@@ -1629,6 +1635,7 @@ struct UTCFast(_Calendarized):
         Returns:
             Tuple containing date data.
         """
+        _ = self
         var num8 = UInt8(0)
         var num16 = UInt16(0)
         var result = (num16, num8, num8, num8, num8, num8, num16, num16)
@@ -1673,7 +1680,6 @@ struct UTCFast(_Calendarized):
                 >> (cal_h.shift_64_s - cal_h.shift_64_ms)
             )
             result[6] = int(value & cal_h.mask_64_ms)
-        _ = self
         return result
 
     @staticmethod
