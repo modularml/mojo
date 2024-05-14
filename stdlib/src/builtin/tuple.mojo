@@ -50,19 +50,19 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, *args: *element_types):
+    fn __init__(inout self, owned *args: *element_types):
         """Construct the tuple.
 
         Args:
             args: Initial values.
         """
-        self = Self(storage=args)
+        self = Self(storage=args^)
 
     @always_inline("nodebug")
     fn __init__(
         inout self,
         *,
-        storage: VariadicPack[_, _, CollectionElement, element_types],
+        owned storage: VariadicPack[_, _, CollectionElement, element_types],
     ):
         """Construct the tuple from a low-level internal representation.
 
@@ -76,14 +76,16 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            # TODO: We could be fancier and take the values out of an owned
-            # pack. For now just keep everything simple and copy the element.
-            initialize_pointee_copy(
-                UnsafePointer(self[idx]),
-                storage[idx],
+            move_pointee(
+                dst=UnsafePointer(self[idx]),
+                src=UnsafePointer(storage[idx]),
             )
 
+        # Move each element into the tuple storage.
         unroll[initialize_elt, Self.__len__()]()
+
+        # Mark the elements as already destroyed.
+        storage._is_owned = False
 
     fn __del__(owned self):
         """Destructor that destroys all of the elements."""
