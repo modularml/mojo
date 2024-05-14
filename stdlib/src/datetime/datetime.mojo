@@ -218,7 +218,6 @@ struct DateTime[
         y.n_second = ns.n_second
         return y
 
-    @always_inline
     fn replace(
         owned self,
         *,
@@ -459,23 +458,57 @@ struct DateTime[
             self.tz,
             self.calendar,
         )
+        var minyear = dt.calendar.min_year
         var maxyear = dt.calendar.max_year
         if dt.year > maxyear:
-            dt = dt.replace(year=dt.calendar.min_year).add(
-                years=int(dt.year - maxyear)
-            )
+            dt = dt.replace(year=minyear).add(years=int(dt.year - maxyear))
+        var minmon = dt.calendar.min_month
         var maxmon = dt.calendar.max_month
         if dt.month > maxmon:
-            dt = dt.replace(month=maxmon).add(months=int(dt.month - maxmon))
+            dt = dt.replace(month=minmon).add(
+                years=1, months=int(dt.month - maxmon)
+            )
+        var minday = dt.calendar.min_day
         var maxday = dt.calendar.max_days_in_month(dt.year, dt.month)
         if dt.day > maxday:
-            dt = dt.replace(day=maxday).add(months=1, days=int(dt.day - maxday))
+            dt = dt.replace(day=minday).add(months=1, days=int(dt.day - maxday))
+        var minhour = dt.calendar.min_hour
+        var maxhour = dt.calendar.max_hour
+        if dt.hour > maxhour:
+            dt = dt.replace(hour=minhour).add(
+                days=1, hours=int(dt.hour - maxhour)
+            )
+        var minmin = dt.calendar.min_minute
+        var maxmin = dt.calendar.max_minute
+        if dt.minute > maxmin:
+            dt = dt.replace(minute=minmin).add(
+                hours=1, minutes=int(dt.minute - maxmin)
+            )
+        var minsec = dt.calendar.min_second
         var maxsec = dt.calendar.max_second(
             dt.year, dt.month, dt.day, dt.hour, dt.minute
         )
         if dt.second > maxsec:
-            dt = dt.replace(second=maxsec).add(
-                days=1, seconds=int(dt.second - maxsec)
+            dt = dt.replace(second=minsec).add(
+                minutes=1, seconds=int(dt.second - maxsec)
+            )
+        var minmsec = dt.calendar.min_milisecond
+        var maxmsec = dt.calendar.max_milisecond
+        if dt.m_second > maxmsec:
+            dt = dt.replace(m_second=minmsec).add(
+                seconds=1, m_seconds=int(dt.m_second - maxmsec)
+            )
+        var minusec = dt.calendar.min_microsecond
+        var maxusec = dt.calendar.max_microsecond
+        if dt.u_second > maxusec:
+            dt = dt.replace(u_second=minusec).add(
+                m_seconds=1, u_seconds=int(dt.u_second - maxusec)
+            )
+        var minnsec = dt.calendar.min_nanosecond
+        var maxnsec = dt.calendar.max_nanosecond
+        if dt.n_second > maxnsec:
+            dt = dt.replace(n_second=minnsec).add(
+                u_seconds=1, n_seconds=int(dt.n_second - maxnsec)
             )
         return dt
 
@@ -527,33 +560,31 @@ struct DateTime[
             self.calendar,
         )
         var minyear = dt.calendar.min_year
+        var maxyear = dt.calendar.max_year
         if dt.year < minyear:
-            dt = dt.replace(year=dt.calendar.max_year).subtract(
-                years=int(minyear - dt.year)
-            )
+            dt = dt.replace(year=maxyear).subtract(years=int(minyear - dt.year))
         var minmonth = dt.calendar.min_month
+        var maxmonth = dt.calendar.max_month
         if dt.month < minmonth:
-            dt = dt.replace(month=dt.calendar.max_month).subtract(
+            dt = dt.replace(month=maxmonth).subtract(
                 years=1, months=int(minmonth - dt.month)
             )
         var minday = dt.calendar.min_day
         if dt.day < minday:
+            dt = dt.subtract(months=1)
             var prev_day = dt.calendar.max_days_in_month(dt.year, dt.month - 1)
-            if dt.month - 1 < dt.calendar.min_month:
-                var ref = dt.calendar
-                prev_day = ref.max_days_in_month(ref.min_year, ref.max_month)
-            dt = dt.replace(day=prev_day).subtract(
-                months=1, days=int(minday - dt.day)
-            )
+            dt = dt.replace(day=prev_day).subtract(days=int(minday - dt.day))
         var minhour = dt.calendar.min_hour
+        var maxhour = dt.calendar.max_hour
         if dt.hour < minhour:
-            dt = dt.replace(hour=dt.calendar.max_hour).subtract(
+            dt = dt.replace(hour=maxhour).subtract(
                 days=1, hours=int(minhour - dt.hour)
             )
         var minmin = dt.calendar.min_minute
+        var maxmin = dt.calendar.max_minute
         if dt.minute < minmin:
-            dt = dt.replace(minute=dt.calendar.max_minute).subtract(
-                days=1, minutes=int(minmin - dt.minute)
+            dt = dt.replace(minute=maxmin).subtract(
+                hours=1, minutes=int(minmin - dt.minute)
             )
         var minsec = dt.calendar.min_second
         if dt.second < minsec:
@@ -561,22 +592,25 @@ struct DateTime[
                 dt.year, dt.month, dt.day, dt.hour, dt.minute
             )
             dt = dt.replace(second=sec).subtract(
-                days=1, seconds=int(minsec - dt.second)
+                minutes=1, seconds=int(minsec - dt.second)
             )
         var minmsec = dt.calendar.min_milisecond
+        var maxmsec = dt.calendar.max_milisecond
         if dt.m_second < minmsec:
-            dt = dt.replace(m_second=UInt16(999)).subtract(
-                days=1, m_seconds=int(minmsec - dt.m_second)
+            dt = dt.replace(m_second=maxmsec).subtract(
+                seconds=1, m_seconds=int(minmsec - dt.m_second)
             )
         var minusec = dt.calendar.min_microsecond
+        var maxusec = dt.calendar.max_microsecond
         if dt.u_second < minusec:
-            dt = dt.replace(u_second=UInt16(999)).subtract(
-                days=1, u_seconds=int(minusec - dt.u_second)
+            dt = dt.replace(u_second=maxusec).subtract(
+                m_seconds=1, u_seconds=int(minusec - dt.u_second)
             )
         var minnsec = dt.calendar.min_nanosecond
+        var maxnsec = dt.calendar.max_nanosecond
         if dt.n_second < minnsec:
-            dt = dt.replace(n_second=UInt16(999)).subtract(
-                days=1, n_seconds=int(minnsec - dt.n_second)
+            dt = dt.replace(n_second=maxnsec).subtract(
+                u_seconds=1, n_seconds=int(minnsec - dt.n_second)
             )
         return dt
 

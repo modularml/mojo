@@ -248,11 +248,11 @@ struct Calendar(_Calendarized):
     """Maximum typical value of seconds in a minute (no leaps)."""
     var max_possible_second: UInt8
     """Maximum possible value of seconds in a minute (with leaps)."""
-    var max_milisecond: UInt8
+    var max_milisecond: UInt16
     """Maximum value of miliseconds in a second."""
-    var max_microsecond: UInt8
+    var max_microsecond: UInt16
     """Maximum value of microseconds in a second."""
-    var max_nanosecond: UInt8
+    var max_nanosecond: UInt16
     """Maximum value of nanoseconds in a second."""
     var min_year: UInt16
     """Default minimum year in the calendar."""
@@ -655,11 +655,11 @@ struct Gregorian(_Calendarized):
     """Maximum typical value of seconds in a minute (no leaps)."""
     alias max_possible_second: UInt8 = 60
     """Maximum possible value of seconds in a minute (with leaps)."""
-    alias max_milisecond: UInt8 = 999
+    alias max_milisecond: UInt16 = 999
     """Maximum value of miliseconds in a second."""
-    alias max_microsecond: UInt8 = 999
+    alias max_microsecond: UInt16 = 999
     """Maximum value of microseconds in a second."""
-    alias max_nanosecond: UInt8 = 999
+    alias max_nanosecond: UInt16 = 999
     """Maximum value of nanoseconds in a second."""
     var min_year: UInt16
     """Default minimum year in the calendar."""
@@ -1207,11 +1207,11 @@ struct UTCFast(_Calendarized):
     """Maximum typical value of seconds in a minute (no leaps)."""
     alias max_possible_second: UInt8 = 59
     """Maximum possible value of seconds in a minute (with leaps)."""
-    alias max_milisecond: UInt8 = 999
+    alias max_milisecond: UInt16 = 999
     """Maximum value of miliseconds in a second."""
-    alias max_microsecond: UInt8 = 999
+    alias max_microsecond: UInt16 = 999
     """Maximum value of microseconds in a second."""
-    alias max_nanosecond: UInt8 = 999
+    alias max_nanosecond: UInt16 = 999
     """Maximum value of nanoseconds in a second."""
     var min_year: UInt16
     """Default minimum year in the calendar."""

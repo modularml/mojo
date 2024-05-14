@@ -140,7 +140,6 @@ struct Date[
         y.day = d.day
         return y
 
-    # @always_inline
     fn replace(
         owned self,
         *,
@@ -310,17 +309,20 @@ struct Date[
             self.calendar,
         )
 
+        var minyear = dt.calendar.min_year
         var maxyear = dt.calendar.max_year
         if dt.year > maxyear:
-            dt = dt.replace(year=dt.calendar.min_year).add(
-                years=int(dt.year - maxyear)
-            )
+            dt = dt.replace(year=minyear).add(years=int(dt.year - maxyear))
+        var minmon = dt.calendar.min_month
         var maxmon = dt.calendar.max_month
         if dt.month > maxmon:
-            dt = dt.replace(month=maxmon).add(months=int(dt.month - maxmon))
+            dt = dt.replace(month=minmon).add(
+                years=1, months=int(dt.month - maxmon)
+            )
+        var minday = dt.calendar.min_day
         var maxday = dt.calendar.max_days_in_month(dt.year, dt.month)
         if dt.day > maxday:
-            dt = dt.replace(day=maxday).add(months=1, days=int(dt.day - maxday))
+            dt = dt.replace(day=minday).add(months=1, days=int(dt.day - maxday))
         return dt
 
     fn subtract(
@@ -362,24 +364,20 @@ struct Date[
             self.calendar,
         )
         var minyear = dt.calendar.min_year
+        var maxyear = dt.calendar.max_year
         if dt.year < minyear:
-            dt = dt.replace(year=dt.calendar.max_year).subtract(
-                years=int(minyear - dt.year)
-            )
+            dt = dt.replace(year=maxyear).subtract(years=int(minyear - dt.year))
         var minmonth = dt.calendar.min_month
+        var maxmonth = dt.calendar.max_month
         if dt.month < minmonth:
-            dt = dt.replace(month=dt.calendar.max_month).subtract(
+            dt = dt.replace(month=maxmonth).subtract(
                 years=1, months=int(minmonth - dt.month)
             )
         var minday = dt.calendar.min_day
         if dt.day < minday:
+            dt = dt.subtract(months=1)
             var prev_day = dt.calendar.max_days_in_month(dt.year, dt.month - 1)
-            if dt.month - 1 < dt.calendar.min_month:
-                var ref = dt.calendar
-                prev_day = ref.max_days_in_month(ref.min_year, ref.max_month)
-            dt = dt.replace(day=prev_day).subtract(
-                months=1, days=int(minday - dt.day)
-            )
+            dt = dt.replace(day=prev_day).subtract(days=int(minday - dt.day))
         return dt
 
     # @always_inline("nodebug")
