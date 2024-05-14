@@ -511,7 +511,7 @@ struct DateTime64(Hashable, Stringable):
         Notes:
             This builds an instance with a hash set to default UTC epoch start.
         """
-        return DateTime64().add(seconds=seconds)
+        return Self().add(seconds=seconds)
 
     @staticmethod
     @always_inline("nodebug")
@@ -526,7 +526,7 @@ struct DateTime64(Hashable, Stringable):
         """
         var ms = time.now() // 1_000_000
         var s = ms // 1_000
-        return DateTime64.from_unix_epoch(s).add(m_seconds=ms)
+        return Self.from_unix_epoch(s).add(m_seconds=ms)
 
     @always_inline("nodebug")
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
@@ -554,7 +554,7 @@ struct DateTime64(Hashable, Stringable):
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
     ](s: String) -> OptionalReg[Self]:
-        """Construct a dateTime64time from an
+        """Construct a `DateTime64` from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
         `String`.
 
@@ -571,7 +571,7 @@ struct DateTime64(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = DateTime64(
+            var dt = Self(
                 int(p[0]), int(p[1]), int(p[2]), int(p[3]), int(p[4]), int(p[5])
             )
             return dt
@@ -590,7 +590,7 @@ struct DateTime64(Hashable, Stringable):
             Self.
         """
         var d = _calendar.from_hash[_cal_h64](int(value))
-        return DateTime64(
+        return Self(
             int(d[0]),
             int(d[1]),
             int(d[2]),
@@ -639,7 +639,7 @@ struct DateTime32(Hashable, Stringable):
         minute: OptionalReg[Int] = None,
         hash_val: OptionalReg[Int] = None,
     ):
-        """Construct a `DateTime32 ` from valid values.
+        """Construct a `DateTime32` from valid values.
         UTCCalendar is the default.
 
         Args:
@@ -1012,7 +1012,7 @@ struct DateTime32(Hashable, Stringable):
     @staticmethod
     @always_inline("nodebug")
     fn from_unix_epoch(seconds: Int) -> Self:
-        """Construct a `DateTime32 ` from the seconds since the Unix Epoch
+        """Construct a `DateTime32` from the seconds since the Unix Epoch
         1970-01-01.
 
         Args:
@@ -1024,12 +1024,12 @@ struct DateTime32(Hashable, Stringable):
         Notes:
             This builds an instance with a hash set to default UTC epoch start.
         """
-        return DateTime32().add(seconds=seconds)
+        return Self().add(seconds=seconds)
 
     @staticmethod
     @always_inline("nodebug")
     fn now() -> Self:
-        """Construct a `DateTime32 ` from `time.now()`.
+        """Construct a `DateTime32` from `time.now()`.
 
         Returns:
             Self.
@@ -1037,7 +1037,7 @@ struct DateTime32(Hashable, Stringable):
         Notes:
             This builds an instance with a hash set to default UTC epoch start.
         """
-        return DateTime32.from_unix_epoch(time.now() // 1_000_000_000)
+        return Self.from_unix_epoch(time.now() // 1_000_000_000)
 
     @always_inline("nodebug")
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
@@ -1086,9 +1086,7 @@ struct DateTime32(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = DateTime32(
-                int(p[0]), int(p[1]), int(p[2]), int(p[3]), int(p[4])
-            )
+            var dt = Self(int(p[0]), int(p[1]), int(p[2]), int(p[3]), int(p[4]))
             return dt
         except:
             return None
@@ -1096,7 +1094,7 @@ struct DateTime32(Hashable, Stringable):
     @staticmethod
     @always_inline("nodebug")
     fn from_hash(value: UInt32) -> Self:
-        """Construct a `DateTime32 ` from a hash made by it.
+        """Construct a `DateTime32` from a hash made by it.
 
         Args:
             value: The hash.
@@ -1105,7 +1103,7 @@ struct DateTime32(Hashable, Stringable):
             Self.
         """
         var d = _calendar.from_hash[_cal_h32](int(value))
-        return DateTime32(
+        return Self(
             int(d[0]),
             int(d[1]),
             int(d[2]),
@@ -1117,7 +1115,7 @@ struct DateTime32(Hashable, Stringable):
 
 @register_passable("trivial")
 struct DateTime16(Hashable, Stringable):
-    """Fast `DateTime16 ` struct. This is a `DateTime` with
+    """Fast `DateTime16` struct. This is a `DateTime` with
     hour resolution, it can be used as a year, dayofyear,
     hour representation. Uses UTCFastCal epoch
     [1970-01-01, 9999-12-31] and other params at build time.
@@ -1477,7 +1475,7 @@ struct DateTime16(Hashable, Stringable):
     @staticmethod
     @always_inline("nodebug")
     fn from_unix_epoch(seconds: Int) -> Self:
-        """Construct a `DateTime16 ` from the seconds since the Unix Epoch
+        """Construct a `DateTime16` from the seconds since the Unix Epoch
         1970-01-01.
 
         Args:
@@ -1489,12 +1487,12 @@ struct DateTime16(Hashable, Stringable):
         Notes:
             This builds an instance with a hash set to default UTC epoch start.
         """
-        return DateTime16().add(seconds=seconds)
+        return Self().add(seconds=seconds)
 
     @staticmethod
     @always_inline("nodebug")
     fn now() -> Self:
-        """Construct a `DateTime16 ` from `time.now()`.
+        """Construct a `DateTime16` from `time.now()`.
 
         Returns:
             Self.
@@ -1502,7 +1500,7 @@ struct DateTime16(Hashable, Stringable):
         Notes:
             This builds an instance with a hash set to default UTC epoch start.
         """
-        return DateTime16.from_unix_epoch(time.now() // 1_000_000_000)
+        return Self.from_unix_epoch(time.now() // 1_000_000_000)
 
     @always_inline("nodebug")
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
@@ -1551,7 +1549,7 @@ struct DateTime16(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = DateTime16(int(p[0]), int(p[1]), int(p[2]), int(p[3]))
+            var dt = Self(int(p[0]), int(p[1]), int(p[2]), int(p[3]))
             return dt
         except:
             return None
@@ -1559,7 +1557,7 @@ struct DateTime16(Hashable, Stringable):
     @staticmethod
     @always_inline("nodebug")
     fn from_hash(value: UInt16) -> Self:
-        """Construct a `DateTime16 ` from a hash made by it.
+        """Construct a `DateTime16` from a hash made by it.
 
         Args:
             value: The hash.
@@ -1568,14 +1566,14 @@ struct DateTime16(Hashable, Stringable):
             Self.
         """
         var d = _calendar.from_hash[_cal_h16](int(value))
-        return DateTime16(
+        return Self(
             year=int(d[0]), day=int(d[2]), hour=int(d[3]), hash_val=int(value)
         )
 
 
 @register_passable("trivial")
 struct DateTime8(Hashable, Stringable):
-    """Fast `DateTime8 ` struct. This is a `DateTime`
+    """Fast `DateTime8` struct. This is a `DateTime`
     with hour resolution, it can be used as a dayofweek,
     hour representation. Uses UTCFastCal epoch
     [1970-01-01, 9999-12-31] and other params at build time.
@@ -1608,7 +1606,7 @@ struct DateTime8(Hashable, Stringable):
         hour: OptionalReg[Int] = None,
         hash_val: OptionalReg[Int] = None,
     ):
-        """Construct a `DateTime8 ` from valid values.
+        """Construct a `DateTime8` from valid values.
         UTCCalendar is the default.
 
         Args:
@@ -1927,7 +1925,7 @@ struct DateTime8(Hashable, Stringable):
     @staticmethod
     @always_inline("nodebug")
     fn from_unix_epoch(seconds: Int) -> Self:
-        """Construct a `DateTime8 ` from the seconds since the Unix Epoch
+        """Construct a `DateTime8` from the seconds since the Unix Epoch
         1970-01-01.
 
         Args:
@@ -1939,12 +1937,12 @@ struct DateTime8(Hashable, Stringable):
         Notes:
             This builds an instance with a hash set to default UTC epoch start.
         """
-        return DateTime8().add(seconds=seconds)
+        return Self().add(seconds=seconds)
 
     @staticmethod
     @always_inline("nodebug")
     fn now() -> Self:
-        """Construct a `DateTime8 ` from `time.now()`.
+        """Construct a `DateTime8` from `time.now()`.
 
         Returns:
             Self.
@@ -1952,7 +1950,7 @@ struct DateTime8(Hashable, Stringable):
         Notes:
             This builds an instance with a hash set to default UTC epoch start.
         """
-        return DateTime8.from_unix_epoch(time.now() // 1_000_000_000)
+        return Self.from_unix_epoch(time.now() // 1_000_000_000)
 
     @always_inline("nodebug")
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
@@ -2001,7 +1999,7 @@ struct DateTime8(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = DateTime8(int(p[0]), int(p[1]), int(p[2]), int(p[3]))
+            var dt = Self(int(p[0]), int(p[1]), int(p[2]), int(p[3]))
             return dt
         except:
             return None
@@ -2018,4 +2016,4 @@ struct DateTime8(Hashable, Stringable):
             Self.
         """
         var d = _calendar.from_hash[_cal_h8](int(value))
-        return DateTime8(day=int(d[2]), hour=int(d[3]), hash_val=int(value))
+        return Self(day=int(d[2]), hour=int(d[3]), hash_val=int(value))

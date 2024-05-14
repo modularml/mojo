@@ -299,7 +299,7 @@ fn test_time() raises:
     var start = dt.now()
     time.sleep(1e-9)  # nanosecond resolution
     var end = dt.now()
-    assert_true(start.nanosecond != end.nanosecond)
+    assert_true(start.n_second != end.n_second)
 
 
 fn test_hash() raises:

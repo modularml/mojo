@@ -70,7 +70,7 @@ fn test_add() raises:
     assert_true(result == offset_n_1 and result == add_seconds)
 
     # test year and month add
-    result = date(2022, 6, 1, tz_0_, pycal) + date(3, 6, 31, tz_0_, unixcal)
+    result = date(2022, 6, 1, tz_0_, pycal) + date(3, 6, 31, tz_0_, pycal)
     offset_0 = date(2025, 1, 1, tz_0_, unixcal)
     offset_p_1 = date(2025, 1, 1, tz_1, unixcal)
     offset_n_1 = date(2024, 12, 31, tz1_, unixcal)
@@ -143,7 +143,7 @@ fn test_subtract() raises:
     assert_true(result == offset_n_1 and result == sub_seconds)
 
     # test year and month subtract
-    result = date(2025, 1, 1, tz_0_, pycal) - date(3, 6, 31, tz_0_, unixcal)
+    result = date(2025, 1, 1, tz_0_, pycal) - date(3, 6, 31, tz_0_, pycal)
     offset_0 = date(2022, 6, 1, tz_0_, unixcal)
     offset_p_1 = date(2022, 6, 1, tz_1, unixcal)
     offset_n_1 = date(2022, 5, 31, tz1_, unixcal)

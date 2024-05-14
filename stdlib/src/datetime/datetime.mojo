@@ -723,7 +723,12 @@ struct DateTime[
         Returns:
             Bool.
         """
-        return hash(self) == hash(other)
+        var s = self
+        var o = other
+        if self.tz != other.tz:
+            s = self.to_utc()
+            o = other.to_utc()
+        return hash(s) == hash(o)
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -735,7 +740,12 @@ struct DateTime[
         Returns:
             Bool.
         """
-        return hash(self) != hash(other)
+        var s = self
+        var o = other
+        if self.tz != other.tz:
+            s = self.to_utc()
+            o = other.to_utc()
+        return hash(s) != hash(o)
 
     @always_inline("nodebug")
     fn __gt__(self, other: Self) -> Bool:
@@ -747,7 +757,12 @@ struct DateTime[
         Returns:
             Bool.
         """
-        return hash(self) > hash(other)
+        var s = self
+        var o = other
+        if self.tz != other.tz:
+            s = self.to_utc()
+            o = other.to_utc()
+        return hash(s) > hash(o)
 
     @always_inline("nodebug")
     fn __ge__(self, other: Self) -> Bool:
@@ -759,7 +774,12 @@ struct DateTime[
         Returns:
             Bool.
         """
-        return hash(self) >= hash(other)
+        var s = self
+        var o = other
+        if self.tz != other.tz:
+            s = self.to_utc()
+            o = other.to_utc()
+        return hash(s) >= hash(o)
 
     @always_inline("nodebug")
     fn __le__(self, other: Self) -> Bool:
@@ -771,7 +791,12 @@ struct DateTime[
         Returns:
             Bool.
         """
-        return hash(self) <= hash(other)
+        var s = self
+        var o = other
+        if self.tz != other.tz:
+            s = self.to_utc()
+            o = other.to_utc()
+        return hash(s) <= hash(o)
 
     @always_inline("nodebug")
     fn __lt__(self, other: Self) -> Bool:
@@ -783,7 +808,12 @@ struct DateTime[
         Returns:
             Bool.
         """
-        return hash(self) < hash(other)
+        var s = self
+        var o = other
+        if self.tz != other.tz:
+            s = self.to_utc()
+            o = other.to_utc()
+        return hash(s) < hash(o)
 
     @always_inline("nodebug")
     fn __invert__(owned self) -> UInt32:
