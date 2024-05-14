@@ -19,6 +19,7 @@
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 """
 from time import time
+from collections.optional import OptionalReg
 
 from .timezone import TimeZone, ZoneInfo
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
@@ -96,9 +97,9 @@ struct Date[
         T: _IntCollect = UInt16, A: _IntCollect = UInt8
     ](
         inout self,
-        year: Optional[T] = None,
-        month: Optional[A] = None,
-        day: Optional[A] = None,
+        year: OptionalReg[T] = None,
+        month: OptionalReg[A] = None,
+        day: OptionalReg[A] = None,
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ):
@@ -115,9 +116,9 @@ struct Date[
             tz: Tz.
             calendar: Calendar.
         """
-        self.year = int(year.value()[]) if year else int(calendar.min_year)
-        self.month = int(month.value()[]) if month else int(calendar.min_month)
-        self.day = int(day.value()[]) if day else int(calendar.min_day)
+        self.year = int(year.value()) if year else int(calendar.min_year)
+        self.month = int(month.value()) if month else int(calendar.min_month)
+        self.day = int(day.value()) if day else int(calendar.min_day)
         self.tz = tz
         self.calendar = calendar
 
@@ -149,11 +150,11 @@ struct Date[
     fn replace(
         owned self,
         *,
-        owned year: Optional[UInt16] = None,
-        owned month: Optional[UInt8] = None,
-        owned day: Optional[UInt8] = None,
-        owned tz: Optional[Self._tz] = None,
-        owned calendar: Optional[Calendar] = None,
+        owned year: OptionalReg[UInt16] = None,
+        owned month: OptionalReg[UInt8] = None,
+        owned day: OptionalReg[UInt8] = None,
+        owned tz: OptionalReg[Self._tz] = None,
+        owned calendar: OptionalReg[Calendar] = None,
     ) -> Self:
         """Replace with give value/s.
 
@@ -169,15 +170,15 @@ struct Date[
         """
         var new_self = self
         if year:
-            new_self.year = year.unsafe_take()
+            new_self.year = year.value()
         if month:
-            new_self.month = month.unsafe_take()
+            new_self.month = month.value()
         if day:
-            new_self.day = day.unsafe_take()
+            new_self.day = day.value()
         if tz:
-            new_self.tz = tz.unsafe_take()
+            new_self.tz = tz.value()
         if calendar:
-            var cal = calendar.unsafe_take()
+            var cal = calendar.value()
             new_self.year -= self.calendar.min_year
             new_self.year += cal.min_year
             new_self.month -= self.calendar.min_month
@@ -855,7 +856,7 @@ struct Date[
         format_str: StringLiteral,
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
-    ](s: String) -> Optional[Self]:
+    ](s: String) -> OptionalReg[Self]:
         """Parse a `Date` from a  `String`.
 
         Parameters:
@@ -872,16 +873,16 @@ struct Date[
         var parsed = dt_str.strptime[format_str](s)
         if not parsed:
             return None
-        var p = parsed.unsafe_take()
+        var p = parsed.value()[]
         return Self(p[0], p[1], p[2], tz=tz, calendar=calendar)
 
     @staticmethod
     @parameter
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-        tz: Optional[Self._tz] = None,
+        tz: OptionalReg[Self._tz] = None,
         calendar: Calendar = _calendar,
-    ](s: String) -> Optional[Self]:
+    ](s: String) -> OptionalReg[Self]:
         """Construct a date from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
         `String`.
@@ -904,7 +905,7 @@ struct Date[
             var p = dt_str.from_iso[iso, iana, pyzoneinfo, native](s)
             var dt = Self(p[0], p[1], p[2], tz=p[6], calendar=calendar)
             if tz:
-                var t = tz.value()[]
+                var t = tz.value()
                 if t != dt.tz:
                     return dt.to_utc().from_utc(t)
             return dt

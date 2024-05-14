@@ -20,6 +20,7 @@ Notes:
 """
 from time import time
 from utils import Variant
+from collections.optional import OptionalReg
 
 from .timezone import TimeZone, ZoneInfo
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
@@ -110,15 +111,15 @@ struct DateTime[
         T: _IntCollect = UInt16, A: _IntCollect = UInt8
     ](
         inout self,
-        year: Optional[T] = None,
-        month: Optional[A] = None,
-        day: Optional[A] = None,
-        hour: Optional[A] = None,
-        minute: Optional[A] = None,
-        second: Optional[A] = None,
-        m_second: Optional[T] = None,
-        u_second: Optional[T] = None,
-        n_second: Optional[T] = None,
+        year: OptionalReg[T] = None,
+        month: OptionalReg[A] = None,
+        day: OptionalReg[A] = None,
+        hour: OptionalReg[A] = None,
+        minute: OptionalReg[A] = None,
+        second: OptionalReg[A] = None,
+        m_second: OptionalReg[T] = None,
+        u_second: OptionalReg[T] = None,
+        n_second: OptionalReg[T] = None,
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ):
@@ -141,23 +142,23 @@ struct DateTime[
             tz: Tz.
             calendar: Calendar.
         """
-        self.year = int(year.value()[]) if year else int(calendar.min_year)
-        self.month = int(month.value()[]) if month else int(calendar.min_month)
-        self.day = int(day.value()[]) if day else int(calendar.min_day)
-        self.hour = int(hour.value()[]) if hour else int(calendar.min_hour)
-        self.minute = int(minute.value()[]) if minute else int(
+        self.year = int(year.value()) if year else int(calendar.min_year)
+        self.month = int(month.value()) if month else int(calendar.min_month)
+        self.day = int(day.value()) if day else int(calendar.min_day)
+        self.hour = int(hour.value()) if hour else int(calendar.min_hour)
+        self.minute = int(minute.value()) if minute else int(
             calendar.min_minute
         )
-        self.second = int(second.value()[]) if second else int(
+        self.second = int(second.value()) if second else int(
             calendar.min_second
         )
-        self.m_second = int(m_second.value()[]) if m_second else int(
+        self.m_second = int(m_second.value()) if m_second else int(
             calendar.min_milisecond
         )
-        self.u_second = int(u_second.value()[]) if u_second else int(
+        self.u_second = int(u_second.value()) if u_second else int(
             calendar.min_microsecond
         )
-        self.n_second = int(n_second.value()[]) if n_second else int(
+        self.n_second = int(n_second.value()) if n_second else int(
             calendar.min_nanosecond
         )
         self.tz = tz
@@ -227,17 +228,17 @@ struct DateTime[
     fn replace(
         owned self,
         *,
-        owned year: Optional[UInt16] = None,
-        owned month: Optional[UInt8] = None,
-        owned day: Optional[UInt8] = None,
-        owned hour: Optional[UInt8] = None,
-        owned minute: Optional[UInt8] = None,
-        owned second: Optional[UInt8] = None,
-        owned m_second: Optional[UInt16] = None,
-        owned u_second: Optional[UInt16] = None,
-        owned n_second: Optional[UInt16] = None,
-        tz: Optional[Self._tz] = None,
-        calendar: Optional[Calendar] = None,
+        owned year: OptionalReg[UInt16] = None,
+        owned month: OptionalReg[UInt8] = None,
+        owned day: OptionalReg[UInt8] = None,
+        owned hour: OptionalReg[UInt8] = None,
+        owned minute: OptionalReg[UInt8] = None,
+        owned second: OptionalReg[UInt8] = None,
+        owned m_second: OptionalReg[UInt16] = None,
+        owned u_second: OptionalReg[UInt16] = None,
+        owned n_second: OptionalReg[UInt16] = None,
+        tz: OptionalReg[Self._tz] = None,
+        calendar: OptionalReg[Calendar] = None,
     ) -> Self:
         """Replace with give value/s.
 
@@ -260,27 +261,27 @@ struct DateTime[
 
         var new_self = self
         if year:
-            new_self.year = year.unsafe_take()
+            new_self.year = year.value()
         if month:
-            new_self.month = month.unsafe_take()
+            new_self.month = month.value()
         if day:
-            new_self.day = day.unsafe_take()
+            new_self.day = day.value()
         if hour:
-            new_self.hour = hour.unsafe_take()
+            new_self.hour = hour.value()
         if minute:
-            new_self.minute = minute.unsafe_take()
+            new_self.minute = minute.value()
         if second:
-            new_self.second = second.unsafe_take()
+            new_self.second = second.value()
         if m_second:
-            new_self.m_second = m_second.unsafe_take()
+            new_self.m_second = m_second.value()
         if u_second:
-            new_self.u_second = u_second.unsafe_take()
+            new_self.u_second = u_second.value()
         if n_second:
-            new_self.n_second = n_second.unsafe_take()
+            new_self.n_second = n_second.value()
         if tz:
-            new_self.tz = tz.value()[]
+            new_self.tz = tz.value()
         if calendar:
-            var cal = calendar.value()[]
+            var cal = calendar.value()
             new_self.year -= self.calendar.min_year
             new_self.year += cal.min_year
             new_self.month -= self.calendar.min_month
@@ -957,7 +958,7 @@ struct DateTime[
         """Construct a `DateTime` from minutes."""
         var m = int(calendar.max_minute)
         if minutes < m:
-            return Self(minute=minutes, tz=tz, calendar=calendar)
+            return Self(minute=UInt8(minutes), tz=tz, calendar=calendar)
         var h = minutes // (m + 1)
         var rest = minutes % (m + 1)
         var dt = Self._from_hours[add_leap](h, tz, calendar)
@@ -1182,7 +1183,7 @@ struct DateTime[
         format_str: StringLiteral,
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
-    ](s: String) -> Optional[Self]:
+    ](s: String) -> OptionalReg[Self]:
         """Parse a `DateTime` from a  `String`.
 
         Parameters:
@@ -1199,7 +1200,7 @@ struct DateTime[
         var parsed = dt_str.strptime[format_str](s)
         if not parsed:
             return None
-        var p = parsed.unsafe_take()
+        var p = parsed.value()[]
         return Self(
             p[0],
             p[1],
@@ -1218,9 +1219,9 @@ struct DateTime[
     @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-        tz: Optional[Self._tz] = None,
+        tz: OptionalReg[Self._tz] = None,
         calendar: Calendar = _calendar,
-    ](s: String) -> Optional[Self]:
+    ](s: String) -> OptionalReg[Self]:
         """Construct a datetime from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
         `String`.
@@ -1245,7 +1246,7 @@ struct DateTime[
                 p[0], p[1], p[2], p[3], p[4], p[5], tz=p[6], calendar=calendar
             )
             if tz:
-                var t = tz.value()[]
+                var t = tz.value()
                 if t != dt.tz:
                     return dt.to_utc().from_utc(t)
             return dt
