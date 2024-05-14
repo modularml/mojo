@@ -99,6 +99,40 @@ trait Copyable:
         ...
 
 
+trait Defaultable:
+    """The `Defaultable` trait describes a type with a default constructor.
+
+    Implementing the `Defaultable` trait requires the type to define
+    an `__init__` method with no arguments:
+
+    ```mojo
+    struct Foo(Defaultable):
+        var s: String
+
+        fn __init__(inout self):
+            self.s = "default"
+    ```
+
+    You can now construct a generic `Defaultable` type:
+
+    ```mojo
+    fn default_init[T: Defaultable]() -> T:
+        return T()
+
+    var foo = default_init[Foo]()
+    print(foo.s)
+    ```
+
+    ```plaintext
+    default
+    ```
+    """
+
+    fn __init__(inout self):
+        """Create a default instance of the value."""
+        ...
+
+
 trait CollectionElement(Copyable, Movable):
     """The CollectionElement trait denotes a trait composition
     of the `Copyable` and `Movable` traits.
