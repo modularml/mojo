@@ -14,7 +14,7 @@
 
 from sys import has_neon
 
-from testing import assert_equal, assert_not_equal, assert_true
+from testing import assert_equal, assert_not_equal, assert_true, assert_false
 
 
 def test_cast():
@@ -122,16 +122,16 @@ def test_truthy():
     @parameter
     fn test_dtype[type: DType]() raises:
         # # Scalars of 0-values are false-y, 1-values are truth-y
-        assert_equal(False, Scalar[type](False).__bool__())
-        assert_equal(True, Scalar[type](True).__bool__())
+        assert_false(Scalar[type](False).__bool__())
+        assert_true(Scalar[type](True).__bool__())
 
         # # SIMD vectors are truth-y if _all_ values are truth-y
-        assert_equal(True, SIMD[type, 2](True, True).__bool__())
+        assert_true(SIMD[type, 2](True, True).__bool__())
 
         # # SIMD vectors are false-y if _any_ values are false-y
-        assert_equal(False, SIMD[type, 2](False, True).__bool__())
-        assert_equal(False, SIMD[type, 2](True, False).__bool__())
-        assert_equal(False, SIMD[type, 2](False, False).__bool__())
+        assert_false(SIMD[type, 2](False, True).__bool__())
+        assert_false(SIMD[type, 2](True, False).__bool__())
+        assert_false(SIMD[type, 2](False, False).__bool__())
 
     @parameter
     fn test_dtype_unrolled[i: Int]() raises:
@@ -209,18 +209,35 @@ def test_roundeven():
 
 
 def test_floordiv():
-    assert_equal(Int32(2) // Int32(2), 1)
-    assert_equal(Int32(2) // Int32(3), 0)
-    assert_equal(Int32(2) // Int32(-2), -1)
-    assert_equal(Int32(99) // Int32(-2), -50)
+    assert_equal(Int32(2).__floordiv__(2), 1)
+    assert_equal(Int32(2).__floordiv__(Int32(2)), 1)
+    assert_equal(Int32(2).__floordiv__(Int32(3)), 0)
 
-    assert_equal(UInt32(2) // UInt32(2), 1)
-    assert_equal(UInt32(2) // UInt32(3), 0)
+    assert_equal(Int32(2).__floordiv__(-2), -1)
+    assert_equal(Int32(2).__floordiv__(Int32(-2)), -1)
+    assert_equal(Int32(99).__floordiv__(Int32(-2)), -50)
 
-    assert_equal(Float32(2) // Float32(2), 1)
-    assert_equal(Float32(2) // Float32(3), 0)
-    assert_equal(Float32(2) // Float32(-2), -1)
-    assert_equal(Float32(99) // Float32(-2), -50)
+    assert_equal(UInt32(2).__floordiv__(2), 1)
+    assert_equal(UInt32(2).__floordiv__(UInt32(2)), 1)
+    assert_equal(UInt32(2).__floordiv__(UInt32(3)), 0)
+
+    assert_equal(Float32(2).__floordiv__(2), 1)
+    assert_equal(Float32(2).__floordiv__(Float32(2)), 1)
+    assert_equal(Float32(2).__floordiv__(Float32(3)), 0)
+
+    assert_equal(Float32(2).__floordiv__(-2), -1)
+    assert_equal(Float32(2).__floordiv__(Float32(-2)), -1)
+    assert_equal(Float32(99).__floordiv__(Float32(-2)), -50)
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(2, 4, -2, -4)
+    assert_equal(i.__floordiv__(2), I(1, 2, -1, -2))
+    assert_equal(i.__floordiv__(Int32(2)), I(1, 2, -1, -2))
+
+    alias F = SIMD[DType.float32, 4]
+    var f = F(3, -4, 1, 5)
+    assert_equal(f.__floordiv__(3), F(1, -2, 0, 1))
+    assert_equal(f.__floordiv__(Float32(3)), F(1, -2, 0, 1))
 
 
 def test_rfloordiv():

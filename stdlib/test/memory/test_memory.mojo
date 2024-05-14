@@ -14,7 +14,7 @@
 
 from sys import sizeof
 
-from memory import memcmp, memcpy, memset_zero, DTypePointer, Pointer
+from memory import memcmp, memcpy, memset, memset_zero, DTypePointer, Pointer
 from utils._numerics import nan
 from testing import (
     assert_almost_equal,
@@ -292,6 +292,16 @@ def test_memset():
 
     assert_equal(pair.lo, 0)
     assert_equal(pair.hi, 0)
+
+    var buf0 = DTypePointer[DType.int32].alloc(2)
+    memset(buf0, 1, 2)
+    assert_equal(buf0.load(0), 16843009)
+    memset(buf0, -1, 2)
+    assert_equal(buf0.load(0), -1)
+
+    var buf1 = DTypePointer[DType.int8].alloc(2)
+    memset(buf1, 5, 2)
+    assert_equal(buf1.load(0), 5)
 
 
 def test_pointer_string():
