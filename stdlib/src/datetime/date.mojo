@@ -144,11 +144,11 @@ struct Date[
     fn replace(
         owned self,
         *,
-        owned year: OptionalReg[UInt16] = None,
-        owned month: OptionalReg[UInt8] = None,
-        owned day: OptionalReg[UInt8] = None,
-        owned tz: OptionalReg[Self._tz] = None,
-        owned calendar: OptionalReg[Calendar] = None,
+        year: OptionalReg[UInt16] = None,
+        month: OptionalReg[UInt8] = None,
+        day: OptionalReg[UInt8] = None,
+        tz: OptionalReg[Self._tz] = None,
+        calendar: OptionalReg[Calendar] = None,
     ) -> Self:
         """Replace with give value/s.
 
@@ -298,10 +298,10 @@ struct Date[
             int(self.day)
             + days
             + seconds
-            // int(
-                (self.calendar.max_hour + 1)
-                * (self.calendar.max_minute + 1)
-                * (self.calendar.max_typical_second + 1)
+            // (
+                int(self.calendar.max_hour + 1)
+                * int(self.calendar.max_minute + 1)
+                * int(self.calendar.max_typical_second + 1)
             ),
             self.tz,
             self.calendar,

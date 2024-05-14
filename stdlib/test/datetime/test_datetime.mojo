@@ -138,9 +138,7 @@ fn test_subtract() raises:
     )
     var offset_0 = dt(2024, 2, 29, tz=tz_0_, calendar=unixcal)
     var offset_p_1 = dt(2024, 2, 29, hour=1, tz=tz_1, calendar=unixcal)
-    var offset_n_1 = dt(
-        2024, 2, 28, hour=23, hour=23, tz=tz1_, calendar=unixcal
-    )
+    var offset_n_1 = dt(2024, 2, 28, hour=23, tz=tz1_, calendar=unixcal)
     var sub_seconds = dt(2024, 3, 1, tz=tz_0_, calendar=unixcal).subtract(
         seconds=1
     )

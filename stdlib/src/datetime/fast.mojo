@@ -146,13 +146,13 @@ struct DateTime64(Hashable, Stringable):
     fn replace(
         owned self,
         *,
-        owned year: OptionalReg[Int] = None,
-        owned month: OptionalReg[Int] = None,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
-        owned minute: OptionalReg[Int] = None,
-        owned second: OptionalReg[Int] = None,
-        owned m_second: OptionalReg[Int] = None,
+        year: OptionalReg[Int] = None,
+        month: OptionalReg[Int] = None,
+        day: OptionalReg[Int] = None,
+        hour: OptionalReg[Int] = None,
+        minute: OptionalReg[Int] = None,
+        second: OptionalReg[Int] = None,
+        m_second: OptionalReg[Int] = None,
     ) -> Self:
         """Replace values inside the hash.
 
@@ -656,11 +656,11 @@ struct DateTime32(Hashable, Stringable):
     fn replace(
         owned self,
         *,
-        owned year: OptionalReg[Int] = None,
-        owned month: OptionalReg[Int] = None,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
-        owned minute: OptionalReg[Int] = None,
+        year: OptionalReg[Int] = None,
+        month: OptionalReg[Int] = None,
+        day: OptionalReg[Int] = None,
+        hour: OptionalReg[Int] = None,
+        minute: OptionalReg[Int] = None,
     ) -> Self:
         """Replace values inside the hash.
 
@@ -1113,8 +1113,8 @@ struct DateTime16(Hashable, Stringable):
     fn replace(
         owned self,
         *,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
+        day: OptionalReg[Int] = None,
+        hour: OptionalReg[Int] = None,
     ) -> Self:
         """Replace values inside the hash.
 
@@ -1553,8 +1553,8 @@ struct DateTime8(Hashable, Stringable):
     fn replace(
         owned self,
         *,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
+        day: OptionalReg[Int] = None,
+        hour: OptionalReg[Int] = None,
     ) -> Self:
         """Replace values inside the hash.
 
