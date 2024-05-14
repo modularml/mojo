@@ -179,12 +179,12 @@ struct LegacyPointer[
     var address: Self._mlir_type
     """The pointed-to address."""
 
-    alias _mlir_ref_type = Reference[
+    alias _ref_type = Reference[
         type,
         __mlir_attr.`1: i1`,
         __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
         address_space,
-    ]._mlir_type
+    ]
 
     @always_inline("nodebug")
     fn __init__() -> Self:
@@ -281,18 +281,18 @@ struct LegacyPointer[
         )
 
     @always_inline("nodebug")
-    fn __refitem__(self) -> Self._mlir_ref_type:
+    fn __refitem__(self) -> Self._ref_type:
         """Enable subscript syntax `ref[]` to access the element.
 
         Returns:
             The MLIR reference for the Mojo compiler to use.
         """
-        return __mlir_op.`lit.ref.from_pointer`[_type = Self._mlir_ref_type](
-            self.address
-        )
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Self._ref_type._mlir_type
+        ](self.address)
 
     @always_inline("nodebug")
-    fn __refitem__[T: Intable](self, offset: T) -> Self._mlir_ref_type:
+    fn __refitem__[T: Intable](self, offset: T) -> Self._ref_type:
         """Enable subscript syntax `ref[idx]` to access the element.
 
         Parameters:

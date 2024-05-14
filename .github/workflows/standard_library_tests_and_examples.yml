@@ -29,6 +29,7 @@ jobs:
         os: ["ubuntu-latest", "macos-14"]
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
 
     defaults:
       run:
