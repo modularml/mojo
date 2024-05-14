@@ -33,8 +33,8 @@ alias _max_delta = UInt16(~UInt64(0) // (365 * 24 * 60 * 60 * 1_000_000_000))
 Gregorian calendar with year = 365 d * 24 h, 60 min, 60 s, 10^9 ns"""
 
 
-trait _IntCollect(Intable, CollectionElement):
-    ...
+# trait _IntCollect(Intable, CollectionElement):
+#     ...
 
 
 # @value
@@ -107,27 +107,21 @@ struct DateTime[
     var calendar: Calendar
     """Calendar."""
 
-    fn __init__[
-        T: _IntCollect = UInt16, A: _IntCollect = UInt8
-    ](
+    fn __init__(
         inout self,
-        year: OptionalReg[T] = None,
-        month: OptionalReg[A] = None,
-        day: OptionalReg[A] = None,
-        hour: OptionalReg[A] = None,
-        minute: OptionalReg[A] = None,
-        second: OptionalReg[A] = None,
-        m_second: OptionalReg[T] = None,
-        u_second: OptionalReg[T] = None,
-        n_second: OptionalReg[T] = None,
+        year: OptionalReg[Int] = None,
+        month: OptionalReg[Int] = None,
+        day: OptionalReg[Int] = None,
+        hour: OptionalReg[Int] = None,
+        minute: OptionalReg[Int] = None,
+        second: OptionalReg[Int] = None,
+        m_second: OptionalReg[Int] = None,
+        u_second: OptionalReg[Int] = None,
+        n_second: OptionalReg[Int] = None,
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ):
         """Construct a `DateTime` from valid values.
-
-        Parameters:
-            T: Any Intable Collectable type.
-            A: Any Intable Collectable type.
 
         Args:
             year: Year.
@@ -865,17 +859,17 @@ struct DateTime[
 
     @staticmethod
     fn _from_years(
-        years: UInt16,
+        years: Int,
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `DateTime` from years."""
-        var delta = calendar.max_year - years
+        var delta = int(calendar.max_year) - years
         if delta > 0:
-            if years > calendar.min_year:
+            if years > int(calendar.min_year):
                 return Self(year=years, tz=tz, calendar=calendar)
             return Self._from_years(delta)
-        return Self._from_years(calendar.max_year - delta)
+        return Self._from_years(int(calendar.max_year) - delta)
 
     @staticmethod
     @always_inline("nodebug")
@@ -886,7 +880,7 @@ struct DateTime[
     ) -> Self:
         """Construct a `DateTime` from months."""
         if months <= int(calendar.max_month):
-            return Self(month=UInt8(months), tz=tz, calendar=calendar)
+            return Self(month=months, tz=tz, calendar=calendar)
         var y = months // int(calendar.max_month)
         var rest = months % int(calendar.max_month)
         var dt = Self._from_years(y, tz, calendar)
@@ -902,12 +896,12 @@ struct DateTime[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `DateTime` from days."""
-        var minyear = calendar.min_year
+        var minyear = int(calendar.min_year)
         var dt = Self(minyear, tz=tz, calendar=calendar)
         var maxtdays = int(calendar.max_typical_days_in_year)
         var maxposdays = int(calendar.max_possible_days_in_year)
         var years = days // maxtdays
-        if years > int(minyear):
+        if years > minyear:
             dt = Self._from_years(years, tz, calendar)
         var maxydays = maxposdays if calendar.is_leapyear(dt.year) else maxtdays
         var day = days
@@ -919,7 +913,7 @@ struct DateTime[
         if day > maxydays:
             var y = day // maxydays
             day = day % maxydays
-            var dt2 = Self._from_years(UInt16(y), tz, calendar)
+            var dt2 = Self._from_years(y, tz, calendar)
             dt.year += dt2.year
         var maxmondays = int(calendar.max_days_in_month(dt.year, dt.month))
         while day > maxmondays:
@@ -940,7 +934,7 @@ struct DateTime[
         """Construct a `DateTime` from hours."""
         var h = int(calendar.max_hour)
         if hours <= h:
-            return Self(hour=UInt8(hours), tz=tz, calendar=calendar)
+            return Self(hour=hours, tz=tz, calendar=calendar)
         var d = hours // (h + 1)
         var rest = hours % (h + 1)
         var dt = Self._from_days[add_leap](d, tz, calendar)
@@ -958,7 +952,7 @@ struct DateTime[
         """Construct a `DateTime` from minutes."""
         var m = int(calendar.max_minute)
         if minutes < m:
-            return Self(minute=UInt8(minutes), tz=tz, calendar=calendar)
+            return Self(minute=minutes, tz=tz, calendar=calendar)
         var h = minutes // (m + 1)
         var rest = minutes % (m + 1)
         var dt = Self._from_hours[add_leap](h, tz, calendar)
@@ -1022,7 +1016,7 @@ struct DateTime[
         """Construct a `DateTime` from miliseconds."""
         var ms = int(calendar.max_milisecond)
         if m_seconds <= ms:
-            return Self(m_second=UInt16(m_seconds), tz=tz, calendar=calendar)
+            return Self(m_second=m_seconds, tz=tz, calendar=calendar)
         var s = m_seconds // (ms + 1)
         var rest = m_seconds % (ms + 1)
         var dt = Self.from_seconds(s, tz, calendar)
@@ -1038,7 +1032,7 @@ struct DateTime[
         """Construct a `DateTime` from microseconds."""
         var us = int(calendar.max_microsecond)
         if u_seconds <= us:
-            return Self(u_second=UInt16(u_seconds), tz=tz, calendar=calendar)
+            return Self(u_second=u_seconds, tz=tz, calendar=calendar)
         var ms = u_seconds // (us + 1)
         var rest = u_seconds % (us + 1)
         var dt = Self._from_m_seconds(ms, tz, calendar)
@@ -1055,7 +1049,7 @@ struct DateTime[
         """Construct a `DateTime` from nanoseconds."""
         var ns = int(calendar.max_nanosecond)
         if n_seconds <= ns:
-            return Self(n_second=UInt16(n_seconds), tz=tz, calendar=calendar)
+            return Self(n_second=n_seconds, tz=tz, calendar=calendar)
         var us = n_seconds // (ns + 1)
         var rest = n_seconds % (ns + 1)
         var dt = Self._from_u_seconds(us, tz, calendar)
@@ -1202,15 +1196,15 @@ struct DateTime[
             return None
         var p = parsed.value()[]
         return Self(
-            p[0],
-            p[1],
-            p[2],
-            p[3],
-            p[4],
-            p[5],
-            p[6],
-            p[7],
-            p[8],
+            int(p[0]),
+            int(p[1]),
+            int(p[2]),
+            int(p[3]),
+            int(p[4]),
+            int(p[5]),
+            int(p[6]),
+            int(p[7]),
+            int(p[8]),
             tz=tz,
             calendar=calendar,
         )
@@ -1243,7 +1237,14 @@ struct DateTime[
         try:
             var p = dt_str.from_iso[iso, iana, pyzoneinfo, native](s)
             var dt = Self(
-                p[0], p[1], p[2], p[3], p[4], p[5], tz=p[6], calendar=calendar
+                int(p[0]),
+                int(p[1]),
+                int(p[2]),
+                int(p[3]),
+                int(p[4]),
+                int(p[5]),
+                tz=p[6],
+                calendar=calendar,
             )
             if tz:
                 var t = tz.value()
@@ -1273,14 +1274,14 @@ struct DateTime[
         """
         var d = calendar.from_hash(value)
         return Self(
-            d[0],
-            d[1],
-            d[2],
-            d[3],
-            d[4],
-            d[5],
-            d[6],
-            d[7],
+            int(d[0]),
+            int(d[1]),
+            int(d[2]),
+            int(d[3]),
+            int(d[4]),
+            int(d[5]),
+            int(d[6]),
+            int(d[7]),
             tz=tz,
             calendar=calendar,
         )

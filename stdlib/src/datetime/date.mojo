@@ -30,8 +30,8 @@ alias _calendar = PythonCalendar
 alias _cal_hash = CalendarHashes(32)
 
 
-trait _IntCollect(Intable, CollectionElement):
-    ...
+# trait _IntCollect(Intable, CollectionElement):
+#     ...
 
 
 # @value
@@ -93,21 +93,15 @@ struct Date[
     var calendar: Calendar
     """Calendar."""
 
-    fn __init__[
-        T: _IntCollect = UInt16, A: _IntCollect = UInt8
-    ](
+    fn __init__(
         inout self,
-        year: OptionalReg[T] = None,
-        month: OptionalReg[A] = None,
-        day: OptionalReg[A] = None,
+        year: OptionalReg[Int] = None,
+        month: OptionalReg[Int] = None,
+        day: OptionalReg[Int] = None,
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ):
         """Construct a `Date` from valid values.
-
-        Parameters:
-            T: Any Intable Collectable type.
-            A: Any Intable Collectable type.
 
         Args:
             year: Year.
@@ -635,17 +629,17 @@ struct Date[
 
     @staticmethod
     fn _from_years(
-        years: UInt16,
+        years: Int,
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from years."""
-        var delta = calendar.max_year - years
+        var delta = int(calendar.max_year) - years
         if delta > 0:
-            if years > calendar.min_year:
+            if years > int(calendar.min_year):
                 return Self(year=years, tz=tz, calendar=calendar)
             return Self._from_years(delta)
-        return Self._from_years(calendar.max_year - delta)
+        return Self._from_years(int(calendar.max_year) - delta)
 
     @staticmethod
     fn _from_months(
@@ -655,7 +649,7 @@ struct Date[
     ) -> Self:
         """Construct a `Date` from months."""
         if months <= int(calendar.max_month):
-            return Self(month=UInt8(months), tz=tz, calendar=calendar)
+            return Self(month=months, tz=tz, calendar=calendar)
         var y = months // int(calendar.max_month)
         var rest = months % int(calendar.max_month)
         var dt = Self._from_years(y, tz, calendar)
@@ -671,12 +665,12 @@ struct Date[
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from days."""
-        var minyear = calendar.min_year
+        var minyear = int(calendar.min_year)
         var dt = Self(minyear, tz=tz, calendar=calendar)
         var maxtdays = int(calendar.max_typical_days_in_year)
         var maxposdays = int(calendar.max_possible_days_in_year)
         var years = days // maxtdays
-        if years > int(minyear):
+        if years > minyear:
             dt = Self._from_years(years, tz, calendar)
         var maxydays = maxposdays if calendar.is_leapyear(dt.year) else maxtdays
         var day = days
@@ -688,7 +682,7 @@ struct Date[
         if day > maxydays:
             var y = day // maxydays
             day = day % maxydays
-            var dt2 = Self._from_years(UInt16(y), tz, calendar)
+            var dt2 = Self._from_years(y, tz, calendar)
             dt.year += dt2.year
         var maxmondays = int(calendar.max_days_in_month(dt.year, dt.month))
         while day > maxmondays:
@@ -709,7 +703,7 @@ struct Date[
         """Construct a `Date` from hours."""
         var h = int(calendar.max_hour)
         if hours <= h:
-            return Self(calendar.min_year, tz=tz, calendar=calendar)
+            return Self(int(calendar.min_year), tz=tz, calendar=calendar)
         var d = hours // (h + 1)
         return Self._from_days[add_leap](d, tz, calendar)
 
@@ -724,7 +718,7 @@ struct Date[
         """Construct a `Date` from minutes."""
         var m = int(calendar.max_minute)
         if minutes < m:
-            return Self(calendar.min_year, tz=tz, calendar=calendar)
+            return Self(int(calendar.min_year), tz=tz, calendar=calendar)
         var h = minutes // (m + 1)
         return Self._from_hours[add_leap](h, tz, calendar)
 
@@ -874,7 +868,7 @@ struct Date[
         if not parsed:
             return None
         var p = parsed.value()[]
-        return Self(p[0], p[1], p[2], tz=tz, calendar=calendar)
+        return Self(int(p[0]), int(p[1]), int(p[2]), tz=tz, calendar=calendar)
 
     @staticmethod
     @parameter
@@ -903,7 +897,9 @@ struct Date[
         """
         try:
             var p = dt_str.from_iso[iso, iana, pyzoneinfo, native](s)
-            var dt = Self(p[0], p[1], p[2], tz=p[6], calendar=calendar)
+            var dt = Self(
+                int(p[0]), int(p[1]), int(p[2]), tz=p[6], calendar=calendar
+            )
             if tz:
                 var t = tz.value()
                 if t != dt.tz:
@@ -929,4 +925,4 @@ struct Date[
             Self.
         """
         var d = calendar.from_hash[_cal_hash](int(value))
-        return Self(d[0], d[1], d[2], tz=tz, calendar=calendar)
+        return Self(int(d[0]), int(d[1]), int(d[2]), tz=tz, calendar=calendar)
