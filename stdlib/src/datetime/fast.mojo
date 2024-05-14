@@ -34,8 +34,8 @@ from .calendar import UTCFastCal, CalendarHashes
 import .dt_str
 
 
-# trait _IntCollect(Intable, CollectionElement):
-#     ...
+trait _IntCollect(Intable, CollectionElement):
+    ...
 
 
 @value
@@ -73,19 +73,25 @@ struct DateTime64(Hashable, Stringable):
     alias _calendar = UTCFastCal
     alias _cal_h = CalendarHashes(64)
 
-    fn __init__(
+    fn __init__[
+        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+    ](
         inout self,
-        owned year: Optional[Int] = None,
-        owned month: Optional[Int] = None,
-        owned day: Optional[Int] = None,
-        owned hour: Optional[Int] = None,
-        owned minute: Optional[Int] = None,
-        owned second: Optional[Int] = None,
-        owned m_second: Optional[Int] = None,
-        owned hash_val: Optional[Int] = None,
+        owned year: Optional[T] = None,
+        owned month: Optional[A] = None,
+        owned day: Optional[A] = None,
+        owned hour: Optional[A] = None,
+        owned minute: Optional[A] = None,
+        owned second: Optional[A] = None,
+        owned m_second: Optional[T] = None,
+        owned hash_val: Optional[UInt64] = None,
     ):
         """Construct a `DateTime64` from valid values.
         UTCCalendar is the default.
+
+        Parameters:
+            T: Any type that is Intable and Collectable.
+            A: Any type that is Intable and Collectable.
 
         Args:
             year: Year.
@@ -533,9 +539,7 @@ struct DateTime64(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = Self(
-                int(p[0]), int(p[1]), int(p[2]), int(p[3]), int(p[4]), int(p[5])
-            )
+            var dt = Self(p[0], p[1], p[2], p[3], p[4], p[5])
             return dt
         except:
             return None
@@ -552,15 +556,7 @@ struct DateTime64(Hashable, Stringable):
             Self.
         """
         var d = Self._calendar.from_hash[Self._cal_h](int(value))
-        return Self(
-            int(d[0]),
-            int(d[1]),
-            int(d[2]),
-            int(d[3]),
-            int(d[4]),
-            int(d[5]),
-            hash_val=int(value),
-        )
+        return Self(d[0], d[1], d[2], d[3], d[4], d[5], hash_val=value)
 
 
 @value
@@ -595,17 +591,23 @@ struct DateTime32(Hashable, Stringable):
     alias _calendar = UTCFastCal
     alias _cal_h = CalendarHashes(32)
 
-    fn __init__(
+    fn __init__[
+        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+    ](
         inout self,
-        owned year: Optional[Int] = None,
-        owned month: Optional[Int] = None,
-        owned day: Optional[Int] = None,
-        owned hour: Optional[Int] = None,
-        owned minute: Optional[Int] = None,
-        owned hash_val: Optional[Int] = None,
+        owned year: Optional[T] = None,
+        owned month: Optional[A] = None,
+        owned day: Optional[A] = None,
+        owned hour: Optional[A] = None,
+        owned minute: Optional[A] = None,
+        owned hash_val: Optional[UInt32] = None,
     ):
         """Construct a `DateTime32` from valid values.
         UTCCalendar is the default.
+
+        Parameters:
+            T: Any type that is Intable and Collectable.
+            A: Any type that is Intable and Collectable.
 
         Args:
             year: Year.
@@ -1019,7 +1021,7 @@ struct DateTime32(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = Self(int(p[0]), int(p[1]), int(p[2]), int(p[3]), int(p[4]))
+            var dt = Self(p[0], p[1], p[2], p[3], p[4])
             return dt
         except:
             return None
@@ -1036,14 +1038,7 @@ struct DateTime32(Hashable, Stringable):
             Self.
         """
         var d = Self._calendar.from_hash[Self._cal_h](int(value))
-        return Self(
-            int(d[0]),
-            int(d[1]),
-            int(d[2]),
-            int(d[3]),
-            int(d[4]),
-            hash_val=int(value),
-        )
+        return Self(d[0], d[1], d[2], d[3], d[4], hash_val=value)
 
 
 @value
@@ -1077,16 +1072,22 @@ struct DateTime16(Hashable, Stringable):
     alias _calendar = UTCFastCal
     alias _cal_h = CalendarHashes(16)
 
-    fn __init__(
+    fn __init__[
+        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+    ](
         inout self,
-        owned year: Optional[Int] = None,
-        owned month: Optional[Int] = None,
-        owned day: Optional[Int] = None,
-        owned hour: Optional[Int] = None,
-        owned hash_val: Optional[Int] = None,
+        owned year: Optional[T] = None,
+        owned month: Optional[A] = None,
+        owned day: Optional[A] = None,
+        owned hour: Optional[A] = None,
+        owned hash_val: Optional[UInt16] = None,
     ):
         """Construct a `DateTime16` from valid values.
         UTCCalendar is the default.
+
+        Parameters:
+            T: Any type that is Intable and Collectable.
+            A: Any type that is Intable and Collectable.
 
         Args:
             year: Year.
@@ -1471,7 +1472,7 @@ struct DateTime16(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = Self(int(p[0]), int(p[1]), int(p[2]), int(p[3]))
+            var dt = Self(p[0], p[1], p[2], p[3])
             return dt
         except:
             return None
@@ -1488,9 +1489,7 @@ struct DateTime16(Hashable, Stringable):
             Self.
         """
         var d = Self._calendar.from_hash[Self._cal_h](int(value))
-        return Self(
-            year=int(d[0]), day=int(d[2]), hour=int(d[3]), hash_val=int(value)
-        )
+        return Self(year=d[0], day=d[2], hour=d[3], hash_val=value)
 
 
 @value
@@ -1523,16 +1522,22 @@ struct DateTime8(Hashable, Stringable):
     alias _calendar = UTCFastCal
     alias _cal_h = CalendarHashes(8)
 
-    fn __init__(
+    fn __init__[
+        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+    ](
         inout self,
-        owned year: Optional[Int] = None,
-        owned month: Optional[Int] = None,
-        owned day: Optional[Int] = None,
-        owned hour: Optional[Int] = None,
-        owned hash_val: Optional[Int] = None,
+        owned year: Optional[T] = None,
+        owned month: Optional[A] = None,
+        owned day: Optional[A] = None,
+        owned hour: Optional[A] = None,
+        owned hash_val: Optional[UInt8] = None,
     ):
         """Construct a `DateTime8` from valid values.
         UTCCalendar is the default.
+
+        Parameters:
+            T: Any type that is Intable and Collectable.
+            A: Any type that is Intable and Collectable.
 
         Args:
             year: Year.
@@ -1915,7 +1920,7 @@ struct DateTime8(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = Self(int(p[0]), int(p[1]), int(p[2]), int(p[3]))
+            var dt = Self(p[0], p[1], p[2], p[3])
             return dt
         except:
             return None
@@ -1932,4 +1937,4 @@ struct DateTime8(Hashable, Stringable):
             Self.
         """
         var d = Self._calendar.from_hash[Self._cal_h](int(value))
-        return Self(day=int(d[2]), hour=int(d[3]), hash_val=int(value))
+        return Self(day=d[2], hour=d[3], hash_val=value)

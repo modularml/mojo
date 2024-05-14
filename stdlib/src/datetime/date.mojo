@@ -30,8 +30,8 @@ alias _calendar = PythonCalendar
 alias _cal_hash = CalendarHashes(32)
 
 
-# trait _IntCollect(Intable, CollectionElement):
-#     ...
+trait _IntCollect(Intable, CollectionElement):
+    ...
 
 
 @value
@@ -93,15 +93,21 @@ struct Date[
     var calendar: Calendar
     """Calendar."""
 
-    fn __init__(
+    fn __init__[
+        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+    ](
         inout self,
-        owned year: Optional[Int] = None,
-        owned month: Optional[Int] = None,
-        owned day: Optional[Int] = None,
+        owned year: Optional[T] = None,
+        owned month: Optional[A] = None,
+        owned day: Optional[A] = None,
         owned tz: Self._tz = Self._tz(),
         owned calendar: Calendar = _calendar,
     ):
         """Construct a `Date` from valid values.
+
+        Parameters:
+            T: Any type that is Intable and Collectable.
+            A: Any type that is Intable and Collectable.
 
         Args:
             year: Year.

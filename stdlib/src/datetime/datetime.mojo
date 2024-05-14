@@ -33,8 +33,8 @@ alias _max_delta = UInt16(~UInt64(0) // (365 * 24 * 60 * 60 * 1_000_000_000))
 Gregorian calendar with year = 365 d * 24 h, 60 min, 60 s, 10^9 ns"""
 
 
-# trait _IntCollect(Intable, CollectionElement):
-#     ...
+trait _IntCollect(Intable, CollectionElement):
+    ...
 
 
 @value
@@ -107,21 +107,27 @@ struct DateTime[
     var calendar: Calendar
     """Calendar."""
 
-    fn __init__(
+    fn __init__[
+        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+    ](
         inout self,
-        owned year: Optional[Int] = None,
-        owned month: Optional[Int] = None,
-        owned day: Optional[Int] = None,
-        owned hour: Optional[Int] = None,
-        owned minute: Optional[Int] = None,
-        owned second: Optional[Int] = None,
-        owned m_second: Optional[Int] = None,
-        owned u_second: Optional[Int] = None,
-        owned n_second: Optional[Int] = None,
+        owned year: Optional[T] = None,
+        owned month: Optional[A] = None,
+        owned day: Optional[A] = None,
+        owned hour: Optional[A] = None,
+        owned minute: Optional[A] = None,
+        owned second: Optional[A] = None,
+        owned m_second: Optional[T] = None,
+        owned u_second: Optional[T] = None,
+        owned n_second: Optional[T] = None,
         owned tz: Self._tz = Self._tz(),
         owned calendar: Calendar = _calendar,
     ):
         """Construct a `DateTime` from valid values.
+
+        Parameters:
+            T: Any type that is Intable and Collectable.
+            A: Any type that is Intable and Collectable.
 
         Args:
             year: Year.
