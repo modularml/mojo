@@ -41,6 +41,9 @@ trait Roundable:
     fn __round__(self) -> Self:
         ...
 
+    fn __round__(self, ndigits: IntLiteral) -> Self:
+        ...
+
 
 @always_inline
 fn round[T: Roundable](value: T) -> T:

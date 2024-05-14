@@ -233,14 +233,14 @@ struct FloatLiteral(
         if not self._is_normal():
             return self
 
-        var truncated: IntLiteral = self.__int_literal__()
+        var truncated: Self = self.__int_literal__()
         var result: Self
         if abs(self) - abs(truncated) <= 0.5:
-            result = Self(truncated)
+            result = truncated
         elif self > 0:
-            result = Self(truncated + 1)
+            result = truncated + 1
         else:
-            result = Self(truncated - 1)
+            result = truncated - 1
         return result
 
     @always_inline("nodebug")
@@ -248,7 +248,7 @@ struct FloatLiteral(
         """Return the rounded value of the FloatLiteral.
 
         Args:
-            ndigits: The number of digits to round to. Defaults to 0.
+            ndigits: The number of digits to round to.
 
         Returns:
             The rounded value.
