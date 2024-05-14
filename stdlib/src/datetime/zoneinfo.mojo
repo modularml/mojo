@@ -487,7 +487,7 @@ alias ZoneInfo = (ZoneInfoMem32, ZoneInfoMem8)
 """ZoneInfo."""
 
 
-@always_inline
+# @always_inline
 fn get_zoneinfo() -> Optional[ZoneInfo]:
     """Get all zoneinfo available. First tries to get it
     from the OS, then from the internet, then falls back

@@ -25,8 +25,8 @@ from .zoneinfo import ZoneInfo, offset_at, offset_no_dst_tz
 alias _all_zones = get_zoneinfo()
 
 
-# @value
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct TimeZone[
     iana: Bool = True, pyzoneinfo: Bool = True, native: Bool = False
 ]:

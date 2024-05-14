@@ -19,7 +19,7 @@
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 """
 from time import time
-from collections.optional import OptionalReg
+from collections.optional import Optional
 
 from .timezone import TimeZone, ZoneInfo
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
@@ -34,8 +34,8 @@ alias _cal_hash = CalendarHashes(32)
 #     ...
 
 
-# @value
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct Date[
     iana: Bool = True,
     pyzoneinfo: Bool = True,
@@ -95,9 +95,9 @@ struct Date[
 
     fn __init__(
         inout self,
-        owned year: OptionalReg[Int] = None,
-        owned month: OptionalReg[Int] = None,
-        owned day: OptionalReg[Int] = None,
+        owned year: Optional[Int] = None,
+        owned month: Optional[Int] = None,
+        owned day: Optional[Int] = None,
         owned tz: Self._tz = Self._tz(),
         owned calendar: Calendar = _calendar,
     ):
@@ -110,9 +110,9 @@ struct Date[
             tz: Tz.
             calendar: Calendar.
         """
-        self.year = int(year.value()) if year else int(calendar.min_year)
-        self.month = int(month.value()) if month else int(calendar.min_month)
-        self.day = int(day.value()) if day else int(calendar.min_day)
+        self.year = int(year.value()[]) if year else int(calendar.min_year)
+        self.month = int(month.value()[]) if month else int(calendar.min_month)
+        self.day = int(day.value()[]) if day else int(calendar.min_day)
         self.tz = tz
         self.calendar = calendar
 
@@ -143,11 +143,11 @@ struct Date[
     fn replace(
         owned self,
         *,
-        owned year: OptionalReg[UInt16] = None,
-        owned month: OptionalReg[UInt8] = None,
-        owned day: OptionalReg[UInt8] = None,
-        owned tz: OptionalReg[Self._tz] = None,
-        owned calendar: OptionalReg[Calendar] = None,
+        owned year: Optional[UInt16] = None,
+        owned month: Optional[UInt8] = None,
+        owned day: Optional[UInt8] = None,
+        owned tz: Optional[Self._tz] = None,
+        owned calendar: Optional[Calendar] = None,
     ) -> Self:
         """Replace with give value/s.
 
@@ -165,15 +165,15 @@ struct Date[
         """
         var new_self = self
         if year:
-            new_self.year = year.value()
+            new_self.year = year.value()[]
         if month:
-            new_self.month = month.value()
+            new_self.month = month.value()[]
         if day:
-            new_self.day = day.value()
+            new_self.day = day.value()[]
         if tz:
-            new_self.tz = tz.value()
+            new_self.tz = tz.value()[]
         if calendar:
-            var cal = calendar.value()
+            var cal = calendar.value()[]
             var s = self.seconds_since_epoch()
             new_self.year = cal.min_year
             new_self.month = cal.min_month
@@ -881,7 +881,7 @@ struct Date[
         format_str: StringLiteral,
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
-    ](s: String) -> OptionalReg[Self]:
+    ](s: String) -> Optional[Self]:
         """Parse a `Date` from a  `String`.
 
         Parameters:
@@ -899,15 +899,15 @@ struct Date[
         if not parsed:
             return None
         var p = parsed.value()[]
-        return Self(int(p[0]), int(p[1]), int(p[2]), tz=tz, calendar=calendar)
+        return Self(p[0], p[1], p[2], tz=tz, calendar=calendar)
 
     @staticmethod
     @parameter
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-        tz: OptionalReg[Self._tz] = None,
+        tz: Optional[Self._tz] = None,
         calendar: Calendar = _calendar,
-    ](s: String) -> OptionalReg[Self]:
+    ](s: String) -> Optional[Self]:
         """Construct a date from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
         `String`.
@@ -928,11 +928,9 @@ struct Date[
         """
         try:
             var p = dt_str.from_iso[iso, iana, pyzoneinfo, native](s)
-            var dt = Self(
-                int(p[0]), int(p[1]), int(p[2]), tz=p[6], calendar=calendar
-            )
+            var dt = Self(p[0], p[1], p[2], tz=p[6], calendar=calendar)
             if tz:
-                var t = tz.value()
+                var t = tz.value()[]
                 if t != dt.tz:
                     return dt.to_utc().from_utc(t)
             return dt
@@ -956,4 +954,4 @@ struct Date[
             Self.
         """
         var d = calendar.from_hash[_cal_hash](int(value))
-        return Self(int(d[0]), int(d[1]), int(d[2]), tz=tz, calendar=calendar)
+        return Self(d[0], d[1], d[2], tz=tz, calendar=calendar)

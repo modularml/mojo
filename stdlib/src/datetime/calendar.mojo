@@ -25,7 +25,8 @@ alias _date = (UInt16, UInt8, UInt8, UInt8, UInt8, UInt8, UInt16, UInt16)
 """Alias for the date type. Up to microsecond resolution."""
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct CalendarHashes:
     """Hashing definitions. Up to microsecond resolution for
     the 64bit hash. Each calendar implementation can still
@@ -228,7 +229,8 @@ trait _Calendarized:
         ...
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct Calendar(_Calendarized):
     """`Calendar` interface."""
 
@@ -635,7 +637,8 @@ struct Calendar(_Calendarized):
         return self._implementation.from_hash[cal_hash](value)
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct Gregorian(_Calendarized):
     """`Gregorian` Calendar."""
 
@@ -1187,7 +1190,8 @@ struct Gregorian(_Calendarized):
         return Self(min_year=year)
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct UTCFast(_Calendarized):
     """`UTCFast` Calendar."""
 

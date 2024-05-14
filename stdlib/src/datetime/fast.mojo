@@ -28,7 +28,7 @@ years.
     each struct's docstrings.
 """
 from time import time
-from collections.optional import OptionalReg
+from collections.optional import Optional
 
 from .calendar import UTCFastCal, CalendarHashes
 import .dt_str
@@ -38,7 +38,8 @@ import .dt_str
 #     ...
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct DateTime64(Hashable, Stringable):
     """Fast `DateTime64` struct. This is a "normal"
     `DateTime` with milisecond resolution. Uses
@@ -74,14 +75,14 @@ struct DateTime64(Hashable, Stringable):
 
     fn __init__(
         inout self,
-        owned year: OptionalReg[Int] = None,
-        owned month: OptionalReg[Int] = None,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
-        owned minute: OptionalReg[Int] = None,
-        owned second: OptionalReg[Int] = None,
-        owned m_second: OptionalReg[Int] = None,
-        owned hash_val: OptionalReg[Int] = None,
+        owned year: Optional[Int] = None,
+        owned month: Optional[Int] = None,
+        owned day: Optional[Int] = None,
+        owned hour: Optional[Int] = None,
+        owned minute: Optional[Int] = None,
+        owned second: Optional[Int] = None,
+        owned m_second: Optional[Int] = None,
+        owned hash_val: Optional[Int] = None,
     ):
         """Construct a `DateTime64` from valid values.
         UTCCalendar is the default.
@@ -96,23 +97,25 @@ struct DateTime64(Hashable, Stringable):
             m_second: M_second.
             hash_val: Hash_val.
         """
-        var y = int(year.value()) if year else int(self._calendar.min_year)
-        var mon = int(month.value()) if month else int(self._calendar.min_month)
-        var d = int(day.value()) if day else int(self._calendar.min_day)
-        var h = int(hour.value()) if hour else int(self._calendar.min_hour)
-        var m = int(minute.value()) if minute else int(
+        var y = int(year.value()[]) if year else int(self._calendar.min_year)
+        var mon = int(month.value()[]) if month else int(
+            self._calendar.min_month
+        )
+        var d = int(day.value()[]) if day else int(self._calendar.min_day)
+        var h = int(hour.value()[]) if hour else int(self._calendar.min_hour)
+        var m = int(minute.value()[]) if minute else int(
             self._calendar.min_minute
         )
-        var s = int(second.value()) if second else int(
+        var s = int(second.value()[]) if second else int(
             self._calendar.min_second
         )
-        var ms = int(m_second.value()) if day else int(
+        var ms = int(m_second.value()[]) if day else int(
             self._calendar.min_milisecond
         )
         self.m_seconds = self._calendar.m_seconds_since_epoch(
             y, mon, d, h, m, s, ms
         )
-        self.hash = int(hash_val.value()) if hash_val else int(
+        self.hash = int(hash_val.value()[]) if hash_val else int(
             self._calendar.hash[self._cal_h](y, mon, d, h, m, s, ms)
         )
 
@@ -154,13 +157,13 @@ struct DateTime64(Hashable, Stringable):
     fn replace(
         owned self,
         *,
-        owned year: OptionalReg[Int] = None,
-        owned month: OptionalReg[Int] = None,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
-        owned minute: OptionalReg[Int] = None,
-        owned second: OptionalReg[Int] = None,
-        owned m_second: OptionalReg[Int] = None,
+        owned year: Optional[Int] = None,
+        owned month: Optional[Int] = None,
+        owned day: Optional[Int] = None,
+        owned hour: Optional[Int] = None,
+        owned minute: Optional[Int] = None,
+        owned second: Optional[Int] = None,
+        owned m_second: Optional[Int] = None,
     ) -> Self:
         """Replace values inside the hash.
 
@@ -179,31 +182,31 @@ struct DateTime64(Hashable, Stringable):
         var s = self
         if year:
             s.hash = (s.hash & ~self._cal_h.mask_64_y) | (
-                year.value() << self._cal_h.shift_64_y
+                year.value()[] << self._cal_h.shift_64_y
             )
         if month:
             s.hash = (s.hash & ~self._cal_h.mask_64_mon) | (
-                month.value() << self._cal_h.shift_64_mon
+                month.value()[] << self._cal_h.shift_64_mon
             )
         if day:
             s.hash = (s.hash & ~self._cal_h.mask_64_d) | (
-                day.value() << self._cal_h.shift_64_d
+                day.value()[] << self._cal_h.shift_64_d
             )
         if hour:
             s.hash = (s.hash & ~self._cal_h.mask_64_h) | (
-                day.value() << self._cal_h.shift_64_h
+                day.value()[] << self._cal_h.shift_64_h
             )
         if minute:
             s.hash = (s.hash & ~self._cal_h.mask_64_m) | (
-                day.value() << self._cal_h.shift_64_m
+                day.value()[] << self._cal_h.shift_64_m
             )
         if second:
             s.hash = (s.hash & ~self._cal_h.mask_64_s) | (
-                day.value() << self._cal_h.shift_64_s
+                day.value()[] << self._cal_h.shift_64_s
             )
         if m_second:
             s.hash = (s.hash & ~self._cal_h.mask_64_ms) | (
-                day.value() << self._cal_h.shift_64_ms
+                day.value()[] << self._cal_h.shift_64_ms
             )
         return s
 
@@ -512,7 +515,7 @@ struct DateTime64(Hashable, Stringable):
     # @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-    ](s: String) -> OptionalReg[Self]:
+    ](s: String) -> Optional[Self]:
         """Construct a `DateTime64` from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
         `String`.
@@ -526,7 +529,7 @@ struct DateTime64(Hashable, Stringable):
                 IsoFormat.
 
         Returns:
-            An OptionalReg[Self].
+            An Optional[Self].
         """
         try:
             var p = dt_str.from_iso[iso](s)
@@ -560,7 +563,8 @@ struct DateTime64(Hashable, Stringable):
         )
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct DateTime32(Hashable, Stringable):
     """Fast `DateTime32 ` struct. This is a "normal" `DateTime`
     with minute resolution. Uses UTCFastCal epoch
@@ -593,12 +597,12 @@ struct DateTime32(Hashable, Stringable):
 
     fn __init__(
         inout self,
-        owned year: OptionalReg[Int] = None,
-        owned month: OptionalReg[Int] = None,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
-        owned minute: OptionalReg[Int] = None,
-        owned hash_val: OptionalReg[Int] = None,
+        owned year: Optional[Int] = None,
+        owned month: Optional[Int] = None,
+        owned day: Optional[Int] = None,
+        owned hour: Optional[Int] = None,
+        owned minute: Optional[Int] = None,
+        owned hash_val: Optional[Int] = None,
     ):
         """Construct a `DateTime32` from valid values.
         UTCCalendar is the default.
@@ -611,11 +615,13 @@ struct DateTime32(Hashable, Stringable):
             minute: Minute.
             hash_val: Hash_val.
         """
-        var y = int(year.value()) if year else int(self._calendar.min_year)
-        var mon = int(month.value()) if month else int(self._calendar.min_month)
-        var d = int(day.value()) if day else int(self._calendar.min_day)
-        var h = int(hour.value()) if hour else int(self._calendar.min_hour)
-        var m = int(minute.value()) if minute else int(
+        var y = int(year.value()[]) if year else int(self._calendar.min_year)
+        var mon = int(month.value()[]) if month else int(
+            self._calendar.min_month
+        )
+        var d = int(day.value()[]) if day else int(self._calendar.min_day)
+        var h = int(hour.value()[]) if hour else int(self._calendar.min_hour)
+        var m = int(minute.value()[]) if minute else int(
             self._calendar.min_minute
         )
         self.minutes = (
@@ -624,7 +630,7 @@ struct DateTime32(Hashable, Stringable):
             )
             // 60
         ).cast[DType.uint32]()
-        self.hash = int(hash_val.value()) if hash_val else int(
+        self.hash = int(hash_val.value()[]) if hash_val else int(
             self._calendar.hash[self._cal_h](y, mon, d, h, m)
         )
 
@@ -669,11 +675,11 @@ struct DateTime32(Hashable, Stringable):
     fn replace(
         owned self,
         *,
-        owned year: OptionalReg[Int] = None,
-        owned month: OptionalReg[Int] = None,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
-        owned minute: OptionalReg[Int] = None,
+        owned year: Optional[Int] = None,
+        owned month: Optional[Int] = None,
+        owned day: Optional[Int] = None,
+        owned hour: Optional[Int] = None,
+        owned minute: Optional[Int] = None,
     ) -> Self:
         """Replace values inside the hash.
 
@@ -690,23 +696,23 @@ struct DateTime32(Hashable, Stringable):
         var s = self
         if year:
             s.hash = (s.hash & ~self._cal_h.mask_32_y) | (
-                year.value() << self._cal_h.shift_32_y
+                year.value()[] << self._cal_h.shift_32_y
             )
         if month:
             s.hash = (s.hash & ~self._cal_h.mask_32_mon) | (
-                month.value() << self._cal_h.shift_32_mon
+                month.value()[] << self._cal_h.shift_32_mon
             )
         if day:
             s.hash = (s.hash & ~self._cal_h.mask_32_d) | (
-                day.value() << self._cal_h.shift_32_d
+                day.value()[] << self._cal_h.shift_32_d
             )
         if hour:
             s.hash = (s.hash & ~self._cal_h.mask_32_h) | (
-                day.value() << self._cal_h.shift_32_h
+                day.value()[] << self._cal_h.shift_32_h
             )
         if minute:
             s.hash = (s.hash & ~self._cal_h.mask_32_m) | (
-                day.value() << self._cal_h.shift_32_m
+                day.value()[] << self._cal_h.shift_32_m
             )
         return s
 
@@ -995,7 +1001,7 @@ struct DateTime32(Hashable, Stringable):
     # @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-    ](s: String) -> OptionalReg[Self]:
+    ](s: String) -> Optional[Self]:
         """Construct a `DateTime32` time from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
         `String`.
@@ -1009,7 +1015,7 @@ struct DateTime32(Hashable, Stringable):
                 IsoFormat.
 
         Returns:
-            An OptionalReg[Self].
+            An Optional[Self].
         """
         try:
             var p = dt_str.from_iso[iso](s)
@@ -1040,7 +1046,8 @@ struct DateTime32(Hashable, Stringable):
         )
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct DateTime16(Hashable, Stringable):
     """Fast `DateTime16` struct. This is a `DateTime` with
     hour resolution, it can be used as a year, dayofyear,
@@ -1072,11 +1079,11 @@ struct DateTime16(Hashable, Stringable):
 
     fn __init__(
         inout self,
-        owned year: OptionalReg[Int] = None,
-        owned month: OptionalReg[Int] = None,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
-        owned hash_val: OptionalReg[Int] = None,
+        owned year: Optional[Int] = None,
+        owned month: Optional[Int] = None,
+        owned day: Optional[Int] = None,
+        owned hour: Optional[Int] = None,
+        owned hash_val: Optional[Int] = None,
     ):
         """Construct a `DateTime16` from valid values.
         UTCCalendar is the default.
@@ -1088,16 +1095,18 @@ struct DateTime16(Hashable, Stringable):
             hour: Hour.
             hash_val: Hash_val.
         """
-        var y = int(year.value()) if year else int(self._calendar.min_year)
-        var mon = int(month.value()) if month else int(self._calendar.min_month)
-        var d = int(day.value()) if day else int(self._calendar.min_day)
-        var h = int(hour.value()) if hour else int(self._calendar.min_hour)
+        var y = int(year.value()[]) if year else int(self._calendar.min_year)
+        var mon = int(month.value()[]) if month else int(
+            self._calendar.min_month
+        )
+        var d = int(day.value()[]) if day else int(self._calendar.min_day)
+        var h = int(hour.value()[]) if hour else int(self._calendar.min_hour)
         var m = int(self._calendar.min_minute)
         var s = int(self._calendar.min_second)
         self.hours = (
             self._calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
         ).cast[DType.uint16]()
-        self.hash = int(hash_val.value()) if hash_val else int(
+        self.hash = int(hash_val.value()[]) if hash_val else int(
             self._calendar.hash[self._cal_h](y, mon, d, h, m, s)
         )
 
@@ -1127,8 +1136,8 @@ struct DateTime16(Hashable, Stringable):
     fn replace(
         owned self,
         *,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
+        owned day: Optional[Int] = None,
+        owned hour: Optional[Int] = None,
     ) -> Self:
         """Replace values inside the hash.
 
@@ -1142,11 +1151,11 @@ struct DateTime16(Hashable, Stringable):
         var s = self
         if day:
             s.hash = (s.hash & ~self._cal_h.mask_16_d) | (
-                day.value() << self._cal_h.shift_16_d
+                day.value()[] << self._cal_h.shift_16_d
             )
         if hour:
             s.hash = (s.hash & ~self._cal_h.mask_16_h) | (
-                day.value() << self._cal_h.shift_16_h
+                day.value()[] << self._cal_h.shift_16_h
             )
         return s
 
@@ -1444,7 +1453,7 @@ struct DateTime16(Hashable, Stringable):
     # @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-    ](s: String) -> OptionalReg[Self]:
+    ](s: String) -> Optional[Self]:
         """Construct a `DateTime16` time from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
         `String`.
@@ -1458,7 +1467,7 @@ struct DateTime16(Hashable, Stringable):
                 IsoFormat.
 
         Returns:
-            An OptionalReg[Self].
+            An Optional[Self].
         """
         try:
             var p = dt_str.from_iso[iso](s)
@@ -1484,7 +1493,8 @@ struct DateTime16(Hashable, Stringable):
         )
 
 
-@register_passable("trivial")
+@value
+# @register_passable("trivial")
 struct DateTime8(Hashable, Stringable):
     """Fast `DateTime8` struct. This is a `DateTime`
     with hour resolution, it can be used as a dayofweek,
@@ -1515,11 +1525,11 @@ struct DateTime8(Hashable, Stringable):
 
     fn __init__(
         inout self,
-        owned year: OptionalReg[Int] = None,
-        owned month: OptionalReg[Int] = None,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
-        owned hash_val: OptionalReg[Int] = None,
+        owned year: Optional[Int] = None,
+        owned month: Optional[Int] = None,
+        owned day: Optional[Int] = None,
+        owned hour: Optional[Int] = None,
+        owned hash_val: Optional[Int] = None,
     ):
         """Construct a `DateTime8` from valid values.
         UTCCalendar is the default.
@@ -1531,16 +1541,18 @@ struct DateTime8(Hashable, Stringable):
             hour: Hour.
             hash_val: Hash_val.
         """
-        var y = int(year.value()) if year else int(self._calendar.min_year)
-        var mon = int(month.value()) if month else int(self._calendar.min_month)
-        var d = int(day.value()) if day else int(self._calendar.min_day)
-        var h = int(hour.value()) if hour else int(self._calendar.min_hour)
+        var y = int(year.value()[]) if year else int(self._calendar.min_year)
+        var mon = int(month.value()[]) if month else int(
+            self._calendar.min_month
+        )
+        var d = int(day.value()[]) if day else int(self._calendar.min_day)
+        var h = int(hour.value()[]) if hour else int(self._calendar.min_hour)
         var m = int(self._calendar.min_minute)
         var s = int(self._calendar.min_second)
         self.hours = (
             self._calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
         ).cast[DType.uint8]()
-        self.hash = int(hash_val.value()) if hash_val else int(
+        self.hash = int(hash_val.value()[]) if hash_val else int(
             self._calendar.hash[self._cal_h](y, mon, d, h, m, s)
         )
 
@@ -1568,8 +1580,8 @@ struct DateTime8(Hashable, Stringable):
     fn replace(
         owned self,
         *,
-        owned day: OptionalReg[Int] = None,
-        owned hour: OptionalReg[Int] = None,
+        owned day: Optional[Int] = None,
+        owned hour: Optional[Int] = None,
     ) -> Self:
         """Replace values inside the hash.
 
@@ -1583,11 +1595,11 @@ struct DateTime8(Hashable, Stringable):
         var s = self
         if day:
             s.hash = (s.hash & ~self._cal_h.mask_8_d) | (
-                day.value() << self._cal_h.shift_8_d
+                day.value()[] << self._cal_h.shift_8_d
             )
         if hour:
             s.hash = (s.hash & ~self._cal_h.mask_8_h) | (
-                day.value() << self._cal_h.shift_8_h
+                day.value()[] << self._cal_h.shift_8_h
             )
         return s
 
@@ -1885,7 +1897,7 @@ struct DateTime8(Hashable, Stringable):
     # @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-    ](s: String) -> OptionalReg[Self]:
+    ](s: String) -> Optional[Self]:
         """Construct a `DateTime8` time from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
         `String`.
@@ -1899,7 +1911,7 @@ struct DateTime8(Hashable, Stringable):
                 IsoFormat.
 
         Returns:
-            An OptionalReg[Self].
+            An Optional[Self].
         """
         try:
             var p = dt_str.from_iso[iso](s)
