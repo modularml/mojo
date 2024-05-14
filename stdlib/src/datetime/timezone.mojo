@@ -99,12 +99,12 @@ struct TimeZone[
             ),
         )
 
-        @parameter
-        if iana:
-            debug_assert(
-                iana.value()[][0].get(tz_str) or iana.value()[][1].get(tz_str),
-                msg="that timezone is not in the given IANA ZoneInfo",
-            )
+        # @parameter
+        # if iana:
+        #     debug_assert(
+        #         iana.value()[][0].get(tz_str) or iana.value()[][1].get(tz_str),
+        #         msg="that timezone is not in the given IANA ZoneInfo",
+        #     )
 
         self.tz_str = tz_str
         self.offset_h = offset_h
@@ -262,4 +262,4 @@ struct TimeZone[
         """
         _ = year, month, day, offset_h, offset_m, sign
         # TODO: it should create an Etc/UTC-X TimeZone
-        return TimeZone[iana, pyzoneinfo, native]()
+        return Self()
