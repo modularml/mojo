@@ -162,3 +162,36 @@ trait CeilDivableRaising:
 
     fn __neg__(self) raises -> Self:
         ...
+
+
+# ===----------------------------------------------------------------------=== #
+# Truncable
+# ===----------------------------------------------------------------------=== #
+
+
+trait Truncable:
+    """
+    The `Truncable` trait describes a type that defines a truncation operation.
+
+    Types that conform to `Truncable` will work with the builtin `trunc`
+    function. The truncation operation always returns the same type as the
+    input.
+
+    For example:
+    ```mojo
+    from math import Truncable, trunc
+
+    @value
+    struct Complex(Truncable):
+        var re: Float64
+        var im: Float64
+
+        fn __trunc__(self) -> Self:
+            return Self(trunc(re), trunc(im))
+    ```
+    """
+
+    # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
+    # associated types.
+    fn __trunc__(self) -> Self:
+        ...

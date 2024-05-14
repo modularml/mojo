@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the IntLiteral class."""
 
-from builtin._math import Ceilable, CeilDivable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 
 
 @value
@@ -28,6 +28,7 @@ struct IntLiteral(
     Intable,
     Roundable,
     Stringable,
+    Truncable,
 ):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and
@@ -252,6 +253,15 @@ struct IntLiteral(
     @always_inline("nodebug")
     fn __round__(self) -> Self:
         """Return the rounded value of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __trunc__(self) -> Self:
+        """Return the truncated of the IntLiteral value, which is itself.
 
         Returns:
             The IntLiteral value itself.
