@@ -29,9 +29,9 @@ fn test_add() raises:
     alias unixcal = UTCCalendar
     alias dt = DateTime[iana=False, pyzoneinfo=False, native=False]
     alias TZ = dt._tz
-    alias tz_0_ = TZ("", 0, 0)
-    alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, -1)
+    alias tz_0_ = TZ("Etc/UTC", 0, 0)
+    alias tz_1 = TZ("Etc/UTC-1", 1, 0)
+    alias tz1_ = TZ("Etc/UTC+1", 1, 0, -1)
 
     # test february leapyear
     var result = dt(2024, 2, 29, tz=tz_0_, calendar=pycal) + dt(
@@ -128,9 +128,9 @@ fn test_subtract() raises:
     alias unixcal = UTCCalendar
     alias dt = DateTime[iana=False, pyzoneinfo=False, native=False]
     alias TZ = dt._tz
-    alias tz_0_ = TZ("", 0, 0)
-    alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, -1)
+    alias tz_0_ = TZ("Etc/UTC", 0, 0)
+    alias tz_1 = TZ("Etc/UTC-1", 1, 0)
+    alias tz1_ = TZ("Etc/UTC+1", 1, 0, -1)
 
     # test february leapyear
     var result = dt(2024, 3, 1, tz=tz_0_, calendar=pycal) - dt(
@@ -217,9 +217,9 @@ fn test_logic() raises:
     alias unixcal = UTCCalendar
     alias dt = DateTime[iana=False, pyzoneinfo=False, native=False]
     alias TZ = dt._tz
-    alias tz_0_ = TZ("", 0, 0)
-    alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, -1)
+    alias tz_0_ = TZ("Etc/UTC", 0, 0)
+    alias tz_1 = TZ("Etc/UTC-1", 1, 0)
+    alias tz1_ = TZ("Etc/UTC+1", 1, 0, -1)
 
     var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
     assert_true(ref == dt(1970, 1, 1, tz=tz_0_, calendar=unixcal))
@@ -238,9 +238,9 @@ fn test_bitwise() raises:
     alias unixcal = UTCCalendar
     alias dt = DateTime[iana=False, pyzoneinfo=False, native=False]
     alias TZ = dt._tz
-    alias tz_0_ = TZ("", 0, 0)
-    alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, -1)
+    alias tz_0_ = TZ("Etc/UTC", 0, 0)
+    alias tz_1 = TZ("Etc/UTC-1", 1, 0)
+    alias tz1_ = TZ("Etc/UTC+1", 1, 0, -1)
 
     var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
     assert_true(ref & dt(1970, 1, 1, tz=tz_0_, calendar=unixcal) == 0)
@@ -259,7 +259,7 @@ fn test_iso() raises:
     alias pycal = PythonCalendar
     alias dt = DateTime[iana=False, pyzoneinfo=False, native=False]
     alias TZ = dt._tz
-    alias tz_0_ = TZ("", 0, 0)
+    alias tz_0_ = TZ("Etc/UTC", 0, 0)
 
     var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
     var iso_str = "1970-01-01T00:00:00+00:00"
