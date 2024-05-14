@@ -298,7 +298,8 @@ struct DateTime[
         Returns:
             Self.
         """
-        if self.tz == Self._tz():
+        alias TZ_UTC = Self._tz()
+        if self.tz == TZ_UTC:
             return self
         var new_self = self
         var offset = self.tz.offset_at(
@@ -310,7 +311,7 @@ struct DateTime[
             new_self = self.add(hours=of_h, minutes=of_m)
         else:
             new_self = self.subtract(hours=of_h, minutes=of_m)
-        return new_self.replace(tz=Self._tz())
+        return new_self.replace(tz=TZ_UTC)
 
     fn from_utc(owned self, tz: Self._tz) -> Self:
         """Translate `TimeZone` from UTC. If `self.tz` is UTC
@@ -322,7 +323,8 @@ struct DateTime[
         Returns:
             Self.
         """
-        if tz == Self._tz():
+        alias TZ_UTC = Self._tz()
+        if tz == TZ_UTC:
             return self
         var offset = tz.offset_at(
             self.year, self.month, self.day, self.hour, self.minute, self.second

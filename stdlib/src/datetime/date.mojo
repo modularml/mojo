@@ -218,7 +218,8 @@ struct Date[
         Returns:
             Self with tz casted to given tz.
         """
-        if tz == Self._tz():
+        alias TZ_UTC = Self._tz()
+        if tz == TZ_UTC:
             return self
         var maxmin = self.calendar.max_minute
         var maxsec = self.calendar.max_typical_second
