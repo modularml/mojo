@@ -31,29 +31,29 @@ fn test_add() raises:
     alias TZ = dt._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, 1)
+    alias tz1_ = TZ("", 1, 0, -1)
 
     # test february leapyear
-    var result = dt(2024, 3, 1, tz=tz_0_, calendar=pycal) + dt(
+    var result = dt(2024, 2, 29, tz=tz_0_, calendar=pycal) + dt(
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    var offset_0 = dt(2024, 2, 29, tz=tz_0_, calendar=unixcal)
-    var offset_p_1 = dt(2024, 2, 29, tz=tz_1, calendar=unixcal)
-    var offset_n_1 = dt(2024, 3, 1, tz=tz1_, calendar=unixcal)
-    var add_seconds = dt(2024, 3, 1, tz=tz_0_, calendar=unixcal).add(
+    var offset_0 = dt(2024, 3, 1, tz=tz_0_, calendar=unixcal)
+    var offset_p_1 = dt(2024, 3, 1, hour=1, tz=tz_1, calendar=unixcal)
+    var offset_n_1 = dt(2024, 2, 29, hour=23, tz=tz1_, calendar=unixcal)
+    var add_seconds = dt(2024, 2, 29, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
     # test february not leapyear
-    result = dt(2023, 3, 1, tz=tz_0_, calendar=pycal) + dt(
+    result = dt(2023, 2, 28, tz=tz_0_, calendar=pycal) + dt(
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    offset_0 = dt(2023, 2, 28, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(2023, 2, 28, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(2023, 3, 1, tz=tz1_, calendar=unixcal)
-    add_seconds = dt(2023, 3, 1, tz=tz_0_, calendar=unixcal).add(
+    offset_0 = dt(2023, 3, 1, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(2023, 3, 1, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2023, 2, 28, hour=23, tz=tz1_, calendar=unixcal)
+    add_seconds = dt(2023, 2, 28, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
     assert_true(result == offset_0 and result == offset_p_1)
@@ -64,8 +64,8 @@ fn test_add() raises:
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
     offset_0 = dt(2024, 6, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(2024, 6, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(2024, 5, 31, tz=tz1_, calendar=unixcal)
+    offset_p_1 = dt(2024, 6, 1, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2024, 5, 31, hour=23, tz=tz1_, calendar=unixcal)
     add_seconds = dt(2024, 5, 31, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
@@ -77,8 +77,8 @@ fn test_add() raises:
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
     offset_0 = dt(2025, 1, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(2025, 1, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(2024, 12, 31, tz=tz1_, calendar=unixcal)
+    offset_p_1 = dt(2025, 1, 1, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2024, 12, 31, hour=23, tz=tz1_, calendar=unixcal)
     add_seconds = dt(2024, 12, 31, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
@@ -90,8 +90,8 @@ fn test_add() raises:
         3, 6, 31, tz=tz_0_, calendar=pycal
     )
     offset_0 = dt(2025, 1, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(2025, 1, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(2024, 12, 31, tz=tz1_, calendar=unixcal)
+    offset_p_1 = dt(2025, 1, 1, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2024, 12, 31, hour=23, tz=tz1_, calendar=unixcal)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
 
@@ -100,8 +100,8 @@ fn test_add() raises:
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
     offset_0 = dt(1, 1, 1, tz=tz_0_, calendar=pycal)
-    offset_p_1 = dt(1, 1, 1, tz=tz_1, calendar=pycal)
-    offset_n_1 = dt(1, 1, 1, tz=tz1_, calendar=pycal)
+    offset_p_1 = dt(1, 1, 1, hour=1, tz=tz_1, calendar=pycal)
+    offset_n_1 = dt(9999, 12, 31, hour=23, tz=tz1_, calendar=pycal)
     add_seconds = dt(9999, 12, 31, tz=tz_0_, calendar=pycal).add(
         seconds=24 * 3600
     )
@@ -113,8 +113,8 @@ fn test_add() raises:
         0, 0, 1, tz=tz_0_, calendar=unixcal
     )
     offset_0 = dt(1970, 1, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(1970, 1, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(1970, 1, 1, tz=tz1_, calendar=unixcal)
+    offset_p_1 = dt(1970, 1, 1, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(9999, 12, 31, hour=23, tz=tz1_, calendar=unixcal)
     add_seconds = dt(9999, 12, 31, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
@@ -130,15 +130,17 @@ fn test_subtract() raises:
     alias TZ = dt._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, 1)
+    alias tz1_ = TZ("", 1, 0, -1)
 
     # test february leapyear
     var result = dt(2024, 3, 1, tz=tz_0_, calendar=pycal) - dt(
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
     var offset_0 = dt(2024, 2, 29, tz=tz_0_, calendar=unixcal)
-    var offset_p_1 = dt(2024, 2, 29, tz=tz_1, calendar=unixcal)
-    var offset_n_1 = dt(2024, 3, 1, tz=tz1_, calendar=unixcal)
+    var offset_p_1 = dt(2024, 2, 29, hour=1, tz=tz_1, calendar=unixcal)
+    var offset_n_1 = dt(
+        2024, 2, 28, hour=23, hour=23, tz=tz1_, calendar=unixcal
+    )
     var sub_seconds = dt(2024, 3, 1, tz=tz_0_, calendar=unixcal).subtract(
         seconds=1
     )
@@ -150,8 +152,8 @@ fn test_subtract() raises:
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
     offset_0 = dt(2023, 2, 28, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(2023, 2, 28, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(2023, 3, 1, tz=tz1_, calendar=unixcal)
+    offset_p_1 = dt(2023, 2, 28, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2023, 2, 27, hour=23, tz=tz1_, calendar=unixcal)
     sub_seconds = dt(2023, 3, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
@@ -161,8 +163,8 @@ fn test_subtract() raises:
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
     offset_0 = dt(2024, 5, 31, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(2024, 5, 31, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(2024, 6, 1, tz=tz1_, calendar=unixcal)
+    offset_p_1 = dt(2024, 5, 31, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2024, 5, 30, hour=23, tz=tz1_, calendar=unixcal)
     sub_seconds = dt(2024, 6, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
@@ -172,8 +174,8 @@ fn test_subtract() raises:
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
     offset_0 = dt(2024, 12, 31, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(2024, 12, 31, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(2025, 1, 1, tz=tz1_, calendar=unixcal)
+    offset_p_1 = dt(2024, 12, 31, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2024, 12, 30, hour=23, tz=tz1_, calendar=unixcal)
     sub_seconds = dt(2025, 1, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
@@ -183,8 +185,8 @@ fn test_subtract() raises:
         3, 6, 31, tz=tz_0_, calendar=pycal
     )
     offset_0 = dt(2022, 6, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(2022, 6, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(2022, 5, 31, tz=tz1_, calendar=unixcal)
+    offset_p_1 = dt(2022, 6, 1, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2022, 5, 31, hour=23, tz=tz1_, calendar=unixcal)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
 
@@ -193,8 +195,8 @@ fn test_subtract() raises:
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
     offset_0 = dt(9999, 12, 31, tz=tz_0_, calendar=pycal)
-    offset_p_1 = dt(9999, 12, 31, tz=tz_1, calendar=pycal)
-    offset_n_1 = dt(9999, 12, 31, tz=tz1_, calendar=pycal)
+    offset_p_1 = dt(9999, 12, 31, hour=1, tz=tz_1, calendar=pycal)
+    offset_n_1 = dt(9999, 12, 30, hour=23, tz=tz1_, calendar=pycal)
     sub_seconds = dt(1, 1, 1, tz=tz_0_, calendar=pycal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
@@ -204,8 +206,8 @@ fn test_subtract() raises:
         0, 0, 1, tz=tz_0_, calendar=unixcal
     )
     offset_0 = dt(9999, 12, 31, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = dt(9999, 12, 31, tz=tz_1, calendar=unixcal)
-    offset_n_1 = dt(9999, 12, 31, tz=tz1_, calendar=unixcal)
+    offset_p_1 = dt(9999, 12, 31, hour=1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(9999, 12, 30, hour=23, tz=tz1_, calendar=unixcal)
     sub_seconds = dt(1970, 1, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
@@ -219,7 +221,7 @@ fn test_logic() raises:
     alias TZ = dt._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, 1)
+    alias tz1_ = TZ("", 1, 0, -1)
 
     var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
     assert_true(ref == dt(1970, 1, 1, tz=tz_0_, calendar=unixcal))
@@ -240,7 +242,7 @@ fn test_bitwise() raises:
     alias TZ = dt._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, 1)
+    alias tz1_ = TZ("", 1, 0, -1)
 
     var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
     assert_true(ref & dt(1970, 1, 1, tz=tz_0_, calendar=unixcal) == 0)

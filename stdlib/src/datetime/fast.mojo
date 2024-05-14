@@ -71,8 +71,8 @@ struct DateTime64(Hashable, Stringable):
             shouldn't be used since they are invalid.
     """
 
-    var m_second: UInt64
-    """Milisecond."""
+    var m_seconds: UInt64
+    """Miliseconds since epoch."""
     var hash: UInt64
     """Hash."""
 
@@ -107,93 +107,40 @@ struct DateTime64(Hashable, Stringable):
         var m = int(minute.value()) if minute else int(_calendar.min_minute)
         var s = int(second.value()) if second else int(_calendar.min_second)
         var ms = int(m_second.value()) if day else int(_calendar.min_milisecond)
-        self.m_second = _calendar.m_seconds_since_epoch(y, mon, d, h, m, s, ms)
+        self.m_seconds = _calendar.m_seconds_since_epoch(y, mon, d, h, m, s, ms)
         self.hash = int(hash_val.value()) if hash_val else int(
             _calendar.hash[_cal_h64](y, mon, d, h, m, s, ms)
         )
 
     @always_inline("nodebug")
-    fn get_year(self) -> UInt64:
-        """Get the year assuming the hash is valid.
+    fn __getattr__[name: StringLiteral](self) -> UInt64:
+        """Get the attribute.
+
+        Parameters:
+            name: The name of the attribute.
 
         Returns:
-            The item.
+            The attribute value assuming the hash is valid.
         """
-        return (self.hash & _cal_h64.mask_64_y) >> _cal_h64.shift_64_y
 
-    @always_inline("nodebug")
-    fn get_month(self) -> UInt64:
-        """Get the month assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h64.mask_64_mon) >> _cal_h64.shift_64_mon
-
-    @always_inline("nodebug")
-    fn get_day(self) -> UInt64:
-        """Get the day assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h64.mask_64_d) >> _cal_h64.shift_64_d
-
-    @always_inline("nodebug")
-    fn get_hour(self) -> UInt64:
-        """Get the hour assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h64.mask_64_h) >> _cal_h64.shift_64_h
-
-    @always_inline("nodebug")
-    fn get_minute(self) -> UInt64:
-        """Get the minute assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h64.mask_64_m) >> _cal_h64.shift_64_m
-
-    @always_inline("nodebug")
-    fn get_second(self) -> UInt64:
-        """Get the second assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h64.mask_64_s) >> _cal_h64.shift_64_s
-
-    @always_inline("nodebug")
-    fn get_m_second(self) -> UInt64:
-        """Get the m_second assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h64.mask_64_ms) >> _cal_h64.shift_64_ms
-
-    @always_inline("nodebug")
-    fn get_attrs(
-        self,
-    ) -> (UInt64, UInt64, UInt64, UInt64, UInt64, UInt64, UInt64):
-        """Get the year, month, day, hour, minute, second, milisecond
-        assuming the hash is valid.
-
-        Returns:
-            The items.
-        """
-        return (
-            self.get_year(),
-            self.get_month(),
-            self.get_day(),
-            self.get_hour(),
-            self.get_minute(),
-            self.get_second(),
-            self.get_m_second(),
-        )
+        @parameter
+        if name == "year":
+            return (self.hash & _cal_h64.mask_64_y) >> _cal_h64.shift_64_y
+        elif name == "month":
+            return (self.hash & _cal_h64.mask_64_mon) >> _cal_h64.shift_64_mon
+        elif name == "day":
+            return (self.hash & _cal_h64.mask_64_d) >> _cal_h64.shift_64_d
+        elif name == "hour":
+            return (self.hash & _cal_h64.mask_64_h) >> _cal_h64.shift_64_h
+        elif name == "minute":
+            return (self.hash & _cal_h64.mask_64_m) >> _cal_h64.shift_64_m
+        elif name == "second":
+            return (self.hash & _cal_h64.mask_64_s) >> _cal_h64.shift_64_s
+        elif name == "m_second":
+            return (self.hash & _cal_h64.mask_64_ms) >> _cal_h64.shift_64_ms
+        else:
+            constrained[name == "b", "that attr does not exist"]()
+            return 0
 
     @always_inline
     fn replace(
@@ -259,7 +206,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Seconds since epoch.
         """
-        return self.m_second // 1000
+        return self.m_seconds // 1000
 
     @always_inline("nodebug")
     fn m_seconds_since_epoch(self) -> UInt64:
@@ -268,7 +215,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Miliseconds since epoch.
         """
-        return self.m_second
+        return self.m_seconds
 
     @always_inline("nodebug")
     fn __add__(owned self, owned other: Self) -> Self:
@@ -280,7 +227,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.m_second += other.m_second
+        self.m_seconds += other.m_seconds
         return self
 
     @always_inline("nodebug")
@@ -293,7 +240,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.m_second -= other.m_second
+        self.m_seconds -= other.m_seconds
         return self
 
     @always_inline("nodebug")
@@ -303,7 +250,7 @@ struct DateTime64(Hashable, Stringable):
         Args:
             other: Other.
         """
-        self.m_second += other.m_second
+        self.m_seconds += other.m_seconds
 
     @always_inline("nodebug")
     fn __isub__(inout self, owned other: Self):
@@ -312,7 +259,7 @@ struct DateTime64(Hashable, Stringable):
         Args:
             other: Other.
         """
-        self.m_second -= other.m_second
+        self.m_seconds -= other.m_seconds
 
     @always_inline("nodebug")
     fn __hash__(self) -> Int:
@@ -333,7 +280,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.m_second == other.m_second
+        return self.m_seconds == other.m_seconds
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -345,7 +292,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.m_second != other.m_second
+        return self.m_seconds != other.m_seconds
 
     @always_inline("nodebug")
     fn __gt__(self, other: Self) -> Bool:
@@ -357,7 +304,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.m_second > other.m_second
+        return self.m_seconds > other.m_seconds
 
     @always_inline("nodebug")
     fn __ge__(self, other: Self) -> Bool:
@@ -369,7 +316,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.m_second >= other.m_second
+        return self.m_seconds >= other.m_seconds
 
     @always_inline("nodebug")
     fn __le__(self, other: Self) -> Bool:
@@ -381,7 +328,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.m_second <= other.m_second
+        return self.m_seconds <= other.m_seconds
 
     @always_inline("nodebug")
     fn __lt__(self, other: Self) -> Bool:
@@ -393,7 +340,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.m_second < other.m_second
+        return self.m_seconds < other.m_seconds
 
     @always_inline("nodebug")
     fn __invert__(owned self) -> Self:
@@ -479,7 +426,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.m_second += seconds * 1000 + m_seconds
+        self.m_seconds += seconds * 1000 + m_seconds
         return self
 
     @always_inline("nodebug")
@@ -493,7 +440,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.m_second -= seconds * 1000 + m_seconds
+        self.m_seconds -= seconds * 1000 + m_seconds
         return self
 
     @staticmethod
@@ -543,9 +490,14 @@ struct DateTime64(Hashable, Stringable):
         Notes:
             This is done assuming the current hash is valid.
         """
-        var s = self.get_attrs()
+        var s = self
         var time = dt_str.to_iso[iso](
-            int(s[0]), int(s[1]), int(s[2]), int(s[3]), int(s[4]), int(s[5])
+            int(s.year),
+            int(s.month),
+            int(s.day),
+            int(s.hour),
+            int(s.minute),
+            int(s.second),
         )
         return time[:19]
 
@@ -625,8 +577,8 @@ struct DateTime32(Hashable, Stringable):
             shouldn't be used since they are invalid.
     """
 
-    var minute: UInt32
-    """Minute."""
+    var minutes: UInt32
+    """Minutes since epoch."""
     var hash: UInt32
     """Hash."""
 
@@ -655,7 +607,7 @@ struct DateTime32(Hashable, Stringable):
         var d = int(day.value()) if day else int(_calendar.min_day)
         var h = int(hour.value()) if hour else int(_calendar.min_hour)
         var m = int(minute.value()) if minute else int(_calendar.min_minute)
-        self.minute = (
+        self.minutes = (
             _calendar.seconds_since_epoch(
                 y, mon, d, h, m, int(_calendar.min_second)
             )
@@ -666,67 +618,30 @@ struct DateTime32(Hashable, Stringable):
         )
 
     @always_inline("nodebug")
-    fn get_year(self) -> UInt32:
-        """Get the year assuming the hash is valid.
+    fn __getattr__[name: StringLiteral](self) -> UInt32:
+        """Get the attribute.
+
+        Parameters:
+            name: The name of the attribute.
 
         Returns:
-            The item.
+            The attribute value assuming the hash is valid.
         """
-        return (self.hash & _cal_h32.mask_32_y) >> _cal_h32.shift_32_y
 
-    @always_inline("nodebug")
-    fn get_month(self) -> UInt32:
-        """Get the month assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h32.mask_32_mon) >> _cal_h32.shift_32_mon
-
-    @always_inline("nodebug")
-    fn get_day(self) -> UInt32:
-        """Get the day assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h32.mask_32_d) >> _cal_h32.shift_32_d
-
-    @always_inline("nodebug")
-    fn get_hour(self) -> UInt32:
-        """Get the hour assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h32.mask_32_h) >> _cal_h32.shift_32_h
-
-    @always_inline("nodebug")
-    fn get_minute(self) -> UInt32:
-        """Get the minute assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h32.mask_32_m) >> _cal_h32.shift_32_m
-
-    @always_inline("nodebug")
-    fn get_attrs(
-        self,
-    ) -> (UInt32, UInt32, UInt32, UInt32, UInt32):
-        """Get the year, month, day, hour, minute, second
-        assuming the hash is valid.
-
-        Returns:
-            The items.
-        """
-        return (
-            self.get_year(),
-            self.get_month(),
-            self.get_day(),
-            self.get_hour(),
-            self.get_minute(),
-        )
+        @parameter
+        if name == "year":
+            return (self.hash & _cal_h32.mask_32_y) >> _cal_h32.shift_32_y
+        elif name == "month":
+            return (self.hash & _cal_h32.mask_32_mon) >> _cal_h32.shift_32_mon
+        elif name == "day":
+            return (self.hash & _cal_h32.mask_32_d) >> _cal_h32.shift_32_d
+        elif name == "hour":
+            return (self.hash & _cal_h32.mask_32_h) >> _cal_h32.shift_32_h
+        elif name == "minute":
+            return (self.hash & _cal_h32.mask_32_m) >> _cal_h32.shift_32_m
+        else:
+            constrained[name == "b", "that attr does not exist"]()
+            return 0
 
     @always_inline("nodebug")
     fn seconds_since_epoch(self) -> UInt64:
@@ -735,7 +650,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Seconds since epoch.
         """
-        return self.minute.cast[DType.uint64]() * 60
+        return self.minutes.cast[DType.uint64]() * 60
 
     @always_inline
     fn replace(
@@ -792,7 +707,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.minute += other.minute
+        self.minutes += other.minutes
         return self
 
     @always_inline("nodebug")
@@ -805,7 +720,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.minute -= other.minute
+        self.minutes -= other.minutes
         return self
 
     @always_inline("nodebug")
@@ -815,7 +730,7 @@ struct DateTime32(Hashable, Stringable):
         Args:
             other: Other.
         """
-        self.minute += other.minute
+        self.minutes += other.minutes
 
     @always_inline("nodebug")
     fn __isub__(inout self, owned other: Self):
@@ -824,7 +739,7 @@ struct DateTime32(Hashable, Stringable):
         Args:
             other: Other.
         """
-        self.minute -= other.minute
+        self.minutes -= other.minutes
 
     @always_inline("nodebug")
     fn __hash__(self) -> Int:
@@ -845,7 +760,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.minute == other.minute
+        return self.minutes == other.minutes
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -857,7 +772,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.minute != other.minute
+        return self.minutes != other.minutes
 
     @always_inline("nodebug")
     fn __gt__(self, other: Self) -> Bool:
@@ -869,7 +784,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.minute > other.minute
+        return self.minutes > other.minutes
 
     @always_inline("nodebug")
     fn __ge__(self, other: Self) -> Bool:
@@ -881,7 +796,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.minute >= other.minute
+        return self.minutes >= other.minutes
 
     @always_inline("nodebug")
     fn __le__(self, other: Self) -> Bool:
@@ -893,7 +808,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.minute <= other.minute
+        return self.minutes <= other.minutes
 
     @always_inline("nodebug")
     fn __lt__(self, other: Self) -> Bool:
@@ -905,7 +820,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.minute < other.minute
+        return self.minutes < other.minutes
 
     @always_inline("nodebug")
     fn __invert__(owned self) -> Self:
@@ -969,7 +884,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Result.
         """
-        return int(self.minute)
+        return int(self.minutes)
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
@@ -992,7 +907,7 @@ struct DateTime32(Hashable, Stringable):
             Self.
         """
 
-        self.minute += minutes + seconds * 60
+        self.minutes += minutes + seconds * 60
         return self
 
     @always_inline("nodebug")
@@ -1006,7 +921,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.minute -= minutes + seconds * 60
+        self.minutes -= minutes + seconds * 60
         return self
 
     @staticmethod
@@ -1055,11 +970,11 @@ struct DateTime32(Hashable, Stringable):
             This is done assuming the current hash is valid.
         """
         var time = dt_str.to_iso(
-            int(self.get_year()),
-            int(self.get_month()),
-            int(self.get_day()),
-            int(self.get_hour()),
-            int(self.get_minute()),
+            int(self.year),
+            int(self.month),
+            int(self.day),
+            int(self.hour),
+            int(self.minute),
             int(_calendar.min_second),
         )
         return time[:19]
@@ -1136,8 +1051,8 @@ struct DateTime16(Hashable, Stringable):
             shouldn't be used since they are invalid.
     """
 
-    var hour: UInt16
-    """Hour."""
+    var hours: UInt16
+    """Hours since epoch."""
     var hash: UInt16
     """Hash."""
 
@@ -1165,7 +1080,7 @@ struct DateTime16(Hashable, Stringable):
         var h = int(hour.value()) if hour else int(_calendar.min_hour)
         var m = int(_calendar.min_minute)
         var s = int(_calendar.min_second)
-        self.hour = (
+        self.hours = (
             _calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
         ).cast[DType.uint16]()
         self.hash = int(hash_val.value()) if hash_val else int(
@@ -1173,41 +1088,26 @@ struct DateTime16(Hashable, Stringable):
         )
 
     @always_inline("nodebug")
-    fn get_year(self) -> UInt16:
-        """Get the year assuming the hash is valid.
+    fn __getattr__[name: StringLiteral](self) -> UInt16:
+        """Get the attribute.
+
+        Parameters:
+            name: The name of the attribute.
 
         Returns:
-            The item.
+            The attribute value assuming the hash is valid.
         """
-        return (self.hash & _cal_h16.mask_16_y) >> _cal_h16.shift_16_y
 
-    @always_inline("nodebug")
-    fn get_day(self) -> UInt16:
-        """Get the day assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h16.mask_16_d) >> _cal_h16.shift_16_d
-
-    @always_inline("nodebug")
-    fn get_hour(self) -> UInt16:
-        """Get the hour assuming the hash is valid.
-
-        Returns:
-            The item.
-        """
-        return (self.hash & _cal_h16.mask_16_h) >> _cal_h16.shift_16_h
-
-    @always_inline("nodebug")
-    fn get_attrs(self) -> (UInt16, UInt16, UInt16):
-        """Get the year, month, day, hour, minute, second
-        assuming the hash is valid.
-
-        Returns:
-            The items.
-        """
-        return (self.get_year(), self.get_day(), self.get_hour())
+        @parameter
+        if name == "year":
+            return (self.hash & _cal_h16.mask_16_y) >> _cal_h16.shift_16_y
+        elif name == "day":
+            return (self.hash & _cal_h16.mask_16_d) >> _cal_h16.shift_16_d
+        elif name == "hour":
+            return (self.hash & _cal_h16.mask_16_h) >> _cal_h16.shift_16_h
+        else:
+            constrained[name == "b", "that attribute does not exist"]()
+            return 0
 
     @always_inline
     fn replace(
@@ -1243,7 +1143,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Seconds.
         """
-        return self.hour.cast[DType.uint32]() * 60 * 60
+        return self.hours.cast[DType.uint32]() * 60 * 60
 
     @always_inline("nodebug")
     fn __add__(owned self, owned other: Self) -> Self:
@@ -1255,7 +1155,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.hour += other.hour
+        self.hours += other.hours
         return self
 
     @always_inline("nodebug")
@@ -1268,7 +1168,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.hour -= other.hour
+        self.hours -= other.hours
         return self
 
     @always_inline("nodebug")
@@ -1278,7 +1178,7 @@ struct DateTime16(Hashable, Stringable):
         Args:
             other: Other.
         """
-        self.hour += other.hour
+        self.hours += other.hours
 
     @always_inline("nodebug")
     fn __isub__(inout self, owned other: Self):
@@ -1287,7 +1187,7 @@ struct DateTime16(Hashable, Stringable):
         Args:
             other: Other.
         """
-        self.hour -= other.hour
+        self.hours -= other.hours
 
     @always_inline("nodebug")
     fn __hash__(self) -> Int:
@@ -1308,7 +1208,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour == other.hour
+        return self.hours == other.hours
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -1320,7 +1220,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour != other.hour
+        return self.hours != other.hours
 
     @always_inline("nodebug")
     fn __gt__(self, other: Self) -> Bool:
@@ -1332,7 +1232,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour > other.hour
+        return self.hours > other.hours
 
     @always_inline("nodebug")
     fn __ge__(self, other: Self) -> Bool:
@@ -1344,7 +1244,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour >= other.hour
+        return self.hours >= other.hours
 
     @always_inline("nodebug")
     fn __le__(self, other: Self) -> Bool:
@@ -1356,7 +1256,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour <= other.hour
+        return self.hours <= other.hours
 
     @always_inline("nodebug")
     fn __lt__(self, other: Self) -> Bool:
@@ -1368,7 +1268,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour < other.hour
+        return self.hours < other.hours
 
     @always_inline("nodebug")
     fn __invert__(owned self) -> Self:
@@ -1432,7 +1332,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Result.
         """
-        return int(self.hour)
+        return int(self.hours)
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
@@ -1455,7 +1355,7 @@ struct DateTime16(Hashable, Stringable):
             Self.
         """
 
-        self.hour += hours + seconds * 60 * 60
+        self.hours += hours + seconds * 60 * 60
         return self
 
     @always_inline("nodebug")
@@ -1469,7 +1369,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.hour -= hours + seconds * 60 * 60
+        self.hours -= hours + seconds * 60 * 60
         return self
 
     @staticmethod
@@ -1518,10 +1418,10 @@ struct DateTime16(Hashable, Stringable):
             This is done assuming the current hash is valid.
         """
         var time = dt_str.to_iso[iso](
-            int(self.get_year()),
+            int(self.year),
             int(_calendar.min_month),
-            int(self.get_day()),
-            int(self.get_hour()),
+            int(self.day),
+            int(self.hour),
             int(_calendar.min_minute),
             int(_calendar.min_second),
         )
@@ -1593,8 +1493,8 @@ struct DateTime8(Hashable, Stringable):
             shouldn't be used since they are invalid.
     """
 
-    var hour: UInt8
-    """Hour."""
+    var hours: UInt8
+    """Hours since epoch."""
     var hash: UInt8
     """Hash."""
 
@@ -1622,7 +1522,7 @@ struct DateTime8(Hashable, Stringable):
         var h = int(hour.value()) if hour else int(_calendar.min_hour)
         var m = int(_calendar.min_minute)
         var s = int(_calendar.min_second)
-        self.hour = (
+        self.hours = (
             _calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
         ).cast[DType.uint8]()
         self.hash = int(hash_val.value()) if hash_val else int(
@@ -1630,34 +1530,24 @@ struct DateTime8(Hashable, Stringable):
         )
 
     @always_inline("nodebug")
-    fn get_day(self) -> UInt8:
-        """Get the day assuming the hash is valid.
+    fn __getattr__[name: StringLiteral](self) -> UInt8:
+        """Get the attribute.
+
+        Parameters:
+            name: The name of the attribute.
 
         Returns:
-            The day.
+            The attribute value assuming the hash is valid.
         """
-        return (self.hash & _cal_h8.mask_8_d) >> _cal_h8.shift_8_d
 
-    @always_inline("nodebug")
-    fn get_hour(self) -> UInt8:
-        """Get the hour assuming the hash is valid.
-
-        Returns:
-            The hour.
-        """
-        return (self.hash & _cal_h8.mask_8_h) >> _cal_h8.shift_8_h
-
-    @always_inline("nodebug")
-    fn get_attrs(
-        self,
-    ) -> (UInt8, UInt8):
-        """Get the year, month, day, hour, minute, second
-        assuming the hash is valid.
-
-        Returns:
-            The items.
-        """
-        return (self.get_day(), self.get_hour())
+        @parameter
+        if name == "day":
+            return (self.hash & _cal_h8.mask_8_d) >> _cal_h8.shift_8_d
+        elif name == "hour":
+            return (self.hash & _cal_h8.mask_8_h) >> _cal_h8.shift_8_h
+        else:
+            constrained[name == "b", "that attr does not exist"]()
+            return 0
 
     @always_inline
     fn replace(
@@ -1705,7 +1595,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.hour += other.hour
+        self.hours += other.hours
         return self
 
     @always_inline("nodebug")
@@ -1718,7 +1608,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.hour -= other.hour
+        self.hours -= other.hours
         return self
 
     @always_inline("nodebug")
@@ -1728,7 +1618,7 @@ struct DateTime8(Hashable, Stringable):
         Args:
             other: Other.
         """
-        self.hour += other.hour
+        self.hours += other.hours
 
     @always_inline("nodebug")
     fn __isub__(inout self, owned other: Self):
@@ -1737,7 +1627,7 @@ struct DateTime8(Hashable, Stringable):
         Args:
             other: Other.
         """
-        self.hour -= other.hour
+        self.hours -= other.hours
 
     @always_inline("nodebug")
     fn __hash__(self) -> Int:
@@ -1758,7 +1648,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour == other.hour
+        return self.hours == other.hours
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -1770,7 +1660,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour != other.hour
+        return self.hours != other.hours
 
     @always_inline("nodebug")
     fn __gt__(self, other: Self) -> Bool:
@@ -1782,7 +1672,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour > other.hour
+        return self.hours > other.hours
 
     @always_inline("nodebug")
     fn __ge__(self, other: Self) -> Bool:
@@ -1794,7 +1684,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour >= other.hour
+        return self.hours >= other.hours
 
     @always_inline("nodebug")
     fn __le__(self, other: Self) -> Bool:
@@ -1806,7 +1696,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour <= other.hour
+        return self.hours <= other.hours
 
     @always_inline("nodebug")
     fn __lt__(self, other: Self) -> Bool:
@@ -1818,7 +1708,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Bool.
         """
-        return self.hour < other.hour
+        return self.hours < other.hours
 
     @always_inline("nodebug")
     fn __invert__(owned self) -> Self:
@@ -1882,7 +1772,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Result.
         """
-        return int(self.hour)
+        return int(self.hours)
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
@@ -1905,7 +1795,7 @@ struct DateTime8(Hashable, Stringable):
             Self.
         """
 
-        self.hour += hours + seconds * 60 * 60
+        self.hours += hours + seconds * 60 * 60
         return self
 
     @always_inline("nodebug")
@@ -1919,7 +1809,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Self.
         """
-        self.hour -= hours + seconds * 60 * 60
+        self.hours -= hours + seconds * 60 * 60
         return self
 
     @staticmethod
@@ -1970,8 +1860,8 @@ struct DateTime8(Hashable, Stringable):
         var time = dt_str.to_iso[iso](
             int(_calendar.min_year),
             int(_calendar.min_month),
-            int(self.get_day()),
-            int(self.get_hour()),
+            int(self.day),
+            int(self.hour),
             int(_calendar.min_minute),
             int(_calendar.min_second),
         )

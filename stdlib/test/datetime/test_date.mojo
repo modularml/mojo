@@ -31,7 +31,7 @@ fn test_add() raises:
     alias TZ = date._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, 1)
+    alias tz1_ = TZ("", 1, 0, -1)
 
     # test february leapyear
     var result = date(2024, 3, 1, tz_0_, pycal) + date(0, 0, 1, tz_0_, pycal)
@@ -104,7 +104,7 @@ fn test_subtract() raises:
     alias TZ = date._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, 1)
+    alias tz1_ = TZ("", 1, 0, -1)
 
     # test february leapyear
     var result = date(2024, 3, 1, tz_0_, pycal) - date(0, 0, 1, tz_0_, pycal)
@@ -177,7 +177,7 @@ fn test_logic() raises:
     alias TZ = date._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, 1)
+    alias tz1_ = TZ("", 1, 0, -1)
 
     var ref = date(1970, 1, 1, tz_0_, pycal)
     assert_true(ref == date(1970, 1, 1, tz_0_, unixcal))
@@ -198,7 +198,7 @@ fn test_bitwise() raises:
     alias TZ = date._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
-    alias tz1_ = TZ("", 1, 0, 1)
+    alias tz1_ = TZ("", 1, 0, -1)
 
     var ref = date(1970, 1, 1, tz_0_, pycal)
     assert_true((ref & date(1970, 1, 1, tz_0_, unixcal)) == 0)
