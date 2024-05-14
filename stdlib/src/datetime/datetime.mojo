@@ -109,17 +109,17 @@ struct DateTime[
 
     fn __init__(
         inout self,
-        year: OptionalReg[Int] = None,
-        month: OptionalReg[Int] = None,
-        day: OptionalReg[Int] = None,
-        hour: OptionalReg[Int] = None,
-        minute: OptionalReg[Int] = None,
-        second: OptionalReg[Int] = None,
-        m_second: OptionalReg[Int] = None,
-        u_second: OptionalReg[Int] = None,
-        n_second: OptionalReg[Int] = None,
-        tz: Self._tz = Self._tz(),
-        calendar: Calendar = _calendar,
+        owned year: OptionalReg[Int] = None,
+        owned month: OptionalReg[Int] = None,
+        owned day: OptionalReg[Int] = None,
+        owned hour: OptionalReg[Int] = None,
+        owned minute: OptionalReg[Int] = None,
+        owned second: OptionalReg[Int] = None,
+        owned m_second: OptionalReg[Int] = None,
+        owned u_second: OptionalReg[Int] = None,
+        owned n_second: OptionalReg[Int] = None,
+        owned tz: Self._tz = Self._tz(),
+        owned calendar: Calendar = _calendar,
     ):
         """Construct a `DateTime` from valid values.
 
@@ -231,8 +231,8 @@ struct DateTime[
         owned m_second: OptionalReg[UInt16] = None,
         owned u_second: OptionalReg[UInt16] = None,
         owned n_second: OptionalReg[UInt16] = None,
-        tz: OptionalReg[Self._tz] = None,
-        calendar: OptionalReg[Calendar] = None,
+        owned tz: OptionalReg[Self._tz] = None,
+        owned calendar: OptionalReg[Calendar] = None,
     ) -> Self:
         """Replace with give value/s.
 
@@ -311,7 +311,8 @@ struct DateTime[
             new_self = self.add(hours=of_h, minutes=of_m)
         else:
             new_self = self.subtract(hours=of_h, minutes=of_m)
-        return new_self.replace(tz=TZ_UTC)
+        new_self.tz = TZ_UTC
+        return new_self
 
     fn from_utc(owned self, tz: Self._tz) -> Self:
         """Translate `TimeZone` from UTC. If `self.tz` is UTC
@@ -821,7 +822,7 @@ struct DateTime[
         return ~hash(self)
 
     # @always_inline("nodebug")
-    fn __and__[T: Intable](self, other: T) -> UInt64:
+    fn __and__[T: Hashable](self, other: T) -> UInt64:
         """And.
 
         Parameters:
@@ -833,10 +834,10 @@ struct DateTime[
         Returns:
             Result.
         """
-        return hash(self) & int(other)
+        return hash(self) & hash(other)
 
     # @always_inline("nodebug")
-    fn __or__[T: Intable](self, other: T) -> UInt64:
+    fn __or__[T: Hashable](self, other: T) -> UInt64:
         """Or.
 
         Parameters:
@@ -848,10 +849,10 @@ struct DateTime[
         Returns:
             Result.
         """
-        return hash(self) | int(other)
+        return hash(self) | hash(other)
 
     # @always_inline("nodebug")
-    fn __xor__[T: Intable](self, other: T) -> UInt64:
+    fn __xor__[T: Hashable](self, other: T) -> UInt64:
         """Xor.
 
         Parameters:
@@ -863,7 +864,7 @@ struct DateTime[
         Returns:
             Result.
         """
-        return hash(self) ^ int(other)
+        return hash(self) ^ hash(other)
 
     # @always_inline("nodebug")
     fn __int__(self) -> Int:

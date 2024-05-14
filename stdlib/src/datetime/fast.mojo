@@ -74,14 +74,14 @@ struct DateTime64(Hashable, Stringable):
 
     fn __init__(
         inout self,
-        year: OptionalReg[Int] = None,
-        month: OptionalReg[Int] = None,
-        day: OptionalReg[Int] = None,
-        hour: OptionalReg[Int] = None,
-        minute: OptionalReg[Int] = None,
-        second: OptionalReg[Int] = None,
-        m_second: OptionalReg[Int] = None,
-        hash_val: OptionalReg[Int] = None,
+        owned year: OptionalReg[Int] = None,
+        owned month: OptionalReg[Int] = None,
+        owned day: OptionalReg[Int] = None,
+        owned hour: OptionalReg[Int] = None,
+        owned minute: OptionalReg[Int] = None,
+        owned second: OptionalReg[Int] = None,
+        owned m_second: OptionalReg[Int] = None,
+        owned hash_val: OptionalReg[Int] = None,
     ):
         """Construct a `DateTime64` from valid values.
         UTCCalendar is the default.
@@ -360,7 +360,7 @@ struct DateTime64(Hashable, Stringable):
         return ~self.hash
 
     # @always_inline("nodebug")
-    fn __and__[T: Intable](self, other: T) -> UInt64:
+    fn __and__[T: Hashable](self, other: T) -> UInt64:
         """And.
 
         Parameters:
@@ -372,10 +372,10 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash & int(other)
+        return self.hash & hash(other)
 
     # @always_inline("nodebug")
-    fn __or__[T: Intable](self, other: T) -> UInt64:
+    fn __or__[T: Hashable](self, other: T) -> UInt64:
         """And.
 
         Parameters:
@@ -387,10 +387,10 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash | int(other)
+        return self.hash | hash(other)
 
     # @always_inline("nodebug")
-    fn __xor__[T: Intable](self, other: T) -> UInt64:
+    fn __xor__[T: Hashable](self, other: T) -> UInt64:
         """And.
 
         Parameters:
@@ -402,7 +402,7 @@ struct DateTime64(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash ^ int(other)
+        return self.hash ^ hash(other)
 
     # @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -593,12 +593,12 @@ struct DateTime32(Hashable, Stringable):
 
     fn __init__(
         inout self,
-        year: OptionalReg[Int] = None,
-        month: OptionalReg[Int] = None,
-        day: OptionalReg[Int] = None,
-        hour: OptionalReg[Int] = None,
-        minute: OptionalReg[Int] = None,
-        hash_val: OptionalReg[Int] = None,
+        owned year: OptionalReg[Int] = None,
+        owned month: OptionalReg[Int] = None,
+        owned day: OptionalReg[Int] = None,
+        owned hour: OptionalReg[Int] = None,
+        owned minute: OptionalReg[Int] = None,
+        owned hash_val: OptionalReg[Int] = None,
     ):
         """Construct a `DateTime32` from valid values.
         UTCCalendar is the default.
@@ -845,7 +845,7 @@ struct DateTime32(Hashable, Stringable):
         return ~self.hash
 
     # @always_inline("nodebug")
-    fn __and__[T: Intable](self, other: T) -> UInt32:
+    fn __and__[T: Hashable](self, other: T) -> UInt32:
         """And.
 
         Parameters:
@@ -857,10 +857,10 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash & int(other)
+        return self.hash & hash(other)
 
     # @always_inline("nodebug")
-    fn __or__[T: Intable](self, other: T) -> UInt32:
+    fn __or__[T: Hashable](self, other: T) -> UInt32:
         """And.
 
         Parameters:
@@ -872,10 +872,10 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash | int(other)
+        return self.hash | hash(other)
 
     # @always_inline("nodebug")
-    fn __xor__[T: Intable](self, other: T) -> UInt32:
+    fn __xor__[T: Hashable](self, other: T) -> UInt32:
         """And.
 
         Parameters:
@@ -887,7 +887,7 @@ struct DateTime32(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash ^ int(other)
+        return self.hash ^ hash(other)
 
     # @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -1072,11 +1072,11 @@ struct DateTime16(Hashable, Stringable):
 
     fn __init__(
         inout self,
-        year: OptionalReg[Int] = None,
-        month: OptionalReg[Int] = None,
-        day: OptionalReg[Int] = None,
-        hour: OptionalReg[Int] = None,
-        hash_val: OptionalReg[Int] = None,
+        owned year: OptionalReg[Int] = None,
+        owned month: OptionalReg[Int] = None,
+        owned day: OptionalReg[Int] = None,
+        owned hour: OptionalReg[Int] = None,
+        owned hash_val: OptionalReg[Int] = None,
     ):
         """Construct a `DateTime16` from valid values.
         UTCCalendar is the default.
@@ -1294,7 +1294,7 @@ struct DateTime16(Hashable, Stringable):
         return ~self.hash
 
     # @always_inline("nodebug")
-    fn __and__[T: Intable](self, other: T) -> UInt16:
+    fn __and__[T: Hashable](self, other: T) -> UInt16:
         """And.
 
         Parameters:
@@ -1306,10 +1306,10 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash & int(other)
+        return self.hash & hash(other)
 
     # @always_inline("nodebug")
-    fn __or__[T: Intable](self, other: T) -> UInt16:
+    fn __or__[T: Hashable](self, other: T) -> UInt16:
         """And.
 
         Parameters:
@@ -1321,10 +1321,10 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash | int(other)
+        return self.hash | hash(other)
 
     # @always_inline("nodebug")
-    fn __xor__[T: Intable](self, other: T) -> UInt16:
+    fn __xor__[T: Hashable](self, other: T) -> UInt16:
         """And.
 
         Parameters:
@@ -1336,7 +1336,7 @@ struct DateTime16(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash ^ int(other)
+        return self.hash ^ hash(other)
 
     # @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -1515,11 +1515,11 @@ struct DateTime8(Hashable, Stringable):
 
     fn __init__(
         inout self,
-        year: OptionalReg[Int] = None,
-        month: OptionalReg[Int] = None,
-        day: OptionalReg[Int] = None,
-        hour: OptionalReg[Int] = None,
-        hash_val: OptionalReg[Int] = None,
+        owned year: OptionalReg[Int] = None,
+        owned month: OptionalReg[Int] = None,
+        owned day: OptionalReg[Int] = None,
+        owned hour: OptionalReg[Int] = None,
+        owned hash_val: OptionalReg[Int] = None,
     ):
         """Construct a `DateTime8` from valid values.
         UTCCalendar is the default.
@@ -1735,7 +1735,7 @@ struct DateTime8(Hashable, Stringable):
         return ~self.hash
 
     # @always_inline("nodebug")
-    fn __and__[T: Intable](self, other: T) -> UInt8:
+    fn __and__[T: Hashable](self, other: T) -> UInt8:
         """And.
 
         Parameters:
@@ -1747,10 +1747,10 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash & int(other)
+        return self.hash & hash(other)
 
     # @always_inline("nodebug")
-    fn __or__[T: Intable](self, other: T) -> UInt8:
+    fn __or__[T: Hashable](self, other: T) -> UInt8:
         """And.
 
         Parameters:
@@ -1762,10 +1762,10 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash | int(other)
+        return self.hash | hash(other)
 
     # @always_inline("nodebug")
-    fn __xor__[T: Intable](self, other: T) -> UInt8:
+    fn __xor__[T: Hashable](self, other: T) -> UInt8:
         """And.
 
         Parameters:
@@ -1777,7 +1777,7 @@ struct DateTime8(Hashable, Stringable):
         Returns:
             Result.
         """
-        return self.hash ^ int(other)
+        return self.hash ^ hash(other)
 
     # @always_inline("nodebug")
     fn __int__(self) -> Int:

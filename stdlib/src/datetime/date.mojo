@@ -95,11 +95,11 @@ struct Date[
 
     fn __init__(
         inout self,
-        year: OptionalReg[Int] = None,
-        month: OptionalReg[Int] = None,
-        day: OptionalReg[Int] = None,
-        tz: Self._tz = Self._tz(),
-        calendar: Calendar = _calendar,
+        owned year: OptionalReg[Int] = None,
+        owned month: OptionalReg[Int] = None,
+        owned day: OptionalReg[Int] = None,
+        owned tz: Self._tz = Self._tz(),
+        owned calendar: Calendar = _calendar,
     ):
         """Construct a `Date` from valid values.
 
@@ -147,8 +147,8 @@ struct Date[
         owned year: OptionalReg[UInt16] = None,
         owned month: OptionalReg[UInt8] = None,
         owned day: OptionalReg[UInt8] = None,
-        tz: OptionalReg[Self._tz] = None,
-        calendar: OptionalReg[Calendar] = None,
+        owned tz: OptionalReg[Self._tz] = None,
+        owned calendar: OptionalReg[Calendar] = None,
     ) -> Self:
         """Replace with give value/s.
 
@@ -206,7 +206,8 @@ struct Date[
             new_self = self.add(seconds=amnt)
         else:
             new_self = self.subtract(seconds=amnt)
-        return new_self.replace(tz=TZ_UTC)
+        new_self.tz = TZ_UTC
+        return new_self
 
     fn from_utc(owned self, tz: Self._tz) -> Self:
         """Translate `TimeZone` from UTC. If `self.tz` is UTC
@@ -597,7 +598,7 @@ struct Date[
         return ~hash(self)
 
     # @always_inline("nodebug")
-    fn __and__[T: Intable](self, other: T) -> UInt32:
+    fn __and__[T: Hashable](self, other: T) -> UInt32:
         """And.
 
         Parameters:
@@ -609,10 +610,10 @@ struct Date[
         Returns:
             Result.
         """
-        return hash(self) & int(other)
+        return hash(self) & hash(other)
 
     # @always_inline("nodebug")
-    fn __or__[T: Intable](self, other: T) -> UInt32:
+    fn __or__[T: Hashable](self, other: T) -> UInt32:
         """Or.
 
         Parameters:
@@ -624,10 +625,10 @@ struct Date[
         Returns:
             Result.
         """
-        return hash(self) | int(other)
+        return hash(self) | hash(other)
 
     # @always_inline("nodebug")
-    fn __xor__[T: Intable](self, other: T) -> UInt32:
+    fn __xor__[T: Hashable](self, other: T) -> UInt32:
         """Xor.
 
         Parameters:
@@ -639,7 +640,7 @@ struct Date[
         Returns:
             Result.
         """
-        return hash(self) ^ int(other)
+        return hash(self) ^ hash(other)
 
     # @always_inline("nodebug")
     fn __int__(self) -> Int:
