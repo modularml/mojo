@@ -86,7 +86,8 @@ struct Date[
     var day: UInt8
     """Day."""
     # TODO: tz and calendar should be references
-    var tz: TimeZone[iana, pyzoneinfo, native]
+    alias _tz = TimeZone[iana, pyzoneinfo, native]
+    var tz: Self._tz
     """Tz."""
     var calendar: Calendar
     """Calendar."""
@@ -98,9 +99,7 @@ struct Date[
         year: Optional[T] = None,
         month: Optional[A] = None,
         day: Optional[A] = None,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ):
         """Construct a `Date` from valid values.
@@ -127,9 +126,7 @@ struct Date[
         years: Int = 0,
         months: Int = 0,
         days: Int = 0,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from possibly overflowing values."""
@@ -155,7 +152,7 @@ struct Date[
         owned year: Optional[UInt16] = None,
         owned month: Optional[UInt8] = None,
         owned day: Optional[UInt8] = None,
-        owned tz: Optional[TimeZone[iana, pyzoneinfo, native]] = None,
+        owned tz: Optional[Self._tz] = None,
         owned calendar: Optional[Calendar] = None,
     ) -> Self:
         """Replace with give value/s.
@@ -206,7 +203,7 @@ struct Date[
         Returns:
             Self with tz casted to UTC.
         """
-        alias TZ_UTC = TimeZone[iana, pyzoneinfo, native]()
+        alias TZ_UTC = Self._tz()
         if self.tz == TZ_UTC:
             return self
         var new_self = self
@@ -224,7 +221,7 @@ struct Date[
             new_self = self.subtract(seconds=amnt)
         return new_self.replace(tz=TZ_UTC)
 
-    fn from_utc(owned self, tz: TimeZone[iana, pyzoneinfo, native]) -> Self:
+    fn from_utc(owned self, tz: Self._tz) -> Self:
         """Translate `TimeZone` from UTC. If `self.tz` is UTC
         it returns early.
 
@@ -234,7 +231,7 @@ struct Date[
         Returns:
             Self with tz casted to given tz.
         """
-        if tz == TimeZone[iana, pyzoneinfo, native]():
+        if tz == Self._tz():
             return self
         var maxmin = self.calendar.max_minute
         var maxsec = self.calendar.max_typical_second
@@ -647,9 +644,7 @@ struct Date[
     @staticmethod
     fn _from_years(
         years: UInt16,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from years."""
@@ -663,9 +658,7 @@ struct Date[
     @staticmethod
     fn _from_months(
         months: Int,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from months."""
@@ -682,9 +675,7 @@ struct Date[
         add_leap: Bool = False
     ](
         days: Int,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from days."""
@@ -720,9 +711,7 @@ struct Date[
         add_leap: Bool = False
     ](
         hours: Int,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from hours."""
@@ -737,9 +726,7 @@ struct Date[
         add_leap: Bool = False
     ](
         minutes: Int,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from minutes."""
@@ -754,9 +741,7 @@ struct Date[
         add_leap: Bool = False
     ](
         seconds: Int,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from seconds.
@@ -792,12 +777,7 @@ struct Date[
     @staticmethod
     fn from_unix_epoch[
         add_leap: Bool = False
-    ](
-        seconds: Int,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
-    ) -> Self:
+    ](seconds: Int, tz: Self._tz = Self._tz(),) -> Self:
         """Construct a `Date` from the seconds since the Unix Epoch
         1970-01-01. Adding the cumulative leap seconds since 1972
         to the given date.
@@ -817,9 +797,7 @@ struct Date[
 
     @staticmethod
     fn now(
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a date from `time.now()`.
@@ -884,9 +862,7 @@ struct Date[
     @parameter
     fn strptime[
         format_str: StringLiteral,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ](s: String) -> Optional[Self]:
         """Parse a `Date` from a  `String`.
@@ -912,7 +888,7 @@ struct Date[
     @parameter
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-        tz: Optional[TimeZone[iana, pyzoneinfo, native]] = None,
+        tz: Optional[Self._tz] = None,
         calendar: Calendar = _calendar,
     ](s: String) -> Optional[Self]:
         """Construct a date from an
@@ -947,9 +923,7 @@ struct Date[
     @staticmethod
     fn from_hash(
         value: UInt32,
-        tz: TimeZone[iana, pyzoneinfo, native] = TimeZone[
-            iana, pyzoneinfo, native
-        ](),
+        tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
     ) -> Self:
         """Construct a `Date` from a hash made by it.
