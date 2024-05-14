@@ -223,8 +223,31 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
         unroll[each, len(VariadicList(Ts))]()
 
-    fn unsafe_take[T: CollectionElement](inout self) -> T:
+    @always_inline
+    fn take[T: CollectionElement](inout self) -> T:
         """Take the current value of the variant as the provided type.
+
+        The caller takes ownership of the underlying value. The variant
+        type is consumed without calling any deleters.
+
+        This explicitly check that your value is of that type!
+        If you haven't verified the type correctness at runtime, the program
+        will abort!
+
+        Parameters:
+            T: The type to take.
+
+        Returns:
+            The underlying data as an owned value.
+        """
+        if not self.isa[T]():
+            abort("taking the wrong type!")
+
+        return self.unsafe_take[T]()
+
+    @always_inline
+    fn unsafe_take[T: CollectionElement](inout self) -> T:
+        """Unsafely take the current value of the variant as the provided type.
 
         The caller takes ownership of the underlying value. The variant
         type is consumed without calling any deleters.
@@ -240,9 +263,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Returns:
             The underlying data as an owned value.
         """
-        debug_assert(
-            Self._check[T]() == self._get_state()[], "taking wrong type"
-        )
+        debug_assert(self.isa[T](), "taking wrong type")
         # don't call the variant's deleter later
         self._get_state()[] = Self._sentinel
         return move_from_pointee(self._get_ptr[T]())
@@ -275,7 +296,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         alias idx = Self._check[T]()
         return self._get_state()[] == idx
 
-    fn __refitem__[
+    fn unsafe_get[
         T: CollectionElement
     ](self: Reference[Self, _, _]) -> Reference[
         T, self.is_mutable, self.lifetime
@@ -298,6 +319,31 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         debug_assert(self[].isa[T](), "get: wrong variant type")
         return self[]._get_ptr[T]()[]
+
+    fn __refitem__[
+        T: CollectionElement
+    ](self: Reference[Self, _, _]) -> Reference[
+        T, self.is_mutable, self.lifetime
+    ]:
+        """Get the value out of the variant as a type-checked type.
+
+        This explicitly check that your value is of that type!
+        If you haven't verified the type correctness at runtime, the program
+        will abort!
+
+        For now this has the limitations that it
+            - requires the variant value to be mutable
+
+        Parameters:
+            T: The type of the value to get out.
+
+        Returns:
+            The internal data represented as a `Reference[T]`.
+        """
+        if not self[].isa[T]():
+            abort("get: wrong variant type")
+
+        return self[].unsafe_get[T]()
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:
