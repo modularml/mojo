@@ -16,7 +16,6 @@
 from sys import env_get_string
 
 from python import Python, PythonObject
-from python._cpython import CPython, PyObjectPtr
 
 from testing import assert_equal, assert_raises
 
