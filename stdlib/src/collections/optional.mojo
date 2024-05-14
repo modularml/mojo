@@ -152,7 +152,6 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
 
         The caller takes ownership over the new value, which is moved
         out of the Optional, and the Optional is left in an empty state.
-        destroyed.
 
         This check to see if the optional contains a value.
         If you call this without first verifying the optional with __bool__()
@@ -171,7 +170,6 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
 
         The caller takes ownership over the new value, which is moved
         out of the Optional, and the Optional is left in an empty state.
-        destroyed.
 
         This check to see if the optional contains a value.
         If you call this without first verifying the optional with __bool__()
@@ -182,7 +180,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             The contained data of the option as an owned T value.
         """
         debug_assert(self.__bool__(), ".unsafe_take() on empty Optional")
-        return self._value.unsafe_take[T]()
+        return self._value.unsafe_replace[_NoneType, T](_NoneType())
 
     fn or_else(self, default: T) -> T:
         """Return the underlying value contained in the Optional or a default value if the Optional's underlying value is not present.

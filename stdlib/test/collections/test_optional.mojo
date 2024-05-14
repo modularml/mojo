@@ -108,6 +108,18 @@ def test_optional_reg_isnot():
     assert_false(a is not None)
 
 
+def test_optional_take_mutates():
+    var opt1 = Optional[Int](5)
+
+    assert_true(opt1)
+
+    var value: Int = opt1.take()
+
+    assert_equal(value, 5)
+    # The optional should now be empty
+    assert_false(opt1)
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
@@ -115,3 +127,4 @@ def main():
     test_optional_isnot()
     test_optional_reg_is()
     test_optional_reg_isnot()
+    test_optional_take_mutates()

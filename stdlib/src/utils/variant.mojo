@@ -225,20 +225,19 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     @always_inline
     fn take[T: CollectionElement](inout self) -> T:
-        """Take the current value of the variant as the provided type.
+        """Take the current value of the variant with the provided type.
 
-        The caller takes ownership of the underlying value. The variant
-        type is consumed without calling any deleters.
+        The caller takes ownership of the underlying value.
 
         This explicitly check that your value is of that type!
         If you haven't verified the type correctness at runtime, the program
         will abort!
 
         Parameters:
-            T: The type to take.
+            T: The type to take out.
 
         Returns:
-            The underlying data as an owned value.
+            The underlying data to be taken out as an owned value.
         """
         if not self.isa[T]():
             abort("taking the wrong type!")
@@ -247,10 +246,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     @always_inline
     fn unsafe_take[T: CollectionElement](inout self) -> T:
-        """Unsafely take the current value of the variant as the provided type.
+        """Unsafely take the current value of the variant with the provided type.
 
-        The caller takes ownership of the underlying value. The variant
-        type is consumed without calling any deleters.
+        The caller takes ownership of the underlying value.
 
         This doesn't explicitly check that your value is of that type!
         If you haven't verified the type correctness at runtime, you'll get
@@ -258,15 +256,71 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         and garbage member data.
 
         Parameters:
-            T: The type to take.
+            T: The type to take out.
 
         Returns:
-            The underlying data as an owned value.
+            The underlying data to be taken out as an owned value.
         """
         debug_assert(self.isa[T](), "taking wrong type")
         # don't call the variant's deleter later
         self._get_state()[] = Self._sentinel
         return move_from_pointee(self._get_ptr[T]())
+
+    @always_inline
+    fn replace[
+        Tin: CollectionElement, Tout: CollectionElement
+    ](inout self, value: Tin) -> Tout:
+        """Replace the current value of the variant with the provided type.
+
+        The caller takes ownership of the underlying value.
+
+        This explicitly check that your value is of that type!
+        If you haven't verified the type correctness at runtime, the program
+        will abort!
+
+        Parameters:
+            Tin: The type to put in.
+            Tout: The type to take out.
+
+        Args:
+            value: The value to put in.
+
+        Returns:
+            The underlying data to be taken out as an owned value.
+        """
+        if not self.isa[Tout]():
+            abort("taking out the wrong type!")
+
+        return self.unsafe_replace[Tin, Tout](value)
+
+    @always_inline
+    fn unsafe_replace[
+        Tin: CollectionElement, Tout: CollectionElement
+    ](inout self, value: Tin) -> Tout:
+        """Unsafely replace the current value of the variant with the provided type.
+
+        The caller takes ownership of the underlying value.
+
+        This doesn't explicitly check that your value is of that type!
+        If you haven't verified the type correctness at runtime, you'll get
+        a type that _looks_ like your type, but has potentially unsafe
+        and garbage member data.
+
+        Parameters:
+            Tin: The type to put in.
+            Tout: The type to take out.
+
+        Args:
+            value: The value to put in.
+
+        Returns:
+            The underlying data to be taken out as an owned value.
+        """
+        debug_assert(self.isa[Tout](), "taking out the wrong type!")
+
+        var x = self.unsafe_take[Tout]()
+        self.set[Tin](value)
+        return x^
 
     fn set[T: CollectionElement](inout self, owned value: T):
         """Set the variant value.
