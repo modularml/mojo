@@ -19,3 +19,12 @@ repos:
         language: system
         files: '\.(mojo|🔥|py)$'
         stages: [commit]
+      - id: spellcheck-notebook
+        name: Spellcheck Jupyter Notebook
+        entry: ./stdlib/scripts/spellcheck-notebooks.sh
+        language: python
+        files: \.ipynb$
+        additional_dependencies:
+          - jupyter==1.0.0
+          - codespell==2.2.6
+          - nbformat==5.10.4
