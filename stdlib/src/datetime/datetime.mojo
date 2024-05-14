@@ -816,7 +816,7 @@ struct DateTime[
         return hash(s) < hash(o)
 
     @always_inline("nodebug")
-    fn __invert__(owned self) -> UInt32:
+    fn __invert__(self) -> UInt32:
         """Invert.
 
         Returns:
