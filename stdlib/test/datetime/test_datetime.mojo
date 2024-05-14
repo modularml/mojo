@@ -17,7 +17,7 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from time import time
 
-from datetime.datetime import DateTime as dt
+from datetime.datetime import DateTime
 from datetime.calendar import Calendar, PythonCalendar, UTCCalendar
 from datetime.timezone import TimeZone
 from datetime.dt_str import IsoFormat
@@ -27,95 +27,95 @@ fn test_add() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
-    alias TZ = DateTime._tz
+    alias dt = DateTime[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = dt._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
     alias tz1_ = TZ("", 1, 0, 1)
 
     # test february leapyear
-    var result = DateTime(2024, 3, 1, tz=tz_0_, calendar=pycal) + DateTime(
-        0, 0, 1, tz=tz_0_, calendar=unixcal
+    var result = dt(2024, 3, 1, tz=tz_0_, calendar=pycal) + dt(
+        0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    var offset_0 = DateTime(2024, 2, 29, tz=tz_0_, calendar=unixcal)
-    var offset_p_1 = DateTime(2024, 2, 29, tz=tz_1, calendar=unixcal)
-    var offset_n_1 = DateTime(2024, 3, 1, tz=tz1_, calendar=unixcal)
-    var add_seconds = DateTime(2024, 3, 1, tz=tz_0_, calendar=unixcal).add(
+    var offset_0 = dt(2024, 2, 29, tz=tz_0_, calendar=unixcal)
+    var offset_p_1 = dt(2024, 2, 29, tz=tz_1, calendar=unixcal)
+    var offset_n_1 = dt(2024, 3, 1, tz=tz1_, calendar=unixcal)
+    var add_seconds = dt(2024, 3, 1, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
     # test february not leapyear
-    result = DateTime(2023, 3, 1, tz=tz_0_, calendar=pycal) + DateTime(
-        0, 0, 1, tz=tz_0_, calendar=unixcal
+    result = dt(2023, 3, 1, tz=tz_0_, calendar=pycal) + dt(
+        0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(2023, 2, 28, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(2023, 2, 28, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(2023, 3, 1, tz=tz1_, calendar=unixcal)
-    add_seconds = DateTime(2023, 3, 1, tz=tz_0_, calendar=unixcal).add(
+    offset_0 = dt(2023, 2, 28, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(2023, 2, 28, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2023, 3, 1, tz=tz1_, calendar=unixcal)
+    add_seconds = dt(2023, 3, 1, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
     # test normal month
-    result = DateTime(2024, 5, 31, tz=tz_0_, calendar=pycal) + DateTime(
-        0, 0, 1, tz=tz_0_, calendar=unixcal
+    result = dt(2024, 5, 31, tz=tz_0_, calendar=pycal) + dt(
+        0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(2024, 6, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(2024, 6, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(2024, 5, 31, tz=tz1_, calendar=unixcal)
-    add_seconds = DateTime(2024, 5, 31, tz=tz_0_, calendar=unixcal).add(
+    offset_0 = dt(2024, 6, 1, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(2024, 6, 1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2024, 5, 31, tz=tz1_, calendar=unixcal)
+    add_seconds = dt(2024, 5, 31, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
     # test december
-    result = DateTime(2024, 12, 31, tz=tz_0_, calendar=pycal) + DateTime(
-        0, 0, 1, tz=tz_0_, calendar=unixcal
+    result = dt(2024, 12, 31, tz=tz_0_, calendar=pycal) + dt(
+        0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(2025, 1, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(2025, 1, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(2024, 12, 31, tz=tz1_, calendar=unixcal)
-    add_seconds = DateTime(2024, 12, 31, tz=tz_0_, calendar=unixcal).add(
+    offset_0 = dt(2025, 1, 1, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(2025, 1, 1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2024, 12, 31, tz=tz1_, calendar=unixcal)
+    add_seconds = dt(2024, 12, 31, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
     # test year and month add
-    result = DateTime(2022, 6, 1, tz=tz_0_, calendar=pycal) + DateTime(
-        3, 6, 31, tz=tz_0_, calendar=unixcal
+    result = dt(2022, 6, 1, tz=tz_0_, calendar=pycal) + dt(
+        3, 6, 31, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(2025, 1, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(2025, 1, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(2024, 12, 31, tz=tz1_, calendar=unixcal)
+    offset_0 = dt(2025, 1, 1, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(2025, 1, 1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2024, 12, 31, tz=tz1_, calendar=unixcal)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
 
     # test positive overflow pycal
-    result = DateTime(9999, 12, 31, tz=tz_0_, calendar=pycal) + DateTime(
+    result = dt(9999, 12, 31, tz=tz_0_, calendar=pycal) + dt(
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(1, 1, 1, tz=tz_0_, calendar=pycal)
-    offset_p_1 = DateTime(1, 1, 1, tz=tz_1, calendar=pycal)
-    offset_n_1 = DateTime(1, 1, 1, tz=tz1_, calendar=pycal)
-    add_seconds = DateTime(9999, 12, 31, tz=tz_0_, calendar=pycal).add(
+    offset_0 = dt(1, 1, 1, tz=tz_0_, calendar=pycal)
+    offset_p_1 = dt(1, 1, 1, tz=tz_1, calendar=pycal)
+    offset_n_1 = dt(1, 1, 1, tz=tz1_, calendar=pycal)
+    add_seconds = dt(9999, 12, 31, tz=tz_0_, calendar=pycal).add(
         seconds=24 * 3600
     )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == add_seconds)
 
     # test positive overflow unixcal
-    result = DateTime(9999, 12, 31, tz=tz_0_, calendar=unixcal) + DateTime(
+    result = dt(9999, 12, 31, tz=tz_0_, calendar=unixcal) + dt(
         0, 0, 1, tz=tz_0_, calendar=unixcal
     )
-    offset_0 = DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(1970, 1, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(1970, 1, 1, tz=tz1_, calendar=unixcal)
-    add_seconds = DateTime(9999, 12, 31, tz=tz_0_, calendar=unixcal).add(
+    offset_0 = dt(1970, 1, 1, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(1970, 1, 1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(1970, 1, 1, tz=tz1_, calendar=unixcal)
+    add_seconds = dt(9999, 12, 31, tz=tz_0_, calendar=unixcal).add(
         seconds=24 * 3600
     )
     assert_true(result == offset_0 and result == offset_p_1)
@@ -126,97 +126,87 @@ fn test_subtract() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
-    alias TZ = DateTime._tz
+    alias dt = DateTime[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = dt._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
     alias tz1_ = TZ("", 1, 0, 1)
 
     # test february leapyear
-    var result = DateTime(2024, 3, 1, tz=tz_0_, calendar=pycal) - DateTime(
-        0, 0, 1, tz=tz_0_, calendar=unixcal
+    var result = dt(2024, 3, 1, tz=tz_0_, calendar=pycal) - dt(
+        0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    var offset_0 = DateTime(2024, 2, 29, tz=tz_0_, calendar=unixcal)
-    var offset_p_1 = DateTime(2024, 2, 29, tz=tz_1, calendar=unixcal)
-    var offset_n_1 = DateTime(2024, 3, 1, tz=tz1_, calendar=unixcal)
-    var sub_seconds = DateTime(2024, 3, 1, tz=tz_0_, calendar=unixcal).subtract(
+    var offset_0 = dt(2024, 2, 29, tz=tz_0_, calendar=unixcal)
+    var offset_p_1 = dt(2024, 2, 29, tz=tz_1, calendar=unixcal)
+    var offset_n_1 = dt(2024, 3, 1, tz=tz1_, calendar=unixcal)
+    var sub_seconds = dt(2024, 3, 1, tz=tz_0_, calendar=unixcal).subtract(
         seconds=1
     )
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
     # test february not leapyear
-    result = DateTime(2023, 3, 1, tz=tz_0_, calendar=pycal) - DateTime(
-        0, 0, 1, tz=tz_0_, calendar=unixcal
+    result = dt(2023, 3, 1, tz=tz_0_, calendar=pycal) - dt(
+        0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(2023, 2, 28, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(2023, 2, 28, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(2023, 3, 1, tz=tz1_, calendar=unixcal)
-    sub_seconds = DateTime(2023, 3, 1, tz=tz_0_, calendar=unixcal).subtract(
-        seconds=1
-    )
+    offset_0 = dt(2023, 2, 28, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(2023, 2, 28, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2023, 3, 1, tz=tz1_, calendar=unixcal)
+    sub_seconds = dt(2023, 3, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
     # test normal month
-    result = DateTime(2024, 6, 1, tz=tz_0_, calendar=pycal) - DateTime(
-        0, 0, 1, tz=tz_0_, calendar=unixcal
+    result = dt(2024, 6, 1, tz=tz_0_, calendar=pycal) - dt(
+        0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(2024, 5, 31, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(2024, 5, 31, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(2024, 6, 1, tz=tz1_, calendar=unixcal)
-    sub_seconds = DateTime(2024, 6, 1, tz=tz_0_, calendar=unixcal).subtract(
-        seconds=1
-    )
+    offset_0 = dt(2024, 5, 31, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(2024, 5, 31, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2024, 6, 1, tz=tz1_, calendar=unixcal)
+    sub_seconds = dt(2024, 6, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
     # test december
-    result = DateTime(2025, 1, 1, tz=tz_0_, calendar=pycal) - DateTime(
-        0, 0, 1, tz=tz_0_, calendar=unixcal
+    result = dt(2025, 1, 1, tz=tz_0_, calendar=pycal) - dt(
+        0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(2024, 12, 31, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(2024, 12, 31, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(2025, 1, 1, tz=tz1_, calendar=unixcal)
-    sub_seconds = DateTime(2025, 1, 1, tz=tz_0_, calendar=unixcal).subtract(
-        seconds=1
-    )
+    offset_0 = dt(2024, 12, 31, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(2024, 12, 31, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2025, 1, 1, tz=tz1_, calendar=unixcal)
+    sub_seconds = dt(2025, 1, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
     # test year and month subtract
-    result = DateTime(2025, 1, 1, tz=tz_0_, calendar=pycal) - DateTime(
-        3, 6, 31, tz=tz_0_, calendar=unixcal
+    result = dt(2025, 1, 1, tz=tz_0_, calendar=pycal) - dt(
+        3, 6, 31, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(2022, 6, 1, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(2022, 6, 1, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(2022, 5, 31, tz=tz1_, calendar=unixcal)
+    offset_0 = dt(2022, 6, 1, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(2022, 6, 1, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(2022, 5, 31, tz=tz1_, calendar=unixcal)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1)
 
     # test negative overflow pycal
-    result = DateTime(1, 1, 1, tz=tz_0_, calendar=pycal) - DateTime(
+    result = dt(1, 1, 1, tz=tz_0_, calendar=pycal) - dt(
         0, 0, 1, tz=tz_0_, calendar=pycal
     )
-    offset_0 = DateTime(9999, 12, 31, tz=tz_0_, calendar=pycal)
-    offset_p_1 = DateTime(9999, 12, 31, tz=tz_1, calendar=pycal)
-    offset_n_1 = DateTime(9999, 12, 31, tz=tz1_, calendar=pycal)
-    sub_seconds = DateTime(1, 1, 1, tz=tz_0_, calendar=pycal).subtract(
-        seconds=1
-    )
+    offset_0 = dt(9999, 12, 31, tz=tz_0_, calendar=pycal)
+    offset_p_1 = dt(9999, 12, 31, tz=tz_1, calendar=pycal)
+    offset_n_1 = dt(9999, 12, 31, tz=tz1_, calendar=pycal)
+    sub_seconds = dt(1, 1, 1, tz=tz_0_, calendar=pycal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
     # test negative overflow unixcal
-    result = DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal) - DateTime(
+    result = dt(1970, 1, 1, tz=tz_0_, calendar=unixcal) - dt(
         0, 0, 1, tz=tz_0_, calendar=unixcal
     )
-    offset_0 = DateTime(9999, 12, 31, tz=tz_0_, calendar=unixcal)
-    offset_p_1 = DateTime(9999, 12, 31, tz=tz_1, calendar=unixcal)
-    offset_n_1 = DateTime(9999, 12, 31, tz=tz1_, calendar=unixcal)
-    sub_seconds = DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal).subtract(
-        seconds=1
-    )
+    offset_0 = dt(9999, 12, 31, tz=tz_0_, calendar=unixcal)
+    offset_p_1 = dt(9999, 12, 31, tz=tz_1, calendar=unixcal)
+    offset_n_1 = dt(9999, 12, 31, tz=tz1_, calendar=unixcal)
+    sub_seconds = dt(1970, 1, 1, tz=tz_0_, calendar=unixcal).subtract(seconds=1)
     assert_true(result == offset_0 and result == offset_p_1)
     assert_true(result == offset_n_1 and result == sub_seconds)
 
@@ -225,42 +215,41 @@ fn test_logic() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
-    alias TZ = DateTime._tz
+    alias dt = DateTime[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = dt._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
     alias tz1_ = TZ("", 1, 0, 1)
 
-    var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
-    assert_true(ref == DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal))
-    assert_true(ref == DateTime(1970, 1, 1, tz=tz_1, calendar=unixcal))
-    assert_true(ref == DateTime(1969, 12, 31, tz=tz1_, calendar=pycal))
+    var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
+    assert_true(ref == dt(1970, 1, 1, tz=tz_0_, calendar=unixcal))
+    assert_true(ref == dt(1970, 1, 1, tz=tz_1, calendar=unixcal))
+    assert_true(ref == dt(1969, 12, 31, tz=tz1_, calendar=pycal))
 
-    assert_true(ref < DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal))
-    assert_true(ref <= DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal))
-    assert_true(ref > DateTime(1969, 12, 31, tz=tz_0_, calendar=pycal))
-    assert_true(ref >= DateTime(1969, 12, 31, tz=tz_0_, calendar=pycal))
+    assert_true(ref < dt(1970, 1, 2, tz=tz_0_, calendar=pycal))
+    assert_true(ref <= dt(1970, 1, 2, tz=tz_0_, calendar=pycal))
+    assert_true(ref > dt(1969, 12, 31, tz=tz_0_, calendar=pycal))
+    assert_true(ref >= dt(1969, 12, 31, tz=tz_0_, calendar=pycal))
 
 
 fn test_bitwise() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
-    alias TZ = DateTime._tz
+    alias dt = DateTime[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = dt._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
     alias tz1_ = TZ("", 1, 0, 1)
 
-    var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
-    assert_true(ref & DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal) == 0)
-    assert_true(ref & DateTime(1970, 1, 1, tz=tz_1, calendar=unixcal) == 0)
-    assert_true(ref & DateTime(1969, 12, 31, tz=tz1_, calendar=pycal) == 0)
+    var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
+    assert_true(ref & dt(1970, 1, 1, tz=tz_0_, calendar=unixcal) == 0)
+    assert_true(ref & dt(1970, 1, 1, tz=tz_1, calendar=unixcal) == 0)
+    assert_true(ref & dt(1969, 12, 31, tz=tz1_, calendar=pycal) == 0)
 
-    assert_true((ref ^ DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal)) != 0)
+    assert_true((ref ^ dt(1970, 1, 2, tz=tz_0_, calendar=pycal)) != 0)
     assert_true(
-        (ref | (DateTime(1970, 1, 2, tz=tz_0_, calendar=pycal) & 0))
-        == hash(ref)
+        (ref | (dt(1970, 1, 2, tz=tz_0_, calendar=pycal) & 0)) == hash(ref)
     )
     assert_true((ref & ~ref) == 0)
     assert_true(~(ref ^ ~ref) == 0)
@@ -268,11 +257,11 @@ fn test_bitwise() raises:
 
 fn test_iso() raises:
     alias pycal = PythonCalendar
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
-    alias TZ = DateTime._tz
+    alias dt = DateTime[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = dt._tz
     alias tz_0_ = TZ("", 0, 0)
 
-    var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
+    var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
     var iso_str = "1970-01-01T00:00:00+00:00"
     alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
     assert_true(ref == DateTime.from_iso[fmt1](iso_str).value()[])
@@ -305,7 +294,7 @@ fn test_iso() raises:
 
 
 fn test_time() raises:
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+    alias dt = DateTime[iana=None, pyzoneinfo=False, native=False]
 
     var start = DateTime.now()
     time.sleep(1e-9)  # nanosecond resolution
@@ -314,9 +303,9 @@ fn test_time() raises:
 
 
 fn test_hash() raises:
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+    alias dt = DateTime[iana=None, pyzoneinfo=False, native=False]
 
-    var ref = DateTime(1970, 1, 1)
+    var ref = dt(1970, 1, 1)
     var data = hash(ref)
     var parsed = DateTime.from_hash(data)
     assert_true(ref == parsed)
