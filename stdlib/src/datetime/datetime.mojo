@@ -36,12 +36,10 @@ trait _IntCollect(Intable, CollectionElement):
     ...
 
 
-@value
-# @register_passable("trivial")
+# @value
+@register_passable("trivial")
 struct DateTime[
-    iana: Optional[ZoneInfo] = None,
-    pyzoneinfo: Bool = True,
-    native: Bool = False,
+    iana: Bool = True, pyzoneinfo: Bool = True, native: Bool = False
 ](Hashable, Stringable):
     """Custom `Calendar` and `TimeZone` may be passed in.
     By default, it uses `PythonCalendar` which is a Gregorian

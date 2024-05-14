@@ -22,12 +22,13 @@
 from .zoneinfo import ZoneInfo, offset_at, offset_no_dst_tz
 
 
-@value
-# @register_passable("trivial")
+alias _all_zones = get_zoneinfo()
+
+
+# @value
+@register_passable("trivial")
 struct TimeZone[
-    iana: Optional[ZoneInfo] = None,
-    pyzoneinfo: Bool = True,
-    native: Bool = False,
+    iana: Bool = True, pyzoneinfo: Bool = True, native: Bool = False
 ]:
     """`TimeZone` struct. Because of a POSIX standard, if you set
     the tz_str e.g. Etc/UTC-4 it means 4 hours east of UTC
@@ -114,9 +115,9 @@ struct TimeZone[
 
         @parameter
         if iana:
-            if has_dst:
+            if has_dst or not _all_zones:
                 return
-            var tz = iana.value()[][1].get(tz_str)
+            var tz = _all_zones.value()[][1].get(tz_str)
             var val = offset_no_dst_tz(tz)
             if not val:
                 return
@@ -153,12 +154,12 @@ struct TimeZone[
         @parameter
         if iana and native:
             if self.has_dst:
-                var dst = iana.value()[][0].get(self.tz_str)
+                var dst = _all_zones.value()[][0].get(self.tz_str)
                 var offset = offset_at(
                     dst, year, month, day, hour, minute, second
                 )
                 if offset:
-                    return offset.unsafe_take()
+                    return offset.value()[]
         elif iana and pyzoneinfo:
             try:
                 from python import Python

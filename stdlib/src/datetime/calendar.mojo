@@ -185,7 +185,7 @@ trait _Calendarized:
         hour: UInt8,
         minute: UInt8,
         second: UInt8,
-        m_second: UInt8,
+        m_second: UInt16,
     ) -> UInt64:
         ...
 
@@ -227,7 +227,7 @@ trait _Calendarized:
         ...
 
 
-@value
+@register_passable("trivial")
 struct Calendar(_Calendarized):
     """`Calendar` interface."""
 
@@ -488,7 +488,7 @@ struct Calendar(_Calendarized):
         hour: UInt8,
         minute: UInt8,
         second: UInt8,
-        m_second: UInt8,
+        m_second: UInt16,
     ) -> UInt64:
         """Miliseconds since the begining of the calendar's epoch.
 
@@ -504,9 +504,8 @@ struct Calendar(_Calendarized):
         Returns:
             The amount.
         """
-        _ = m_second
-        return self._implementation.seconds_since_epoch(
-            year, month, day, hour, minute, second
+        return self._implementation.m_seconds_since_epoch(
+            year, month, day, hour, minute, second, m_second
         )
 
     @always_inline("nodebug")
@@ -635,7 +634,7 @@ struct Calendar(_Calendarized):
         return self._implementation.from_hash[cal_hash](value)
 
 
-@value
+@register_passable("trivial")
 struct Gregorian(_Calendarized):
     """`Gregorian` Calendar."""
 
@@ -927,7 +926,7 @@ struct Gregorian(_Calendarized):
         hour: UInt8,
         minute: UInt8,
         second: UInt8,
-        m_second: UInt8,
+        m_second: UInt16,
     ) -> UInt64:
         """Miliseconds since the begining of the calendar's epoch.
 
@@ -943,7 +942,6 @@ struct Gregorian(_Calendarized):
         Returns:
             The amount.
         """
-        _ = m_second
         alias sec_to_mili = 1000
         alias min_to_mili = 60 * sec_to_mili
         alias hours_to_mili = 60 * min_to_mili
@@ -960,7 +958,7 @@ struct Gregorian(_Calendarized):
             DType.uint64
         ]()
 
-        var y_d = ((year - self.min_year) * years_to_mili).cast[DType.uint64]()
+        var y_d = (year - self.min_year).cast[DType.uint64]() * years_to_mili
 
         var days: UInt64 = 0
         for i in range(self.min_month, month + 1):
@@ -979,7 +977,10 @@ struct Gregorian(_Calendarized):
         var s_d = (second - UInt8(self.min_second)).cast[
             DType.uint64
         ]() * sec_to_mili
-        return y_d + mon_d + d_d + h_d + min_d + s_d + leaps
+        var m_sec = (m_second - UInt16(self.min_milisecond)).cast[
+            DType.uint64
+        ]()
+        return m_sec + y_d + mon_d + d_d + h_d + min_d + s_d + leaps
 
     fn n_seconds_since_epoch(
         self,
@@ -1183,7 +1184,7 @@ struct Gregorian(_Calendarized):
         return Self(min_year=year)
 
 
-@value
+@register_passable("trivial")
 struct UTCFast(_Calendarized):
     """`UTCFast` Calendar."""
 
@@ -1439,7 +1440,7 @@ struct UTCFast(_Calendarized):
         hour: UInt8,
         minute: UInt8,
         second: UInt8,
-        m_second: UInt8,
+        m_second: UInt16,
     ) -> UInt64:
         """Miliseconds since the begining of the calendar's epoch.
 
@@ -1455,22 +1456,28 @@ struct UTCFast(_Calendarized):
         Returns:
             The amount.
         """
-        _ = self
         alias sec_to_mili = 1000
         alias min_to_mili = 60 * sec_to_mili
         alias hours_to_mili = 60 * min_to_mili
         alias days_to_mili = 24 * hours_to_mili
         alias years_to_mili = 365 * days_to_mili
 
-        return (
-            UInt64(year) * years_to_mili
-            + UInt64(month) * 30
-            + UInt64(day) * days_to_mili
-            + UInt64(hour) * hours_to_mili
-            + UInt64(minute) * min_to_mili
-            + UInt64(second) * sec_to_mili
-            + UInt64(m_second)
-        )
+        var y = (year - self.min_year).cast[DType.uint64]() * years_to_mili
+
+        var days: UInt64 = 0
+        for i in range(self.min_month, month):
+            days += self._monthdays[i].cast[DType.uint64]()
+        var mon_d = days * days_to_mili
+
+        var d_d = (day - self.min_day).cast[DType.uint64]() * days_to_mili
+        var h_d = (hour - self.min_hour).cast[DType.uint64]() * hours_to_mili
+        var min_d = (minute - self.min_minute).cast[
+            DType.uint64
+        ]() * min_to_mili
+        var s_d = (second - self.min_second).cast[DType.uint64]()
+        var ms_d = (m_second - self.min_milisecond).cast[DType.uint64]()
+
+        return y + mon_d + d_d + h_d + min_d + s_d + ms_d
 
     fn n_seconds_since_epoch(
         self,
@@ -1509,17 +1516,24 @@ struct UTCFast(_Calendarized):
         alias days_to_nano = 24 * hours_to_nano
         alias years_to_nano = 365 * days_to_nano
 
-        return (
-            UInt64(year) * years_to_nano
-            + UInt64(month) * 30
-            + UInt64(day) * days_to_nano
-            + UInt64(hour) * hours_to_nano
-            + UInt64(minute) * min_to_nano
-            + UInt64(second) * sec_to_nano
-            + UInt64(m_second) * 1_000_000
-            + UInt64(u_second) * 1_000
-            + UInt64(n_second)
-        )
+        var y = (year - self.min_year).cast[DType.uint64]() * years_to_nano
+
+        var days: UInt64 = 0
+        for i in range(self.min_month, month):
+            days += self._monthdays[i].cast[DType.uint64]()
+        var mon_d = days * days_to_nano
+
+        var d_d = (day - self.min_day).cast[DType.uint64]() * days_to_nano
+        var h_d = (hour - self.min_hour).cast[DType.uint64]() * hours_to_nano
+        var min_d = (minute - self.min_minute).cast[
+            DType.uint64
+        ]() * min_to_nano
+        var s_d = (second - self.min_second).cast[DType.uint64]()
+        var ms_d = (m_second - self.min_milisecond).cast[DType.uint64]()
+        var us_d = (m_second - self.min_microsecond).cast[DType.uint64]()
+        var ns_d = (m_second - self.min_nanosecond).cast[DType.uint64]()
+
+        return y + mon_d + d_d + h_d + min_d + s_d + ms_d + us_d + ns_d
 
     @always_inline("nodebug")
     fn hash[

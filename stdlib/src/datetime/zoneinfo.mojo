@@ -303,7 +303,7 @@ struct ZoneInfoFile(CollectionElement):
         Returns:
             An Optional `ZoneDST`.
         """
-        if self._index > UInt8.MAX_FINITE:
+        if self._index > 0xFF:
             return None
         var value: UInt32
         with open(self._file, "rb") as f:

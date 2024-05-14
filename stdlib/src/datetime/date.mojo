@@ -33,10 +33,10 @@ trait _IntCollect(Intable, CollectionElement):
     ...
 
 
-@value
-# @register_passable("trivial")
+# @value
+@register_passable("trivial")
 struct Date[
-    iana: Optional[ZoneInfo] = None,
+    iana: Bool = True,
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](Hashable, Stringable):

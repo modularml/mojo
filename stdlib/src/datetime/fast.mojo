@@ -47,10 +47,10 @@ trait _IntCollect(Intable, CollectionElement):
 struct DateTime64(Hashable, Stringable):
     """Fast `DateTime64` struct. This is a "normal"
     `DateTime` with milisecond resolution. Uses
-    given calendar's epoch and other params at
-    build time. Assumes all instances have the same
-    timezone and epoch and that there are no leap
-    seconds or days. UTCCalendar is the default.
+    UTCFastCal epoch [1970-01-01, 9999-12-31] and other
+    params at build time. Assumes all instances have
+    the same timezone and epoch and that there are no
+    leap seconds or days.
 
     - Hash Resolution:
         - year: Up to year 134_217_728.
@@ -86,7 +86,6 @@ struct DateTime64(Hashable, Stringable):
         minute: Optional[A] = None,
         second: Optional[A] = None,
         m_second: Optional[T] = None,
-        calendar: Calendar = _calendar,
         hash_val: Optional[B] = None,
     ):
         """Construct a `DateTime64` from valid values.
@@ -105,21 +104,20 @@ struct DateTime64(Hashable, Stringable):
             minute: Minute.
             second: Second.
             m_second: M_second.
-            calendar: Calendar.
             hash_val: Hash_val.
         """
-        var y = int(year.value()[]) if year else int(calendar.min_year)
-        var mon = int(month.value()[]) if month else int(calendar.min_month)
-        var d = int(day.value()[]) if day else int(calendar.min_day)
-        var h = int(hour.value()[]) if hour else int(calendar.min_hour)
-        var m = int(minute.value()[]) if minute else int(calendar.min_minute)
-        var s = int(second.value()[]) if second else int(calendar.min_second)
+        var y = int(year.value()[]) if year else int(_calendar.min_year)
+        var mon = int(month.value()[]) if month else int(_calendar.min_month)
+        var d = int(day.value()[]) if day else int(_calendar.min_day)
+        var h = int(hour.value()[]) if hour else int(_calendar.min_hour)
+        var m = int(minute.value()[]) if minute else int(_calendar.min_minute)
+        var s = int(second.value()[]) if second else int(_calendar.min_second)
         var ms = int(m_second.value()[]) if day else int(
-            calendar.min_milisecond
+            _calendar.min_milisecond
         )
-        self.m_second = calendar.m_seconds_since_epoch(y, mon, d, h, m, s, ms)
+        self.m_second = _calendar.m_seconds_since_epoch(y, mon, d, h, m, s, ms)
         self.hash = int(hash_val.value()[]) if hash_val else int(
-            calendar.hash[_cal_h64](y, mon, d, h, m, s, ms)
+            _calendar.hash[_cal_h64](y, mon, d, h, m, s, ms)
         )
 
     @always_inline("nodebug")
@@ -563,7 +561,6 @@ struct DateTime64(Hashable, Stringable):
     @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-        calendar: Calendar = _calendar,
     ](s: String) -> Optional[Self]:
         """Construct a dateTime64time from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
@@ -571,7 +568,6 @@ struct DateTime64(Hashable, Stringable):
 
         Parameters:
             iso: The `IsoFormat` to parse.
-            calendar: The calendar to which the result will belong.
 
         Args:
             s: The `String` to parse; it's assumed that it is properly formatted
@@ -583,45 +579,33 @@ struct DateTime64(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = DateTime64(
-                p[0], p[1], p[2], p[3], p[4], p[5], calendar=calendar
-            )
+            var dt = DateTime64(p[0], p[1], p[2], p[3], p[4], p[5])
             return dt
         except:
             return None
 
     @staticmethod
     @always_inline("nodebug")
-    fn from_hash(value: UInt64, calendar: Calendar = _calendar) -> Self:
+    fn from_hash(value: UInt64) -> Self:
         """Construct a `DateTime64` from a hash made by it.
 
         Args:
             value: The hash.
-            calendar: The Calendar to parse the hash with.
 
         Returns:
             Self.
         """
-        var d = calendar.from_hash[_cal_h64](int(value))
-        return DateTime64(
-            d[0],
-            d[1],
-            d[2],
-            d[3],
-            d[4],
-            d[5],
-            calendar=calendar,
-            hash_val=value,
-        )
+        var d = _calendar.from_hash[_cal_h64](int(value))
+        return DateTime64(d[0], d[1], d[2], d[3], d[4], d[5], hash_val=value)
 
 
 @register_passable("trivial")
 struct DateTime32(Hashable, Stringable):
     """Fast `DateTime32 ` struct. This is a "normal" `DateTime`
-    with minute resolution. Uses given calendar's epoch
-    and other params at build time. Assumes all instances have
-    the same timezone and epoch and that there are no leap
-    seconds or days. UTCCalendar is the default.
+    with minute resolution. Uses UTCFastCal epoch
+    [1970-01-01, 9999-12-31] and other params at build time.
+    Assumes all instances have the same timezone and epoch
+    and that there are no leap seconds or days.
 
     - Hash Resolution:
         - year: Up to year 4_096.
@@ -653,7 +637,6 @@ struct DateTime32(Hashable, Stringable):
         day: Optional[A] = None,
         hour: Optional[A] = None,
         minute: Optional[A] = None,
-        calendar: Calendar = _calendar,
         hash_val: Optional[B] = None,
     ):
         """Construct a `DateTime32 ` from valid values.
@@ -670,22 +653,21 @@ struct DateTime32(Hashable, Stringable):
             day: Day.
             hour: Hour.
             minute: Minute.
-            calendar: Calendar.
             hash_val: Hash_val.
         """
-        var y = int(year.value()[]) if year else int(calendar.min_year)
-        var mon = int(month.value()[]) if month else int(calendar.min_month)
-        var d = int(day.value()[]) if day else int(calendar.min_day)
-        var h = int(hour.value()[]) if hour else int(calendar.min_hour)
-        var m = int(minute.value()[]) if minute else int(calendar.min_minute)
+        var y = int(year.value()[]) if year else int(_calendar.min_year)
+        var mon = int(month.value()[]) if month else int(_calendar.min_month)
+        var d = int(day.value()[]) if day else int(_calendar.min_day)
+        var h = int(hour.value()[]) if hour else int(_calendar.min_hour)
+        var m = int(minute.value()[]) if minute else int(_calendar.min_minute)
         self.minute = (
-            calendar.seconds_since_epoch(
-                y, mon, d, h, m, int(calendar.min_second)
+            _calendar.seconds_since_epoch(
+                y, mon, d, h, m, int(_calendar.min_second)
             )
             // 60
         ).cast[DType.uint32]()
         self.hash = int(hash_val.value()[]) if hash_val else int(
-            calendar.hash[_cal_h32](y, mon, d, h, m)
+            _calendar.hash[_cal_h32](y, mon, d, h, m)
         )
 
     @always_inline("nodebug")
@@ -1091,7 +1073,6 @@ struct DateTime32(Hashable, Stringable):
     @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-        calendar: Calendar = _calendar,
     ](s: String) -> Optional[Self]:
         """Construct a `DateTime32` time from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
@@ -1099,7 +1080,6 @@ struct DateTime32(Hashable, Stringable):
 
         Parameters:
             iso: The `IsoFormat` to parse.
-            calendar: The calendar to which the result will belong.
 
         Args:
             s: The `String` to parse; it's assumed that it is properly formatted
@@ -1111,37 +1091,34 @@ struct DateTime32(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = DateTime32(p[0], p[1], p[2], p[3], p[4], calendar=calendar)
+            var dt = DateTime32(p[0], p[1], p[2], p[3], p[4])
             return dt
         except:
             return None
 
     @staticmethod
     @always_inline("nodebug")
-    fn from_hash(value: UInt32, calendar: Calendar = _calendar) -> Self:
+    fn from_hash(value: UInt32) -> Self:
         """Construct a `DateTime32 ` from a hash made by it.
 
         Args:
             value: The hash.
-            calendar: The Calendar to parse the hash with.
 
         Returns:
             Self.
         """
-        var d = calendar.from_hash[_cal_h32](int(value))
-        return DateTime32(
-            d[0], d[1], d[2], d[3], d[4], calendar=calendar, hash_val=value
-        )
+        var d = _calendar.from_hash[_cal_h32](int(value))
+        return DateTime32(d[0], d[1], d[2], d[3], d[4], hash_val=value)
 
 
 @register_passable("trivial")
 struct DateTime16(Hashable, Stringable):
     """Fast `DateTime16 ` struct. This is a `DateTime` with
     hour resolution, it can be used as a year, dayofyear,
-    hour representation. uses given calendar's epoch and
-    other params at build time. Assumes all instances have
-    the same timezone and epoch and that there are no leap
-    seconds or days. UTCCalendar is the default.
+    hour representation. Uses UTCFastCal epoch
+    [1970-01-01, 9999-12-31] and other params at build time.
+    Assumes all instances have the same timezone and epoch
+    and that there are no leap seconds or days.
 
     - Hash Resolution:
         year: Up to year 4.
@@ -1170,7 +1147,6 @@ struct DateTime16(Hashable, Stringable):
         month: Optional[A] = None,
         day: Optional[A] = None,
         hour: Optional[A] = None,
-        calendar: Calendar = _calendar,
         hash_val: Optional[T] = None,
     ):
         """Construct a `DateTime16` from valid values.
@@ -1185,20 +1161,19 @@ struct DateTime16(Hashable, Stringable):
             month: Month.
             day: Day.
             hour: Hour.
-            calendar: Calendar.
             hash_val: Hash_val.
         """
-        var y = int(year.value()[]) if year else int(calendar.min_year)
-        var mon = int(month.value()[]) if month else int(calendar.min_month)
-        var d = int(day.value()[]) if day else int(calendar.min_day)
-        var h = int(hour.value()[]) if hour else int(calendar.min_hour)
-        var m = int(calendar.min_minute)
-        var s = int(calendar.min_second)
+        var y = int(year.value()[]) if year else int(_calendar.min_year)
+        var mon = int(month.value()[]) if month else int(_calendar.min_month)
+        var d = int(day.value()[]) if day else int(_calendar.min_day)
+        var h = int(hour.value()[]) if hour else int(_calendar.min_hour)
+        var m = int(_calendar.min_minute)
+        var s = int(_calendar.min_second)
         self.hour = (
-            calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
+            _calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
         ).cast[DType.uint16]()
         self.hash = int(hash_val.value()[]) if hash_val else int(
-            calendar.hash[_cal_h16](y, mon, d, h, m, s)
+            _calendar.hash[_cal_h16](y, mon, d, h, m, s)
         )
 
     @always_inline("nodebug")
@@ -1560,7 +1535,6 @@ struct DateTime16(Hashable, Stringable):
     @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-        calendar: Calendar = _calendar,
     ](s: String) -> Optional[Self]:
         """Construct a `DateTime16` time from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
@@ -1568,7 +1542,6 @@ struct DateTime16(Hashable, Stringable):
 
         Parameters:
             iso: The `IsoFormat` to parse.
-            calendar: The calendar to which the result will belong.
 
         Args:
             s: The `String` to parse; it's assumed that it is properly formatted
@@ -1580,37 +1553,34 @@ struct DateTime16(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = DateTime16(p[0], p[1], p[2], p[3], calendar=calendar)
+            var dt = DateTime16(p[0], p[1], p[2], p[3])
             return dt
         except:
             return None
 
     @staticmethod
     @always_inline("nodebug")
-    fn from_hash(value: UInt16, calendar: Calendar = _calendar) -> Self:
+    fn from_hash(value: UInt16) -> Self:
         """Construct a `DateTime16 ` from a hash made by it.
 
         Args:
             value: The hash.
-            calendar: The Calendar to parse the hash with.
 
         Returns:
             Self.
         """
-        var d = calendar.from_hash[_cal_h16](int(value))
-        return DateTime16(
-            year=d[0], day=d[2], hour=d[3], calendar=calendar, hash_val=value
-        )
+        var d = _calendar.from_hash[_cal_h16](int(value))
+        return DateTime16(year=d[0], day=d[2], hour=d[3], hash_val=value)
 
 
 @register_passable("trivial")
 struct DateTime8(Hashable, Stringable):
     """Fast `DateTime8 ` struct. This is a `DateTime`
     with hour resolution, it can be used as a dayofweek,
-    hour representation. uses given calendar's epoch and
-    other params at build time. Assumes all instances have
-    the same timezone and epoch and that there are no leap
-    seconds or days. UTCCalendar is the default.
+    hour representation. Uses UTCFastCal epoch
+    [1970-01-01, 9999-12-31] and other params at build time.
+    Assumes all instances have the same timezone and epoch
+    and that there are no leap seconds or days.
 
     - Hash Resolution:
         - day: Up to day 8.
@@ -1638,7 +1608,6 @@ struct DateTime8(Hashable, Stringable):
         month: Optional[A] = None,
         day: Optional[A] = None,
         hour: Optional[A] = None,
-        calendar: Calendar = _calendar,
         hash_val: Optional[A] = None,
     ):
         """Construct a `DateTime8 ` from valid values.
@@ -1653,20 +1622,19 @@ struct DateTime8(Hashable, Stringable):
             month: Month.
             day: Day.
             hour: Hour.
-            calendar: Calendar.
             hash_val: Hash_val.
         """
-        var y = int(year.value()[]) if year else int(calendar.min_year)
-        var mon = int(month.value()[]) if month else int(calendar.min_month)
-        var d = int(day.value()[]) if day else int(calendar.min_day)
-        var h = int(hour.value()[]) if hour else int(calendar.min_hour)
-        var m = int(calendar.min_minute)
-        var s = int(calendar.min_second)
+        var y = int(year.value()[]) if year else int(_calendar.min_year)
+        var mon = int(month.value()[]) if month else int(_calendar.min_month)
+        var d = int(day.value()[]) if day else int(_calendar.min_day)
+        var h = int(hour.value()[]) if hour else int(_calendar.min_hour)
+        var m = int(_calendar.min_minute)
+        var s = int(_calendar.min_second)
         self.hour = (
-            calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
+            _calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
         ).cast[DType.uint8]()
         self.hash = int(hash_val.value()[]) if hash_val else int(
-            calendar.hash[_cal_h8](y, mon, d, h, m, s)
+            _calendar.hash[_cal_h8](y, mon, d, h, m, s)
         )
 
     @always_inline("nodebug")
@@ -2021,7 +1989,6 @@ struct DateTime8(Hashable, Stringable):
     @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
-        calendar: Calendar = _calendar,
     ](s: String) -> Optional[Self]:
         """Construct a `DateTime8` time from an
         [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601) compliant
@@ -2029,7 +1996,6 @@ struct DateTime8(Hashable, Stringable):
 
         Parameters:
             iso: The `IsoFormat` to parse.
-            calendar: The calendar to which the result will belong.
 
         Args:
             s: The `String` to parse; it's assumed that it is properly formatted
@@ -2041,22 +2007,21 @@ struct DateTime8(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[iso](s)
-            var dt = DateTime8(p[0], p[1], p[2], p[3], calendar=calendar)
+            var dt = DateTime8(p[0], p[1], p[2], p[3])
             return dt
         except:
             return None
 
     @staticmethod
     @always_inline("nodebug")
-    fn from_hash(value: UInt8, calendar: Calendar = _calendar) -> Self:
+    fn from_hash(value: UInt8) -> Self:
         """Construct a `DateTime8` from a hash made by it.
 
         Args:
             value: The hash.
-            calendar: The Calendar to parse the hash with.
 
         Returns:
             Self.
         """
-        var d = calendar.from_hash[_cal_h8](int(value))
-        return DateTime8(day=d[2], hour=d[3], calendar=calendar, hash_val=value)
+        var d = _calendar.from_hash[_cal_h8](int(value))
+        return DateTime8(day=d[2], hour=d[3], hash_val=value)
