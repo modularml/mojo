@@ -28,9 +28,9 @@ fn test_add() raises:
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
-    var tz_0_ = TZ("", 0, 0)
-    var tz_1 = TZ("", 1, 0)
-    var tz1_ = TZ("", 1, 0, 1)
+    alias tz_0_ = TZ("", 0, 0)
+    alias tz_1 = TZ("", 1, 0)
+    alias tz1_ = TZ("", 1, 0, 1)
     alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     # test february leapyear
@@ -127,9 +127,9 @@ fn test_subtract() raises:
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
-    var tz_0_ = TZ("", 0, 0)
-    var tz_1 = TZ("", 1, 0)
-    var tz1_ = TZ("", 1, 0, 1)
+    alias tz_0_ = TZ("", 0, 0)
+    alias tz_1 = TZ("", 1, 0)
+    alias tz1_ = TZ("", 1, 0, 1)
     alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     # test february leapyear
@@ -226,9 +226,9 @@ fn test_logic() raises:
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
-    var tz_0_ = TZ("", 0, 0)
-    var tz_1 = TZ("", 1, 0)
-    var tz1_ = TZ("", 1, 0, 1)
+    alias tz_0_ = TZ("", 0, 0)
+    alias tz_1 = TZ("", 1, 0)
+    alias tz1_ = TZ("", 1, 0, 1)
     alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
@@ -247,9 +247,9 @@ fn test_bitwise() raises:
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
-    var tz_0_ = TZ("", 0, 0)
-    var tz_1 = TZ("", 1, 0)
-    var tz1_ = TZ("", 1, 0, 1)
+    alias tz_0_ = TZ("", 0, 0)
+    alias tz_1 = TZ("", 1, 0)
+    alias tz1_ = TZ("", 1, 0, 1)
     alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
@@ -269,7 +269,7 @@ fn test_bitwise() raises:
 fn test_iso() raises:
     alias pycal = PythonCalendar
     alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
-    var tz_0_ = TZ("", 0, 0)
+    alias tz_0_ = TZ("", 0, 0)
     alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)

@@ -178,21 +178,12 @@ struct Date[
             new_self.tz = tz.unsafe_take()
         if calendar:
             var cal = calendar.unsafe_take()
-            if not (
-                self.calendar.max_possible_days_in_year
-                == cal.max_possible_days_in_year
-                and self.calendar.max_hour == cal.max_hour
-                and self.calendar.max_possible_second == cal.max_possible_second
-            ):
-                if (
-                    self.calendar.max_possible_days_in_year
-                    < cal.max_possible_days_in_year
-                    or self.calendar.max_hour < cal.max_hour
-                    or self.calendar.max_possible_second
-                    < cal.max_possible_second
-                ):
-                    new_self.calendar = cal
-                    new_self = new_self.subtract()
+            new_self.year -= self.calendar.min_year
+            new_self.year += cal.min_year
+            new_self.month -= self.calendar.min_month
+            new_self.month += cal.min_month
+            new_self.day -= self.calendar.min_day
+            new_self.day += cal.min_day
             new_self.calendar = cal
         return new_self
 
