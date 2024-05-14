@@ -2032,6 +2032,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             size_out: The width of the reduction.
 
         Constraints:
+            `size_out` must not exceed width of the vector.
             The element type of the vector must be integer or FP.
 
         Returns:
@@ -2089,6 +2090,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             size_out: The width of the reduction.
 
         Constraints:
+            `size_out` must not exceed width of the vector.
             The element type of the vector must be integer or FP.
 
         Returns:
@@ -2145,6 +2147,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Parameters:
             size_out: The width of the reduction.
 
+        Constraints:
+            `size_out` must not exceed width of the vector.
+
         Returns:
             The sum of all vector elements.
 
@@ -2167,6 +2172,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             size_out: The width of the reduction.
 
         Constraints:
+            `size_out` must not exceed width of the vector.
             The element type of the vector must be integer or FP.
 
         Returns:
