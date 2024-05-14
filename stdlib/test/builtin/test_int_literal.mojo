@@ -38,6 +38,12 @@ def test_round():
     assert_equal(IntLiteral.__round__(5), 5)
     assert_equal(IntLiteral.__round__(0), 0)
     assert_equal(IntLiteral.__round__(-5), -5)
+    assert_equal(IntLiteral.__round__(6, ndigits=1), 6)
+    assert_equal(IntLiteral.__round__(6, ndigits=2), 6)
+    # assert_equal(IntLiteral.__round__(6, ndigits=-1), 10)
+    assert_equal(IntLiteral.__round__(6, ndigits=-2), 0)
+    assert_equal(IntLiteral.__round__(62, ndigits=-1), 60)
+    assert_equal(IntLiteral.__round__(62, ndigits=-2), 100)
 
 
 def test_floordiv():
