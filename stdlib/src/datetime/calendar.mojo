@@ -25,6 +25,7 @@ alias _date = (UInt16, UInt8, UInt8, UInt8, UInt8, UInt8, UInt16, UInt16)
 """Alias for the date type. Up to microsecond resolution."""
 
 
+@register_passable("trivial")
 struct CalendarHashes:
     """Hashing definitions. Up to microsecond resolution for
     the 64bit hash. Each calendar implementation can still
@@ -801,7 +802,7 @@ struct Gregorian(_Calendarized):
             Bool.
         """
         _ = self
-        return Gregorian.is_leapyear(year)
+        return Self.is_leapyear(year)
 
     fn is_leapsec(
         self,
@@ -1012,7 +1013,7 @@ struct Gregorian(_Calendarized):
         Returns:
             The amount.
         """
-        alias sec_to_nano = 1000_000_000
+        alias sec_to_nano = 1_000_000_000
         alias min_to_nano = 60 * sec_to_nano
         alias hours_to_nano = 60 * min_to_nano
         alias days_to_nano = 24 * hours_to_nano
@@ -1228,7 +1229,9 @@ struct UTCFast(_Calendarized):
     """Default minimum microsecond."""
     alias min_nanosecond: UInt16 = 0
     """Default minimum nanosecond."""
-    alias _monthdays: List[UInt8] = List[UInt8]()
+    alias _monthdays: List[UInt8] = List[UInt8](
+        31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+    )
     """An array with the amount of days each month contains without 
     leap values. It's assumed that `len(monthdays) == max_month`."""
 
@@ -1417,20 +1420,24 @@ struct UTCFast(_Calendarized):
         Returns:
             The amount.
         """
-        _ = self
         alias min_to_sec: UInt64 = 60
         alias hours_to_sec: UInt64 = 60 * min_to_sec
         alias days_to_sec: UInt64 = 24 * hours_to_sec
         alias years_to_sec: UInt64 = 365 * days_to_sec
 
-        return (
-            UInt64(year) * years_to_sec
-            + UInt64(month) * 30
-            + UInt64(day) * days_to_sec
-            + UInt64(hour) * hours_to_sec
-            + UInt64(minute) * min_to_sec
-            + UInt64(second)
-        )
+        var y = (year - self.min_year).cast[DType.uint64]() * years_to_sec
+
+        var days: UInt64 = 0
+        for i in range(self.min_month, month):
+            days += self._monthdays[i].cast[DType.uint64]()
+        var mon_d = days * days_to_sec
+
+        var d_d = (day - self.min_day).cast[DType.uint64]() * days_to_sec
+        var h_d = (hour - self.min_hour).cast[DType.uint64]() * hours_to_sec
+        var min_d = (minute - self.min_minute).cast[DType.uint64]() * min_to_sec
+        var s_d = (second - self.min_second).cast[DType.uint64]()
+
+        return y + mon_d + d_d + h_d + min_d + s_d
 
     fn m_seconds_since_epoch(
         self,
@@ -1509,8 +1516,7 @@ struct UTCFast(_Calendarized):
         Returns:
             The amount.
         """
-        _ = self
-        alias sec_to_nano = 1000_000_000
+        alias sec_to_nano = 1_000_000_000
         alias min_to_nano = 60 * sec_to_nano
         alias hours_to_nano = 60 * min_to_nano
         alias days_to_nano = 24 * hours_to_nano
@@ -1528,10 +1534,14 @@ struct UTCFast(_Calendarized):
         var min_d = (minute - self.min_minute).cast[
             DType.uint64
         ]() * min_to_nano
-        var s_d = (second - self.min_second).cast[DType.uint64]()
-        var ms_d = (m_second - self.min_milisecond).cast[DType.uint64]()
-        var us_d = (m_second - self.min_microsecond).cast[DType.uint64]()
-        var ns_d = (m_second - self.min_nanosecond).cast[DType.uint64]()
+        var s_d = (second - self.min_second).cast[DType.uint64]() * sec_to_nano
+        var ms_d = (m_second - self.min_milisecond).cast[
+            DType.uint64
+        ]() * 1_000_000
+        var us_d = (u_second - self.min_microsecond).cast[
+            DType.uint64
+        ]() * 1_000
+        var ns_d = (n_second - self.min_nanosecond).cast[DType.uint64]()
 
         return y + mon_d + d_d + h_d + min_d + s_d + ms_d + us_d + ns_d
 
@@ -1619,7 +1629,6 @@ struct UTCFast(_Calendarized):
         Returns:
             Tuple containing date data.
         """
-        _ = self
         var num8 = UInt8(0)
         var num16 = UInt16(0)
         var result = (num16, num8, num8, num8, num8, num8, num16, num16)
@@ -1664,6 +1673,7 @@ struct UTCFast(_Calendarized):
                 >> (cal_h.shift_64_s - cal_h.shift_64_ms)
             )
             result[6] = int(value & cal_h.mask_64_ms)
+        _ = self
         return result
 
     @staticmethod

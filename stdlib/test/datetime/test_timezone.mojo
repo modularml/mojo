@@ -17,7 +17,7 @@ from datetime.timezone import TimeZone
 
 
 fn test_tz_no_iana() raises:
-    alias tz = TimeZone[None, False, False]
+    alias tz = TimeZone[False, False, False]
     var tz0 = tz("Etc/UTC", 0, 0)
     var tz_1 = tz("Etc/UTC-1", 1, 0)
     var tz_2 = tz("Etc/UTC-2", 2, 30)

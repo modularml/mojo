@@ -27,7 +27,7 @@ fn test_add() raises:
     # when using python and unix calendar there should be no difference in results
     var pycal = PythonCalendar
     var unixcal = UTCCalendar
-    alias date = Date[iana=None, pyzoneinfo=False, native=False]
+    alias date = Date[iana=False, pyzoneinfo=False, native=False]
     alias TZ = date._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
@@ -100,7 +100,7 @@ fn test_subtract() raises:
     # when using python and unix calendar there should be no difference in results
     var pycal = PythonCalendar
     var unixcal = UTCCalendar
-    alias date = Date[iana=None, pyzoneinfo=False, native=False]
+    alias date = Date[iana=False, pyzoneinfo=False, native=False]
     alias TZ = date._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
@@ -173,7 +173,7 @@ fn test_logic() raises:
     # when using python and unix calendar there should be no difference in results
     var pycal = PythonCalendar
     var unixcal = UTCCalendar
-    alias date = Date[iana=None, pyzoneinfo=False, native=False]
+    alias date = Date[iana=False, pyzoneinfo=False, native=False]
     alias TZ = date._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
@@ -194,7 +194,7 @@ fn test_bitwise() raises:
     # when using python and unix calendar there should be no difference in results
     var pycal = PythonCalendar
     var unixcal = UTCCalendar
-    alias date = Date[iana=None, pyzoneinfo=False, native=False]
+    alias date = Date[iana=False, pyzoneinfo=False, native=False]
     alias TZ = date._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
@@ -215,7 +215,7 @@ fn test_iso() raises:
     # when using python and unix calendar there should be no difference in results
     var pycal = PythonCalendar
     var unixcal = UTCCalendar
-    alias date = Date[iana=None, pyzoneinfo=False, native=False]
+    alias date = Date[iana=False, pyzoneinfo=False, native=False]
     alias TZ = date._tz
     alias tz_0_ = TZ("", 0, 0)
 
@@ -252,7 +252,7 @@ fn test_iso() raises:
 
 
 fn test_time() raises:
-    alias date = Date[iana=None, pyzoneinfo=False, native=False]
+    alias date = Date[iana=False, pyzoneinfo=False, native=False]
 
     var start = Date.now()
     time.sleep(0.1)
@@ -261,7 +261,7 @@ fn test_time() raises:
 
 
 fn test_hash() raises:
-    alias date = Date[iana=None, pyzoneinfo=False, native=False]
+    alias date = Date[iana=False, pyzoneinfo=False, native=False]
 
     var ref = date(1970, 1, 1)
     var data = hash(ref)
