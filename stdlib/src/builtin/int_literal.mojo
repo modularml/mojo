@@ -311,6 +311,28 @@ struct IntLiteral(
         return self
 
     @always_inline("nodebug")
+    fn __round__(self, ndigits: IntLiteral) -> Self:
+        """Return the rounded value of the IntLiteral value, which is itself.
+
+        Args:
+            ndigits: The number of digits to round to. Defaults to 0.
+
+        Returns:
+            The IntLiteral value itself if ndigits >= 0 else the rounded value.
+        """
+        if ndigits >= 0:
+            return self
+        alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
+        alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
+        var multiplier = one
+        # TODO: Use IntLiteral.__pow__() when it's implemented.
+        for _ in range(ndigits):
+            multiplier = __mlir_op.`kgen.int_literal.binop`[
+                oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
+            ](multiplier, ten)
+        return self - self % Self(multiplier)
+
+    @always_inline("nodebug")
     fn __invert__(self) -> Self:
         """Return ~self.
 
