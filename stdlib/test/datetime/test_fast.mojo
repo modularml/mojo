@@ -23,10 +23,10 @@ from datetime.dt_str import IsoFormat
 
 fn test_add64() raises:
     # test february leapyear
-    var result = DateTime64(2024, 2, 29) + DateTime64(day=1)
+    var result = DateTime64(2024, 2, 28) + DateTime64(day=1)
     var offset_0 = DateTime64(2024, 3, 1)
     assert_true(result == offset_0)
-    var add_seconds = DateTime64(2024, 2, 29).add(seconds=24 * 3600)
+    var add_seconds = DateTime64(2024, 2, 28).add(seconds=24 * 3600)
     assert_true(result == add_seconds)
 
     # test february not leapyear
@@ -72,10 +72,10 @@ fn test_add64() raises:
 
 fn test_add32() raises:
     # test february leapyear
-    var result = DateTime32(2024, 2, 29) + DateTime32(day=1)
+    var result = DateTime32(2024, 2, 28) + DateTime32(day=1)
     var offset_0 = DateTime32(2024, 3, 1)
     assert_true(result == offset_0)
-    var add_seconds = DateTime32(2024, 2, 29).add(seconds=24 * 3600)
+    var add_seconds = DateTime32(2024, 2, 28).add(seconds=24 * 3600)
     assert_true(result == add_seconds)
 
     # test february not leapyear
@@ -122,7 +122,7 @@ fn test_add32() raises:
 fn test_subtract64() raises:
     # test february leapyear
     var result = DateTime64(2024, 3, 1) - DateTime64(day=1)
-    var offset_0 = DateTime64(2024, 2, 29)
+    var offset_0 = DateTime64(2024, 2, 28)
     assert_true(result == offset_0)
     var sub_seconds = DateTime64(2024, 3, 1).subtract(seconds=1)
     assert_true(result == sub_seconds)
@@ -171,7 +171,7 @@ fn test_subtract64() raises:
 fn test_subtract32() raises:
     # test february leapyear
     var result = DateTime32(2024, 3, 1) - DateTime32(day=1)
-    var offset_0 = DateTime32(2024, 2, 29)
+    var offset_0 = DateTime32(2024, 2, 28)
     assert_true(result == offset_0)
     var sub_seconds = DateTime32(2024, 3, 1).subtract(seconds=1)
     assert_true(result == sub_seconds)

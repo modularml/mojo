@@ -27,11 +27,11 @@ fn test_add() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = DateTime._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
     alias tz1_ = TZ("", 1, 0, 1)
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     # test february leapyear
     var result = DateTime(2024, 3, 1, tz=tz_0_, calendar=pycal) + DateTime(
@@ -126,11 +126,11 @@ fn test_subtract() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = DateTime._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
     alias tz1_ = TZ("", 1, 0, 1)
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     # test february leapyear
     var result = DateTime(2024, 3, 1, tz=tz_0_, calendar=pycal) - DateTime(
@@ -225,11 +225,11 @@ fn test_logic() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = DateTime._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
     alias tz1_ = TZ("", 1, 0, 1)
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
     assert_true(ref == DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal))
@@ -246,11 +246,11 @@ fn test_bitwise() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = DateTime._tz
     alias tz_0_ = TZ("", 0, 0)
     alias tz_1 = TZ("", 1, 0)
     alias tz1_ = TZ("", 1, 0, 1)
-    alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
 
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
     assert_true(ref & DateTime(1970, 1, 1, tz=tz_0_, calendar=unixcal) == 0)
@@ -268,9 +268,9 @@ fn test_bitwise() raises:
 
 fn test_iso() raises:
     alias pycal = PythonCalendar
-    alias TZ = TimeZone[iana=None, pyzoneinfo=False, native=False]
-    alias tz_0_ = TZ("", 0, 0)
     alias DateTime = dt[iana=None, pyzoneinfo=False, native=False]
+    alias TZ = DateTime._tz
+    alias tz_0_ = TZ("", 0, 0)
 
     var ref = DateTime(1970, 1, 1, tz=tz_0_, calendar=pycal)
     var iso_str = "1970-01-01T00:00:00+00:00"
