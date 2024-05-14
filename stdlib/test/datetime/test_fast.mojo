@@ -23,7 +23,7 @@ from datetime.dt_str import IsoFormat
 
 fn test_add64() raises:
     # test february leapyear
-    var result = (DateTime64(2024, 2, 29) + DateTime64(0, 0, 1))
+    var result = DateTime64(2024, 2, 29) + DateTime64(0, 0, 1)
     var offset_0 = DateTime64(2024, 3, 1)
     assert_true(result == offset_0)
     var add_seconds = DateTime64(2024, 2, 29).add(seconds=24 * 3600)

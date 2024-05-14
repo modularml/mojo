@@ -206,7 +206,7 @@ struct Date[
         Returns:
             Self with tz casted to UTC.
         """
-        var TZ_UTC = TimeZone[iana, pyzoneinfo, native]()
+        alias TZ_UTC = TimeZone[iana, pyzoneinfo, native]()
         if self.tz == TZ_UTC:
             return self
         var new_self = self
@@ -813,9 +813,7 @@ struct Date[
         Returns:
             Self.
         """
-        return Date[iana, pyzoneinfo, native].from_seconds[add_leap](
-            seconds, tz=tz, calendar=UTCCalendar
-        )
+        return Self.from_seconds[add_leap](seconds, tz=tz, calendar=UTCCalendar)
 
     @staticmethod
     fn now(
@@ -908,9 +906,7 @@ struct Date[
         if not parsed:
             return None
         var p = parsed.unsafe_take()
-        return Date[iana, pyzoneinfo, native](
-            p[0], p[1], p[2], tz=tz, calendar=calendar
-        )
+        return Self(p[0], p[1], p[2], tz=tz, calendar=calendar)
 
     @staticmethod
     @parameter
@@ -939,9 +935,7 @@ struct Date[
         """
         try:
             var p = dt_str.from_iso[iso, iana, pyzoneinfo, native](s)
-            var dt = Date[iana, pyzoneinfo, native](
-                p[0], p[1], p[2], tz=p[6], calendar=calendar
-            )
+            var dt = Self(p[0], p[1], p[2], tz=p[6], calendar=calendar)
             if tz:
                 var t = tz.value()[]
                 if t != dt.tz:
@@ -969,6 +963,4 @@ struct Date[
             Self.
         """
         var d = calendar.from_hash[_cal_hash](int(value))
-        return Date[iana, pyzoneinfo, native](
-            d[0], d[1], d[2], tz=tz, calendar=calendar
-        )
+        return Self(d[0], d[1], d[2], tz=tz, calendar=calendar)

@@ -43,8 +43,7 @@ trait _IntCollect(Intable, CollectionElement):
     ...
 
 
-@value
-# @register_passable("trivial")
+@register_passable("trivial")
 struct DateTime64(Hashable, Stringable):
     """Fast `DateTime64` struct. This is a "normal"
     `DateTime` with milisecond resolution. Uses
@@ -616,8 +615,7 @@ struct DateTime64(Hashable, Stringable):
         )
 
 
-@value
-# @register_passable("trivial")
+@register_passable("trivial")
 struct DateTime32(Hashable, Stringable):
     """Fast `DateTime32 ` struct. This is a "normal" `DateTime`
     with minute resolution. Uses given calendar's epoch
@@ -1133,8 +1131,7 @@ struct DateTime32(Hashable, Stringable):
         )
 
 
-@value
-# @register_passable("trivial")
+@register_passable("trivial")
 struct DateTime16(Hashable, Stringable):
     """Fast `DateTime16 ` struct. This is a `DateTime` with
     hour resolution, it can be used as a year, dayofyear,
@@ -1615,8 +1612,7 @@ struct DateTime16(Hashable, Stringable):
         )
 
 
-@value
-# @register_passable("trivial")
+@register_passable("trivial")
 struct DateTime8(Hashable, Stringable):
     """Fast `DateTime8 ` struct. This is a `DateTime`
     with hour resolution, it can be used as a dayofweek,

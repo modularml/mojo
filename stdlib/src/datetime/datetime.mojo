@@ -310,7 +310,7 @@ struct DateTime[
         Returns:
             Self.
         """
-        var TZ_UTC = TimeZone[iana, pyzoneinfo, native]()
+        alias TZ_UTC = TimeZone[iana, pyzoneinfo, native]()
         if self.tz == TZ_UTC:
             return self
         var new_self = self
@@ -342,7 +342,7 @@ struct DateTime[
         )
         var h = int(offset[0])
         var m = int(offset[1])
-        var new_self: DateTime[iana, pyzoneinfo, native]
+        var new_self: Self
         if offset[2] == 1:
             new_self = self.add(hours=h, minutes=m)
         else:
@@ -1037,14 +1037,10 @@ struct DateTime[
         """Construct a `DateTime` from miliseconds."""
         var ms = int(calendar.max_milisecond)
         if m_seconds <= ms:
-            return DateTime[iana, pyzoneinfo, native](
-                m_second=UInt16(m_seconds), tz=tz, calendar=calendar
-            )
+            return Self(m_second=UInt16(m_seconds), tz=tz, calendar=calendar)
         var s = m_seconds // (ms + 1)
         var rest = m_seconds % (ms + 1)
-        var dt = DateTime[iana, pyzoneinfo, native].from_seconds(
-            s, tz, calendar
-        )
+        var dt = Self.from_seconds(s, tz, calendar)
         dt.m_second = rest
         return dt
 
@@ -1059,14 +1055,10 @@ struct DateTime[
         """Construct a `DateTime` from microseconds."""
         var us = int(calendar.max_microsecond)
         if u_seconds <= us:
-            return DateTime[iana, pyzoneinfo, native](
-                u_second=UInt16(u_seconds), tz=tz, calendar=calendar
-            )
+            return Self(u_second=UInt16(u_seconds), tz=tz, calendar=calendar)
         var ms = u_seconds // (us + 1)
         var rest = u_seconds % (us + 1)
-        var dt = DateTime[iana, pyzoneinfo, native]._from_m_seconds(
-            ms, tz, calendar
-        )
+        var dt = Self._from_m_seconds(ms, tz, calendar)
         dt.u_second = rest
         return dt
 
@@ -1082,14 +1074,10 @@ struct DateTime[
         """Construct a `DateTime` from nanoseconds."""
         var ns = int(calendar.max_nanosecond)
         if n_seconds <= ns:
-            return DateTime[iana, pyzoneinfo, native](
-                n_second=UInt16(n_seconds), tz=tz, calendar=calendar
-            )
+            return Self(n_second=UInt16(n_seconds), tz=tz, calendar=calendar)
         var us = n_seconds // (ns + 1)
         var rest = n_seconds % (ns + 1)
-        var dt = DateTime[iana, pyzoneinfo, native]._from_u_seconds(
-            us, tz, calendar
-        )
+        var dt = Self._from_u_seconds(us, tz, calendar)
         dt.n_second = rest
         return dt
 
@@ -1118,9 +1106,7 @@ struct DateTime[
         Returns:
             Self.
         """
-        return DateTime[iana, pyzoneinfo, native].from_seconds[add_leap](
-            seconds, tz=tz, calendar=UTCCalendar
-        )
+        return Self.from_seconds[add_leap](seconds, tz=tz, calendar=UTCCalendar)
 
     @staticmethod
     @always_inline("nodebug")
@@ -1143,9 +1129,7 @@ struct DateTime[
         var us: UInt16 = ns // 1_000
         var ms: UInt16 = ns // 1_000_000
         var s = ns // 1_000_000_000
-        var dt = DateTime[iana, pyzoneinfo, native].from_unix_epoch(
-            s, tz
-        ).replace(calendar=calendar)
+        var dt = Self.from_unix_epoch(s, tz).replace(calendar=calendar)
         return dt.replace(m_second=ms, u_second=us, n_second=UInt16(ns))
 
     @always_inline("nodebug")
@@ -1245,7 +1229,7 @@ struct DateTime[
         if not parsed:
             return None
         var p = parsed.unsafe_take()
-        return DateTime[iana, pyzoneinfo, native](
+        return Self(
             p[0],
             p[1],
             p[2],
@@ -1286,7 +1270,7 @@ struct DateTime[
         """
         try:
             var p = dt_str.from_iso[iso, iana, pyzoneinfo, native](s)
-            var dt = DateTime[iana, pyzoneinfo, native](
+            var dt = Self(
                 p[0], p[1], p[2], p[3], p[4], p[5], tz=p[6], calendar=calendar
             )
             if tz:
@@ -1318,7 +1302,7 @@ struct DateTime[
             Self.
         """
         var d = calendar.from_hash(value)
-        return DateTime[iana, pyzoneinfo, native](
+        return Self(
             d[0],
             d[1],
             d[2],
