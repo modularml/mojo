@@ -103,6 +103,25 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     fn value(
         self: Reference[Self, _, _]
     ) -> Reference[T, self.is_mutable, self.lifetime]:
+        """Retrieve a reference to the value of the Optional.
+
+        This check to see if the optional contains a value.
+        If you call this without first verifying the optional with __bool__()
+        eg. by `if my_option:` or without otherwise knowing that it contains a
+        value (for instance with `or_else`), the program will abort
+
+        Returns:
+            A reference to the contained data of the option as a Reference[T].
+        """
+        if not self[].__bool__():
+            abort(".value() on empty Optional")
+
+        return self[].unsafe_value()
+
+    @always_inline
+    fn unsafe_value(
+        self: Reference[Self, _, _]
+    ) -> Reference[T, self.is_mutable, self.lifetime]:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
@@ -128,16 +147,36 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         debug_assert(self.__bool__(), ".value() on empty Optional")
         return self._value[T]
 
-    fn unsafe_take(inout self) -> T:
-        """Unsafely move the value out of the Optional.
+    fn take(inout self) -> T:
+        """Move the value out of the Optional.
 
-        The caller takes ownership over the new value, and the Optional is
+        The caller takes ownership over the new value, which is moved
+        out of the Optional, and the Optional is left in an empty state.
         destroyed.
 
-        This doesn't check to see if the optional contains a value.
+        This check to see if the optional contains a value.
         If you call this without first verifying the optional with __bool__()
         eg. by `if my_option:` or without otherwise knowing that it contains a
         value (for instance with `or_else`), you'll get garbage unsafe data out.
+
+        Returns:
+            The contained data of the option as an owned T value.
+        """
+        if not self.__bool__():
+            abort(".take() on empty Optional")
+        return self.unsafe_take()
+
+    fn unsafe_take(inout self) -> T:
+        """Unsafely move the value out of the Optional.
+
+        The caller takes ownership over the new value, which is moved
+        out of the Optional, and the Optional is left in an empty state.
+        destroyed.
+
+        This check to see if the optional contains a value.
+        If you call this without first verifying the optional with __bool__()
+        eg. by `if my_option:` or without otherwise knowing that it contains a
+        value (for instance with `or_else`), the program will abort!
 
         Returns:
             The contained data of the option as an owned T value.
