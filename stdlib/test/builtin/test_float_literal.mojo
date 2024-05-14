@@ -192,6 +192,7 @@ def main():
     test_ceil()
     test_floor()
     test_round()
+    test_trunc()
     test_round10()
     test_division()
     test_power()

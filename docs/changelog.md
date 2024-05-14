@@ -71,16 +71,17 @@ what we publish.
   `builtin`, so you no longer need to do
   `from math import abs, round, min, max, divmod`.
 
-- Mojo now allows types to opt in to use the `floor()` and `ceil()` functions in
-  the `math` module by implementing the `__floor__()` and `__ceil__()` methods
-  (and so conforming to the new `math.Floorable` and `math.Ceilable` traits,
-  respectively). For example:
+- Mojo now allows types to opt in to use the `floor()`, `ceil()`, and `trunc()`
+  functions in the `math` module by implementing the `__floor__()`,
+  `__ceil__()`, and `__trunc__()` methods (and so conforming to the new
+  `math.Floorable`, `math.Ceilable`, and `math.Truncable` traits, respectively).
+  For example:
 
   ```mojo
-    from math import Ceilable, Floorable, ceil, floor
+    from math import Ceilable, Floorable, Truncable, ceil, floor, trunc
 
     @value
-    struct Complex(Ceilable, Floorable):
+    struct Complex(Ceilable, Floorable, Truncable):
       var re: Float64
       var im: Float64
 
@@ -89,6 +90,9 @@ what we publish.
 
       fn __floor__(self) -> Self:
           return Self(floor(re), floor(im))
+
+      fn __trunc__(self) -> Self:
+          return Self(trunc(re), trunc(im))
   ```
 
 - Add an `InlinedArray` type that works on memory-only types.

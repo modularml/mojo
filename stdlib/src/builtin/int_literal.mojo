@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the IntLiteral class."""
 
-from builtin._math import Ceilable, CeilDivable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 
 
 @value
@@ -28,6 +28,7 @@ struct IntLiteral(
     Intable,
     Roundable,
     Stringable,
+    Truncable,
 ):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and
@@ -259,20 +260,6 @@ struct IntLiteral(
         return self
 
     @always_inline("nodebug")
-    fn __divmod__(self, rhs: Self) -> Tuple[Self, Self]:
-        """Return the quotient and remainder of the division of self by rhs.
-
-        Args:
-            rhs: The value to divide on.
-
-        Returns:
-            The quotient and remainder of the division.
-        """
-        var quotient: Self = self.__floordiv__(rhs)
-        var remainder: Self = self - (quotient * rhs)
-        return quotient, remainder
-
-    @always_inline("nodebug")
     fn __round__(self, ndigits: IntLiteral) -> Self:
         """Return the rounded value of the IntLiteral value, which is itself.
 
@@ -298,6 +285,29 @@ struct IntLiteral(
             t[0] += 1
             t[1] -= multiplier
         return self - t[1]
+
+    @always_inline("nodebug")
+    fn __divmod__(self, rhs: Self) -> Tuple[Self, Self]:
+        """Return the quotient and remainder of the division of self by rhs.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            The quotient and remainder of the division.
+        """
+        var quotient: Self = self.__floordiv__(rhs)
+        var remainder: Self = self - (quotient * rhs)
+        return quotient, remainder
+
+    @always_inline("nodebug")
+    fn __trunc__(self) -> Self:
+        """Return the truncated of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
 
     @always_inline("nodebug")
     fn __invert__(self) -> Self:
