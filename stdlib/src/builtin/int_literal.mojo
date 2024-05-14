@@ -311,11 +311,25 @@ struct IntLiteral(
         return self
 
     @always_inline("nodebug")
+    fn __divmod__(self, rhs: Self) -> Tuple[Self, Self]:
+        """Return the quotient and remainder of the division of self by rhs.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            The quotient and remainder of the division.
+        """
+        var quotient: Self = self.__floordiv__(rhs)
+        var remainder: Self = self - (quotient * rhs)
+        return quotient, remainder
+
+    @always_inline("nodebug")
     fn __round__(self, ndigits: IntLiteral) -> Self:
         """Return the rounded value of the IntLiteral value, which is itself.
 
         Args:
-            ndigits: The number of digits to round to. Defaults to 0.
+            ndigits: The number of digits to round to.
 
         Returns:
             The IntLiteral value itself if ndigits >= 0 else the rounded value.
@@ -326,11 +340,16 @@ struct IntLiteral(
         alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
         var multiplier = one
         # TODO: Use IntLiteral.__pow__() when it's implemented.
-        for _ in range(ndigits):
+        for _ in range(-ndigits):
             multiplier = __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
             ](multiplier, ten)
-        return self - self % Self(multiplier)
+        alias Pair = Tuple[Self, Self]
+        var t: Pair = self.__divmod__(Self(multiplier))
+        if t[1] * 2 >= multiplier:
+            t[0] += 1
+            t[1] -= multiplier
+        return self - t[1]
 
     @always_inline("nodebug")
     fn __invert__(self) -> Self:
