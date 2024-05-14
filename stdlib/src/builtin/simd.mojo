@@ -25,7 +25,7 @@ from sys import (
     _RegisterPackType,
 )
 
-from builtin._math import Ceilable, CeilDivable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from memory import bitcast
 
@@ -132,6 +132,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Roundable,
     Sized,
     Stringable,
+    Truncable,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -903,9 +904,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         return (self < 0).select(-self, self)
 
-    fn _floor_ceil_impl[intrinsic: StringLiteral](self) -> Self:
+    fn _floor_ceil_trunc_impl[intrinsic: StringLiteral](self) -> Self:
         constrained[
-            intrinsic == "llvm.floor" or intrinsic == "llvm.ceil",
+            intrinsic == "llvm.floor"
+            or intrinsic == "llvm.ceil"
+            or intrinsic == "llvm.trunc",
             "unsupported intrinsic",
         ]()
 
@@ -917,13 +920,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if has_neon() and type == DType.bfloat16:
             return (
                 self.cast[DType.float32]()
-                ._floor_ceil_impl[intrinsic]()
+                ._floor_ceil_trunc_impl[intrinsic]()
                 .cast[type]()
             )
 
-        return llvm_intrinsic[
-            intrinsic, __type_of(self), has_side_effect=False
-        ](self)
+        return llvm_intrinsic[intrinsic, Self, has_side_effect=False](self)
 
     @always_inline("nodebug")
     fn __floor__(self) -> Self:
@@ -932,7 +933,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             The elementwise floor of this SIMD vector.
         """
-        return self._floor_ceil_impl["llvm.floor"]()
+        return self._floor_ceil_trunc_impl["llvm.floor"]()
 
     @always_inline("nodebug")
     fn __ceil__(self) -> Self:
@@ -941,7 +942,17 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             The elementwise ceiling of this SIMD vector.
         """
-        return self._floor_ceil_impl["llvm.ceil"]()
+        return self._floor_ceil_trunc_impl["llvm.ceil"]()
+
+    @always_inline("nodebug")
+    fn __trunc__(self) -> Self:
+        """Performs elementwise truncation on the elements of a SIMD vector.
+
+        Returns:
+            The elementwise truncated values of this SIMD vector.
+        """
+
+        return self._floor_ceil_trunc_impl["llvm.trunc"]()
 
     fn clamp(self, lower_bound: Self, upper_bound: Self) -> Self:
         """Clamps the values in a SIMD vector to be in a certain range.
@@ -972,9 +983,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             The elementwise banker's rounding of this SIMD vector.
         """
-        return llvm_intrinsic[
-            "llvm.roundeven", __type_of(self), has_side_effect=False
-        ](self)
+        return llvm_intrinsic["llvm.roundeven", Self, has_side_effect=False](
+            self
+        )
 
     @always_inline("nodebug")
     fn __round__(self) -> Self:
@@ -985,9 +996,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             The elementwise rounded value of this SIMD vector.
         """
-        return llvm_intrinsic[
-            "llvm.round", __type_of(self), has_side_effect=False
-        ](self)
+        return llvm_intrinsic["llvm.round", Self, has_side_effect=False](self)
 
     # ===-------------------------------------------------------------------===#
     # In place operations.
