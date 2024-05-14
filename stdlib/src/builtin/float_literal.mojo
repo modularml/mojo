@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from builtin._math import Ceilable, CeilDivable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 
 # ===----------------------------------------------------------------------===#
 # FloatLiteral
@@ -34,6 +34,7 @@ struct FloatLiteral(
     Floorable,
     Intable,
     Stringable,
+    Truncable,
 ):
     """Mojo floating point literal type."""
 
@@ -220,6 +221,23 @@ struct FloatLiteral(
         if self <= 0 or self.__eq__(Self(truncated)):
             return truncated
         return truncated + 1
+
+    @always_inline("nodebug")
+    fn __trunc__(self) -> Self:
+        """Truncates the floating point literal. If there is a fractional
+        component, then the value is truncated towards zero.
+
+        For example, `(4.5).__trunc__()` returns `4.0`, and `(-3.7).__trunc__()`
+        returns `-3.0`.
+
+        Returns:
+            The truncated FloatLiteral value.
+        """
+
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+        return Self(self.__int_literal__())
 
     # TODO: implement __round__
 

@@ -192,6 +192,29 @@ def test_floor():
     assert_equal(B.__floor__(b), b)
 
 
+def test_trunc():
+    assert_equal(Float32.__trunc__(Float32(1.5)), 1.0)
+    assert_equal(Float32.__trunc__(Float32(-1.5)), -1.0)
+    assert_equal(Float32.__trunc__(Float32(3.0)), 3.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(
+        F.__trunc__(F(0.0, 1.6, -42.5, -12.4)), F(0.0, 1.0, -42.0, -12.0)
+    )
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(0, 2, -42, -12)
+    assert_equal(I.__trunc__(i), i)
+
+    alias U = SIMD[DType.uint32, 4]
+    var u = U(0, 2, 42, 12)
+    assert_equal(U.__trunc__(u), u)
+
+    alias B = SIMD[DType.bool, 4]
+    var b = B(True, False, True, False)
+    assert_equal(B.__trunc__(b), b)
+
+
 def test_round():
     assert_equal(Float32.__round__(Float32(2.5)), 3.0)
     assert_equal(Float32.__round__(Float32(-3.5)), -4.0)
@@ -910,6 +933,7 @@ def main():
     test_truthy()
     test_ceil()
     test_floor()
+    test_trunc()
     test_round()
     test_roundeven()
     test_floordiv()
