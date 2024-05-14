@@ -334,7 +334,7 @@ struct DateTime[
             Self.
         """
         if tz == Self._tz():
-            return self^
+            return self
         var offset = tz.offset_at(
             self.year, self.month, self.day, self.hour, self.minute, self.second
         )
