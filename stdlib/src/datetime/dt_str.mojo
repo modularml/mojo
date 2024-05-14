@@ -15,7 +15,7 @@
 from .timezone import TimeZone
 
 
-@value
+@register_passable("trivial")
 struct IsoFormat:
     """Available formats to parse from and to
     [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)."""

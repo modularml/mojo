@@ -17,10 +17,10 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from time import time
 
-from datetime.datetime import DateTime
-from datetime.calendar import Calendar, PythonCalendar, UTCCalendar
-from datetime.timezone import TimeZone
-from datetime.dt_str import IsoFormat
+from dt.datetime import DateTime
+from dt.calendar import Calendar, PythonCalendar, UTCCalendar
+from dt.timezone import TimeZone
+from dt.dt_str import IsoFormat
 
 
 fn test_add() raises:
@@ -264,42 +264,42 @@ fn test_iso() raises:
     var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
     var iso_str = "1970-01-01T00:00:00+00:00"
     alias fmt1 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS_TZD)
-    assert_true(ref == DateTime.from_iso[fmt1](iso_str).value()[])
+    assert_true(ref == dt.from_iso[fmt1](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt1]())
 
     iso_str = "1970-01-01 00:00:00+00:00"
     alias fmt2 = IsoFormat(IsoFormat.YYYY_MM_DD___HH_MM_SS)
-    assert_true(ref == DateTime.from_iso[fmt2](iso_str).value()[])
+    assert_true(ref == dt.from_iso[fmt2](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt2]())
 
     iso_str = "1970-01-01T00:00:00"
     alias fmt3 = IsoFormat(IsoFormat.YYYY_MM_DD_T_HH_MM_SS)
-    assert_true(ref == DateTime.from_iso[fmt3](iso_str).value()[])
+    assert_true(ref == dt.from_iso[fmt3](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt3]())
 
     iso_str = "19700101000000"
     alias fmt4 = IsoFormat(IsoFormat.YYYYMMDDHHMMSS)
-    assert_true(ref == DateTime.from_iso[fmt4](iso_str).value()[])
+    assert_true(ref == dt.from_iso[fmt4](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt4]())
 
     iso_str = "00:00:00"
     alias fmt5 = IsoFormat(IsoFormat.HH_MM_SS)
-    assert_true(ref == DateTime.from_iso[fmt5](iso_str).value()[])
+    assert_true(ref == dt.from_iso[fmt5](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt5]())
 
     iso_str = "000000"
     alias fmt6 = IsoFormat(IsoFormat.HHMMSS)
-    assert_true(ref == DateTime.from_iso[fmt6](iso_str).value()[])
+    assert_true(ref == dt.from_iso[fmt6](iso_str).value()[])
     assert_equal(iso_str, ref.to_iso[fmt6]())
 
 
 fn test_time() raises:
     alias dt = DateTime[iana=False, pyzoneinfo=False, native=False]
 
-    var start = DateTime.now()
+    var start = dt.now()
     time.sleep(1e-9)  # nanosecond resolution
-    var end = DateTime.now()
-    assert_true(start != end)
+    var end = dt.now()
+    assert_true(start.nanosecond != end.nanosecond)
 
 
 fn test_hash() raises:
@@ -307,7 +307,7 @@ fn test_hash() raises:
 
     var ref = dt(1970, 1, 1)
     var data = hash(ref)
-    var parsed = DateTime.from_hash(data)
+    var parsed = dt.from_hash(data)
     assert_true(ref == parsed)
 
 
