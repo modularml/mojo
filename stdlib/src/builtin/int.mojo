@@ -504,7 +504,7 @@ struct Int(
         Returns:
             The absolute value.
         """
-        return self if self > 0 else -self
+        return -self if self < 0 else self
 
     @always_inline("nodebug")
     fn __ceil__(self) -> Self:
