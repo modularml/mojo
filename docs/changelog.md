@@ -100,7 +100,7 @@ what we publish.
     ([PR #2364](https://github.com/modularml/mojo/pull/2364) by [@mikowals](https://github.com/mikowals))
 
 - Add `repr()` function and `Representable` trait.
-    ([PR #2361](https://github.com/modularml/mojo/pull/2361) by [@mikowals](https://github.com/gabrieldemarmiesse))
+    ([PR #2361](https://github.com/modularml/mojo/pull/2361) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - Add `SIMD.shuffle()` with `StaticIntTuple` mask.
     ([PR #2315](https://github.com/modularml/mojo/pull/2315) by [@mikowals](https://github.com/mikowals))
