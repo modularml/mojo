@@ -140,13 +140,13 @@ struct Date[
         y.day = d.day
         return y
 
-    @always_inline
+    # @always_inline
     fn replace(
         owned self,
         *,
-        year: OptionalReg[UInt16] = None,
-        month: OptionalReg[UInt8] = None,
-        day: OptionalReg[UInt8] = None,
+        owned year: OptionalReg[UInt16] = None,
+        owned month: OptionalReg[UInt8] = None,
+        owned day: OptionalReg[UInt8] = None,
         tz: OptionalReg[Self._tz] = None,
         calendar: OptionalReg[Calendar] = None,
     ) -> Self:
@@ -380,7 +380,7 @@ struct Date[
             )
         return dt
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn add(owned self, other: Self) -> Self:
         """Adds another `Date`.
 
@@ -394,7 +394,7 @@ struct Date[
             years=int(other.year), months=int(other.month), days=int(other.day)
         )
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn subtract(owned self, other: Self) -> Self:
         """Subtracts another `Date`.
 
@@ -408,7 +408,7 @@ struct Date[
             years=int(other.year), months=int(other.month), days=int(other.day)
         )
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __add__(owned self, other: Self) -> Self:
         """Add.
 
@@ -420,7 +420,7 @@ struct Date[
         """
         return self.add(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __sub__(owned self, other: Self) -> Self:
         """Subtract.
 
@@ -432,7 +432,7 @@ struct Date[
         """
         return self.subtract(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __iadd__(inout self, owned other: Self):
         """Add Immediate.
 
@@ -441,7 +441,7 @@ struct Date[
         """
         self = self.add(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __isub__(inout self, owned other: Self):
         """Subtract Immediate.
 
@@ -450,7 +450,7 @@ struct Date[
         """
         self = self.subtract(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn dayofweek(self) -> UInt8:
         """Calculates the day of the week for a `Date`.
 
@@ -484,7 +484,7 @@ struct Date[
         """
         return self.calendar.hash[_cal_hash](self.year, self.month, self.day)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
         """Eq.
 
@@ -501,7 +501,7 @@ struct Date[
             o = other.to_utc()
         return hash(s) == hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
         """Ne.
 
@@ -518,7 +518,7 @@ struct Date[
             o = other.to_utc()
         return hash(s) != hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __gt__(self, other: Self) -> Bool:
         """Gt.
 
@@ -535,7 +535,7 @@ struct Date[
             o = other.to_utc()
         return hash(s) > hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __ge__(self, other: Self) -> Bool:
         """Ge.
 
@@ -552,7 +552,7 @@ struct Date[
             o = other.to_utc()
         return hash(s) >= hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __le__(self, other: Self) -> Bool:
         """Le.
 
@@ -569,7 +569,7 @@ struct Date[
             o = other.to_utc()
         return hash(s) <= hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __lt__(self, other: Self) -> Bool:
         """Lt.
 
@@ -586,7 +586,7 @@ struct Date[
             o = other.to_utc()
         return hash(s) < hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __invert__(self) -> UInt32:
         """Invert.
 
@@ -595,7 +595,7 @@ struct Date[
         """
         return ~hash(self)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __and__[T: Intable](self, other: T) -> UInt32:
         """And.
 
@@ -610,7 +610,7 @@ struct Date[
         """
         return hash(self) & int(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __or__[T: Intable](self, other: T) -> UInt32:
         """Or.
 
@@ -625,7 +625,7 @@ struct Date[
         """
         return hash(self) | int(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __xor__[T: Intable](self, other: T) -> UInt32:
         """Xor.
 
@@ -640,7 +640,7 @@ struct Date[
         """
         return hash(self) ^ int(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Int.
 
@@ -649,7 +649,7 @@ struct Date[
         """
         return hash(self)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __str__(self) -> String:
         """str.
 
@@ -859,7 +859,7 @@ struct Date[
         """
         return dt_str.strftime(fmt, self.year, self.month, self.day, 0, 0, 0)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
         compliant formatted`String` e.g. `IsoFormat.YYYY_MM_DD` ->

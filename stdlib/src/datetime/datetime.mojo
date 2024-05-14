@@ -222,15 +222,15 @@ struct DateTime[
     fn replace(
         owned self,
         *,
-        year: OptionalReg[UInt16] = None,
-        month: OptionalReg[UInt8] = None,
-        day: OptionalReg[UInt8] = None,
-        hour: OptionalReg[UInt8] = None,
-        minute: OptionalReg[UInt8] = None,
-        second: OptionalReg[UInt8] = None,
-        m_second: OptionalReg[UInt16] = None,
-        u_second: OptionalReg[UInt16] = None,
-        n_second: OptionalReg[UInt16] = None,
+        owned year: OptionalReg[UInt16] = None,
+        owned month: OptionalReg[UInt8] = None,
+        owned day: OptionalReg[UInt8] = None,
+        owned hour: OptionalReg[UInt8] = None,
+        owned minute: OptionalReg[UInt8] = None,
+        owned second: OptionalReg[UInt8] = None,
+        owned m_second: OptionalReg[UInt16] = None,
+        owned u_second: OptionalReg[UInt16] = None,
+        owned n_second: OptionalReg[UInt16] = None,
         tz: OptionalReg[Self._tz] = None,
         calendar: OptionalReg[Calendar] = None,
     ) -> Self:
@@ -577,7 +577,7 @@ struct DateTime[
             )
         return dt
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn add(owned self, other: Self) -> Self:
         """Adds another `DateTime`.
 
@@ -599,7 +599,7 @@ struct DateTime[
             n_seconds=int(other.n_second),
         )
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn subtract(owned self, other: Self) -> Self:
         """Subtracts another `DateTime`.
 
@@ -621,7 +621,7 @@ struct DateTime[
             n_seconds=int(other.n_second),
         )
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __add__(owned self, other: Self) -> Self:
         """Add.
 
@@ -633,7 +633,7 @@ struct DateTime[
         """
         return self.add(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __sub__(owned self, other: Self) -> Self:
         """Subtract.
 
@@ -645,7 +645,7 @@ struct DateTime[
         """
         return self.subtract(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __iadd__(inout self, owned other: Self):
         """Add Immediate.
 
@@ -654,7 +654,7 @@ struct DateTime[
         """
         self = self.add(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __isub__(inout self, owned other: Self):
         """Subtract Immediate.
 
@@ -663,7 +663,7 @@ struct DateTime[
         """
         self = self.subtract(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn dayofweek(self) -> UInt8:
         """Calculates the day of the week for a `DateTime`.
 
@@ -707,7 +707,7 @@ struct DateTime[
             self.n_second,
         )
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
         """Eq.
 
@@ -724,7 +724,7 @@ struct DateTime[
             o = other.to_utc()
         return hash(s) == hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
         """Ne.
 
@@ -741,7 +741,7 @@ struct DateTime[
             o = other.to_utc()
         return hash(s) != hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __gt__(self, other: Self) -> Bool:
         """Gt.
 
@@ -758,7 +758,7 @@ struct DateTime[
             o = other.to_utc()
         return hash(s) > hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __ge__(self, other: Self) -> Bool:
         """Ge.
 
@@ -775,7 +775,7 @@ struct DateTime[
             o = other.to_utc()
         return hash(s) >= hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __le__(self, other: Self) -> Bool:
         """Le.
 
@@ -792,7 +792,7 @@ struct DateTime[
             o = other.to_utc()
         return hash(s) <= hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __lt__(self, other: Self) -> Bool:
         """Lt.
 
@@ -809,7 +809,7 @@ struct DateTime[
             o = other.to_utc()
         return hash(s) < hash(o)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __invert__(self) -> UInt32:
         """Invert.
 
@@ -818,7 +818,7 @@ struct DateTime[
         """
         return ~hash(self)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __and__[T: Intable](self, other: T) -> UInt64:
         """And.
 
@@ -833,7 +833,7 @@ struct DateTime[
         """
         return hash(self) & int(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __or__[T: Intable](self, other: T) -> UInt64:
         """Or.
 
@@ -848,7 +848,7 @@ struct DateTime[
         """
         return hash(self) | int(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __xor__[T: Intable](self, other: T) -> UInt64:
         """Xor.
 
@@ -863,7 +863,7 @@ struct DateTime[
         """
         return hash(self) ^ int(other)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Int.
 
@@ -872,7 +872,7 @@ struct DateTime[
         """
         return hash(self)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __str__(self) -> String:
         """Str.
 
@@ -896,7 +896,7 @@ struct DateTime[
         return Self._from_years(int(calendar.max_year) - delta)
 
     @staticmethod
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn _from_months(
         months: Int,
         tz: Self._tz = Self._tz(),
@@ -1064,7 +1064,7 @@ struct DateTime[
         return dt
 
     @staticmethod
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn _from_n_seconds(
         n_seconds: Int,
         tz: Self._tz = Self._tz(),
@@ -1081,7 +1081,7 @@ struct DateTime[
         return dt
 
     @staticmethod
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn from_unix_epoch[
         add_leap: Bool = False
     ](seconds: Int, tz: Self._tz = Self._tz(),) -> Self:
@@ -1103,7 +1103,7 @@ struct DateTime[
         return Self.from_seconds[add_leap](seconds, tz=tz, calendar=UTCCalendar)
 
     @staticmethod
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn now(
         tz: Self._tz = Self._tz(),
         calendar: Calendar = _calendar,
@@ -1124,7 +1124,7 @@ struct DateTime[
         var dt = Self.from_unix_epoch(s, tz).replace(calendar=calendar)
         return dt.replace(m_second=ms, u_second=us, n_second=UInt16(ns))
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn strftime[format_str: StringLiteral](self) -> String:
         """Formats time into a `String`.
 
@@ -1141,7 +1141,7 @@ struct DateTime[
             self.year, self.month, self.day, self.hour, self.minute, self.second
         )
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn strftime(self, fmt: String) -> String:
         """Formats time into a `String`.
 
@@ -1164,7 +1164,7 @@ struct DateTime[
             self.second,
         )
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn __format__(self, fmt: String) -> String:
         """Format.
 
@@ -1176,7 +1176,7 @@ struct DateTime[
         """
         return self.strftime(fmt)
 
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn to_iso[iso: dt_str.IsoFormat = dt_str.IsoFormat()](self) -> String:
         """Return an [ISO 8601](https://es.wikipedia.org/wiki/ISO_8601)
         compliant formatted `String` e.g. `IsoFormat.YYYY_MM_DD_T_MM_HH_TZD`
@@ -1196,7 +1196,7 @@ struct DateTime[
         return time + self.tz.to_iso()
 
     @staticmethod
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn strptime[
         format_str: StringLiteral,
         tz: Self._tz = Self._tz(),
@@ -1234,7 +1234,7 @@ struct DateTime[
         )
 
     @staticmethod
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn from_iso[
         iso: dt_str.IsoFormat = dt_str.IsoFormat(),
         tz: OptionalReg[Self._tz] = None,
@@ -1279,7 +1279,7 @@ struct DateTime[
             return None
 
     @staticmethod
-    @always_inline("nodebug")
+    # @always_inline("nodebug")
     fn from_hash(
         value: Int,
         tz: Self._tz = Self._tz(),

@@ -150,7 +150,7 @@ struct DateTime64(Hashable, Stringable):
             constrained[name == "b", "that attr does not exist"]()
             return 0
 
-    @always_inline
+    # @always_inline
     fn replace(
         owned self,
         *,
@@ -665,7 +665,7 @@ struct DateTime32(Hashable, Stringable):
         """
         return self.minutes.cast[DType.uint64]() * 60
 
-    @always_inline
+    # @always_inline
     fn replace(
         owned self,
         *,
@@ -1123,7 +1123,7 @@ struct DateTime16(Hashable, Stringable):
             constrained[name == "b", "that attribute does not exist"]()
             return 0
 
-    @always_inline
+    # @always_inline
     fn replace(
         owned self,
         *,
@@ -1150,7 +1150,7 @@ struct DateTime16(Hashable, Stringable):
             )
         return s
 
-    @always_inline
+    # @always_inline
     fn seconds_since_epoch(self) -> UInt32:
         """Seconds since the begining of the calendar's epoch.
 
@@ -1564,7 +1564,7 @@ struct DateTime8(Hashable, Stringable):
             constrained[name == "b", "that attr does not exist"]()
             return 0
 
-    @always_inline
+    # @always_inline
     fn replace(
         owned self,
         *,
