@@ -146,6 +146,66 @@ def test_truthy():
         test_dtype[DType.bfloat16]()
 
 
+def test_add():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    assert_equal(i.__add__(0), I(-2, -4, 0, 1))
+    assert_equal(i.__add__(Int32(0)), I(-2, -4, 0, 1))
+    assert_equal(i.__add__(2), I(0, -2, 2, 3))
+    assert_equal(i.__add__(Int32(2)), I(0, -2, 2, 3))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    assert_equal(i1.__add__(i2), I(3, 1, 0, 3))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    assert_equal(f1.__add__(f2), F(0, 0, 0, 0, 0, 0, 0, 0))
+
+
+def test_radd():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    assert_equal(i.__radd__(0), I(-2, -4, 0, 1))
+    assert_equal(i.__radd__(Int32(0)), I(-2, -4, 0, 1))
+    assert_equal(i.__radd__(2), I(0, -2, 2, 3))
+    assert_equal(i.__radd__(Int32(2)), I(0, -2, 2, 3))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    assert_equal(i1.__radd__(i2), I(3, 1, 0, 3))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    assert_equal(f1.__radd__(f2), F(0, 0, 0, 0, 0, 0, 0, 0))
+
+
+def test_iadd():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    i.__iadd__(0)
+    assert_equal(i, I(-2, -4, 0, 1))
+    i.__iadd__(Int32(0))
+    assert_equal(i, I(-2, -4, 0, 1))
+    i.__iadd__(2)
+    assert_equal(i, I(0, -2, 2, 3))
+    i.__iadd__(I(0, -2, 2, 3))
+    assert_equal(i, I(0, -4, 4, 6))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    i1.__iadd__(i2)
+    assert_equal(i1, I(3, 1, 0, 3))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    f1.__iadd__(f2)
+    assert_equal(f1, F(0, 0, 0, 0, 0, 0, 0, 0))
+
+
 def test_ceil():
     assert_equal(Float32.__ceil__(Float32(1.5)), 2.0)
     assert_equal(Float32.__ceil__(Float32(-1.5)), -1.0)
@@ -190,6 +250,29 @@ def test_floor():
     alias B = SIMD[DType.bool, 4]
     var b = B(True, False, True, False)
     assert_equal(B.__floor__(b), b)
+
+
+def test_trunc():
+    assert_equal(Float32.__trunc__(Float32(1.5)), 1.0)
+    assert_equal(Float32.__trunc__(Float32(-1.5)), -1.0)
+    assert_equal(Float32.__trunc__(Float32(3.0)), 3.0)
+
+    alias F = SIMD[DType.float32, 4]
+    assert_equal(
+        F.__trunc__(F(0.0, 1.6, -42.5, -12.4)), F(0.0, 1.0, -42.0, -12.0)
+    )
+
+    alias I = SIMD[DType.int32, 4]
+    var i = I(0, 2, -42, -12)
+    assert_equal(I.__trunc__(i), i)
+
+    alias U = SIMD[DType.uint32, 4]
+    var u = U(0, 2, 42, 12)
+    assert_equal(U.__trunc__(u), u)
+
+    alias B = SIMD[DType.bool, 4]
+    var b = B(True, False, True, False)
+    assert_equal(B.__trunc__(b), b)
 
 
 def test_round():
@@ -908,8 +991,12 @@ def main():
     test_convert_simd_to_string()
     test_issue_20421()
     test_truthy()
+    test_add()
+    test_radd()
+    test_iadd()
     test_ceil()
     test_floor()
+    test_trunc()
     test_round()
     test_roundeven()
     test_floordiv()
