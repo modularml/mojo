@@ -31,7 +31,7 @@ from memory import UnsafePointer, bitcast
 
 
 @always_inline("nodebug")
-fn _digits[type: DType]() -> Int:
+fn _digits[type: DType]() -> IntLiteral:
     """Returns the number of digits in base-radix that can be represented by
     the type without change.
 
@@ -52,29 +52,24 @@ fn _digits[type: DType]() -> Int:
     @parameter
     if type == DType.bool:
         return 1
+    elif type.is_integral():
 
-    @parameter
-    if type.is_integral():
-        var bitwidth = bitwidthof[mlir_type]()
-        return bitwidth - 1 if type.is_signed() else bitwidth
-
-    @parameter
-    if type == DType.float16:
+        @parameter
+        if type.is_signed():
+            return bitwidthof[mlir_type]() - 1
+        else:
+            return bitwidthof[mlir_type]()
+    elif type == DType.float16:
         return 11
-
-    @parameter
-    if type == DType.bfloat16:
+    elif type == DType.bfloat16:
         return 8
-
-    @parameter
-    if type == DType.float32:
+    elif type == DType.float32:
         return 24
-
-    @parameter
-    if type == DType.float64:
+    elif type == DType.float64:
         return 53
-    # Unreachable.
-    return -1
+    else:
+        constrained[False, "unsupported DType"]()
+        return -1
 
 
 # ===----------------------------------------------------------------------===#
@@ -142,7 +137,7 @@ struct FPUtils[type: DType]:
 
     @staticmethod
     @always_inline("nodebug")
-    fn mantissa_width() -> Int:
+    fn mantissa_width() -> IntLiteral:
         """Returns the mantissa width of a floating point type.
 
         Returns:
@@ -156,7 +151,7 @@ struct FPUtils[type: DType]:
 
     @staticmethod
     @always_inline("nodebug")
-    fn max_exponent() -> Int:
+    fn max_exponent() -> IntLiteral:
         """Returns the max exponent of a floating point type.
 
         Returns:
@@ -172,13 +167,13 @@ struct FPUtils[type: DType]:
             return 16
         elif type == DType.float32 or type == DType.bfloat16:
             return 128
-
-        debug_assert(type == DType.float64, "must be float64")
-        return 1024
+        else:
+            debug_assert(type == DType.float64, "must be float64")
+            return 1024
 
     @staticmethod
     @always_inline("nodebug")
-    fn exponent_width() -> Int:
+    fn exponent_width() -> IntLiteral:
         """Returns the exponent width of a floating point type.
 
         Returns:
@@ -194,9 +189,9 @@ struct FPUtils[type: DType]:
             return 5
         elif type == DType.float32 or type == DType.bfloat16:
             return 8
-
-        debug_assert(type == DType.float64, "must be float64")
-        return 11
+        else:
+            debug_assert(type == DType.float64, "must be float64")
+            return 11
 
     @staticmethod
     @always_inline
@@ -214,7 +209,7 @@ struct FPUtils[type: DType]:
 
     @staticmethod
     @always_inline
-    fn exponent_bias() -> Int:
+    fn exponent_bias() -> IntLiteral:
         """Returns the exponent bias of a floating point type.
 
         Returns:
@@ -239,7 +234,8 @@ struct FPUtils[type: DType]:
             type.is_floating_point(),
             "dtype must be a floating point type",
         ]()
-        return 1 << (Self.exponent_width() + Self.mantissa_width())
+        alias shift = int(Self.exponent_width() + Self.mantissa_width())
+        return 1 << shift
 
     @staticmethod
     @always_inline
@@ -289,7 +285,7 @@ struct FPUtils[type: DType]:
             type.is_floating_point(),
             "dtype must be a floating point type",
         ]()
-        var mantissa_width_val = Self.mantissa_width()
+        alias mantissa_width_val = Self.mantissa_width()
         return (1 << Self.exponent_width() - 1) << mantissa_width_val + (
             1 << (mantissa_width_val - 1)
         )
@@ -380,8 +376,8 @@ struct FPUtils[type: DType]:
         Returns:
             Returns the exponent bits.
         """
-
-        return Self.get_exponent(value) - Self.exponent_bias()
+        alias bias = int(Self.exponent_bias())
+        return Self.get_exponent(value) - bias
 
     @staticmethod
     @always_inline
@@ -602,8 +598,7 @@ fn nan[type: DType]() -> Scalar[type]:
         )
     else:
         constrained[False, "nan only support on floating point types"]()
-
-    return 0
+        return 0
 
 
 # ===----------------------------------------------------------------------===#
@@ -697,8 +692,7 @@ fn inf[type: DType]() -> Scalar[type]:
         )
     else:
         constrained[False, "+inf only support on floating point types"]()
-
-    return 0
+        return 0
 
 
 # ===----------------------------------------------------------------------===#
