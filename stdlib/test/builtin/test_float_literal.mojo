@@ -95,6 +95,25 @@ def test_trunc():
     assert_equal(FloatLiteral.__trunc__(neg_inf), neg_inf)
 
 
+def test_round():
+    assert_equal(FloatLiteral.__round__(1.5), 2.0)
+    assert_equal(FloatLiteral.__round__(1.4), 1.0)
+    assert_equal(FloatLiteral.__round__(-1.5), -2.0)
+    assert_equal(FloatLiteral.__round__(-3.4), -3.0)
+    assert_equal(FloatLiteral.__round__(3.0), 3.0)
+    assert_equal(FloatLiteral.__round__(0.0), 0.0)
+
+    assert_true(FloatLiteral.__round__(nan).is_nan())
+    assert_true(FloatLiteral.__round__(neg_zero).is_neg_zero())
+    assert_equal(FloatLiteral.__round__(inf), inf)
+    assert_equal(FloatLiteral.__round__(neg_inf), neg_inf)
+
+    assert_equal(FloatLiteral.__round__(1.5, 1), 1.5)
+    assert_equal(FloatLiteral.__round__(1.123, 1), 1.1)
+    assert_equal(FloatLiteral.__round__(1.198, 2), 1.2)
+    assert_equal(FloatLiteral.__round__(1.123, 2), 1.12)
+
+
 fn round10(x: Float64) -> Float64:
     # TODO: implement __div__ on FloatLiteral?
     return (round(Float64(x * 10)) / 10).value
@@ -206,6 +225,7 @@ def main():
     test_floor()
     test_round()
     test_trunc()
+    test_round()
     test_round10()
     test_division()
     test_power()
