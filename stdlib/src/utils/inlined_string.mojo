@@ -21,7 +21,7 @@ from memory import memcpy, LegacyPointer, UnsafePointer
 
 from collections import Optional
 
-from utils import StaticTuple, Variant
+from utils import InlineArray, Variant
 from utils._format import ToFormatter
 
 
@@ -495,7 +495,7 @@ struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
         SIZE: The fixed number of elements stored in the array.
     """
 
-    var storage: StaticTuple[ElementType, SIZE]
+    var storage: InlineArray[ElementType, SIZE]
     """The underlying storage for this array value."""
 
     # ===------------------------------------------------------------------===#
@@ -506,7 +506,7 @@ struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
     fn __init__(inout self):
         """Constructs an empty (undefined) array."""
 
-        self.storage = StaticTuple[ElementType, SIZE]()
+        self.storage = InlineArray[ElementType, SIZE](unsafe_uninitialized=True)
 
     # ===------------------------------------------------------------------=== #
     # Trait Interfaces
@@ -522,7 +522,7 @@ struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
 
     fn __setitem__(inout self, index: Int, owned value: ElementType):
         var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer(Reference(self.storage.array)).address, index.value
+            UnsafePointer(Reference(self.storage._array)).address, index.value
         )
         __mlir_op.`pop.store`(value, ptr)
 
