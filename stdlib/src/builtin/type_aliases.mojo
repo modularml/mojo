@@ -36,8 +36,7 @@ alias MutStaticLifetime = __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`
 
 # Helper to build !lit.lifetime type.
 # TODO: Should be a parametric alias.
-# TODO: Should take a Bool, not an i1.
-struct AnyLifetime[is_mutable: __mlir_type.i1]:
+struct AnyLifetime[is_mutable: Bool]:
     """This represents a lifetime reference of potentially parametric type.
     TODO: This should be replaced with a parametric type alias.
 
@@ -47,6 +46,6 @@ struct AnyLifetime[is_mutable: __mlir_type.i1]:
 
     alias type = __mlir_type[
         `!lit.lifetime<`,
-        is_mutable,
+        is_mutable.value,
         `>`,
     ]
