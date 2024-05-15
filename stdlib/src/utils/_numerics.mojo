@@ -25,9 +25,9 @@ from sys._assembly import inlined_assembly
 from builtin.dtype import _integral_type_of
 from memory import UnsafePointer, bitcast
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # _digits
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -72,9 +72,9 @@ fn _digits[type: DType]() -> IntLiteral:
         return -1
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # _fp_bitcast_to_integer
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
@@ -94,9 +94,9 @@ fn _fp_bitcast_to_integer[type: DType](value: Scalar[type]) -> Int:
     return int(bitcast[integer_type, 1](value))
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # _fp_bitcast_from_integer
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
@@ -117,9 +117,9 @@ fn _fp_bitcast_from_integer[type: DType](value: Int) -> Scalar[type]:
     return bitcast[type, 1](int_val)
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # FPUtils
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 struct FPUtils[type: DType]:
@@ -447,9 +447,9 @@ struct FPUtils[type: DType]:
         return res
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # FlushDenormals
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 struct FlushDenormals:
@@ -548,9 +548,9 @@ struct FlushDenormals:
         return fpcr64.cast[DType.int32]()
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # nan
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -601,9 +601,9 @@ fn nan[type: DType]() -> Scalar[type]:
         return 0
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # isnan
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -642,9 +642,9 @@ fn isnan[
     ](val.value, (signaling_nan_test | quiet_nan_test).value)
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # inf
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -695,9 +695,192 @@ fn inf[type: DType]() -> Scalar[type]:
         return 0
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
+# neg_inf
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn neg_inf[type: DType]() -> Scalar[type]:
+    """Gets a -inf value for the given dtype.
+
+    Constraints:
+        Can only be used for FP dtypes.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The -inf value of the given dtype.
+    """
+
+    @parameter
+    if type == DType.float16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f16>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<f16>`],
+            ]()
+        )
+    elif type == DType.bfloat16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<bf16>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<bf16>`],
+            ]()
+        )
+    elif type == DType.float32:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f32>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<f32>`],
+            ]()
+        )
+    elif type == DType.float64:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f64>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<f64>`],
+            ]()
+        )
+    else:
+        constrained[False, "+inf only support on floating point types"]()
+        return 0
+
+
+# ===----------------------------------------------------------------------=== #
+# max_finite
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn max_finite[type: DType]() -> Scalar[type]:
+    """Returns the maximum finite value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The maximum representable value of the type. Does not include infinity
+        for floating-point types.
+    """
+
+    @parameter
+    if type == DType.int8:
+        return 127
+    elif type == DType.uint8:
+        return 255
+    elif type == DType.int16:
+        return 32767
+    elif type == DType.uint16:
+        return 65535
+    elif type == DType.int32 or type.is_index32():
+        return 2147483647
+    elif type == DType.uint32:
+        return 4294967295
+    elif type == DType.int64 or type.is_index64():
+        return 9223372036854775807
+    elif type == DType.uint64:
+        return 18446744073709551615
+    elif type == DType.float16:
+        return 65504
+    elif type == DType.bfloat16:
+        return 3.38953139e38
+    elif type == DType.float32:
+        return 3.40282346638528859812e38
+    elif type == DType.float64:
+        return 1.79769313486231570815e308
+    else:
+        constrained[False, "max_finite() called on unsupported type"]()
+        return 0
+
+
+# ===----------------------------------------------------------------------=== #
+# min_finite
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn min_finite[type: DType]() -> Scalar[type]:
+    """Returns the minimum (lowest) finite value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The minimum representable value of the type. Does not include negative
+        infinity for floating-point types.
+    """
+
+    @parameter
+    if type.is_unsigned():
+        return 0
+    elif type == DType.int8:
+        return -128
+    elif type == DType.int16:
+        return -32768
+    elif type == DType.int32 or type.is_index32():
+        return -2147483648
+    elif type == DType.int64 or type.is_index64():
+        return -9223372036854775808
+    elif type.is_floating_point():
+        return -max_finite[type]()
+    else:
+        constrained[False, "min_finite() called on unsupported type"]()
+        return 0
+
+
+# ===----------------------------------------------------------------------=== #
+# max_or_inf
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn max_or_inf[type: DType]() -> Scalar[type]:
+    """Returns the maximum (potentially infinite) value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The maximum representable value of the type. Can include infinity for
+        floating-point types.
+    """
+
+    @parameter
+    if type.is_floating_point():
+        return inf[type]()
+    else:
+        return max_finite[type]()
+
+
+# ===----------------------------------------------------------------------=== #
+# min_or_neg_inf
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn min_or_neg_inf[type: DType]() -> Scalar[type]:
+    """Returns the minimum (potentially negative infinite) value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The minimum representable value of the type. Can include negative
+        infinity for floating-point types.
+    """
+
+    @parameter
+    if type.is_floating_point():
+        return neg_inf[type]()
+    else:
+        return min_finite[type]()
+
+
+# ===----------------------------------------------------------------------=== #
 # isinf
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -730,9 +913,9 @@ fn isinf[
     )
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # isfinite
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -763,9 +946,9 @@ fn isfinite[
     )
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # get_accum_type
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
