@@ -142,23 +142,19 @@ struct DateTime[
             tz: Tz.
             calendar: Calendar.
         """
-        self.year = int(year.value()[]) if year else int(calendar.min_year)
-        self.month = int(month.value()[]) if month else int(calendar.min_month)
-        self.day = int(day.value()[]) if day else int(calendar.min_day)
-        self.hour = int(hour.value()[]) if hour else int(calendar.min_hour)
-        self.minute = int(minute.value()[]) if minute else int(
-            calendar.min_minute
-        )
-        self.second = int(second.value()[]) if second else int(
-            calendar.min_second
-        )
-        self.m_second = int(m_second.value()[]) if m_second else int(
+        self.year = int(year.take()) if year else int(calendar.min_year)
+        self.month = int(month.take()) if month else int(calendar.min_month)
+        self.day = int(day.take()) if day else int(calendar.min_day)
+        self.hour = int(hour.take()) if hour else int(calendar.min_hour)
+        self.minute = int(minute.take()) if minute else int(calendar.min_minute)
+        self.second = int(second.take()) if second else int(calendar.min_second)
+        self.m_second = int(m_second.take()) if m_second else int(
             calendar.min_milisecond
         )
-        self.u_second = int(u_second.value()[]) if u_second else int(
+        self.u_second = int(u_second.take()) if u_second else int(
             calendar.min_microsecond
         )
-        self.n_second = int(n_second.value()[]) if n_second else int(
+        self.n_second = int(n_second.take()) if n_second else int(
             calendar.min_nanosecond
         )
         self.tz = tz
@@ -262,27 +258,27 @@ struct DateTime[
 
         var new_self = self
         if year:
-            new_self.year = year.value()[]
+            new_self.year = year.take()
         if month:
-            new_self.month = month.value()[]
+            new_self.month = month.take()
         if day:
-            new_self.day = day.value()[]
+            new_self.day = day.take()
         if hour:
-            new_self.hour = hour.value()[]
+            new_self.hour = hour.take()
         if minute:
-            new_self.minute = minute.value()[]
+            new_self.minute = minute.take()
         if second:
-            new_self.second = second.value()[]
+            new_self.second = second.take()
         if m_second:
-            new_self.m_second = m_second.value()[]
+            new_self.m_second = m_second.take()
         if u_second:
-            new_self.u_second = u_second.value()[]
+            new_self.u_second = u_second.take()
         if n_second:
-            new_self.n_second = n_second.value()[]
+            new_self.n_second = n_second.take()
         if tz:
-            new_self.tz = tz.value()[]
+            new_self.tz = tz.take()
         if calendar:
-            var cal = calendar.value()[]
+            var cal = calendar.take()
             var tmpcal = self.calendar.from_year(self.year)
             new_self.calendar = tmpcal
             var ns = new_self.n_seconds_since_epoch()
@@ -1261,7 +1257,7 @@ struct DateTime[
         var parsed = dt_str.strptime[format_str](s)
         if not parsed:
             return None
-        var p = parsed.value()[]
+        var p = parsed.take()
         return Self(
             p[0],
             p[1],

@@ -116,9 +116,9 @@ struct Date[
             tz: Tz.
             calendar: Calendar.
         """
-        self.year = int(year.value()[]) if year else int(calendar.min_year)
-        self.month = int(month.value()[]) if month else int(calendar.min_month)
-        self.day = int(day.value()[]) if day else int(calendar.min_day)
+        self.year = int(year.take()) if year else int(calendar.min_year)
+        self.month = int(month.take()) if month else int(calendar.min_month)
+        self.day = int(day.take()) if day else int(calendar.min_day)
         self.tz = tz
         self.calendar = calendar
 
@@ -171,15 +171,15 @@ struct Date[
         """
         var new_self = self
         if year:
-            new_self.year = year.value()[]
+            new_self.year = year.take()
         if month:
-            new_self.month = month.value()[]
+            new_self.month = month.take()
         if day:
-            new_self.day = day.value()[]
+            new_self.day = day.take()
         if tz:
-            new_self.tz = tz.value()[]
+            new_self.tz = tz.take()
         if calendar:
-            var cal = calendar.value()[]
+            var cal = calendar.take()
             var s = self.seconds_since_epoch()
             new_self.year = cal.min_year
             new_self.month = cal.min_month
@@ -904,7 +904,7 @@ struct Date[
         var parsed = dt_str.strptime[format_str](s)
         if not parsed:
             return None
-        var p = parsed.value()[]
+        var p = parsed.take()
         return Self(p[0], p[1], p[2], tz=tz, calendar=calendar)
 
     @staticmethod

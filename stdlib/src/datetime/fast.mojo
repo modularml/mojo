@@ -103,25 +103,19 @@ struct DateTime64(Hashable, Stringable):
             m_second: M_second.
             hash_val: Hash_val.
         """
-        var y = int(year.value()[]) if year else int(self._calendar.min_year)
-        var mon = int(month.value()[]) if month else int(
-            self._calendar.min_month
-        )
-        var d = int(day.value()[]) if day else int(self._calendar.min_day)
-        var h = int(hour.value()[]) if hour else int(self._calendar.min_hour)
-        var m = int(minute.value()[]) if minute else int(
-            self._calendar.min_minute
-        )
-        var s = int(second.value()[]) if second else int(
-            self._calendar.min_second
-        )
-        var ms = int(m_second.value()[]) if day else int(
+        var y = int(year.take()) if year else int(self._calendar.min_year)
+        var mon = int(month.take()) if month else int(self._calendar.min_month)
+        var d = int(day.take()) if day else int(self._calendar.min_day)
+        var h = int(hour.take()) if hour else int(self._calendar.min_hour)
+        var m = int(minute.take()) if minute else int(self._calendar.min_minute)
+        var s = int(second.take()) if second else int(self._calendar.min_second)
+        var ms = int(m_second.take()) if day else int(
             self._calendar.min_milisecond
         )
         self.m_seconds = self._calendar.m_seconds_since_epoch(
             y, mon, d, h, m, s, ms
         )
-        self.hash = int(hash_val.value()[]) if hash_val else int(
+        self.hash = int(hash_val.take()) if hash_val else int(
             self._calendar.hash[self._cal_h](y, mon, d, h, m, s, ms)
         )
 
@@ -188,31 +182,31 @@ struct DateTime64(Hashable, Stringable):
         var s = self
         if year:
             s.hash = (s.hash & ~self._cal_h.mask_64_y) | (
-                year.value()[] << self._cal_h.shift_64_y
+                year.take() << self._cal_h.shift_64_y
             )
         if month:
             s.hash = (s.hash & ~self._cal_h.mask_64_mon) | (
-                month.value()[] << self._cal_h.shift_64_mon
+                month.take() << self._cal_h.shift_64_mon
             )
         if day:
             s.hash = (s.hash & ~self._cal_h.mask_64_d) | (
-                day.value()[] << self._cal_h.shift_64_d
+                day.take() << self._cal_h.shift_64_d
             )
         if hour:
             s.hash = (s.hash & ~self._cal_h.mask_64_h) | (
-                day.value()[] << self._cal_h.shift_64_h
+                day.take() << self._cal_h.shift_64_h
             )
         if minute:
             s.hash = (s.hash & ~self._cal_h.mask_64_m) | (
-                day.value()[] << self._cal_h.shift_64_m
+                day.take() << self._cal_h.shift_64_m
             )
         if second:
             s.hash = (s.hash & ~self._cal_h.mask_64_s) | (
-                day.value()[] << self._cal_h.shift_64_s
+                day.take() << self._cal_h.shift_64_s
             )
         if m_second:
             s.hash = (s.hash & ~self._cal_h.mask_64_ms) | (
-                day.value()[] << self._cal_h.shift_64_ms
+                day.take() << self._cal_h.shift_64_ms
             )
         return s
 
@@ -617,22 +611,18 @@ struct DateTime32(Hashable, Stringable):
             minute: Minute.
             hash_val: Hash_val.
         """
-        var y = int(year.value()[]) if year else int(self._calendar.min_year)
-        var mon = int(month.value()[]) if month else int(
-            self._calendar.min_month
-        )
-        var d = int(day.value()[]) if day else int(self._calendar.min_day)
-        var h = int(hour.value()[]) if hour else int(self._calendar.min_hour)
-        var m = int(minute.value()[]) if minute else int(
-            self._calendar.min_minute
-        )
+        var y = int(year.take()) if year else int(self._calendar.min_year)
+        var mon = int(month.take()) if month else int(self._calendar.min_month)
+        var d = int(day.take()) if day else int(self._calendar.min_day)
+        var h = int(hour.take()) if hour else int(self._calendar.min_hour)
+        var m = int(minute.take()) if minute else int(self._calendar.min_minute)
         self.minutes = (
             self._calendar.seconds_since_epoch(
                 y, mon, d, h, m, int(self._calendar.min_second)
             )
             // 60
         ).cast[DType.uint32]()
-        self.hash = int(hash_val.value()[]) if hash_val else int(
+        self.hash = int(hash_val.take()) if hash_val else int(
             self._calendar.hash[self._cal_h](y, mon, d, h, m)
         )
 
@@ -698,23 +688,23 @@ struct DateTime32(Hashable, Stringable):
         var s = self
         if year:
             s.hash = (s.hash & ~self._cal_h.mask_32_y) | (
-                year.value()[] << self._cal_h.shift_32_y
+                year.take() << self._cal_h.shift_32_y
             )
         if month:
             s.hash = (s.hash & ~self._cal_h.mask_32_mon) | (
-                month.value()[] << self._cal_h.shift_32_mon
+                month.take() << self._cal_h.shift_32_mon
             )
         if day:
             s.hash = (s.hash & ~self._cal_h.mask_32_d) | (
-                day.value()[] << self._cal_h.shift_32_d
+                day.take() << self._cal_h.shift_32_d
             )
         if hour:
             s.hash = (s.hash & ~self._cal_h.mask_32_h) | (
-                day.value()[] << self._cal_h.shift_32_h
+                day.take() << self._cal_h.shift_32_h
             )
         if minute:
             s.hash = (s.hash & ~self._cal_h.mask_32_m) | (
-                day.value()[] << self._cal_h.shift_32_m
+                day.take() << self._cal_h.shift_32_m
             )
         return s
 
@@ -1096,18 +1086,16 @@ struct DateTime16(Hashable, Stringable):
             hour: Hour.
             hash_val: Hash_val.
         """
-        var y = int(year.value()[]) if year else int(self._calendar.min_year)
-        var mon = int(month.value()[]) if month else int(
-            self._calendar.min_month
-        )
-        var d = int(day.value()[]) if day else int(self._calendar.min_day)
-        var h = int(hour.value()[]) if hour else int(self._calendar.min_hour)
+        var y = int(year.take()) if year else int(self._calendar.min_year)
+        var mon = int(month.take()) if month else int(self._calendar.min_month)
+        var d = int(day.take()) if day else int(self._calendar.min_day)
+        var h = int(hour.take()) if hour else int(self._calendar.min_hour)
         var m = int(self._calendar.min_minute)
         var s = int(self._calendar.min_second)
         self.hours = (
             self._calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
         ).cast[DType.uint16]()
-        self.hash = int(hash_val.value()[]) if hash_val else int(
+        self.hash = int(hash_val.take()) if hash_val else int(
             self._calendar.hash[self._cal_h](y, mon, d, h, m, s)
         )
 
@@ -1152,11 +1140,11 @@ struct DateTime16(Hashable, Stringable):
         var s = self
         if day:
             s.hash = (s.hash & ~self._cal_h.mask_16_d) | (
-                day.value()[] << self._cal_h.shift_16_d
+                day.take() << self._cal_h.shift_16_d
             )
         if hour:
             s.hash = (s.hash & ~self._cal_h.mask_16_h) | (
-                day.value()[] << self._cal_h.shift_16_h
+                day.take() << self._cal_h.shift_16_h
             )
         return s
 
@@ -1546,18 +1534,16 @@ struct DateTime8(Hashable, Stringable):
             hour: Hour.
             hash_val: Hash_val.
         """
-        var y = int(year.value()[]) if year else int(self._calendar.min_year)
-        var mon = int(month.value()[]) if month else int(
-            self._calendar.min_month
-        )
-        var d = int(day.value()[]) if day else int(self._calendar.min_day)
-        var h = int(hour.value()[]) if hour else int(self._calendar.min_hour)
+        var y = int(year.take()) if year else int(self._calendar.min_year)
+        var mon = int(month.take()) if month else int(self._calendar.min_month)
+        var d = int(day.take()) if day else int(self._calendar.min_day)
+        var h = int(hour.take()) if hour else int(self._calendar.min_hour)
         var m = int(self._calendar.min_minute)
         var s = int(self._calendar.min_second)
         self.hours = (
             self._calendar.seconds_since_epoch(y, mon, d, h, m, s) // (60 * 60)
         ).cast[DType.uint8]()
-        self.hash = int(hash_val.value()[]) if hash_val else int(
+        self.hash = int(hash_val.take()) if hash_val else int(
             self._calendar.hash[self._cal_h](y, mon, d, h, m, s)
         )
 
@@ -1600,11 +1586,11 @@ struct DateTime8(Hashable, Stringable):
         var s = self
         if day:
             s.hash = (s.hash & ~self._cal_h.mask_8_d) | (
-                day.value()[] << self._cal_h.shift_8_d
+                day.take() << self._cal_h.shift_8_d
             )
         if hour:
             s.hash = (s.hash & ~self._cal_h.mask_8_h) | (
-                day.value()[] << self._cal_h.shift_8_h
+                day.take() << self._cal_h.shift_8_h
             )
         return s
 
