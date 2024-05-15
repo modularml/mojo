@@ -162,7 +162,7 @@ struct VariadicList[type: AnyRegType](Sized):
 @value
 struct _VariadicListMemIter[
     elt_type: AnyType,
-    elt_is_mutable: __mlir_type.i1,
+    elt_is_mutable: Bool,
     elt_lifetime: AnyLifetime[elt_is_mutable].type,
     list_lifetime: ImmLifetime,
 ]:
@@ -176,13 +176,11 @@ struct _VariadicListMemIter[
     """
 
     alias variadic_list_type = VariadicListMem[
-        elt_type, elt_is_mutable, elt_lifetime
+        elt_type, elt_is_mutable.value, elt_lifetime
     ]
 
     var index: Int
-    var src: Reference[
-        Self.variadic_list_type, __mlir_attr.`0: i1`, list_lifetime
-    ]
+    var src: Reference[Self.variadic_list_type, False, list_lifetime]
 
     fn __next__(inout self) -> Self.variadic_list_type.reference_type:
         self.index += 1
@@ -197,25 +195,31 @@ struct _VariadicListMemIter[
 # Helper to compute the union of two lifetimes:
 # TODO: parametric aliases would be nice.
 struct _lit_lifetime_union[
-    is_mutable: __mlir_type.i1,
+    is_mutable: Bool,
     a: AnyLifetime[is_mutable].type,
     b: AnyLifetime[is_mutable].type,
 ]:
     alias result = __mlir_attr[
-        `#lit.lifetime.union<`, a, `,`, b, `> : !lit.lifetime<`, is_mutable, `>`
+        `#lit.lifetime.union<`,
+        a,
+        `,`,
+        b,
+        `> : !lit.lifetime<`,
+        is_mutable.value,
+        `>`,
     ]
 
 
 struct _lit_mut_cast[
-    is_mutable: __mlir_type.i1,
+    is_mutable: Bool,
     operand: AnyLifetime[is_mutable].type,
-    result_mutable: __mlir_type.i1,
+    result_mutable: Bool,
 ]:
     alias result = __mlir_attr[
         `#lit.lifetime.mutcast<`,
         operand,
         `> : !lit.lifetime<`,
-        +result_mutable,
+        +result_mutable.value,
         `>`,
     ]
 
@@ -223,7 +227,7 @@ struct _lit_mut_cast[
 struct VariadicListMem[
     element_type: AnyType,
     elt_is_mutable: __mlir_type.i1,
-    lifetime: AnyLifetime[elt_is_mutable].type,
+    lifetime: __mlir_type[`!lit.lifetime<`, elt_is_mutable, `>`],
 ](Sized):
     """A utility class to access variadic function arguments of memory-only
     types that may have ownership. It exposes references to the elements in a
@@ -236,7 +240,9 @@ struct VariadicListMem[
         lifetime: The reference lifetime of the underlying elements.
     """
 
-    alias reference_type = Reference[element_type, elt_is_mutable, lifetime]
+    alias reference_type = Reference[
+        element_type, Bool {value: elt_is_mutable}, lifetime
+    ]
     alias _mlir_ref_type = Self.reference_type._mlir_type
     alias _mlir_type = __mlir_type[
         `!kgen.variadic<`, Self._mlir_ref_type, `, borrow_in_mem>`
@@ -363,15 +369,15 @@ struct VariadicListMem[
         self, index: Int
     ) -> Reference[
         element_type,
-        elt_is_mutable,
+        Bool {value: elt_is_mutable},
         _lit_lifetime_union[
-            elt_is_mutable,
+            Bool {value: elt_is_mutable},
             lifetime,
             # cast mutability of self to match the mutability of the element,
             # since that is what we want to use in the ultimate reference and
             # the union overall doesn't matter.
             _lit_mut_cast[
-                __mlir_attr.`0: i1`, __lifetime_of(self), elt_is_mutable
+                False, __lifetime_of(self), Bool {value: elt_is_mutable}
             ].result,
         ].result,
     ]:
@@ -389,7 +395,10 @@ struct VariadicListMem[
     fn __iter__(
         self,
     ) -> _VariadicListMemIter[
-        element_type, elt_is_mutable, lifetime, __lifetime_of(self)
+        element_type,
+        Bool {value: elt_is_mutable},
+        lifetime,
+        __lifetime_of(self),
     ]:
         """Iterate over the list.
 
@@ -397,7 +406,10 @@ struct VariadicListMem[
             An iterator to the start of the list.
         """
         return _VariadicListMemIter[
-            element_type, elt_is_mutable, lifetime, __lifetime_of(self)
+            element_type,
+            Bool {value: elt_is_mutable},
+            lifetime,
+            __lifetime_of(self),
         ](0, self)
 
 
@@ -412,7 +424,7 @@ alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
 @value
 struct _LITRefPackHelper[
     is_mutable: __mlir_type.i1,
-    lifetime: AnyLifetime[is_mutable].type,
+    lifetime: AnyLifetime[Bool {value: is_mutable}].type,
     address_space: __mlir_type.index,
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
@@ -480,7 +492,7 @@ struct _LITRefPackHelper[
 @register_passable
 struct VariadicPack[
     elt_is_mutable: __mlir_type.i1,
-    lifetime: AnyLifetime[elt_is_mutable].type,
+    lifetime: __mlir_type[`!lit.lifetime<`, elt_is_mutable, `>`],
     element_trait: _AnyTypeMetaType,
     *element_types: element_trait,
 ](Sized):
@@ -574,7 +586,7 @@ struct VariadicPack[
         index: Int
     ](self) -> Reference[
         element_types[index.value],
-        Self.elt_is_mutable,
+        Bool {value: Self.elt_is_mutable},
         Self.lifetime,
     ]:
         """Return a reference to an element of the pack.
@@ -595,7 +607,7 @@ struct VariadicPack[
         # element_types[index] expression is erased to AnyType for Reference.
         alias result_ref = Reference[
             element_types[index.value],
-            Self.elt_is_mutable,
+            Bool {value: Self.elt_is_mutable},
             Self.lifetime,
         ]
         return rebind[result_ref._mlir_type](ref_elt)
