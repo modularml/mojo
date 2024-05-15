@@ -20,7 +20,7 @@ from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple
+from utils import StringRef, StaticIntTuple, Span
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
@@ -1194,6 +1194,40 @@ struct String(
         )
 
         return copy
+
+    fn as_bytes_slice(
+        self: Reference[Self, _, _]
+    ) -> Span[Int8, self.is_mutable, self.lifetime]:
+        """
+        Returns a contiguous slice of the bytes owned by this string.
+
+        This does not include the trailing null terminator.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        return Span[Int8, self.is_mutable, self.lifetime](
+            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+            # Does NOT include the NUL terminator.
+            len=self[]._byte_length(),
+        )
+
+    fn _byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        This does not include the trailing null terminator in the count.
+
+        Returns:
+            The length of this StringLiteral in bytes, excluding null terminator.
+        """
+
+        var buffer_len = len(self._buffer)
+
+        if buffer_len > 0:
+            return buffer_len - 1
+        else:
+            return buffer_len
 
     fn _steal_ptr(inout self) -> DTypePointer[DType.int8]:
         """Transfer ownership of pointer to the underlying memory.
