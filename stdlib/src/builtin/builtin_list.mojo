@@ -37,13 +37,13 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
     """The underlying storage for the list."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, *args: *Ts):
+    fn __init__(inout self, owned *args: *Ts):
         """Construct the list literal from the given values.
 
         Args:
             args: The init values.
         """
-        self.storage = Tuple(storage=args)
+        self.storage = Tuple(storage=args^)
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
