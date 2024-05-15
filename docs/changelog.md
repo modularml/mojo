@@ -204,6 +204,8 @@ what we publish.
   `swap` and `partition` will likely shuffle around as we're reworking
   our builtnin `sort` function and optimizing it.
 
+- The `math.bit` module has been moved to a new top-level `bit` module.
+
 ### ❌ Removed
 
 - The method `object.print()` has been removed. Since now, `object` has the
@@ -224,6 +226,10 @@ what we publish.
 
 - The `math.div_ceil` function has been removed in favor of the `math.ceildiv`
   function.
+
+- The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
+  same functionality is available in the builtin `SIMD.select` and
+  `SIMD.__and__` methods, respectively.
 
 ### 🛠️ Fixed
 

@@ -2230,6 +2230,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             true_case: The values selected if the positional value is True.
             false_case: The values selected if the positional value is False.
 
+        Constraints:
+            The element type of the vector must be boolean.
+
         Returns:
             A new vector of the form
             `[true_case[i] if elem else false_case[i] for i, elem in enumerate(self)]`.
