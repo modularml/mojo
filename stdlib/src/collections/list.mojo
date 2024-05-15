@@ -768,7 +768,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Parameters:
             T2: The type of the elements in the list. Must implement the
               traits `EqualityComparable` and `CollectionElement`.
-
+        
         Args:
             value: The value to find.
 
