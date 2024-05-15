@@ -28,7 +28,6 @@ from sys import (
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from memory import bitcast
-
 from utils._numerics import FPUtils
 from utils._numerics import isnan as _isnan
 from utils._numerics import nan as _nan
@@ -2444,11 +2443,20 @@ fn _pow[
 
         var result = SIMD[lhs_type, simd_width]()
 
-        @unroll
-        for i in range(simd_width):
-            result[i] = llvm_intrinsic[
-                "llvm.pow", Scalar[lhs_type], has_side_effect=False
-            ](lhs[i], rhs[i])
+        @parameter
+        if triple_is_nvidia_cuda():
+            print(
+                "ABORT: pow with two floating point operands is not supported"
+                " on GPU"
+            )
+            abort()
+        else:
+
+            @unroll
+            for i in range(simd_width):
+                result[i] = llvm_intrinsic[
+                    "llvm.pow", Scalar[lhs_type], has_side_effect=False
+                ](lhs[i], rhs[i])
 
         return result
     elif rhs_type.is_integral():
