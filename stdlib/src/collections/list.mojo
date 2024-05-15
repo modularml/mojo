@@ -479,11 +479,11 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn index[
         C: ComparableCollectionElement
     ](
-        self: List[C], value: C, start: Int = 0, end: Optional[Int] = None
+        self: List[C], value: C, start: Int = 0, stop: Optional[Int] = None
     ) raises -> Int:
         """
-        Returns the index of the first occurrence of a value in a list, starting from the specified
-        index (default 0). Raises an Error if the value is not found.
+        Returns the index of the first occurrence of a value in a list
+        restricted by the range given the start and stop bounds.
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
@@ -493,45 +493,33 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Args:
             self: The list to search in.
             value: The value to search for.
-            start: The starting index of the search (default 0).
-            end: The ending index of the search (default None, which means the end of the list).
+            start: The starting index of the search, treated as a slice index
+                (defaults to 0).
+            stop: The ending index of the search, treated as a slice index
+                (defaults to None, which means the end of the list).
 
         Parameters:
-            C: The type of the elements in the list. Must implement the `ComparableCollectionElement` trait.
+            C: The type of the elements in the list. Must implement the
+                `ComparableCollectionElement` trait.
 
         Returns:
             The index of the first occurrence of the value in the list.
 
         Raises:
-            ValueError If the value is not found in the list.
-
+            ValueError: If the value is not found in the list.
         """
-        var normalized_start = (self.size + start) if start < 0 else start
-        # TODO: Once the min() and max() functions are available in Mojo,
-        # TODO: we can simplify the entire if-else block into a single line using the ternary operator:
-        # var normalized_end = self.size if end is None else min(max(end, 0), self.size)
-        var normalized_end: Int
-        if end is None:
-            normalized_end = self.size
-        else:
-            if end.value()[] < 0:
-                normalized_end = self.size + end.value()[]
+        var normalized_start = max(self.size + start, 0) if start < 0 else start
+
+        @parameter
+        fn normalized_stop() -> Int:
+            if stop is None:
+                return self.size
+            elif stop.value()[] < 0:
+                return min(stop.value()[] + self.size, self.size)
             else:
-                if end.value()[] > self.size:
-                    normalized_end = self.size
-                else:
-                    normalized_end = end.value()[]
+                return stop.value()[]
 
-        if not self.size:
-            raise "Cannot find index of a value in an empty list."
-        if normalized_start >= self.size:
-            raise "Given 'start' parameter (" + str(
-                normalized_start
-            ) + ") is out of range. List only has " + str(
-                self.size
-            ) + " elements."
-
-        for i in range(normalized_start, normalized_end):
+        for i in range(normalized_start, normalized_stop()):
             if self[i] == value:
                 return i
         raise "ValueError: Given element is not in list"
