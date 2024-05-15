@@ -474,12 +474,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             earlier_idx += 1
             later_idx -= 1
 
-    # TODO: Modify this to be regular method when issue 1876 is resolved
-    @staticmethod
+    # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
         C: ComparableCollectionElement
     ](
-        self: List[C], value: C, start: Int = 0, stop: Optional[Int] = None
+        self: Reference[List[C]],
+        value: C,
+        start: Int = 0,
+        stop: Optional[Int] = None,
     ) raises -> Int:
         """
         Returns the index of the first occurrence of a value in a list
@@ -487,11 +489,10 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(__type_of(my_list).index(my_list, 2)) # Output: 1
+        print(my_list.index(2)) # prints `1`
         ```
 
         Args:
-            self: The list to search in.
             value: The value to search for.
             start: The starting index of the search, treated as a slice index
                 (defaults to 0).
@@ -508,19 +509,19 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Raises:
             ValueError: If the value is not found in the list.
         """
-        var normalized_start = max(self.size + start, 0) if start < 0 else start
+        var size = self[].size
+        var normalized_start = max(size + start, 0) if start < 0 else start
 
         @parameter
         fn normalized_stop() -> Int:
             if stop is None:
-                return self.size
-            elif stop.value()[] < 0:
-                return min(stop.value()[] + self.size, self.size)
+                return size
             else:
-                return stop.value()[]
+                var end = stop.value()[]
+                return end if end > 0 else min(end + size, size)
 
         for i in range(normalized_start, normalized_stop()):
-            if self[i] == value:
+            if self[][i] == value:
                 return i
         raise "ValueError: Given element is not in list"
 

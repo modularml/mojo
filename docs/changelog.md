@@ -178,6 +178,14 @@ what we publish.
 - `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
     ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
 
+- `List` now has an `index` method that allows one to find the (first) location
+  of an element in a `List` of `EqualityComparable` types. For example:
+
+  ```mojo
+  var my_list = List[Int](2, 3, 5, 7, 3)
+  print(my_list.index(3))  # prints 1
+  ```
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
