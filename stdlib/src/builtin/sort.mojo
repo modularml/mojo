@@ -15,6 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from bit import ctlz
 from collections import List
 from memory import Pointer, UnsafePointer
 from sys import bitwidthof
@@ -124,27 +125,9 @@ fn _partition[
     return right
 
 
-# ===----------------------------------------------------------------------===#
-# ctlz
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline("nodebug")
-fn _ctlz(val: Int) -> Int:
-    """Counts the number of leading zeros of an integer.
-
-    Args:
-        val: The input value.
-
-    Returns:
-        The number of leading zeros of the input.
-    """
-    return llvm_intrinsic["llvm.ctlz", Int, has_side_effect=False](val, False)
-
-
 fn _estimate_initial_height(size: Int) -> Int:
     # Compute the log2 of the size rounded upward.
-    var log2 = int((bitwidthof[DType.index]() - 1) ^ _ctlz(size | 1))
+    var log2 = int((bitwidthof[DType.index]() - 1) ^ ctlz(size | 1))
     return max(2, log2)
 
 
