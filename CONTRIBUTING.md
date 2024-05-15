@@ -132,6 +132,31 @@ accepted. For example:
 - Changes if contributors are not responsive.
 - Adding an entire new module without going through the RFC/proposal process.
 
+### About pull request sizes
+
+We ask that contributors make pull requests as small as possible. When 
+you are opening a pull request, check the number of lines modified in github. The smaller
+the better. If your pull request is over 100 lines, please try to split it into multiple
+(if possible independant) pull requests. 
+
+This guideline is here for the following reasons:
+* **Higher quality reviews** It is much easier to spot a bug in a few lines than in 1000 lines.
+* **Faster overall review** Reviewers, to approve a pull request, need to understand every line and understand how
+it fits into your overall change. They also need to go back and forth between files and functions to understand the flow
+of the code. This is exponentially hard as there are more lines in the code.
+* **Avoiding blocking changes that are valid** In a huge pull request, it's likely that some changes are valid and some need to
+be reworked/discussed. If all the changes are in the same pull request, then the valid changes will be be blocked until
+all discussions have been resolved.
+* **Reducing the number of git conflicts** Bigger pull request means slower reviews, thus means that the pull request will be open
+longuer and will have more git conflicts to be resolved before being merged.
+* **Parrallel processing** All programmers like to parralelize. Well reviewers also like to parralelize code reviews to merge your code
+faster. If you open two pull requests that are independant, then two reviewers will be able to work on your code.
+* **Finding the time for a code review** Doing a code review often requires that the code is reviewed in one go, as it's
+hard to remember functions and code logic from one review session to another. Thus a big pull request will require the reviewer to
+allocate a big chunk of time to do the code review, which is not always possible and might delay the review and merge of your pull request.
+
+Be mindful of the reviewers' time. You will also have a better developer experience out of it!
+
 ### Proposals
 
 If you’re interested in making a significant change—one that doesn’t fall into
