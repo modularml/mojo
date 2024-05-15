@@ -51,7 +51,7 @@ struct UnsafePointer[
     alias _ref_type = Reference[
         T,
         __mlir_attr.`1: i1`,
-        __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
+        MutStaticLifetime,
         address_space,
     ]
 
