@@ -22,6 +22,7 @@ from collections import List
 
 from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
+from sys.intrinsics import _type_is_eq
 from .optional import Optional
 
 # ===----------------------------------------------------------------------===#
@@ -753,3 +754,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             The UnsafePointer to the underlying memory.
         """
         return self.data
+
+    @always_inline
+    fn __contains__[T2:ComparableCollectionElement](
+        self: List[T2], value : T
+    )->Bool: 
+        constrained[_type_is_eq[T,T2](),"value type is not self.T"]()
+        for i in self:
+            if i[] == rebind[T2](value): return True
+        return False
