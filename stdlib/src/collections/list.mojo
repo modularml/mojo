@@ -32,7 +32,7 @@ from .optional import Optional
 @value
 struct _ListIter[
     T: CollectionElement,
-    list_mutability: __mlir_type.`i1`,
+    list_mutability: Bool,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
 ]:

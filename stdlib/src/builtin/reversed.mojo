@@ -125,11 +125,11 @@ fn reversed[
 
 
 fn reversed[
-    mutability: __mlir_type.`i1`,
+    mutability: Bool,
     self_life: AnyLifetime[mutability].type,
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
 ](
     value: Reference[
@@ -160,11 +160,11 @@ fn reversed[
 
 
 fn reversed[
-    mutability: __mlir_type.`i1`,
+    mutability: Bool,
     self_life: AnyLifetime[mutability].type,
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
 ](
     value: Reference[

@@ -26,7 +26,7 @@ from . import InlineArray
 @value
 struct _SpanIter[
     T: CollectionElement,
-    is_mutable: __mlir_type.`i1`,
+    is_mutable: Bool,
     lifetime: AnyLifetime[is_mutable].type,
     forward: Bool = True,
 ]:
@@ -70,7 +70,7 @@ struct _SpanIter[
 @value
 struct Span[
     T: CollectionElement,
-    is_mutable: __mlir_type.i1,
+    is_mutable: Bool,
     lifetime: AnyLifetime[is_mutable].type,
 ]:
     """A non owning view of contiguous data.
