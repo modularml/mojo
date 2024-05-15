@@ -162,8 +162,9 @@ fn matmul_unrolled(inout C: Matrix, A: Matrix, B: Matrix):
     fn calc_row(m: Int):
         @parameter
         fn calc_tile[tile_x: Int, tile_y: Int](x: Int, y: Int):
-            @unroll(tile_y)
-            for k in range(y, y + tile_y):
+            @unroll
+            for _k in range(tile_y):
+                var k = _k + y
 
                 @parameter
                 fn dot[nelts: Int](n: Int):
