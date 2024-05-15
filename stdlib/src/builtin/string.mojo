@@ -411,23 +411,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
 
     var result: Float64 = 0.0
     var exponent: Int = 0
-
     var is_negative: Bool = False
-    var is_afterdot: Bool = False
-    var is_scientific: Bool = False  # e.g., 1.7E+3
-
-    var start: Int = 0
-    var str_len = len(str_ref)
-    var buff = str_ref.unsafe_ptr()
-    for pos in range(start, str_len):
-        if isspace(buff[pos]):
-            continue
-        if str_ref[pos] == "-":
-            is_negative = True
-            start = pos + 1
-        else:
-            start = pos
-        break
 
     alias ord_0 = ord("0")
     alias ord_9 = ord("9")
@@ -439,48 +423,74 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     alias ord_e = ord("e")
     alias ord_E = ord("E")
 
-    var has_space_after_number = False
-    for pos in range(start, str_len):
-        var digit = int(buff[pos])
-        if is_scientific:
-            var sign = 1
-            if int(buff[pos]) == ord_plus:
-                pos += 1
-            elif int(buff[pos]) == ord_minus:
-                sign = -1
-                pos += 1
-            var i = 0
-            while ord_0 <= int(buff[pos]) <= ord_9:
-                i = i * 10 + (int(buff[pos]) - ord_0)
-                pos += 1
-            exponent += i * sign
-            break
-        elif ord_0 <= digit <= ord_9:
-            result = result * 10.0 + (digit - ord_0)
-            if is_afterdot:
-                exponent -= 1
-        elif isspace(digit) or (
-            is_afterdot and (digit == ord_f or digit == ord_F)
-        ):
-            has_space_after_number = True
-            start = pos + 1
-            break
-        elif digit == ord_dot:
-            is_afterdot = True
-        elif digit == ord_e or digit == ord_E:
-            is_scientific = True
-        else:
-            raise Error(_atof_error(str_ref))
-    if has_space_after_number:
-        for pos in range(start, str_len):
-            if not isspace(buff[pos]):
-                raise Error(_atof_error(str_ref))
+    var start: Int = 0
+    var str_len = len(str_ref)
+    var buff = str_ref.unsafe_ptr()
 
-    var shift: Float64 = 10.0 ** abs(exponent)
+    var c: Int = 0
+    # skip leading spaces and read sign
+    for pos in range(start, str_len):
+        c = int(buff[pos])
+        if isspace(c):
+            start += 1
+            continue
+        if c == ord_minus:
+            is_negative = True
+            start += 1
+        else:
+            break
+    # read before dot
+    for pos in range(start, str_len):
+        c = int(buff[pos])
+        if ord_0 <= c <= ord_9:
+            result = result * 10.0 + (c - ord_0)
+            start += 1
+        else:
+            break
+    # if dot -> read after dot
+    if c == ord_dot:
+        start += 1
+        for pos in range(start, str_len):
+            c = int(buff[pos])
+            if ord_0 <= c <= ord_9:
+                result = result * 10.0 + (c - ord_0)
+                exponent -= 1
+                start += 1
+            else:
+                break
+    # if e/E -> read scientific notation
+    if c == ord_e or c == ord_E:
+        start += 1
+        var sign: Int = 1
+        var shift: Int = 0
+        for pos in range(start, str_len):
+            c = int(buff[pos])
+            if c == ord_plus:
+                start += 1
+            elif c == ord_minus:
+                sign = -1
+                start += 1
+            elif ord_0 <= c <= ord_9:
+                shift = shift * 10 + (c - ord_0)
+                start += 1
+            else:
+                exponent += sign * shift
+                break
+    # check if the string is fully parsed
+    if start != str_len:
+        if c == ord_f or c == ord_F:  # f/F at end is allowed
+            start += 1
+        for pos in range(start, str_len):
+            c = int(buff[pos])
+            if not isspace(c):
+                raise Error(_atof_error(str_ref))
+    # apply shift
+    var shift: Int = 10 ** abs(exponent)
     if exponent > 0:
         result *= shift
     if exponent < 0:
         result /= shift
+    # apply sign
     if is_negative:
         result = -result
     return result

@@ -402,7 +402,7 @@ fn test_atol_base_0() raises:
 
 
 fn test_atof() raises:
-    assert_equal(375.0, atof(String("375.")))
+    assert_equal(375.0, atof(String("375.f")))
     assert_equal(1.0, atof(String("001.")))
     assert_equal(5.0, atof(String(" 005.")))
     assert_equal(13.0, atof(String(" 013.f  ")))
@@ -412,6 +412,7 @@ fn test_atof() raises:
     assert_equal(23e3, atof(String(" 23E3  ")))
     assert_equal(989343e-13, atof(String(" 989343E-13  ")))
     assert_equal(1.123, atof(String(" 1.123f")))
+    assert_equal(0.78, atof(String(" .78 ")))
     assert_equal(121234.0, atof(String(" 121234.  ")))
     assert_equal(985031234.0, atof(String(" 985031234.F  ")))
 
@@ -428,6 +429,11 @@ fn test_atof() raises:
         contains="String is not convertible to float: ' f.9123 '"
     ):
         _ = atof(String(" f.9123 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 989343E-1A3 '"
+    ):
+        _ = atof(String(" 989343E-1A3 "))
 
     with assert_raises(
         contains="String is not convertible to float: ' 124124124_2134124124 '"
