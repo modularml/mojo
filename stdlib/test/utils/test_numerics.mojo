@@ -13,20 +13,19 @@
 # RUN: %mojo %s
 
 from sys.info import has_neon
-from testing import assert_equal, assert_true, assert_false
-from utils._numerics import FPUtils, inf, isinf
-
-alias FPU64 = FPUtils[DType.float64]
+from testing import assert_equal, assert_true, assert_false, assert_almost_equal
+from utils._numerics import FPUtils, inf, isinf, isnan, max_finite, nan, ulp
 
 
-fn test_numerics() raises:
+# TODO: improve coverage and organization of these tests
+def test_FPUtils():
     assert_equal(FPUtils[DType.float32].mantissa_width(), 23)
-
-    assert_equal(FPUtils[DType.float64].mantissa_width(), 52)
-
     assert_equal(FPUtils[DType.float32].exponent_bias(), 127)
 
-    assert_equal(FPUtils[DType.float64].exponent_bias(), 1023)
+    alias FPU64 = FPUtils[DType.float64]
+
+    assert_equal(FPU64.mantissa_width(), 52)
+    assert_equal(FPU64.exponent_bias(), 1023)
 
     assert_equal(FPU64.get_exponent(FPU64.set_exponent(1, 2)), 2)
     assert_equal(FPU64.get_mantissa(FPU64.set_mantissa(1, 3)), 3)
@@ -63,6 +62,18 @@ fn test_inf() raises:
     _test_inf[DType.float64]()
 
 
+def test_ulp():
+    assert_true(isnan(ulp(nan[DType.float32]())))
+    assert_true(isinf(ulp(inf[DType.float32]())))
+    assert_true(isinf(ulp(-inf[DType.float32]())))
+    assert_almost_equal(ulp(Float64(0)), 5e-324)
+    assert_equal(ulp(max_finite[DType.float64]()), 1.99584030953472e292)
+    assert_equal(ulp(Float64(5)), 8.881784197001252e-16)
+    assert_equal(ulp(Float64(-5)), 8.881784197001252e-16)
+
+
 def main():
-    test_numerics()
+    test_FPUtils()
     test_inf()
+    # TODO: test nextafter
+    test_ulp()
