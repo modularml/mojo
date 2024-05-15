@@ -285,3 +285,157 @@ fn bit_length[
         var leading_zero_neg = ctlz(bit_not(val))
         var leading_zero = (val > 0).select(leading_zero_pos, leading_zero_neg)
         return bitwidth - leading_zero
+
+
+# ===----------------------------------------------------------------------===#
+# rotate_bits_left
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn rotate_bits_left[shift: Int](x: Int) -> Int:
+    """Shifts the bits of an input to the left by `shift` bits (with
+    wrap-around).
+
+    Constraints:
+        `-size <= shift < size`
+
+    Parameters:
+        shift: The number of bit positions by which to rotate the bits of the
+               integer to the left (with wrap-around).
+
+    Args:
+        x: The input value.
+
+    Returns:
+        The input rotated to the left by `shift` elements (with wrap-around).
+    """
+    constrained[
+        shift >= -sizeof[Int]() and shift < sizeof[Int](),
+        "Constraints: -sizeof[Int]() <= shift < sizeof[Int]()",
+    ]()
+
+    @parameter
+    if shift == 0:
+        return x
+    elif shift < 0:
+        return rotate_bits_right[-shift](x)
+    else:
+        return llvm_intrinsic["llvm.fshl", Int, has_side_effect=False](
+            x, x, shift
+        )
+
+
+fn rotate_bits_left[
+    shift: Int, type: DType, width: Int
+](x: SIMD[type, width]) -> SIMD[type, width]:
+    """Shifts bits to the left by `shift` positions (with wrap-around) for each
+    element of a SIMD vector.
+
+    Constraints:
+        `0 <= shift < size`
+
+    Parameters:
+        shift: The number of positions by which to shift left the bits for each
+               element of a SIMD vector to the left (with wrap-around).
+        type: The `dtype` of the input and output SIMD vector.
+              Constraints: must be integral and unsigned.
+        width: The width of the input and output SIMD vector.
+
+    Args:
+        x: SIMD vector to perform the operation on.
+
+    Returns:
+        The SIMD vector with each element's bits shifted to the left by `shift`
+        bits (with wrap-around).
+    """
+
+    constrained[type.is_unsigned(), "Only unsigned types can be rotated."]()
+
+    @parameter
+    if shift == 0:
+        return x
+    elif shift < 0:
+        return rotate_bits_right[-shift, type, width](x)
+    else:
+        return llvm_intrinsic["llvm.fshl", __type_of(x), has_side_effect=False](
+            x, x, SIMD[type, width](shift)
+        )
+
+
+# ===----------------------------------------------------------------------===#
+# rotate_bits_right
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn rotate_bits_right[shift: Int](x: Int) -> Int:
+    """Shifts the bits of an input to the right by `shift` bits (with
+    wrap-around).
+
+    Constraints:
+        `-size <= shift < size`
+
+    Parameters:
+        shift: The number of bit positions by which to rotate the bits of the
+               integer to the right (with wrap-around).
+
+    Args:
+        x: The input value.
+
+    Returns:
+        The input rotated to the right by `shift` elements (with wrap-around).
+    """
+    constrained[
+        shift >= -sizeof[Int]() and shift < sizeof[Int](),
+        "Constraints: -sizeof[Int]() <= shift < sizeof[Int]()",
+    ]()
+
+    @parameter
+    if shift == 0:
+        return x
+    elif shift < 0:
+        return rotate_bits_left[-shift](x)
+    else:
+        return llvm_intrinsic["llvm.fshr", Int, has_side_effect=False](
+            x, x, shift
+        )
+
+
+fn rotate_bits_right[
+    shift: Int,
+    type: DType,
+    width: Int,
+](x: SIMD[type, width]) -> SIMD[type, width]:
+    """Shifts bits to the right by `shift` positions (with wrap-around) for each
+    element of a SIMD vector.
+
+    Constraints:
+        `0 <= shift < size`
+
+    Parameters:
+        shift: The number of positions by which to shift right the bits for each
+               element of a SIMD vector to the left (with wrap-around).
+        type: The `dtype` of the input and output SIMD vector.
+              Constraints: must be integral and unsigned.
+        width: The width of the input and output SIMD vector.
+
+    Args:
+        x: SIMD vector to perform the operation on.
+
+    Returns:
+        The SIMD vector with each element's bits shifted to the right by `shift`
+        bits (with wrap-around).
+    """
+
+    constrained[type.is_unsigned(), "Only unsigned types can be rotated."]()
+
+    @parameter
+    if shift == 0:
+        return x
+    elif shift < 0:
+        return rotate_bits_left[-shift, type, width](x)
+    else:
+        return llvm_intrinsic["llvm.fshr", __type_of(x), has_side_effect=False](
+            x, x, SIMD[type, width](shift)
+        )

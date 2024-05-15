@@ -206,6 +206,9 @@ what we publish.
 
 - The `math.bit` module has been moved to a new top-level `bit` module.
 
+- The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
+  moved to the `bit` module.
+
 ### ❌ Removed
 
 - The method `object.print()` has been removed. Since now, `object` has the
@@ -230,6 +233,11 @@ what we publish.
 - The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
   same functionality is available in the builtin `SIMD.select` and
   `SIMD.__and__` methods, respectively.
+
+- The `math.rotate_left` and `math.rotate_right` functions have been removed.
+  The same functionality is available in the builtin `SIMD.rotate_{left,right}`
+  methods for `SIMD` types, and the `bit.rotate_bits_{left,right}` methods for
+  `Int`.
 
 ### 🛠️ Fixed
 

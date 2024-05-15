@@ -20,4 +20,6 @@ from .bit import (
     ctpop,
     bit_not,
     bit_length,
+    rotate_bits_left,
+    rotate_bits_right,
 )
