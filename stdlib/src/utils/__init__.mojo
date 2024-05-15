@@ -22,4 +22,5 @@ from .loop import unroll
 from .span import Span
 from .static_tuple import StaticTuple, InlineArray
 from .stringref import StringRef
+from .string_slice import StringSlice
 from .variant import Variant

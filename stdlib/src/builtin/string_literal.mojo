@@ -236,9 +236,27 @@ struct StringLiteral(
         """
         return self.__str__().__repr__()
 
+    @always_inline
+    fn as_string_slice(
+        self: Reference[Self, _, _]
+    ) -> StringSlice[False, ImmStaticLifetime]:
+        """Returns a string slice of this static string literal.
+
+        Returns:
+            A string slice pointing to this static string literal.
+        """
+
+        var bytes = self[].as_bytes_slice()
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in StringLiteral so this is actually
+        #   guaranteed to be valid.
+        return StringSlice(unsafe_from_utf8=bytes)
+
+    @always_inline
     fn as_bytes_slice(
         self: Reference[Self, _, _]
-    ) -> Span[Int8, __mlir_attr.`0: i1`, ImmStaticLifetime]:
+    ) -> Span[Int8, False, ImmStaticLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -248,7 +266,7 @@ struct StringLiteral(
 
         var ptr = rebind[UnsafePointer[Int8]](self[].unsafe_ptr())
 
-        return Span[Int8, __mlir_attr.`0: i1`, ImmStaticLifetime](
+        return Span[Int8, False, ImmStaticLifetime](
             unsafe_ptr=ptr,
             len=self[]._byte_length(),
         )
