@@ -1900,7 +1900,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return SIMD[type, 2 * size](self[0], other[0])
 
         return llvm_intrinsic[
-            "llvm.experimental.vector.interleave2",
+            "llvm.vector.interleave2",
             SIMD[type, 2 * size],
             has_side_effect=False,
         ](self, other)
@@ -1932,7 +1932,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             )
 
         var res = llvm_intrinsic[
-            "llvm.experimental.vector.deinterleave2",
+            "llvm.vector.deinterleave2",
             _RegisterPackType[Self._SIMDHalfType, Self._SIMDHalfType],
             has_side_effect=False,
         ](self)
@@ -2272,7 +2272,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             constrained[shift == 0, "for scalars the shift must be 0"]()
             return self
         return llvm_intrinsic[
-            "llvm.experimental.vector.splice", Self, has_side_effect=False
+            "llvm.vector.splice", Self, has_side_effect=False
         ](self, self, Int32(shift))
 
     @always_inline
@@ -2341,7 +2341,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         alias zero_simd = Self()
 
         return llvm_intrinsic[
-            "llvm.experimental.vector.splice", Self, has_side_effect=False
+            "llvm.vector.splice", Self, has_side_effect=False
         ](self, zero_simd, Int32(shift))
 
     @always_inline
@@ -2381,7 +2381,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         alias zero_simd = Self()
 
         return llvm_intrinsic[
-            "llvm.experimental.vector.splice", Self, has_side_effect=False
+            "llvm.vector.splice", Self, has_side_effect=False
         ](zero_simd, self, Int32(-shift))
 
 
