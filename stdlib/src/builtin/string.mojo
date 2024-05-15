@@ -21,7 +21,7 @@ from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, Span
+from utils import StringRef, StaticIntTuple, Span, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
@@ -625,6 +625,29 @@ struct String(
         self._buffer = buffer^
 
     @always_inline
+    fn __init__(inout self, str_slice: StringSlice):
+        """Construct a string from a string slice.
+
+        This will allocate a new string that copies the string contents from
+        the provided string slice `str_slice`.
+
+        Args:
+            str_slice: The string slice from which to construct this string.
+        """
+
+        # Calculate length in bytes
+        var length = len(str_slice.as_bytes_slice())
+        var buffer = Self._buffer_type()
+        buffer.resize(length + 1, 0)
+        memcpy(
+            DTypePointer(buffer.data),
+            DTypePointer(str_slice.as_bytes_slice().unsafe_ptr()),
+            length,
+        )
+        buffer[length] = 0
+        self._buffer = buffer^
+
+    @always_inline
     fn __init__(inout self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 
@@ -1179,6 +1202,7 @@ struct String(
 
         return copy
 
+    @always_inline
     fn as_bytes_slice(
         self: Reference[Self, _, _]
     ) -> Span[Int8, self.is_mutable, self.lifetime]:
@@ -1196,6 +1220,22 @@ struct String(
             # Does NOT include the NUL terminator.
             len=self[]._byte_length(),
         )
+
+    @always_inline
+    fn as_string_slice(
+        self: Reference[Self, _, _]
+    ) -> StringSlice[self.is_mutable, self.lifetime]:
+        """Returns a string slice of the data owned by this string.
+
+        Returns:
+            A string slice pointing to the data owned by this string.
+        """
+        var bytes = self[].as_bytes_slice()
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in String so this is actually
+        #   guaranteed to be valid.
+        return StringSlice(unsafe_from_utf8=bytes)
 
     fn _byte_length(self) -> Int:
         """Get the string length in bytes.
