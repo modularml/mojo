@@ -401,6 +401,40 @@ fn test_atol_base_0() raises:
         _ = atol("0of_", base=0)
 
 
+fn test_atof() raises:
+    assert_equal(375.0, atof(String("375.")))
+    assert_equal(1.0, atof(String("001.")))
+    assert_equal(5.0, atof(String(" 005.")))
+    assert_equal(13.0, atof(String(" 013.f  ")))
+    assert_equal(-89, atof(String("-89")))
+    assert_equal(-0.3, atof(String(" -0.3")))
+    assert_equal(-69e3, atof(String(" -69E+3  ")))
+    assert_equal(23e3, atof(String(" 23E3  ")))
+    assert_equal(989343e-13, atof(String(" 989343E-13  ")))
+    assert_equal(1.123, atof(String(" 1.123f")))
+    assert_equal(121234.0, atof(String(" 121234.  ")))
+    assert_equal(985031234.0, atof(String(" 985031234.F  ")))
+
+    # Negative cases
+    with assert_raises(contains="String is not convertible to float: ''"):
+        _ = atof(String(""))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 123 asd'"
+    ):
+        _ = atof(String(" 123 asd"))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' f.9123 '"
+    ):
+        _ = atof(String(" f.9123 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 124124124_2134124124 '"
+    ):
+        _ = atof(String(" 124124124_2134124124 "))
+
+
 fn test_calc_initial_buffer_size_int32() raises:
     assert_equal(1, _calc_initial_buffer_size_int32(0))
     assert_equal(1, _calc_initial_buffer_size_int32(9))
@@ -844,6 +878,7 @@ def main():
     test_string_indexing()
     test_atol()
     test_atol_base_0()
+    test_atof()
     test_calc_initial_buffer_size_int32()
     test_calc_initial_buffer_size_int64()
     test_contains()
