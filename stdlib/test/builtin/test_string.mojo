@@ -409,6 +409,7 @@ fn test_atof() raises:
     assert_equal(-89, atof(String("-89")))
     assert_equal(-0.3, atof(String(" -0.3")))
     assert_equal(-69e3, atof(String(" -69E+3  ")))
+    assert_equal(123.2e1, atof(String(" 123.2E1  ")))
     assert_equal(23e3, atof(String(" 23E3  ")))
     assert_equal(989343e-13, atof(String(" 989343E-13  ")))
     assert_equal(1.123, atof(String(" 1.123f")))

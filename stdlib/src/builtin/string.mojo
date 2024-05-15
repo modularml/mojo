@@ -463,6 +463,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
         start += 1
         var sign: Int = 1
         var shift: Int = 0
+        var has_number: Bool = False
         for pos in range(start, str_len):
             c = int(buff[pos])
             if c == ord_plus:
@@ -471,11 +472,14 @@ fn _atof(str_ref: StringRef) raises -> Float64:
                 sign = -1
                 start += 1
             elif ord_0 <= c <= ord_9:
+                has_number = True
                 shift = shift * 10 + (c - ord_0)
                 start += 1
             else:
-                exponent += sign * shift
                 break
+        exponent += sign * shift
+        if not has_number:
+            raise Error(_atof_error(str_ref))
     # check if the string is fully parsed
     if start != str_len:
         if c == ord_f or c == ord_F:  # f/F at end is allowed
