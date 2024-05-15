@@ -56,7 +56,7 @@ trait RepresentableKeyElement(KeyElement, Representable):
 struct _DictEntryIter[
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
@@ -73,9 +73,7 @@ struct _DictEntryIter[
     alias imm_dict_lifetime = __mlir_attr[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
-    alias ref_type = Reference[
-        DictEntry[K, V], __mlir_attr.`0: i1`, Self.imm_dict_lifetime
-    ]
+    alias ref_type = Reference[DictEntry[K, V], False, Self.imm_dict_lifetime]
 
     var index: Int
     var seen: Int
@@ -122,7 +120,7 @@ struct _DictEntryIter[
 struct _DictKeyIter[
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
@@ -139,7 +137,7 @@ struct _DictKeyIter[
     alias imm_dict_lifetime = __mlir_attr[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
-    alias ref_type = Reference[K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime]
+    alias ref_type = Reference[K, False, Self.imm_dict_lifetime]
 
     alias dict_entry_iter = _DictEntryIter[
         K, V, dict_mutability, dict_lifetime, forward
@@ -161,8 +159,9 @@ struct _DictKeyIter[
 struct _DictValueIter[
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
+    forward: Bool = True,
 ]:
     """Iterator over Dict value references. These are mutable if the dict
     is mutable.
@@ -172,14 +171,25 @@ struct _DictValueIter[
         V: The value type of the elements in the dictionary.
         dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
     """
 
     alias ref_type = Reference[V, dict_mutability, dict_lifetime]
 
-    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
+    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime, forward]
 
     fn __iter__(self) -> Self:
         return self
+
+    fn __reversed__[
+        mutability: Bool, self_life: AnyLifetime[mutability].type
+    ](self) -> _DictValueIter[K, V, dict_mutability, dict_lifetime, False]:
+        var src = self.iter.src
+        return _DictValueIter(
+            _DictEntryIter[K, V, dict_mutability, dict_lifetime, False](
+                src[]._reserved, 0, src
+            )
+        )
 
     fn __next__(inout self) -> Self.ref_type:
         var entry_ref = self.iter.__next__()

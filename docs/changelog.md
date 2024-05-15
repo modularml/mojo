@@ -71,16 +71,17 @@ what we publish.
   `builtin`, so you no longer need to do
   `from math import abs, round, min, max, divmod`.
 
-- Mojo now allows types to opt in to use the `floor()` and `ceil()` functions in
-  the `math` module by implementing the `__floor__()` and `__ceil__()` methods
-  (and so conforming to the new `math.Floorable` and `math.Ceilable` traits,
-  respectively). For example:
+- Mojo now allows types to opt in to use the `floor()`, `ceil()`, and `trunc()`
+  functions in the `math` module by implementing the `__floor__()`,
+  `__ceil__()`, and `__trunc__()` methods (and so conforming to the new
+  `math.Floorable`, `math.Ceilable`, and `math.Truncable` traits, respectively).
+  For example:
 
   ```mojo
-    from math import Ceilable, Floorable, ceil, floor
+    from math import Ceilable, Floorable, Truncable, ceil, floor, trunc
 
     @value
-    struct Complex(Ceilable, Floorable):
+    struct Complex(Ceilable, Floorable, Truncable):
       var re: Float64
       var im: Float64
 
@@ -89,6 +90,9 @@ what we publish.
 
       fn __floor__(self) -> Self:
           return Self(floor(re), floor(im))
+
+      fn __trunc__(self) -> Self:
+          return Self(trunc(re), trunc(im))
   ```
 
 - Add an `InlinedArray` type that works on memory-only types.
@@ -100,7 +104,7 @@ what we publish.
     ([PR #2364](https://github.com/modularml/mojo/pull/2364) by [@mikowals](https://github.com/mikowals))
 
 - Add `repr()` function and `Representable` trait.
-    ([PR #2361](https://github.com/modularml/mojo/pull/2361) by [@mikowals](https://github.com/gabrieldemarmiesse))
+    ([PR #2361](https://github.com/modularml/mojo/pull/2361) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - Add `SIMD.shuffle()` with `StaticIntTuple` mask.
     ([PR #2315](https://github.com/modularml/mojo/pull/2315) by [@mikowals](https://github.com/mikowals))
@@ -131,6 +135,14 @@ what we publish.
   requirement that the decl has documentation (e.g. when used with
   --diagnose-missing-doc-strings).
 
+- Added a new `Span` type for taking slices of contiguous collections.
+  ([PR #2595](https://github.com/modularml/mojo/pull/2595) by [lsh](https://github.com/lsh))
+
+- Added new `as_bytes_slice()` methods to `String` and `StringLiteral`, which
+  returns a `Span` of the bytes owned by the string.
+
+- Add new `ImmStaticLifetime` and `MutStaticLifetime` helpers
+
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
 
@@ -143,7 +155,19 @@ what we publish.
 
 - `Dict.__get_ref(key)`, allowing to get references to dictionary values.
 
+- `String.strip()`, `lstrip()` and `rstrip()` can now remove custom characters
+  other than whitespace.  In addition, there are now several useful aliases for
+  whitespace, ASCII lower/uppercase, and so on.
+    ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
+
+- `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
+    ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
+
 ### 🦋 Changed
+
+- The `let` keyword has been completely removed from the language. We previously
+  removed `let` declarations but still provided an error message to users. Now,
+  it is completely gone from the grammar. Long live `var`!
 
 - The `abs` and `round` functions have moved from `math` to `builtin`, so you no
   longer need to do `from math import abs, round`.

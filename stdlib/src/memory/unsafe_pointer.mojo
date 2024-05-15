@@ -51,7 +51,7 @@ struct UnsafePointer[
     alias _ref_type = Reference[
         T,
         __mlir_attr.`1: i1`,
-        __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
+        MutStaticLifetime,
         address_space,
     ]
 
@@ -319,7 +319,7 @@ struct UnsafePointer[
     @always_inline
     fn __refitem__(
         self,
-    ) -> Self._ref_type._mlir_type:
+    ) -> Self._ref_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Returns:
@@ -330,7 +330,7 @@ struct UnsafePointer[
         ](self.address)
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self._ref_type._mlir_type:
+    fn __refitem__(self, offset: Int) -> Self._ref_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Args:
@@ -357,7 +357,9 @@ fn destroy_pointee(ptr: UnsafePointer[_]):
     """Destroy the pointed-to value.
 
     The pointer must not be null, and the pointer memory location is assumed
-    to contain a valid initialized instance of `T`.
+    to contain a valid initialized instance of `T`.  This is equivalent to
+    `_ = move_from_pointee(ptr)` but doesn't require `Movable` and is more
+    efficient becase it doesn't invoke `__moveinit__`.
 
     Args:
         ptr: The pointer whose pointee this destroys.
