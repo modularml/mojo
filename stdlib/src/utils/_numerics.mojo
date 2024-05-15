@@ -20,9 +20,11 @@ from utils._numerics import FPUtils
 """
 
 from sys import llvm_intrinsic, bitwidthof, has_neon, has_sse4
+from sys.ffi import _external_call_const
 from sys._assembly import inlined_assembly
 
 from builtin.dtype import _integral_type_of
+from builtin.simd import _simd_apply
 from memory import UnsafePointer, bitcast
 
 # ===----------------------------------------------------------------------=== #
@@ -968,3 +970,100 @@ fn get_accum_type[type: DType]() -> DType:
     """
 
     return DType.float32 if type.is_half_float() else type
+
+
+# ===----------------------------------------------------------------------=== #
+# nextafter
+# ===----------------------------------------------------------------------=== #
+
+
+fn nextafter[
+    type: DType, simd_width: Int
+](arg0: SIMD[type, simd_width], arg1: SIMD[type, simd_width]) -> SIMD[
+    type, simd_width
+]:
+    """Computes next representable value of `arg0` in the direction of `arg1`.
+
+    Constraints:
+        The element type of the input must be a floating-point type.
+
+    Parameters:
+        type: The `dtype` of the input and output SIMD vector.
+        simd_width: The width of the input and output SIMD vector.
+
+    Args:
+        arg0: The first input argument.
+        arg1: The second input argument.
+
+    Returns:
+        The `nextafter` of the inputs.
+    """
+
+    @always_inline("nodebug")
+    @parameter
+    fn _float32_dispatch[
+        lhs_type: DType, rhs_type: DType, result_type: DType
+    ](arg0: SIMD[lhs_type, 1], arg1: SIMD[rhs_type, 1]) -> SIMD[result_type, 1]:
+        return _external_call_const["nextafterf", SIMD[result_type, 1]](
+            arg0, arg1
+        )
+
+    @always_inline("nodebug")
+    @parameter
+    fn _float64_dispatch[
+        lhs_type: DType, rhs_type: DType, result_type: DType
+    ](arg0: SIMD[lhs_type, 1], arg1: SIMD[rhs_type, 1]) -> SIMD[result_type, 1]:
+        return _external_call_const["nextafter", SIMD[result_type, 1]](
+            arg0, arg1
+        )
+
+    constrained[type.is_floating_point(), "input type must be floating point"]()
+
+    @parameter
+    if type == DType.float64:
+        return _simd_apply[_float64_dispatch, type, simd_width](arg0, arg1)
+    return _simd_apply[_float32_dispatch, type, simd_width](arg0, arg1)
+
+
+# ===----------------------------------------------------------------------=== #
+# ulp
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn ulp[
+    type: DType, simd_width: Int
+](x: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    """Computes the ULP (units of last place) or (units of least precision) of
+    the number.
+
+    Constraints:
+        The element type of the inpiut must be a floating-point type.
+
+    Parameters:
+        type: The `dtype` of the input and output SIMD vector.
+        simd_width: The width of the input and output SIMD vector.
+
+    Args:
+        x: SIMD vector input.
+
+    Returns:
+        The ULP of x.
+    """
+
+    constrained[type.is_floating_point(), "the type must be floating point"]()
+
+    var nan_mask = isnan(x)
+    var xabs = abs(x)
+    var inf_mask = isinf(xabs)
+    alias inf_val = SIMD[type, simd_width](inf[type]())
+    var x2 = nextafter(xabs, inf_val)
+    var x2_inf_mask = isinf(x2)
+
+    return nan_mask.select(
+        x,
+        inf_mask.select(
+            xabs,
+            x2_inf_mask.select(xabs - nextafter(xabs, -inf_val), x2 - xabs),
+        ),
+    )
