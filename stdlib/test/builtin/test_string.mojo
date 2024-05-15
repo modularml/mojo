@@ -441,6 +441,11 @@ fn test_atof() raises:
     ):
         _ = atof(String(" 124124124_2134124124 "))
 
+    with assert_raises(
+        contains="String is not convertible to float: ' 123.2E '"
+    ):
+        _ = atof(String(" 123.2E "))
+
 
 fn test_calc_initial_buffer_size_int32() raises:
     assert_equal(1, _calc_initial_buffer_size_int32(0))
