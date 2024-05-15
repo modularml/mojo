@@ -758,7 +758,24 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     @always_inline
     fn __contains__[T2:ComparableCollectionElement](
         self: List[T2], value : T
-    )->Bool: 
+    )->Bool:
+        """Verify if a given value is present in the list.
+        
+        ```mojo
+        var x = List[Int](1,2,3)
+        if 3 in x: print("x contains 3")
+        ```
+        Parameters:
+            T2: The type of the elements in the list. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
+        Args:
+            self: The list to search.
+            value: The value to find.
+
+        Returns:
+            True or False.
+        """
+        
         constrained[_type_is_eq[T,T2](),"value type is not self.T"]()
         for i in self:
             if i[] == rebind[T2](value): return True
