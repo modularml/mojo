@@ -24,7 +24,7 @@ from memory import memcmp, memcpy, DTypePointer
 from memory import Arc
 from memory.unsafe_pointer import move_from_pointee
 
-from utils import StringRef, unroll
+from utils import StringRef, unroll, Variant
 
 from .io import _printf, _put
 
@@ -239,7 +239,6 @@ struct _Function:
         )
 
 
-@register_passable
 struct _ObjectImpl(CollectionElement, Stringable):
     """This class is the underlying implementation of the value of an `object`.
     It is a variant of primitive types and pointers to implementations of more
@@ -249,24 +248,15 @@ struct _ObjectImpl(CollectionElement, Stringable):
     TODO: These should be BigInt and BigFloat one day.
     """
 
-    alias type = __mlir_type[
-        `!kgen.variant<`,
+    alias type = Variant[
         _NoneMarker,
-        `, `,
         Bool,
-        `, `,
         Int64,
-        `, `,
         Float64,
-        `, `,
         _ImmutableString,
-        `, `,
         _RefCountedListRef,
-        `, `,
         _Function,
-        `, `,
         _RefCountedAttrsDictRef,
-        `>`,
     ]
     """The variant value type."""
     var value: Self.type
@@ -302,55 +292,43 @@ struct _ObjectImpl(CollectionElement, Stringable):
 
     @always_inline
     fn __init__(inout self):
-        self.value = __mlir_op.`kgen.variant.create`[
-            _type = Self.type, index = Self.none.value
-        ](_NoneMarker {})
+        self.value = Self.type(_NoneMarker {})
 
     @always_inline
     fn __init__(inout self, value: Bool):
-        self.value = __mlir_op.`kgen.variant.create`[
-            _type = Self.type, index = Self.bool.value
-        ](value)
+        self.value = Self.type(value)
 
     @always_inline
     fn __init__[dt: DType](inout self, value: SIMD[dt, 1]):
         @parameter
         if dt.is_integral():
-            self.value = __mlir_op.`kgen.variant.create`[
-                _type = Self.type, index = Self.int.value
-            ](value.cast[DType.int64]())
+            self.value = Self.type(value)
         else:
-            self.value = __mlir_op.`kgen.variant.create`[
-                _type = Self.type, index = Self.float.value
-            ](value.cast[DType.float64]())
+            self.value = Self.type(value)
 
     @always_inline
     fn __init__(inout self, value: _ImmutableString):
-        self.value = __mlir_op.`kgen.variant.create`[
-            _type = Self.type, index = Self.str.value
-        ](value)
+        self.value = Self.type(value)
 
     @always_inline
     fn __init__(inout self, value: _RefCountedListRef):
-        self.value = __mlir_op.`kgen.variant.create`[
-            _type = Self.type, index = Self.list.value
-        ](value)
+        self.value = Self.type(value)
 
     @always_inline
     fn __init__(inout self, value: _Function):
-        self.value = __mlir_op.`kgen.variant.create`[
-            _type = Self.type, index = Self.function.value
-        ](value)
+        self.value = Self.type(value)
 
     @always_inline
     fn __init__(inout self, value: _RefCountedAttrsDictRef):
-        self.value = __mlir_op.`kgen.variant.create`[
-            _type = Self.type, index = Self.obj.value
-        ](value)
+        self.value = Self.type(value)
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
         self = existing.value
+
+    @always_inline
+    fn __moveinit__(inout self, owned other: Self):
+        self = other.value^
 
     @always_inline
     fn copy(self) -> Self:
@@ -382,27 +360,27 @@ struct _ObjectImpl(CollectionElement, Stringable):
 
     @always_inline
     fn is_none(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Self.none.value](self.value)
+        return self.value.isa[_NoneMarker]()
 
     @always_inline
     fn is_bool(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Self.bool.value](self.value)
+        return self.value.isa[Bool]()
 
     @always_inline
     fn is_int(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Self.int.value](self.value)
+        return self.value.isa[Int64]()
 
     @always_inline
     fn is_float(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Self.float.value](self.value)
+        return self.value.isa[Float64]()
 
     @always_inline
     fn is_str(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Self.str.value](self.value)
+        return self.value.isa[_ImmutableString]()
 
     @always_inline
     fn is_list(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Self.list.value](self.value)
+        return self.value.isa[_RefCountedListRef]()
 
     @always_inline
     fn is_dict(self) -> Bool:
@@ -410,49 +388,40 @@ struct _ObjectImpl(CollectionElement, Stringable):
 
     @always_inline
     fn is_func(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Self.function.value](
-            self.value
-        )
+        return self.value.isa[_Function]()
 
     @always_inline
     fn is_obj(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Self.obj.value](self.value)
+        return self.value.isa[_RefCountedAttrsDictRef]()
 
+    # get a copy
     @always_inline
     fn get_as_bool(self) -> Bool:
-        return __mlir_op.`kgen.variant.take`[index = Self.bool.value](
-            self.value
-        )
+        return self.value[Bool]
 
     @always_inline
     fn get_as_int(self) -> Int64:
-        return __mlir_op.`kgen.variant.take`[index = Self.int.value](self.value)
+        return self.value[Int64]
 
     @always_inline
     fn get_as_float(self) -> Float64:
-        return __mlir_op.`kgen.variant.take`[index = Self.float.value](
-            self.value
-        )
+        return self.value[Float64]
 
     @always_inline
     fn get_as_string(self) -> _ImmutableString:
-        return __mlir_op.`kgen.variant.take`[index = Self.str.value](self.value)
+        return self.value[_ImmutableString]
 
     @always_inline
     fn get_as_list(self) -> _RefCountedListRef:
-        return __mlir_op.`kgen.variant.take`[index = Self.list.value](
-            self.value
-        )
+        return self.value[_RefCountedListRef]
 
     @always_inline
     fn get_as_func(self) -> _Function:
-        return __mlir_op.`kgen.variant.take`[index = Self.function.value](
-            self.value
-        )
+        return self.value[_Function]
 
     @always_inline
     fn get_obj_attrs(self) -> _RefCountedAttrsDictRef:
-        return __mlir_op.`kgen.variant.take`[index = Self.obj.value](self.value)
+        return self.value[_RefCountedAttrsDictRef]
 
     @always_inline
     fn get_type_id(self) -> Int:
