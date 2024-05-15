@@ -189,7 +189,7 @@ struct AddressSpace(EqualityComparable):
 @register_passable("trivial")
 struct Reference[
     type: AnyType,
-    is_mutable: __mlir_type.i1,
+    is_mutable: Bool,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
