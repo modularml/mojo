@@ -204,6 +204,9 @@ what we publish.
   `swap` and `partition` will likely shuffle around as we're reworking
   our builtnin `sort` function and optimizing it.
 
+- `ListLiteral` and `Tuple` now only requires that element types be `Copyable`.
+  Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
+
 - The `math.bit` module has been moved to a new top-level `bit` module.
 
 - The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
