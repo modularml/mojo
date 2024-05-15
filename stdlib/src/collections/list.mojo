@@ -770,7 +770,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
               traits `EqualityComparable` and `CollectionElement`.
         
         Args:
-            self: The list to search.
             value: The value to find.
 
         Returns:
