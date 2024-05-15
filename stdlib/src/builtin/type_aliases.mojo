@@ -22,10 +22,16 @@ alias NoneType = __mlir_type.`!kgen.none`
 """Represents the absence of a value."""
 
 alias ImmLifetime = __mlir_type.`!lit.lifetime<0>`
-"""Immutable lifetime reference."""
+"""Immutable lifetime reference type."""
 
 alias MutLifetime = __mlir_type.`!lit.lifetime<1>`
-"""Mutable lifetime reference."""
+"""Mutable lifetime reference type."""
+
+alias ImmStaticLifetime = __mlir_attr.`#lit.lifetime<0>: !lit.lifetime<0>`
+"""The immutable lifetime that lasts for the entire duration of program execution."""
+
+alias MutStaticLifetime = __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`
+"""The mutable lifetime that lasts for the entire duration of program execution."""
 
 
 # Helper to build !lit.lifetime type.

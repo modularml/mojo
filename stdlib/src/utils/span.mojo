@@ -84,6 +84,10 @@ struct Span[
     var _data: UnsafePointer[T]
     var _len: Int
 
+    # ===------------------------------------------------------------------===#
+    # Initializers
+    # ===------------------------------------------------------------------===#
+
     @always_inline
     fn __init__(inout self, *, unsafe_ptr: UnsafePointer[T], len: Int):
         """Unsafe construction from a pointer and length.
@@ -120,6 +124,10 @@ struct Span[
         self._data = UnsafePointer(array).bitcast[T]()
         self._len = size
 
+    # ===------------------------------------------------------------------===#
+    # Trait impls
+    # ===------------------------------------------------------------------===#
+
     @always_inline
     fn __len__(self) -> Int:
         """Returns the length of the span. This is a known constant value.
@@ -128,6 +136,10 @@ struct Span[
             The size of the span.
         """
         return self._len
+
+    # ===------------------------------------------------------------------===#
+    # Operator dunders
+    # ===------------------------------------------------------------------===#
 
     @always_inline
     fn _refitem__[
@@ -163,7 +175,9 @@ struct Span[
         return adjusted_span
 
     @always_inline
-    fn __getitem__[IntableType: Intable](self, index: IntableType) -> T:
+    fn __getitem__[
+        IntableType: Intable
+    ](self, index: IntableType) -> Reference[T, is_mutable, lifetime]:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -176,7 +190,7 @@ struct Span[
             A reference to the item at the given index.
         """
         # note that self._refitem__ is already bounds checking
-        return self._refitem__(index)[]
+        return self._refitem__(index)
 
     @always_inline
     fn __setitem__[
@@ -228,3 +242,17 @@ struct Span[
             An iterator over the elements of the span.
         """
         return _SpanIter(0, self)
+
+    # ===------------------------------------------------------------------===#
+    # Methods
+    # ===------------------------------------------------------------------===#
+
+    fn unsafe_ptr(self) -> UnsafePointer[T]:
+        """
+        Gets a pointer to the first element of this slice.
+
+        Returns:
+            A pointer pointing at the first element of this slice.
+        """
+
+        return self._data

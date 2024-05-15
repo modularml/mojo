@@ -135,6 +135,14 @@ what we publish.
   requirement that the decl has documentation (e.g. when used with
   --diagnose-missing-doc-strings).
 
+- Added a new `Span` type for taking slices of contiguous collections.
+  ([PR #2595](https://github.com/modularml/mojo/pull/2595) by [lsh](https://github.com/lsh))
+
+- Added new `as_bytes_slice()` methods to `String` and `StringLiteral`, which
+  returns a `Span` of the bytes owned by the string.
+
+- Add new `ImmStaticLifetime` and `MutStaticLifetime` helpers
+
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
 

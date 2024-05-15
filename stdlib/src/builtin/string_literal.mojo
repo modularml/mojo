@@ -67,6 +67,18 @@ struct StringLiteral(
         Returns:
             The length of this StringLiteral.
         """
+        # TODO(MSTDL-160):
+        #   Properly count Unicode codepoints instead of returning this length
+        #   in bytes.
+        return self._byte_length()
+
+    @always_inline
+    fn _byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        Returns:
+            The length of this StringLiteral in bytes.
+        """
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
@@ -223,6 +235,23 @@ struct StringLiteral(
             A new representation of the string.
         """
         return self.__str__().__repr__()
+
+    fn as_bytes_slice(
+        self: Reference[Self, _, _]
+    ) -> Span[Int8, __mlir_attr.`0: i1`, ImmStaticLifetime]:
+        """
+        Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        var ptr = rebind[UnsafePointer[Int8]](self[].unsafe_ptr())
+
+        return Span[Int8, __mlir_attr.`0: i1`, ImmStaticLifetime](
+            unsafe_ptr=ptr,
+            len=self[]._byte_length(),
+        )
 
     fn format_to(self, inout writer: Formatter):
         """

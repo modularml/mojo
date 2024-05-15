@@ -182,7 +182,7 @@ struct LegacyPointer[
     alias _ref_type = Reference[
         type,
         __mlir_attr.`1: i1`,
-        __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
+        MutStaticLifetime,
         address_space,
     ]
 
