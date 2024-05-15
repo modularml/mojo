@@ -13,7 +13,7 @@
 """Implements the StringRef class.
 """
 
-
+from bit import cttz
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol
 from memory import DTypePointer, UnsafePointer
@@ -443,18 +443,6 @@ struct StringRef(
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline("nodebug")
-fn _cttz(val: Int) -> Int:
-    return llvm_intrinsic["llvm.cttz", Int, has_side_effect=False](val, False)
-
-
-@always_inline("nodebug")
-fn _cttz(val: SIMD) -> __type_of(val):
-    return llvm_intrinsic["llvm.cttz", __type_of(val), has_side_effect=False](
-        val, False
-    )
-
-
 @always_inline
 fn _memchr[
     type: DType
@@ -471,7 +459,7 @@ fn _memchr[
         var bool_mask = source.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
-            return source + i + _cttz(mask)
+            return source + i + cttz(mask)
 
     for i in range(vectorized_end, len):
         if source[i] == char:
@@ -504,7 +492,7 @@ fn _memmem[
         var bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         while mask:
-            var offset = i + _cttz(mask)
+            var offset = i + cttz(mask)
             if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
                 return haystack + offset
             mask = mask & (mask - 1)
