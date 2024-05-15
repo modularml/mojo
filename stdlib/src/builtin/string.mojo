@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import ctlz
+from bit import countl_zero
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
@@ -54,7 +54,7 @@ fn ord(s: String) -> Int:
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
         return int(b1)
-    var num_bytes = ctlz(~b1)
+    var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
@@ -1673,7 +1673,7 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
     )
     var n = UInt32(n0)
-    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ ctlz(n | 1))
+    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ countl_zero(n | 1))
     return (n0 + lookup_table[int(log2)]) >> 32
 
 

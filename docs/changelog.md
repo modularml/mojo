@@ -207,7 +207,14 @@ what we publish.
 - `ListLiteral` and `Tuple` now only requires that element types be `Copyable`.
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
 
-- The `math.bit` module has been moved to a new top-level `bit` module.
+- The `math.bit` module has been moved to a new top-level `bit` module. The
+  following functions in this module have been renamed:
+  - `ctlz` -> `countl_zero`
+  - `cttz` -> `countr_zero`
+  - `bit_length` -> `bit_width`
+  - `ctpop` -> `pop_count`
+  - `bswap` -> `byte_reverse`
+  - `bitreverse` -> `bit_reverse`
 
 - The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
   moved to the `bit` module.

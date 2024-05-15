@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import ctlz
+from bit import countl_zero
 from collections import List
 from memory import Pointer, UnsafePointer
 from sys import bitwidthof
@@ -127,7 +127,7 @@ fn _partition[
 
 fn _estimate_initial_height(size: Int) -> Int:
     # Compute the log2 of the size rounded upward.
-    var log2 = int((bitwidthof[DType.index]() - 1) ^ ctlz(size | 1))
+    var log2 = int((bitwidthof[DType.index]() - 1) ^ countl_zero(size | 1))
     return max(2, log2)
 
 

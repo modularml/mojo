@@ -15,7 +15,7 @@
 You can import these APIs from the `bit` package. For example:
 
 ```mojo
-from bit import ctlz
+from bit import countl_zero
 ```
 """
 
@@ -23,12 +23,12 @@ from sys import llvm_intrinsic
 from sys.info import bitwidthof
 
 # ===----------------------------------------------------------------------===#
-# ctlz
+# countl_zero
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn ctlz(val: Int) -> Int:
+fn countl_zero(val: Int) -> Int:
     """Counts the number of leading zeros of an integer.
 
     Args:
@@ -41,7 +41,7 @@ fn ctlz(val: Int) -> Int:
 
 
 @always_inline("nodebug")
-fn ctlz[
+fn countl_zero[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Counts the per-element number of leading zeros in a SIMD vector.
@@ -67,12 +67,12 @@ fn ctlz[
 
 
 # ===----------------------------------------------------------------------===#
-# cttz
+# countr_zero
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn cttz(val: Int) -> Int:
+fn countr_zero(val: Int) -> Int:
     """Counts the number of trailing zeros for an integer.
 
     Args:
@@ -85,7 +85,7 @@ fn cttz(val: Int) -> Int:
 
 
 @always_inline("nodebug")
-fn cttz[
+fn countr_zero[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Counts the per-element number of trailing zeros in a SIMD vector.
@@ -111,12 +111,12 @@ fn cttz[
 
 
 # ===----------------------------------------------------------------------===#
-# bitreverse
+# bit_reverse
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn bitreverse[
+fn bit_reverse[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Element-wise reverses the bitpattern of an integral value.
@@ -142,12 +142,12 @@ fn bitreverse[
 
 
 # ===----------------------------------------------------------------------===#
-# bswap
+# byte_reverse
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn bswap[
+fn byte_reverse[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Byte-swaps a value.
@@ -186,12 +186,12 @@ fn bswap[
 
 
 # ===----------------------------------------------------------------------===#
-# ctpop
+# pop_count
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn ctpop[
+fn pop_count[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Counts the number of bits set in a value.
@@ -246,16 +246,18 @@ fn bit_not[
     return __mlir_op.`pop.xor`(val.value, neg_one.value)
 
 
+# TODO: implement bit_ceil, bit_floor, has_single_bit, et al
+
 # ===----------------------------------------------------------------------===#
-# bit_length
+# bit_width
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline
-fn bit_length[
+fn bit_width[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Computes the number of digits required to represent the integer.
+    """Computes the minimum number of digits required to represent the integer.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -279,10 +281,10 @@ fn bit_length[
 
     @parameter
     if type.is_unsigned():
-        return bitwidth - ctlz(val)
+        return bitwidth - countl_zero(val)
     else:
-        var leading_zero_pos = ctlz(val)
-        var leading_zero_neg = ctlz(bit_not(val))
+        var leading_zero_pos = countl_zero(val)
+        var leading_zero_neg = countl_zero(bit_not(val))
         var leading_zero = (val > 0).select(leading_zero_pos, leading_zero_neg)
         return bitwidth - leading_zero
 
