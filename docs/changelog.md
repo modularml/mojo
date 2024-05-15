@@ -130,6 +130,21 @@ what we publish.
 - A new `--validate-doc-strings` option has been added to `mojo` to emit errors
   on invalid doc strings instead of warnings.
 
+- Several `mojo` subcommands now support a `--diagnostic-format` option that
+  changes the format with which errors, warnings, and other diagnostics are
+  printed. By specifying `--diagnostic-format json` on the command line, errors
+  and other diagnostics will be output in a structured
+  [JSON Lines](https://jsonlines.org) format that is easier for machines to
+  parse.
+
+  The full list of subcommands that support `--diagnostic-format` is as follows:
+  `mojo build`, `mojo doc`, `mojo run`, `mojo package`, and `mojo test`.
+  Further, the `mojo test --json` option has been subsumed into this new option;
+  for the same behavior, run `mojo test --diagnostic-format json`.
+
+  Note that the format of the JSON output may change; we don't currently
+  guarantee its stability across releases of Mojo.
+
 - A new decorator, `@doc_private`, was added that can be used to hide a decl
   from being generated in the output of `mojo doc`. It also removes the
   requirement that the decl has documentation (e.g. when used with
