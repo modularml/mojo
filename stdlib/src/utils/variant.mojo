@@ -334,9 +334,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             value: The new value to set the variant to.
         """
-        self._call_correct_deleter()
-        self._get_state()[] = Self._check[T]()
-        initialize_pointee_move(self._get_ptr[T](), value^)
+        self = Self(value^)
 
     fn isa[T: CollectionElement](self) -> Bool:
         """Check if the variant contains the required type.
