@@ -399,6 +399,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @parameter
+        if type == target:
+            return rebind[SIMD[target, size]](self)
+
+        @parameter
         if has_neon() and (type == DType.bfloat16 or target == DType.bfloat16):
             # BF16 support on neon systems is not supported.
             return _unchecked_zero[target, size]()
