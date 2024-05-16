@@ -417,7 +417,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
         c = int(buff[pos])
         if c == ord_minus:
             if is_negative:
-                raise Error(_atof_error(str_ref))
+                raise _atof_error(str_ref)
             is_negative = True
         elif not isspace(c):
             break
@@ -461,7 +461,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
             start += 1
         exponent += sign * shift
         if not has_number:
-            raise Error(_atof_error(str_ref))
+            raise _atof_error(str_ref)
     # check if the string is fully parsed
     if start != str_len:
         if c == ord_f or c == ord_F:  # f/F at end is allowed
@@ -469,7 +469,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
         for pos in range(start, str_len):
             c = int(buff[pos])
             if not isspace(c):
-                raise Error(_atof_error(str_ref))
+                raise _atof_error(str_ref)
     # apply shift
     var shift: Int = 10 ** abs(exponent)
     if exponent > 0:
