@@ -86,8 +86,8 @@ struct _ZeroStartingRange(Sized, ReversibleRange):
         return idx
 
     @always_inline("nodebug")
-    fn __reversed__(self) -> _StridedRangeIterator:
-        return _StridedRangeIterator(self.end - 1, -1, -1)
+    fn __reversed__(self) -> _StridedRange:
+        return range(self.end - 1, -1, -1)
 
 
 @value
@@ -117,8 +117,8 @@ struct _SequentialRange(Sized, ReversibleRange):
         return self.start + idx
 
     @always_inline("nodebug")
-    fn __reversed__(self) -> _StridedRangeIterator:
-        return _StridedRangeIterator(self.end - 1, self.start - 1, -1)
+    fn __reversed__(self) -> _StridedRange:
+        return range(self.end - 1, self.start - 1, -1)
 
 
 @value
@@ -127,10 +127,6 @@ struct _StridedRangeIterator(Sized):
     var start: Int
     var end: Int
     var step: Int
-
-    @always_inline("nodebug")
-    fn __iter__(self) -> Self:
-        return self
 
     @always_inline
     fn __len__(self) -> Int:
@@ -189,12 +185,12 @@ struct _StridedRange(Sized, ReversibleRange):
         return self.start + idx * self.step
 
     @always_inline("nodebug")
-    fn __reversed__(self) -> _StridedRangeIterator:
+    fn __reversed__(self) -> _StridedRange:
         var shifted_end = self.end - _sign(self.step)
         var start = shifted_end - ((shifted_end - self.start) % self.step)
         var end = self.start - self.step
         var step = -self.step
-        return _StridedRangeIterator(start, end, step)
+        return range(start, end, step)
 
 
 @always_inline("nodebug")
