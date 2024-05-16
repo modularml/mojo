@@ -416,12 +416,17 @@ fn _atof(str_ref: StringRef) raises -> Float64:
         if not isspace(buff[pos]):
             break
         start += 1
-    # check sign
+    # check sign, inf, nan
     if buff[start] == ord_plus:
         start += 1
     elif buff[start] == ord_minus:
         start += 1
         sign = -1
+    if (str_len - start) >= 3:
+        if StringRef(buff + start, 3) == "nan":
+            return FloatLiteral.nan
+        if StringRef(buff + start, 3) == "inf":
+            return FloatLiteral.infinity * sign
     # read before dot
     for pos in range(start, str_len):
         if ord_0 <= buff[pos] <= ord_9:

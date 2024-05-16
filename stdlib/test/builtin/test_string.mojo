@@ -416,6 +416,10 @@ fn test_atof() raises:
     assert_equal(0.78, atof(String(" .78 ")))
     assert_equal(121234.0, atof(String(" 121234.  ")))
     assert_equal(985031234.0, atof(String(" 985031234.F  ")))
+    assert_equal(FloatLiteral.negative_zero, atof(String("-0")))
+    assert_equal(FloatLiteral.nan, atof(String("  nan")))
+    assert_equal(FloatLiteral.infinity, atof(String(" inf ")))
+    assert_equal(FloatLiteral.negative_infinity, atof(String("-inf  ")))
 
     # Negative cases
     with assert_raises(contains="String is not convertible to float: ''"):
