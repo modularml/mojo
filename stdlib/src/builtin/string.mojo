@@ -372,8 +372,8 @@ fn atol(str: String, base: Int = 10) raises -> Int:
     return _atol(str._strref_dangerous(), base)
 
 
-fn _atof_error(str_ref: StringRef) -> String:
-    return "String is not convertible to float: '" + str(str_ref) + "'"
+fn _atof_error(str_ref: StringRef) -> Error:
+    return Error("String is not convertible to float: '" + str(str_ref) + "'")
 
 
 @always_inline
