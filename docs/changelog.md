@@ -137,6 +137,10 @@ what we publish.
 - Base64 decoding support has been added.
     ([PR #2364](https://github.com/modularml/mojo/pull/2364) by [@mikowals](https://github.com/mikowals))
 
+- Add Base16 encoding and decoding support.
+  ([PR #2584](https://github.com/modularml/mojo/pull/2584)
+   by [@kernhanda](https://github.com/kernhanda))
+
 - Add `repr()` function and `Representable` trait.
     ([PR #2361](https://github.com/modularml/mojo/pull/2361) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 

@@ -12,4 +12,4 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the base64 package."""
 
-from .base64 import b64encode, b64decode
+from .base64 import b64encode, b64decode, b16encode, b16decode
