@@ -21,7 +21,7 @@ def test_static_tuple():
     var tup1 = StaticTuple[Int, 1](1)
     assert_equal(tup1[0], 1)
 
-    var tup2 = StaticTuple[Int, 2](1)
+    var tup2 = StaticTuple[Int, 2](1, 1)
     assert_equal(tup2[0], 1)
     assert_equal(tup2[1], 1)
 
