@@ -95,6 +95,20 @@ what we publish.
           return Self(trunc(re), trunc(im))
   ```
 
+- Add builtin `any()` and `all()` functions to check for truthy elements in a collection.
+  This also works to get the truthy value of a SIMD vector.
+  ([PR #2600](https://github.com/modularml/mojo/pull/2600) by [@helehex](https://github.com/helehex))
+  For example:
+
+  ```mojo
+    fn truthy_simd():
+        var vec = SIMD[DType.int32, 4](0, 1, 2, 3)
+        if any(vec):
+            print("any elements are truthy")
+        if all(vec):
+            print("all elements are truthy")
+  ```
+
 - Add an `InlinedArray` type that works on memory-only types.
   Compare with the existing `StaticTuple` type, which is conceptually an array
   type, but only worked on `AnyRegType`.

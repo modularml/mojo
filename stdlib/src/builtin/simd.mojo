@@ -2217,6 +2217,33 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             "llvm.vector.reduce.or", Scalar[DType.bool], has_side_effect=False
         ](self)
 
+    @always_inline
+    fn _reduce_all(self) -> Bool:
+        """Returns whether **all** elements in this vector are non-zero.
+
+        Returns:
+            `True` if and only if **all** elements in this vector are non-zero.
+        """
+
+        @parameter
+        if type == DType.bool:
+            return self.reduce_and()
+        return self.cast[DType.bool]().reduce_and()
+
+    @always_inline
+    fn _reduce_any(self) -> Bool:
+        """Returns whether this vector contains **any** non-zero elements.
+
+        Returns:
+            `True` if this vector contains **any** non-zero elements, `False`
+            otherwise.
+        """
+
+        @parameter
+        if type == DType.bool:
+            return self.reduce_or()
+        return self.cast[DType.bool]().reduce_or()
+
     # ===-------------------------------------------------------------------===#
     # select
     # ===-------------------------------------------------------------------===#

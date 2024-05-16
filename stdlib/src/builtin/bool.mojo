@@ -17,6 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 from utils._visualizers import lldb_formatter_wrapping_type
 
+from collections import Set
+
 
 # ===----------------------------------------------------------------------=== #
 #  Boolable
@@ -355,3 +357,115 @@ fn bool[T: Boolable](value: T) -> Bool:
         The bool representation of the object.
     """
     return value.__bool__()
+
+
+# ===----------------------------------------------------------------------=== #
+#  any
+# ===----------------------------------------------------------------------=== #
+
+
+# TODO: Combine these into Iterators over Boolable elements
+
+
+fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
+    """Checks if **any** elements in the list are truthy.
+
+    Parameters:
+        T: The type of elements to check.
+
+    Args:
+        list: The list to check.
+
+    Returns:
+        Returns `True` if **any** elements in the list are truthy, `False` otherwise.
+    """
+    for item in list:
+        if item[]:
+            return True
+    return False
+
+
+fn any[T: BoolableKeyElement](set: Set[T]) -> Bool:
+    """Checks if **any** elements in the set are truthy.
+
+    Parameters:
+        T: The type of elements to check.
+
+    Args:
+        set: The set to check.
+
+    Returns:
+        Returns `True` if **any** elements in the set are truthy, `False` otherwise.
+    """
+    for item in set:
+        if item[]:
+            return True
+    return False
+
+
+fn any(value: SIMD) -> Bool:
+    """Checks if **any** elements in the simd vector are truthy.
+
+    Args:
+        value: The simd vector to check.
+
+    Returns:
+        Returns `True` if **any** elements in the simd vector are truthy, `False` otherwise.
+    """
+    return value._reduce_any()
+
+
+# ===----------------------------------------------------------------------=== #
+#  all
+# ===----------------------------------------------------------------------=== #
+
+
+# TODO: Combine these into Iterators over Boolable elements
+
+
+fn all[T: BoolableCollectionElement](list: List[T]) -> Bool:
+    """Checks if **all** elements in the list are truthy.
+
+    Parameters:
+        T: The type of elements to check.
+
+    Args:
+        list: The list to check.
+
+    Returns:
+        Returns `True` if **all** elements in the list are truthy, `False` otherwise.
+    """
+    for item in list:
+        if not item[]:
+            return False
+    return True
+
+
+fn all[T: BoolableKeyElement](set: Set[T]) -> Bool:
+    """Checks if **all** elements in the set are truthy.
+
+    Parameters:
+        T: The type of elements to check.
+
+    Args:
+        set: The set to check.
+
+    Returns:
+        Returns `True` if **all** elements in the set are truthy, `False` otherwise.
+    """
+    for item in set:
+        if not item[]:
+            return False
+    return True
+
+
+fn all(value: SIMD) -> Bool:
+    """Checks if **all** elements in the simd vector are truthy.
+
+    Args:
+        value: The simd vector to check.
+
+    Returns:
+        Returns `True` if **all** elements in the simd vector are truthy, `False` otherwise.
+    """
+    return value._reduce_all()
