@@ -200,6 +200,9 @@ what we publish.
   print(my_list.index(3))  # prints 1
   ```
 
+- `StringRef` now implements `strip()` which can be used to remove leading and trailing whitespaces.
+    ([PR #2683](https://github.com/modularml/mojo/pull/2683) by [@fknfilewalker](https://github.com/fknfilewalker))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
