@@ -660,7 +660,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         return _ListIter[forward=False](len(self[]), self)
 
-    # @staticmethod
     fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
