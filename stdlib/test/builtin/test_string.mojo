@@ -228,10 +228,10 @@ fn test_stringref_strip() raises:
     var b = StringRef("mojo  ")
     var c = StringRef("  mojo")
     var d = StringRef("")
-    assert_equal(a, "mojo rocks")
-    assert_equal(b, "mojo")
-    assert_equal(c, "mojo")
-    assert_equal(d, "")
+    assert_equal(a.strip(), "mojo rocks")
+    assert_equal(b.strip(), "mojo")
+    assert_equal(c.strip(), "mojo")
+    assert_equal(d.strip(), "")
 
 
 fn test_ord() raises:
