@@ -133,6 +133,12 @@ repo](https://github.com/modularml/mojo/) to try our code examples:
   git clone https://github.com/modularml/mojo.git
   ```
 
+  If you installed the nightly build, also checkout the nightly branch:
+
+  ```sh
+  git checkout nightly
+  ```
+
   In addition to several `.mojo` examples, the repo includes [Jupyter
   notebooks](https://github.com/modularml/mojo/tree/main/examples/notebooks#readme)
   that teach advanced Mojo features.
