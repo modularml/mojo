@@ -703,7 +703,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         result += "]"
         return result
 
-    @staticmethod
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,
@@ -711,7 +710,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(__type_of(my_list).count(my_list, 1))
+        print(my_list.count(1))
         ```
 
         When the compiler supports conditional methods, then a simple `my_list.count(1)` will
@@ -722,7 +721,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
               traits `EqualityComparable` and `CollectionElement`.
 
         Args:
-            self: The list to search.
             value: The value to count.
 
         Returns:
