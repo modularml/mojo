@@ -18,6 +18,26 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo added support for the `inferred` passing kind on parameters. `inferred`
+  parameters must appear at the beginning of the parameter list and cannot be
+  explicitly specified by the user. This allows users to define functions with
+  dependent parameters to be called without the caller specifying all the
+  necessary parameters. For example:
+
+  ```mojo
+  fn parameter_simd[inferred dt: DType, value: Scalar[dt]]():
+      print(value)
+
+  fn call_it():
+      parameter_simd[Int32(42)]()
+  ```
+
+  In the above example, `Int32(42)` is passed directly into `value`, the first
+  non-inferred parameter. `dt` is inferred from the parameter itself to
+  `DType.int32`.
+
+  Note that this only works on function parameter lists at the moment.
+
 - Mojo now supports adding a `@deprecated` decorator on structs, functions,
   traits, aliases, and global variables. The decorator marks the attached decl
   as deprecated and causes a warning to be emitted when the deprecated decl is
