@@ -415,13 +415,11 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     # skip leading spaces and read sign
     for pos in range(start, str_len):
         c = int(buff[pos])
-        if isspace(c):
-            pass
-        elif c == ord_minus:
+        if c == ord_minus:
             if is_negative:
                 raise Error(_atof_error(str_ref))
             is_negative = True
-        else:
+        elif not isspace(c):
             break
         start += 1
     # read before dot
