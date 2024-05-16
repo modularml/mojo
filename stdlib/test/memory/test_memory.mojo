@@ -15,7 +15,7 @@
 from sys import sizeof
 
 from memory import memcmp, memcpy, memset, memset_zero, DTypePointer, Pointer
-from utils._numerics import nan
+from utils.numerics import nan
 from testing import (
     assert_almost_equal,
     assert_equal,

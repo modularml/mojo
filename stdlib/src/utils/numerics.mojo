@@ -15,7 +15,7 @@
 You can import these APIs from the `utils` package. For example:
 
 ```mojo
-from utils._numerics import FPUtils
+from utils.numerics import FPUtils
 ```
 """
 

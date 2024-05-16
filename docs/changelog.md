@@ -227,6 +227,11 @@ what we publish.
 - The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
   moved to the `bit` module.
 
+- The implementation of the following functions have been moved from the `math`
+  module to the new `utils.numerics` module: `isfinite`, `isinf`, `isnan`,
+  `nan`, `nextafter`, and `ulp`. The functions continue to be exposed in the
+  `math` module.
+
 ### ❌ Removed
 
 - The method `object.print()` has been removed. Since now, `object` has the

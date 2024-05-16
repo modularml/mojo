@@ -19,7 +19,7 @@ from testing import assert_true
 ```
 """
 from collections import Optional
-from utils._numerics import isfinite, isnan
+from utils.numerics import isfinite, isnan
 from builtin._location import __call_location, _SourceLocation
 
 # ===----------------------------------------------------------------------=== #

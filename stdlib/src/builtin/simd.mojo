@@ -29,7 +29,7 @@ from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from memory import bitcast
 
-from utils._numerics import (
+from utils.numerics import (
     FPUtils,
     isnan as _isnan,
     nan as _nan,

@@ -14,7 +14,7 @@
 
 from sys.info import has_neon
 from testing import assert_equal, assert_true, assert_false, assert_almost_equal
-from utils._numerics import FPUtils, inf, isinf, isnan, max_finite, nan, ulp
+from utils.numerics import FPUtils, inf, isinf, isnan, max_finite, nan, ulp
 
 
 # TODO: improve coverage and organization of these tests
