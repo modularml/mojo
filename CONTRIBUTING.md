@@ -149,7 +149,7 @@ be reworked/discussed. If all the changes are in the same pull request, then the
 all discussions have been resolved.
 * **Reducing the number of git conflicts**: Bigger pull request means slower reviews, thus means that the pull request will be open
 longuer and will have more git conflicts to be resolved before being merged.
-* **Parrallel processing**: All programmers like to parralelize. Well reviewers also like to parralelize code reviews to merge your code
+* **Parallel processing**: All programmers like to parallelize. Well reviewers also like to parallelize code reviews to merge your code
 faster. If you open two pull requests that are independant, then two reviewers will be able to work on your code.
 * **Finding the time for a code review**: Doing a code review often requires that the code is reviewed in one go, as it's
 hard to remember functions and code logic from one review session to another. Thus a big pull request will require the reviewer to
