@@ -162,6 +162,8 @@ what we publish.
 
 - `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
     ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
+- `List()` now support `__contains__`. ([PR #2667](https://github.com/modularml/mojo/pull/2667) by [@rd4com](https://github.com/rd4com/))
+  
 
 ### 🦋 Changed
 
