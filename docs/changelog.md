@@ -200,6 +200,9 @@ what we publish.
   print(my_list.index(3))  # prints 1
   ```
 
+- Added `atof()` function which can convert a `String` to a `float64`.
+    ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
