@@ -18,6 +18,9 @@ These are Mojo built-ins, so you don't need to import them.
 
 from python import PythonObject
 
+# FIXME(MOCO-658): Explicit conformance to these traits shouldn't be needed.
+from builtin._stubs import _IntIterable, _StridedIterable
+
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
@@ -58,7 +61,7 @@ fn _sign(x: Int) -> Int:
 
 
 @register_passable("trivial")
-struct _ZeroStartingRange(Sized, ReversibleRange):
+struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     var curr: Int
     var end: Int
 
@@ -92,7 +95,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange):
 
 @value
 @register_passable("trivial")
-struct _SequentialRange(Sized, ReversibleRange):
+struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
     var start: Int
     var end: Int
 
@@ -146,7 +149,7 @@ struct _StridedRangeIterator(Sized):
 
 @value
 @register_passable("trivial")
-struct _StridedRange(Sized, ReversibleRange):
+struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     var start: Int
     var end: Int
     var step: Int
