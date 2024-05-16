@@ -59,103 +59,33 @@ fn assert_sorted[D: ComparableCollectionElement](inout list: List[D]) raises:
         assert_true(list[i] >= list[i - 1], "error at index: " + str(i))
 
 
-def test_sort_random_numbers_u8():
-    var list = random_numbers[DType.uint8](10)
-    assert_sorted(list)
-    list = random_numbers[DType.uint8](100)
-    assert_sorted(list)
-    list = random_numbers[DType.uint8](1000)
-    assert_sorted(list)
+def test_sort_random_numbers():
+    alias type_list = List[DType](
+        DType.uint8,
+        DType.int8,
+        DType.uint16,
+        DType.int16,
+        DType.float16,
+        DType.uint32,
+        DType.int32,
+        DType.float32,
+        DType.uint64,
+        DType.int64,
+        DType.float64,
+    )
 
+    @parameter
+    @always_inline
+    fn perfomr_test[idx: Int]() raises:
+        alias concrete_type = type_list[idx]
+        var list = random_numbers[concrete_type](10)
+        assert_sorted(list)
+        list = random_numbers[concrete_type](100)
+        assert_sorted(list)
+        list = random_numbers[concrete_type](1000)
+        assert_sorted(list)
 
-def test_sort_random_numbers_i8():
-    var list = random_numbers[DType.int8](10)
-    assert_sorted(list)
-    list = random_numbers[DType.int8](100)
-    assert_sorted(list)
-    list = random_numbers[DType.int8](1000)
-    assert_sorted(list)
-
-
-def test_sort_random_numbers_u16():
-    var list = random_numbers[DType.uint16](10)
-    assert_sorted(list)
-    list = random_numbers[DType.uint16](100)
-    assert_sorted(list)
-    list = random_numbers[DType.uint16](1000)
-    assert_sorted(list)
-
-
-def test_sort_random_numbers_i16():
-    var list = random_numbers[DType.int16](10)
-    assert_sorted(list)
-    list = random_numbers[DType.int16](100)
-    assert_sorted(list)
-    list = random_numbers[DType.int16](1000)
-    assert_sorted(list)
-
-
-def test_sort_random_numbers_f16():
-    var list = random_numbers[DType.float16](10)
-    assert_sorted(list)
-    list = random_numbers[DType.float16](100)
-    assert_sorted(list)
-    list = random_numbers[DType.float16](1000)
-    assert_sorted(list)
-
-
-def test_sort_random_numbers_u32():
-    var list = random_numbers[DType.uint32](10)
-    assert_sorted(list)
-    list = random_numbers[DType.uint32](100)
-    assert_sorted(list)
-    list = random_numbers[DType.uint32](1000)
-    assert_sorted(list)
-
-
-def test_sort_random_numbers_i32():
-    var list = random_numbers[DType.int32](10)
-    assert_sorted(list)
-    list = random_numbers[DType.int32](100)
-    assert_sorted(list)
-    list = random_numbers[DType.int32](1000)
-    assert_sorted(list)
-
-
-def test_sort_random_numbers_f32():
-    var list = random_numbers[DType.float32](10)
-    assert_sorted(list)
-    list = random_numbers[DType.float32](100)
-    assert_sorted(list)
-    list = random_numbers[DType.float32](1000)
-    assert_sorted(list)
-
-
-def test_sort_random_numbers_u64():
-    var list = random_numbers[DType.uint64](10)
-    assert_sorted(list)
-    list = random_numbers[DType.uint64](100)
-    assert_sorted(list)
-    list = random_numbers[DType.uint64](1000)
-    assert_sorted(list)
-
-
-def test_sort_random_numbers_i64():
-    var list = random_numbers[DType.int64](10)
-    assert_sorted(list)
-    list = random_numbers[DType.int64](100)
-    assert_sorted(list)
-    list = random_numbers[DType.int64](1000)
-    assert_sorted(list)
-
-
-def test_sort_random_numbers_f64():
-    var list = random_numbers[DType.float64](10)
-    assert_sorted(list)
-    list = random_numbers[DType.float64](100)
-    assert_sorted(list)
-    list = random_numbers[DType.float64](1000)
-    assert_sorted(list)
+    unroll[perfomr_test, len(type_list)]()
 
 
 def test_sort_string_small_list():
@@ -236,19 +166,24 @@ def test_sort_oder_comparamble_elements_list():
     assert_sorted(list)
 
 
+fn test_sort_empty_list() raises:
+    var person_list = List[Person]()
+    sort(person_list)
+    insertion_sort(person_list)
+    quick_sort(person_list)
+    assert_true(len(person_list) == 0)
+
+    var uint_list = List[UInt64]()
+    sort[DType.uint64](uint_list)
+    insertion_sort[DType.uint64](uint_list)
+    quick_sort[DType.uint64](uint_list)
+    assert_true(len(uint_list) == 0)
+
+
 def main():
-    test_sort_random_numbers_u8()
-    test_sort_random_numbers_i8()
-    test_sort_random_numbers_u16()
-    test_sort_random_numbers_i16()
-    test_sort_random_numbers_f16()
-    test_sort_random_numbers_u32()
-    test_sort_random_numbers_i32()
-    test_sort_random_numbers_f32()
-    test_sort_random_numbers_u64()
-    test_sort_random_numbers_i64()
-    test_sort_random_numbers_f64()
+    test_sort_random_numbers()
     test_sort_string_small_list()
     test_sort_string_big_list()
     test_sort_strings()
     test_sort_oder_comparamble_elements_list()
+    test_sort_empty_list()

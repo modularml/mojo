@@ -28,7 +28,7 @@ fn insertion_sort[D: DType](inout list: List[Scalar[D]]):
         D: The dtype of the scalar.
 
     Args:
-        list: The list of the scalars which will be sorted inpace.
+        list: The list of the scalars which will be sorted in-pace.
     """
     for i in range(1, len(list)):
         var key = list[i]
@@ -40,7 +40,7 @@ fn insertion_sort[D: DType](inout list: List[Scalar[D]]):
 
 
 fn _quick_sort[D: DType](inout list: List[Scalar[D]], low: Int, high: Int):
-    """Sort section of the list, between low and high, with quick sort algorithm inplace.
+    """Sort section of the list, between low and high, with quick sort algorithm in-place.
 
     Parameters:
         D: The dtype of the scalar.
@@ -82,17 +82,18 @@ fn quick_sort[D: DType](inout list: List[Scalar[D]]):
     _quick_sort(list, 0, len(list) - 1)
 
 
-fn sort[D: DType](inout list: List[Scalar[D]]):
+fn sort[D: DType, slist_ub: Int = 64](inout list: List[Scalar[D]]):
     """Sort list of scalars in place. This function picks the best algorithm based on the list length.
 
     Parameters:
         D: The dtype of the scalar.
+        slist_ub: The upper bound for a list size which is considered small.
 
     Args:
         list: The list of the scalars which will be sorted inpace.
     """
     var count = len(list)
-    if count <= 64:
+    if count <= slist_ub:
         insertion_sort(list)  # small lists are best sorted with insertion sort
     else:
         quick_sort(list)  # medium lists are best sorted with quick sort
@@ -125,7 +126,7 @@ fn insertion_sort[D: ComparableCollectionElement](inout list: List[D]):
 fn _quick_sort[
     D: ComparableCollectionElement
 ](inout list: List[D], low: Int, high: Int):
-    """Sort section of the list, between low and high, with quick sort algorithm inplace.
+    """Sort section of the list, between low and high, with quick sort algorithm in-place.
 
     Parameters:
         D: The order comparable collection element type.
@@ -167,17 +168,20 @@ fn quick_sort[D: ComparableCollectionElement](inout list: List[D]):
     _quick_sort(list, 0, len(list) - 1)
 
 
-fn sort[D: ComparableCollectionElement](inout list: List[D]):
+fn sort[
+    D: ComparableCollectionElement, slist_ub: Int = 64
+](inout list: List[D]):
     """Sort list of the order comparable elements in place. This function picks the best algorithm based on the list length.
 
     Parameters:
         D: The order comparable collection element type.
+        slist_ub: The upper bound for a list size which is considered small.
 
     Args:
         list: The list of the scalars which will be sorted inpace.
     """
     var count = len(list)
-    if count <= 64:
+    if count <= slist_ub:
         insertion_sort(list)  # small lists are best sorted with insertion sort
     else:
         quick_sort(list)  # others are best sorted with quick sort
