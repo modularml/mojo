@@ -222,6 +222,9 @@ what we publish.
   is not possible yet.
     ([PR #2674](https://github.com/modularml/mojo/pull/2674) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
+- `List()` now supports `__contains__`.
+    ([PR #2667](https://github.com/modularml/mojo/pull/2667) by [@rd4com](https://github.com/rd4com/))
+
 - `List` now has an `index` method that allows one to find the (first) location
   of an element in a `List` of `EqualityComparable` types. For example:
 
