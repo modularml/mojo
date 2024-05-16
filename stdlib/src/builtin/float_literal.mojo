@@ -33,6 +33,7 @@ struct FloatLiteral(
     Comparable,
     Floorable,
     Intable,
+    Roundable,
     Stringable,
     Truncable,
 ):
@@ -239,7 +240,60 @@ struct FloatLiteral(
             return self
         return Self(self.__int_literal__())
 
-    # TODO: implement __round__
+    fn __round__(self) -> Self:
+        """Return the rounded value of the FloatLiteral.
+
+        Returns:
+            The rounded value.
+        """
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        var truncated: IntLiteral = self.__int_literal__()
+        var result: Self
+        if abs(self) - abs(truncated) <= 0.5:
+            result = Self(truncated)
+        elif self > 0:
+            result = Self(truncated + 1)
+        else:
+            result = Self(truncated - 1)
+        return result
+
+    @always_inline("nodebug")
+    fn __round__(self, ndigits: IntLiteral) -> Self:
+        """Return the rounded value of the FloatLiteral.
+
+        Args:
+            ndigits: The number of digits to round to. Defaults to 0.
+
+        Returns:
+            The rounded value.
+        """
+        # Handle special values first.
+        if not self._is_normal():
+            return self
+
+        alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
+        alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
+        var multiplier = one
+        # TODO: Use IntLiteral.__pow__() when it's implemented.
+        for _ in range(ndigits):
+            multiplier = __mlir_op.`kgen.int_literal.binop`[
+                oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
+            ](multiplier, ten)
+        var target: Self = self * Self(multiplier)
+        var truncated: Self = target.__int_literal__()
+        var result: Self
+        if abs(target) - abs(truncated) <= 0.5:
+            result = truncated
+        elif self > 0:
+            result = truncated + 1
+        else:
+            result = truncated - 1
+        if ndigits > 0:
+            result /= Self(multiplier)
+        return result
 
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
@@ -315,6 +369,31 @@ struct FloatLiteral(
         return self.__truediv__(rhs).__floor__()
 
     @always_inline("nodebug")
+    fn __mod__(self, rhs: Self) -> Self:
+        """Return the remainder of self divided by rhs.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            The remainder of dividing self by rhs.
+        """
+        return self.__divmod__(rhs)[1]
+
+    @always_inline("nodebug")
+    fn __divmod__(self, rhs: Self) -> Tuple[Self, Self]:
+        """Return a tuple with the quotient and the remainder of self divided by rhs.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            The tuple with the dividend and the remainder
+        """
+        var quotient: Self = self.__floordiv__(rhs)
+        var remainder: Self = self - (quotient * rhs)
+        return quotient, remainder
+
     fn __rfloordiv__(self, rhs: Self) -> Self:
         """Returns rhs divided by self, rounded down to the nearest integer.
 
@@ -326,7 +405,6 @@ struct FloatLiteral(
         """
         return rhs // self
 
-    # TODO - maybe __mod__?
     # TODO - maybe __pow__?
 
     # ===------------------------------------------------------------------===#
