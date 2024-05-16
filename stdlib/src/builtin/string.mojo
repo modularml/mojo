@@ -620,7 +620,14 @@ struct String(
         var length = len(str)
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
-        memcpy(rebind[DTypePointer[DType.uint8]](buffer.data), str.data, length)
+        memcpy(
+            # TODO(modularml/mojo#2317):
+            #   Remove this bitcast after transition to UInt8 for string data
+            #   is complete.
+            dest=buffer.data.bitcast[UInt8](),
+            src=str.data,
+            count=length,
+        )
         buffer[length] = 0
         self._buffer = buffer^
 
@@ -640,9 +647,9 @@ struct String(
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
         memcpy(
-            DTypePointer(buffer.data),
-            DTypePointer(str_slice.as_bytes_slice().unsafe_ptr()),
-            length,
+            dest=buffer.data,
+            src=str_slice.as_bytes_slice().unsafe_ptr(),
+            count=length,
         )
         buffer[length] = 0
         self._buffer = buffer^
@@ -981,14 +988,14 @@ struct String(
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
         memcpy(
-            DTypePointer(buffer.data),
-            self.unsafe_ptr(),
-            self_len,
+            dest=buffer.data,
+            src=self.unsafe_ptr(),
+            count=self_len,
         )
         memcpy(
-            DTypePointer(buffer.data + self_len),
-            other.unsafe_ptr(),
-            other_len + 1,  # Also copy the terminator
+            dest=buffer.data + self_len,
+            src=other.unsafe_ptr(),
+            count=other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
 
@@ -1641,9 +1648,9 @@ struct String(
         buf.resize(count, 0)
         for i in range(n):
             memcpy(
-                rebind[DTypePointer[DType.int8]](buf.data) + len_self * i,
-                self.unsafe_ptr(),
-                len_self,
+                dest=buf.data + len_self * i,
+                src=self.unsafe_ptr(),
+                count=len_self,
             )
         return String(buf^)
 

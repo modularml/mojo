@@ -309,6 +309,27 @@ fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
     memcpy(dest.address, src.address, count)
 
 
+@always_inline
+fn memcpy[
+    inferred dtype: DType
+](*, dest: UnsafePointer[Scalar[dtype]], src: __type_of(dest), count: Int):
+    """Copies a memory area.
+
+    Parameters:
+        dtype: *Inferred* The dtype of the data to copy.
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+        count: The number of elements to copy (not bytes!).
+    """
+    memcpy(
+        dest=DTypePointer(dest),
+        src=DTypePointer(src),
+        count=count,
+    )
+
+
 # ===----------------------------------------------------------------------===#
 # memset
 # ===----------------------------------------------------------------------===#
