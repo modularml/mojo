@@ -746,6 +746,19 @@ def test_list_mult():
     assert_equal(len(List[Int](1, 2, 3) * 0), 0)
 
 
+def test_list_contains():
+    var x = List[Int](1, 2, 3)
+    assert_false(0 in x)
+    assert_true(1 in x)
+    assert_false(4 in x)
+
+    # TODO: implement List.__eq__ for Self[ComparableCollectionElement]
+    # var y = List[List[Int]]()
+    # y.append(List(1,2))
+    # assert_equal(List(1,2) in y,True)
+    # assert_equal(List(0,1) in y,False)
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -773,3 +786,4 @@ def main():
     test_list_count()
     test_list_add()
     test_list_mult()
+    test_list_contains()
