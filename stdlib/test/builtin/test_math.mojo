@@ -40,3 +40,6 @@ def test_max():
 def main():
     test_min()
     test_max()
+    # TODO: add tests for abs, divmod, round. These tests should be simple; they
+    # test the free functions, so it's not needed to cover all corner cases of
+    # the underlying implementations.
