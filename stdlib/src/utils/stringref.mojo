@@ -425,6 +425,23 @@ struct StringRef(
 
         return StringRef(data, length)
 
+    fn strip(self) -> StringRef:
+        """Gets a StringRef with leading and trailing whitespaces removed.
+
+        For example, `"  mojo  "` returns `"mojo"`.
+
+        Returns:
+            A StringRef with leading and trailing whitespaces removed.
+        """
+        var start: Int = 0
+        var end: Int = len(self) - 1  # without '\0'
+        var ptr: DTypePointer[DType.int8] = self.data.bitcast[DType.int8]()
+        while start < end and isspace(ptr[start]):
+            start += 1
+        while end > start and isspace(ptr[end]):
+            end -= 1
+        return StringRef(ptr + start, end - start + 1)
+
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
 
