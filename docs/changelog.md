@@ -241,6 +241,18 @@ what we publish.
   use `str(my_list)` yet.
     ([PR #2673](https://github.com/modularml/mojo/pull/2673) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
+- Added the `Indexer` trait to denote types that implement the `__index__()` method
+  which allows all integral types to be accepted in `__getitem__` and `__setitem__`
+  implementations. For example:
+
+  ```mojo
+  struct MyList:
+      var data: List[Int]
+
+      fn __getitem__[T: Indexer](self, idx: T) -> T:
+          return self.data[index(idx)]
+  ```
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
