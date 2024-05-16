@@ -296,7 +296,6 @@ struct FloatLiteral(
             return self
         return Self(self.__int_literal__())
 
-
     # ===------------------------------------------------------------------===#
     # Arithmetic Operators
     # ===------------------------------------------------------------------===#
@@ -407,7 +406,6 @@ struct FloatLiteral(
         """
         return rhs // self
 
-    # TODO - maybe __mod__?
     # TODO - maybe __pow__?
 
     # ===------------------------------------------------------------------===#
