@@ -29,6 +29,7 @@ struct IntLiteral(
     Roundable,
     Stringable,
     Truncable,
+    Indexer,
 ):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and

@@ -84,6 +84,11 @@ def test_abs():
     assert_equal(abs(0), 0)
 
 
+def test_indexer():
+    assert_equal(1, IntLiteral.__index__(1))
+    assert_equal(88, IntLiteral.__index__(88))
+
+
 def main():
     test_int()
     test_ceil()
@@ -94,3 +99,4 @@ def main():
     test_mod()
     test_bit_width()
     test_abs()
+    test_indexer()
