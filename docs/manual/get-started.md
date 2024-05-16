@@ -86,7 +86,7 @@ Now let's write the code in a Mojo source file and run it with the
     Hello, world!
     ```
 
-If this didn't work for you, double-check your code looks exactly like the code
+If this didn't work for you, double-check that your code looks exactly like the code
 in step 1, and make sure you correctly [installed
 MAX](/max/install) (it includes Mojo).
 
