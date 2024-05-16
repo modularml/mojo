@@ -20,7 +20,7 @@ from testing import (
     assert_raises,
     assert_true,
 )
-from utils._numerics import inf, nan
+from utils.numerics import inf, nan
 
 
 @value
