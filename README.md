@@ -54,7 +54,23 @@ program](https://docs.modular.com/mojo/manual/get-started/hello-world).
 
 The nightly Mojo builds are subject to breakage and provide an inside
 view of how the development of Mojo is progressing.  Use at your own risk
-and be patient! Install them using the instructions [here](./CONTRIBUTING.md).
+and be patient!
+
+To get nightly builds, see the same instructions to [install the Mojo
+SDK](https://docs.modular.com/mojo/manual/get-started/#install-mojo), but use
+the command shown there to install `nightly/mojo`.
+
+When you clone this repo, be sure you switch to the `nightly` branch, because
+the `main` branch is for stable releases and might not be compatible with
+nightly builds:
+
+```bash
+git clone https://github.com/modularml/mojo.git
+```
+
+```bash
+git checkout nightly
+```
 
 ## Contributing
 
