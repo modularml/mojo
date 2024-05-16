@@ -551,7 +551,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return len(self).__bool__()
 
-    @staticmethod
     fn __str__[
         T: RepresentableKeyElement, U: RepresentableCollectionElement
     ](self: Dict[T, U]) -> String:
@@ -564,7 +563,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var my_dict = Dict[Int, Float64]()
         my_dict[1] = 1.1
         my_dict[2] = 2.2
-        dict_as_string = __type_of(my_dict).__str__(my_dict)
+        dict_as_string = my_dict.__str__()
         print(dict_as_string)
         # prints "{1: 1.1, 2: 2.2}"
         ```
@@ -574,9 +573,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
         Note that both they keys and values' types must implement the `__repr__()` method
         for this to work. See the `Representable` trait for more information.
-
-        Args:
-            self: The Dict to represent as a string.
 
         Parameters:
             T: The type of the keys in the Dict. Must implement the

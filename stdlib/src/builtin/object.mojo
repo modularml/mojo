@@ -337,7 +337,11 @@ struct _ObjectImpl(CollectionElement, Stringable):
             var impl = _ImmutableString(
                 UnsafePointer[Int8].alloc(str.length), str.length
             )
-            memcpy(impl.data, DTypePointer[DType.int8](str.data), str.length)
+            memcpy(
+                dest=impl.data,
+                src=str.data,
+                count=str.length,
+            )
             return impl
         if self.is_list():
             return self.get_as_list().copy()
