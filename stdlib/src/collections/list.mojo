@@ -660,7 +660,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         return _ListIter[forward=False](len(self[]), self)
 
-    @staticmethod
     fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
@@ -669,16 +668,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(__type_of(my_list).__str__(my_list))
+        print(my_list.__str__())
         ```
 
         When the compiler supports conditional methods, then a simple `str(my_list)` will
         be enough.
 
         The elements' type must implement the `__repr__()` for this to work.
-
-        Args:
-            self: The list to represent as a string.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
@@ -704,6 +700,33 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return result
 
     @staticmethod
+    fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
+        """Returns a string representation of a `List`.
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(__type_of(my_list).__repr__(my_list))
+        ```
+
+        When the compiler supports conditional methods, then a simple `repr(my_list)` will
+        be enough.
+
+        The elements' type must implement the `__repr__()` for this to work.
+
+        Args:
+            self: The list to represent as a string.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the list.
+        """
+        return __type_of(self).__str__(self)
+
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,
@@ -711,7 +734,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(__type_of(my_list).count(my_list, 1))
+        print(my_list.count(1))
         ```
 
         When the compiler supports conditional methods, then a simple `my_list.count(1)` will
@@ -722,7 +745,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
               traits `EqualityComparable` and `CollectionElement`.
 
         Args:
-            self: The list to search.
             value: The value to count.
 
         Returns:
