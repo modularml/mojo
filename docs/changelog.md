@@ -18,6 +18,26 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo added support for the `inferred` passing kind on parameters. `inferred`
+  parameters must appear at the beginning of the parameter list and cannot be
+  explicitly specified by the user. This allows users to define functions with
+  dependent parameters to be called without the caller specifying all the
+  necessary parameters. For example:
+
+  ```mojo
+  fn parameter_simd[inferred dt: DType, value: Scalar[dt]]():
+      print(value)
+
+  fn call_it():
+      parameter_simd[Int32(42)]()
+  ```
+
+  In the above example, `Int32(42)` is passed directly into `value`, the first
+  non-inferred parameter. `dt` is inferred from the parameter itself to
+  `DType.int32`.
+
+  Note that this only works on function parameter lists at the moment.
+
 - Mojo now supports adding a `@deprecated` decorator on structs, functions,
   traits, aliases, and global variables. The decorator marks the attached decl
   as deprecated and causes a warning to be emitted when the deprecated decl is
@@ -172,6 +192,8 @@ what we publish.
 
 - Add new `ImmStaticLifetime` and `MutStaticLifetime` helpers
 
+- Add new `memcpy` overload for `UnsafePointer[Scalar[_]]` pointers.
+
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
 
@@ -189,8 +211,16 @@ what we publish.
   whitespace, ASCII lower/uppercase, and so on.
     ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
 
+- `List` has a simplified syntax to call the `count` method: `my_list.count(x)`.
+    ([PR #2675](https://github.com/modularml/mojo/pull/2675) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
 - `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
     ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
+
+- `Dict` now has a simplified conversion to `String` with `my_dict.__str__()`.
+  Note that `Dict` does not conform to the `Stringable` trait so `str(my_dict)`
+  is not possible yet.
+    ([PR #2674](https://github.com/modularml/mojo/pull/2674) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - `List` now has an `index` method that allows one to find the (first) location
   of an element in a `List` of `EqualityComparable` types. For example:
@@ -199,6 +229,17 @@ what we publish.
   var my_list = List[Int](2, 3, 5, 7, 3)
   print(my_list.index(3))  # prints 1
   ```
+
+- `List` can now be converted to a `String` with a simplified syntax:
+  
+  ```mojo
+  var my_list = List[Int](2, 3)
+  print(my_list.__str__())  # prints [2, 3] 
+  ```
+
+  Note that `List` doesn't conform to the `Stringable` trait yet so you cannot
+  use `str(my_list)` yet.
+    ([PR #2673](https://github.com/modularml/mojo/pull/2673) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 ### 🦋 Changed
 
