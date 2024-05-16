@@ -28,6 +28,52 @@ from utils._format import Formattable, Formatter
 from utils.inlined_string import _ArrayMem
 
 # ===----------------------------------------------------------------------=== #
+#  Indexer
+# ===----------------------------------------------------------------------=== #
+
+
+trait Indexer:
+    """This trait denotes a type that can be used to index a container that
+    handles integral index values.
+
+    This solves the issue of being able to index data structures such as `List`
+    with the various integral types without being too broad and allowing types
+    that are coercible to `Int` (e.g. floating point values that have `__int__`
+    method). In contrast to `Intable`, types conforming to `Indexer` must be
+    convertible to `Int` in a lossless way.
+    """
+
+    fn __index__(self) -> Int:
+        """Return the index value.
+
+        Returns:
+            The index value of the object.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+#  index
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn index[T: Indexer](idx: T) -> Int:
+    """Returns the value of `__index__` for the given value.
+
+    Parameters:
+        T: A type conforming to the `Indexer` trait.
+
+    Args:
+        idx: The value.
+
+    Returns:
+        An `Int` respresenting the index value.
+    """
+    return idx.__index__()
+
+
+# ===----------------------------------------------------------------------=== #
 #  Intable
 # ===----------------------------------------------------------------------=== #
 
@@ -205,6 +251,7 @@ struct Int(
     Roundable,
     Stringable,
     Truncable,
+    Indexer,
 ):
     """This type represents an integer value."""
 

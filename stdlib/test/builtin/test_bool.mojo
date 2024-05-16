@@ -100,6 +100,11 @@ def test_neg():
     assert_equal(0, -False)
 
 
+def test_indexer():
+    assert_equal(1, Bool.__index__(True))
+    assert_equal(0, Bool.__index__(False))
+
+
 def main():
     test_bool_cast_to_int()
     test_bool_none()
@@ -107,3 +112,4 @@ def main():
     test_bool_to_string()
     test_bitwise()
     test_neg()
+    test_indexer()

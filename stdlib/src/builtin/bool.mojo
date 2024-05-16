@@ -59,7 +59,12 @@ trait Boolable:
 @value
 @register_passable("trivial")
 struct Bool(
-    Stringable, CollectionElement, Boolable, EqualityComparable, Intable
+    Stringable,
+    CollectionElement,
+    Boolable,
+    EqualityComparable,
+    Intable,
+    Indexer,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
@@ -150,6 +155,15 @@ struct Bool(
             1 if the Bool is True, 0 otherwise.
         """
         return __mlir_op.`pop.select`[_type=Int](self.value, Int(1), Int(0))
+
+    @always_inline("nodebug")
+    fn __index__(self) -> Int:
+        """Convert this Bool to an integer for indexing purposes.
+
+        Returns:
+            1 if the Bool is True, 0 otherwise.
+        """
+        return self.__int__()
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Bool) -> Bool:

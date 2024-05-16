@@ -143,6 +143,11 @@ def test_int_representation():
     assert_equal(repr(Int(-100)), "-100")
 
 
+def test_indexer():
+    assert_equal(5, Int(5).__index__())
+    assert_equal(987, Int(987).__index__())
+
+
 def main():
     test_constructors()
     test_properties()
@@ -160,3 +165,4 @@ def main():
     test_abs()
     test_string_conversion()
     test_int_representation()
+    test_indexer()

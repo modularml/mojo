@@ -238,15 +238,38 @@ what we publish.
   ```
 
 - `List` can now be converted to a `String` with a simplified syntax:
-  
+
   ```mojo
   var my_list = List[Int](2, 3)
-  print(my_list.__str__())  # prints [2, 3] 
+  print(my_list.__str__())  # prints [2, 3]
   ```
 
   Note that `List` doesn't conform to the `Stringable` trait yet so you cannot
   use `str(my_list)` yet.
     ([PR #2673](https://github.com/modularml/mojo/pull/2673) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
+- Added the `Indexer` trait to denote types that implement the `__index__()`
+  method which allow these types to be accepted in common `__getitem__` and
+  `__setitem__` implementations, as well as allow a new builtin `index` function
+  to be called on them. For example:
+
+  ```mojo
+  @value
+  struct AlwaysZero(Indexer):
+      fn __index__(self) -> Int:
+          return 0
+
+  struct MyList:
+      var data: List[Int]
+
+      fn __init__(inout self):
+          self.data = List[Int](1, 2, 3, 4)
+
+      fn __getitem__[T: Indexer](self, idx: T) -> T:
+          return self.data[index(idx)]
+
+  print(MyList()[AlwaysZero()])  # prints `1`
+  ```
 
 ### 🦋 Changed
 

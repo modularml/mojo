@@ -139,6 +139,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Sized,
     Stringable,
     Truncable,
+    Indexer,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -178,6 +179,22 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
+
+    @always_inline("nodebug")
+    fn __index__(self) -> Int:
+        """Returns the value as an int if it is an integral value.
+
+        Constraints:
+            Must be a scalar integral value.
+
+        Returns:
+            The value as an integer.
+        """
+        constrained[
+            type.is_integral() or type.is_bool(),
+            "expected integral or bool type",
+        ]()
+        return self.__int__()
 
     @always_inline("nodebug")
     fn __init__(inout self, value: SIMD[DType.float64, 1]):

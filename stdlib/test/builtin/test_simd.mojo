@@ -1009,6 +1009,13 @@ def test_min_max_clamp():
     assert_equal(i.clamp(-7, 4), I(-7, -5, 4, 4))
 
 
+def test_indexer():
+    assert_equal(5, Int8(5).__index__())
+    assert_equal(56, UInt32(56).__index__())
+    assert_equal(1, Scalar[DType.bool](True).__index__())
+    assert_equal(0, Scalar[DType.bool](False).__index__())
+
+
 def main():
     test_cast()
     test_simd_variadic()
@@ -1044,3 +1051,4 @@ def main():
     test_mul_with_overflow()
     test_abs()
     test_min_max_clamp()
+    test_indexer()
