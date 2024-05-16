@@ -113,6 +113,20 @@ fn test_string_byte_slice() raises:
     # )
 
 
+fn test_heap_string_from_string_slice() raises:
+    var string_lit: StringLiteral = "Hello"
+
+    var static_str: StringSlice[
+        False, ImmStaticLifetime
+    ] = string_lit.as_string_slice()
+
+    var heap_string = String(static_str)
+
+    assert_equal(heap_string, "Hello")
+
+
 fn main() raises:
     test_string_literal_byte_slice()
     test_string_byte_slice()
+
+    test_heap_string_from_string_slice()

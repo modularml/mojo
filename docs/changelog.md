@@ -67,8 +67,8 @@ what we publish.
           return Self(round(self.re), round(self.im))
   ```
 
-- The `abs, round, min, max, and divmod` functions have moved from `math` to
-  `builtin`, so you no longer need to do
+- The `abs`, `round`, `min`, `max`, and `divmod` functions have moved from
+  `math` to `builtin`, so you no longer need to do
   `from math import abs, round, min, max, divmod`.
 
 - Mojo now allows types to opt in to use the `floor()`, `ceil()`, and `trunc()`
@@ -93,6 +93,20 @@ what we publish.
 
       fn __trunc__(self) -> Self:
           return Self(trunc(re), trunc(im))
+  ```
+
+- Add builtin `any()` and `all()` functions to check for truthy elements in a collection.
+  This also works to get the truthy value of a SIMD vector.
+  ([PR #2600](https://github.com/modularml/mojo/pull/2600) by [@helehex](https://github.com/helehex))
+  For example:
+
+  ```mojo
+    fn truthy_simd():
+        var vec = SIMD[DType.int32, 4](0, 1, 2, 3)
+        if any(vec):
+            print("any elements are truthy")
+        if all(vec):
+            print("all elements are truthy")
   ```
 
 - Add an `InlinedArray` type that works on memory-only types.
@@ -130,6 +144,21 @@ what we publish.
 - A new `--validate-doc-strings` option has been added to `mojo` to emit errors
   on invalid doc strings instead of warnings.
 
+- Several `mojo` subcommands now support a `--diagnostic-format` option that
+  changes the format with which errors, warnings, and other diagnostics are
+  printed. By specifying `--diagnostic-format json` on the command line, errors
+  and other diagnostics will be output in a structured
+  [JSON Lines](https://jsonlines.org) format that is easier for machines to
+  parse.
+
+  The full list of subcommands that support `--diagnostic-format` is as follows:
+  `mojo build`, `mojo doc`, `mojo run`, `mojo package`, and `mojo test`.
+  Further, the `mojo test --json` option has been subsumed into this new option;
+  for the same behavior, run `mojo test --diagnostic-format json`.
+
+  Note that the format of the JSON output may change; we don't currently
+  guarantee its stability across releases of Mojo.
+
 - A new decorator, `@doc_private`, was added that can be used to hide a decl
   from being generated in the output of `mojo doc`. It also removes the
   requirement that the decl has documentation (e.g. when used with
@@ -163,6 +192,14 @@ what we publish.
 - `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
     ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
 
+- `List` now has an `index` method that allows one to find the (first) location
+  of an element in a `List` of `EqualityComparable` types. For example:
+
+  ```mojo
+  var my_list = List[Int](2, 3, 5, 7, 3)
+  print(my_list.index(3))  # prints 1
+  ```
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
@@ -189,6 +226,26 @@ what we publish.
   `swap` and `partition` will likely shuffle around as we're reworking
   our builtnin `sort` function and optimizing it.
 
+- `ListLiteral` and `Tuple` now only requires that element types be `Copyable`.
+  Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
+
+- The `math.bit` module has been moved to a new top-level `bit` module. The
+  following functions in this module have been renamed:
+  - `ctlz` -> `countl_zero`
+  - `cttz` -> `countr_zero`
+  - `bit_length` -> `bit_width`
+  - `ctpop` -> `pop_count`
+  - `bswap` -> `byte_reverse`
+  - `bitreverse` -> `bit_reverse`
+
+- The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
+  moved to the `bit` module.
+
+- The implementation of the following functions have been moved from the `math`
+  module to the new `utils.numerics` module: `isfinite`, `isinf`, `isnan`,
+  `nan`, `nextafter`, and `ulp`. The functions continue to be exposed in the
+  `math` module.
+
 ### ❌ Removed
 
 - The method `object.print()` has been removed. Since now, `object` has the
@@ -209,6 +266,22 @@ what we publish.
 
 - The `math.div_ceil` function has been removed in favor of the `math.ceildiv`
   function.
+
+- The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
+  same functionality is available in the builtin `SIMD.select` and
+  `SIMD.__and__` methods, respectively.
+
+- The `math.rotate_left` and `math.rotate_right` functions have been removed.
+  The same functionality is available in the builtin `SIMD.rotate_{left,right}`
+  methods for `SIMD` types, and the `bit.rotate_bits_{left,right}` methods for
+  `Int`.
+
+- The `math.limit` module has been removed. The same functionality is available
+  as follows:
+  - `math.limit.inf`: use `utils.numerics.max_or_inf`
+  - `math.limit.neginf`: use `utils.numerics.min_or_neg_inf`
+  - `math.limit.max_finite`: use `utils.numerics.max_finite`
+  - `math.limit.min_finite`: use `utils.numerics.min_finite`
 
 ### 🛠️ Fixed
 

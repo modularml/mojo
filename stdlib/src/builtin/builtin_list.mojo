@@ -23,8 +23,7 @@ from memory.unsafe_pointer import destroy_pointee
 # ===----------------------------------------------------------------------===#
 
 
-@value
-struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
+struct ListLiteral[*Ts: Movable](Sized, Movable):
     """The type of a literal heterogeneous list expression.
 
     A list consists of zero or more values, separated by commas.
@@ -45,6 +44,15 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         """
         self.storage = Tuple(storage=args^)
 
+    fn __moveinit__(inout self, owned existing: Self):
+        """Move construct the list.
+
+        Args:
+            existing: The value to move from.
+        """
+
+        self.storage = existing.storage^
+
     @always_inline("nodebug")
     fn __len__(self) -> Int:
         """Get the list length.
@@ -55,7 +63,7 @@ struct ListLiteral[*Ts: CollectionElement](Sized, CollectionElement):
         return len(self.storage)
 
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](self) -> T:
+    fn get[i: Int, T: Movable](self) -> T:
         """Get a list element at the given index.
 
         Parameters:
