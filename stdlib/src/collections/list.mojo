@@ -773,7 +773,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             value: The value to find.
 
         Returns:
-            True or False.
+            True if the value is contained in the list, False otherwise.
         """
 
         constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
