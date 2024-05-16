@@ -212,6 +212,11 @@ what we publish.
 - `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
     ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
 
+- `Dict` now has a simplified conversion to `String` with `my_dict.__str__()`.
+  Note that `Dict` does not conform to the `Stringable` trait so `str(my_dict)`
+  is not possible yet.
+    ([PR #2674](https://github.com/modularml/mojo/pull/2674) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
 - `List` now has an `index` method that allows one to find the (first) location
   of an element in a `List` of `EqualityComparable` types. For example:
 
