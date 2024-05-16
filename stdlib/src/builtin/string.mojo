@@ -432,13 +432,14 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     for pos in range(start, str_len):
         c = int(buff[pos])
         if isspace(c):
-            start += 1
-            continue
-        if c == ord_minus:
+            pass
+        elif c == ord_minus:
+            if is_negative:
+                raise Error(_atof_error(str_ref))
             is_negative = True
-            start += 1
         else:
             break
+        start += 1
     # read before dot
     for pos in range(start, str_len):
         c = int(buff[pos])
@@ -455,9 +456,9 @@ fn _atof(str_ref: StringRef) raises -> Float64:
             if ord_0 <= c <= ord_9:
                 result = result * 10.0 + (c - ord_0)
                 exponent -= 1
-                start += 1
             else:
                 break
+            start += 1
     # if e/E -> read scientific notation
     if c == ord_e or c == ord_E:
         start += 1
@@ -467,16 +468,15 @@ fn _atof(str_ref: StringRef) raises -> Float64:
         for pos in range(start, str_len):
             c = int(buff[pos])
             if c == ord_plus:
-                start += 1
+                pass
             elif c == ord_minus:
                 sign = -1
-                start += 1
             elif ord_0 <= c <= ord_9:
                 has_number = True
                 shift = shift * 10 + (c - ord_0)
-                start += 1
             else:
                 break
+            start += 1
         exponent += sign * shift
         if not has_number:
             raise Error(_atof_error(str_ref))
