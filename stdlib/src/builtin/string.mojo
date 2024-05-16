@@ -569,6 +569,9 @@ struct String(
         Args:
             impl: The buffer.
         """
+        if len(impl) == 0:
+            impl.append(0)  # ensure we have a null terminator
+
         debug_assert(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
@@ -592,6 +595,8 @@ struct String(
         Args:
             impl: The buffer.
         """
+        if len(impl) == 0:
+            impl.append(0)  # ensure we have a null terminator
         debug_assert(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",

@@ -19,7 +19,7 @@ from collections import List
 ```
 """
 
-
+from collections.index_normalization import normalize_index
 from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
 from .optional import Optional
@@ -614,11 +614,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A copy of the element at the given index.
         """
-        debug_assert(-self.size <= i < self.size, "index must be within bounds")
-
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += len(self)
+        var normalized_idx = normalize_index[container_name="List"](i, self)
 
         return (self.data + normalized_idx)[]
 

@@ -201,6 +201,7 @@ struct Int(
     Floorable,
     Formattable,
     Intable,
+    Indexer,
     KeyElement,
     Roundable,
     Stringable,
