@@ -395,7 +395,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
 
     var result: Float64 = 0.0
     var exponent: Int = 0
-    var is_negative: Bool = False
+    var sign: Int = 1
 
     alias ord_0 = Int8(ord("0"))
     alias ord_9 = Int8(ord("9"))
@@ -411,15 +411,17 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     var str_len = len(str_ref)
     var buff = str_ref.unsafe_ptr()
 
-    # skip leading spaces and read sign
+    # skip leading spaces
     for pos in range(start, str_len):
-        if buff[pos] == ord_minus:
-            if is_negative:
-                raise _atof_error(str_ref)
-            is_negative = True
-        elif not isspace(buff[pos]):
+        if not isspace(buff[pos]):
             break
         start += 1
+    # check sign
+    if buff[start] == ord_plus:
+        start += 1
+    elif buff[start] == ord_minus:
+        start += 1
+        sign = -1
     # read before dot
     for pos in range(start, str_len):
         if ord_0 <= buff[pos] <= ord_9:
@@ -473,9 +475,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     if exponent < 0:
         result /= shift
     # apply sign
-    if is_negative:
-        result = -result
-    return result
+    return result * sign
 
 
 fn atof(str: String) raises -> Float64:

@@ -404,7 +404,7 @@ fn test_atol_base_0() raises:
 fn test_atof() raises:
     assert_equal(375.0, atof(String("375.f")))
     assert_equal(1.0, atof(String("001.")))
-    assert_equal(5.0, atof(String(" 005.")))
+    assert_equal(+5.0, atof(String(" +005.")))
     assert_equal(13.0, atof(String(" 013.f  ")))
     assert_equal(-89, atof(String("-89")))
     assert_equal(-0.3, atof(String(" -0.3")))
@@ -450,6 +450,11 @@ fn test_atof() raises:
         contains="String is not convertible to float: ' --958.23 '"
     ):
         _ = atof(String(" --958.23 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' ++94. '"
+    ):
+        _ = atof(String(" ++94. "))
 
 
 fn test_calc_initial_buffer_size_int32() raises:
