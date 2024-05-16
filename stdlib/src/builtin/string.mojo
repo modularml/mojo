@@ -397,65 +397,60 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     var exponent: Int = 0
     var is_negative: Bool = False
 
-    alias ord_0 = ord("0")
-    alias ord_9 = ord("9")
-    alias ord_dot = ord(".")
-    alias ord_plus = ord("+")
-    alias ord_minus = ord("-")
-    alias ord_f = ord("f")
-    alias ord_F = ord("F")
-    alias ord_e = ord("e")
-    alias ord_E = ord("E")
+    alias ord_0 = Int8(ord("0"))
+    alias ord_9 = Int8(ord("9"))
+    alias ord_dot = Int8(ord("."))
+    alias ord_plus = Int8(ord("+"))
+    alias ord_minus = Int8(ord("-"))
+    alias ord_f = Int8(ord("f"))
+    alias ord_F = Int8(ord("F"))
+    alias ord_e = Int8(ord("e"))
+    alias ord_E = Int8(ord("E"))
 
     var start: Int = 0
     var str_len = len(str_ref)
     var buff = str_ref.unsafe_ptr()
 
-    var c: Int = 0
     # skip leading spaces and read sign
     for pos in range(start, str_len):
-        c = int(buff[pos])
-        if c == ord_minus:
+        if buff[pos] == ord_minus:
             if is_negative:
                 raise _atof_error(str_ref)
             is_negative = True
-        elif not isspace(c):
+        elif not isspace(buff[pos]):
             break
         start += 1
     # read before dot
     for pos in range(start, str_len):
-        c = int(buff[pos])
-        if ord_0 <= c <= ord_9:
-            result = result * 10.0 + (c - ord_0)
+        if ord_0 <= buff[pos] <= ord_9:
+            result = result * 10.0 + int(buff[pos] - ord_0)
             start += 1
         else:
             break
     # if dot -> read after dot
-    if c == ord_dot:
+    if buff[start] == ord_dot:
         start += 1
         for pos in range(start, str_len):
-            c = int(buff[pos])
-            if ord_0 <= c <= ord_9:
-                result = result * 10.0 + (c - ord_0)
+            if ord_0 <= buff[pos] <= ord_9:
+                result = result * 10.0 + int(buff[pos] - ord_0)
                 exponent -= 1
             else:
                 break
             start += 1
     # if e/E -> read scientific notation
-    if c == ord_e or c == ord_E:
+    if buff[start] == ord_e or buff[start] == ord_E:
         start += 1
         var sign: Int = 1
         var shift: Int = 0
         var has_number: Bool = False
         for pos in range(start, str_len):
-            c = int(buff[pos])
-            if c == ord_plus:
+            if buff[start] == ord_plus:
                 pass
-            elif c == ord_minus:
+            elif buff[pos] == ord_minus:
                 sign = -1
-            elif ord_0 <= c <= ord_9:
+            elif ord_0 <= buff[start] <= ord_9:
                 has_number = True
-                shift = shift * 10 + (c - ord_0)
+                shift = shift * 10 + int(buff[pos] - ord_0)
             else:
                 break
             start += 1
@@ -464,11 +459,12 @@ fn _atof(str_ref: StringRef) raises -> Float64:
             raise _atof_error(str_ref)
     # check if the string is fully parsed
     if start != str_len:
-        if c == ord_f or c == ord_F:  # f/F at end is allowed
+        if (
+            buff[start] == ord_f or buff[start] == ord_F
+        ):  # f/F at end is allowed
             start += 1
         for pos in range(start, str_len):
-            c = int(buff[pos])
-            if not isspace(c):
+            if not isspace(buff[pos]):
                 raise _atof_error(str_ref)
     # apply shift
     var shift: Int = 10 ** abs(exponent)
