@@ -743,9 +743,9 @@ def test_list_mult():
 
 def test_list_contains():
     var x = List[Int](1, 2, 3)
-    assert_equal(0 in x, False)
-    assert_equal(1 in x, True)
-    assert_equal(4 in x, False)
+    assert_false(0 in x)
+    assert_true(1 in x)
+    assert_false(4 in x)
 
     # TODO: implement List.__eq__ for Self[ComparableCollectionElement]
     # var y = List[List[Int]]()
