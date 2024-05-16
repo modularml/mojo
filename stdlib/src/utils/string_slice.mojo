@@ -44,6 +44,7 @@ struct StringSlice[
     # Initializers
     # ===------------------------------------------------------------------===#
 
+    @always_inline
     fn __init__(
         inout self, owned unsafe_from_utf8: Span[Int8, is_mutable, lifetime]
     ):
