@@ -31,6 +31,14 @@ fn test_variadic_list() raises:
     check_list(5, 8, 6)
 
 
+fn test_repr_list() raises:
+    var l = List(1, 2, 3)
+    assert_equal(__type_of(l).__repr__(l), "[1, 2, 3]")
+    var empty = List[Int]()
+    assert_equal(__type_of(empty).__repr__(empty), "[]")
+
+
 def main():
     test_list()
     test_variadic_list()
+    test_repr_list()

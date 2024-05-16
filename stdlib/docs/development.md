@@ -226,7 +226,7 @@ import os
 
 def main():
     all_paths = os.get_cwd_and_paths()
-    print(__type_of(all_paths).__str__(all_paths))
+    print(all_paths.__str__())
 ```
 
 We also need to set the following environment variable that tells Mojo to
