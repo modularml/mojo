@@ -10,22 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements the bit package."""
 
-
-fn divmod(numerator: Int, denominator: Int) -> Tuple[Int, Int]:
-    """Performs integer division and returns the quotient and the remainder.
-
-    Currently supported only for integers. Support for more standard library
-    types like Int8, Int16... is planned.
-
-    This method calls `a.__divmod__(b)`, thus, the actual implementation of
-    divmod should go in the `__divmod__` method of the struct of `a`.
-
-    Args:
-        numerator: The dividend.
-        denominator: The divisor.
-
-    Returns:
-        A `Tuple` containing the quotient and the remainder.
-    """
-    return numerator.__divmod__(denominator)
+from .bit import (
+    countl_zero,
+    countr_zero,
+    bit_reverse,
+    byte_reverse,
+    pop_count,
+    bit_not,
+    bit_width,
+    rotate_bits_left,
+    rotate_bits_right,
+)

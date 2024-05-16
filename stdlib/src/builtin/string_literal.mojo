@@ -67,6 +67,18 @@ struct StringLiteral(
         Returns:
             The length of this StringLiteral.
         """
+        # TODO(MSTDL-160):
+        #   Properly count Unicode codepoints instead of returning this length
+        #   in bytes.
+        return self._byte_length()
+
+    @always_inline
+    fn _byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        Returns:
+            The length of this StringLiteral in bytes.
+        """
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
@@ -197,7 +209,22 @@ struct StringLiteral(
         Returns:
             A new string.
         """
-        return self
+        var string = String()
+        var length: Int = __mlir_op.`pop.string.size`(self.value)
+        var buffer = String._buffer_type()
+        var new_capacity = length + 1
+        buffer._realloc(new_capacity)
+        buffer.size = new_capacity
+        var uint8Ptr = __mlir_op.`pop.pointer.bitcast`[
+            _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
+        ](__mlir_op.`pop.string.address`(self.value))
+        var data: DTypePointer[DType.uint8] = DTypePointer[DType.uint8](
+            uint8Ptr
+        )
+        memcpy(rebind[DTypePointer[DType.uint8]](buffer.data), data, length)
+        initialize_pointee_move(buffer.data + length, 0)
+        string._buffer = buffer^
+        return string
 
     fn __repr__(self) -> String:
         """Return a representation of the `StringLiteral` instance.
@@ -208,6 +235,41 @@ struct StringLiteral(
             A new representation of the string.
         """
         return self.__str__().__repr__()
+
+    @always_inline
+    fn as_string_slice(
+        self: Reference[Self, _, _]
+    ) -> StringSlice[False, ImmStaticLifetime]:
+        """Returns a string slice of this static string literal.
+
+        Returns:
+            A string slice pointing to this static string literal.
+        """
+
+        var bytes = self[].as_bytes_slice()
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in StringLiteral so this is actually
+        #   guaranteed to be valid.
+        return StringSlice(unsafe_from_utf8=bytes)
+
+    @always_inline
+    fn as_bytes_slice(
+        self: Reference[Self, _, _]
+    ) -> Span[Int8, False, ImmStaticLifetime]:
+        """
+        Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        var ptr = rebind[UnsafePointer[Int8]](self[].unsafe_ptr())
+
+        return Span[Int8, False, ImmStaticLifetime](
+            unsafe_ptr=ptr,
+            len=self[]._byte_length(),
+        )
 
     fn format_to(self, inout writer: Formatter):
         """

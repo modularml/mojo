@@ -15,32 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from bit import countl_zero
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple
+from utils import StringRef, StaticIntTuple, Span, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
-
-# ===----------------------------------------------------------------------===#
-# Utilities
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _ctlz(val: Int) -> Int:
-    return llvm_intrinsic["llvm.ctlz", Int, has_side_effect=False](val, False)
-
-
-@always_inline("nodebug")
-fn _ctlz(val: SIMD) -> __type_of(val):
-    return llvm_intrinsic["llvm.ctlz", __type_of(val), has_side_effect=False](
-        val, False
-    )
-
 
 # ===----------------------------------------------------------------------===#
 # ord
@@ -70,7 +54,7 @@ fn ord(s: String) -> Int:
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
         return int(b1)
-    var num_bytes = _ctlz(~b1)
+    var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
@@ -641,14 +625,36 @@ struct String(
         self._buffer = buffer^
 
     @always_inline
-    fn __init__(inout self, str: StringLiteral):
+    fn __init__(inout self, str_slice: StringSlice):
+        """Construct a string from a string slice.
+
+        This will allocate a new string that copies the string contents from
+        the provided string slice `str_slice`.
+
+        Args:
+            str_slice: The string slice from which to construct this string.
+        """
+
+        # Calculate length in bytes
+        var length = len(str_slice.as_bytes_slice())
+        var buffer = Self._buffer_type()
+        buffer.resize(length + 1, 0)
+        memcpy(
+            DTypePointer(buffer.data),
+            DTypePointer(str_slice.as_bytes_slice().unsafe_ptr()),
+            length,
+        )
+        buffer[length] = 0
+        self._buffer = buffer^
+
+    @always_inline
+    fn __init__(inout self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 
         Args:
-            str: The input constant string.
+            literal: The input constant string.
         """
-
-        self = String(StringRef(str))
+        self = literal.__str__()
 
     fn __init__[stringable: Stringable](inout self, value: stringable):
         """Creates a string from a value that conforms to Stringable trait.
@@ -1196,6 +1202,57 @@ struct String(
 
         return copy
 
+    @always_inline
+    fn as_bytes_slice(
+        self: Reference[Self, _, _]
+    ) -> Span[Int8, self.is_mutable, self.lifetime]:
+        """
+        Returns a contiguous slice of the bytes owned by this string.
+
+        This does not include the trailing null terminator.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        return Span[Int8, self.is_mutable, self.lifetime](
+            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+            # Does NOT include the NUL terminator.
+            len=self[]._byte_length(),
+        )
+
+    @always_inline
+    fn as_string_slice(
+        self: Reference[Self, _, _]
+    ) -> StringSlice[self.is_mutable, self.lifetime]:
+        """Returns a string slice of the data owned by this string.
+
+        Returns:
+            A string slice pointing to the data owned by this string.
+        """
+        var bytes = self[].as_bytes_slice()
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in String so this is actually
+        #   guaranteed to be valid.
+        return StringSlice(unsafe_from_utf8=bytes)
+
+    fn _byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        This does not include the trailing null terminator in the count.
+
+        Returns:
+            The length of this StringLiteral in bytes, excluding null terminator.
+        """
+
+        var buffer_len = len(self._buffer)
+
+        if buffer_len > 0:
+            return buffer_len - 1
+        else:
+            return buffer_len
+
     fn _steal_ptr(inout self) -> DTypePointer[DType.int8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
@@ -1656,7 +1713,7 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
     )
     var n = UInt32(n0)
-    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ _ctlz(n | 1))
+    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ countl_zero(n | 1))
     return (n0 + lookup_table[int(log2)]) >> 32
 
 
