@@ -17,14 +17,13 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
-from builtin._math import Ceilable, CeilDivable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
 from builtin.hex import _try_write_int
 
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils import StaticIntTuple
 from utils._format import Formattable, Formatter
 from utils.inlined_string import _ArrayMem
 
@@ -198,12 +197,14 @@ struct Int(
     Boolable,
     Ceilable,
     CeilDivable,
+    Comparable,
     Floorable,
     Formattable,
     Intable,
     KeyElement,
     Roundable,
     Stringable,
+    Truncable,
 ):
     """This type represents an integer value."""
 
@@ -503,7 +504,7 @@ struct Int(
         Returns:
             The absolute value.
         """
-        return self if self > 0 else -self
+        return -self if self < 0 else self
 
     @always_inline("nodebug")
     fn __ceil__(self) -> Self:
@@ -526,6 +527,15 @@ struct Int(
     @always_inline("nodebug")
     fn __round__(self) -> Self:
         """Return the rounded value of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __trunc__(self) -> Self:
+        """Return the truncated Int value, which is itself.
 
         Returns:
             The Int value itself.
@@ -1026,4 +1036,5 @@ struct Int(
             uses. Its intended usage is for data structures. See the `hash`
             builtin documentation for more details.
         """
-        return _hash_simd(Scalar[DType.index](self))
+        # TODO(MOCO-636): switch to DType.index
+        return _hash_simd(Scalar[DType.int64](self))

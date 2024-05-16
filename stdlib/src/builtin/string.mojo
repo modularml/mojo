@@ -15,32 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from bit import countl_zero
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple
+from utils import StringRef, StaticIntTuple, Span, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
-
-# ===----------------------------------------------------------------------===#
-# Utilities
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _ctlz(val: Int) -> Int:
-    return llvm_intrinsic["llvm.ctlz", Int, has_side_effect=False](val, False)
-
-
-@always_inline("nodebug")
-fn _ctlz(val: SIMD) -> __type_of(val):
-    return llvm_intrinsic["llvm.ctlz", __type_of(val), has_side_effect=False](
-        val, False
-    )
-
 
 # ===----------------------------------------------------------------------===#
 # ord
@@ -70,7 +54,7 @@ fn ord(s: String) -> Int:
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
         return int(b1)
-    var num_bytes = _ctlz(~b1)
+    var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
@@ -520,6 +504,17 @@ struct String(
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
+    """ Useful string aliases. """
+    alias WHITESPACE = String(" \n\t\r\f\v")
+    alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
+    alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
+    alias DIGITS = String("0123456789")
+    alias HEX_DIGITS = String.DIGITS + String("abcdef") + String("ABCDEF")
+    alias OCT_DIGITS = String("01234567")
+    alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
+    alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
+
     @always_inline
     fn __str__(self) -> String:
         return self
@@ -630,14 +625,36 @@ struct String(
         self._buffer = buffer^
 
     @always_inline
-    fn __init__(inout self, str: StringLiteral):
+    fn __init__(inout self, str_slice: StringSlice):
+        """Construct a string from a string slice.
+
+        This will allocate a new string that copies the string contents from
+        the provided string slice `str_slice`.
+
+        Args:
+            str_slice: The string slice from which to construct this string.
+        """
+
+        # Calculate length in bytes
+        var length = len(str_slice.as_bytes_slice())
+        var buffer = Self._buffer_type()
+        buffer.resize(length + 1, 0)
+        memcpy(
+            DTypePointer(buffer.data),
+            DTypePointer(str_slice.as_bytes_slice().unsafe_ptr()),
+            length,
+        )
+        buffer[length] = 0
+        self._buffer = buffer^
+
+    @always_inline
+    fn __init__(inout self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 
         Args:
-            str: The input constant string.
+            literal: The input constant string.
         """
-
-        self = String(StringRef(str))
+        self = literal.__str__()
 
     fn __init__[stringable: Stringable](inout self, value: stringable):
         """Creates a string from a value that conforms to Stringable trait.
@@ -891,6 +908,60 @@ struct String(
         return not (self == other)
 
     @always_inline
+    fn __lt__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using LT comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is strictly less than the RHS String and False otherwise.
+        """
+        var len1 = len(self)
+        var len2 = len(rhs)
+
+        if len1 < len2:
+            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
+        else:
+            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
+
+    @always_inline
+    fn __le__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using LE comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is less than or equal to the RHS String and False otherwise.
+        """
+        return not (rhs < self)
+
+    @always_inline
+    fn __gt__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using GT comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is strictly greater than the RHS String and False otherwise.
+        """
+        return rhs < self
+
+    @always_inline
+    fn __ge__(self, rhs: String) -> Bool:
+        """Compare this String to the RHS using GE comparison.
+
+        Args:
+            rhs: The other String to compare against.
+
+        Returns:
+            True if this String is greater than or equal to the RHS String and False otherwise.
+        """
+        return not (self < rhs)
+
+    @always_inline
     fn __add__(self, other: String) -> String:
         """Creates a string by appending another string at the end.
 
@@ -1131,6 +1202,57 @@ struct String(
 
         return copy
 
+    @always_inline
+    fn as_bytes_slice(
+        self: Reference[Self, _, _]
+    ) -> Span[Int8, self.is_mutable, self.lifetime]:
+        """
+        Returns a contiguous slice of the bytes owned by this string.
+
+        This does not include the trailing null terminator.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        return Span[Int8, self.is_mutable, self.lifetime](
+            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+            # Does NOT include the NUL terminator.
+            len=self[]._byte_length(),
+        )
+
+    @always_inline
+    fn as_string_slice(
+        self: Reference[Self, _, _]
+    ) -> StringSlice[self.is_mutable, self.lifetime]:
+        """Returns a string slice of the data owned by this string.
+
+        Returns:
+            A string slice pointing to the data owned by this string.
+        """
+        var bytes = self[].as_bytes_slice()
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in String so this is actually
+        #   guaranteed to be valid.
+        return StringSlice(unsafe_from_utf8=bytes)
+
+    fn _byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        This does not include the trailing null terminator in the count.
+
+        Returns:
+            The length of this StringLiteral in bytes, excluding null terminator.
+        """
+
+        var buffer_len = len(self._buffer)
+
+        if buffer_len > 0:
+            return buffer_len - 1
+        else:
+            return buffer_len
+
     fn _steal_ptr(inout self) -> DTypePointer[DType.int8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
@@ -1306,43 +1428,46 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self) -> String:
-        """Return a copy of the string with leading and trailing whitespace characters removed.
+    fn strip(self, chars: String = String.WHITESPACE) -> String:
+        """Return a copy of the string with leading and trailing characters removed.
 
-        See `isspace` for a list of whitespace characters
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no leading or trailing whitespace characters.
+          A copy of the string with no leading or trailing characters.
         """
 
-        return self.lstrip().rstrip()
+        return self.lstrip(chars).rstrip(chars)
 
-    fn rstrip(self) -> String:
-        """Return a copy of the string with trailing whitespace characters removed.
+    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
+        """Return a copy of the string with trailing characters removed.
 
-        See `isspace` for a list of whitespace characters
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no trailing whitespace characters.
+          A copy of the string with no trailing characters.
         """
 
         var r_idx = len(self)
-        while r_idx > 0 and isspace(ord(self[r_idx - 1])):
+        while r_idx > 0 and self[r_idx - 1] in chars:
             r_idx -= 1
 
         return self[:r_idx]
 
-    fn lstrip(self) -> String:
-        """Return a copy of the string with leading whitespace characters removed.
+    fn lstrip(self, chars: String = String.WHITESPACE) -> String:
+        """Return a copy of the string with leading characters removed.
 
-        See `isspace` for a list of whitespace characters
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no leading whitespace characters.
+          A copy of the string with no leading characters.
         """
 
         var l_idx = 0
-        while l_idx < len(self) and isspace(ord(self[l_idx])):
+        while l_idx < len(self) and self[l_idx] in chars:
             l_idx += 1
 
         return self[l_idx:]
@@ -1588,7 +1713,7 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
     )
     var n = UInt32(n0)
-    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ _ctlz(n | 1))
+    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ countl_zero(n | 1))
     return (n0 + lookup_table[int(log2)]) >> 32
 
 

@@ -50,7 +50,7 @@ def test_basic():
     assert_equal(1, a1)
     assert_equal(2, b1)
 
-    assert_equal(1, (a^).unsafe_take())
+    assert_equal(1, a.unsafe_take())
 
     # TODO: this currently only checks for mutable references.
     # We may want to come back and add an immutable test once
@@ -108,6 +108,18 @@ def test_optional_reg_isnot():
     assert_false(a is not None)
 
 
+def test_optional_take_mutates():
+    var opt1 = Optional[Int](5)
+
+    assert_true(opt1)
+
+    var value: Int = opt1.take()
+
+    assert_equal(value, 5)
+    # The optional should now be empty
+    assert_false(opt1)
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
@@ -115,3 +127,4 @@ def main():
     test_optional_isnot()
     test_optional_reg_is()
     test_optional_reg_isnot()
+    test_optional_take_mutates()

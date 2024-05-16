@@ -277,12 +277,24 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
-    fn __init__(inout self, *, uninitialized: Bool):
-        """Constructs an empty with uninitized data.
+    fn __init__(inout self, *, unsafe_uninitialized: Bool):
+        """Create an InlineArray with uninitialized memory.
+
+        Note that this is highly unsafe and should be used with caution.
+
+        We recommend to use the `InlineList` instead if all the objects
+        are not available when creating the array.
+
+        If despite those workarounds, one still needs an uninitialized array,
+        it is possible with:
+
+        ```mojo
+        var uninitialized_array = InlineArray[Int, 10](unsafe_uninitialized=True)
+        ```
 
         Args:
-            uninitialized: Unused, exists just to make uninitialized
-                case explicit.
+            unsafe_uninitialized: A boolean to indicate if the array should be initialized.
+                Always set to `True` (it's not actually used inside the constructor).
         """
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
@@ -392,3 +404,20 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             normalized_idx += size
 
         return self[]._get_reference_unsafe(normalized_idx)
+
+    @always_inline
+    fn unsafe_ptr(
+        self: Reference[Self, _, _]
+    ) -> UnsafePointer[Self.ElementType]:
+        """Get an `UnsafePointer` to the underlying array.
+
+        That pointer is unsafe but can be used to read or write to the array.
+        Be careful when using this. As opposed to a pointer to a `List`,
+        this pointer becomes invalid when the `InlineArray` is moved.
+
+        Make sure to refresh your pointer every time the `InlineArray` is moved.
+
+        Returns:
+            An `UnsafePointer` to the underlying array.
+        """
+        return UnsafePointer(self[]._array).bitcast[Self.ElementType]()

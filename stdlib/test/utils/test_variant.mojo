@@ -158,6 +158,13 @@ def test_set_calls_deleter():
     assert_no_poison()
 
 
+def test_replace():
+    var v1: Variant[Int, String] = 998
+    var x = v1.replace[String, Int]("hello")
+
+    assert_equal(x, 998)
+
+
 def test_take_doesnt_call_deleter():
     alias TestDeleterVariant = Variant[ObservableDel, Poison]
     var deleted: Bool = False
@@ -186,12 +193,6 @@ def test_get_returns_mutable_reference():
     v2[String] = "something else"
     assert_equal(v2[String], "something else")
 
-    var v3: Variant[Int, String] = 4
-    assert_equal(
-        int(v3._get_ptr[Int]()),
-        int(Reference(v3)[]._get_ptr[Int]()),
-    )
-
 
 def main():
     test_basic()
@@ -199,5 +200,6 @@ def main():
     test_copy()
     test_move()
     test_del()
-    test_set_calls_deleter()
     test_take_doesnt_call_deleter()
+    test_set_calls_deleter()
+    test_replace()

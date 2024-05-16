@@ -209,7 +209,7 @@ struct PythonObject(
         self.py_object = cpython.toPython(string._strref_dangerous())
         string._strref_keepalive()
 
-    fn __init__[*Ts: CollectionElement](inout self, value: ListLiteral[Ts]):
+    fn __init__[*Ts: Movable](inout self, value: ListLiteral[Ts]):
         """Initialize the object from a list literal.
 
         Parameters:
@@ -250,7 +250,7 @@ struct PythonObject(
 
         unroll[fill, len(VariadicList(Ts))]()
 
-    fn __init__[*Ts: CollectionElement](inout self, value: Tuple[Ts]):
+    fn __init__[*Ts: Movable](inout self, value: Tuple[Ts]):
         """Initialize the object from a tuple literal.
 
         Parameters:

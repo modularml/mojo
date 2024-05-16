@@ -10,22 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-
-
-fn divmod(numerator: Int, denominator: Int) -> Tuple[Int, Int]:
-    """Performs integer division and returns the quotient and the remainder.
-
-    Currently supported only for integers. Support for more standard library
-    types like Int8, Int16... is planned.
-
-    This method calls `a.__divmod__(b)`, thus, the actual implementation of
-    divmod should go in the `__divmod__` method of the struct of `a`.
-
-    Args:
-        numerator: The dividend.
-        denominator: The divisor.
-
-    Returns:
-        A `Tuple` containing the quotient and the remainder.
-    """
-    return numerator.__divmod__(denominator)
+"""IO constants and functions."""
+alias stdout: Int = 1
+alias stderr: Int = 2
