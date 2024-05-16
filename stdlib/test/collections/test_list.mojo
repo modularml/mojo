@@ -649,12 +649,10 @@ def test_constructor_from_other_list_through_pointer():
 
 def test_converting_list_to_string():
     var my_list = List[Int](1, 2, 3)
-    assert_equal(__type_of(my_list).__str__(my_list), "[1, 2, 3]")
+    assert_equal(my_list.__str__(), "[1, 2, 3]")
 
     var my_list4 = List[String]("a", "b", "c", "foo")
-    assert_equal(
-        __type_of(my_list4).__str__(my_list4), "['a', 'b', 'c', 'foo']"
-    )
+    assert_equal(my_list4.__str__(), "['a', 'b', 'c', 'foo']")
 
 
 def test_list_count():
@@ -675,23 +673,23 @@ def test_list_add():
     # check that original values aren't modified
     assert_equal(len(a), 3)
     assert_equal(len(b), 3)
-    assert_equal(__type_of(c).__str__(c), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(c.__str__(), "[1, 2, 3, 4, 5, 6]")
 
     a += b
     assert_equal(len(a), 6)
-    assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(a.__str__(), "[1, 2, 3, 4, 5, 6]")
     assert_equal(len(b), 3)
 
     a = List[Int](1, 2, 3)
     a += b^
     assert_equal(len(a), 6)
-    assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(a.__str__(), "[1, 2, 3, 4, 5, 6]")
 
     var d = List[Int](1, 2, 3)
     var e = List[Int](4, 5, 6)
     var f = d + e^
     assert_equal(len(f), 6)
-    assert_equal(__type_of(f).__str__(f), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(f.__str__(), "[1, 2, 3, 4, 5, 6]")
 
     var l = List[Int](1, 2, 3)
     l += List[Int]()
@@ -702,13 +700,13 @@ def test_list_mult():
     var a = List[Int](1, 2, 3)
     var b = a * 2
     assert_equal(len(b), 6)
-    assert_equal(__type_of(b).__str__(b), "[1, 2, 3, 1, 2, 3]")
+    assert_equal(b.__str__(), "[1, 2, 3, 1, 2, 3]")
     b = a * 3
     assert_equal(len(b), 9)
-    assert_equal(__type_of(b).__str__(b), "[1, 2, 3, 1, 2, 3, 1, 2, 3]")
+    assert_equal(b.__str__(), "[1, 2, 3, 1, 2, 3, 1, 2, 3]")
     a *= 2
     assert_equal(len(a), 6)
-    assert_equal(__type_of(a).__str__(a), "[1, 2, 3, 1, 2, 3]")
+    assert_equal(a.__str__(), "[1, 2, 3, 1, 2, 3]")
 
     var l = List[Int](1, 2)
     l *= 1

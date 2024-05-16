@@ -220,6 +220,17 @@ what we publish.
   print(my_list.index(3))  # prints 1
   ```
 
+- `List` can now be converted to a `String` with a simplified syntax:
+  
+  ```mojo
+  var my_list = List[Int](2, 3)
+  print(my_list.__str__())  # prints [2, 3] 
+  ```
+
+  Note that `List` doesn't conform to the `Stringable` trait yet so you cannot
+  use `str(my_list)` yet.
+    ([PR #2673](https://github.com/modularml/mojo/pull/2673) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously

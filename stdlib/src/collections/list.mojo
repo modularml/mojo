@@ -660,7 +660,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         return _ListIter[forward=False](len(self[]), self)
 
-    @staticmethod
     fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
@@ -669,16 +668,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(__type_of(my_list).__str__(my_list))
+        print(my_list.__str__())
         ```
 
         When the compiler supports conditional methods, then a simple `str(my_list)` will
         be enough.
 
         The elements' type must implement the `__repr__()` for this to work.
-
-        Args:
-            self: The list to represent as a string.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
