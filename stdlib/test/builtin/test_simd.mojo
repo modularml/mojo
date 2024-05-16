@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from sys import has_neon
+from utils.numerics import isfinite, isinf, isnan
 
 from testing import assert_equal, assert_not_equal, assert_true, assert_false
 
@@ -289,6 +290,24 @@ def test_roundeven():
 
     alias F = SIMD[DType.float32, 4]
     assert_equal(F(1.5, 2.5, -2.5, -3.5).roundeven(), F(2.0, 2.0, -2.0, -4.0))
+
+
+def test_div():
+    assert_false(isfinite(Float32(33).__truediv__(0)))
+    assert_false(isfinite(Float32(0).__truediv__(0)))
+
+    assert_true(isinf(Float32(33).__truediv__(0)))
+    assert_false(isinf(Float32(0).__truediv__(0)))
+
+    assert_false(isnan(Float32(33).__truediv__(0)))
+    assert_true(isnan(Float32(0).__truediv__(0)))
+
+    alias F32 = SIMD[DType.float32, 4]
+    var res = F32.__truediv__(F32(1, 0, 3, -1), F32(0, 0, 1, 0))
+    alias B = SIMD[DType.bool, 4]
+    assert_equal(isfinite(res), B(False, False, True, False))
+    assert_equal(isinf(res), B(True, False, False, True))
+    assert_equal(isnan(res), B(False, True, False, False))
 
 
 def test_floordiv():
@@ -713,207 +732,179 @@ def test_limits():
 
 
 def test_add_with_overflow():
-    # TODO: replace all the aliases with math.limit.max_finite()
-    # and math.limit.min_finite()
-    alias uint8_min = 0
-    alias uint8_max = 255
     var value_u8: UInt8
     var overflowed_u8: Scalar[DType.bool]
-    value_u8, overflowed_u8 = UInt8(uint8_max).add_with_overflow(1)
-    assert_equal(value_u8, uint8_min)
+    value_u8, overflowed_u8 = UInt8(UInt8.MAX).add_with_overflow(1)
+    assert_equal(value_u8, UInt8.MIN)
     assert_equal(overflowed_u8, True)
 
     var value_u8x4: SIMD[DType.uint8, 4]
     var overflowed_u8x4: SIMD[DType.bool, 4]
     value_u8x4, overflowed_u8x4 = SIMD[DType.uint8, 4](
-        1, uint8_max, 1, uint8_max
+        1, UInt8.MAX, 1, UInt8.MAX
     ).add_with_overflow(SIMD[DType.uint8, 4](0, 1, 0, 1))
-    assert_equal(value_u8x4, SIMD[DType.uint8, 4](1, uint8_min, 1, uint8_min))
+    assert_equal(value_u8x4, SIMD[DType.uint8, 4](1, UInt8.MIN, 1, UInt8.MIN))
     assert_equal(overflowed_u8x4, SIMD[DType.bool, 4](False, True, False, True))
 
-    alias int8_min = -128
-    alias int8_max = 127
     var value_i8: Int8
     var overflowed_i8: Scalar[DType.bool]
-    value_i8, overflowed_i8 = Int8(int8_max).add_with_overflow(1)
-    assert_equal(value_i8, int8_min)
+    value_i8, overflowed_i8 = Int8(Int8.MAX).add_with_overflow(1)
+    assert_equal(value_i8, Int8.MIN)
     assert_equal(overflowed_i8, True)
 
     var value_i8x4: SIMD[DType.int8, 4]
     var overflowed_i8x4: SIMD[DType.bool, 4]
     value_i8x4, overflowed_i8x4 = SIMD[DType.int8, 4](
-        1, int8_max, 1, int8_max
+        1, Int8.MAX, 1, Int8.MAX
     ).add_with_overflow(SIMD[DType.int8, 4](0, 1, 0, 1))
-    assert_equal(value_i8x4, SIMD[DType.int8, 4](1, int8_min, 1, int8_min))
+    assert_equal(value_i8x4, SIMD[DType.int8, 4](1, Int8.MIN, 1, Int8.MIN))
     assert_equal(overflowed_i8x4, SIMD[DType.bool, 4](False, True, False, True))
 
-    alias uint32_min = 0
-    alias uint32_max = 4294967295
     var value_u32: UInt32
     var overflowed_u32: Scalar[DType.bool]
-    value_u32, overflowed_u32 = UInt32(uint32_max).add_with_overflow(1)
-    assert_equal(value_u32, uint32_min)
+    value_u32, overflowed_u32 = UInt32(UInt32.MAX).add_with_overflow(1)
+    assert_equal(value_u32, UInt32.MIN)
     assert_equal(overflowed_u32, True)
 
     var value_u32x4: SIMD[DType.uint32, 4]
     var overflowed_u32x4: SIMD[DType.bool, 4]
     value_u32x4, overflowed_u32x4 = SIMD[DType.uint32, 4](
-        1, uint32_max, 1, uint32_max
+        1, UInt32.MAX, 1, UInt32.MAX
     ).add_with_overflow(SIMD[DType.uint32, 4](0, 1, 0, 1))
     assert_equal(
-        value_u32x4, SIMD[DType.uint32, 4](1, uint32_min, 1, uint32_min)
+        value_u32x4, SIMD[DType.uint32, 4](1, UInt32.MIN, 1, UInt32.MIN)
     )
     assert_equal(
         overflowed_u32x4, SIMD[DType.bool, 4](False, True, False, True)
     )
 
-    alias int32_min = -2147483648
-    alias int32_max = 2147483647
     var value_i32: Int32
     var overflowed_i32: Scalar[DType.bool]
-    value_i32, overflowed_i32 = Int32(int32_max).add_with_overflow(1)
-    assert_equal(value_i32, int32_min)
+    value_i32, overflowed_i32 = Int32(Int32.MAX).add_with_overflow(1)
+    assert_equal(value_i32, Int32.MIN)
     assert_equal(overflowed_i32, True)
 
     var value_i32x4: SIMD[DType.int32, 4]
     var overflowed_i32x4: SIMD[DType.bool, 4]
     value_i32x4, overflowed_i32x4 = SIMD[DType.int32, 4](
-        1, int32_max, 1, int32_max
+        1, Int32.MAX, 1, Int32.MAX
     ).add_with_overflow(SIMD[DType.int32, 4](0, 1, 0, 1))
-    assert_equal(value_i32x4, SIMD[DType.int32, 4](1, int32_min, 1, int32_min))
+    assert_equal(value_i32x4, SIMD[DType.int32, 4](1, Int32.MIN, 1, Int32.MIN))
     assert_equal(
         overflowed_i32x4, SIMD[DType.bool, 4](False, True, False, True)
     )
 
 
 def test_sub_with_overflow():
-    # TODO: replace all the aliases with math.limit.max_finite()
-    # and math.limit.min_finite()
-    alias uint8_min = 0
-    alias uint8_max = 255
     var value_u8: UInt8
     var overflowed_u8: Scalar[DType.bool]
-    value_u8, overflowed_u8 = UInt8(uint8_min).sub_with_overflow(1)
-    assert_equal(value_u8, uint8_max)
+    value_u8, overflowed_u8 = UInt8(UInt8.MIN).sub_with_overflow(1)
+    assert_equal(value_u8, UInt8.MAX)
     assert_equal(overflowed_u8, True)
 
     var value_u8x4: SIMD[DType.uint8, 4]
     var overflowed_u8x4: SIMD[DType.bool, 4]
     value_u8x4, overflowed_u8x4 = SIMD[DType.uint8, 4](
-        1, uint8_min, 1, uint8_min
+        1, UInt8.MIN, 1, UInt8.MIN
     ).sub_with_overflow(SIMD[DType.uint8, 4](0, 1, 0, 1))
-    assert_equal(value_u8x4, SIMD[DType.uint8, 4](1, uint8_max, 1, uint8_max))
+    assert_equal(value_u8x4, SIMD[DType.uint8, 4](1, UInt8.MAX, 1, UInt8.MAX))
     assert_equal(overflowed_u8x4, SIMD[DType.bool, 4](False, True, False, True))
 
-    alias int8_min = -128
-    alias int8_max = 127
     var value_i8: Int8
     var overflowed_i8: Scalar[DType.bool]
-    value_i8, overflowed_i8 = Int8(int8_min).sub_with_overflow(1)
-    assert_equal(value_i8, int8_max)
+    value_i8, overflowed_i8 = Int8(Int8.MIN).sub_with_overflow(1)
+    assert_equal(value_i8, Int8.MAX)
     assert_equal(overflowed_i8, True)
 
     var value_i8x4: SIMD[DType.int8, 4]
     var overflowed_i8x4: SIMD[DType.bool, 4]
     value_i8x4, overflowed_i8x4 = SIMD[DType.int8, 4](
-        1, int8_min, 1, int8_min
+        1, Int8.MIN, 1, Int8.MIN
     ).sub_with_overflow(SIMD[DType.int8, 4](0, 1, 0, 1))
-    assert_equal(value_i8x4, SIMD[DType.int8, 4](1, int8_max, 1, int8_max))
+    assert_equal(value_i8x4, SIMD[DType.int8, 4](1, Int8.MAX, 1, Int8.MAX))
     assert_equal(overflowed_i8x4, SIMD[DType.bool, 4](False, True, False, True))
 
-    alias uint32_min = 0
-    alias uint32_max = 4294967295
     var value_u32: UInt32
     var overflowed_u32: Scalar[DType.bool]
-    value_u32, overflowed_u32 = UInt32(uint32_min).sub_with_overflow(1)
-    assert_equal(value_u32, uint32_max)
+    value_u32, overflowed_u32 = UInt32(UInt32.MIN).sub_with_overflow(1)
+    assert_equal(value_u32, UInt32.MAX)
     assert_equal(overflowed_u32, True)
 
     var value_u32x4: SIMD[DType.uint32, 4]
     var overflowed_u32x4: SIMD[DType.bool, 4]
     value_u32x4, overflowed_u32x4 = SIMD[DType.uint32, 4](
-        1, uint32_min, 1, uint32_min
+        1, UInt32.MIN, 1, UInt32.MIN
     ).sub_with_overflow(SIMD[DType.uint32, 4](0, 1, 0, 1))
     assert_equal(
-        value_u32x4, SIMD[DType.uint32, 4](1, uint32_max, 1, uint32_max)
+        value_u32x4, SIMD[DType.uint32, 4](1, UInt32.MAX, 1, UInt32.MAX)
     )
     assert_equal(
         overflowed_u32x4, SIMD[DType.bool, 4](False, True, False, True)
     )
 
-    alias int32_min = -2147483648
-    alias int32_max = 2147483647
     var value_i32: Int32
     var overflowed_i32: Scalar[DType.bool]
-    value_i32, overflowed_i32 = Int32(int32_min).sub_with_overflow(1)
-    assert_equal(value_i32, int32_max)
+    value_i32, overflowed_i32 = Int32(Int32.MIN).sub_with_overflow(1)
+    assert_equal(value_i32, Int32.MAX)
     assert_equal(overflowed_i32, True)
 
     var value_i32x4: SIMD[DType.int32, 4]
     var overflowed_i32x4: SIMD[DType.bool, 4]
     value_i32x4, overflowed_i32x4 = SIMD[DType.int32, 4](
-        1, int32_min, 1, int32_min
+        1, Int32.MIN, 1, Int32.MIN
     ).sub_with_overflow(SIMD[DType.int32, 4](0, 1, 0, 1))
-    assert_equal(value_i32x4, SIMD[DType.int32, 4](1, int32_max, 1, int32_max))
+    assert_equal(value_i32x4, SIMD[DType.int32, 4](1, Int32.MAX, 1, Int32.MAX))
     assert_equal(
         overflowed_i32x4, SIMD[DType.bool, 4](False, True, False, True)
     )
 
 
 def test_mul_with_overflow():
-    # TODO: replace all the aliases with math.limit.max_finite()
-    # and math.limit.min_finite()
-    alias uint8_min = 0
-    alias uint8_max = 255
     alias uint8_max_x2 = 254
     var value_u8: UInt8
     var overflowed_u8: Scalar[DType.bool]
-    value_u8, overflowed_u8 = UInt8(uint8_max).mul_with_overflow(2)
+    value_u8, overflowed_u8 = UInt8(UInt8.MAX).mul_with_overflow(2)
     assert_equal(value_u8, uint8_max_x2)
     assert_equal(overflowed_u8, True)
 
     var value_u8x4: SIMD[DType.uint8, 4]
     var overflowed_u8x4: SIMD[DType.bool, 4]
     value_u8x4, overflowed_u8x4 = SIMD[DType.uint8, 4](
-        1, uint8_max, 1, uint8_max
+        1, UInt8.MAX, 1, UInt8.MAX
     ).mul_with_overflow(SIMD[DType.uint8, 4](0, 2, 0, 2))
     assert_equal(
         value_u8x4, SIMD[DType.uint8, 4](0, uint8_max_x2, 0, uint8_max_x2)
     )
     assert_equal(overflowed_u8x4, SIMD[DType.bool, 4](False, True, False, True))
 
-    alias int8_min = -128
-    alias int8_max = 127
     alias int8_max_x2 = -2
     var value_i8: Int8
     var overflowed_i8: Scalar[DType.bool]
-    value_i8, overflowed_i8 = Int8(int8_max).mul_with_overflow(2)
+    value_i8, overflowed_i8 = Int8(Int8.MAX).mul_with_overflow(2)
     assert_equal(value_i8, int8_max_x2)
     assert_equal(overflowed_i8, True)
 
     var value_i8x4: SIMD[DType.int8, 4]
     var overflowed_i8x4: SIMD[DType.bool, 4]
     value_i8x4, overflowed_i8x4 = SIMD[DType.int8, 4](
-        1, int8_max, 1, int8_max
+        1, Int8.MAX, 1, Int8.MAX
     ).mul_with_overflow(SIMD[DType.int8, 4](0, 2, 0, 2))
     assert_equal(
         value_i8x4, SIMD[DType.int8, 4](0, int8_max_x2, 0, int8_max_x2)
     )
     assert_equal(overflowed_i8x4, SIMD[DType.bool, 4](False, True, False, True))
 
-    alias uint32_min = 0
-    alias uint32_max = 4294967295
     alias uint32_max_x2 = 4294967294
     var value_u32: UInt32
     var overflowed_u32: Scalar[DType.bool]
-    value_u32, overflowed_u32 = UInt32(uint32_max).mul_with_overflow(2)
+    value_u32, overflowed_u32 = UInt32(UInt32.MAX).mul_with_overflow(2)
     assert_equal(value_u32, uint32_max_x2)
     assert_equal(overflowed_u32, True)
 
     var value_u32x4: SIMD[DType.uint32, 4]
     var overflowed_u32x4: SIMD[DType.bool, 4]
     value_u32x4, overflowed_u32x4 = SIMD[DType.uint32, 4](
-        1, uint32_max, 1, uint32_max
+        1, UInt32.MAX, 1, UInt32.MAX
     ).mul_with_overflow(SIMD[DType.uint32, 4](0, 2, 0, 2))
     assert_equal(
         value_u32x4, SIMD[DType.uint32, 4](0, uint32_max_x2, 0, uint32_max_x2)
@@ -922,19 +913,17 @@ def test_mul_with_overflow():
         overflowed_u32x4, SIMD[DType.bool, 4](False, True, False, True)
     )
 
-    alias int32_min = -2147483648
-    alias int32_max = 2147483647
     alias int32_max_x2 = -2
     var value_i32: Int32
     var overflowed_i32: Scalar[DType.bool]
-    value_i32, overflowed_i32 = Int32(int32_max).mul_with_overflow(2)
+    value_i32, overflowed_i32 = Int32(Int32.MAX).mul_with_overflow(2)
     assert_equal(value_i32, int32_max_x2)
     assert_equal(overflowed_i32, True)
 
     var value_i32x4: SIMD[DType.int32, 4]
     var overflowed_i32x4: SIMD[DType.bool, 4]
     value_i32x4, overflowed_i32x4 = SIMD[DType.int32, 4](
-        1, int32_max, 1, int32_max
+        1, Int32.MAX, 1, Int32.MAX
     ).mul_with_overflow(SIMD[DType.int32, 4](0, 2, 0, 2))
     assert_equal(
         value_i32x4, SIMD[DType.int32, 4](0, int32_max_x2, 0, int32_max_x2)
@@ -999,6 +988,7 @@ def main():
     test_trunc()
     test_round()
     test_roundeven()
+    test_div()
     test_floordiv()
     test_rfloordiv()
     test_mod()

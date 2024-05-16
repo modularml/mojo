@@ -14,7 +14,17 @@
 
 from sys.info import has_neon
 from testing import assert_equal, assert_true, assert_false, assert_almost_equal
-from utils.numerics import FPUtils, inf, isinf, isnan, max_finite, nan, ulp
+from utils.numerics import (
+    FPUtils,
+    inf,
+    isfinite,
+    isinf,
+    isnan,
+    max_finite,
+    nan,
+    ulp,
+    neg_inf,
+)
 
 
 # TODO: improve coverage and organization of these tests
@@ -45,21 +55,64 @@ def test_FPUtils():
     assert_equal(FPU64.get_mantissa(FPU64.pack(True, 6, 12)), 12)
 
 
-fn test_inf() raises:
-    @parameter
-    fn _test_inf[type: DType]() raises:
-        var val = inf[type]()
-        var msg = "`test_inf` failed for `type == " + str(type) + "`"
-        assert_true((val > 0.0) & isinf(val), msg=msg)
+def test_isfinite():
+    assert_true(isfinite(Float32(33)))
 
     @parameter
     if not has_neon():
-        # "bf16 is not supported for ARM architectures"
-        _test_inf[DType.bfloat16]()
+        assert_false(isfinite(inf[DType.bfloat16]()))
+        assert_false(isfinite(neg_inf[DType.bfloat16]()))
+        assert_false(isfinite(nan[DType.bfloat16]()))
 
-    _test_inf[DType.float16]()
-    _test_inf[DType.float32]()
-    _test_inf[DType.float64]()
+    assert_false(isfinite(inf[DType.float16]()))
+    assert_false(isfinite(inf[DType.float32]()))
+    assert_false(isfinite(inf[DType.float64]()))
+    assert_false(isfinite(neg_inf[DType.float16]()))
+    assert_false(isfinite(neg_inf[DType.float32]()))
+    assert_false(isfinite(neg_inf[DType.float64]()))
+    assert_false(isfinite(nan[DType.float16]()))
+    assert_false(isfinite(nan[DType.float32]()))
+    assert_false(isfinite(nan[DType.float64]()))
+
+
+def test_isinf():
+    assert_false(isinf(Float32(33)))
+
+    @parameter
+    if not has_neon():
+        assert_true(isinf(inf[DType.bfloat16]()))
+        assert_true(isinf(neg_inf[DType.bfloat16]()))
+        assert_false(isinf(nan[DType.bfloat16]()))
+
+    assert_true(isinf(inf[DType.float16]()))
+    assert_true(isinf(inf[DType.float32]()))
+    assert_true(isinf(inf[DType.float64]()))
+    assert_true(isinf(neg_inf[DType.float16]()))
+    assert_true(isinf(neg_inf[DType.float32]()))
+    assert_true(isinf(neg_inf[DType.float64]()))
+    assert_false(isinf(nan[DType.float16]()))
+    assert_false(isinf(nan[DType.float32]()))
+    assert_false(isinf(nan[DType.float64]()))
+
+
+def test_isnan():
+    assert_false(isnan(Float32(33)))
+
+    @parameter
+    if not has_neon():
+        assert_false(isnan(inf[DType.bfloat16]()))
+        assert_false(isnan(neg_inf[DType.bfloat16]()))
+        assert_true(isnan(nan[DType.bfloat16]()))
+
+    assert_false(isnan(inf[DType.float16]()))
+    assert_false(isnan(inf[DType.float32]()))
+    assert_false(isnan(inf[DType.float64]()))
+    assert_false(isnan(neg_inf[DType.float16]()))
+    assert_false(isnan(neg_inf[DType.float32]()))
+    assert_false(isnan(neg_inf[DType.float64]()))
+    assert_true(isnan(nan[DType.float16]()))
+    assert_true(isnan(nan[DType.float32]()))
+    assert_true(isnan(nan[DType.float64]()))
 
 
 def test_ulp():
@@ -74,6 +127,8 @@ def test_ulp():
 
 def main():
     test_FPUtils()
-    test_inf()
+    test_isfinite()
+    test_isinf()
+    test_isnan()
     # TODO: test nextafter
     test_ulp()

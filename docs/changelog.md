@@ -262,6 +262,13 @@ what we publish.
   methods for `SIMD` types, and the `bit.rotate_bits_{left,right}` methods for
   `Int`.
 
+- The `math.limit` module has been removed. The same functionality is available
+  as follows:
+  - `math.limit.inf`: use `utils.numerics.max_or_inf`
+  - `math.limit.neginf`: use `utils.numerics.min_or_neg_inf`
+  - `math.limit.max_finite`: use `utils.numerics.max_finite`
+  - `math.limit.min_finite`: use `utils.numerics.min_finite`
+
 ### 🛠️ Fixed
 
 - [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on
