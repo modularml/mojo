@@ -435,7 +435,7 @@ struct StringRef(
         """
         var start: Int = 0
         var end: Int = len(self) - 1  # without '\0'
-        var ptr: DTypePointer[DType.int8] = self.data.bitcast[DType.int8]()
+        var ptr = str_ref.unsafe_ptr()
         while start < end and isspace(ptr[start]):
             start += 1
         while end > start and isspace(ptr[end]):
