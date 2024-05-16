@@ -192,6 +192,8 @@ what we publish.
 
 - Add new `ImmStaticLifetime` and `MutStaticLifetime` helpers
 
+- Add new `memcpy` overload for `UnsafePointer[Scalar[_]]` pointers.
+
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
 
