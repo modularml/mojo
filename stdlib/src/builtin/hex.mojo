@@ -165,7 +165,7 @@ fn _try_write_int(
 
             # Write the char representing the value of the least significant
             # digit.
-            buf[offset] = digit_chars_array[digit_value]
+            buf[offset] = digit_chars_array[int(digit_value)]
 
             # Position the offset to write the next digit.
             offset -= 1
