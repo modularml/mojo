@@ -82,13 +82,17 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
         """Get raw pointer to the underlying data.
 
         Returns:
             The raw pointer to the data.
         """
-        return __mlir_op.`pop.string.address`(self.value)
+        var ptr = DTypePointer[DType.int8](
+            __mlir_op.`pop.string.address`(self.value)
+        )
+
+        return UnsafePointer[Int8]._from_dtype_ptr(ptr)
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:

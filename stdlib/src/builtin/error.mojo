@@ -62,7 +62,7 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         return Error {
-            data: value.unsafe_ptr().bitcast[DType.uint8](),
+            data: DTypePointer(value.unsafe_ptr()).bitcast[DType.uint8](),
             loaded_length: len(value),
         }
 
