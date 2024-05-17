@@ -20,9 +20,9 @@ from utils import Span
 ```
 """
 
-from sys.intrinsics import _type_is_eq
-
 from . import InlineArray
+from collections.list import ComparableCollectionElement
+from sys.intrinsics import _type_is_eq
 
 
 @value
@@ -241,3 +241,30 @@ struct Span[
         debug_assert(len(self) == len(other), "Spans must be of equal length")
         for i in range(len(self)):
             self[i] = other[i]
+
+    fn __bool__(self) -> Bool:
+        return len(self) > 0
+
+    fn __eq__[
+        T2: ComparableCollectionElement
+    ](ref [_]self: Span[T2, lifetime], ref [_]rhs: Span[T, _]) -> Bool:
+        constrained[_type_is_eq[T, T2](), "T must be equal to T2"]()
+        # both empty
+        if not self and not rhs:
+            return True
+        if len(self) != len(rhs):
+            return False
+        # same pointer and length, so equal
+        if self.unsafe_ptr().bitcast[T]() == rhs.unsafe_ptr():
+            return True
+        for i in range(len(self)):
+            if self[i] != rhs.unsafe_ptr().bitcast[T2]()[i]:
+                return False
+        return True
+
+    @always_inline
+    fn __ne__[
+        T2: ComparableCollectionElement
+    ](ref [_]self: Span[T2, lifetime], ref [_]rhs: Span[T, _]) -> Bool:
+        constrained[_type_is_eq[T, T2](), "T must be equal to T2"]()
+        return not self == rhs
