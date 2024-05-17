@@ -449,6 +449,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Parameters:
             T: The type of the elements in the array. Must implement the
               traits `EqualityComparable` and `CollectionElement`.
+
         Args:
             value: The value to find.
 
