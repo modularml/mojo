@@ -172,6 +172,10 @@ what we publish.
       return a
   ```
 
+- `StringRef` now implements `split()` which can be used to split a
+  `StringRef` into a `List[StringRef]` by a delimiter.
+  ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
+
 ### 🦋 Changed
 
 - More things have been removed from the auto-exported set of entities in the `prelude`
