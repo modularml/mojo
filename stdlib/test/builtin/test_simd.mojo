@@ -1016,6 +1016,13 @@ def test_indexer():
     assert_equal(0, Scalar[DType.bool](False).__index__())
 
 
+def test_indexing():
+    var s = SIMD[DType.int32, 4](1, 2, 3, 4)
+    assert_equal(s[False], 1)
+    assert_equal(s[Int32(2)], 3)
+    assert_equal(s[3], 4)
+
+
 def main():
     test_cast()
     test_simd_variadic()
@@ -1052,3 +1059,4 @@ def main():
     test_abs()
     test_min_max_clamp()
     test_indexer()
+    test_indexing()

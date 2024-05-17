@@ -251,7 +251,9 @@ what we publish.
 - Added the `Indexer` trait to denote types that implement the `__index__()`
   method which allow these types to be accepted in common `__getitem__` and
   `__setitem__` implementations, as well as allow a new builtin `index` function
-  to be called on them. For example:
+  to be called on them. Most stdlib containers are now able to be indexed by
+  any type that implements `Indexer`.
+  For example:
 
   ```mojo
   @value

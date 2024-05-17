@@ -146,16 +146,19 @@ struct VariadicList[type: AnyRegType](Sized):
         return __mlir_op.`pop.variadic.size`(self.value)
 
     @always_inline
-    fn __getitem__(self, index: Int) -> type:
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> type:
         """Gets a single element on the variadic list.
 
+        Parameters:
+            IndexerType: The type of the indexer.
+
         Args:
-            index: The index of the element to access on the list.
+            idx: The index of the element to access on the list.
 
         Returns:
             The element on the list corresponding to the given index.
         """
-        return __mlir_op.`pop.variadic.get`(self.value, index.value)
+        return __mlir_op.`pop.variadic.get`(self.value, index(idx).value)
 
     @always_inline
     fn __iter__(self) -> Self.IterType:
@@ -358,24 +361,29 @@ struct VariadicListMem[
     # TODO: Fix for loops + _VariadicListIter to support a __nextref__ protocol
     # allowing us to get rid of this and make foreach iteration clean.
     @always_inline
-    fn __getitem__(self, index: Int) -> Self.reference_type:
+    fn __getitem__[
+        IndexerType: Indexer
+    ](self, idx: IndexerType) -> Self.reference_type:
         """Gets a single element on the variadic list.
 
+        Parameters:
+            IndexerType: The type of the indexer.
+
         Args:
-            index: The index of the element to access on the list.
+            idx: The index of the element to access on the list.
 
         Returns:
             A low-level pointer to the element on the list corresponding to the
             given index.
         """
         return Self.reference_type(
-            __mlir_op.`pop.variadic.get`(self.value, index.value)
+            __mlir_op.`pop.variadic.get`(self.value, index(idx).value)
         )
 
     @always_inline
-    fn __refitem__(
-        self, index: Int
-    ) -> Reference[
+    fn __refitem__[
+        IndexerType: Indexer
+    ](self, idx: IndexerType) -> Reference[
         element_type,
         Bool {value: elt_is_mutable},
         _lit_lifetime_union[
@@ -391,14 +399,17 @@ struct VariadicListMem[
     ]:
         """Gets a single element on the variadic list.
 
+        Parameters:
+            IndexerType: The type of the indexer.
+
         Args:
-            index: The index of the element to access on the list.
+            idx: The index of the element to access on the list.
 
         Returns:
             A low-level pointer to the element on the list corresponding to the
             given index.
         """
-        return __mlir_op.`pop.variadic.get`(self.value, index.value)
+        return __mlir_op.`pop.variadic.get`(self.value, index(idx).value)
 
     fn __iter__(
         self,

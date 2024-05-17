@@ -176,38 +176,38 @@ struct Span[
 
     @always_inline
     fn __getitem__[
-        IntableType: Intable
-    ](self, index: IntableType) -> Reference[T, is_mutable, lifetime]:
+        IndexerType: Indexer
+    ](self, idx: IndexerType) -> Reference[T, is_mutable, lifetime]:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
-            IntableType: The inferred type of an intable argument.
+            IndexerType: The type of the indexer.
 
         Args:
-            index: The index of the item.
+            idx: The index of the item.
 
         Returns:
             A reference to the item at the given index.
         """
         # note that self._refitem__ is already bounds checking
-        return self._refitem__(index)
+        return self._refitem__(index(idx))
 
     @always_inline
     fn __setitem__[
-        IntableType: Intable
-    ](inout self, index: IntableType, value: T):
+        IndexerType: Indexer
+    ](inout self, idx: IndexerType, value: T):
         """Get a `Reference` to the element at the given index.
 
         Parameters:
-            IntableType: The inferred type of an intable argument.
+            IndexerType: The type of the indexer.
 
         Args:
-            index: The index of the item.
+            idx: The index of the item.
             value: The value to set at the given index.
         """
         # note that self._refitem__ is already bounds checking
         var ref = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
-            UnsafePointer(self._refitem__(index))[]
+            UnsafePointer(self._refitem__(index(idx)))[]
         )
         ref[] = value
 
