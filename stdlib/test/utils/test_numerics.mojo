@@ -158,6 +158,17 @@ def test_min_or_neg_inf():
     )
 
 
+def test_neg_inf():
+    assert_false(isfinite(neg_inf[DType.float32]()))
+    assert_false(isfinite(neg_inf[DType.float64]()))
+    assert_true(isinf(neg_inf[DType.float32]()))
+    assert_true(isinf(neg_inf[DType.float64]()))
+    assert_false(isnan(neg_inf[DType.float32]()))
+    assert_false(isnan(neg_inf[DType.float64]()))
+    assert_equal(-inf[DType.float32](), neg_inf[DType.float32]())
+    assert_equal(-inf[DType.float64](), neg_inf[DType.float64]())
+
+
 def test_nextafter():
     assert_true(isnan(nextafter(nan[DType.float32](), nan[DType.float32]())))
     assert_true(isinf(nextafter(inf[DType.float32](), inf[DType.float32]())))
@@ -211,5 +222,6 @@ def main():
     test_max_or_inf()
     test_min_finite()
     test_min_or_neg_inf()
+    test_neg_inf()
     test_nextafter()
     test_ulp()
