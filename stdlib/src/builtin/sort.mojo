@@ -21,14 +21,14 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 @always_inline
-fn insertion_sort[D: DType](inout list: List[Scalar[D]]):
-    """Sort list of scalars in place with insertion sort algorithm.
+fn insertion_sort[dtype: DType](inout list: List[Scalar[dtype]]):
+    """Sort list of scalars in-place with insertion sort algorithm.
 
     Parameters:
-        D: The dtype of the scalar.
+        dtype: The dtype of the scalar.
 
     Args:
-        list: The list of the scalars which will be sorted in-pace.
+        list: The list of the scalars which will be sorted in-place.
     """
     for i in range(1, len(list)):
         var key = list[i]
@@ -39,15 +39,15 @@ fn insertion_sort[D: DType](inout list: List[Scalar[D]]):
         list[j + 1] = key
 
 
-fn _quick_sort[D: DType](inout list: List[Scalar[D]], low: Int, high: Int):
+fn _quick_sort[dtype: DType](inout list: List[Scalar[dtype]], low: Int, high: Int):
     """Sort section of the list, between low and high, with quick sort algorithm in-place.
 
     Parameters:
-        D: The dtype of the scalar.
+        dtype: The dtype of the scalar.
 
     Args:
-        list: The list of the scalars which will be sorted inpace.
-        low: Int value identifying the lowes index of the list section to be sorted.
+        list: The list of the scalars which will be sorted in-place.
+        low: Int value identifying the lowest index of the list section to be sorted.
         high: Int value identifying the highest index of the list section to be sorted.
     """
 
@@ -70,27 +70,27 @@ fn _quick_sort[D: DType](inout list: List[Scalar[D]], low: Int, high: Int):
 
 
 @always_inline
-fn quick_sort[D: DType](inout list: List[Scalar[D]]):
-    """Sort list of scalars in place with quick sort algorithm.
+fn quick_sort[dtype: DType](inout list: List[Scalar[dtype]]):
+    """Sort list of scalars in-place with quick sort algorithm.
 
     Parameters:
-        D: The dtype of the scalar.
+        dtype: The dtype of the scalar.
 
     Args:
-        list: The list of the scalars which will be sorted inpace.
+        list: The list of the scalars which will be sorted in-place.
     """
     _quick_sort(list, 0, len(list) - 1)
 
 
-fn sort[D: DType, slist_ub: Int = 64](inout list: List[Scalar[D]]):
-    """Sort list of scalars in place. This function picks the best algorithm based on the list length.
+fn sort[dtype: DType, slist_ub: Int = 64](inout list: List[Scalar[dtype]]):
+    """Sort list of scalars in-place. This function picks the best algorithm based on the list length.
 
     Parameters:
-        D: The dtype of the scalar.
+        dtype: The dtype of the scalar.
         slist_ub: The upper bound for a list size which is considered small.
 
     Args:
-        list: The list of the scalars which will be sorted inpace.
+        list: The list of the scalars which will be sorted in-place.
     """
     var count = len(list)
     if count <= slist_ub:
@@ -105,14 +105,14 @@ fn sort[D: DType, slist_ub: Int = 64](inout list: List[Scalar[D]]):
 
 
 @always_inline
-fn insertion_sort[D: ComparableCollectionElement](inout list: List[D]):
-    """Sort list of the order comparable elements in place with insertion sort algorithm.
+fn insertion_sort[type: ComparableCollectionElement](inout list: List[type]):
+    """Sort list of the order comparable elements in-place with insertion sort algorithm.
 
     Parameters:
-        D: The order comparable collection element type.
+        type: The order comparable collection element type.
 
     Args:
-        list: The list of the order comparable elements which will be sorted inpace.
+        list: The list of the order comparable elements which will be sorted in-place.
     """
     for i in range(1, len(list)):
         var key = list[i]
@@ -124,16 +124,16 @@ fn insertion_sort[D: ComparableCollectionElement](inout list: List[D]):
 
 
 fn _quick_sort[
-    D: ComparableCollectionElement
-](inout list: List[D], low: Int, high: Int):
+    type: ComparableCollectionElement
+](inout list: List[type], low: Int, high: Int):
     """Sort section of the list, between low and high, with quick sort algorithm in-place.
 
     Parameters:
-        D: The order comparable collection element type.
+        type: The order comparable collection element type.
 
     Args:
-        list: The list of the order comparable elements which will be sorted inpace.
-        low: Int value identifying the lowes index of the list section to be sorted.
+        list: The list of the order comparable elements which will be sorted in-place.
+        low: Int value identifying the lowest index of the list section to be sorted.
         high: Int value identifying the highest index of the list section to be sorted.
     """
 
@@ -156,29 +156,29 @@ fn _quick_sort[
 
 
 @always_inline
-fn quick_sort[D: ComparableCollectionElement](inout list: List[D]):
-    """Sort list of the order comparable elements in place with quick sort algorithm.
+fn quick_sort[type: ComparableCollectionElement](inout list: List[type]):
+    """Sort list of the order comparable elements in-place with quick sort algorithm.
 
     Parameters:
-        D: The order comparable collection element type.
+        type: The order comparable collection element type.
 
     Args:
-        list: The list of the order comparable elements which will be sorted inpace.
+        list: The list of the order comparable elements which will be sorted in-place.
     """
     _quick_sort(list, 0, len(list) - 1)
 
 
 fn sort[
-    D: ComparableCollectionElement, slist_ub: Int = 64
-](inout list: List[D]):
-    """Sort list of the order comparable elements in place. This function picks the best algorithm based on the list length.
+    type: ComparableCollectionElement, slist_ub: Int = 64
+](inout list: List[type]):
+    """Sort list of the order comparable elements in-place. This function picks the best algorithm based on the list length.
 
     Parameters:
-        D: The order comparable collection element type.
+        type: The order comparable collection element type.
         slist_ub: The upper bound for a list size which is considered small.
 
     Args:
-        list: The list of the scalars which will be sorted inpace.
+        list: The list of the scalars which will be sorted in-place.
     """
     var count = len(list)
     if count <= slist_ub:
