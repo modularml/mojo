@@ -23,6 +23,8 @@ from memory.unsafe_pointer import (
     move_pointee,
 )
 
+from sys.intrinsics import _type_is_eq
+
 # ===----------------------------------------------------------------------===#
 # Tuple
 # ===----------------------------------------------------------------------===#
@@ -178,3 +180,36 @@ struct Tuple[*element_types: Movable](Sized, Movable):
             The tuple element at the requested index.
         """
         return rebind[T](self[i])
+
+    @always_inline("nodebug")
+    fn __contains__[
+        inferred RHS_T: EqualityComparable
+    ](inout self, rhs: RHS_T) -> Bool:
+        """Verify if a given value is present in the tuple.
+
+        ```mojo
+        var x = Tuple(1,2,True)
+        if 1 in x: print("x contains 1")
+        ```
+        Args:
+            rhs: The value to find.
+
+        Parameters:
+            RHS_T: The inferred type of RHS. Must implement the
+              trait `EqualityComparable`.
+
+        Returns:
+            True if the value is contained in the list, False otherwise.
+        """
+        var result = False
+
+        @parameter
+        fn SingleIteration[Index: Int]():
+            if _type_is_eq[RHS_T, element_types[Index.value]]():
+                result |= rhs.__eq__(
+                    rebind[RHS_T](self.get[Index, element_types[Index.value]]())
+                )
+
+        unroll[SingleIteration, len(VariadicList(element_types))]()
+
+        return result
