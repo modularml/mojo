@@ -360,10 +360,16 @@ struct assert_raises:
     var message_contains: Optional[String]
     """If present, check that the error message contains this literal string."""
 
+    var call_location: _SourceLocation
+    """Assigned the value returned by __call_locations() at Self.__init__."""
+
+    @always_inline
     fn __init__(inout self):
         """Construct a context manager with no message pattern."""
         self.message_contains = None
+        self.call_location = __call_location()
 
+    @always_inline
     fn __init__(inout self, *, contains: String):
         """Construct a context manager matching specific errors.
 
@@ -372,6 +378,7 @@ struct assert_raises:
                 includes the literal text passed.
         """
         self.message_contains = contains
+        self.call_location = __call_location()
 
     fn __enter__(self):
         """Enter the context manager."""
@@ -383,7 +390,9 @@ struct assert_raises:
         Raises:
             AssertionError: Always. The block must raise to pass the test.
         """
-        raise Error("AssertionError: Didn't raise")
+        raise Error(
+            "AssertionError: Didn't raise at " + str(self.call_location)
+        )
 
     fn __exit__(self, error: Error) raises -> Bool:
         """Exit the context manager with an error.
