@@ -408,14 +408,10 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     alias ord_E = Int8(ord("E"))
 
     var start: Int = 0
-    var str_len = len(str_ref)
-    var buff = str_ref.unsafe_ptr()
+    var str_ref_strip = str_ref.strip()
+    var str_len = len(str_ref_strip)
+    var buff = str_ref_strip.unsafe_ptr()
 
-    # skip leading spaces
-    for pos in range(start, str_len):
-        if not isspace(buff[pos]):
-            break
-        start += 1
     # check sign, inf, nan
     if buff[start] == ord_plus:
         start += 1
@@ -464,15 +460,12 @@ fn _atof(str_ref: StringRef) raises -> Float64:
         exponent += sign * shift
         if not has_number:
             raise _atof_error(str_ref)
-    # check if the string is fully parsed
+    # check for f/F at the end
+    if buff[start] == ord_f or buff[start] == ord_F:
+        start += 1
+    # check if string got fully parsed
     if start != str_len:
-        if (
-            buff[start] == ord_f or buff[start] == ord_F
-        ):  # f/F at end is allowed
-            start += 1
-        for pos in range(start, str_len):
-            if not isspace(buff[pos]):
-                raise _atof_error(str_ref)
+        raise _atof_error(str_ref)
     # apply shift
     var shift: Int = 10 ** abs(exponent)
     if exponent > 0:
