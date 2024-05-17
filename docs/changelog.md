@@ -18,6 +18,24 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo has introduced `@parameter for`, a new feature for compile-time
+  programming. `@parameter for` defines a for loop where the sequence must be a
+  parameter value and the induction variables are also parameter values in that
+  sequence. For example:
+
+  ```mojo
+  fn parameter_for[max: Int]():
+      @parameter
+      for i in range(max)
+          @parameter
+          if i == 10:
+              print("found 10!")
+  ```
+
+  Currently, `@parameter for` does not allow early exits in the body (`return`,
+  `break`, `continue`, etc.) and requires the sequence's `__iter__` method to
+  return a `_StridedRangeIterator`. These restrictions will be lifted soon.
+
 - Mojo added support for the `inferred` passing kind on parameters. `inferred`
   parameters must appear at the beginning of the parameter list and cannot be
   explicitly specified by the user. This allows users to define functions with
@@ -330,6 +348,14 @@ what we publish.
   `math` module.
 
 ### ❌ Removed
+
+- The `@unroll` decorator has been deprecated and removed. The decorator was
+  supposed to guarantee that a decorated loop would be unrolled, or else the
+  compiler would error. In practice, this guarantee was eroded over time, as
+  a compiler-based approach cannot be as robust as the Mojo parameter system.
+  In addition, the `@unroll` decorator did not make the loop induction variables
+  parameter values, limiting its usefulness. Please see `@parameter for` for a
+  replacement!
 
 - The method `object.print()` has been removed. Since now, `object` has the
   `Stringable` trait, you can use `print(my_object)` instead.
