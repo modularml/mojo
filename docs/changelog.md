@@ -293,6 +293,11 @@ what we publish.
   trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
   by [@fknfilewalker](https://github.com/fknfilewalker))
 
+- The `bencher` module as part of the `benchmark` package is now public
+  and documented. This module provides types such as `Bencher` which provides
+  the ability to execute a `Benchmark` and allows for benchmarking configuration
+  via the `BenchmarkConfig` struct.
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
