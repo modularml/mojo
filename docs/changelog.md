@@ -416,3 +416,5 @@ what we publish.
 - Made several improvements to dictionary performance. Dicts with integer keys
   are most heavily affected, but large dicts and dicts with large values
   will also see large improvements.
+- [#2692](https://github.com/modularml/mojo/issues/2692) Fix `assert_raises`
+  to include calling location.
