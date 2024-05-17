@@ -52,6 +52,14 @@ def test_tuple_contains():
     assert_false(True in c)
     assert_false(False in c)
 
+    var d = (123, True, String("Mojo is awesome"))
+
+    assert_true(String("Mojo is awesome") in d)
+    assert_true(d.__contains__(String("Mojo is awesome")))
+
+    assert_false(String("Hello world") in d)
+    assert_false(d.__contains__(String("Hello world")))
+
 
 def main():
     test_tuple_contains()

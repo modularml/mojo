@@ -183,8 +183,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
     @always_inline("nodebug")
     fn __contains__[
-        inferred RHS_T: EqualityComparable
-    ](inout self, rhs: RHS_T) -> Bool:
+        RHS_T: ComparableCollectionElement
+    ](inout self, owned rhs: RHS_T) -> Bool:
         """Verify if a given value is present in the tuple.
 
         ```mojo
@@ -196,7 +196,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         Parameters:
             RHS_T: The inferred type of RHS. Must implement the
-              trait `EqualityComparable`.
+              trait `ComparableCollectionElement`.
 
         Returns:
             True if the value is contained in the tuple, False otherwise.
@@ -206,10 +206,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         @parameter
         fn SingleIteration[Index: Int]():
             if _type_is_eq[RHS_T, element_types[Index.value]]():
-                result |= rhs.__eq__(
-                    rebind[RHS_T](self.get[Index, element_types[Index.value]]())
-                )
+                result |= rhs.__eq__(self.get[Index, RHS_T]())
 
         unroll[SingleIteration, len(VariadicList(element_types))]()
-
+        _ = rhs
         return result
