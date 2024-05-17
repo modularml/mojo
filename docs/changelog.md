@@ -308,6 +308,9 @@ what we publish.
   string representation. ([PR #2603](https://github.com/modularml/mojo/pull/2603)
   by [@bgreni](https://github.com/bgreni))
 
+- Added `atof()` function which can convert a `String` to a `float64`.
+  ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
