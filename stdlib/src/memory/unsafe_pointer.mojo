@@ -54,6 +54,10 @@ struct UnsafePointer[
     var address: Self._mlir_type
     """The underlying pointer."""
 
+    # ===-------------------------------------------------------------------===#
+    # Initializers
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
     fn __init__() -> Self:
         """Create a null pointer.
@@ -103,6 +107,19 @@ struct UnsafePointer[
             )
         }
 
+    # ===-------------------------------------------------------------------===#
+    # Factory methods
+    # ===-------------------------------------------------------------------===#
+
+    @staticmethod
+    fn _from_dtype_ptr[
+        dtype: DType
+    ](ptr: DTypePointer[dtype]) -> UnsafePointer[Scalar[dtype]]:
+        # TODO:
+        #   Is there a better way to create an UnsafePointer from a
+        #   DTypePointer?
+        return UnsafePointer[Scalar[dtype]](address=int(ptr))
+
     @staticmethod
     @always_inline("nodebug")
     fn get_null() -> Self:
@@ -147,6 +164,10 @@ struct UnsafePointer[
         """
         return Self(arg)
 
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
@@ -173,6 +194,18 @@ struct UnsafePointer[
         ](self.address)
 
     @always_inline
+    fn offset(self, offset: Int) -> Self:
+        """Return a pointer at an offset from the current one.
+
+        Args:
+            offset: The offset index.
+
+        Returns:
+            An offset pointer.
+        """
+        return Self(address=int(self) + offset * sizeof[T]())
+
+    @always_inline
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
 
@@ -185,6 +218,10 @@ struct UnsafePointer[
 
     fn __str__(self) -> String:
         return hex(self)
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -205,7 +242,7 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return Self(address=int(self) + offset * sizeof[T]())
+        return self.offset(offset)
 
     @always_inline
     fn __sub__(self, offset: Int) -> Self:
