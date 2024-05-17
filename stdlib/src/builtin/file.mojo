@@ -282,7 +282,7 @@ struct FileHandle:
             raise (err_msg^).consume_as_error()
         return size_copy
 
-    fn read_bytes(self, size: Int64 = -1) raises -> List[Int8]:
+    fn read_bytes(self, size: Int64 = -1) raises -> List[UInt8]:
         """Reads data from a file and sets the file handle seek position. If
         size is left as default of -1, it will read to the end of the file.
         Setting size to a number larger than what's in the file will be handled
@@ -337,7 +337,7 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
 
         var buf = external_call[
-            "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[Int8]
+            "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[UInt8]
         ](
             self.handle,
             UnsafePointer.address_of(size_copy),
@@ -347,7 +347,7 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[Int8](
+        var list = List[UInt8](
             unsafe_pointer=buf, size=int(size_copy), capacity=int(size_copy)
         )
 

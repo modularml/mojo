@@ -377,11 +377,11 @@ struct Int(
             # Stack allocate enough bytes to store any formatted 64-bit integer
             alias size: Int = 32
 
-            var buf = InlineArray[Int8, size](unsafe_uninitialized=True)
+            var buf = InlineArray[UInt8, size](fill=0)
 
             # Format the integer to the local byte array
             var len = _snprintf(
-                rebind[UnsafePointer[Int8]](buf.unsafe_ptr()),
+                buf.unsafe_ptr(),
                 size,
                 "%li",
                 self.value,
