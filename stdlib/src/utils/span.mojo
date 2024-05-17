@@ -223,8 +223,8 @@ struct Span[
         """
         var adjusted_span = self._adjust_span(slice)
         debug_assert(
-            0 <= adjusted_span.start < self._len
-            and 0 <= adjusted_span.end < self._len,
+            0 <= adjusted_span.start <= self._len
+            and 0 <= adjusted_span.end <= self._len,
             "Slice must be within bounds.",
         )
         var res = Self(
