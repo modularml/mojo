@@ -95,6 +95,24 @@ struct StringLiteral(
         return UnsafePointer[Int8]._from_dtype_ptr(ptr)
 
     @always_inline("nodebug")
+    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
+        """Get raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        return self.unsafe_ptr().bitcast[UInt8]()
+
+    @always_inline("nodebug")
+    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Get raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        return self.unsafe_ptr().bitcast[UInt8]()
+
+    @always_inline("nodebug")
     fn __bool__(self) -> Bool:
         """Convert the string to a bool value.
 
@@ -215,7 +233,7 @@ struct StringLiteral(
         var data: DTypePointer[DType.uint8] = DTypePointer[DType.uint8](
             uint8Ptr
         )
-        memcpy(rebind[DTypePointer[DType.uint8]](buffer.data), data, length)
+        memcpy(DTypePointer(buffer.data), data, length)
         initialize_pointee_move(buffer.data + length, 0)
         string._buffer = buffer^
         return string
@@ -231,22 +249,26 @@ struct StringLiteral(
         return self.__str__().__repr__()
 
     @always_inline
-    fn as_string_slice(self) -> StringSlice[False, ImmStaticLifetime]:
+    fn as_string_slice(
+        self: Reference[Self, _, _]
+    ) -> StringSlice[False, ImmStaticLifetime]:
         """Returns a string slice of this static string literal.
 
         Returns:
             A string slice pointing to this static string literal.
         """
 
-        var bytes = self.as_bytes_slice()
+        var bytes = self[].as_bytes_slice()
 
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=bytes)
+        return StringSlice[False, ImmStaticLifetime](unsafe_from_utf8=bytes)
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, False, ImmStaticLifetime]:
+    fn as_bytes_slice(
+        self: Reference[Self, _, _]
+    ) -> Span[UInt8, False, ImmStaticLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -254,12 +276,11 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        # TODO: Remove cast after transition to UInt8 strings is complete.
-        var ptr = self.unsafe_ptr().bitcast[UInt8]()
+        var ptr = self[].unsafe_uint8_ptr()
 
         return Span[UInt8, False, ImmStaticLifetime](
             unsafe_ptr=ptr,
-            len=self._byte_length(),
+            len=self[]._byte_length(),
         )
 
     fn format_to(self, inout writer: Formatter):

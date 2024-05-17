@@ -117,25 +117,6 @@ struct StringRef(
 
         return Self {data: unsafe_ptr, length: len}
 
-    # TODO: #2317 Drop support for this constructor when we have fully
-    # transitioned to UInt8 as the main byte type.
-    @always_inline
-    fn __init__(ptr: UnsafePointer[Int8]) -> StringRef:
-        """Construct a StringRef value given a null-terminated string.
-
-        Note that you should use the constructor from `UnsafePointer[UInt8]` instead
-        as we are now storing the bytes as UInt8.
-        See https://github.com/modularml/mojo/issues/2317 for more information.
-
-        Args:
-            ptr: UnsafePointer to the string.
-
-        Returns:
-            Constructed `StringRef` object.
-        """
-
-        return DTypePointer[DType.int8](ptr)
-
     @always_inline
     fn __init__(ptr: UnsafePointer[UInt8]) -> StringRef:
         """Construct a StringRef value given a null-terminated string.

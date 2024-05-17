@@ -386,47 +386,47 @@ def test_list_index():
     assert_equal(test_list_a.index(30), 2)
     assert_equal(test_list_a.index(50), 4)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(60)
+        _ = test_list_a.index(60)
 
     # Tests With Start Parameter
     assert_equal(test_list_a.index(30, start=1), 2)
     assert_equal(test_list_a.index(30, start=-4), 2)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(30, start=3)
+        _ = test_list_a.index(30, start=3)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(30, start=5)
+        _ = test_list_a.index(30, start=5)
 
     # Tests With Start and End Parameters
     assert_equal(test_list_a.index(30, start=1, stop=3), 2)
     assert_equal(test_list_a.index(30, start=-4, stop=-2), 2)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(30, start=1, stop=2)
+        _ = test_list_a.index(30, start=1, stop=2)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(30, start=3, stop=1)
+        _ = test_list_a.index(30, start=3, stop=1)
 
     # Tests With End Parameter Only
     assert_equal(test_list_a.index(30, stop=3), 2)
     assert_equal(test_list_a.index(30, stop=-2), 2)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(30, stop=1)
+        _ = test_list_a.index(30, stop=1)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(30, stop=2)
+        _ = test_list_a.index(30, stop=2)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(60, stop=50)
+        _ = test_list_a.index(60, stop=50)
 
     # Edge Cases and Special Conditions
     assert_equal(test_list_a.index(10, start=-5, stop=-1), 0)
     assert_equal(test_list_a.index(10, start=0, stop=50), 0)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(50, start=-5, stop=-1)
+        _ = test_list_a.index(50, start=-5, stop=-1)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(50, start=0, stop=-1)
+        _ = test_list_a.index(50, start=0, stop=-1)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(10, start=-4, stop=-1)
+        _ = test_list_a.index(10, start=-4, stop=-1)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        test_list_a.index(10, start=5, stop=50)
+        _ = test_list_a.index(10, start=5, stop=50)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        List[Int]().index(10)
+        _ = List[Int]().index(10)
 
     var test_list_b = List[Int](10, 20, 30, 20, 10)
 

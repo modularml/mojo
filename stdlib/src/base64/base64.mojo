@@ -70,10 +70,10 @@ fn b64encode(str: String) -> String:
       Base64 encoding of the input string.
     """
     alias lookup = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    var b64chars = lookup.unsafe_ptr()
+    var b64chars = lookup.as_uint8_ptr()
 
     var length = len(str)
-    var out = List[Int8](capacity=length + 1)
+    var out = String._buffer_type(capacity=length + 1)
 
     @parameter
     @always_inline
@@ -125,7 +125,7 @@ fn b64decode(str: String) -> String:
     var n = len(str)
     debug_assert(n % 4 == 0, "Input length must be divisible by 4")
 
-    var p = List[Int8](capacity=n + 1)
+    var p = String._buffer_type(capacity=n + 1)
 
     # This algorithm is based on https://arxiv.org/abs/1704.00605
     for i in range(0, n, 4):
@@ -169,16 +169,15 @@ fn b16encode(str: String) -> String:
       Base16 encoding of the input string.
     """
     alias lookup = "0123456789ABCDEF"
-    var b16chars = lookup.unsafe_ptr()
+    var b16chars = lookup.as_uint8_ptr()
 
     var length = len(str)
-    var out = List[Int8](capacity=length * 2 + 1)
+    var out = List[UInt8](capacity=length * 2 + 1)
 
     @parameter
     @always_inline
-    fn str_bytes(idx: Int) -> Int:
-        # TODO: Remove cast once transition to UInt8 string types is complete.
-        return int(str.unsafe_ptr().bitcast[UInt8]()[idx])
+    fn str_bytes(idx: UInt8) -> UInt8:
+        return str._buffer[int(idx)]
 
     for i in range(length):
         var str_byte = str_bytes(i)
@@ -226,7 +225,7 @@ fn b16decode(str: String) -> String:
     var n = len(str)
     debug_assert(n % 2 == 0, "Input length must be divisible by 2")
 
-    var p = List[Int8](capacity=int(n / 2) + 1)
+    var p = List[UInt8](capacity=int(n / 2) + 1)
 
     for i in range(0, n, 2):
         var hi = str[i]

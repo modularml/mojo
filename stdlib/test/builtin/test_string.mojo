@@ -81,7 +81,7 @@ fn test_constructors() raises:
     assert_equal(3, len(s2))
 
     # Construction from UnsafePointer
-    var ptr = UnsafePointer[Int8].alloc(4)
+    var ptr = UnsafePointer[UInt8].alloc(4)
     ptr[0] = ord("a")
     ptr[1] = ord("b")
     ptr[2] = ord("c")

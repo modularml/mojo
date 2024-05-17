@@ -712,7 +712,7 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
 
     alias INITIAL_CAPACITY = 32
 
-    var buf = List[Int8](capacity=INITIAL_CAPACITY)
+    var buf = List[UInt8](capacity=INITIAL_CAPACITY)
     var buf_len = Int(INITIAL_CAPACITY)
 
     var err = external_call["sysctlbyname", Int32](

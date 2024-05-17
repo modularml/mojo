@@ -438,7 +438,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             The length of the SIMD vector.
         """
 
-        return size
+        return self.size
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
@@ -2799,7 +2799,8 @@ fn _format_scalar[dtype: DType](inout writer: Formatter, value: Scalar[dtype]):
     # type.
     alias size: Int = _calc_format_buffer_size[dtype]()
 
-    var buf = InlineArray[Int8, size](unsafe_uninitialized=True)
+    var buf = InlineArray[UInt8, size](fill=0)
+
     var buf_ptr = buf.unsafe_ptr()
 
     var wrote = _snprintf_scalar[dtype](

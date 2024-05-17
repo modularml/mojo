@@ -178,14 +178,14 @@ def test_file_write_again():
 @value
 @register_passable
 struct Word:
-    var first_letter: Int8
-    var second_letter: Int8
-    var third_letter: Int8
-    var fourth_letter: Int8
-    var fith_letter: Int8
+    var first_letter: UInt8
+    var second_letter: UInt8
+    var third_letter: UInt8
+    var fourth_letter: UInt8
+    var fith_letter: UInt8
 
     fn __str__(self) -> String:
-        var word = List[Int8](capacity=6)
+        var word = List[UInt8](capacity=6)
         word.append(self.first_letter)
         word.append(self.second_letter)
         word.append(self.third_letter)
