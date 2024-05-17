@@ -39,7 +39,9 @@ no-inline-html: false
 no-alt-text: false
 
 # MD050: Use **something** instead of __something__ for bold text
-strong-style: asterisk
+MD050:
+  # Strong style
+  style: "asterisk"
 
 # MD051: Disable link checker because it false-flags custom anchors
 #        https://github.com/DavidAnson/markdownlint/issues/570

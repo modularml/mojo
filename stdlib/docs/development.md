@@ -142,7 +142,7 @@ standard library, test it, and raise a PR.
 
 First, follow everything in the [prerequisites](#prerequisites).
 
-__IMPORTANT__ We'll be in the `mojo/stdlib` folder for this tutorial, check and
+**IMPORTANT** We'll be in the `mojo/stdlib` folder for this tutorial, check and
 make sure you're in that location if anything goes wrong:
 `cd [path-to-repo]/stdlib`
 
@@ -263,7 +263,7 @@ ls **/*.mojo | entr sh -c "./scripts/build-stdlib.sh && mojo main.mojo"
 Now, every time you save a Mojo file, it packages the standard library and
 runs `main.mojo`.
 
-__Note__: you should stop `entr` while doing commits, otherwise you could have
+**Note**: you should stop `entr` while doing commits, otherwise you could have
 some issues, this is because some pre-commit hooks use mojo scripts
 and will try to load the standard library while it is being compiled by `entr`.
 
