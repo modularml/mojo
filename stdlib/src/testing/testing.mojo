@@ -363,11 +363,13 @@ struct assert_raises:
     var call_location: _SourceLocation
     """Assigned the value returned by __call_locations() at Self.__init__."""
 
+    @always_inline
     fn __init__(inout self):
         """Construct a context manager with no message pattern."""
         self.message_contains = None
         self.call_location = __call_location()
 
+    @always_inline
     fn __init__(inout self, *, contains: String):
         """Construct a context manager matching specific errors.
 
