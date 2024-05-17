@@ -799,6 +799,28 @@ struct Dict[K: KeyElement, V: CollectionElement](
             return default.value()[]
         raise "KeyError"
 
+    fn popitem(inout self) raises -> DictEntry[K, V]:
+        """Remove and return a (key, value) pair from the dictionary. Pairs are returned in LIFO order.
+        popitem() is useful to destructively iterate over a dictionary, as often used in set algorithms.
+        If the dictionary is empty, calling popitem() raises a KeyError.
+
+        Args: None
+
+        Returns:
+            Last dictionary item
+
+        Raises:
+            "KeyError" if the dictionary is empty.
+        """
+
+        for item in reversed(self.items()):
+            var key = item[].key
+            var value = item[].value
+            _ = self.pop(key)
+            return DictEntry[K, V](key, value)
+
+        raise "KeyError"
+
     fn keys(
         self: Reference[Self, _, _]
     ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
