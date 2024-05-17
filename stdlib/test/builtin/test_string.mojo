@@ -523,10 +523,46 @@ fn test_rfind() raises:
 
 
 fn test_split() raises:
+    alias _line_sep_utf8 = List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38)
+    """Unicode Line Separator: \\u2028."""
+    alias _paragraph_sep_utf8 = List[UInt8](
+        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39
+    )
+    """Unicode Paragraph Separator: \\u2029."""
+    # TODO add line and paragraph separator as stringliteral once unicode escape secuences are accepted
+    alias _universal_separators = List[String](
+        String("\n"),
+        String("\r"),
+        String("\v"),
+        String("\f"),
+        String("\x1c"),
+        String("\x1e"),
+        String("\x85"),
+        String(_line_sep_utf8),
+        String(_paragraph_sep_utf8),
+    )
+    alias spaces = List[String](
+        String(" "), String("\t")
+    ) + _universal_separators
     # empty delimiters default to whitespace
     var d = String("hello world").split("")
     assert_true(d[0] == "hello", d[1] == "world")
-    d = String("hello world").split()
+    d = String("hello \t\n\n\v\fworld").split("\n")
+    assert_true(d[0] == "hello \t", d[1] == "", d[2] == "\v\fworld")
+    # Python adds all whitespace like chars as one
+    var s = ""
+    # test leading whitespace
+    for i in range(len(spaces)):
+        s += spaces[i]
+    s += "hello"
+    # test middle whitespace
+    for i in range(len(spaces)):
+        s += spaces[i]
+    s += "world"
+    d = s.split()
+    # test trailing whitespace
+    for i in range(len(spaces)):
+        s += spaces[i]
     assert_true(d[0] == "hello", d[1] == "world")
 
     # Split in middle

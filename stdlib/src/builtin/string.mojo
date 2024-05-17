@@ -484,6 +484,26 @@ fn _is_ascii_lowercase(c: Int8) -> Bool:
 # isspace
 # ===----------------------------------------------------------------------===#
 
+alias _whitespaces = List[String](String(" "), String("\t"))
+alias _line_sep_utf8 = List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38)
+"""Unicode Line Separator: \\u2028."""
+alias _paragraph_sep_utf8 = List[UInt8](
+    0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39
+)
+"""Unicode Paragraph Separator: \\u2029."""
+# TODO add line and paragraph separator as stringliteral once unicode escape secuences are accepted
+alias _universal_separators = List[String](
+    String("\n"),
+    String("\r"),
+    String("\v"),
+    String("\f"),
+    String("\x1c"),
+    String("\x1e"),
+    String("\x85"),
+    String(_line_sep_utf8),
+    String(_paragraph_sep_utf8),
+)
+
 
 fn isspace(c: Int8) -> Bool:
     """Determines whether the given character is a whitespace character.
@@ -544,7 +564,12 @@ struct String(
     """The underlying storage for the string."""
 
     """ Useful string aliases. """
-    alias WHITESPACE = String(" \n\t\r\f\v")
+    alias WHITESPACES = _whitespaces + _universal_separators
+    """Whitespaces " ", "\\t", and [universal separators](
+        https://docs.python.org/3/library/stdtypes.html#str.splitlines)."""
+    alias UNIVERSAL_SEPARATORS = _universal_separators
+    """[Universal separators](
+        https://docs.python.org/3/library/stdtypes.html#str.splitlines)."""
     alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
     alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
@@ -552,7 +577,7 @@ struct String(
     alias HEX_DIGITS = String.DIGITS + String("abcdef") + String("ABCDEF")
     alias OCT_DIGITS = String("01234567")
     alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
-    alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
+    alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACES
 
     @always_inline
     fn __str__(self) -> String:
@@ -1304,34 +1329,78 @@ struct String(
             substr._strref_dangerous(), start=start
         )
 
-    fn split(self, owned delimiter: String = " ") -> List[String]:
-        """Split the string by a delimiter.
+    fn split[
+        maxsplit: Int = -1
+    ](self, owned delimiter: String = "") -> List[String]:
+        """Split the string by a delimiter. This defaults to universal
+        newlines [just as Python](https://docs.python.org/3/library/stdtypes.html).
+
+        Parameters:
+            maxsplit: The maximum amount of items to split from String.
+                Defaults to unlimited.
 
         Args:
-          delimiter: The string to split on.
+            delimiter: The string to split on.
 
         Returns:
-          A List of Strings containing the input split by the delimiter.
+            A List of Strings containing the input split by the delimiter.
 
+        Examples:
+
+        Splitting a space:
+        ```mojo
+        var s = String("hello world").split(" ") # ["hello", "world"]
+        ```
+
+        Splitting adjacent delimiters:
+        ```mojo
+        var s = String("hello,,world").split(",") # ["hello", "", "world"]
+        ```
+
+        Splitting adjacent universal newlines:
+        ```mojo
+        var s = String("hello \t\n\r\v\fworld").split() # ["hello", "world"]
+        ```
+
+        Splitting with maxsplit:
+        ```mojo
+        var s = String("1,2,3").split[maxsplit=1](",") # ['1', '2,3']
+        ```
+        .
         """
-        if not delimiter:
-            delimiter = " "
-
         var output = List[String]()
 
         var current_offset = 0
+        var items = 0
         while True:
             var loc = self.find(delimiter, current_offset)
-            # delimiter not found, so add the search slice from where we're currently at
             if loc == -1:
                 output.append(self[current_offset:])
                 break
 
-            # We found a delimiter, so add the preceding string slice
-            output.append(self[current_offset:loc])
+            # Python adds all "whitespace chars" as one delimeter
+            # if no delimeter was specified
+            if delimiter == "":
+                var start_loc = loc
+                var str_len = len(self)
+                while loc < str_len:
+                    if self[loc + 1] in String.WHITESPACES:
+                        loc += 1
+                # if it went until the end of the String, then
+                # it should be sliced up until the original
+                # start of the whitespace
+                if loc == str_len:
+                    loc = start_loc
 
-            # Advance our search offset past the delimiter
+            output.append(self[current_offset:loc])
             current_offset = loc + len(delimiter)
+
+            @parameter
+            if maxsplit > -1:
+                items += 1
+                if items == maxsplit:
+                    output.append(self[current_offset:])
+                    break
 
         return output
 
@@ -1392,7 +1461,7 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self, chars: String = String.WHITESPACE) -> String:
+    fn strip(self, chars: String = String.WHITESPACES) -> String:
         """Return a copy of the string with leading and trailing characters removed.
 
         Args:
@@ -1404,7 +1473,7 @@ struct String(
 
         return self.lstrip(chars).rstrip(chars)
 
-    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
+    fn rstrip(self, chars: String = String.WHITESPACES) -> String:
         """Return a copy of the string with trailing characters removed.
 
         Args:
@@ -1420,7 +1489,7 @@ struct String(
 
         return self[:r_idx]
 
-    fn lstrip(self, chars: String = String.WHITESPACE) -> String:
+    fn lstrip(self, chars: String = String.WHITESPACES) -> String:
         """Return a copy of the string with leading characters removed.
 
         Args:
