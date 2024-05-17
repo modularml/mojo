@@ -14,7 +14,7 @@
 
 from utils import InlineArray, Span
 from collections.list import List
-from testing import assert_equal
+from testing import assert_equal, assert_true
 
 
 def test_span_list_int():
@@ -87,6 +87,13 @@ def test_span_array_int():
     assert_equal(l[-1], 0)
 
 
+def test_bool():
+    var l = InlineArray[String, 7]("a", "b", "c", "d", "e", "f", "g")
+    var s = Span(l)
+    assert_true(s)
+    assert_true(not s[0:0])
+
+
 def test_span_array_str():
     var l = InlineArray[String, 7]("a", "b", "c", "d", "e", "f", "g")
     var s = Span(l)
@@ -110,8 +117,26 @@ def test_span_array_str():
     assert_equal(l[-1], "i")
 
 
+def test_equality():
+    var l = InlineArray[String, 7]("a", "b", "c", "d", "e", "f", "g")
+    var l2 = List[String]("a", "b", "c", "d", "e", "f", "g")
+    var sp = Span(l)
+    var sp2 = Span(l)
+    var sp3 = Span(l2)
+    # same pointer
+    assert_true(sp == sp2)
+    # different pointer
+    assert_true(sp == sp3)
+    # different length
+    assert_true(sp != sp3[:-1])
+    # empty
+    assert_true(sp[0:0] == sp3[0:0])
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
     test_span_array_int()
     test_span_array_str()
+    test_equality()
+    test_bool()
