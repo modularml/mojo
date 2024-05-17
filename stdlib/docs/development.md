@@ -263,7 +263,7 @@ ls **/*.mojo | entr sh -c "./scripts/build-stdlib.sh && mojo main.mojo"
 Now, every time you save a Mojo file, it packages the standard library and
 runs `main.mojo`.
 
-**Note**: you should stop `entr` while doing commits, otherwise you could have
+__Note__: you should stop `entr` while doing commits, otherwise you could have
 some issues, this is because some pre-commit hooks use mojo scripts
 and will try to load the standard library while it is being compiled by `entr`.
 
