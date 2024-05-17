@@ -147,6 +147,41 @@ def test_truthy():
         test_dtype[DType.bfloat16]()
 
 
+def test_len():
+    var i1 = Int32(0)
+    assert_equal(i1.__len__(), 1)
+
+    alias I32 = SIMD[DType.int32, 4]
+    var i2 = I32(-1, 0, 1)
+    assert_equal(4, i2.__len__())
+    var i3 = I32(-1, 0, 1, 3)
+    assert_equal(4, i3.__len__())
+
+    alias I8 = SIMD[DType.int8, 1]
+    var i4 = I8(1)
+    assert_equal(1, i4.__len__())
+
+    alias UI64 = SIMD[DType.uint64, 16]
+    var i5 = UI64(10, 20, 30, 40)
+    assert_equal(16, i5.__len__())
+    var i6 = UI64(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+    assert_equal(16, i6.__len__())
+
+    @parameter
+    if not has_neon():
+        alias BF16 = SIMD[DType.bfloat16, 2]
+        var f1 = BF16(0.0)
+        assert_equal(2, f1.__len__())
+        var f2 = BF16(0.1, 0.2)
+        assert_equal(2, f2.__len__())
+
+    alias F = SIMD[DType.float64, 8]
+    var f3 = F(1.0)
+    assert_equal(8, f3.__len__())
+    var f4 = F(0, -1.0, 1.0, -1.111, 1.111, -2.2222, 2.2222, 3.1415)
+    assert_equal(8, f4.__len__())
+
+
 def test_add():
     alias I = SIMD[DType.int32, 4]
     var i = I(-2, -4, 0, 1)
@@ -974,12 +1009,20 @@ def test_min_max_clamp():
     assert_equal(i.clamp(-7, 4), I(-7, -5, 4, 4))
 
 
+def test_indexer():
+    assert_equal(5, Int8(5).__index__())
+    assert_equal(56, UInt32(56).__index__())
+    assert_equal(1, Scalar[DType.bool](True).__index__())
+    assert_equal(0, Scalar[DType.bool](False).__index__())
+
+
 def main():
     test_cast()
     test_simd_variadic()
     test_convert_simd_to_string()
     test_issue_20421()
     test_truthy()
+    test_len()
     test_add()
     test_radd()
     test_iadd()
@@ -1008,3 +1051,4 @@ def main():
     test_mul_with_overflow()
     test_abs()
     test_min_max_clamp()
+    test_indexer()

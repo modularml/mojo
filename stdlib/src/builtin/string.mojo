@@ -1021,13 +1021,7 @@ struct String(
         Returns:
             True if the Strings are equal and False otherwise.
         """
-        if len(self) != len(other):
-            return False
-
-        if int(self.unsafe_ptr()) == int(other.unsafe_ptr()):
-            return True
-
-        return memcmp(self.unsafe_ptr(), other.unsafe_ptr(), len(self)) == 0
+        return not (self != other)
 
     @always_inline
     fn __ne__(self, other: String) -> Bool:
@@ -1039,7 +1033,7 @@ struct String(
         Returns:
             True if the Strings are not equal and False otherwise.
         """
-        return not (self == other)
+        return self._strref_dangerous() != other._strref_dangerous()
 
     @always_inline
     fn __lt__(self, rhs: String) -> Bool:
@@ -1051,13 +1045,7 @@ struct String(
         Returns:
             True if this String is strictly less than the RHS String and False otherwise.
         """
-        var len1 = len(self)
-        var len2 = len(rhs)
-
-        if len1 < len2:
-            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
-        else:
-            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
+        return self._strref_dangerous() < rhs._strref_dangerous()
 
     @always_inline
     fn __le__(self, rhs: String) -> Bool:

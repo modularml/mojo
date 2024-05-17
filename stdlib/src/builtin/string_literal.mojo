@@ -82,13 +82,17 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
         """Get raw pointer to the underlying data.
 
         Returns:
             The raw pointer to the data.
         """
-        return __mlir_op.`pop.string.address`(self.value)
+        var ptr = DTypePointer[DType.int8](
+            __mlir_op.`pop.string.address`(self.value)
+        )
+
+        return UnsafePointer[Int8]._from_dtype_ptr(ptr)
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
@@ -121,11 +125,7 @@ struct StringLiteral(
         Returns:
             True if they are equal.
         """
-        var length = len(self)
-        if length != len(rhs):
-            return False
-
-        return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), length) == 0
+        return not (self != rhs)
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: StringLiteral) -> Bool:
@@ -137,7 +137,7 @@ struct StringLiteral(
         Returns:
             True if they are not equal.
         """
-        return not self == rhs
+        return StringRef(self) != StringRef(rhs)
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: StringLiteral) -> Bool:
@@ -149,13 +149,7 @@ struct StringLiteral(
         Returns:
             True if this StringLiteral is strictly less than the RHS StringLiteral and False otherwise.
         """
-        var len1 = len(self)
-        var len2 = len(rhs)
-
-        if len1 < len2:
-            return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
-        else:
-            return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
+        return StringRef(self) < StringRef(rhs)
 
     @always_inline("nodebug")
     fn __le__(self, rhs: StringLiteral) -> Bool:
@@ -328,19 +322,3 @@ struct StringLiteral(
             An integer value that represents the string, or otherwise raises.
         """
         return _atol(self)
-
-
-# Use a local memcmp rather than memory.memcpy to avoid #31139 and #25100.
-@always_inline("nodebug")
-fn _memcmp(
-    s1: DTypePointer[DType.int8], s2: DTypePointer[DType.int8], count: Int
-) -> Int:
-    for i in range(count):
-        var s1i = s1[i]
-        var s2i = s2[i]
-        if s1i == s2i:
-            continue
-        if s1i > s2i:
-            return 1
-        return -1
-    return 0

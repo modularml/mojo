@@ -137,6 +137,10 @@ what we publish.
 - Base64 decoding support has been added.
     ([PR #2364](https://github.com/modularml/mojo/pull/2364) by [@mikowals](https://github.com/mikowals))
 
+- Add Base16 encoding and decoding support.
+  ([PR #2584](https://github.com/modularml/mojo/pull/2584)
+   by [@kernhanda](https://github.com/kernhanda))
+
 - Add `repr()` function and `Representable` trait.
     ([PR #2361](https://github.com/modularml/mojo/pull/2361) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
@@ -222,6 +226,9 @@ what we publish.
   is not possible yet.
     ([PR #2674](https://github.com/modularml/mojo/pull/2674) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
+- `List()` now supports `__contains__`.
+    ([PR #2667](https://github.com/modularml/mojo/pull/2667) by [@rd4com](https://github.com/rd4com/))
+
 - `List` now has an `index` method that allows one to find the (first) location
   of an element in a `List` of `EqualityComparable` types. For example:
 
@@ -231,15 +238,42 @@ what we publish.
   ```
 
 - `List` can now be converted to a `String` with a simplified syntax:
-  
+
   ```mojo
   var my_list = List[Int](2, 3)
-  print(my_list.__str__())  # prints [2, 3] 
+  print(my_list.__str__())  # prints [2, 3]
   ```
 
   Note that `List` doesn't conform to the `Stringable` trait yet so you cannot
   use `str(my_list)` yet.
     ([PR #2673](https://github.com/modularml/mojo/pull/2673) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
+- Added the `Indexer` trait to denote types that implement the `__index__()`
+  method which allow these types to be accepted in common `__getitem__` and
+  `__setitem__` implementations, as well as allow a new builtin `index` function
+  to be called on them. For example:
+
+  ```mojo
+  @value
+  struct AlwaysZero(Indexer):
+      fn __index__(self) -> Int:
+          return 0
+
+  struct MyList:
+      var data: List[Int]
+
+      fn __init__(inout self):
+          self.data = List[Int](1, 2, 3, 4)
+
+      fn __getitem__[T: Indexer](self, idx: T) -> T:
+          return self.data[index(idx)]
+
+  print(MyList()[AlwaysZero()])  # prints `1`
+  ```
+
+- `StringRef` now implements `strip()` which can be used to remove leading and
+  trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
+  by [@fknfilewalker](https://github.com/fknfilewalker))
 
 - Added `atof()` function which can convert a `String` to a `float64`.
     ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))

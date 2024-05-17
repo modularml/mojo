@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from base64 import b64encode, b64decode
+from base64 import b64encode, b64decode, b16encode, b16decode
 from testing import assert_equal
 
 
@@ -52,6 +52,42 @@ def test_b64decode():
     assert_equal(b64decode("QUJDREVGYWJjZGVm"), "ABCDEFabcdef")
 
 
+def test_b16encode():
+    assert_equal(b16encode("a"), "61")
+
+    assert_equal(b16encode("fo"), "666F")
+
+    assert_equal(b16encode("Hello Mojo!!!"), "48656C6C6F204D6F6A6F212121")
+
+    assert_equal(b16encode("Hello 🔥!!!"), "48656C6C6F20F09F94A5212121")
+
+    assert_equal(
+        b16encode("the quick brown fox jumps over the lazy dog"),
+        "74686520717569636B2062726F776E20666F78206A756D7073206F76657220746865206C617A7920646F67",
+    )
+
+    assert_equal(b16encode("ABCDEFabcdef"), "414243444546616263646566")
+
+
+def test_b16decode():
+    assert_equal(b16decode("61"), "a")
+
+    assert_equal(b16decode("666F"), "fo")
+
+    assert_equal(b16decode("48656C6C6F204D6F6A6F212121"), "Hello Mojo!!!")
+
+    assert_equal(b16decode("48656C6C6F20F09F94A5212121"), "Hello 🔥!!!")
+
+    assert_equal(
+        b16encode("the quick brown fox jumps over the lazy dog"),
+        "74686520717569636B2062726F776E20666F78206A756D7073206F76657220746865206C617A7920646F67",
+    )
+
+    assert_equal(b16decode("414243444546616263646566"), "ABCDEFabcdef")
+
+
 def main():
     test_b64encode()
     test_b64decode()
+    test_b16encode()
+    test_b16decode()
