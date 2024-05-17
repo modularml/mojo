@@ -439,16 +439,19 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         T: ComparableCollectionElement
     ](self: Reference[InlineArray[T, size]], value: Self.ElementType) -> Bool:
         """Verify if a given value is present in the array.
+
         ```mojo
         from utils import InlineArray
-        var x = LInlineArray[Int, 3](1,2,3)
+        var x = InlineArray[Int, 3](1,2,3)
         if 3 in x: print("x contains 3")
         ```
+
         Parameters:
             T: The type of the elements in the array. Must implement the
               traits `EqualityComparable` and `CollectionElement`.
         Args:
             value: The value to find.
+
         Returns:
             True if the value is contained in the array, False otherwise.
         """
