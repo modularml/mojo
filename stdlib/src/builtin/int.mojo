@@ -58,7 +58,7 @@ trait Indexer:
 
 
 @always_inline("nodebug")
-fn index[T: Indexer](idx: T) -> Int:
+fn index[T: Indexer](idx: T, /) -> Int:
     """Returns the value of `__index__` for the given value.
 
     Parameters:

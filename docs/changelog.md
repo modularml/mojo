@@ -269,7 +269,10 @@ what we publish.
 - Added the `Indexer` trait to denote types that implement the `__index__()`
   method which allow these types to be accepted in common `__getitem__` and
   `__setitem__` implementations, as well as allow a new builtin `index` function
-  to be called on them. For example:
+  to be called on them.
+  ([PR #2685](https://github.com/modularml/mojo/pull/2685) by
+  [@bgreni](https://github.com/bgreni))
+  For example:
 
   ```mojo
   @value
@@ -297,6 +300,10 @@ what we publish.
   and documented. This module provides types such as `Bencher` which provides
   the ability to execute a `Benchmark` and allows for benchmarking configuration
   via the `BenchmarkConfig` struct.
+
+- Added the `bin()` builtin function to convert integral types into their binary
+  string representation. ([PR #2603](https://github.com/modularml/mojo/pull/2603)
+  by [@bgreni](https://github.com/bgreni))
 
 ### 🦋 Changed
 
