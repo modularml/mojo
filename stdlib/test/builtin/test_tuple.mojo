@@ -16,11 +16,41 @@ from testing import assert_true, assert_false
 
 
 def test_tuple_contains():
-    var a = (1, True)
-    assert_true(1 in a)
-    assert_true(a.__contains__(1))
+    var a = (123, True, "Mojo is awesome")
+
+    assert_true("Mojo is awesome" in a)
+    assert_true(a.__contains__("Mojo is awesome"))
+
+    assert_false("Hello world" in a)
+    assert_false(a.__contains__("Hello world"))
+
+    assert_true(123 in a)
+    assert_true(a.__contains__(123))
+
     assert_true(True in a)
-    assert_false(2 in a)
+    assert_true(a.__contains__(True))
+
+    assert_false(False in a)
+    assert_false(a.__contains__(False))
+
+    assert_false(a.__contains__(1))
+    assert_false(a.__contains__(0))
+    assert_false(1 in a)
+    assert_false(0 in a)
+
+    var b = (False, True)
+    assert_true(True in b)
+    assert_true(b.__contains__(True))
+    assert_true(False in b)
+    assert_true(b.__contains__(False))
+    assert_false(b.__contains__(1))
+    assert_false(b.__contains__(0))
+
+    var c = (1, 0)
+    assert_false(c.__contains__(True))
+    assert_false(c.__contains__(False))
+    assert_false(True in c)
+    assert_false(False in c)
 
 
 def main():
