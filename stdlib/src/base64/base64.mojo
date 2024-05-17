@@ -78,7 +78,8 @@ fn b64encode(str: String) -> String:
     @parameter
     @always_inline
     fn s(idx: Int) -> Int:
-        return int(str.unsafe_ptr().bitcast[DType.uint8]()[idx])
+        # TODO: Remove cast once transition to UInt8 string types is complete.
+        return int(str.unsafe_ptr().bitcast[UInt8]()[idx])
 
     # This algorithm is based on https://arxiv.org/abs/1704.00605
     var end = length - (length % 3)
@@ -176,7 +177,8 @@ fn b16encode(str: String) -> String:
     @parameter
     @always_inline
     fn str_bytes(idx: Int) -> Int:
-        return int(str.unsafe_ptr().bitcast[DType.uint8]()[idx])
+        # TODO: Remove cast once transition to UInt8 string types is complete.
+        return int(str.unsafe_ptr().bitcast[UInt8]()[idx])
 
     for i in range(length):
         var str_byte = str_bytes(i)

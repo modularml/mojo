@@ -49,8 +49,8 @@ fn ord(s: String) -> Int:
     # 2: 110aaaaa 10bbbbbb                   -> 00000000 00000000 00000aaa aabbbbbb     a << 6  | b
     # 3: 1110aaaa 10bbbbbb 10cccccc          -> 00000000 00000000 aaaabbbb bbcccccc     a << 12 | b << 6  | c
     # 4: 11110aaa 10bbbbbb 10cccccc 10dddddd -> 00000000 000aaabb bbbbcccc ccdddddd     a << 18 | b << 12 | c << 6 | d
-    var p = s.unsafe_ptr().bitcast[DType.uint8]()
-    var b1 = p.load()
+    var p = s.unsafe_ptr().bitcast[UInt8]()
+    var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
         return int(b1)
@@ -62,7 +62,7 @@ fn ord(s: String) -> Int:
     for i in range(1, num_bytes):
         p += 1
         shift -= 6
-        result |= int(p.load() & 0b00111111) << shift
+        result |= int(p[] & 0b00111111) << shift
     return result
 
 
@@ -1018,9 +1018,9 @@ struct String(
         self._buffer.resize(total_len + 1, 0)
         # Copy the data alongside the terminator.
         memcpy(
-            self.unsafe_uint8_ptr() + self_len,
-            other.unsafe_uint8_ptr(),
-            other_len + 1,
+            dest=self.unsafe_ptr() + self_len,
+            src=other.unsafe_ptr(),
+            count=other_len + 1,
         )
 
     # ===------------------------------------------------------------------=== #
@@ -1144,10 +1144,7 @@ struct String(
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {
-            data: UnsafePointer[UInt8]._from_dtype_ptr(self.unsafe_uint8_ptr()),
-            length: len(self),
-        }
+        return StringRef(self.unsafe_ptr(), len(self))
 
     fn _strref_keepalive(self):
         """
@@ -1158,7 +1155,7 @@ struct String(
         pass
 
     # TODO: Remove this method when #2317 is done
-    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
         """Retrieves a pointer to the underlying memory.
 
         Note that you should use `unsafe_uint8_ptr()` if you need to access the
@@ -1169,17 +1166,15 @@ struct String(
         Returns:
             The pointer to the underlying memory.
         """
-        return rebind[DTypePointer[DType.int8]](self._buffer.data)
+        return self._buffer.data
 
-    fn unsafe_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return rebind[DTypePointer[DType.uint8]](
-            self._buffer.data.bitcast[UInt8]()
-        )
+        return self._buffer.data.bitcast[UInt8]()
 
     fn as_bytes(self) -> List[Int8]:
         """Retrieves the underlying byte sequence encoding the characters in
@@ -1408,20 +1403,20 @@ struct String(
 
             # Copy preceding unchanged chars
             for _ in range(curr_offset, idx):
-                res.append(self_ptr.load())
+                res.append(self_ptr[])
                 self_ptr += 1
 
             # Insert a copy of the new replacement string
             for i in range(new_len):
-                res.append(new_ptr.load(i))
+                res.append(new_ptr[i])
 
             self_ptr += old_len
 
         while True:
-            var val = self_ptr.load()
+            var val = self_ptr[]
             if val == 0:
                 break
-            res.append(self_ptr.load())
+            res.append(self_ptr[])
             self_ptr += 1
 
         res.append(0)
@@ -1488,8 +1483,8 @@ struct String(
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
-                res.append(val_ptr.load(j))
-            res.append(self_ptr.load(i))
+                res.append(val_ptr[j])
+            res.append(self_ptr[i])
         res.append(0)
         return String(res^)
 

@@ -80,7 +80,7 @@ struct Error(Stringable, Boolable):
         memcpy(
             dest=dest,
             # TODO: Remove cast once string UInt8 transition is complete.
-            src=src.unsafe_ptr().bitcast[DType.uint8](),
+            src=src.unsafe_ptr().bitcast[UInt8](),
             count=length,
         )
         dest[length] = 0
