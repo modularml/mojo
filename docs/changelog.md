@@ -427,6 +427,9 @@ what we publish.
 
 - Added a new `tempfile` module. Similarly to Python, this will contain
   utilities for creating and working with temporary files and directories.
+  
+- Added `SIMD.__repr__` to get the verbose string representation of `SIMD` types.
+([PR #2728](https://github.com/modularml/mojo/pull/2728) by [@bgreni](https://github.com/bgreni))
 
 ### 🦋 Changed
 
