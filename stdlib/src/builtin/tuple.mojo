@@ -206,8 +206,10 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         @parameter
         fn SingleIteration[Index: Int]():
             if _type_is_eq[RHS_T, element_types[Index.value]]():
-                result |= rhs.__eq__(self.get[Index, RHS_T]())
+                var tmp = rhs
+                result |= self.get[Index, RHS_T]().__eq__(tmp)
+                _ = tmp
 
         unroll[SingleIteration, len(VariadicList(element_types))]()
-        _ = rhs
+        _ = rhs^
         return result
