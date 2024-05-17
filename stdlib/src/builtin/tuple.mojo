@@ -199,7 +199,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
               trait `EqualityComparable`.
 
         Returns:
-            True if the value is contained in the list, False otherwise.
+            True if the value is contained in the tuple, False otherwise.
         """
         var result = False
 
