@@ -262,6 +262,10 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     var _array: Self.type
     """The underlying storage for the array."""
 
+    # ===------------------------------------------------------------------===#
+    # Initializers
+    # ===------------------------------------------------------------------===#
+
     @always_inline
     fn __init__(inout self):
         """This constructor will always cause a compile time error if used.
@@ -271,7 +275,8 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             False,
             (
                 "Initialize with either a variadic list of arguments, a default"
-                " fill element or pass the keyword argument 'uninitialized'."
+                " fill element or pass the keyword argument"
+                " 'unsafe_uninitialized'."
             ),
         ]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
@@ -331,12 +336,16 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
                 UnsafePointer[Self.ElementType](ref), elems[i]
             )
 
+    # ===------------------------------------------------------------------=== #
+    # Trait Interfaces
+    # ===------------------------------------------------------------------=== #
+
     @always_inline("nodebug")
     fn __len__(self) -> Int:
         """Returns the length of the array. This is a known constant value.
 
         Returns:
-            The size of the list.
+            The size of the array.
         """
         return size
 
@@ -353,6 +362,10 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             index.value,
         )
         return UnsafePointer(ptr)[]
+
+    # ===------------------------------------------------------------------===#
+    # Operator dunders
+    # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __refitem__[
@@ -406,9 +419,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         return self[]._get_reference_unsafe(normalized_idx)
 
     @always_inline
-    fn unsafe_ptr(
-        self: Reference[Self, _, _]
-    ) -> UnsafePointer[Self.ElementType]:
+    fn unsafe_ptr(self) -> UnsafePointer[Self.ElementType]:
         """Get an `UnsafePointer` to the underlying array.
 
         That pointer is unsafe but can be used to read or write to the array.
@@ -420,4 +431,4 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Returns:
             An `UnsafePointer` to the underlying array.
         """
-        return UnsafePointer(self[]._array).bitcast[Self.ElementType]()
+        return UnsafePointer(self._array).bitcast[Self.ElementType]()

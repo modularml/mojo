@@ -290,7 +290,7 @@ struct _FixedString[CAP: Int](
         CAP: The fixed-size count of bytes of string storage capacity available.
     """
 
-    var buffer: _ArrayMem[Int8, CAP]
+    var buffer: InlineArray[Int8, CAP]
     """The underlying storage for the fixed string."""
     var size: Int
     """The number of elements in the vector."""
@@ -301,7 +301,7 @@ struct _FixedString[CAP: Int](
 
     fn __init__(inout self):
         """Constructs a new empty string."""
-        self.buffer = _ArrayMem[Int8, CAP]()
+        self.buffer = InlineArray[Int8, CAP](unsafe_uninitialized=True)
         self.size = 0
 
     @always_inline
@@ -320,10 +320,14 @@ struct _FixedString[CAP: Int](
                 + ")"
             )
 
-        self.buffer = _ArrayMem[Int8, CAP]()
+        self.buffer = InlineArray[Int8, CAP](unsafe_uninitialized=True)
         self.size = len(literal)
 
-        memcpy(self.buffer.as_ptr(), literal.unsafe_ptr(), len(literal))
+        memcpy(
+            DTypePointer(self.buffer.unsafe_ptr()),
+            literal.unsafe_ptr(),
+            len(literal),
+        )
 
     # ===------------------------------------------------------------------=== #
     # Trait Interfaces
@@ -381,7 +385,7 @@ struct _FixedString[CAP: Int](
 
         # Append the bytes from `strref` at the end of the current string
         memcpy(
-            self.buffer.as_ptr().bitcast[UInt8]() + len(self),
+            DTypePointer(self.buffer.unsafe_ptr().bitcast[UInt8]() + len(self)),
             strref.data,
             len(strref),
         )
@@ -453,7 +457,7 @@ struct _FixedString[CAP: Int](
         Returns:
             The pointer to the underlying memory.
         """
-        return self.buffer.as_ptr()
+        return self.buffer.unsafe_ptr()
 
     fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
         """Retrieves a pointer to the underlying memory.
@@ -461,7 +465,7 @@ struct _FixedString[CAP: Int](
         Returns:
             The pointer to the underlying memory.
         """
-        return self.buffer.as_ptr().bitcast[UInt8]()
+        return self.buffer.unsafe_ptr().bitcast[UInt8]()
 
     fn _strref_dangerous(self) -> StringRef:
         """
@@ -479,71 +483,3 @@ struct _FixedString[CAP: Int](
         without the string getting deallocated early.
         """
         pass
-
-
-# ===----------------------------------------------------------------------===#
-# _ArrayMem
-# ===----------------------------------------------------------------------===#
-
-
-@value
-struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
-    """A fixed-sized, homogeneous, contiguous, inline collection type.
-
-    Parameters:
-        ElementType: The type of the elements in the array.
-        SIZE: The fixed number of elements stored in the array.
-    """
-
-    var storage: InlineArray[ElementType, SIZE]
-    """The underlying storage for this array value."""
-
-    # ===------------------------------------------------------------------===#
-    # Constructors
-    # ===------------------------------------------------------------------===#
-
-    @always_inline
-    fn __init__(inout self):
-        """Constructs an empty (undefined) array."""
-
-        self.storage = InlineArray[ElementType, SIZE](unsafe_uninitialized=True)
-
-    # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
-    # ===------------------------------------------------------------------=== #
-
-    fn __len__(self) -> Int:
-        """Returns the length of the array. This is a known constant value.
-
-        Returns:
-            The length of the array
-        """
-        return SIZE
-
-    fn __setitem__(inout self, index: Int, owned value: ElementType):
-        var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer(Reference(self.storage._array)).address, index.value
-        )
-        __mlir_op.`pop.store`(value, ptr)
-
-    # ===------------------------------------------------------------------=== #
-    # Methods
-    # ===------------------------------------------------------------------=== #
-
-    fn as_ptr(self) -> LegacyPointer[ElementType]:
-        """Get a pointer to the elements contained by this array.
-
-        Returns:
-            A pointer to the elements contained by this array.
-        """
-
-        return LegacyPointer.address_of(self.storage).bitcast[ElementType]()
-
-    fn unsafe_ptr(inout self) -> UnsafePointer[ElementType]:
-        """Get a pointer to the elements contained by this array.
-
-        Returns:
-            A pointer to the elements contained by this array.
-        """
-
-        return UnsafePointer.address_of(self.storage).bitcast[ElementType]()

@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import List, Optional
-from utils.inlined_string import _ArrayMem
+from utils import InlineArray
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -145,7 +145,7 @@ fn _try_write_int(
     # Stack allocate enough bytes to store any formatted 64-bit integer
     alias CAPACITY: Int = 64
 
-    var buf = _ArrayMem[Int8, CAPACITY]()
+    var buf = InlineArray[Int8, CAPACITY](unsafe_uninitialized=True)
 
     # Start the buf pointer at the end. We will write the least-significant
     # digits later in the buffer, and then decrement the pointer to move

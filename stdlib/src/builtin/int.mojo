@@ -25,7 +25,7 @@ from builtin.hex import _try_write_int
 
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._format import Formattable, Formatter
-from utils.inlined_string import _ArrayMem
+from utils import InlineArray
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -377,7 +377,7 @@ struct Int(
             # Stack allocate enough bytes to store any formatted 64-bit integer
             alias size: Int = 32
 
-            var buf = _ArrayMem[Int8, size]()
+            var buf = InlineArray[Int8, size](unsafe_uninitialized=True)
 
             # Format the integer to the local byte array
             var len = _snprintf(
@@ -394,7 +394,7 @@ struct Int(
             #
             # SAFETY:
             #   `buf` is kept alive long enough for the use of this StringRef.
-            writer.write_str(StringRef(buf.as_ptr(), len))
+            writer.write_str(StringRef(buf.unsafe_ptr(), len))
 
             # Keep buf alive until we've finished with the StringRef
             _ = buf^
