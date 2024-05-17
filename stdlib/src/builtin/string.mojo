@@ -1541,6 +1541,11 @@ struct String(
         Returns:
           True if the self[start:end] is prefixed by the input prefix.
         """
+        if end == -1:
+            return StringRef(
+                self.unsafe_ptr() + start, len(self) - start
+            ).startswith(prefix._strref_dangerous())
+
         return StringRef(self.unsafe_ptr() + start, end - start).startswith(
             prefix._strref_dangerous()
         )
@@ -1557,7 +1562,12 @@ struct String(
         Returns:
           True if the self[start:end] is suffixed by the input suffix.
         """
-        return StringRef(self.unsafe_ptr() + start, end - start).startswith(
+        if end == -1:
+            return StringRef(
+                self.unsafe_ptr() + start, len(self) - start
+            ).endswith(suffix._strref_dangerous())
+
+        return StringRef(self.unsafe_ptr() + start, end - start).endswith(
             suffix._strref_dangerous()
         )
 
