@@ -1333,11 +1333,15 @@ struct String(
             substr._strref_dangerous(), start=start
         )
 
-    fn split(self, delimiter: String) raises -> List[String]:
+    @always_inline
+    fn split(
+        self, sep: StringRef, maxsplit: Int = Int.MAX
+    ) raises -> List[String]:
         """Split the string by a delimiter.
 
         Args:
-          delimiter: The string to split on.
+          sep: The string to split on.
+          maxsplit: The maximum number of splits to allow.
 
         Returns:
           A List of Strings containing the input split by the delimiter.
@@ -1345,24 +1349,77 @@ struct String(
         Raises:
           Error if an empty delimiter is specified.
         """
-        if not delimiter:
+        return self.split(str(sep), maxsplit)
+
+    fn split(
+        self, sep: Optional[String] = None, maxsplit: Int = Int.MAX
+    ) raises -> List[String]:
+        """Split the string by a delimiter.
+
+        Args:
+          sep: The string to split on.
+          maxsplit: The maximum number of splits to allow.
+
+        Returns:
+          A List of Strings containing the input split by the delimiter.
+
+        Raises:
+          Error if an empty delimiter is specified.
+        """
+        if sep and not sep.value()[]:
             raise Error("empty delimiter not allowed to be passed to split.")
 
         var output = List[String]()
 
+        if maxsplit != Int.MAX:
+            output.reserve(maxsplit + 1)
+
+        var splits_remaining = maxsplit
         var current_offset = 0
-        while True:
-            var loc = self.find(delimiter, current_offset)
-            # delimiter not found, so add the search slice from where we're currently at
-            if loc == -1:
+
+        if not sep:
+            var self_ref = self._strref_dangerous()
+            while splits_remaining > 0:
+                splits_remaining -= 1
+                # skip any contiguous section of whitespace
+                while self_ref[
+                    current_offset
+                ] in String.WHITESPACE and current_offset < len(self):
+                    current_offset += 1
+                if current_offset == len(self):
+                    break
+                var start_loc = current_offset
+                current_offset += 1
+                # find the next whitespace char
+                while self_ref[
+                    current_offset
+                ] not in String.WHITESPACE and current_offset < len(self):
+                    current_offset += 1
+                output.append(self[start_loc:current_offset])
+            if current_offset < len(self):
+                while self_ref[
+                    current_offset
+                ] in String.WHITESPACE and current_offset < len(self):
+                    current_offset += 1
                 output.append(self[current_offset:])
-                break
+        else:
+            while splits_remaining > 0:
+                splits_remaining -= 1
+                var loc = self.find(sep.value()[], current_offset)
+                # delimiter not found, so add the search slice from where we're currently at
+                if loc == -1:
+                    output.append(self[current_offset:])
+                    current_offset = len(self)
+                    break
 
-            # We found a delimiter, so add the preceding string slice
-            output.append(self[current_offset:loc])
+                # We found a delimiter, so add the preceding string slice
+                output.append(self[current_offset:loc])
 
-            # Advance our search offset past the delimiter
-            current_offset = loc + len(delimiter)
+                # Advance our search offset past the delimiter
+                current_offset = loc + len(sep.value()[])
+
+            if current_offset < len(self):
+                output.append(self[current_offset:])
 
         return output
 

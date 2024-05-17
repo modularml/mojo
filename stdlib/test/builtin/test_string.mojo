@@ -573,6 +573,23 @@ fn test_split() raises:
     assert_equal(res4[0], "he")
     assert_equal(res4[1], "o")
 
+    assert_equal(String("a,,b").split(String(",")).__str__(), "['a', '', 'b']")
+
+    assert_equal(String("a b").split().__str__(), "['a', 'b']")
+    assert_equal(String("a    b    c").split().__str__(), "['a', 'b', 'c']")
+    assert_equal(String("a    b c").split(maxsplit=1).__str__(), "['a', 'b c']")
+    assert_equal(String("a\nb\tc").split().__str__(), "['a', 'b', 'c']")
+    assert_equal(String("abs  gr").split(maxsplit=1).__str__(), "['abs', 'gr']")
+    assert_equal(
+        String("abs  gr").split(" ", maxsplit=1).__str__(), "['abs', ' gr']"
+    )
+    assert_equal(String("a b c").split(maxsplit=1).__str__(), "['a', 'b c']")
+    assert_equal(String("1<>2<>3").split("<>").__str__(), "['1', '2', '3']")
+    assert_equal(String("abc").split().__str__(), "['abc']")
+    assert_equal(
+        String("a b c d e").split(maxsplit=2).__str__(), "['a', 'b', 'c d e']"
+    )
+
 
 fn test_isupper() raises:
     assert_true(isupper(ord("A")))
