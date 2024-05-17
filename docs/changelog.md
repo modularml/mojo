@@ -247,6 +247,9 @@ what we publish.
 - `List()` now supports `__contains__`.
     ([PR #2667](https://github.com/modularml/mojo/pull/2667) by [@rd4com](https://github.com/rd4com/))
 
+- `InlineList()` now supports `__contains__`, `__iter__`.
+    ([PR #2703](https://github.com/modularml/mojo/pull/2703) by [@ChristopherLR](https://github.com/ChristopherLR))
+
 - `List` now has an `index` method that allows one to find the (first) location
   of an element in a `List` of `EqualityComparable` types. For example:
 
