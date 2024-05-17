@@ -29,7 +29,7 @@ from memory.unsafe_pointer import (
 
 
 @lldb_formatter_wrapping_type
-struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
+struct Tuple[*element_types: Movable](Sized, Movable):
     """The type of a literal tuple expression.
 
     A tuple consists of zero or more values, separated by commas.
@@ -40,7 +40,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
     alias _mlir_type = __mlir_type[
         `!kgen.pack<:!kgen.variadic<`,
-        CollectionElement,
+        Movable,
         `> `,
         +element_types,
         `>`,
@@ -62,14 +62,15 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     fn __init__(
         inout self,
         *,
-        owned storage: VariadicPack[_, _, CollectionElement, element_types],
+        owned storage: VariadicPack[_, _, Movable, element_types],
     ):
         """Construct the tuple from a low-level internal representation.
 
         Args:
             storage: The variadic pack storage to construct from.
         """
-        # Mark 'storage' as being initialized so we can work on it.
+
+        # Mark 'self.storage' as being initialized so we can work on it.
         __mlir_op.`lit.ownership.mark_initialized`(
             __get_mvalue_as_litref(self.storage)
         )
@@ -97,24 +98,6 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             destroy_pointee(UnsafePointer(self[idx]))
 
         unroll[destroy_elt, Self.__len__()]()
-
-    @always_inline("nodebug")
-    fn __copyinit__(inout self, existing: Self):
-        """Copy construct the tuple.
-
-        Args:
-            existing: The value to copy from.
-        """
-        # Mark 'storage' as being initialized so we can work on it.
-        __mlir_op.`lit.ownership.mark_initialized`(
-            __get_mvalue_as_litref(self.storage)
-        )
-
-        @parameter
-        fn initialize_elt[idx: Int]():
-            initialize_pointee_copy(UnsafePointer(self[idx]), existing[idx])
-
-        unroll[initialize_elt, Self.__len__()]()
 
     @always_inline("nodebug")
     fn __moveinit__(inout self, owned existing: Self):
@@ -148,7 +131,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         @parameter
         fn variadic_size(
-            x: __mlir_type[`!kgen.variadic<`, CollectionElement, `>`]
+            x: __mlir_type[`!kgen.variadic<`, Movable, `>`]
         ) -> Int:
             return __mlir_op.`pop.variadic.size`(x)
 
@@ -184,7 +167,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     # TODO(#38268): Remove this method when references and parameter expressions
     # cooperate better.  We can't handle the use in test_simd without this.
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](self) -> T:
+    fn get[i: Int, T: Movable](self) -> T:
         """Get a tuple element and rebind to the specified type.
 
         Parameters:

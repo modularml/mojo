@@ -66,7 +66,7 @@ def test_dict_string_representation_string_int():
     var some_dict = Dict[String, Int]()
     some_dict["a"] = 1
     some_dict["b"] = 2
-    dict_as_string = __type_of(some_dict).__str__(some_dict)
+    dict_as_string = some_dict.__str__()
     assert_true(
         some_dict._minimum_size_of_string_representation()
         <= len(dict_as_string)
@@ -80,7 +80,7 @@ def test_dict_string_representation_int_int():
     some_dict[4] = 2
     some_dict[5] = 3
     some_dict[6] = 4
-    dict_as_string = __type_of(some_dict).__str__(some_dict)
+    dict_as_string = some_dict.__str__()
     # one char per key and value, we should have the minimum size of string possible
     assert_equal(
         some_dict._minimum_size_of_string_representation(), len(dict_as_string)

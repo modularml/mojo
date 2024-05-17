@@ -86,7 +86,7 @@ Now let's write the code in a Mojo source file and run it with the
     Hello, world!
     ```
 
-If this didn't work for you, double-check your code looks exactly like the code
+If this didn't work for you, double-check that your code looks exactly like the code
 in step 1, and make sure you correctly [installed
 MAX](/max/install) (it includes Mojo).
 
@@ -131,6 +131,12 @@ repo](https://github.com/modularml/mojo/) to try our code examples:
 
   ```sh
   git clone https://github.com/modularml/mojo.git
+  ```
+
+  If you installed the nightly build, also checkout the nightly branch:
+
+  ```sh
+  git checkout nightly
   ```
 
   In addition to several `.mojo` examples, the repo includes [Jupyter

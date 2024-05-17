@@ -21,7 +21,7 @@ def test_static_tuple():
     var tup1 = StaticTuple[Int, 1](1)
     assert_equal(tup1[0], 1)
 
-    var tup2 = StaticTuple[Int, 2](1)
+    var tup2 = StaticTuple[Int, 2](1, 1)
     assert_equal(tup2[0], 1)
     assert_equal(tup2[1], 1)
 
@@ -118,7 +118,10 @@ def test_array_int():
     assert_equal(arr2[2], 5)
 
     var arr3 = InlineArray[Int, 1](5)
-    assert_equal(arr2[0], 5)
+    assert_equal(arr3[0], 5)
+
+    var arr4 = InlineArray[UInt8, 1](42)
+    assert_equal(arr4[0], 42)
 
 
 def test_array_str():
