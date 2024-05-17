@@ -245,7 +245,7 @@ struct Span[
     fn __bool__(self) -> Bool:
         """Check if a span is non-empty.
 
-        Return:
+        Returns:
            True if a span is non-empty, False otherwise.
         """
         return len(self) > 0
@@ -258,6 +258,7 @@ struct Span[
         Parameters:
             T2: The type of the elements in the span. Must implement the
               traits `EqualityComparable` and `CollectionElement`.
+
         Args:
             rhs: The span to compare against.
 
