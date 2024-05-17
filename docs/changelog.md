@@ -304,6 +304,14 @@ what we publish.
 - `ListLiteral` and `Tuple` now only requires that element types be `Copyable`.
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
 
+- Continued transition to `UnsafePointer` and unsigned byte type for strings:
+  - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer` (was
+    `DTypePointer`).
+  - `InlinedString.as_ptr()` has been renamed to `unsafe_ptr()` and now
+    returns an `UnsafePointer[UInt8]` (was `DTypePointer[DType.int8]`).
+
+- Added `UnsafePointer.offset()` method.
+
 - The `math.bit` module has been moved to a new top-level `bit` module. The
   following functions in this module have been renamed:
   - `ctlz` -> `countl_zero`
