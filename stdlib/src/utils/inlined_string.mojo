@@ -165,9 +165,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
             # Copy the bytes from the additional string.
             memcpy(
                 dest=buffer.unsafe_ptr() + len(self),
-                src=UnsafePointer[Int8]._from_dtype_ptr(
-                    strref.unsafe_uint8_ptr()
-                ),
+                src=strref.unsafe_ptr(),
                 count=len(strref),
             )
 
