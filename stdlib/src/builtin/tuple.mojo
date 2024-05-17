@@ -184,12 +184,12 @@ struct Tuple[*element_types: Movable](Sized, Movable):
     @always_inline("nodebug")
     fn __contains__[
         RHS_T: ComparableCollectionElement
-    ](inout self, owned rhs: RHS_T) -> Bool:
+    ](self: Reference[Self], owned rhs: RHS_T) -> Bool:
         """Verify if a given value is present in the tuple.
 
         ```mojo
         var x = Tuple(1,2,True)
-        if 1 in x: print("x contains 1")
+        if x.__contains__(1): print("x contains 1")
         ```
         Args:
             rhs: The value to find.
@@ -206,8 +206,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         @parameter
         fn SingleIteration[Index: Int]():
             if _type_is_eq[RHS_T, element_types[Index.value]]():
-                var tmp = rhs
-                result |= self.get[Index, RHS_T]().__eq__(tmp)
+                var tmp = self[].__refitem__[Index]()
+                result |= UnsafePointer(tmp).bitcast[RHS_T]()[].__eq__(rhs)
                 _ = tmp
 
         unroll[SingleIteration, len(VariadicList(element_types))]()
