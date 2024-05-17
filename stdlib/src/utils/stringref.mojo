@@ -490,6 +490,9 @@ struct StringRef(
 
         For example, `"  mojo  "` returns `"mojo"`.
 
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
         Returns:
             A StringRef with leading and trailing whitespaces removed.
         """
@@ -498,30 +501,34 @@ struct StringRef(
     fn lstrip(self, chars: String = String.WHITESPACE) -> StringRef:
         """Return a StringRef with leading characters removed.
 
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
         Returns:
           A StringRef with no leading characters.
         """
 
         var l_idx = 0
-        var ptr = self.unsafe_ptr()
-        while l_idx < len(self) and ptr[l_idx] in chars:
+        while l_idx < len(self) and self[l_idx] in chars:
             l_idx += 1
 
-        return StringRef(ptr + l_idx, len(self) - l_idx)
+        return StringRef(self.unsafe_ptr() + l_idx, len(self) - l_idx)
 
     fn rstrip(self, chars: String = String.WHITESPACE) -> StringRef:
         """Return a StringRef with trailing characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
           A StringRef with no trailing characters.
         """
 
         var r_idx = len(self)
-        var ptr = self.unsafe_ptr()
-        while r_idx > 0 and ptr[r_idx - 1] in chars:
+        while r_idx > 0 and self[r_idx - 1] in chars:
             r_idx -= 1
 
-        return StringRef(ptr, r_idx)
+        return StringRef(self.unsafe_ptr(), r_idx)
 
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
