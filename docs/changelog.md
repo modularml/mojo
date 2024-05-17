@@ -275,6 +275,9 @@ what we publish.
   trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
   by [@fknfilewalker](https://github.com/fknfilewalker))
 
+- `StringRef` now implements `split()` which can be used to split a `StringRef` into a `List[StringRef]` by a delimiter. ([PR #](https://github.com/modularml/mojo/pull/)
+  by [@fknfilewalker](https://github.com/fknfilewalker))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously

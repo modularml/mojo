@@ -1348,21 +1348,12 @@ struct String(
         if not delimiter:
             raise Error("empty delimiter not allowed to be passed to split.")
 
-        var output = List[String]()
-
-        var current_offset = 0
-        while True:
-            var loc = self.find(delimiter, current_offset)
-            # delimiter not found, so add the search slice from where we're currently at
-            if loc == -1:
-                output.append(self[current_offset:])
-                break
-
-            # We found a delimiter, so add the preceding string slice
-            output.append(self[current_offset:loc])
-
-            # Advance our search offset past the delimiter
-            current_offset = loc + len(delimiter)
+        var str_ref_split = self._strref_dangerous().split(
+            delimiter._strref_dangerous()
+        )
+        var output = List[String](capacity=len(str_ref_split))
+        for str_ref in str_ref_split:
+            output.append(str_ref[])
 
         return output
 
