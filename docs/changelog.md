@@ -378,11 +378,6 @@ what we publish.
   module to the new `utils.numerics` module: `isfinite`, `isinf`, `isnan`,
   `nan`, `nextafter`, and `ulp`. The functions continue to be exposed in the
   `math` module.
-- `Tuple()` now supports `__contains__`. For example:
-  ```mojo
-  var x = Tuple(1,2,True)
-  if 1 in x: print("x contains 1")
-  ```
 
 ### ❌ Removed
 
