@@ -813,11 +813,17 @@ struct Dict[K: KeyElement, V: CollectionElement](
             "KeyError" if the dictionary is empty.
         """
 
+        var key = Optional[K](None)
+        var val = Optional[V](None)
+
         for item in reversed(self.items()):
-            var key = item[].key
-            var value = item[].value
-            _ = self.pop(key)
-            return DictEntry[K, V](key, value)
+            key = Optional(item[].key)
+            val = Optional(item[].value)
+            break
+
+        if key:
+            _ = self.pop(key.value()[])
+            return DictEntry[K, V](key.value()[], val.value()[])
 
         raise "KeyError"
 
