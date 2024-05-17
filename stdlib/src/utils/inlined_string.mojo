@@ -153,19 +153,23 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
             # Begin by heap allocating enough space to store the combined
             # string.
-            var buffer = List[Int8](capacity=total_len)
-
-            var buffer_ptr = rebind[DTypePointer[DType.uint8]](buffer.data)
+            var buffer = List[UInt8](capacity=total_len)
 
             # Copy the bytes from the current small string layout
             memcpy(
-                buffer_ptr,
-                self._storage[_FixedString[Self.SMALL_CAP]].as_uint8_ptr(),
-                len(self),
+                dest=buffer.unsafe_ptr(),
+                src=self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr(),
+                count=len(self),
             )
 
             # Copy the bytes from the additional string.
-            memcpy(buffer_ptr + len(self), strref.data, len(strref))
+            memcpy(
+                dest=buffer.unsafe_ptr() + len(self),
+                src=UnsafePointer[Int8]._from_dtype_ptr(
+                    strref.unsafe_uint8_ptr()
+                ),
+                count=len(strref),
+            )
 
             # Record that we've initialized `total_len` count of elements
             # in `buffer`
@@ -231,7 +235,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
     # TODO: Remove this when we have transitioned to uint8 for bytes.
     # See https://github.com/modularml/mojo/issues/2317 for details
-    fn as_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Returns a pointer to the bytes of string data.
 
         Returns:
@@ -239,21 +243,11 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         """
 
         if self._is_small():
-            return self._storage[_FixedString[Self.SMALL_CAP]].as_ptr()
+            return self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr()
         else:
-            return self._storage[String].unsafe_ptr()
+            var string_ptr = self._storage[String].unsafe_uint8_ptr()
 
-    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
-        """Returns a pointer to the bytes of string data.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
-
-        if self._is_small():
-            return self._storage[_FixedString[Self.SMALL_CAP]].as_uint8_ptr()
-        else:
-            return self._storage[String].unsafe_uint8_ptr()
+            return UnsafePointer[UInt8]._from_dtype_ptr(string_ptr)
 
     fn _strref_dangerous(self) -> StringRef:
         """
@@ -262,7 +256,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.as_uint8_ptr(), length: len(self)}
+        return StringRef {data: self.unsafe_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
@@ -290,7 +284,7 @@ struct _FixedString[CAP: Int](
         CAP: The fixed-size count of bytes of string storage capacity available.
     """
 
-    var buffer: InlineArray[Int8, CAP]
+    var buffer: InlineArray[UInt8, CAP]
     """The underlying storage for the fixed string."""
     var size: Int
     """The number of elements in the vector."""
@@ -301,7 +295,7 @@ struct _FixedString[CAP: Int](
 
     fn __init__(inout self):
         """Constructs a new empty string."""
-        self.buffer = InlineArray[Int8, CAP](unsafe_uninitialized=True)
+        self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
         self.size = 0
 
     @always_inline
@@ -320,13 +314,14 @@ struct _FixedString[CAP: Int](
                 + ")"
             )
 
-        self.buffer = InlineArray[Int8, CAP](unsafe_uninitialized=True)
+        self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
         self.size = len(literal)
 
         memcpy(
-            DTypePointer(self.buffer.unsafe_ptr()),
-            literal.unsafe_ptr(),
-            len(literal),
+            dest=self.buffer.unsafe_ptr(),
+            # TODO: Remove bitcast after string transition to UInt8 is complete.
+            src=literal.unsafe_ptr().bitcast[UInt8](),
+            count=len(literal),
         )
 
     # ===------------------------------------------------------------------=== #
@@ -449,23 +444,13 @@ struct _FixedString[CAP: Int](
 
         return output^
 
-    # TODO: Remove this when we have transitionned to uint8 for bytes.
-    # See https://github.com/modularml/mojo/issues/2317 for details
-    fn as_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
         return self.buffer.unsafe_ptr()
-
-    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
-        """Retrieves a pointer to the underlying memory.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
-        return self.buffer.unsafe_ptr().bitcast[UInt8]()
 
     fn _strref_dangerous(self) -> StringRef:
         """
@@ -474,7 +459,7 @@ struct _FixedString[CAP: Int](
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.as_uint8_ptr(), length: len(self)}
+        return StringRef {data: self.unsafe_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
