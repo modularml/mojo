@@ -172,7 +172,15 @@ struct StringLiteral(
 
     @always_inline("nodebug")
     fn __le__(self, rhs: StringLiteral) -> Bool:
-        return StringRef(self) < StringRef(rhs)
+        """Compare this StringLiteral to the RHS using LE comparison.
+
+        Args:
+            rhs: The other StringLiteral to compare against.
+
+        Returns:
+            True if this StringLiteral is less than or equal to the RHS StringLiteral and False otherwise.
+        """
+        return not (rhs < self)
 
     @always_inline("nodebug")
     fn __gt__(self, rhs: StringLiteral) -> Bool:

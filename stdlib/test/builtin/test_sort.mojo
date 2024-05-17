@@ -20,27 +20,33 @@ from testing import assert_true
 from random import random_si64, random_ui64, random_float64
 
 
-fn random_numbers[D: DType](size: Int, max: Int = 3000) -> List[SIMD[D, 1]]:
-    var result = List[SIMD[D, 1]](size)
+fn random_numbers[
+    dtype: DType
+](size: Int, max: Int = 3000) -> List[Scalar[dtype]]:
+    var result = List[Scalar[dtype]](size)
     for _ in range(size):
 
         @parameter
         if (
-            D == DType.int8
-            or D == DType.int16
-            or D == DType.int32
-            or D == DType.int64
+            dtype == DType.int8
+            or dtype == DType.int16
+            or dtype == DType.int32
+            or dtype == DType.int64
         ):
-            result.append(random_si64(0, max).cast[D]())
-        elif D == DType.float16 or D == DType.float32 or D == DType.float64:
-            result.append(random_float64(0, max).cast[D]())
+            result.append(random_si64(0, max).cast[dtype]())
+        elif (
+            dtype == DType.float16
+            or dtype == DType.float32
+            or dtype == DType.float64
+        ):
+            result.append(random_float64(0, max).cast[dtype]())
         else:
-            result.append(random_ui64(0, max).cast[D]())
+            result.append(random_ui64(0, max).cast[dtype]())
     return result
 
 
-fn assert_sorted[D: DType](inout list: List[SIMD[D, 1]]) raises:
-    sort[D](list)
+fn assert_sorted[dtype: DType](inout list: List[Scalar[dtype]]) raises:
+    sort[dtype](list)
     for i in range(1, len(list)):
         assert_true(
             list[i] >= list[i - 1], str(list[i - 1]) + " > " + str(list[i])
@@ -54,7 +60,9 @@ fn assert_sorted_string(inout list: List[String]) raises:
         )
 
 
-fn assert_sorted[D: ComparableCollectionElement](inout list: List[D]) raises:
+fn assert_sorted[
+    type: ComparableCollectionElement
+](inout list: List[type]) raises:
     for i in range(1, len(list)):
         assert_true(list[i] >= list[i - 1], "error at index: " + str(i))
 
@@ -76,7 +84,7 @@ def test_sort_random_numbers():
 
     @parameter
     @always_inline
-    fn perfomr_test[idx: Int]() raises:
+    fn perform_test[idx: Int]() raises:
         alias concrete_type = type_list[idx]
         var list = random_numbers[concrete_type](10)
         assert_sorted(list)
@@ -85,7 +93,7 @@ def test_sort_random_numbers():
         list = random_numbers[concrete_type](1000)
         assert_sorted(list)
 
-    unroll[perfomr_test, len(type_list)]()
+    unroll[perform_test, len(type_list)]()
 
 
 def test_sort_string_small_list():
