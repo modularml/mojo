@@ -174,7 +174,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         """Verify if a given value is present in the list.
 
         ```mojo
-        var x = List[Int](1,2,3)
+        var x = InlineList[Int](1,2,3)
         if 3 in x: print("x contains 3")
         ```
         Parameters:
