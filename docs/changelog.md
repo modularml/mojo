@@ -323,6 +323,9 @@ what we publish.
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
+  - `String.unsafe_ptr()` now returns an `UnsafePointer` (was `DTypePointer`)
+  - `String.unsafe_uint8_ptr()` now returns `UnsafePointer` (was
+    `DTypePointer`)
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer` (was
     `DTypePointer`).
   - `InlinedString.as_ptr()` has been renamed to `unsafe_ptr()` and now

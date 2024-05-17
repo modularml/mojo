@@ -243,9 +243,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         if self._is_small():
             return self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr()
         else:
-            var string_ptr = self._storage[String].unsafe_uint8_ptr()
-
-            return UnsafePointer[UInt8]._from_dtype_ptr(string_ptr)
+            return self._storage[String].unsafe_uint8_ptr()
 
     fn _strref_dangerous(self) -> StringRef:
         """
