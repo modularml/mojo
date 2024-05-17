@@ -1,0 +1,19 @@
+[language-server.mojo-lsp]
+command = "mojo-lsp-server"
+config = { provideFormatter = true }
+
+[[grammar]]
+name = "mojo"
+source = { git = "https://github.com/lsh/tree-sitter-mojo", rev = "e645ad097257a29bed5ee6213fef47e26b280f63" }
+
+[[language]]
+name = "mojo"
+grammar = "mojo"
+scope = "source.mojo"
+roots = ["__init__.mojo"]
+file-types = ["mojo", "🔥"]
+indent = { tab-width = 4, unit = " " }
+auto-format = true
+language-servers = ["mojo-lsp"]
+formatter = { command = "mojo", args = ["format", "-q", "-"]}
+comment-token = "#"

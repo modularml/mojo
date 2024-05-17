@@ -22,6 +22,7 @@ from utils import StaticTuple
 from memory import Pointer
 
 from utils import unroll
+from sys.intrinsics import _type_is_eq
 
 # ===----------------------------------------------------------------------===#
 # Utilities
@@ -432,3 +433,18 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             An `UnsafePointer` to the underlying array.
         """
         return UnsafePointer(self._array).bitcast[Self.ElementType]()
+
+    @always_inline
+    fn __contains__[
+        T: ComparableCollectionElement
+    ](self: Reference[InlineArray[T, size]], value: Self.ElementType) -> Bool:
+        constrained[
+            _type_is_eq[T, Self.ElementType](),
+            "T must be equal to Self.ElementType",
+        ]()
+
+        @unroll
+        for i in range(size):
+            if self[][i] == rebind[T](value):
+                return True
+        return False
