@@ -388,6 +388,29 @@ fn atol(str: String, base: Int = 10) raises -> Int:
     return _atol(str._strref_dangerous(), base)
 
 
+fn atol_safe(str: String, base: Int = 10) -> Optional[Int]:
+    """Parses the given string as an integer in the given base and returns that value.
+
+    For example, `atol("19")` returns `19`. If the given string cannot be parsed
+    as an integer value, an empty Optional is returned. For example, `atol("hi")`
+    returns None.
+
+    If base is 0 the the string is parsed as an Integer literal,
+    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+
+    Args:
+        str: A string to be parsed as an integer in the given base.
+        base: Base used for conversion, value must be between 2 and 36, or 0.
+
+    Returns:
+        An Optional integer value that represents the string.
+    """
+    try:
+        return _atol(str._strref_dangerous(), base)
+    except:
+        return None
+
+
 # ===----------------------------------------------------------------------===#
 # isdigit
 # ===----------------------------------------------------------------------===#
@@ -1281,7 +1304,7 @@ struct String(
             substr._strref_dangerous(), start=start
         )
 
-    fn split(self, delimiter: String) raises -> List[String]:
+    fn split(self, owned delimiter: String = " ") -> List[String]:
         """Split the string by a delimiter.
 
         Args:
@@ -1290,11 +1313,9 @@ struct String(
         Returns:
           A List of Strings containing the input split by the delimiter.
 
-        Raises:
-          Error if an empty delimiter is specified.
         """
         if not delimiter:
-            raise Error("empty delimiter not allowed to be passed to split.")
+            delimiter = " "
 
         var output = List[String]()
 

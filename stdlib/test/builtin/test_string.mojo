@@ -523,11 +523,11 @@ fn test_rfind() raises:
 
 
 fn test_split() raises:
-    # Reject empty delimiters
-    with assert_raises(
-        contains="empty delimiter not allowed to be passed to split."
-    ):
-        _ = String("hello").split("")
+    # empty delimiters default to whitespace
+    var d = String("hello world").split("")
+    assert_true(d[0] == "hello", d[1] == "world")
+    d = String("hello world").split()
+    assert_true(d[0] == "hello", d[1] == "world")
 
     # Split in middle
     var d1 = String("n")
