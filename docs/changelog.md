@@ -275,7 +275,7 @@ what we publish.
   trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
   by [@fknfilewalker](https://github.com/fknfilewalker))
 
-- `StringRef` now implements `startswith()` and `endswith()`. ([PR #](https://github.com/modularml/mojo/pull/)
+- `StringRef` now implements `startswith()` and `endswith()`. ([PR #2710](https://github.com/modularml/mojo/pull/2710)
   by [@fknfilewalker](https://github.com/fknfilewalker))
 
 ### 🦋 Changed
