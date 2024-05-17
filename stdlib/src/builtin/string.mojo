@@ -220,7 +220,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
-        if isspace(buff[pos]):
+        if isspace(int(buff[pos])):
             continue
 
         if str_ref[pos] == "-":
@@ -287,7 +287,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
             break
         else:
             raise Error(_atol_error(base, str_ref))
-        if pos + 1 < str_len and not isspace(buff[pos + 1]):
+        if pos + 1 < str_len and not isspace(int(buff[pos + 1])):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
@@ -301,7 +301,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     if has_space_after_number:
         for pos in range(start, str_len):
-            if not isspace(buff[pos]):
+            if not isspace(int(buff[pos])):
                 raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
@@ -446,7 +446,8 @@ fn _is_ascii_lowercase(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn isspace(c: Int8) -> Bool:
+# TODO(MSTDL-160): Make this take a Unicode codepoint type
+fn isspace(c: Int) -> Bool:
     """Determines whether the given character is a whitespace character.
        This currently only respects the default "C" locale, i.e. returns
        True only if the character specified is one of
@@ -1143,7 +1144,10 @@ struct String(
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.unsafe_uint8_ptr(), length: len(self)}
+        return StringRef {
+            data: UnsafePointer[UInt8]._from_dtype_ptr(self.unsafe_uint8_ptr()),
+            length: len(self),
+        }
 
     fn _strref_keepalive(self):
         """

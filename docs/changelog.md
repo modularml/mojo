@@ -327,6 +327,13 @@ what we publish.
     `DTypePointer`).
   - `InlinedString.as_ptr()` has been renamed to `unsafe_ptr()` and now
     returns an `UnsafePointer[UInt8]` (was `DTypePointer[DType.int8]`).
+  - `StringRef.data` is now an `UnsafePointer` (was `DTypePointer`)
+  - `StringRef.unsafe_ptr()` now returns an `UnsafePointer[UInt8]` (was
+    `DTypePointer[DType.int8]`).
+  - Removed `StringRef.unsafe_uint8_ptr()`. The `unsafe_ptr()` method now has
+    the same behavior.
+
+- Changed `isspace(..)` to take an `Int`.
 
 - Added `UnsafePointer.offset()` method.
 

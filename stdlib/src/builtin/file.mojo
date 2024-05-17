@@ -423,7 +423,8 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        self._write(data.unsafe_ptr(), len(data))
+        # TODO: Remove cast when transition to UInt8 strings is complete.
+        self._write(data.unsafe_ptr().bitcast[Int8](), len(data))
 
     @always_inline
     fn _write[

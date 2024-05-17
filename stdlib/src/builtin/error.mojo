@@ -94,7 +94,11 @@ struct Error(Stringable, Boolable):
         """
         var length = len(src)
         var dest = Self.StorageType.alloc(length + 1)
-        memcpy(dest, src.data.bitcast[DType.uint8](), length)
+        memcpy(
+            dest,
+            DTypePointer(src.unsafe_ptr()).bitcast[DType.uint8](),
+            length,
+        )
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
