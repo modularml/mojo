@@ -313,7 +313,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
-        @unroll
+        @parameter
         for i in range(size):
             var ptr = self._get_reference_unsafe(i)
             initialize_pointee_copy(UnsafePointer[Self.ElementType](ptr), fill)
@@ -329,7 +329,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
-        @unroll
+        @parameter
         for i in range(size):
             var ref = self._get_reference_unsafe(i)
             initialize_pointee_move(

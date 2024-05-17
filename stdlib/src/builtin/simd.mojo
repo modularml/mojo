@@ -330,7 +330,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         debug_assert(size == num_elements, "mismatch in the number of elements")
         self = Self()
 
-        @unroll
+        @parameter
         for i in range(size):
             self[i] = elems[i]
 
@@ -1829,7 +1829,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if offset % simdwidthof[type]():
             var tmp = SIMD[type, output_width]()
 
-            @unroll
+            @parameter
             for i in range(output_width):
                 tmp[i] = self[i + offset]
             return tmp
@@ -1877,7 +1877,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if offset % simdwidthof[type]():
             var tmp = self
 
-            @unroll
+            @parameter
             for i in range(input_width):
                 tmp[i + offset] = value[i]
             return tmp
@@ -2507,7 +2507,7 @@ fn _pow[
             abort()
         else:
 
-            @unroll
+            @parameter
             for i in range(simd_width):
                 result[i] = llvm_intrinsic[
                     "llvm.pow", Scalar[lhs_type], has_side_effect=False
@@ -2523,7 +2523,7 @@ fn _pow[
 
         var result = SIMD[lhs_type, simd_width]()
 
-        @unroll
+        @parameter
         for i in range(simd_width):
             result[i] = _powi(lhs[i], rhs[i].cast[DType.int32]())
         return result
@@ -2676,7 +2676,7 @@ fn _simd_apply[
     """
     var result = SIMD[result_type, simd_width]()
 
-    @unroll
+    @parameter
     for i in range(simd_width):
         result[i] = func[x.type, result_type](x[i])
 
@@ -2711,7 +2711,7 @@ fn _simd_apply[
     """
     var result = SIMD[result_type, simd_width]()
 
-    @unroll
+    @parameter
     for i in range(simd_width):
         result[i] = func[x.type, y.type, result_type](x[i], y[i])
 

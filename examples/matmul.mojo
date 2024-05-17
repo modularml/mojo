@@ -180,7 +180,7 @@ fn matmul_unrolled[mode: Int](inout C: Matrix, A: Matrix, B: Matrix):
     fn calc_row(m: Int):
         @parameter
         fn calc_tile[tile_x: Int, tile_y: Int](x: Int, y: Int):
-            @unroll
+            @parameter
             for _k in range(tile_y):
                 var k = _k + y
 

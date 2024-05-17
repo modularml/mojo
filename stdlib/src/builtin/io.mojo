@@ -296,7 +296,7 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
     elif type.is_integral():
         _put("[")
 
-        @unroll
+        @parameter
         for i in range(simd_width):
             _put_simd_scalar(x[i])
             if i != simd_width - 1:
