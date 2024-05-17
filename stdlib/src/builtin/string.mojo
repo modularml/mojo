@@ -15,32 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from bit import countl_zero
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, Span
+from utils import StringRef, StaticIntTuple, Span, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
-
-# ===----------------------------------------------------------------------===#
-# Utilities
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _ctlz(val: Int) -> Int:
-    return llvm_intrinsic["llvm.ctlz", Int, has_side_effect=False](val, False)
-
-
-@always_inline("nodebug")
-fn _ctlz(val: SIMD) -> __type_of(val):
-    return llvm_intrinsic["llvm.ctlz", __type_of(val), has_side_effect=False](
-        val, False
-    )
-
 
 # ===----------------------------------------------------------------------===#
 # ord
@@ -70,7 +54,7 @@ fn ord(s: String) -> Int:
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
         return int(b1)
-    var num_bytes = _ctlz(~b1)
+    var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
@@ -636,7 +620,37 @@ struct String(
         var length = len(str)
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
-        memcpy(rebind[DTypePointer[DType.uint8]](buffer.data), str.data, length)
+        memcpy(
+            # TODO(modularml/mojo#2317):
+            #   Remove this bitcast after transition to UInt8 for string data
+            #   is complete.
+            dest=buffer.data.bitcast[UInt8](),
+            src=str.data,
+            count=length,
+        )
+        buffer[length] = 0
+        self._buffer = buffer^
+
+    @always_inline
+    fn __init__(inout self, str_slice: StringSlice):
+        """Construct a string from a string slice.
+
+        This will allocate a new string that copies the string contents from
+        the provided string slice `str_slice`.
+
+        Args:
+            str_slice: The string slice from which to construct this string.
+        """
+
+        # Calculate length in bytes
+        var length = len(str_slice.as_bytes_slice())
+        var buffer = Self._buffer_type()
+        buffer.resize(length + 1, 0)
+        memcpy(
+            dest=buffer.data,
+            src=str_slice.as_bytes_slice().unsafe_ptr(),
+            count=length,
+        )
         buffer[length] = 0
         self._buffer = buffer^
 
@@ -880,13 +894,7 @@ struct String(
         Returns:
             True if the Strings are equal and False otherwise.
         """
-        if len(self) != len(other):
-            return False
-
-        if int(self.unsafe_ptr()) == int(other.unsafe_ptr()):
-            return True
-
-        return memcmp(self.unsafe_ptr(), other.unsafe_ptr(), len(self)) == 0
+        return not (self != other)
 
     @always_inline
     fn __ne__(self, other: String) -> Bool:
@@ -898,7 +906,7 @@ struct String(
         Returns:
             True if the Strings are not equal and False otherwise.
         """
-        return not (self == other)
+        return self._strref_dangerous() != other._strref_dangerous()
 
     @always_inline
     fn __lt__(self, rhs: String) -> Bool:
@@ -910,13 +918,7 @@ struct String(
         Returns:
             True if this String is strictly less than the RHS String and False otherwise.
         """
-        var len1 = len(self)
-        var len2 = len(rhs)
-
-        if len1 < len2:
-            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
-        else:
-            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
+        return self._strref_dangerous() < rhs._strref_dangerous()
 
     @always_inline
     fn __le__(self, rhs: String) -> Bool:
@@ -974,14 +976,14 @@ struct String(
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
         memcpy(
-            DTypePointer(buffer.data),
-            self.unsafe_ptr(),
-            self_len,
+            dest=buffer.data,
+            src=self.unsafe_ptr(),
+            count=self_len,
         )
         memcpy(
-            DTypePointer(buffer.data + self_len),
-            other.unsafe_ptr(),
-            other_len + 1,  # Also copy the terminator
+            dest=buffer.data + self_len,
+            src=other.unsafe_ptr(),
+            count=other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
 
@@ -1195,6 +1197,7 @@ struct String(
 
         return copy
 
+    @always_inline
     fn as_bytes_slice(
         self: Reference[Self, _, _]
     ) -> Span[Int8, self.is_mutable, self.lifetime]:
@@ -1212,6 +1215,22 @@ struct String(
             # Does NOT include the NUL terminator.
             len=self[]._byte_length(),
         )
+
+    @always_inline
+    fn as_string_slice(
+        self: Reference[Self, _, _]
+    ) -> StringSlice[self.is_mutable, self.lifetime]:
+        """Returns a string slice of the data owned by this string.
+
+        Returns:
+            A string slice pointing to the data owned by this string.
+        """
+        var bytes = self[].as_bytes_slice()
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in String so this is actually
+        #   guaranteed to be valid.
+        return StringSlice(unsafe_from_utf8=bytes)
 
     fn _byte_length(self) -> Int:
         """Get the string length in bytes.
@@ -1617,9 +1636,9 @@ struct String(
         buf.resize(count, 0)
         for i in range(n):
             memcpy(
-                rebind[DTypePointer[DType.int8]](buf.data) + len_self * i,
-                self.unsafe_ptr(),
-                len_self,
+                dest=buf.data + len_self * i,
+                src=self.unsafe_ptr(),
+                count=len_self,
             )
         return String(buf^)
 
@@ -1689,7 +1708,7 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
     )
     var n = UInt32(n0)
-    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ _ctlz(n | 1))
+    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ countl_zero(n | 1))
     return (n0 + lookup_table[int(log2)]) >> 32
 
 

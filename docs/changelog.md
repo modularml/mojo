@@ -18,6 +18,26 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo added support for the `inferred` passing kind on parameters. `inferred`
+  parameters must appear at the beginning of the parameter list and cannot be
+  explicitly specified by the user. This allows users to define functions with
+  dependent parameters to be called without the caller specifying all the
+  necessary parameters. For example:
+
+  ```mojo
+  fn parameter_simd[inferred dt: DType, value: Scalar[dt]]():
+      print(value)
+
+  fn call_it():
+      parameter_simd[Int32(42)]()
+  ```
+
+  In the above example, `Int32(42)` is passed directly into `value`, the first
+  non-inferred parameter. `dt` is inferred from the parameter itself to
+  `DType.int32`.
+
+  Note that this only works on function parameter lists at the moment.
+
 - Mojo now supports adding a `@deprecated` decorator on structs, functions,
   traits, aliases, and global variables. The decorator marks the attached decl
   as deprecated and causes a warning to be emitted when the deprecated decl is
@@ -67,8 +87,8 @@ what we publish.
           return Self(round(self.re), round(self.im))
   ```
 
-- The `abs, round, min, max, and divmod` functions have moved from `math` to
-  `builtin`, so you no longer need to do
+- The `abs`, `round`, `min`, `max`, and `divmod` functions have moved from
+  `math` to `builtin`, so you no longer need to do
   `from math import abs, round, min, max, divmod`.
 
 - Mojo now allows types to opt in to use the `floor()`, `ceil()`, and `trunc()`
@@ -95,6 +115,20 @@ what we publish.
           return Self(trunc(re), trunc(im))
   ```
 
+- Add builtin `any()` and `all()` functions to check for truthy elements in a collection.
+  This also works to get the truthy value of a SIMD vector.
+  ([PR #2600](https://github.com/modularml/mojo/pull/2600) by [@helehex](https://github.com/helehex))
+  For example:
+
+  ```mojo
+    fn truthy_simd():
+        var vec = SIMD[DType.int32, 4](0, 1, 2, 3)
+        if any(vec):
+            print("any elements are truthy")
+        if all(vec):
+            print("all elements are truthy")
+  ```
+
 - Add an `InlinedArray` type that works on memory-only types.
   Compare with the existing `StaticTuple` type, which is conceptually an array
   type, but only worked on `AnyRegType`.
@@ -102,6 +136,10 @@ what we publish.
 
 - Base64 decoding support has been added.
     ([PR #2364](https://github.com/modularml/mojo/pull/2364) by [@mikowals](https://github.com/mikowals))
+
+- Add Base16 encoding and decoding support.
+  ([PR #2584](https://github.com/modularml/mojo/pull/2584)
+   by [@kernhanda](https://github.com/kernhanda))
 
 - Add `repr()` function and `Representable` trait.
     ([PR #2361](https://github.com/modularml/mojo/pull/2361) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
@@ -130,6 +168,21 @@ what we publish.
 - A new `--validate-doc-strings` option has been added to `mojo` to emit errors
   on invalid doc strings instead of warnings.
 
+- Several `mojo` subcommands now support a `--diagnostic-format` option that
+  changes the format with which errors, warnings, and other diagnostics are
+  printed. By specifying `--diagnostic-format json` on the command line, errors
+  and other diagnostics will be output in a structured
+  [JSON Lines](https://jsonlines.org) format that is easier for machines to
+  parse.
+
+  The full list of subcommands that support `--diagnostic-format` is as follows:
+  `mojo build`, `mojo doc`, `mojo run`, `mojo package`, and `mojo test`.
+  Further, the `mojo test --json` option has been subsumed into this new option;
+  for the same behavior, run `mojo test --diagnostic-format json`.
+
+  Note that the format of the JSON output may change; we don't currently
+  guarantee its stability across releases of Mojo.
+
 - A new decorator, `@doc_private`, was added that can be used to hide a decl
   from being generated in the output of `mojo doc`. It also removes the
   requirement that the decl has documentation (e.g. when used with
@@ -142,6 +195,8 @@ what we publish.
   returns a `Span` of the bytes owned by the string.
 
 - Add new `ImmStaticLifetime` and `MutStaticLifetime` helpers
+
+- Add new `memcpy` overload for `UnsafePointer[Scalar[_]]` pointers.
 
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
@@ -160,8 +215,65 @@ what we publish.
   whitespace, ASCII lower/uppercase, and so on.
     ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
 
+- `List` has a simplified syntax to call the `count` method: `my_list.count(x)`.
+    ([PR #2675](https://github.com/modularml/mojo/pull/2675) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
 - `Dict()` now supports `reversed` for `dict.items()` and `dict.values()`.
     ([PR #2340](https://github.com/modularml/mojo/pull/2340) by [@jayzhan211](https://github.com/jayzhan211))
+
+- `Dict` now has a simplified conversion to `String` with `my_dict.__str__()`.
+  Note that `Dict` does not conform to the `Stringable` trait so `str(my_dict)`
+  is not possible yet.
+    ([PR #2674](https://github.com/modularml/mojo/pull/2674) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
+- `List()` now supports `__contains__`.
+    ([PR #2667](https://github.com/modularml/mojo/pull/2667) by [@rd4com](https://github.com/rd4com/))
+
+- `List` now has an `index` method that allows one to find the (first) location
+  of an element in a `List` of `EqualityComparable` types. For example:
+
+  ```mojo
+  var my_list = List[Int](2, 3, 5, 7, 3)
+  print(my_list.index(3))  # prints 1
+  ```
+
+- `List` can now be converted to a `String` with a simplified syntax:
+
+  ```mojo
+  var my_list = List[Int](2, 3)
+  print(my_list.__str__())  # prints [2, 3]
+  ```
+
+  Note that `List` doesn't conform to the `Stringable` trait yet so you cannot
+  use `str(my_list)` yet.
+    ([PR #2673](https://github.com/modularml/mojo/pull/2673) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
+- Added the `Indexer` trait to denote types that implement the `__index__()`
+  method which allow these types to be accepted in common `__getitem__` and
+  `__setitem__` implementations, as well as allow a new builtin `index` function
+  to be called on them. For example:
+
+  ```mojo
+  @value
+  struct AlwaysZero(Indexer):
+      fn __index__(self) -> Int:
+          return 0
+
+  struct MyList:
+      var data: List[Int]
+
+      fn __init__(inout self):
+          self.data = List[Int](1, 2, 3, 4)
+
+      fn __getitem__[T: Indexer](self, idx: T) -> T:
+          return self.data[index(idx)]
+
+  print(MyList()[AlwaysZero()])  # prints `1`
+  ```
+
+- `StringRef` now implements `strip()` which can be used to remove leading and
+  trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
+  by [@fknfilewalker](https://github.com/fknfilewalker))
 
 ### 🦋 Changed
 
@@ -189,6 +301,26 @@ what we publish.
   `swap` and `partition` will likely shuffle around as we're reworking
   our builtnin `sort` function and optimizing it.
 
+- `ListLiteral` and `Tuple` now only requires that element types be `Copyable`.
+  Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
+
+- The `math.bit` module has been moved to a new top-level `bit` module. The
+  following functions in this module have been renamed:
+  - `ctlz` -> `countl_zero`
+  - `cttz` -> `countr_zero`
+  - `bit_length` -> `bit_width`
+  - `ctpop` -> `pop_count`
+  - `bswap` -> `byte_reverse`
+  - `bitreverse` -> `bit_reverse`
+
+- The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
+  moved to the `bit` module.
+
+- The implementation of the following functions have been moved from the `math`
+  module to the new `utils.numerics` module: `isfinite`, `isinf`, `isnan`,
+  `nan`, `nextafter`, and `ulp`. The functions continue to be exposed in the
+  `math` module.
+
 ### ❌ Removed
 
 - The method `object.print()` has been removed. Since now, `object` has the
@@ -209,6 +341,22 @@ what we publish.
 
 - The `math.div_ceil` function has been removed in favor of the `math.ceildiv`
   function.
+
+- The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
+  same functionality is available in the builtin `SIMD.select` and
+  `SIMD.__and__` methods, respectively.
+
+- The `math.rotate_left` and `math.rotate_right` functions have been removed.
+  The same functionality is available in the builtin `SIMD.rotate_{left,right}`
+  methods for `SIMD` types, and the `bit.rotate_bits_{left,right}` methods for
+  `Int`.
+
+- The `math.limit` module has been removed. The same functionality is available
+  as follows:
+  - `math.limit.inf`: use `utils.numerics.max_or_inf`
+  - `math.limit.neginf`: use `utils.numerics.min_or_neg_inf`
+  - `math.limit.max_finite`: use `utils.numerics.max_finite`
+  - `math.limit.min_finite`: use `utils.numerics.min_finite`
 
 ### 🛠️ Fixed
 
