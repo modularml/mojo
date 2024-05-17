@@ -1139,17 +1139,22 @@ struct String(
     fn _strref_dangerous(self, start: Int = 0, length: Int = -1) -> StringRef:
         """Returns an inner pointer to the string as a StringRef.
         This functionality is extremely dangerous because Mojo eagerly releases
-        strings.  Using this requires the use of the _strref_keepalive() method
+        strings. Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
 
         Args:
-            start: Offset from the start of the string.
+            start: Offset from the start of the string. If the start is greater than the
+                length of the string, an empty string is returned.
             length: Length of StringRef. If -1, the length is the remaining length of the string. If
                 the length is greater than the remaining length of the string, the length is truncated.
 
         Returns:
             A StringRef of the inner string.
         """
+        if start >= len(self):
+            return StringRef {
+                data: self.unsafe_uint8_ptr() + len(self), length: 0
+            }
         var _length = len(self) - start
         if length != -1:
             _length = min(length, _length)
