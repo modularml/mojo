@@ -275,7 +275,7 @@ what we publish.
   trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
   by [@fknfilewalker](https://github.com/fknfilewalker))
 
-- `StringRef` now implements `split()` which can be used to split a `StringRef` into a `List[StringRef]` by a delimiter. ([PR #](https://github.com/modularml/mojo/pull/)
+- `StringRef` now implements `split()` which can be used to split a `StringRef` into a `List[StringRef]` by a delimiter. ([PR #2705](https://github.com/modularml/mojo/pull/2705)
   by [@fknfilewalker](https://github.com/fknfilewalker))
 
 ### 🦋 Changed
