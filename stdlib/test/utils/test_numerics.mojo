@@ -16,11 +16,15 @@ from sys.info import has_neon
 from testing import assert_equal, assert_true, assert_false, assert_almost_equal
 from utils.numerics import (
     FPUtils,
+    get_accum_type,
     inf,
     isfinite,
     isinf,
     isnan,
     max_finite,
+    max_or_inf,
+    min_finite,
+    min_or_neg_inf,
     nan,
     neg_inf,
     nextafter,
@@ -54,6 +58,20 @@ def test_FPUtils():
     assert_true(FPU64.get_sign(FPU64.pack(True, 6, 12)))
     assert_equal(FPU64.get_exponent(FPU64.pack(True, 6, 12)), 6)
     assert_equal(FPU64.get_mantissa(FPU64.pack(True, 6, 12)), 12)
+
+
+def test_get_accum_type():
+    assert_equal(get_accum_type[DType.float32](), DType.float32)
+    assert_equal(get_accum_type[DType.float64](), DType.float64)
+    assert_equal(get_accum_type[DType.bfloat16](), DType.float32)
+    assert_equal(get_accum_type[DType.int8](), DType.int8)
+    assert_equal(get_accum_type[DType.int16](), DType.int16)
+    assert_equal(get_accum_type[DType.int32](), DType.int32)
+    assert_equal(get_accum_type[DType.int64](), DType.int64)
+    assert_equal(get_accum_type[DType.uint8](), DType.uint8)
+    assert_equal(get_accum_type[DType.uint16](), DType.uint16)
+    assert_equal(get_accum_type[DType.uint32](), DType.uint32)
+    assert_equal(get_accum_type[DType.uint64](), DType.uint64)
 
 
 def test_isfinite():
@@ -116,6 +134,30 @@ def test_isnan():
     assert_true(isnan(nan[DType.float64]()))
 
 
+def test_max_finite():
+    assert_almost_equal(max_finite[DType.float32](), 3.4028235e38)
+    assert_almost_equal(max_finite[DType.float64](), 1.7976931348623157e308)
+
+
+def test_max_or_inf():
+    assert_almost_equal(max_or_inf[DType.float32](), inf[DType.float32]())
+    assert_almost_equal(max_or_inf[DType.float64](), inf[DType.float64]())
+
+
+def test_min_finite():
+    assert_almost_equal(min_finite[DType.float32](), -3.4028235e38)
+    assert_almost_equal(min_finite[DType.float64](), -1.7976931348623157e308)
+
+
+def test_min_or_neg_inf():
+    assert_almost_equal(
+        min_or_neg_inf[DType.float32](), neg_inf[DType.float32]()
+    )
+    assert_almost_equal(
+        min_or_neg_inf[DType.float64](), neg_inf[DType.float64]()
+    )
+
+
 def test_nextafter():
     assert_true(isnan(nextafter(nan[DType.float32](), nan[DType.float32]())))
     assert_true(isinf(nextafter(inf[DType.float32](), inf[DType.float32]())))
@@ -161,8 +203,13 @@ def test_ulp():
 
 def main():
     test_FPUtils()
+    test_get_accum_type()
     test_isfinite()
     test_isinf()
     test_isnan()
+    test_max_finite()
+    test_max_or_inf()
+    test_min_finite()
+    test_min_or_neg_inf()
     test_nextafter()
     test_ulp()
