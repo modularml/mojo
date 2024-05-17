@@ -42,7 +42,7 @@ from utils._visualizers import lldb_formatter_wrapping_type
 from utils import InlineArray
 
 from .dtype import _integral_type_of, _get_dtype_printf_format
-from .io import _snprintf_scalar, _snprintf, _printf
+from .io import _snprintf_scalar, _snprintf, _printf, _print_fmt
 from .string import _calc_initial_buffer_size, _calc_format_buffer_size
 
 # ===------------------------------------------------------------------------===#
@@ -2571,7 +2571,7 @@ fn _pow[
 
         @parameter
         if triple_is_nvidia_cuda():
-            print(
+            _print_fmt(
                 "ABORT: pow with two floating point operands is not supported"
                 " on GPU"
             )
