@@ -531,7 +531,7 @@ struct StringRef(
                 break
 
             # We found a delimiter, so add the preceding string slice
-            output.append(StringRef(ptr + current_offset, loc))
+            output.append(StringRef(ptr + current_offset, loc - current_offset))
 
             # Advance our search offset past the delimiter
             current_offset = loc + len(delimiter)
