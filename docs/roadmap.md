@@ -608,9 +608,9 @@ zero. In other words, most standard library types are considered "unsafe".
 
 ```mojo
 var l = List[Int](capacity=0)
-print(l[1]) # could crash or print garbage values (undefined behaviour)
+print(l[1]) # could crash or print garbage values (undefined behavior)
 
-print(1//0) # does not raise and could print anything (undefined behaviour)
+print(1//0) # does not raise and could print anything (undefined behavior)
 ```
 
 This is clearly unacceptable given the strong memory safety goals of Mojo. We
