@@ -649,7 +649,8 @@ struct String(
         buffer.resize(length + 1, 0)
         memcpy(
             dest=buffer.data,
-            src=str_slice.as_bytes_slice().unsafe_ptr(),
+            # TODO: Remove cast after transition to UInt8 strings is complete.
+            src=str_slice.as_bytes_slice().unsafe_ptr().bitcast[Int8](),
             count=length,
         )
         buffer[length] = 0
@@ -1199,7 +1200,7 @@ struct String(
     @always_inline
     fn as_bytes_slice(
         self: Reference[Self, _, _]
-    ) -> Span[Int8, self.is_mutable, self.lifetime]:
+    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1209,8 +1210,9 @@ struct String(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[Int8, self.is_mutable, self.lifetime](
-            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+        return Span[UInt8, self.is_mutable, self.lifetime](
+            # TODO: Remove cast after transition to UInt8 strings is complete.
+            unsafe_ptr=self[]._buffer.unsafe_ptr().bitcast[UInt8](),
             # Does NOT include the NUL terminator.
             len=self[]._byte_length(),
         )

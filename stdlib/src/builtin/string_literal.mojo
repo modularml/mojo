@@ -246,7 +246,7 @@ struct StringLiteral(
         return StringSlice(unsafe_from_utf8=bytes)
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[Int8, False, ImmStaticLifetime]:
+    fn as_bytes_slice(self) -> Span[UInt8, False, ImmStaticLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -254,9 +254,10 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        var ptr = rebind[UnsafePointer[Int8]](self.unsafe_ptr())
+        # TODO: Remove cast after transition to UInt8 strings is complete.
+        var ptr = self.unsafe_ptr().bitcast[UInt8]()
 
-        return Span[Int8, False, ImmStaticLifetime](
+        return Span[UInt8, False, ImmStaticLifetime](
             unsafe_ptr=ptr,
             len=self._byte_length(),
         )
