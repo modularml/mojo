@@ -1541,9 +1541,9 @@ struct String(
         Returns:
           True if the self[start:end] is prefixed by the input prefix.
         """
-        if end == -1:
-            return self.find(prefix, start) == start
-        return self[start:end].startswith(prefix)
+        return StringRef(self.unsafe_ptr() + start, end - start).startswith(
+            prefix._strref_dangerous()
+        )
 
     fn endswith(self, suffix: String, start: Int = 0, end: Int = -1) -> Bool:
         """Checks if the string end with the specified suffix between start
@@ -1557,9 +1557,9 @@ struct String(
         Returns:
           True if the self[start:end] is suffixed by the input suffix.
         """
-        if end == -1:
-            return self._endswith_impl(suffix, start)
-        return self[start:end]._endswith_impl(suffix)
+        return StringRef(self.unsafe_ptr() + start, end - start).startswith(
+            suffix._strref_dangerous()
+        )
 
     fn removeprefix(self, prefix: String, /) -> String:
         """If the string starts with the prefix string, return `string[len(prefix):]`.
@@ -1602,10 +1602,6 @@ struct String(
         if self.endswith(suffix):
             return self[: -len(suffix)]
         return self
-
-    @always_inline
-    fn _endswith_impl(self, suffix: String, start: Int = 0) -> Bool:
-        return self.rfind(suffix, start) + len(suffix) == len(self)
 
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.
