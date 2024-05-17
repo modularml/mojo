@@ -39,7 +39,9 @@ fn insertion_sort[dtype: DType](inout list: List[Scalar[dtype]]):
         list[j + 1] = key
 
 
-fn _quick_sort[dtype: DType](inout list: List[Scalar[dtype]], low: Int, high: Int):
+fn _quick_sort[
+    dtype: DType
+](inout list: List[Scalar[dtype]], low: Int, high: Int):
     """Sort section of the list, between low and high, with quick sort algorithm in-place.
 
     Parameters:
