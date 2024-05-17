@@ -22,8 +22,9 @@ from utils.numerics import (
     isnan,
     max_finite,
     nan,
-    ulp,
     neg_inf,
+    nextafter,
+    ulp,
 )
 
 
@@ -115,6 +116,39 @@ def test_isnan():
     assert_true(isnan(nan[DType.float64]()))
 
 
+def test_nextafter():
+    assert_true(isnan(nextafter(nan[DType.float32](), nan[DType.float32]())))
+    assert_true(isinf(nextafter(inf[DType.float32](), inf[DType.float32]())))
+    assert_true(isinf(nextafter(-inf[DType.float32](), -inf[DType.float32]())))
+    assert_almost_equal(nextafter(Float64(0), Float64(0)), 0)
+    assert_almost_equal(nextafter(Float64(0), Float64(1)), 5e-324)
+    assert_almost_equal(nextafter(Float64(0), Float64(-1)), -5e-324)
+    assert_almost_equal(nextafter(Float64(1), Float64(0)), 0.99999999999999988)
+    assert_almost_equal(
+        nextafter(Float64(-1), Float64(0)), -0.99999999999999988
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](0, 1), SIMD[DType.float64, 2](0, 1)),
+        SIMD[DType.float64, 2](0, 1),
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](0, 1), SIMD[DType.float64, 2](1, 1)),
+        SIMD[DType.float64, 2](5e-324, 1),
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](0, 1), SIMD[DType.float64, 2](-1, 1)),
+        SIMD[DType.float64, 2](-5e-324, 1),
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](1, 1), SIMD[DType.float64, 2](0, 0)),
+        SIMD[DType.float64, 2](0.99999999999999988, 0.99999999999999988),
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](-1, -1), SIMD[DType.float64, 2](0, 0)),
+        SIMD[DType.float64, 2](-0.99999999999999988, -0.99999999999999988),
+    )
+
+
 def test_ulp():
     assert_true(isnan(ulp(nan[DType.float32]())))
     assert_true(isinf(ulp(inf[DType.float32]())))
@@ -130,5 +164,5 @@ def main():
     test_isfinite()
     test_isinf()
     test_isnan()
-    # TODO: test nextafter
+    test_nextafter()
     test_ulp()
