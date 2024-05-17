@@ -16,7 +16,7 @@
 from bit import countr_zero
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol
-from memory import DTypePointer, UnsafePointer
+from memory import DTypePointer, UnsafePointer, memcmp
 
 
 # ===----------------------------------------------------------------------=== #
@@ -227,7 +227,7 @@ struct StringRef(
         """
         return self.length
 
-    @always_inline("nodebug")
+    @always_inline
     fn __eq__(self, rhs: StringRef) -> Bool:
         """Compares two strings are equal.
 
@@ -237,14 +237,20 @@ struct StringRef(
         Returns:
           True if the strings match and False otherwise.
         """
-        if len(self) != len(rhs):
-            return False
-        for i in range(len(self)):
-            if self.data.load(i) != rhs.data.load(i):
-                return False
-        return True
+        return not (self != rhs)
 
+    # Use a local memcmp rather than memory.memcpy to avoid indirect recursions.
     @always_inline("nodebug")
+    fn _memcmp(self, other: StringRef, count: Int) -> Int:
+        for i in range(count):
+            var s1i = self.data[i]
+            var s2i = other.data[i]
+            if s1i == s2i:
+                continue
+            return 1 if s1i > s2i else -1
+        return 0
+
+    @always_inline
     fn __ne__(self, rhs: StringRef) -> Bool:
         """Compares two strings are not equal.
 
@@ -254,7 +260,61 @@ struct StringRef(
         Returns:
           True if the strings do not match and False otherwise.
         """
-        return not (self == rhs)
+        return len(self) != len(rhs) or self._memcmp(rhs, len(self))
+
+    @always_inline
+    fn __lt__(self, rhs: StringRef) -> Bool:
+        """Compare this StringRef to the RHS using LT comparison.
+
+        Args:
+            rhs: The other StringRef to compare against.
+
+        Returns:
+            True if this string is strictly less than the RHS string and False
+            otherwise.
+        """
+        var len1 = len(self)
+        var len2 = len(rhs)
+        return self._memcmp(rhs, min(len1, len2)) < int(len1 < len2)
+
+    @always_inline
+    fn __le__(self, rhs: StringRef) -> Bool:
+        """Compare this StringRef to the RHS using LE comparison.
+
+        Args:
+            rhs: The other StringRef to compare against.
+
+        Returns:
+            True if this string is less than or equal to the RHS string and
+            False otherwise.
+        """
+        return not (rhs < self)
+
+    @always_inline
+    fn __gt__(self, rhs: StringRef) -> Bool:
+        """Compare this StringRef to the RHS using GT comparison.
+
+        Args:
+            rhs: The other StringRef to compare against.
+
+        Returns:
+            True if this string is strictly greater than the RHS string and
+            False otherwise.
+        """
+        return rhs < self
+
+    @always_inline
+    fn __ge__(self, rhs: StringRef) -> Bool:
+        """Compare this StringRef to the RHS using GE comparison.
+
+        Args:
+            rhs: The other StringRef to compare against.
+
+        Returns:
+            True if this string is greater than or equal to the RHS string and
+            False otherwise.
+        """
+        return not (self < rhs)
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> StringRef:
