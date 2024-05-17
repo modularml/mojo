@@ -39,7 +39,7 @@ from utils.numerics import (
     min_or_neg_inf as _min_or_neg_inf,
 )
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils.inlined_string import _ArrayMem
+from utils import InlineArray
 
 from .dtype import _integral_type_of, _get_dtype_printf_format
 from .io import _snprintf_scalar, _snprintf, _printf
@@ -139,6 +139,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Sized,
     Stringable,
     Truncable,
+    Indexer,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -178,6 +179,22 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
+
+    @always_inline("nodebug")
+    fn __index__(self) -> Int:
+        """Returns the value as an int if it is an integral value.
+
+        Constraints:
+            Must be a scalar integral value.
+
+        Returns:
+            The value as an integer.
+        """
+        constrained[
+            type.is_integral() or type.is_bool(),
+            "expected integral or bool type",
+        ]()
+        return self.__int__()
 
     @always_inline("nodebug")
     fn __init__(inout self, value: SIMD[DType.float64, 1]):
@@ -2711,12 +2728,8 @@ fn _format_scalar[dtype: DType](inout writer: Formatter, value: Scalar[dtype]):
     # type.
     alias size: Int = _calc_format_buffer_size[dtype]()
 
-    var buf = _ArrayMem[Int8, size]()
-    # TODO(MOCO-268):
-    #   Remove this rebind(..) once compiler type comparison bug is fixed.
-    var buf_ptr: UnsafePointer[Int8] = rebind[UnsafePointer[Int8]](
-        buf.unsafe_ptr()
-    )
+    var buf = InlineArray[Int8, size](unsafe_uninitialized=True)
+    var buf_ptr = buf.unsafe_ptr()
 
     var wrote = _snprintf_scalar[dtype](
         buf_ptr,

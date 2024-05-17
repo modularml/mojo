@@ -25,7 +25,53 @@ from builtin.hex import _try_write_int
 
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._format import Formattable, Formatter
-from utils.inlined_string import _ArrayMem
+from utils import InlineArray
+
+# ===----------------------------------------------------------------------=== #
+#  Indexer
+# ===----------------------------------------------------------------------=== #
+
+
+trait Indexer:
+    """This trait denotes a type that can be used to index a container that
+    handles integral index values.
+
+    This solves the issue of being able to index data structures such as `List`
+    with the various integral types without being too broad and allowing types
+    that are coercible to `Int` (e.g. floating point values that have `__int__`
+    method). In contrast to `Intable`, types conforming to `Indexer` must be
+    convertible to `Int` in a lossless way.
+    """
+
+    fn __index__(self) -> Int:
+        """Return the index value.
+
+        Returns:
+            The index value of the object.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+#  index
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn index[T: Indexer](idx: T) -> Int:
+    """Returns the value of `__index__` for the given value.
+
+    Parameters:
+        T: A type conforming to the `Indexer` trait.
+
+    Args:
+        idx: The value.
+
+    Returns:
+        An `Int` respresenting the index value.
+    """
+    return idx.__index__()
+
 
 # ===----------------------------------------------------------------------=== #
 #  Intable
@@ -205,6 +251,7 @@ struct Int(
     Roundable,
     Stringable,
     Truncable,
+    Indexer,
 ):
     """This type represents an integer value."""
 
@@ -330,7 +377,7 @@ struct Int(
             # Stack allocate enough bytes to store any formatted 64-bit integer
             alias size: Int = 32
 
-            var buf = _ArrayMem[Int8, size]()
+            var buf = InlineArray[Int8, size](unsafe_uninitialized=True)
 
             # Format the integer to the local byte array
             var len = _snprintf(
@@ -347,7 +394,7 @@ struct Int(
             #
             # SAFETY:
             #   `buf` is kept alive long enough for the use of this StringRef.
-            writer.write_str(StringRef(buf.as_ptr(), len))
+            writer.write_str(StringRef(buf.unsafe_ptr(), len))
 
             # Keep buf alive until we've finished with the StringRef
             _ = buf^
