@@ -231,9 +231,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
         return res
 
-    # TODO: Remove this when we have transitioned to uint8 for bytes.
-    # See https://github.com/modularml/mojo/issues/2317 for details
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+    fn as_uint8_ptr(self) -> UnsafePointer[UInt8]:
         """Returns a pointer to the bytes of string data.
 
         Returns:
@@ -252,7 +250,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.unsafe_ptr(), length: len(self)}
+        return StringRef {data: self.as_uint8_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
@@ -310,15 +308,10 @@ struct _FixedString[CAP: Int](
                 + ")"
             )
 
-        self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
+        self.buffer = InlineArray[UInt8, CAP]()
         self.size = len(literal)
 
-        memcpy(
-            dest=self.buffer.unsafe_ptr(),
-            # TODO: Remove bitcast after string transition to UInt8 is complete.
-            src=literal.unsafe_ptr().bitcast[UInt8](),
-            count=len(literal),
-        )
+        memcpy(self.buffer.unsafe_ptr(), literal.as_uint8_ptr(), len(literal))
 
     # ===------------------------------------------------------------------=== #
     # Trait Interfaces

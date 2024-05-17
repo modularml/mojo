@@ -59,7 +59,7 @@ fn ord(s: String) -> Int:
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
     var result = int(b1 & b1_mask) << shift
-    for i in range(1, num_bytes):
+    for _ in range(1, num_bytes):
         p += 1
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
@@ -113,7 +113,7 @@ fn chr(c: Int) -> String:
         shift -= 6
         p.store(i, ((c >> shift) & 0b00111111) | 0b10000000)
     p.store(num_bytes, 0)
-    return String(p.bitcast[DType.int8](), num_bytes + 1)
+    return String(p.bitcast[DType.uint8](), num_bytes + 1)
 
 
 # ===----------------------------------------------------------------------===#
@@ -122,7 +122,7 @@ fn chr(c: Int) -> String:
 
 
 @always_inline("nodebug")
-fn _chr_ascii(c: Int8) -> String:
+fn _chr_ascii(c: UInt8) -> String:
     """Returns a string based on the given ASCII code point.
 
     Args:
@@ -135,7 +135,7 @@ fn _chr_ascii(c: Int8) -> String:
 
 
 @always_inline("nodebug")
-fn _repr_ascii(c: Int8) -> String:
+fn _repr_ascii(c: UInt8) -> String:
     """Returns a printable representation of the given ASCII code point.
 
     Args:
@@ -501,7 +501,7 @@ fn atof(str: String) raises -> Float64:
 # ===----------------------------------------------------------------------===#
 
 
-fn isdigit(c: Int8) -> Bool:
+fn isdigit(c: UInt8) -> Bool:
     """Determines whether the given character is a digit [0-9].
 
     Args:
@@ -520,7 +520,7 @@ fn isdigit(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn isupper(c: Int8) -> Bool:
+fn isupper(c: UInt8) -> Bool:
     """Determines whether the given character is an uppercase character.
        This currently only respects the default "C" locale, i.e. returns
        True only if the character specified is one of ABCDEFGHIJKLMNOPQRSTUVWXYZ.
@@ -534,7 +534,7 @@ fn isupper(c: Int8) -> Bool:
     return _is_ascii_uppercase(c)
 
 
-fn _is_ascii_uppercase(c: Int8) -> Bool:
+fn _is_ascii_uppercase(c: UInt8) -> Bool:
     alias ord_a = ord("A")
     alias ord_z = ord("Z")
     return ord_a <= int(c) <= ord_z
@@ -545,7 +545,7 @@ fn _is_ascii_uppercase(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn islower(c: Int8) -> Bool:
+fn islower(c: UInt8) -> Bool:
     """Determines whether the given character is an lowercase character.
        This currently only respects the default "C" locale, i.e. returns
        True only if the character specified is one of abcdefghijklmnopqrstuvwxyz.
@@ -559,7 +559,7 @@ fn islower(c: Int8) -> Bool:
     return _is_ascii_lowercase(c)
 
 
-fn _is_ascii_lowercase(c: Int8) -> Bool:
+fn _is_ascii_lowercase(c: UInt8) -> Bool:
     alias ord_a = ord("a")
     alias ord_z = ord("z")
     return ord_a <= int(c) <= ord_z
@@ -570,8 +570,7 @@ fn _is_ascii_lowercase(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-# TODO(MSTDL-160): Make this take a Unicode codepoint type
-fn isspace(c: Int) -> Bool:
+fn isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
        This currently only respects the default "C" locale, i.e. returns
        True only if the character specified is one of
@@ -596,7 +595,7 @@ fn isspace(c: Int) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn isprintable(c: Int8) -> Bool:
+fn isprintable(c: UInt8) -> Bool:
     """Determines whether the given character is a printable character.
 
     Args:
@@ -625,7 +624,7 @@ struct String(
 ):
     """Represents a mutable string."""
 
-    alias _buffer_type = List[Int8]
+    alias _buffer_type = List[UInt8]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -671,35 +670,6 @@ struct String(
     # Initializers
     # ===------------------------------------------------------------------===#
 
-    # TODO: Remove this method when #2317 is done
-    @always_inline
-    fn __init__(inout self, owned impl: Self._buffer_type):
-        """Construct a string from a buffer of bytes.
-
-        The buffer must be terminated with a null byte:
-
-        ```mojo
-        var buf = List[Int8]()
-        buf.append(ord('H'))
-        buf.append(ord('i'))
-        buf.append(0)
-        var hi = String(buf)
-        ```
-
-        Note that you should use the constructor from `List[UInt8]` instead
-        as we are now storing the bytes as UInt8.
-
-        See https://github.com/modularml/mojo/issues/2317 for more information.
-
-        Args:
-            impl: The buffer.
-        """
-        debug_assert(
-            impl[-1] == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-        self._buffer = impl^
-
     @always_inline
     fn __init__(inout self, owned impl: List[UInt8]):
         """Construct a string from a buffer of bytes.
@@ -724,8 +694,8 @@ struct String(
         # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
         var length = len(impl)
         var capacity = impl.capacity
-        self._buffer = List[Int8](
-            unsafe_pointer=impl.steal_data().bitcast[Int8](),
+        self._buffer = List[UInt8](
+            unsafe_pointer=impl.steal_data().bitcast[UInt8](),
             size=length,
             capacity=capacity,
         )
@@ -768,13 +738,12 @@ struct String(
         """
 
         # Calculate length in bytes
-        var length = len(str_slice.as_bytes_slice())
+        var length: Int = len(str_slice.as_bytes_slice())
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
         memcpy(
             dest=buffer.data,
-            # TODO: Remove cast after transition to UInt8 strings is complete.
-            src=str_slice.as_bytes_slice().unsafe_ptr().bitcast[Int8](),
+            src=str_slice.as_bytes_slice().unsafe_ptr(),
             count=length,
         )
         buffer[length] = 0
@@ -801,29 +770,6 @@ struct String(
 
         self = str(value)
 
-    # TODO: Remove this method when #2317 is done
-    @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[Int8], len: Int):
-        """Creates a string from the buffer. Note that the string now owns
-        the buffer.
-
-        The buffer must be terminated with a null byte.
-
-        Note that you should use the constructor from `UnsafePointer[UInt8]` instead
-        as we are now storing the bytes as UInt8.
-
-        See https://github.com/modularml/mojo/issues/2317 for more information.
-
-        Args:
-            ptr: The pointer to the buffer.
-            len: The length of the buffer, including the null terminator.
-        """
-        # we don't know the capacity of ptr, but we'll assume it's the same or
-        # larger than len
-        self._buffer = Self._buffer_type(
-            unsafe_pointer=ptr, size=len, capacity=len
-        )
-
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
@@ -838,11 +784,11 @@ struct String(
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
         self._buffer = Self._buffer_type(
-            unsafe_pointer=ptr.bitcast[Int8](), size=len, capacity=len
+            unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
         )
 
     @always_inline
-    fn __init__(inout self, ptr: LegacyPointer[Int8], len: Int):
+    fn __init__(inout self, ptr: LegacyPointer[UInt8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -853,11 +799,11 @@ struct String(
             len: The length of the buffer, including the null terminator.
         """
         self._buffer = Self._buffer_type()
-        self._buffer.data = rebind[UnsafePointer[Int8]](ptr)
+        self._buffer.data = UnsafePointer(ptr.address)
         self._buffer.size = len
 
     @always_inline
-    fn __init__(inout self, ptr: DTypePointer[DType.int8], len: Int):
+    fn __init__(inout self, ptr: DTypePointer[DType.uint8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -889,7 +835,7 @@ struct String(
 
     @staticmethod
     @always_inline
-    fn _from_bytes(owned buff: DTypePointer[DType.int8]) -> String:
+    fn _from_bytes(owned buff: DTypePointer[DType.uint8]) -> String:
         """Construct a string from a sequence of bytes.
 
         This does no validation that the given bytes are valid in any specific
@@ -990,7 +936,7 @@ struct String(
         var buffer = Self._buffer_type()
         var adjusted_span_len = len(adjusted_span)
         buffer.resize(adjusted_span_len + 1, 0)
-        var ptr = self.unsafe_ptr()
+        var ptr = self.unsafe_uint8_ptr()
         for i in range(adjusted_span_len):
             buffer[i] = ptr[adjusted_span[i]]
         buffer[adjusted_span_len] = 0
@@ -1102,14 +1048,14 @@ struct String(
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
         memcpy(
-            dest=buffer.data,
-            src=self.unsafe_ptr(),
-            count=self_len,
+            DTypePointer(buffer.data),
+            self.unsafe_uint8_ptr(),
+            self_len,
         )
         memcpy(
-            dest=buffer.data + self_len,
-            src=other.unsafe_ptr(),
-            count=other_len + 1,  # Also copy the terminator
+            DTypePointer(buffer.data + self_len),
+            other.unsafe_uint8_ptr(),
+            other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
 
@@ -1291,7 +1237,7 @@ struct String(
         Returns:
             The pointer to the underlying memory.
         """
-        return self._buffer.data
+        return self._buffer.data.bitcast[Int8]()
 
     fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
@@ -1301,7 +1247,7 @@ struct String(
         """
         return self._buffer.data.bitcast[UInt8]()
 
-    fn as_bytes(self) -> List[Int8]:
+    fn as_bytes(self) -> List[UInt8]:
         """Retrieves the underlying byte sequence encoding the characters in
         this string.
 
@@ -1335,8 +1281,7 @@ struct String(
         """
 
         return Span[UInt8, self.is_mutable, self.lifetime](
-            # TODO: Remove cast after transition to UInt8 strings is complete.
-            unsafe_ptr=self[]._buffer.unsafe_ptr().bitcast[UInt8](),
+            unsafe_ptr=self[]._buffer.unsafe_ptr(),
             # Does NOT include the NUL terminator.
             len=self[]._byte_length(),
         )
@@ -1355,7 +1300,9 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=bytes)
+        return StringSlice[self.is_mutable, self.lifetime](
+            unsafe_from_utf8=bytes
+        )
 
     fn _byte_length(self) -> Int:
         """Get the string length in bytes.
@@ -1381,7 +1328,7 @@ struct String(
             The pointer to the underlying memory.
         """
         var ptr = self.unsafe_ptr()
-        self._buffer.data = UnsafePointer[Int8]()
+        self._buffer.data = UnsafePointer[UInt8]()
         self._buffer.size = 0
         self._buffer.capacity = 0
         return ptr
@@ -1509,15 +1456,15 @@ struct String(
         if occurrences == -1:
             return self
 
-        var self_start = self.unsafe_ptr()
-        var self_ptr = self.unsafe_ptr()
-        var new_ptr = new.unsafe_ptr()
+        var self_start = self.unsafe_uint8_ptr()
+        var self_ptr = self.unsafe_uint8_ptr()
+        var new_ptr = new.unsafe_uint8_ptr()
 
         var self_len = len(self)
         var old_len = len(old)
         var new_len = len(new)
 
-        var res = List[Int8]()
+        var res = List[UInt8]()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
 
         for _ in range(occurrences):
@@ -1603,9 +1550,9 @@ struct String(
         return hash(self._strref_dangerous())
 
     fn _interleave(self, val: String) -> String:
-        var res = List[Int8]()
-        var val_ptr = val.unsafe_ptr()
-        var self_ptr = self.unsafe_ptr()
+        var res = List[UInt8]()
+        var val_ptr = val.unsafe_uint8_ptr()
+        var self_ptr = self.unsafe_uint8_ptr()
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
@@ -1641,13 +1588,13 @@ struct String(
         return self._toggle_ascii_case[_is_ascii_lowercase]()
 
     @always_inline
-    fn _toggle_ascii_case[check_case: fn (Int8) -> Bool](self) -> String:
+    fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
         var copy: String = self
 
-        var char_ptr = copy.unsafe_ptr()
+        var char_ptr = copy.unsafe_uint8_ptr()
 
         for i in range(len(self)):
-            var char: Int8 = char_ptr[i]
+            var char: UInt8 = char_ptr[i]
             if check_case(char):
                 var lower = _toggle_ascii_case(char)
                 char_ptr[i] = lower
@@ -1762,7 +1709,7 @@ struct String(
         for i in range(n):
             memcpy(
                 dest=buf.data + len_self * i,
-                src=self.unsafe_ptr(),
+                src=self.unsafe_uint8_ptr(),
                 count=len_self,
             )
         return String(buf^)
@@ -1777,7 +1724,7 @@ struct String(
 fn _vec_fmt[
     *types: AnyType
 ](
-    str: UnsafePointer[Int8],
+    str: UnsafePointer[UInt8],
     size: Int,
     fmt: StringLiteral,
     *arguments: *types,
@@ -1785,7 +1732,7 @@ fn _vec_fmt[
     return _snprintf(str, size, fmt, arguments)
 
 
-fn _toggle_ascii_case(char: Int8) -> Int8:
+fn _toggle_ascii_case(char: UInt8) -> UInt8:
     """Assuming char is a cased ASCII character, this function will return the opposite-cased letter
     """
 
