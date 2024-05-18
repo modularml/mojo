@@ -48,16 +48,15 @@ struct UnsafePointer[
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful
     # lifetime for them anyway.
-    alias _ref_type = Reference[
-        T,
-        __mlir_attr.`1: i1`,
-        __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
-        address_space,
-    ]
+    alias _ref_type = Reference[T, True, MutStaticLifetime, address_space]
 
     """The underlying pointer type."""
     var address: Self._mlir_type
     """The underlying pointer."""
+
+    # ===-------------------------------------------------------------------===#
+    # Initializers
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __init__() -> Self:
@@ -108,6 +107,19 @@ struct UnsafePointer[
             )
         }
 
+    # ===-------------------------------------------------------------------===#
+    # Factory methods
+    # ===-------------------------------------------------------------------===#
+
+    @staticmethod
+    fn _from_dtype_ptr[
+        dtype: DType
+    ](ptr: DTypePointer[dtype]) -> UnsafePointer[Scalar[dtype]]:
+        # TODO:
+        #   Is there a better way to create an UnsafePointer from a
+        #   DTypePointer?
+        return UnsafePointer[Scalar[dtype]](address=int(ptr))
+
     @staticmethod
     @always_inline("nodebug")
     fn get_null() -> Self:
@@ -152,6 +164,10 @@ struct UnsafePointer[
         """
         return Self(arg)
 
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
@@ -178,6 +194,18 @@ struct UnsafePointer[
         ](self.address)
 
     @always_inline
+    fn offset(self, offset: Int) -> Self:
+        """Return a pointer at an offset from the current one.
+
+        Args:
+            offset: The offset index.
+
+        Returns:
+            An offset pointer.
+        """
+        return Self(address=int(self) + offset * sizeof[T]())
+
+    @always_inline
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
 
@@ -190,6 +218,10 @@ struct UnsafePointer[
 
     fn __str__(self) -> String:
         return hex(self)
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -210,7 +242,7 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return Self(address=int(self) + offset * sizeof[T]())
+        return self.offset(offset)
 
     @always_inline
     fn __sub__(self, offset: Int) -> Self:
@@ -319,7 +351,7 @@ struct UnsafePointer[
     @always_inline
     fn __refitem__(
         self,
-    ) -> Self._ref_type._mlir_type:
+    ) -> Self._ref_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Returns:
@@ -330,7 +362,7 @@ struct UnsafePointer[
         ](self.address)
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self._ref_type._mlir_type:
+    fn __refitem__(self, offset: Int) -> Self._ref_type:
         """Return a reference to the underlying data, offset by the offset index.
 
         Args:
@@ -357,7 +389,9 @@ fn destroy_pointee(ptr: UnsafePointer[_]):
     """Destroy the pointed-to value.
 
     The pointer must not be null, and the pointer memory location is assumed
-    to contain a valid initialized instance of `T`.
+    to contain a valid initialized instance of `T`.  This is equivalent to
+    `_ = move_from_pointee(ptr)` but doesn't require `Movable` and is more
+    efficient becase it doesn't invoke `__moveinit__`.
 
     Args:
         ptr: The pointer whose pointee this destroys.

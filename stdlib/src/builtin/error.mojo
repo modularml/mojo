@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from sys import alignof, sizeof
 
 from memory.memory import _free
-from memory import memcmp, memcpy, DTypePointer
+from memory import memcmp, memcpy, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # Error
@@ -29,9 +29,7 @@ from memory import memcmp, memcpy, DTypePointer
 struct Error(Stringable, Boolable):
     """This type represents an Error."""
 
-    alias StorageType = DTypePointer[DType.uint8]
-
-    var data: Self.StorageType
+    var data: UnsafePointer[UInt8]
     """A pointer to the beginning of the string data being referenced."""
 
     var loaded_length: Int
@@ -49,7 +47,7 @@ struct Error(Stringable, Boolable):
         Returns:
             The constructed Error object.
         """
-        return Error {data: Self.StorageType(), loaded_length: 0}
+        return Error {data: UnsafePointer[UInt8](), loaded_length: 0}
 
     @always_inline("nodebug")
     fn __init__(value: StringLiteral) -> Error:
@@ -62,7 +60,8 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         return Error {
-            data: value.unsafe_ptr().bitcast[DType.uint8](),
+            # TODO: Remove cast once string UInt8 transition is complete.
+            data: value.unsafe_ptr().bitcast[UInt8](),
             loaded_length: len(value),
         }
 
@@ -77,8 +76,13 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         var length = len(src)
-        var dest = Self.StorageType.alloc(length + 1)
-        memcpy(dest, src.unsafe_ptr().bitcast[DType.uint8](), length)
+        var dest = UnsafePointer[UInt8].alloc(length + 1)
+        memcpy(
+            dest=dest,
+            # TODO: Remove cast once string UInt8 transition is complete.
+            src=src.unsafe_ptr().bitcast[UInt8](),
+            count=length,
+        )
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
@@ -93,8 +97,12 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         var length = len(src)
-        var dest = Self.StorageType.alloc(length + 1)
-        memcpy(dest, src.data.bitcast[DType.uint8](), length)
+        var dest = UnsafePointer[UInt8].alloc(length + 1)
+        memcpy(
+            dest=dest,
+            src=src.unsafe_ptr(),
+            count=length,
+        )
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
@@ -112,7 +120,7 @@ struct Error(Stringable, Boolable):
         """
         if existing.loaded_length < 0:
             var length = -existing.loaded_length
-            var dest = Self.StorageType.alloc(length + 1)
+            var dest = UnsafePointer[UInt8].alloc(length + 1)
             memcpy(dest, existing.data, length)
             dest[length] = 0
             return Error {data: dest, loaded_length: existing.loaded_length}
@@ -158,4 +166,4 @@ struct Error(Stringable, Boolable):
         var length = self.loaded_length
         if length < 0:
             length = -length
-        return String(StringRef(self.data.bitcast[DType.int8](), length))
+        return String(StringRef(self.data, length))

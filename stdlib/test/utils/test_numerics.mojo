@@ -13,20 +13,34 @@
 # RUN: %mojo %s
 
 from sys.info import has_neon
-from testing import assert_equal, assert_true, assert_false
-from utils._numerics import FPUtils, inf, isinf
+from testing import assert_equal, assert_true, assert_false, assert_almost_equal
+from utils.numerics import (
+    FPUtils,
+    get_accum_type,
+    inf,
+    isfinite,
+    isinf,
+    isnan,
+    max_finite,
+    max_or_inf,
+    min_finite,
+    min_or_neg_inf,
+    nan,
+    neg_inf,
+    nextafter,
+    ulp,
+)
 
-alias FPU64 = FPUtils[DType.float64]
 
-
-fn test_numerics() raises:
+# TODO: improve coverage and organization of these tests
+def test_FPUtils():
     assert_equal(FPUtils[DType.float32].mantissa_width(), 23)
-
-    assert_equal(FPUtils[DType.float64].mantissa_width(), 52)
-
     assert_equal(FPUtils[DType.float32].exponent_bias(), 127)
 
-    assert_equal(FPUtils[DType.float64].exponent_bias(), 1023)
+    alias FPU64 = FPUtils[DType.float64]
+
+    assert_equal(FPU64.mantissa_width(), 52)
+    assert_equal(FPU64.exponent_bias(), 1023)
 
     assert_equal(FPU64.get_exponent(FPU64.set_exponent(1, 2)), 2)
     assert_equal(FPU64.get_mantissa(FPU64.set_mantissa(1, 3)), 3)
@@ -46,23 +60,168 @@ fn test_numerics() raises:
     assert_equal(FPU64.get_mantissa(FPU64.pack(True, 6, 12)), 12)
 
 
-fn test_inf() raises:
-    @parameter
-    fn _test_inf[type: DType]() raises:
-        var val = inf[type]()
-        var msg = "`test_inf` failed for `type == " + str(type) + "`"
-        assert_true((val > 0.0) & isinf(val), msg=msg)
+def test_get_accum_type():
+    assert_equal(get_accum_type[DType.float32](), DType.float32)
+    assert_equal(get_accum_type[DType.float64](), DType.float64)
+    assert_equal(get_accum_type[DType.bfloat16](), DType.float32)
+    assert_equal(get_accum_type[DType.int8](), DType.int8)
+    assert_equal(get_accum_type[DType.int16](), DType.int16)
+    assert_equal(get_accum_type[DType.int32](), DType.int32)
+    assert_equal(get_accum_type[DType.int64](), DType.int64)
+    assert_equal(get_accum_type[DType.uint8](), DType.uint8)
+    assert_equal(get_accum_type[DType.uint16](), DType.uint16)
+    assert_equal(get_accum_type[DType.uint32](), DType.uint32)
+    assert_equal(get_accum_type[DType.uint64](), DType.uint64)
+
+
+def test_isfinite():
+    assert_true(isfinite(Float32(33)))
 
     @parameter
     if not has_neon():
-        # "bf16 is not supported for ARM architectures"
-        _test_inf[DType.bfloat16]()
+        assert_false(isfinite(inf[DType.bfloat16]()))
+        assert_false(isfinite(neg_inf[DType.bfloat16]()))
+        assert_false(isfinite(nan[DType.bfloat16]()))
 
-    _test_inf[DType.float16]()
-    _test_inf[DType.float32]()
-    _test_inf[DType.float64]()
+    assert_false(isfinite(inf[DType.float16]()))
+    assert_false(isfinite(inf[DType.float32]()))
+    assert_false(isfinite(inf[DType.float64]()))
+    assert_false(isfinite(neg_inf[DType.float16]()))
+    assert_false(isfinite(neg_inf[DType.float32]()))
+    assert_false(isfinite(neg_inf[DType.float64]()))
+    assert_false(isfinite(nan[DType.float16]()))
+    assert_false(isfinite(nan[DType.float32]()))
+    assert_false(isfinite(nan[DType.float64]()))
+
+
+def test_isinf():
+    assert_false(isinf(Float32(33)))
+
+    @parameter
+    if not has_neon():
+        assert_true(isinf(inf[DType.bfloat16]()))
+        assert_true(isinf(neg_inf[DType.bfloat16]()))
+        assert_false(isinf(nan[DType.bfloat16]()))
+
+    assert_true(isinf(inf[DType.float16]()))
+    assert_true(isinf(inf[DType.float32]()))
+    assert_true(isinf(inf[DType.float64]()))
+    assert_true(isinf(neg_inf[DType.float16]()))
+    assert_true(isinf(neg_inf[DType.float32]()))
+    assert_true(isinf(neg_inf[DType.float64]()))
+    assert_false(isinf(nan[DType.float16]()))
+    assert_false(isinf(nan[DType.float32]()))
+    assert_false(isinf(nan[DType.float64]()))
+
+
+def test_isnan():
+    assert_false(isnan(Float32(33)))
+
+    @parameter
+    if not has_neon():
+        assert_false(isnan(inf[DType.bfloat16]()))
+        assert_false(isnan(neg_inf[DType.bfloat16]()))
+        assert_true(isnan(nan[DType.bfloat16]()))
+
+    assert_false(isnan(inf[DType.float16]()))
+    assert_false(isnan(inf[DType.float32]()))
+    assert_false(isnan(inf[DType.float64]()))
+    assert_false(isnan(neg_inf[DType.float16]()))
+    assert_false(isnan(neg_inf[DType.float32]()))
+    assert_false(isnan(neg_inf[DType.float64]()))
+    assert_true(isnan(nan[DType.float16]()))
+    assert_true(isnan(nan[DType.float32]()))
+    assert_true(isnan(nan[DType.float64]()))
+
+
+def test_max_finite():
+    assert_almost_equal(max_finite[DType.float32](), 3.4028235e38)
+    assert_almost_equal(max_finite[DType.float64](), 1.7976931348623157e308)
+
+
+def test_max_or_inf():
+    assert_almost_equal(max_or_inf[DType.float32](), inf[DType.float32]())
+    assert_almost_equal(max_or_inf[DType.float64](), inf[DType.float64]())
+
+
+def test_min_finite():
+    assert_almost_equal(min_finite[DType.float32](), -3.4028235e38)
+    assert_almost_equal(min_finite[DType.float64](), -1.7976931348623157e308)
+
+
+def test_min_or_neg_inf():
+    assert_almost_equal(
+        min_or_neg_inf[DType.float32](), neg_inf[DType.float32]()
+    )
+    assert_almost_equal(
+        min_or_neg_inf[DType.float64](), neg_inf[DType.float64]()
+    )
+
+
+def test_neg_inf():
+    assert_false(isfinite(neg_inf[DType.float32]()))
+    assert_false(isfinite(neg_inf[DType.float64]()))
+    assert_true(isinf(neg_inf[DType.float32]()))
+    assert_true(isinf(neg_inf[DType.float64]()))
+    assert_false(isnan(neg_inf[DType.float32]()))
+    assert_false(isnan(neg_inf[DType.float64]()))
+    assert_equal(-inf[DType.float32](), neg_inf[DType.float32]())
+    assert_equal(-inf[DType.float64](), neg_inf[DType.float64]())
+
+
+def test_nextafter():
+    assert_true(isnan(nextafter(nan[DType.float32](), nan[DType.float32]())))
+    assert_true(isinf(nextafter(inf[DType.float32](), inf[DType.float32]())))
+    assert_true(isinf(nextafter(-inf[DType.float32](), -inf[DType.float32]())))
+    assert_almost_equal(nextafter(Float64(0), Float64(0)), 0)
+    assert_almost_equal(nextafter(Float64(0), Float64(1)), 5e-324)
+    assert_almost_equal(nextafter(Float64(0), Float64(-1)), -5e-324)
+    assert_almost_equal(nextafter(Float64(1), Float64(0)), 0.99999999999999988)
+    assert_almost_equal(
+        nextafter(Float64(-1), Float64(0)), -0.99999999999999988
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](0, 1), SIMD[DType.float64, 2](0, 1)),
+        SIMD[DType.float64, 2](0, 1),
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](0, 1), SIMD[DType.float64, 2](1, 1)),
+        SIMD[DType.float64, 2](5e-324, 1),
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](0, 1), SIMD[DType.float64, 2](-1, 1)),
+        SIMD[DType.float64, 2](-5e-324, 1),
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](1, 1), SIMD[DType.float64, 2](0, 0)),
+        SIMD[DType.float64, 2](0.99999999999999988, 0.99999999999999988),
+    )
+    assert_almost_equal(
+        nextafter(SIMD[DType.float64, 2](-1, -1), SIMD[DType.float64, 2](0, 0)),
+        SIMD[DType.float64, 2](-0.99999999999999988, -0.99999999999999988),
+    )
+
+
+def test_ulp():
+    assert_true(isnan(ulp(nan[DType.float32]())))
+    assert_true(isinf(ulp(inf[DType.float32]())))
+    assert_true(isinf(ulp(-inf[DType.float32]())))
+    assert_almost_equal(ulp(Float64(0)), 5e-324)
+    assert_equal(ulp(max_finite[DType.float64]()), 1.99584030953472e292)
+    assert_equal(ulp(Float64(5)), 8.881784197001252e-16)
+    assert_equal(ulp(Float64(-5)), 8.881784197001252e-16)
 
 
 def main():
-    test_numerics()
-    test_inf()
+    test_FPUtils()
+    test_get_accum_type()
+    test_isfinite()
+    test_isinf()
+    test_isnan()
+    test_max_finite()
+    test_max_or_inf()
+    test_min_finite()
+    test_min_or_neg_inf()
+    test_neg_inf()
+    test_nextafter()
+    test_ulp()

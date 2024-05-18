@@ -40,11 +40,25 @@ fn test_stringable() raises:
     assert_equal("a string", str(AString()))
 
 
-fn test_representable() raises:
-    assert_equal(repr(String("hello")), "'hello'")
-    assert_equal(repr(str(0)), "'0'")
-    # TODO: Add more complex cases with "'", escape characters, etc
-    # and make String.__repr__ more robust to handle those cases.
+fn test_repr() raises:
+    # Usual cases
+    assert_equal(String.__repr__("hello"), "'hello'")
+    assert_equal(String.__repr__(str(0)), "'0'")
+
+    # Escape cases
+    assert_equal(String.__repr__("\0"), r"'\x00'")
+    assert_equal(String.__repr__("\x06"), r"'\x06'")
+    assert_equal(String.__repr__("\x09"), r"'\t'")
+    assert_equal(String.__repr__("\n"), r"'\n'")
+    assert_equal(String.__repr__("\x0d"), r"'\r'")
+    assert_equal(String.__repr__("\x0e"), r"'\x0e'")
+    assert_equal(String.__repr__("\x1f"), r"'\x1f'")
+    assert_equal(String.__repr__(" "), "' '")
+    assert_equal(String.__repr__("'"), '"\'"')
+    assert_equal(String.__repr__("A"), "'A'")
+    assert_equal(String.__repr__("\\"), r"'\\'")
+    assert_equal(String.__repr__("~"), "'~'")
+    assert_equal(String.__repr__("\x7f"), r"'\x7f'")
 
 
 fn test_constructors() raises:
@@ -67,7 +81,7 @@ fn test_constructors() raises:
     assert_equal(3, len(s2))
 
     # Construction from UnsafePointer
-    var ptr = UnsafePointer[Int8].alloc(4)
+    var ptr = UnsafePointer[UInt8].alloc(4)
     ptr[0] = ord("a")
     ptr[1] = ord("b")
     ptr[2] = ord("c")
@@ -103,6 +117,46 @@ fn test_equality_operators() raises:
     # Implicit conversion can promote for eq and ne
     assert_equal(s0, "abc")
     assert_not_equal(s0, "notabc")
+
+
+fn test_comparison_operators() raises:
+    var abc = String("abc")
+    var de = String("de")
+    var ABC = String("ABC")
+    var ab = String("ab")
+    var abcd = String("abcd")
+
+    # Test less than and greater than
+    assert_true(String.__lt__(abc, de))
+    assert_false(String.__lt__(de, abc))
+    assert_false(String.__lt__(abc, abc))
+    assert_true(String.__lt__(ab, abc))
+    assert_true(String.__gt__(abc, ab))
+    assert_false(String.__gt__(abc, abcd))
+
+    # Test less than or equal to and greater than or equal to
+    assert_true(String.__le__(abc, de))
+    assert_true(String.__le__(abc, abc))
+    assert_false(String.__le__(de, abc))
+    assert_true(String.__ge__(abc, abc))
+    assert_false(String.__ge__(ab, abc))
+    assert_true(String.__ge__(abcd, abc))
+
+    # Test case sensitivity in comparison (assuming ASCII order)
+    assert_true(String.__gt__(abc, ABC))
+    assert_false(String.__le__(abc, ABC))
+
+    # Testing with implicit conversion
+    assert_true(String.__lt__(abc, "defgh"))
+    assert_false(String.__gt__(abc, "xyz"))
+    assert_true(String.__ge__(abc, "abc"))
+    assert_false(String.__le__(abc, "ab"))
+
+    # Test comparisons involving empty strings
+    assert_true(String.__lt__("", abc))
+    assert_false(String.__lt__(abc, ""))
+    assert_true(String.__le__("", ""))
+    assert_true(String.__ge__("", ""))
 
 
 fn test_add() raises:
@@ -167,6 +221,17 @@ fn test_stringref_from_dtypepointer() raises:
     assert_equal(3, len(a))
     assert_equal(3, len(b))
     assert_equal(a, b)
+
+
+fn test_stringref_strip() raises:
+    var a = StringRef("  mojo rocks  ")
+    var b = StringRef("mojo  ")
+    var c = StringRef("  mojo")
+    var d = StringRef("")
+    assert_equal(a.strip(), "mojo rocks")
+    assert_equal(b.strip(), "mojo")
+    assert_equal(c.strip(), "mojo")
+    assert_equal(d.strip(), "")
 
 
 fn test_ord() raises:
@@ -345,6 +410,66 @@ fn test_atol_base_0() raises:
         contains="String is not convertible to integer with base 0: '0of_'"
     ):
         _ = atol("0of_", base=0)
+
+
+fn test_atof() raises:
+    assert_equal(375.0, atof(String("375.f")))
+    assert_equal(1.0, atof(String("001.")))
+    assert_equal(+5.0, atof(String(" +005.")))
+    assert_equal(13.0, atof(String(" 013.f  ")))
+    assert_equal(-89, atof(String("-89")))
+    assert_equal(-0.3, atof(String(" -0.3")))
+    assert_equal(-69e3, atof(String(" -69E+3  ")))
+    assert_equal(123.2e1, atof(String(" 123.2E1  ")))
+    assert_equal(23e3, atof(String(" 23E3  ")))
+    assert_equal(989343e-13, atof(String(" 989343E-13  ")))
+    assert_equal(1.123, atof(String(" 1.123f")))
+    assert_equal(0.78, atof(String(" .78 ")))
+    assert_equal(121234.0, atof(String(" 121234.  ")))
+    assert_equal(985031234.0, atof(String(" 985031234.F  ")))
+    assert_equal(FloatLiteral.negative_zero, atof(String("-0")))
+    assert_equal(FloatLiteral.nan, atof(String("  nan")))
+    assert_equal(FloatLiteral.infinity, atof(String(" inf ")))
+    assert_equal(FloatLiteral.negative_infinity, atof(String("-inf  ")))
+
+    # Negative cases
+    with assert_raises(contains="String is not convertible to float: ''"):
+        _ = atof(String(""))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 123 asd'"
+    ):
+        _ = atof(String(" 123 asd"))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' f.9123 '"
+    ):
+        _ = atof(String(" f.9123 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 989343E-1A3 '"
+    ):
+        _ = atof(String(" 989343E-1A3 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 124124124_2134124124 '"
+    ):
+        _ = atof(String(" 124124124_2134124124 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 123.2E '"
+    ):
+        _ = atof(String(" 123.2E "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' --958.23 '"
+    ):
+        _ = atof(String(" --958.23 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' ++94. '"
+    ):
+        _ = atof(String(" ++94. "))
 
 
 fn test_calc_initial_buffer_size_int32() raises:
@@ -577,7 +702,55 @@ fn test_isspace() raises:
     assert_false(isspace(ord(".")))
 
 
+fn test_ascii_aliases() raises:
+    var whitespaces = String(" \n\t\r\f\v")
+    for i in range(len(whitespaces)):
+        assert_true(whitespaces[i] in String.WHITESPACE)
+
+    assert_true(String("a") in String.ASCII_LOWERCASE)
+    assert_true(String("b") in String.ASCII_LOWERCASE)
+    assert_true(String("y") in String.ASCII_LOWERCASE)
+    assert_true(String("z") in String.ASCII_LOWERCASE)
+
+    assert_true(String("A") in String.ASCII_UPPERCASE)
+    assert_true(String("B") in String.ASCII_UPPERCASE)
+    assert_true(String("Y") in String.ASCII_UPPERCASE)
+    assert_true(String("Z") in String.ASCII_UPPERCASE)
+
+    assert_true(String("a") in String.ASCII_LETTERS)
+    assert_true(String("b") in String.ASCII_LETTERS)
+    assert_true(String("y") in String.ASCII_LETTERS)
+    assert_true(String("z") in String.ASCII_LETTERS)
+    assert_true(String("A") in String.ASCII_LETTERS)
+    assert_true(String("B") in String.ASCII_LETTERS)
+    assert_true(String("Y") in String.ASCII_LETTERS)
+    assert_true(String("Z") in String.ASCII_LETTERS)
+
+    assert_true(String("0") in String.DIGITS)
+    assert_true(String("9") in String.DIGITS)
+
+    assert_true(String("0") in String.HEX_DIGITS)
+    assert_true(String("9") in String.HEX_DIGITS)
+    assert_true(String("A") in String.HEX_DIGITS)
+    assert_true(String("F") in String.HEX_DIGITS)
+
+    assert_true(String("7") in String.OCT_DIGITS)
+    assert_false(String("8") in String.OCT_DIGITS)
+
+    assert_true(String(",") in String.PUNCTUATION)
+    assert_true(String(".") in String.PUNCTUATION)
+    assert_true(String("\\") in String.PUNCTUATION)
+    assert_true(String("@") in String.PUNCTUATION)
+    assert_true(String('"') in String.PUNCTUATION)
+    assert_true(String("'") in String.PUNCTUATION)
+
+    var text = String("I love my Mom and Dad so much!!!\n")
+    for i in range(len(text)):
+        assert_true(text[i] in String.PRINTABLE)
+
+
 fn test_rstrip() raises:
+    # with default rstrip chars
     var empty_string = String("")
     assert_true(empty_string.rstrip() == "")
 
@@ -593,8 +766,17 @@ fn test_rstrip() raises:
     var str2 = String("something \t\n\t\v\f")
     assert_true(str2.rstrip() == "something")
 
+    # with custom chars for rstrip
+    var str3 = String("mississippi")
+    assert_true(str3.rstrip("sip") == "m")
+
+    var str4 = String("mississippimississippi \n ")
+    assert_true(str4.rstrip("sip ") == "mississippimississippi \n")
+    assert_true(str4.rstrip("sip \n") == "mississippim")
+
 
 fn test_lstrip() raises:
+    # with default lstrip chars
     var empty_string = String("")
     assert_true(empty_string.lstrip() == "")
 
@@ -610,8 +792,17 @@ fn test_lstrip() raises:
     var str2 = String(" \t\n\t\v\fsomething")
     assert_true(str2.lstrip() == "something")
 
+    # with custom chars for lstrip
+    var str3 = String("mississippi")
+    assert_true(str3.lstrip("mis") == "ppi")
+
+    var str4 = String(" \n mississippimississippi")
+    assert_true(str4.lstrip("mis ") == "\n mississippimississippi")
+    assert_true(str4.lstrip("mis \n") == "ppimississippi")
+
 
 fn test_strip() raises:
+    # with default strip chars
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
 
@@ -626,6 +817,15 @@ fn test_strip() raises:
 
     var str2 = String(" \t\n\t\v\fsomething \t\n\t\v\f")
     assert_true(str2.strip() == "something")
+
+    # with custom strip chars
+    var str3 = String("mississippi")
+    assert_true(str3.strip("mips") == "")
+    assert_true(str3.strip("mip") == "ssiss")
+
+    var str4 = String(" \n mississippimississippi \n ")
+    assert_true(str4.strip(" ") == "\n mississippimississippi \n")
+    assert_true(str4.strip("\nmip ") == "ssissippimississ")
 
 
 fn test_hash() raises:
@@ -703,17 +903,20 @@ def main():
     test_constructors()
     test_copy()
     test_equality_operators()
+    test_comparison_operators()
     test_add()
     test_stringable()
-    test_representable()
+    test_repr()
     test_string_join()
     test_stringref()
     test_stringref_from_dtypepointer()
+    test_stringref_strip()
     test_ord()
     test_chr()
     test_string_indexing()
     test_atol()
     test_atol_base_0()
+    test_atof()
     test_calc_initial_buffer_size_int32()
     test_calc_initial_buffer_size_int64()
     test_contains()
@@ -726,9 +929,8 @@ def main():
     test_islower()
     test_lower()
     test_upper()
-    # TODO(37393): Re-enable once we debug why we are depending on some debug behavior
-    # on graviton.  Showing an error in our O3 LLVM pipeline; could be a bug in LLVM.
-    # test_isspace()
+    test_isspace()
+    test_ascii_aliases()
     test_rstrip()
     test_lstrip()
     test_strip()

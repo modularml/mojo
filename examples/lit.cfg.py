@@ -45,12 +45,13 @@ config.test_source_root = Path(__file__).parent.resolve()
 # Substitute %mojo for just `mojo` itself.
 config.substitutions.insert(0, ("%mojo", "mojo"))
 
-pre_built_packages_path = (
+pre_built_packages_path = os.environ.get(
+    "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
     Path(os.environ["MODULAR_HOME"])
     / "pkg"
     / "packages.modular.com_nightly_mojo"
     / "lib"
-    / "mojo"
+    / "mojo",
 )
 
 os.environ[

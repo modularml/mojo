@@ -21,7 +21,7 @@ from memory import memcpy, LegacyPointer, UnsafePointer
 
 from collections import Optional
 
-from utils import StaticTuple, Variant
+from utils import InlineArray, Variant
 from utils._format import ToFormatter
 
 
@@ -96,19 +96,19 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
     fn __len__(self) -> Int:
         if self._is_small():
-            return len(self._storage.get[_FixedString[Self.SMALL_CAP]]()[])
+            return len(self._storage[_FixedString[Self.SMALL_CAP]])
         else:
             debug_assert(
                 self._storage.isa[String](),
                 "expected non-small string variant to be String",
             )
-            return len(self._storage.get[String]()[])
+            return len(self._storage[String])
 
     fn __str__(self) -> String:
         if self._is_small():
-            return str(self._storage.get[_FixedString[Self.SMALL_CAP]]()[])
+            return str(self._storage[_FixedString[Self.SMALL_CAP]])
         else:
-            return self._storage.get[String]()[]
+            return self._storage[String]
 
     fn __iadd__(inout self, literal: StringLiteral):
         """Appends another string to this string.
@@ -138,10 +138,10 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         #       length is shorter than the small capacity.
 
         if not self._is_small():
-            self._storage.get[String]()[] += strref
+            self._storage[String] += strref
         elif total_len < Self.SMALL_CAP:
             try:
-                self._storage.get[_FixedString[Self.SMALL_CAP]]()[] += strref
+                self._storage[_FixedString[Self.SMALL_CAP]] += strref
             except e:
                 abort(
                     "unreachable: InlinedString append to FixedString failed: "
@@ -153,21 +153,21 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
             # Begin by heap allocating enough space to store the combined
             # string.
-            var buffer = List[Int8](capacity=total_len)
-
-            var buffer_ptr = rebind[DTypePointer[DType.uint8]](buffer.data)
+            var buffer = List[UInt8](capacity=total_len)
 
             # Copy the bytes from the current small string layout
             memcpy(
-                buffer_ptr,
-                self._storage.get[
-                    _FixedString[Self.SMALL_CAP]
-                ]()[].as_uint8_ptr(),
-                len(self),
+                dest=buffer.unsafe_ptr(),
+                src=self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr(),
+                count=len(self),
             )
 
             # Copy the bytes from the additional string.
-            memcpy(buffer_ptr + len(self), strref.data, len(strref))
+            memcpy(
+                dest=buffer.unsafe_ptr() + len(self),
+                src=strref.unsafe_ptr(),
+                count=len(strref),
+            )
 
             # Record that we've initialized `total_len` count of elements
             # in `buffer`
@@ -231,9 +231,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
         return res
 
-    # TODO: Remove this when we have transitioned to uint8 for bytes.
-    # See https://github.com/modularml/mojo/issues/2317 for details
-    fn as_ptr(self) -> DTypePointer[DType.int8]:
+    fn as_uint8_ptr(self) -> UnsafePointer[UInt8]:
         """Returns a pointer to the bytes of string data.
 
         Returns:
@@ -241,23 +239,9 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         """
 
         if self._is_small():
-            return self._storage.get[_FixedString[Self.SMALL_CAP]]()[].as_ptr()
+            return self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr()
         else:
-            return self._storage.get[String]()[].unsafe_ptr()
-
-    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
-        """Returns a pointer to the bytes of string data.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
-
-        if self._is_small():
-            return self._storage.get[
-                _FixedString[Self.SMALL_CAP]
-            ]()[].as_uint8_ptr()
-        else:
-            return self._storage.get[String]()[].unsafe_uint8_ptr()
+            return self._storage[String].unsafe_uint8_ptr()
 
     fn _strref_dangerous(self) -> StringRef:
         """
@@ -294,7 +278,7 @@ struct _FixedString[CAP: Int](
         CAP: The fixed-size count of bytes of string storage capacity available.
     """
 
-    var buffer: _ArrayMem[Int8, CAP]
+    var buffer: InlineArray[UInt8, CAP]
     """The underlying storage for the fixed string."""
     var size: Int
     """The number of elements in the vector."""
@@ -305,7 +289,7 @@ struct _FixedString[CAP: Int](
 
     fn __init__(inout self):
         """Constructs a new empty string."""
-        self.buffer = _ArrayMem[Int8, CAP]()
+        self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
         self.size = 0
 
     @always_inline
@@ -324,10 +308,10 @@ struct _FixedString[CAP: Int](
                 + ")"
             )
 
-        self.buffer = _ArrayMem[Int8, CAP]()
+        self.buffer = InlineArray[UInt8, CAP]()
         self.size = len(literal)
 
-        memcpy(self.buffer.as_ptr(), literal.unsafe_ptr(), len(literal))
+        memcpy(self.buffer.unsafe_ptr(), literal.as_uint8_ptr(), len(literal))
 
     # ===------------------------------------------------------------------=== #
     # Trait Interfaces
@@ -385,7 +369,7 @@ struct _FixedString[CAP: Int](
 
         # Append the bytes from `strref` at the end of the current string
         memcpy(
-            self.buffer.as_ptr().bitcast[UInt8]() + len(self),
+            DTypePointer(self.buffer.unsafe_ptr().bitcast[UInt8]() + len(self)),
             strref.data,
             len(strref),
         )
@@ -449,23 +433,13 @@ struct _FixedString[CAP: Int](
 
         return output^
 
-    # TODO: Remove this when we have transitioned to uint8 for bytes.
-    # See https://github.com/modularml/mojo/issues/2317 for details
-    fn as_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return self.buffer.as_ptr()
-
-    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
-        """Retrieves a pointer to the underlying memory.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
-        return self.buffer.as_ptr().bitcast[UInt8]()
+        return self.buffer.unsafe_ptr()
 
     fn _strref_dangerous(self) -> StringRef:
         """
@@ -474,7 +448,7 @@ struct _FixedString[CAP: Int](
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.as_uint8_ptr(), length: len(self)}
+        return StringRef {data: self.unsafe_ptr(), length: len(self)}
 
     fn _strref_keepalive(self):
         """
@@ -483,71 +457,3 @@ struct _FixedString[CAP: Int](
         without the string getting deallocated early.
         """
         pass
-
-
-# ===----------------------------------------------------------------------===#
-# _ArrayMem
-# ===----------------------------------------------------------------------===#
-
-
-@value
-struct _ArrayMem[ElementType: AnyRegType, SIZE: Int](Sized):
-    """A fixed-sized, homogeneous, contiguous, inline collection type.
-
-    Parameters:
-        ElementType: The type of the elements in the array.
-        SIZE: The fixed number of elements stored in the array.
-    """
-
-    var storage: StaticTuple[ElementType, SIZE]
-    """The underlying storage for this array value."""
-
-    # ===------------------------------------------------------------------===#
-    # Constructors
-    # ===------------------------------------------------------------------===#
-
-    @always_inline
-    fn __init__(inout self):
-        """Constructs an empty (undefined) array."""
-
-        self.storage = StaticTuple[ElementType, SIZE]()
-
-    # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
-    # ===------------------------------------------------------------------=== #
-
-    fn __len__(self) -> Int:
-        """Returns the length of the array. This is a known constant value.
-
-        Returns:
-            The length of the array
-        """
-        return SIZE
-
-    fn __setitem__(inout self, index: Int, owned value: ElementType):
-        var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer(Reference(self.storage.array)).address, index.value
-        )
-        __mlir_op.`pop.store`(value, ptr)
-
-    # ===------------------------------------------------------------------=== #
-    # Methods
-    # ===------------------------------------------------------------------=== #
-
-    fn as_ptr(self) -> LegacyPointer[ElementType]:
-        """Get a pointer to the elements contained by this array.
-
-        Returns:
-            A pointer to the elements contained by this array.
-        """
-
-        return LegacyPointer.address_of(self.storage).bitcast[ElementType]()
-
-    fn unsafe_ptr(inout self) -> UnsafePointer[ElementType]:
-        """Get a pointer to the elements contained by this array.
-
-        Returns:
-            A pointer to the elements contained by this array.
-        """
-
-        return UnsafePointer.address_of(self.storage).bitcast[ElementType]()

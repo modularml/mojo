@@ -185,10 +185,11 @@ struct AddressSpace(EqualityComparable):
 
 
 @value
+@automatically_dereference
 @register_passable("trivial")
 struct Reference[
     type: AnyType,
-    is_mutable: __mlir_type.i1,
+    is_mutable: Bool,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
@@ -232,13 +233,13 @@ struct Reference[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __refitem__(self) -> Self._mlir_type:
+    fn __refitem__(self) -> Self:
         """Enable subscript syntax `ref[]` to access the element.
 
         Returns:
             The MLIR reference for the Mojo compiler to use.
         """
-        return self.value
+        return self
 
     @always_inline("nodebug")
     fn __mlir_ref__(self) -> Self._mlir_type:

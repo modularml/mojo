@@ -67,6 +67,12 @@ def test_round():
     assert_equal(Int.__round__(Int(-5)), -5)
 
 
+def test_trunc():
+    assert_equal(Int.__trunc__(Int(5)), 5)
+    assert_equal(Int.__trunc__(Int(0)), 0)
+    assert_equal(Int.__trunc__(Int(-5)), -5)
+
+
 def test_floordiv():
     assert_equal(1, Int(2) // Int(2))
     assert_equal(0, Int(2) // Int(3))
@@ -137,6 +143,11 @@ def test_int_representation():
     assert_equal(repr(Int(-100)), "-100")
 
 
+def test_indexer():
+    assert_equal(5, Int(5).__index__())
+    assert_equal(987, Int(987).__index__())
+
+
 def main():
     test_constructors()
     test_properties()
@@ -147,9 +158,11 @@ def main():
     test_ceil()
     test_floor()
     test_round()
+    test_trunc()
     test_floordiv()
     test_mod()
     test_divmod()
     test_abs()
     test_string_conversion()
     test_int_representation()
+    test_indexer()

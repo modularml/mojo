@@ -17,6 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 from utils._visualizers import lldb_formatter_wrapping_type
 
+from collections import Set
+
 
 # ===----------------------------------------------------------------------=== #
 #  Boolable
@@ -57,11 +59,16 @@ trait Boolable:
 @value
 @register_passable("trivial")
 struct Bool(
-    Stringable, CollectionElement, Boolable, EqualityComparable, Intable
+    Stringable,
+    CollectionElement,
+    Boolable,
+    EqualityComparable,
+    Intable,
+    Indexer,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
-    var value: __mlir_type.`!pop.scalar<bool>`
+    var value: __mlir_type.i1
     """The underlying storage of the boolean value."""
 
     @always_inline("nodebug")
@@ -74,9 +81,19 @@ struct Bool(
         Returns:
             The constructed Bool value.
         """
-        return __mlir_op.`pop.cast_from_builtin`[
-            _type = __mlir_type.`!pop.scalar<bool>`
-        ](value)
+        return Self {value: value}
+
+    @always_inline("nodebug")
+    fn __init__(value: __mlir_type.`!pop.scalar<bool>`) -> Bool:
+        """Construct a Bool value given a `!pop.scalar<bool>` value.
+
+        Args:
+            value: The initial value.
+
+        Returns:
+            The constructed Bool value.
+        """
+        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i1](value)
 
     @always_inline("nodebug")
     fn __init__[boolable: Boolable](value: boolable) -> Bool:
@@ -114,9 +131,13 @@ struct Bool(
         Returns:
             The underlying value for the Bool.
         """
-        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i1](
-            self.value
-        )
+        return self.value
+
+    @always_inline("nodebug")
+    fn _as_scalar_bool(self) -> __mlir_type.`!pop.scalar<bool>`:
+        return __mlir_op.`pop.cast_from_builtin`[
+            _type = __mlir_type.`!pop.scalar<bool>`
+        ](self.value)
 
     fn __str__(self) -> String:
         """Get the bool as a string.
@@ -133,11 +154,16 @@ struct Bool(
         Returns:
             1 if the Bool is True, 0 otherwise.
         """
-        return Int(
-            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-                self.value
-            )
-        )
+        return __mlir_op.`pop.select`[_type=Int](self.value, Int(1), Int(0))
+
+    @always_inline("nodebug")
+    fn __index__(self) -> Int:
+        """Convert this Bool to an integer for indexing purposes.
+
+        Returns:
+            1 if the Bool is True, 0 otherwise.
+        """
+        return self.__int__()
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Bool) -> Bool:
@@ -153,7 +179,7 @@ struct Bool(
             True if the two values match and False otherwise.
         """
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
-            self.value, rhs.value
+            self._as_scalar_bool(), rhs._as_scalar_bool()
         )
 
     @always_inline("nodebug")
@@ -171,7 +197,7 @@ struct Bool(
             False if the two values do match and True otherwise.
         """
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-            self.value, rhs.value
+            self._as_scalar_bool(), rhs._as_scalar_bool()
         )
 
     # ===-------------------------------------------------------------------===#
@@ -189,7 +215,7 @@ struct Bool(
             _type = __mlir_type.`!pop.scalar<bool>`,
             value = __mlir_attr.`#pop.simd<true> : !pop.scalar<bool>`,
         ]()
-        return __mlir_op.`pop.xor`(self.value, true)
+        return __mlir_op.`pop.xor`(self._as_scalar_bool(), true)
 
     @always_inline("nodebug")
     fn __and__(self, rhs: Bool) -> Bool:
@@ -204,7 +230,9 @@ struct Bool(
         Returns:
             `self & rhs`.
         """
-        return __mlir_op.`pop.and`(self.value, rhs.value)
+        return __mlir_op.`pop.and`(
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
 
     @always_inline("nodebug")
     fn __iand__(inout self, rhs: Bool):
@@ -240,7 +268,7 @@ struct Bool(
         Returns:
             `self | rhs`.
         """
-        return __mlir_op.`pop.or`(self.value, rhs.value)
+        return __mlir_op.`pop.or`(self._as_scalar_bool(), rhs._as_scalar_bool())
 
     @always_inline("nodebug")
     fn __ior__(inout self, rhs: Bool):
@@ -276,7 +304,9 @@ struct Bool(
         Returns:
             `self ^ rhs`.
         """
-        return __mlir_op.`pop.xor`(self.value, rhs.value)
+        return __mlir_op.`pop.xor`(
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
 
     @always_inline("nodebug")
     fn __ixor__(inout self, rhs: Bool):
@@ -298,6 +328,15 @@ struct Bool(
             `lhs ^ self`.
         """
         return lhs ^ self
+
+    @always_inline("nodebug")
+    fn __neg__(self) -> Int:
+        """Defines the unary `-` operation.
+
+        Returns:
+            0 for -False and -1 for -True.
+        """
+        return __mlir_op.`index.casts`[_type = __mlir_type.index](self.value)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -332,3 +371,115 @@ fn bool[T: Boolable](value: T) -> Bool:
         The bool representation of the object.
     """
     return value.__bool__()
+
+
+# ===----------------------------------------------------------------------=== #
+#  any
+# ===----------------------------------------------------------------------=== #
+
+
+# TODO: Combine these into Iterators over Boolable elements
+
+
+fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
+    """Checks if **any** elements in the list are truthy.
+
+    Parameters:
+        T: The type of elements to check.
+
+    Args:
+        list: The list to check.
+
+    Returns:
+        Returns `True` if **any** elements in the list are truthy, `False` otherwise.
+    """
+    for item in list:
+        if item[]:
+            return True
+    return False
+
+
+fn any[T: BoolableKeyElement](set: Set[T]) -> Bool:
+    """Checks if **any** elements in the set are truthy.
+
+    Parameters:
+        T: The type of elements to check.
+
+    Args:
+        set: The set to check.
+
+    Returns:
+        Returns `True` if **any** elements in the set are truthy, `False` otherwise.
+    """
+    for item in set:
+        if item[]:
+            return True
+    return False
+
+
+fn any(value: SIMD) -> Bool:
+    """Checks if **any** elements in the simd vector are truthy.
+
+    Args:
+        value: The simd vector to check.
+
+    Returns:
+        Returns `True` if **any** elements in the simd vector are truthy, `False` otherwise.
+    """
+    return value._reduce_any()
+
+
+# ===----------------------------------------------------------------------=== #
+#  all
+# ===----------------------------------------------------------------------=== #
+
+
+# TODO: Combine these into Iterators over Boolable elements
+
+
+fn all[T: BoolableCollectionElement](list: List[T]) -> Bool:
+    """Checks if **all** elements in the list are truthy.
+
+    Parameters:
+        T: The type of elements to check.
+
+    Args:
+        list: The list to check.
+
+    Returns:
+        Returns `True` if **all** elements in the list are truthy, `False` otherwise.
+    """
+    for item in list:
+        if not item[]:
+            return False
+    return True
+
+
+fn all[T: BoolableKeyElement](set: Set[T]) -> Bool:
+    """Checks if **all** elements in the set are truthy.
+
+    Parameters:
+        T: The type of elements to check.
+
+    Args:
+        set: The set to check.
+
+    Returns:
+        Returns `True` if **all** elements in the set are truthy, `False` otherwise.
+    """
+    for item in set:
+        if not item[]:
+            return False
+    return True
+
+
+fn all(value: SIMD) -> Bool:
+    """Checks if **all** elements in the simd vector are truthy.
+
+    Args:
+        value: The simd vector to check.
+
+    Returns:
+        Returns `True` if **all** elements in the simd vector are truthy, `False` otherwise.
+    """
+    return value._reduce_all()

@@ -15,11 +15,11 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from .range import _StridedRangeIterator
+from .range import _StridedRange
 
 from collections.list import _ListIter
 
-from collections.dict import _DictKeyIter
+from collections.dict import _DictKeyIter, _DictValueIter, _DictEntryIter
 
 # ===----------------------------------------------------------------------=== #
 #  Reversible
@@ -43,7 +43,7 @@ trait ReversibleRange:
     # iterators currently check __len__() instead of raising an exception
     # so there is no ReversibleRaising trait yet.
 
-    fn __reversed__(self) -> _StridedRangeIterator:
+    fn __reversed__(self) -> _StridedRange:
         """Get a reversed iterator for the type.
 
         **Note**: iterators are currently non-raising.
@@ -59,7 +59,7 @@ trait ReversibleRange:
 # ===----------------------------------------------------------------------=== #
 
 
-fn reversed[T: ReversibleRange](value: T) -> _StridedRangeIterator:
+fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
     """Get a reversed iterator of the input range.
 
     **Note**: iterators are currently non-raising.
@@ -119,6 +119,79 @@ fn reversed[
         value: The dict to get the reversed iterator of.
 
     Returns:
-        The reversed iterator of the dict.
+        The reversed iterator of the dict keys.
     """
     return value[].__reversed__()
+
+
+fn reversed[
+    mutability: Bool,
+    self_life: AnyLifetime[mutability].type,
+    K: KeyElement,
+    V: CollectionElement,
+    dict_mutability: Bool,
+    dict_lifetime: AnyLifetime[dict_mutability].type,
+](
+    value: Reference[
+        _DictValueIter[K, V, dict_mutability, dict_lifetime],
+        mutability,
+        self_life,
+    ]._mlir_type,
+) -> _DictValueIter[K, V, dict_mutability, dict_lifetime, False]:
+    """Get a reversed iterator of the input dict values.
+
+    **Note**: iterators are currently non-raising.
+
+    Parameters:
+        mutability: Whether the reference to the dict is mutable.
+        self_life: The lifetime of the dict.
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+        dict_mutability: Whether the reference to the dict values is mutable.
+        dict_lifetime: The lifetime of the dict values.
+
+    Args:
+        value: The dict values to get the reversed iterator of.
+
+    Returns:
+        The reversed iterator of the dict values.
+    """
+    return Reference(value)[].__reversed__[mutability, self_life]()
+
+
+fn reversed[
+    mutability: Bool,
+    self_life: AnyLifetime[mutability].type,
+    K: KeyElement,
+    V: CollectionElement,
+    dict_mutability: Bool,
+    dict_lifetime: AnyLifetime[dict_mutability].type,
+](
+    value: Reference[
+        _DictEntryIter[K, V, dict_mutability, dict_lifetime],
+        mutability,
+        self_life,
+    ]._mlir_type,
+) -> _DictEntryIter[K, V, dict_mutability, dict_lifetime, False]:
+    """Get a reversed iterator of the input dict items.
+
+    **Note**: iterators are currently non-raising.
+
+    Parameters:
+        mutability: Whether the reference to the dict is mutable.
+        self_life: The lifetime of the dict.
+        K: The type of the keys in the dict.
+        V: The type of the values in the dict.
+        dict_mutability: Whether the reference to the dict items is mutable.
+        dict_lifetime: The lifetime of the dict items.
+
+    Args:
+        value: The dict items to get the reversed iterator of.
+
+    Returns:
+        The reversed iterator of the dict items.
+    """
+    var src = Reference(value)[].src
+    return _DictEntryIter[K, V, dict_mutability, dict_lifetime, False](
+        src[]._reserved, 0, src
+    )

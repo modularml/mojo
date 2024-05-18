@@ -130,7 +130,7 @@ fn _int_tuple_compare[
     fn do_compare[idx: Int]():
         var a_elem: Int = a.__getitem__[idx]()
         var b_elem: Int = b.__getitem__[idx]()
-        c.__setitem__[idx](comp_fn(a_elem, b_elem).value)
+        c.__setitem__[idx](comp_fn(a_elem, b_elem)._as_scalar_bool())
 
     unroll[do_compare, size]()
 
@@ -297,7 +297,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         var tup = Self()
 
-        @unroll
+        @parameter
         for idx in range(size):
             tup[idx] = elems[idx]
 
@@ -392,7 +392,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         """
         var length: Int = 1
 
-        @unroll
+        @parameter
         for i in range(size):
             length *= self[i]
 

@@ -54,21 +54,63 @@ def test_floor():
     assert_equal(FloatLiteral.__floor__(neg_inf), neg_inf)
 
 
+def test_trunc():
+    assert_equal(FloatLiteral.__trunc__(1.5), 1.0)
+    assert_equal(FloatLiteral.__trunc__(1.6), 1.0)
+    assert_equal(FloatLiteral.__trunc__(-1.5), -1.0)
+    assert_equal(FloatLiteral.__trunc__(-3.6), -3.0)
+    assert_equal(FloatLiteral.__trunc__(3.0), 3.0)
+    assert_equal(FloatLiteral.__trunc__(0.0), 0.0)
+
+    assert_true(FloatLiteral.__trunc__(nan).is_nan())
+    assert_true(FloatLiteral.__trunc__(neg_zero).is_neg_zero())
+    assert_equal(FloatLiteral.__trunc__(inf), inf)
+    assert_equal(FloatLiteral.__trunc__(neg_inf), neg_inf)
+
+
+def test_round():
+    assert_equal(FloatLiteral.__round__(1.5), 1.0)
+    assert_equal(FloatLiteral.__round__(1.6), 2.0)
+    assert_equal(FloatLiteral.__round__(-1.5), -1.0)
+    assert_equal(FloatLiteral.__round__(-3.6), -4.0)
+    assert_equal(FloatLiteral.__round__(3.0), 3.0)
+    assert_equal(FloatLiteral.__round__(0.0), 0.0)
+
+    assert_true(FloatLiteral.__round__(nan).is_nan())
+    assert_true(FloatLiteral.__round__(neg_zero).is_neg_zero())
+    assert_equal(FloatLiteral.__round__(inf), inf)
+    assert_equal(FloatLiteral.__round__(neg_inf), neg_inf)
+
+    assert_equal(FloatLiteral.__round__(1.5, 0), 1.0)
+    assert_equal(FloatLiteral.__round__(2.5, 0), 2.0)
+    assert_equal(FloatLiteral.__round__(1.6, 0), 2.0)
+    assert_equal(FloatLiteral.__round__(-2.5, 0), -2.0)
+
+    assert_equal(FloatLiteral.__round__(1.5, 1), 1.5)
+    assert_equal(FloatLiteral.__round__(1.123, 1), 1.1)
+    assert_equal(FloatLiteral.__round__(1.198, 2), 1.2)
+    assert_equal(FloatLiteral.__round__(1.123, 2), 1.12)
+    assert_equal(FloatLiteral.__round__(-1.5, 1), -1.5)
+    assert_equal(FloatLiteral.__round__(-1.123, 1), -1.1)
+    assert_equal(FloatLiteral.__round__(-1.198, 2), -1.2)
+    assert_equal(FloatLiteral.__round__(-1.123, 2), -1.12)
+
+
 fn round10(x: Float64) -> Float64:
     # TODO: implement __div__ on FloatLiteral?
     return (round(Float64(x * 10)) / 10).value
 
 
 def test_round10():
-    assert_equal(round10(FloatLiteral(4.4) % 0.5), 0.4)
-    assert_equal(round10(FloatLiteral(-4.4) % 0.5), 0.1)
-    assert_equal(round10(FloatLiteral(4.4) % -0.5), -0.1)
-    assert_equal(round10(FloatLiteral(-4.4) % -0.5), -0.4)
-    assert_equal(round10(FloatLiteral(3.1) % 1.0), 0.1)
+    assert_equal(round10(4.4 % 0.5), 0.4)
+    assert_equal(round10(-4.4 % 0.5), 0.1)
+    assert_equal(round10(4.4 % -0.5), -0.1)
+    assert_equal(round10(-4.4 % -0.5), -0.4)
+    assert_equal(round10(3.1 % 1.0), 0.1)
 
 
 def test_division():
-    assert_equal(FloatLiteral(4.4) / 0.5, 8.8)
+    assert_equal(4.4 / 0.5, 8.8)
 
     alias f1 = 4.4 // 0.5
     assert_equal(f1, 8.0)
@@ -81,37 +123,61 @@ def test_division():
 
 
 def test_power():
-    assert_almost_equal(FloatLiteral(4.5) ** 2.5, 42.95673695)
-    assert_almost_equal(FloatLiteral(4.5) ** -2.5, 0.023279235)
+    assert_almost_equal(4.5**2.5, 42.95673695)
+    assert_almost_equal(4.5**-2.5, 0.023279235)
     # TODO (https://github.com/modularml/modular/issues/33045): Float64/SIMD has
     # issues with negative numbers raised to fractional powers.
-    # assert_almost_equal(FloatLiteral(-4.5) ** 2.5, -42.95673695)
-    # assert_almost_equal(FloatLiteral(-4.5) ** -2.5, -0.023279235)
+    # assert_almost_equal((-4.5) ** 2.5, -42.95673695)
+    # assert_almost_equal((-4.5) ** -2.5, -0.023279235)
+
+
+def test_mod():
+    assert_equal(4.5 % 2, 0.5)
+    assert_equal(-4.5 % 2, 1.5)
+    assert_equal(6 % 2.5, 1.0)
+
+
+def test_div_mod():
+    var t: Tuple[FloatLiteral, FloatLiteral] = FloatLiteral.__divmod__(4.5, 2.0)
+    assert_equal(t[0], 2.0)
+    assert_equal(t[1], 0.5)
+
+    t = FloatLiteral.__divmod__(-4.5, 2.0)
+    assert_equal(t[0], -3.0)
+    assert_equal(t[1], 1.5)
+
+    t = FloatLiteral.__divmod__(4.5, -2.0)
+    assert_equal(t[0], -3.0)
+    assert_equal(t[1], -1.5)
+
+    t = FloatLiteral.__divmod__(6.0, 2.5)
+    assert_equal(t[0], 2.0)
+    assert_equal(t[1], 1.0)
 
 
 def test_int_conversion():
-    assert_equal(int(FloatLiteral(-4.0)), -4)
-    assert_equal(int(FloatLiteral(-4.5)), -4)
-    assert_equal(int(FloatLiteral(-4.3)), -4)
-    assert_equal(int(FloatLiteral(4.5)), 4)
-    assert_equal(int(FloatLiteral(4.0)), 4)
+    assert_equal(int(-4.0), -4)
+    assert_equal(int(-4.5), -4)
+    assert_equal(int(-4.3), -4)
+    assert_equal(int(4.5), 4)
+    assert_equal(int(4.0), 4)
 
 
 def test_boolean_comparable():
-    var f1 = FloatLiteral(0.0)
+    var f1 = 0.0
     assert_false(f1)
 
-    var f2 = FloatLiteral(2.0)
+    var f2 = 2.0
     assert_true(f2)
 
-    var f3 = FloatLiteral(1.0)
+    var f3 = 1.0
     assert_true(f3)
 
 
 def test_equality():
-    var f1 = FloatLiteral(4.4)
-    var f2 = FloatLiteral(4.4)
-    var f3 = FloatLiteral(42.0)
+    var f1 = 4.4
+    var f2 = 4.4
+    var f3 = 42.0
     assert_equal(f1, f2)
     assert_not_equal(f1, f3)
 
@@ -124,9 +190,9 @@ def test_is_special_value():
 
 
 def test_abs():
-    assert_equal(FloatLiteral(-4.4).__abs__(), 4.4)
-    assert_equal(FloatLiteral(4.4).__abs__(), 4.4)
-    assert_equal(FloatLiteral(0.0).__abs__(), 0.0)
+    assert_equal((-4.4).__abs__(), 4.4)
+    assert_equal((4.4).__abs__(), 4.4)
+    assert_equal((0.0).__abs__(), 0.0)
 
     assert_true(FloatLiteral.__abs__(nan).is_nan())
     assert_false(FloatLiteral.__abs__(neg_zero).is_neg_zero())
@@ -138,9 +204,13 @@ def test_abs():
 def main():
     test_ceil()
     test_floor()
+    test_trunc()
+    test_round()
     test_round10()
     test_division()
     test_power()
+    test_mod()
+    test_div_mod()
     test_int_conversion()
     test_boolean_comparable()
     test_equality()

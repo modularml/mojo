@@ -17,13 +17,13 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import List, Optional
-from utils.inlined_string import _ArrayMem
+from utils import InlineArray
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
 @always_inline
-fn hex[T: Intable](value: T) -> String:
+fn hex[T: Intable](value: T, prefix: StringLiteral = "0x") -> String:
     """Returns the hex string representation of the given integer.
 
     The hexadecimal representation is a base-16 encoding of the integer value.
@@ -36,13 +36,14 @@ fn hex[T: Intable](value: T) -> String:
 
     Args:
         value: The integer value to format.
+        prefix: The prefix of the formatted int.
 
     Returns:
         A string containing the hex representation of the given integer.
     """
 
     try:
-        return _format_int(int(value), 16, prefix="0x")
+        return _format_int(int(value), 16, prefix=prefix)
     except e:
         # This should not be reachable as _format_int only throws if we pass
         # incompatible radix and custom digit chars, which we aren't doing
@@ -144,7 +145,7 @@ fn _try_write_int(
     # Stack allocate enough bytes to store any formatted 64-bit integer
     alias CAPACITY: Int = 64
 
-    var buf = _ArrayMem[Int8, CAPACITY]()
+    var buf = InlineArray[Int8, CAPACITY](unsafe_uninitialized=True)
 
     # Start the buf pointer at the end. We will write the least-significant
     # digits later in the buffer, and then decrement the pointer to move
@@ -164,7 +165,7 @@ fn _try_write_int(
 
             # Write the char representing the value of the least significant
             # digit.
-            buf[offset] = digit_chars_array[digit_value]
+            buf[offset] = digit_chars_array[int(digit_value)]
 
             # Position the offset to write the next digit.
             offset -= 1
@@ -196,7 +197,7 @@ fn _try_write_int(
     # bytes from our final `buf_ptr` to the end of the buffer.
     var len = CAPACITY - offset
 
-    var strref = StringRef(rebind[UnsafePointer[Int8]](buf_ptr), len)
+    var strref = StringRef(buf_ptr, len)
 
     fmt.write_str(strref)
 

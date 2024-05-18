@@ -183,7 +183,7 @@ fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
     @parameter
     if n < 5:
 
-        @unroll
+        @parameter
         for i in range(n):
             dest_data[i] = src_data[i]
         return
@@ -307,6 +307,27 @@ fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
         count: The number of elements to copy (not bytes!).
     """
     memcpy(dest.address, src.address, count)
+
+
+@always_inline
+fn memcpy[
+    inferred dtype: DType
+](*, dest: UnsafePointer[Scalar[dtype]], src: __type_of(dest), count: Int):
+    """Copies a memory area.
+
+    Parameters:
+        dtype: *Inferred* The dtype of the data to copy.
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+        count: The number of elements to copy (not bytes!).
+    """
+    memcpy(
+        dest=DTypePointer(dest),
+        src=DTypePointer(src),
+        count=count,
+    )
 
 
 # ===----------------------------------------------------------------------===#

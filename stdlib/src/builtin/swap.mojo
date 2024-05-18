@@ -10,22 +10,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements the built-in `swap` function.
+
+These are Mojo built-ins, so you don't need to import them.
+"""
 
 
-fn divmod(numerator: Int, denominator: Int) -> Tuple[Int, Int]:
-    """Performs integer division and returns the quotient and the remainder.
+@always_inline
+fn swap[T: Movable](inout lhs: T, inout rhs: T):
+    """Swaps the two given arguments.
 
-    Currently supported only for integers. Support for more standard library
-    types like Int8, Int16... is planned.
-
-    This method calls `a.__divmod__(b)`, thus, the actual implementation of
-    divmod should go in the `__divmod__` method of the struct of `a`.
+    Parameters:
+       T: Constrained to Copyable types.
 
     Args:
-        numerator: The dividend.
-        denominator: The divisor.
-
-    Returns:
-        A `Tuple` containing the quotient and the remainder.
+        lhs: Argument value swapped with rhs.
+        rhs: Argument value swapped with lhs.
     """
-    return numerator.__divmod__(denominator)
+    var tmp = lhs^
+    lhs = rhs^
+    rhs = tmp^

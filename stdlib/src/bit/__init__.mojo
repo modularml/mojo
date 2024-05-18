@@ -10,29 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo --debug-level full %s
+"""Implements the bit package."""
 
-from testing import assert_equal
-
-from utils.inlined_string import _ArrayMem
-
-
-def main():
-    test_array_mem()
-
-
-def test_array_mem():
-    var array = _ArrayMem[Int, 4](1)
-
-    assert_equal(array.SIZE, 4)
-    assert_equal(len(array), 4)
-
-    # ==================================
-    # Test pointer operations
-    # ==================================
-
-    var ptr = array.unsafe_ptr()
-    assert_equal(ptr[0], 1)
-    assert_equal(ptr[1], 1)
-    assert_equal(ptr[2], 1)
-    assert_equal(ptr[3], 1)
+from .bit import (
+    countl_zero,
+    countr_zero,
+    bit_reverse,
+    byte_reverse,
+    pop_count,
+    bit_not,
+    bit_width,
+    rotate_bits_left,
+    rotate_bits_right,
+)
