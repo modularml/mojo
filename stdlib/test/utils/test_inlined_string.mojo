@@ -67,7 +67,7 @@ def test_fixed_string_growth():
 
     try:
         s1 += "world"
-        assert_true(False, "expected exception to be thrown")
+        assert_true(False, msg="expected exception to be thrown")
     except e:
         assert_equal(
             e,

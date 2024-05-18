@@ -113,7 +113,7 @@ fn test_rmdir_not_empty() raises:
 
     remove(file_name)
     rmdir(my_dir_path)
-    assert_false(exists(my_dir_path), "Failed to remove dir")
+    assert_false(exists(my_dir_path), msg="Failed to remove dir")
 
 
 def main():
