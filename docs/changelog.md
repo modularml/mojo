@@ -420,6 +420,9 @@ what we publish.
 
 - The Mojo Language Server now supports renaming local variables.
 
+- Added `gettempdir` and `mkdtemp` functions in new module `tempfile`.
+  ([PR 2742](https://github.com/modularml/mojo/pull/2742) by [@artemiogr97](https://github.com/artemiogr97))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
