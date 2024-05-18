@@ -360,7 +360,10 @@ fn test_iter() raises:
         for x in not_iterable:
             assert_false(
                 True,
-                "This should not be reachable as the object is not iterable.",
+                msg=(
+                    "This should not be reachable as the object is not"
+                    " iterable."
+                ),
             )
 
 

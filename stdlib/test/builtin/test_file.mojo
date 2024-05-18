@@ -123,7 +123,7 @@ def test_file_seek():
         assert_equal(pos, 6)
 
         alias expected_msg1 = "ipsum dolor sit amet, consectetur adipiscing elit."
-        assert_equal(f.read(len(expected_msg1)), msg=expected_msg1)
+        assert_equal(f.read(len(expected_msg1)), expected_msg1)
 
         # Seek from the end of the file
         pos = f.seek(-16, os.SEEK_END)
@@ -140,7 +140,7 @@ def test_file_seek():
             _ = f.seek(-12)
         except e:
             alias expected_msg = "seek error"
-            assert_equal(str(e)[: len(expected_msg)], msg=expected_msg)
+            assert_equal(str(e)[: len(expected_msg)], expected_msg)
 
 
 def test_file_open_nodir():
