@@ -311,6 +311,13 @@ what we publish.
 - Added `atof()` function which can convert a `String` to a `float64`.
   ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))
 
+- ```Tuple``` now supports ```__contains__```([PR #2709](https://github.com/modularml/mojo/pull/2709) by
+  [@rd4com](https://github.com/rd4com))
+  ```mojo
+  var x = Tuple(1,True,"Mojo is awesome")
+  if "Mojo is awesome" in x: print("Mojo is awesome 🔥")
+  ```
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
