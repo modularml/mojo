@@ -224,6 +224,7 @@ fn test_string_stringref() raises:
     assert_equal("is coming soon", a._strref_dangerous(start=7))
     assert_equal("modcon", a._strref_dangerous(length=6))
     assert_equal("is", a._strref_dangerous(start=7, length=2))
+    a._strref_keepalive()
 
 
 fn test_stringref_from_dtypepointer() raises:
