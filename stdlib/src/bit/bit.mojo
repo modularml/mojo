@@ -254,10 +254,25 @@ fn bit_not[
 
 
 @always_inline
+fn bit_width(val: Int) -> Int:
+    """Computes the minimum number of bits required to represent the integer.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The number of bits required to represent the integer.
+    """
+    alias bitwidth = bitwidthof[Int]()
+
+    return bitwidth - countl_zero(~val if val < 0 else val)
+
+
+@always_inline
 fn bit_width[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Computes the minimum number of digits required to represent the integer.
+    """Computes the minimum number of bits required to represent the integer.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -271,7 +286,7 @@ fn bit_width[
 
     Returns:
         A SIMD value where the element at position `i` equals to the number of
-        digits required to represent the integer at position `i` of the input
+        bits required to represent the integer at position `i` of the input
         value.
     """
 
@@ -287,6 +302,64 @@ fn bit_width[
         var leading_zero_neg = countl_zero(bit_not(val))
         var leading_zero = (val > 0).select(leading_zero_pos, leading_zero_neg)
         return bitwidth - leading_zero
+
+
+# ===----------------------------------------------------------------------===#
+# bit_ceil
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn bit_ceil(val: Int) -> Int:
+    """Computes the smallest power of 2 that is greater than or equal to the
+    input value.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The smallest power of 2 that is greater than or equal to the input value.
+    """
+    if val <= 1:
+        return 1
+
+    if val & (val - 1) == 0:
+        return val
+
+    return 1 << bit_width(val - 1)
+
+
+@always_inline("nodebug")
+fn bit_ceil[
+    type: DType, simd_width: Int
+](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    """Computes the smallest power of 2 that is greater than or equal to the
+    input value for each element of a SIMD vector.
+
+    Parameters:
+        type: `dtype` used for the computation.
+        simd_width: SIMD width used for the computation.
+
+    Constraints:
+        The element type of the input vector must be integral.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        A SIMD value where the element at position `i` is the smallest power of 2
+        that is greater than or equal to the integer at position `i` of the input
+        value.
+    """
+    constrained[type.is_integral(), "must be integral"]()
+
+    alias ones = SIMD[type, simd_width].splat(1)
+    alias zeros = SIMD[type, simd_width].splat(0)
+
+    var ret = (val <= ones).select(ones, val)
+    ret = (val & (val - ones) == zeros).select(val, ret)
+
+    return (val > ones).select(1 << bit_width(val - ones), ret)
 
 
 # ===----------------------------------------------------------------------===#

@@ -22,4 +22,5 @@ from .bit import (
     bit_width,
     rotate_bits_left,
     rotate_bits_right,
+    bit_ceil,
 )

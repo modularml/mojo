@@ -12,9 +12,32 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from bit import rotate_bits_left, rotate_bits_right
+from bit import rotate_bits_left, rotate_bits_right, bit_ceil
 
 from testing import assert_equal
+
+
+def test_bit_ceil():
+    assert_equal(bit_ceil(-2), 1)
+    assert_equal(bit_ceil(1), 1)
+    assert_equal(bit_ceil(2), 2)
+    assert_equal(bit_ceil(4), 4)
+    assert_equal(bit_ceil(5), 8)
+
+
+def test_bit_ceil_simd():
+    alias simd_width = 4
+    alias type = DType.uint8
+
+    alias var1 = SIMD[type, simd_width](-2, -1, 3, 4)
+    assert_equal(
+        bit_ceil[type, simd_width](var1), SIMD[type, simd_width](1, 1, 4, 4)
+    )
+
+    alias var2 = SIMD[type, simd_width](1, 2, 3, 4)
+    assert_equal(
+        bit_ceil[type, simd_width](var2), SIMD[type, simd_width](1, 2, 4, 4)
+    )
 
 
 def test_rotate_bits_int():
@@ -66,3 +89,5 @@ def test_rotate_bits_simd():
 def main():
     test_rotate_bits_int()
     test_rotate_bits_simd()
+    test_bit_ceil()
+    test_bit_ceil_simd()
