@@ -431,7 +431,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     alias EMPTY = _EMPTY
     alias REMOVED = _REMOVED
-    alias _inital_reservation = 8
+    alias _initial_reservation = 8
 
     var size: Int
     """The number of elements currently stored in the dict."""
@@ -448,7 +448,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """Initialize an empty dictiontary."""
         self.size = 0
         self._n_entries = 0
-        self._reserved = Self._inital_reservation
+        self._reserved = Self._initial_reservation
         self._index = _DictIndex(self._reserved)
         self._entries = Self._new_entries(self._reserved)
 
@@ -493,7 +493,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """Remove all elements from the dictionary."""
         self.size = 0
         self._n_entries = 0
-        self._reserved = Self._inital_reservation
+        self._reserved = Self._initial_reservation
         self._index = _DictIndex(self._reserved)
         self._entries = Self._new_entries(self._reserved)
 
