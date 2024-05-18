@@ -105,7 +105,7 @@ def test_copy():
     var v2 = v1
     assert_true(
         v2[TestCounter].copied > v1[TestCounter].copied,
-        "didn't call copyinit",
+        msg="didn't call copyinit",
     )
     # test that we didn't call the other copyinit too!
     assert_no_poison()
@@ -116,7 +116,7 @@ def test_move():
     var v2 = v1
     assert_true(
         v2[TestCounter].moved > v1[TestCounter].moved,
-        "didn't call moveinit",
+        msg="didn't call moveinit",
     )
     # test that we didn't call the other moveinit too!
     assert_no_poison()

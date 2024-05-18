@@ -55,19 +55,19 @@ def test_file_read_bytes_multi():
     )
 
     var bytes1 = f.read_bytes(12)
-    assert_equal(len(bytes1), 12, "12 bytes")
+    assert_equal(len(bytes1), 12, msg="12 bytes")
     # we add the null terminator
     bytes1.append(0)
     var string1 = String(bytes1)
-    assert_equal(len(string1), 12, "12 chars")
+    assert_equal(len(string1), 12, msg="12 chars")
     assert_equal(string1, String("Lorem ipsum "))
 
     var bytes2 = f.read_bytes(6)
-    assert_equal(len(bytes2), 6, "6 bytes")
+    assert_equal(len(bytes2), 6, msg="6 bytes")
     # we add the null terminator
     bytes2.append(0)
     var string2 = String(bytes2)
-    assert_equal(len(string2), 6, "6 chars")
+    assert_equal(len(string2), 6, msg="6 chars")
     assert_equal(string2, "dolor ")
 
     # Read where N is greater than the number of bytes in the file.
@@ -123,7 +123,7 @@ def test_file_seek():
         assert_equal(pos, 6)
 
         alias expected_msg1 = "ipsum dolor sit amet, consectetur adipiscing elit."
-        assert_equal(f.read(len(expected_msg1)), expected_msg1)
+        assert_equal(f.read(len(expected_msg1)), msg=expected_msg1)
 
         # Seek from the end of the file
         pos = f.seek(-16, os.SEEK_END)
@@ -140,7 +140,7 @@ def test_file_seek():
             _ = f.seek(-12)
         except e:
             alias expected_msg = "seek error"
-            assert_equal(str(e)[: len(expected_msg)], expected_msg)
+            assert_equal(str(e)[: len(expected_msg)], msg=expected_msg)
 
 
 def test_file_open_nodir():

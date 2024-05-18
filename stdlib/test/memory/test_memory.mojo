@@ -202,23 +202,23 @@ def test_memcmp_extensive[
     assert_equal(
         memcmp(ptr1, ptr1, count),
         0,
-        "for dtype=" + str(type) + ";count=" + str(count),
+        msg="for dtype=" + str(type) + ";count=" + str(count),
     )
     assert_equal(
         memcmp(ptr1, ptr2, count),
         -1,
-        "for dtype=" + str(type) + ";count=" + str(count),
+        msg="for dtype=" + str(type) + ";count=" + str(count),
     )
     assert_equal(
         memcmp(ptr2, ptr1, count),
         1,
-        "for dtype=" + str(type) + ";count=" + str(count),
+        msg="for dtype=" + str(type) + ";count=" + str(count),
     )
 
     assert_equal(
         memcmp(dptr1, dptr1, count),
         0,
-        "for dtype="
+        msg="for dtype="
         + str(type)
         + ";extremes="
         + str(extermes)
@@ -228,7 +228,7 @@ def test_memcmp_extensive[
     assert_equal(
         memcmp(dptr1, dptr2, count),
         -1,
-        "for dtype="
+        msg="for dtype="
         + str(type)
         + ";extremes="
         + str(extermes)
@@ -238,7 +238,7 @@ def test_memcmp_extensive[
     assert_equal(
         memcmp(dptr2, dptr1, count),
         1,
-        "for dtype="
+        msg="for dtype="
         + str(type)
         + ";extremes="
         + str(extermes)

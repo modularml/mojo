@@ -18,7 +18,7 @@ from testing import assert_false
 
 def check_invalid_dlhandle():
     assert_false(
-        DLHandle("/an/invalid/library"), "the library is not valid location"
+        DLHandle("/an/invalid/library"), msg="the library is not valid location"
     )
 
 

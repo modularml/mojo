@@ -26,7 +26,7 @@ fn create_dir_and_test_delete_string[
     # verify that the test dir does not exist before starting the test
     assert_false(
         exists(dir_name),
-        "Unexpected dir " + dir_name + " it should not exist",
+        msg="Unexpected dir " + dir_name + " it should not exist",
     )
 
     func_create(dir_name, 0o777)
@@ -45,7 +45,7 @@ fn create_dir_and_test_delete_path[
     # verify that the test dir does not exist before starting the test
     assert_false(
         exists(dir_path),
-        "Unexpected dir " + dir_path.__fspath__() + " it should not exist",
+        msg="Unexpected dir " + dir_path.__fspath__() + " it should not exist",
     )
 
     func_create(dir_path, 0o777)
@@ -77,7 +77,7 @@ fn test_mkdir_mode() raises:
 
     assert_false(
         exists(my_dir_path),
-        "Unexpected dir " + my_dir_path.__fspath__() + " it should not exist",
+        msg="Unexpected dir " + my_dir_path.__fspath__() + " it should not exist",
     )
 
     # creating dir without writing permission
@@ -101,7 +101,7 @@ fn test_rmdir_not_empty() raises:
 
     assert_false(
         exists(my_dir_path),
-        "Unexpected dir " + my_dir_path.__fspath__() + " it should not exist",
+        msg="Unexpected dir " + my_dir_path.__fspath__() + " it should not exist",
     )
 
     mkdir(my_dir_path)

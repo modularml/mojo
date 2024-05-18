@@ -56,7 +56,7 @@ fn test_remove() raises:
     # verify that the test file does not exist before starting the test
     assert_false(
         exists(my_file_name),
-        "Unexpected file " + my_file_name + " it should not exist",
+        msg="Unexpected file " + my_file_name + " it should not exist",
     )
 
     # tyring to delete non existing file
