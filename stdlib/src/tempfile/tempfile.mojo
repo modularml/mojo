@@ -164,3 +164,84 @@ fn mkdtemp(
         except:
             continue
     raise Error("Failed to create temporary file")
+
+
+# TODO use shutil.rmtree (or equivalent) when it exists
+fn _rmtree(path: String, ignore_errors: Bool = False) raises:
+    """Removes the specified directory and all its contents.
+    If the path is a symbolic link, an error is raised.
+    If ignore_errors is True, errors resulting from failed removals will be ignored.
+    Absolute and relative paths are allowed, relative paths are resolved from cwd.
+    Args:
+      path: The path to the directory.
+      ignore_errors: Whether to ignore errors.
+    """
+    if os.path.islink(path):
+        raise Error("`path`can not be a symbolic link")
+
+    for file_or_dir in os.listdir(path):
+        if os.path.isfile(path + "/" + file_or_dir[]):
+            try:
+                os.remove(path + "/" + file_or_dir[])
+            except e:
+                if not ignore_errors:
+                    raise Error(e)
+            continue
+        if os.path.isdir(path + "/" + file_or_dir[]):
+            try:
+                _rmtree(path + "/" + file_or_dir[], ignore_errors)
+            except e:
+                if ignore_errors:
+                    continue
+                raise Error(e)
+    try:
+        os.rmdir(path)
+    except e:
+        if not ignore_errors:
+            raise Error(e)
+
+
+struct TemporaryDirectory:
+    """A temporary directory."""
+
+    var name: String
+    """The name of the temporary directory."""
+    var _ignore_cleanup_errors: Bool
+    """Whether to ignore cleanup errors."""
+
+    fn __init__(
+        inout self,
+        suffix: String = "",
+        prefix: String = "tmp",
+        dir: Optional[String] = None,
+        ignore_cleanup_errors: Bool = False,
+    ) raises:
+        """Create a temporary directory. Can be used as a context manager.
+
+        Args:
+            suffix: Suffix to use for the directory name.
+            prefix: Prefix to use for the directory name.
+            dir: Directory in which the directory will be created.
+            ignore_cleanup_errors: Whether to ignore cleanup errors.
+        """
+        self._ignore_cleanup_errors = ignore_cleanup_errors
+        var final_dir: Path
+        if not dir:
+            final_dir = Path(_get_default_tempdir())
+        else:
+            final_dir = Path(dir.value()[])
+
+        self.name = mkdtemp(suffix, prefix, final_dir.__fspath__())
+
+    fn __enter__(self) -> String:
+        return self.name
+
+    fn __exit__(self) raises:
+        _rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+
+    fn __exit__(self, err: Error) -> Bool:
+        try:
+            self.__exit__()
+            return True
+        except:
+            return False

@@ -25,6 +25,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Added `C_char` type alias in `sys.ffi`.
 
+- Added `TemporaryDirectory` in module `tempfile`.
+  ([PR 2743](https://github.com/modularml/mojo/pull/2743) by [@artemiogr97](https://github.com/artemiogr97))
+
 ### 🦋 Changed
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
