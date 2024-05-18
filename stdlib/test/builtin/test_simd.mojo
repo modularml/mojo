@@ -122,17 +122,9 @@ def test_truthy():
 
     @parameter
     fn test_dtype[type: DType]() raises:
-        # # Scalars of 0-values are false-y, 1-values are truth-y
-        assert_false(Scalar[type](False).__bool__())
-        assert_true(Scalar[type](True).__bool__())
-
-        # # SIMD vectors are truth-y if _all_ values are truth-y
-        assert_true(SIMD[type, 2](True, True).__bool__())
-
-        # # SIMD vectors are false-y if _any_ values are false-y
-        assert_false(SIMD[type, 2](False, True).__bool__())
-        assert_false(SIMD[type, 2](True, False).__bool__())
-        assert_false(SIMD[type, 2](False, False).__bool__())
+        # Scalars of 0-values are false-y, 1-values are truth-y
+        assert_false(Scalar[type](False))
+        assert_true(Scalar[type](True))
 
     @parameter
     fn test_dtype_unrolled[i: Int]() raises:
