@@ -41,9 +41,13 @@ def test_path():
 
 
 def test_path_exists():
-    assert_true(Path(__source_location().file_name).exists(), msg="does not exist")
+    assert_true(
+        Path(__source_location().file_name).exists(), msg="does not exist"
+    )
 
-    assert_false((Path() / "this_path_does_not_exist.mojo").exists(), msg="exists")
+    assert_false(
+        (Path() / "this_path_does_not_exist.mojo").exists(), msg="exists"
+    )
 
 
 def test_path_isdir():
