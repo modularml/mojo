@@ -19,3 +19,10 @@ repos:
         language: system
         files: '\.(mojo|🔥|py)$'
         stages: [commit]
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.2.6
+    hooks:
+      - id: codespell
+        files: '\.(mojo|🔥|py|md)$'
+        args: ['-L', 'inout,modul'] # add here any word not known by codespell
+        exclude: 'stdlib/test/'
