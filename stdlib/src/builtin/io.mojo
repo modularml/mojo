@@ -136,7 +136,7 @@ fn _printf[
 fn _snprintf[
     *types: AnyType
 ](
-    str: UnsafePointer[Int8],
+    str: UnsafePointer[UInt8],
     size: Int,
     fmt: StringLiteral,
     *arguments: *types,
@@ -179,7 +179,7 @@ fn _snprintf[
 @no_inline
 fn _snprintf_scalar[
     type: DType
-](buffer: UnsafePointer[Int8], size: Int, x: Scalar[type],) -> Int:
+](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type],) -> Int:
     alias format = _get_dtype_printf_format[type]()
 
     @parameter
@@ -206,7 +206,7 @@ fn _snprintf_scalar[
 
 
 @no_inline
-fn _float_repr(buffer: UnsafePointer[Int8], size: Int, x: Float64) -> Int:
+fn _float_repr(buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
@@ -296,7 +296,7 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
     elif type.is_integral():
         _put("[")
 
-        @unroll
+        @parameter
         for i in range(simd_width):
             _put_simd_scalar(x[i])
             if i != simd_width - 1:

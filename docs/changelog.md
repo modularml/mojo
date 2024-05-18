@@ -18,6 +18,24 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo has introduced `@parameter for`, a new feature for compile-time
+  programming. `@parameter for` defines a for loop where the sequence must be a
+  parameter value and the induction variables are also parameter values in that
+  sequence. For example:
+
+  ```mojo
+  fn parameter_for[max: Int]():
+      @parameter
+      for i in range(max)
+          @parameter
+          if i == 10:
+              print("found 10!")
+  ```
+
+  Currently, `@parameter for` does not allow early exits in the body (`return`,
+  `break`, `continue`, etc.) and requires the sequence's `__iter__` method to
+  return a `_StridedRangeIterator`. These restrictions will be lifted soon.
+
 - Mojo added support for the `inferred` passing kind on parameters. `inferred`
   parameters must appear at the beginning of the parameter list and cannot be
   explicitly specified by the user. This allows users to define functions with
@@ -229,6 +247,9 @@ what we publish.
 - `List()` now supports `__contains__`.
     ([PR #2667](https://github.com/modularml/mojo/pull/2667) by [@rd4com](https://github.com/rd4com/))
 
+- `InlineList()` now supports `__contains__`, `__iter__`.
+    ([PR #2703](https://github.com/modularml/mojo/pull/2703) by [@ChristopherLR](https://github.com/ChristopherLR))
+
 - `List` now has an `index` method that allows one to find the (first) location
   of an element in a `List` of `EqualityComparable` types. For example:
 
@@ -251,7 +272,10 @@ what we publish.
 - Added the `Indexer` trait to denote types that implement the `__index__()`
   method which allow these types to be accepted in common `__getitem__` and
   `__setitem__` implementations, as well as allow a new builtin `index` function
-  to be called on them. For example:
+  to be called on them.
+  ([PR #2685](https://github.com/modularml/mojo/pull/2685) by
+  [@bgreni](https://github.com/bgreni))
+  For example:
 
   ```mojo
   @value
@@ -274,6 +298,18 @@ what we publish.
 - `StringRef` now implements `strip()` which can be used to remove leading and
   trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
   by [@fknfilewalker](https://github.com/fknfilewalker))
+
+- The `bencher` module as part of the `benchmark` package is now public
+  and documented. This module provides types such as `Bencher` which provides
+  the ability to execute a `Benchmark` and allows for benchmarking configuration
+  via the `BenchmarkConfig` struct.
+
+- Added the `bin()` builtin function to convert integral types into their binary
+  string representation. ([PR #2603](https://github.com/modularml/mojo/pull/2603)
+  by [@bgreni](https://github.com/bgreni))
+
+- Added `atof()` function which can convert a `String` to a `float64`.
+  ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))
 
 ### 🦋 Changed
 
@@ -299,10 +335,32 @@ what we publish.
 - Various functions in the `algorithm` module are now moved to be
   builtin-functions.  This includes `sort`, `swap`, and `partition`.
   `swap` and `partition` will likely shuffle around as we're reworking
-  our builtnin `sort` function and optimizing it.
+  our builtin `sort` function and optimizing it.
+
+- `SIMD.bool()` is constrained only for when the `size` is `1` now.  Instead,
+  explicitly use `SIMD.reduce_and()` or `SIMD.reduce_or()`.
+    ([PR #2502](https://github.com/modularml/mojo/pull/2502) by [@helehex](https://github.com/helehex))
 
 - `ListLiteral` and `Tuple` now only requires that element types be `Copyable`.
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
+
+- Continued transition to `UnsafePointer` and unsigned byte type for strings:
+  - `String.unsafe_ptr()` now returns an `UnsafePointer` (was `DTypePointer`)
+  - `String.unsafe_uint8_ptr()` now returns `UnsafePointer` (was
+    `DTypePointer`)
+  - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer` (was
+    `DTypePointer`).
+  - `InlinedString.as_ptr()` has been renamed to `unsafe_ptr()` and now
+    returns an `UnsafePointer[UInt8]` (was `DTypePointer[DType.int8]`).
+  - `StringRef.data` is now an `UnsafePointer` (was `DTypePointer`)
+  - `StringRef.unsafe_ptr()` now returns an `UnsafePointer[UInt8]` (was
+    `DTypePointer[DType.int8]`).
+  - Removed `StringRef.unsafe_uint8_ptr()`. The `unsafe_ptr()` method now has
+    the same behavior.
+
+- Changed `isspace(..)` to take an `Int`.
+
+- Added `UnsafePointer.offset()` method.
 
 - The `math.bit` module has been moved to a new top-level `bit` module. The
   following functions in this module have been renamed:
@@ -322,6 +380,14 @@ what we publish.
   `math` module.
 
 ### ❌ Removed
+
+- The `@unroll` decorator has been deprecated and removed. The decorator was
+  supposed to guarantee that a decorated loop would be unrolled, or else the
+  compiler would error. In practice, this guarantee was eroded over time, as
+  a compiler-based approach cannot be as robust as the Mojo parameter system.
+  In addition, the `@unroll` decorator did not make the loop induction variables
+  parameter values, limiting its usefulness. Please see `@parameter for` for a
+  replacement!
 
 - The method `object.print()` has been removed. Since now, `object` has the
   `Stringable` trait, you can use `print(my_object)` instead.
@@ -367,3 +433,5 @@ what we publish.
 - Made several improvements to dictionary performance. Dicts with integer keys
   are most heavily affected, but large dicts and dicts with large values
   will also see large improvements.
+- [#2692](https://github.com/modularml/mojo/issues/2692) Fix `assert_raises`
+  to include calling location.

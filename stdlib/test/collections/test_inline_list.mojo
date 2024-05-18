@@ -90,7 +90,59 @@ def test_destructor():
         assert_equal(destructor_counter[i], i)
 
 
+def test_list_iter():
+    var vs = InlineList[Int]()
+    vs.append(1)
+    vs.append(2)
+    vs.append(3)
+
+    # Borrow immutably
+    fn sum(vs: InlineList[Int]) -> Int:
+        var sum = 0
+        for v in vs:
+            sum += v[]
+        return sum
+
+    assert_equal(6, sum(vs))
+
+
+def test_list_iter_mutable():
+    var vs = InlineList[Int, 3](1, 2, 3)
+
+    for v in vs:
+        v[] += 1
+
+    var sum = 0
+    for v in vs:
+        sum += v[]
+
+    assert_equal(9, sum)
+
+
+def test_list_contains():
+    var x = InlineList[Int](1, 2, 3)
+    assert_false(0 in x)
+    assert_true(x.__contains__(1))
+    assert_false(x.__contains__(4))
+
+
+def test_list_variadic_constructor():
+    var l = InlineList[Int](2, 4, 6)
+    assert_equal(3, len(l))
+    assert_equal(2, l[0])
+    assert_equal(4, l[1])
+    assert_equal(6, l[2])
+
+    l.append(8)
+    assert_equal(4, len(l))
+    assert_equal(8, l[3])
+
+
 def main():
     test_list()
     test_append_triggers_a_move()
     test_destructor()
+    test_list_iter()
+    test_list_iter_mutable()
+    test_list_contains()
+    test_list_variadic_constructor()
