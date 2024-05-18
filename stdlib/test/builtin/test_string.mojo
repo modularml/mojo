@@ -899,6 +899,23 @@ def test_string_mul():
     assert_equal(String("ab") * 5, "ababababab")
 
 
+def test_empty_string():
+    assert_equal(str(String()), String())
+    assert_equal(str(String()), String(""))
+    assert_equal(str(String()), str(String("")))
+    assert_equal(str(String()), "")
+    assert_equal(str(String()), str(""))
+    assert_equal(len(String()), 0)
+
+    assert_equal(String(), String(List[UInt8]()))
+
+    # useful for functions which assume the pointer is valid and null-terminated
+    assert_equal(len(String(List[UInt8]())._buffer), 1)
+    assert_true(String().unsafe_uint8_ptr())
+    assert_true(String(List[UInt8]()).unsafe_uint8_ptr())
+    assert_equal(String()._buffer[0], 0)
+
+
 def main():
     test_constructors()
     test_copy()
@@ -941,3 +958,4 @@ def main():
     test_removesuffix()
     test_intable()
     test_string_mul()
+    test_empty_string()

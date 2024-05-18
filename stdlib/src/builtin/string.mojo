@@ -687,6 +687,8 @@ struct String(
         Args:
             impl: The buffer.
         """
+        if len(impl) == 0:
+            impl.append(0)
         debug_assert(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
@@ -704,6 +706,7 @@ struct String(
     fn __init__(inout self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
+        self._buffer.append(0)
 
     @always_inline
     fn __init__(inout self, str: StringRef):
@@ -783,8 +786,10 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self._buffer = Self._buffer_type(
-            unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
+        self = Self(
+            Self._buffer_type(
+                unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
+            )
         )
 
     @always_inline
@@ -798,9 +803,13 @@ struct String(
             ptr: The pointer to the buffer.
             len: The length of the buffer, including the null terminator.
         """
-        self._buffer = Self._buffer_type()
-        self._buffer.data = UnsafePointer(ptr.address)
-        self._buffer.size = len
+        self = Self(
+            Self._buffer_type(
+                unsafe_pointer=UnsafePointer(ptr.address),
+                size=len,
+                capacity=len,
+            )
+        )
 
     @always_inline
     fn __init__(inout self, ptr: DTypePointer[DType.uint8], len: Int):
