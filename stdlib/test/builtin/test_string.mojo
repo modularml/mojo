@@ -215,6 +215,17 @@ fn test_stringref() raises:
     assert_equal(a, c)
 
 
+fn test_string_stringref() raises:
+    var a = String("modcon is coming soon")
+
+    assert_equal("modcon is coming soon", a._strref_dangerous())
+    assert_equal("modcon is coming soon", a._strref_dangerous(length=200))
+    assert_equal("", a._strref_dangerous(start=200))
+    assert_equal("is coming soon", a._strref_dangerous(start=7))
+    assert_equal("modcon", a._strref_dangerous(length=6))
+    assert_equal("is", a._strref_dangerous(start=7, length=2))
+
+
 fn test_stringref_from_dtypepointer() raises:
     var a = StringRef("AAA")
     var b = StringRef(a.data)
@@ -909,6 +920,7 @@ def main():
     test_repr()
     test_string_join()
     test_stringref()
+    test_string_stringref()
     test_stringref_from_dtypepointer()
     test_stringref_strip()
     test_ord()

@@ -1208,7 +1208,9 @@ struct String(
         elems.each[add_elt]()
         return result
 
-    fn _strref_dangerous(self, *, start: Int = 0, length: Optional[Int] = None) -> StringRef:
+    fn _strref_dangerous(
+        self, *, start: Int = 0, length: Optional[Int] = None
+    ) -> StringRef:
         """Returns an inner pointer to the string as a StringRef.
         This functionality is extremely dangerous because Mojo eagerly releases
         strings. Using this requires the use of the _strref_keepalive() method
@@ -1224,15 +1226,9 @@ struct String(
             A StringRef of the inner string.
         """
         if start >= len(self):
-            return StringRef {
-                data: self.unsafe_uint8_ptr() + len(self), length: 0
-            }
-        var _length = len(self) - start
-        if length != -1:
-            _length = min(length, _length)
-        return StringRef {
-            data: self.unsafe_ptr() + start, length: _length
-        }
+            return StringRef(self.unsafe_ptr() + len(self), 0)
+        var _length = min(length.or_else(len(self)), len(self) - start)
+        return StringRef(self.unsafe_ptr() + start, _length)
 
     fn _strref_keepalive(self):
         """
