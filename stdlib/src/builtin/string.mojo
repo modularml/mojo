@@ -1136,7 +1136,7 @@ struct String(
         elems.each[add_elt]()
         return result
 
-    fn _strref_dangerous(self, start: Int = 0, length: Int = -1) -> StringRef:
+    fn _strref_dangerous(self, *, start: Int = 0, length: Optional[Int] = None) -> StringRef:
         """Returns an inner pointer to the string as a StringRef.
         This functionality is extremely dangerous because Mojo eagerly releases
         strings. Using this requires the use of the _strref_keepalive() method
