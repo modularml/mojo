@@ -42,7 +42,7 @@ from utils._visualizers import lldb_formatter_wrapping_type
 from utils import InlineArray
 
 from .dtype import _integral_type_of, _get_dtype_printf_format
-from .io import _snprintf_scalar, _snprintf, _printf
+from .io import _snprintf_scalar, _snprintf, _printf, _print_fmt
 from .string import _calc_initial_buffer_size, _calc_format_buffer_size
 
 # ===------------------------------------------------------------------------===#
@@ -330,7 +330,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         debug_assert(size == num_elements, "mismatch in the number of elements")
         self = Self()
 
-        @unroll
+        @parameter
         for i in range(size):
             self[i] = elems[i]
 
@@ -346,18 +346,89 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
 
-        var tn1 = __mlir_op.`kgen.float_literal.convert`[
-            _type = __mlir_type.f64
-        ](value.value)
-        var t0 = __mlir_op.`pop.cast_from_builtin`[
-            _type = __mlir_type.`!pop.scalar<f64>`
-        ](tn1)
-        var casted = __mlir_op.`pop.cast`[
-            _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
-        ](t0)
-        self.value = __mlir_op.`pop.simd.splat`[
-            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
-        ](casted)
+        # TODO (#36686): This introduces uneeded casts here to work around
+        # parameter if issues.
+        @parameter
+        if type == DType.float16:
+            self = SIMD[type, size](
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    __mlir_op.`pop.cast`[
+                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
+                    ](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f16>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f16
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type == DType.bfloat16:
+            self = Self(
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    __mlir_op.`pop.cast`[
+                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
+                    ](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<bf16>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.bf16
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        elif type == DType.float32:
+            self = Self(
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    __mlir_op.`pop.cast`[
+                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
+                    ](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f32>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f32
+                            ](value.value)
+                        )
+                    )
+                )
+            )
+        else:
+            self = Self(
+                __mlir_op.`pop.simd.splat`[
+                    _type = __mlir_type[
+                        `!pop.simd<`, size.value, `,`, type.value, `>`
+                    ]
+                ](
+                    __mlir_op.`pop.cast`[
+                        _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
+                    ](
+                        __mlir_op.`pop.cast_from_builtin`[
+                            _type = __mlir_type[`!pop.scalar<f64>`]
+                        ](
+                            __mlir_op.`kgen.float_literal.convert`[
+                                _type = __mlir_type.f64
+                            ](value.value)
+                        )
+                    )
+                )
+            )
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
@@ -367,21 +438,26 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             The length of the SIMD vector.
         """
 
-        return size
+        return self.size
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
-        """Converts the SIMD vector into a boolean scalar value.
+        """Converts the SIMD scalar into a boolean value.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
 
         Returns:
-            True if all the elements in the SIMD vector are non-zero and False
-            otherwise.
+            True if the SIMD scalar is non-zero and False otherwise.
         """
-
-        @parameter
-        if Self.element_type == DType.bool:
-            return self.reduce_and()
-        return (self != 0).reduce_and()
+        constrained[
+            size == 1,
+            (
+                "The truth value of a SIMD vector with more than one element is"
+                " ambiguous. Use `reduce_and()` or `reduce_or()`"
+            ),
+        ]()
+        return rebind[Scalar[DType.bool]](self.cast[DType.bool]()).value
 
     @staticmethod
     @always_inline("nodebug")
@@ -636,7 +712,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the type must be numeric"]()
 
-        if rhs == 0:
+        if (rhs == 0).reduce_and():
             # this should raise an exception.
             return 0
 
@@ -648,7 +724,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         elif type.is_unsigned():
             return div
         else:
-            if self > 0 and rhs > 0:
+            if ((self > 0) & (rhs > 0)).reduce_and():
                 return div
 
             var mod = self - div * rhs
@@ -684,7 +760,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the type must be numeric"]()
 
-        if rhs == 0:
+        if (rhs == 0).reduce_and():
             # this should raise an exception.
             return 0
 
@@ -1497,7 +1573,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self << rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert(rhs >= 0, "unhandled negative value")
+        debug_assert((rhs >= 0).reduce_and(), "unhandled negative value")
         return __mlir_op.`pop.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -1514,7 +1590,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self >> rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert(rhs >= 0, "unhandled negative value")
+        debug_assert((rhs >= 0).reduce_and(), "unhandled negative value")
         return __mlir_op.`pop.shr`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -1829,7 +1905,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if offset % simdwidthof[type]():
             var tmp = SIMD[type, output_width]()
 
-            @unroll
+            @parameter
             for i in range(output_width):
                 tmp[i] = self[i + offset]
             return tmp
@@ -1877,7 +1953,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if offset % simdwidthof[type]():
             var tmp = self
 
-            @unroll
+            @parameter
             for i in range(input_width):
                 tmp[i + offset] = value[i]
             return tmp
@@ -2493,21 +2569,21 @@ fn _pow[
     @parameter
     if rhs_type.is_floating_point() and lhs_type == rhs_type:
         var rhs_quotient = rhs.__floor__()
-        if rhs >= 0 and rhs_quotient == rhs:
+        if ((rhs >= 0) & (rhs_quotient == rhs)).reduce_and():
             return _pow(lhs, rhs_quotient.cast[_integral_type_of[rhs_type]()]())
 
         var result = SIMD[lhs_type, simd_width]()
 
         @parameter
         if triple_is_nvidia_cuda():
-            print(
+            _print_fmt(
                 "ABORT: pow with two floating point operands is not supported"
                 " on GPU"
             )
             abort()
         else:
 
-            @unroll
+            @parameter
             for i in range(simd_width):
                 result[i] = llvm_intrinsic[
                     "llvm.pow", Scalar[lhs_type], has_side_effect=False
@@ -2516,14 +2592,14 @@ fn _pow[
         return result
     elif rhs_type.is_integral():
         # Common cases
-        if rhs == 2:
+        if (rhs == 2).reduce_and():
             return lhs * lhs
-        if rhs == 3:
+        if (rhs == 3).reduce_and():
             return lhs * lhs * lhs
 
         var result = SIMD[lhs_type, simd_width]()
 
-        @unroll
+        @parameter
         for i in range(simd_width):
             result[i] = _powi(lhs[i], rhs[i].cast[DType.int32]())
         return result
@@ -2676,7 +2752,7 @@ fn _simd_apply[
     """
     var result = SIMD[result_type, simd_width]()
 
-    @unroll
+    @parameter
     for i in range(simd_width):
         result[i] = func[x.type, result_type](x[i])
 
@@ -2711,7 +2787,7 @@ fn _simd_apply[
     """
     var result = SIMD[result_type, simd_width]()
 
-    @unroll
+    @parameter
     for i in range(simd_width):
         result[i] = func[x.type, y.type, result_type](x[i], y[i])
 
@@ -2728,7 +2804,8 @@ fn _format_scalar[dtype: DType](inout writer: Formatter, value: Scalar[dtype]):
     # type.
     alias size: Int = _calc_format_buffer_size[dtype]()
 
-    var buf = InlineArray[Int8, size](unsafe_uninitialized=True)
+    var buf = InlineArray[UInt8, size](fill=0)
+
     var buf_ptr = buf.unsafe_ptr()
 
     var wrote = _snprintf_scalar[dtype](
