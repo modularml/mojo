@@ -431,6 +431,13 @@ def test_list_index():
     with assert_raises(contains="ValueError: Given element is not in list"):
         _ = List[Int]().index(10)
 
+    # Test empty slice
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        _ = test_list_a.index(10, start=1, stop=1)
+    # Test empty slice with 0 start and end
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        _ = test_list_a.index(10, start=0, stop=0)
+
     var test_list_b = List[Int](10, 20, 30, 20, 10)
 
     # Test finding the first occurrence of an item
