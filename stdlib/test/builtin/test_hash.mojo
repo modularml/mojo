@@ -22,7 +22,7 @@ from builtin.hash import _hash_simd
 from testing import assert_equal, assert_not_equal, assert_true
 
 
-def same_low_bits(i1: Int, i2: Int, bits: Int = 5) -> Int:
+def same_low_bits(i1: Int, i2: Int, bits: Int = 5) -> UInt8:
     var mask = (1 << bits) - 1
     return int(not (i1 ^ i2) & mask)
 
@@ -35,7 +35,7 @@ def test_hash_byte_array():
     assert_equal(hash("d".unsafe_ptr(), 1), hash("d".unsafe_ptr(), 1))
 
     # Test that low bits are different
-    var num_same = 0
+    var num_same: UInt8 = 0
     num_same += same_low_bits(
         hash("a".unsafe_ptr(), 1), hash("b".unsafe_ptr(), 1)
     )
@@ -78,7 +78,7 @@ def _test_hash_int_simd[type: DType](bits: Int = 4, max_num_same: Int = 2):
     assert_equal(_hash_simd(d), _hash_simd(d))
 
     # Test that low bits are different
-    var num_same = 0
+    var num_same: UInt8 = 0
     num_same += same_low_bits(_hash_simd(a), _hash_simd(b), bits)
     num_same += same_low_bits(_hash_simd(a), _hash_simd(c), bits)
     num_same += same_low_bits(_hash_simd(a), _hash_simd(d), bits)
