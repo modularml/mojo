@@ -556,7 +556,7 @@ def test_2d_dynamic_list():
 
 def test_list_explicit_copy():
     var list = List[CopyCounter]()
-    list.append(CopyCounter()^)
+    list.append(CopyCounter())
     var list_copy = List(list)
     assert_equal(0, list.__get_ref(0)[].copy_count)
     assert_equal(1, list_copy.__get_ref(0)[].copy_count)
