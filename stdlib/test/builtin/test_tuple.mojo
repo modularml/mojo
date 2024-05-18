@@ -62,6 +62,5 @@ def test_tuple_contains():
     assert_false(d.__contains__(String("Hello world")))
 
 
-
 def main():
     test_tuple_contains()

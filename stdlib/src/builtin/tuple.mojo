@@ -203,20 +203,22 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         """
 
         var result = False
+
         @parameter
         for i in range(len(VariadicList(element_types))):
+
             @parameter
-            if _type_is_eq[T,element_types[i]]():
+            if _type_is_eq[T, element_types[i]]():
                 var tmp_ref = self.__refitem__[i]()
                 var tmp = rebind[
                     Reference[
                         T,
                         tmp_ref.is_mutable,
                         tmp_ref.lifetime,
-                        tmp_ref.address_space
+                        tmp_ref.address_space,
                     ]
                 ](tmp_ref)
                 if tmp[].__eq__(value):
                     result = True
- 
+
         return result
