@@ -442,17 +442,22 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
-        """Converts the SIMD vector into a boolean scalar value.
+        """Converts the SIMD scalar into a boolean value.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
 
         Returns:
-            True if all the elements in the SIMD vector are non-zero and False
-            otherwise.
+            True if the SIMD scalar is non-zero and False otherwise.
         """
-
-        @parameter
-        if Self.element_type == DType.bool:
-            return self.reduce_and()
-        return (self != 0).reduce_and()
+        constrained[
+            size == 1,
+            (
+                "The truth value of a SIMD vector with more than one element is"
+                " ambiguous. Use `reduce_and()` or `reduce_or()`"
+            ),
+        ]()
+        return rebind[Scalar[DType.bool]](self.cast[DType.bool]()).value
 
     @staticmethod
     @always_inline("nodebug")
@@ -707,7 +712,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the type must be numeric"]()
 
-        if rhs == 0:
+        if (rhs == 0).reduce_and():
             # this should raise an exception.
             return 0
 
@@ -719,7 +724,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         elif type.is_unsigned():
             return div
         else:
-            if self > 0 and rhs > 0:
+            if ((self > 0) & (rhs > 0)).reduce_and():
                 return div
 
             var mod = self - div * rhs
@@ -755,7 +760,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the type must be numeric"]()
 
-        if rhs == 0:
+        if (rhs == 0).reduce_and():
             # this should raise an exception.
             return 0
 
@@ -1568,7 +1573,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self << rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert(rhs >= 0, "unhandled negative value")
+        debug_assert((rhs >= 0).reduce_and(), "unhandled negative value")
         return __mlir_op.`pop.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -1585,7 +1590,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self >> rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert(rhs >= 0, "unhandled negative value")
+        debug_assert((rhs >= 0).reduce_and(), "unhandled negative value")
         return __mlir_op.`pop.shr`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -2564,7 +2569,7 @@ fn _pow[
     @parameter
     if rhs_type.is_floating_point() and lhs_type == rhs_type:
         var rhs_quotient = rhs.__floor__()
-        if rhs >= 0 and rhs_quotient == rhs:
+        if ((rhs >= 0) & (rhs_quotient == rhs)).reduce_and():
             return _pow(lhs, rhs_quotient.cast[_integral_type_of[rhs_type]()]())
 
         var result = SIMD[lhs_type, simd_width]()
@@ -2587,9 +2592,9 @@ fn _pow[
         return result
     elif rhs_type.is_integral():
         # Common cases
-        if rhs == 2:
+        if (rhs == 2).reduce_and():
             return lhs * lhs
-        if rhs == 3:
+        if (rhs == 3).reduce_and():
             return lhs * lhs * lhs
 
         var result = SIMD[lhs_type, simd_width]()

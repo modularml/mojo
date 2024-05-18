@@ -235,7 +235,7 @@ fn assert_not_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    if lhs == rhs:
+    if (lhs == rhs).reduce_and():
         raise _assert_not_equal_error(
             str(lhs), str(rhs), msg, __call_location()
         )
