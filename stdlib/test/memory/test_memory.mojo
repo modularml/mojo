@@ -136,10 +136,10 @@ def test_memcmp_overflow():
     p2.store(120)
 
     var c = memcmp(p1, p2, 1)
-    assert_equal(c, -1, "-120 is smaller than 120")
+    assert_equal(c, -1, msg="-120 is smaller than 120")
 
     c = memcmp(p2, p1, 1)
-    assert_equal(c, 1, "120 is bigger than -120")
+    assert_equal(c, 1, msg="120 is bigger than -120")
 
 
 def test_memcmp_simd():
@@ -155,10 +155,10 @@ def test_memcmp_simd():
     p2.store(1, 90)
 
     var c = memcmp(p1, p2, length)
-    assert_equal(c, 1, "[120, 100, 0, ...] is bigger than [120, 90, 0, ...]")
+    assert_equal(c, 1, msg="[120, 100, 0, ...] is bigger than [120, 90, 0, ...]")
 
     c = memcmp(p2, p1, length)
-    assert_equal(c, -1, "[120, 90, 0, ...] is smaller than [120, 100, 0, ...]")
+    assert_equal(c, -1, msg="[120, 90, 0, ...] is smaller than [120, 100, 0, ...]")
 
     memset_zero(p1, length)
     memset_zero(p2, length)
@@ -169,10 +169,10 @@ def test_memcmp_simd():
     p2.store(length - 1, 90)
 
     c = memcmp(p1, p2, length)
-    assert_equal(c, 1, "[..., 0, 120, 100] is bigger than [..., 0, 120, 90]")
+    assert_equal(c, 1, msg="[..., 0, 120, 100] is bigger than [..., 0, 120, 90]")
 
     c = memcmp(p2, p1, length)
-    assert_equal(c, -1, "[..., 0, 120, 90] is smaller than [..., 120, 100]")
+    assert_equal(c, -1, msg="[..., 0, 120, 90] is smaller than [..., 120, 100]")
 
 
 def test_memcmp_extensive[
