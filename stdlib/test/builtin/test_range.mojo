@@ -24,7 +24,9 @@ def test_range_len():
     assert_equal(range(5, 10).__len__(), 5, msg="len(range(5, 10))")
     assert_equal(range(10, 0, -1).__len__(), 10, msg="len(range(10, 0, -1))")
     assert_equal(range(0, 10, 2).__len__(), 5, msg="len(range(0, 10, 2))")
-    assert_equal(range(38, -13, -23).__len__(), 3, msg="len(range(38, -13, -23))")
+    assert_equal(
+        range(38, -13, -23).__len__(), 3, msg="len(range(38, -13, -23))"
+    )
 
     # Edge cases
     assert_equal(range(0).__len__(), 0, msg="len(range(0))")
@@ -65,13 +67,17 @@ def test_range_reversed():
     )
     # Sequential
     assert_equal(
-        range(5, 10).__reversed__().start, 9, msg="range(5,10).__reversed__().start"
+        range(5, 10).__reversed__().start,
+        9,
+        msg="range(5,10).__reversed__().start",
     )
     assert_equal(
         range(5, 10).__reversed__().end, 4, msg="range(5,10).__reversed__().end"
     )
     assert_equal(
-        range(5, 10).__reversed__().step, -1, msg="range(5,10).__reversed__().step"
+        range(5, 10).__reversed__().step,
+        -1,
+        msg="range(5,10).__reversed__().step",
     )
     # Strided
     assert_equal(
@@ -98,7 +104,9 @@ def test_range_reversed():
         var ibackward = forward.__reversed__()
         var backward = range(ibackward.start, ibackward.end, ibackward.step)
         assert_equal(
-            forward.__len__(), backward.__len__(), msg="len(forward), len(backward)"
+            forward.__len__(),
+            backward.__len__(),
+            msg="len(forward), len(backward)",
         )
         var forward_sum = 0
         var backward_sum = 0

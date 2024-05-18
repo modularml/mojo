@@ -77,7 +77,9 @@ fn test_mkdir_mode() raises:
 
     assert_false(
         exists(my_dir_path),
-        msg="Unexpected dir " + my_dir_path.__fspath__() + " it should not exist",
+        msg="Unexpected dir "
+        + my_dir_path.__fspath__()
+        + " it should not exist",
     )
 
     # creating dir without writing permission
@@ -101,7 +103,9 @@ fn test_rmdir_not_empty() raises:
 
     assert_false(
         exists(my_dir_path),
-        msg="Unexpected dir " + my_dir_path.__fspath__() + " it should not exist",
+        msg="Unexpected dir "
+        + my_dir_path.__fspath__()
+        + " it should not exist",
     )
 
     mkdir(my_dir_path)
