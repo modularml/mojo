@@ -335,7 +335,11 @@ what we publish.
 - Various functions in the `algorithm` module are now moved to be
   builtin-functions.  This includes `sort`, `swap`, and `partition`.
   `swap` and `partition` will likely shuffle around as we're reworking
-  our builtnin `sort` function and optimizing it.
+  our builtin `sort` function and optimizing it.
+
+- `SIMD.bool()` is constrained only for when the `size` is `1` now.  Instead,
+  explicitly use `SIMD.reduce_and()` or `SIMD.reduce_or()`.
+    ([PR #2502](https://github.com/modularml/mojo/pull/2502) by [@helehex](https://github.com/helehex))
 
 - `ListLiteral` and `Tuple` now only requires that element types be `Copyable`.
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
