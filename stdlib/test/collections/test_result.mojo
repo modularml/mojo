@@ -60,19 +60,19 @@ fn _returning_transferred_err[
 fn _returning_none_err[T: CollectionElement](value: T) raises -> Result[T]:
     var res1 = Result[String](err=Error("some error"))
     if res1.err:
-        return None, result.err
+        return None, res1.err
     raise Error("shouldn't get here")
 
 
 def test_none_err_constructor():
     var res1 = _returning_none_err(String("some string"))
-    assert_true(not res1 and res.err and res1.err == "some error")
+    assert_true(not res1 and res1.err and res1.err == "some error")
     var res2 = _returning_none_err[String]("some string")
-    assert_true(not res2 and res.err and res2.err == "some error")
+    assert_true(not res2 and res2.err and res2.err == "some error")
     var res3 = _returning_none_err[StringLiteral]("some string")
-    assert_true(not res3 and res.err and res3.err == "some error")
+    assert_true(not res3 and res3.err and res3.err == "some error")
     var res4 = _returning_none_err("some string")
-    assert_true(not res4 and res.err and res4.err == "some error")
+    assert_true(not res4 and res4.err and res4.err == "some error")
 
 
 def test_error_transfer():

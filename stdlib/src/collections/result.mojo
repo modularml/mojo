@@ -67,7 +67,8 @@ fn return_early_if_err[T: CollectionElement, A: CollectionElement]() -> Result[T
     if not result:
         # the internal err gets transferred to a Result[T]
         return result
-        # return None, result.err is also possible
+        # its also possible to do:
+        # return None, Error("func_that_can_err failed")
     var val = result.value()
     var final_result: T
     ...
@@ -155,7 +156,8 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         if not result:
             # the internal err gets transferred to a Result[T]
             return result
-            # return None, result.err is also possible
+            # its also possible to do:
+            # return None, Error("func_that_can_err failed")
         var val = result.value()
         var final_result: T
         ...
