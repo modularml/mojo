@@ -82,7 +82,10 @@ def test_round():
     assert_equal(FloatLiteral.__round__(neg_inf), neg_inf)
 
     assert_equal(FloatLiteral.__round__(1.5, 0), 1.0)
+    assert_equal(FloatLiteral.__round__(2.5, 0), 2.0)
     assert_equal(FloatLiteral.__round__(1.6, 0), 2.0)
+    assert_equal(FloatLiteral.__round__(-2.5, 0), -2.0)
+
     assert_equal(FloatLiteral.__round__(1.5, 1), 1.5)
     assert_equal(FloatLiteral.__round__(1.123, 1), 1.1)
     assert_equal(FloatLiteral.__round__(1.198, 2), 1.2)
