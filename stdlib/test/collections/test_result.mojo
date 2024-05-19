@@ -45,8 +45,11 @@ fn _returning_ok[T: CollectionElement](value: T) raises -> Result[T]:
     raise Error("shouldn't get here")
 
 
-fn _returning_transferred[T: CollectionElement](value: T) raises -> Result[T]:
+fn _returning_transferred_err[
+    T: CollectionElement
+](value: T) raises -> Result[T]:
     # this value and err at the same time will never happen, just for testing
+    # the value "some other string" should NOT get transferred
     var res1 = Result(String("some other string"))
     res1.err = Error("some error")
     if res1:
@@ -54,18 +57,14 @@ fn _returning_transferred[T: CollectionElement](value: T) raises -> Result[T]:
     raise Error("shouldn't get here")
 
 
-def test_transferred():
-    var res1 = _returning_transferred(String("some string"))
-    assert_true(
-        res1.value()[] == "some other string" and res1.err == "some error"
-    )
-    var res2 = _returning_transferred[String]("some string")
-    assert_true(
-        res2.value()[] == "some other string" and res2.err == "some error"
-    )
-    var res3 = _returning_transferred[StringLiteral]("some string")
+def test_error_transfer():
+    var res1 = _returning_transferred_err(String("some string"))
+    assert_true(res1 is None and res1.err == "some error")
+    var res2 = _returning_transferred_err[String]("some string")
+    assert_true(res2 is None and res2.err == "some error")
+    var res3 = _returning_transferred_err[StringLiteral]("some string")
     assert_true(res3 is None and res3.err == "some error")
-    var res4 = _returning_transferred("some string")
+    var res4 = _returning_transferred_err("some string")
     assert_true(res4 is None and res4.err == "some error")
 
 
@@ -243,4 +242,4 @@ def main():
     test_optional_reg_isnot()
     test_returning_ok()
     test_returning_err()
-    test_transferred()
+    test_error_transfer()
