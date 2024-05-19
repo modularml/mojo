@@ -45,6 +45,34 @@ fn _returning_ok[T: CollectionElement](value: T) raises -> Result[T]:
     raise Error("shouldn't get here")
 
 
+fn _returning_rebinded[
+    T: CollectionElement
+](value: T, condition: Bool = True) -> Result[T]:
+    # this value and err at the same time will never happen, just for testing
+    var res1 = Result[String](String("some other string"))
+    res1.err = Error("some error")
+    if res1 and condition:
+        return res1
+    return value
+
+
+def test_rebind():
+    var res1 = _returning_rebinded(String("some string"))
+    assert_true(
+        res1.value()[] == "some other string" and res1.err == "some error"
+    )
+    var res2 = _returning_rebinded("some string")
+    assert_true(res2.value()[] != "some other string" and res2.err == "")
+    var res3 = _returning_rebinded("some string", False)
+    assert_true(res3.value()[] == "some string" and res3.err == "")
+    var res4 = _returning_rebinded("some string")
+    assert_true(
+        res4.value()[] == "some string"
+        and res4.value()[] != "some other string"
+        and res4.err == "some error"
+    )
+
+
 def test_returning_err():
     var item_i = _returning_err_reg(Int())
     assert_true(not item_i and item_i.err and item_i.err == "something")
@@ -219,3 +247,4 @@ def main():
     test_optional_reg_isnot()
     test_returning_ok()
     test_returning_err()
+    test_rebind()
