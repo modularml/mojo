@@ -39,20 +39,20 @@ struct UnsafePointer[
         address_space: The address space associated with the UnsafePointer allocated memory.
     """
 
+    alias type = T
+
     alias _mlir_type = __mlir_type[
         `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
     ]
+    """The underlying pointer type."""
 
-    alias type = T
+    var address: Self._mlir_type
+    """The underlying pointer."""
 
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful
     # lifetime for them anyway.
     alias _ref_type = Reference[T, True, MutStaticLifetime, address_space]
-
-    """The underlying pointer type."""
-    var address: Self._mlir_type
-    """The underlying pointer."""
 
     # ===-------------------------------------------------------------------===#
     # Initializers
@@ -143,13 +143,9 @@ struct UnsafePointer[
         Returns:
             The pointer to the newly allocated array.
         """
-        return Self(
-            address=int(
-                _malloc[Int8, address_space=address_space](
-                    sizeof[T]() * count, alignment=alignof[T]()
-                )
-            )
-        )
+        return _malloc[UInt8, address_space=address_space](
+            sizeof[T]() * count, alignment=alignof[T]()
+        ).bitcast[T]()
 
     @staticmethod
     @always_inline("nodebug")
@@ -171,7 +167,7 @@ struct UnsafePointer[
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
-        Pointer[Int8, address_space=address_space](address=int(self)).free()
+        _free(self)
 
     @always_inline("nodebug")
     fn bitcast[
