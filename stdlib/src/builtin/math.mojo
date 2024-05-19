@@ -235,6 +235,9 @@ trait Roundable:
     fn __round__(self) -> Self:
         ...
 
+    fn __round__(self, ndigits: IntLiteral) -> Self:
+        ...
+
 
 @always_inline
 fn round[T: Roundable](value: T) -> T:
@@ -250,3 +253,20 @@ fn round[T: Roundable](value: T) -> T:
         The rounded value of the object.
     """
     return value.__round__()
+
+
+@always_inline
+fn round[T: Roundable](value: T, ndigits: IntLiteral) -> T:
+    """Get the rounded value of the given object.
+
+    Parameters:
+        T: The type conforming to Roundable.
+
+    Args:
+        value: The object to get the rounded value of.
+        ndigits: The number of digits to round to.
+
+    Returns:
+        The rounded value of the object.
+    """
+    return value.__round__(ndigits)
