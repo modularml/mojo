@@ -67,16 +67,50 @@ struct StringLiteral(
         Returns:
             The length of this StringLiteral.
         """
+        # TODO(MSTDL-160):
+        #   Properly count Unicode codepoints instead of returning this length
+        #   in bytes.
+        return self._byte_length()
+
+    @always_inline
+    fn _byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        Returns:
+            The length of this StringLiteral in bytes.
+        """
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
         """Get raw pointer to the underlying data.
 
         Returns:
             The raw pointer to the data.
         """
-        return __mlir_op.`pop.string.address`(self.value)
+        var ptr = DTypePointer[DType.int8](
+            __mlir_op.`pop.string.address`(self.value)
+        )
+
+        return UnsafePointer[Int8]._from_dtype_ptr(ptr)
+
+    @always_inline("nodebug")
+    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
+        """Get raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        return self.unsafe_ptr().bitcast[UInt8]()
+
+    @always_inline("nodebug")
+    fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+        """Get raw pointer to the underlying data.
+
+        Returns:
+            The raw pointer to the data.
+        """
+        return self.unsafe_ptr().bitcast[UInt8]()
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
@@ -109,11 +143,7 @@ struct StringLiteral(
         Returns:
             True if they are equal.
         """
-        var length = len(self)
-        if length != len(rhs):
-            return False
-
-        return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), length) == 0
+        return not (self != rhs)
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: StringLiteral) -> Bool:
@@ -125,7 +155,7 @@ struct StringLiteral(
         Returns:
             True if they are not equal.
         """
-        return not self == rhs
+        return StringRef(self) != StringRef(rhs)
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: StringLiteral) -> Bool:
@@ -137,13 +167,7 @@ struct StringLiteral(
         Returns:
             True if this StringLiteral is strictly less than the RHS StringLiteral and False otherwise.
         """
-        var len1 = len(self)
-        var len2 = len(rhs)
-
-        if len1 < len2:
-            return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
-        else:
-            return _memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
+        return StringRef(self) < StringRef(rhs)
 
     @always_inline("nodebug")
     fn __le__(self, rhs: StringLiteral) -> Bool:
@@ -197,7 +221,22 @@ struct StringLiteral(
         Returns:
             A new string.
         """
-        return self
+        var string = String()
+        var length: Int = __mlir_op.`pop.string.size`(self.value)
+        var buffer = String._buffer_type()
+        var new_capacity = length + 1
+        buffer._realloc(new_capacity)
+        buffer.size = new_capacity
+        var uint8Ptr = __mlir_op.`pop.pointer.bitcast`[
+            _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
+        ](__mlir_op.`pop.string.address`(self.value))
+        var data: DTypePointer[DType.uint8] = DTypePointer[DType.uint8](
+            uint8Ptr
+        )
+        memcpy(DTypePointer(buffer.data), data, length)
+        initialize_pointee_move(buffer.data + length, 0)
+        string._buffer = buffer^
+        return string
 
     fn __repr__(self) -> String:
         """Return a representation of the `StringLiteral` instance.
@@ -208,6 +247,41 @@ struct StringLiteral(
             A new representation of the string.
         """
         return self.__str__().__repr__()
+
+    @always_inline
+    fn as_string_slice(
+        self: Reference[Self, _, _]
+    ) -> StringSlice[False, ImmStaticLifetime]:
+        """Returns a string slice of this static string literal.
+
+        Returns:
+            A string slice pointing to this static string literal.
+        """
+
+        var bytes = self[].as_bytes_slice()
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in StringLiteral so this is actually
+        #   guaranteed to be valid.
+        return StringSlice[False, ImmStaticLifetime](unsafe_from_utf8=bytes)
+
+    @always_inline
+    fn as_bytes_slice(
+        self: Reference[Self, _, _]
+    ) -> Span[UInt8, False, ImmStaticLifetime]:
+        """
+        Returns a contiguous slice of the bytes owned by this string.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        var ptr = self[].unsafe_uint8_ptr()
+
+        return Span[UInt8, False, ImmStaticLifetime](
+            unsafe_ptr=ptr,
+            len=self[]._byte_length(),
+        )
 
     fn format_to(self, inout writer: Formatter):
         """
@@ -270,19 +344,3 @@ struct StringLiteral(
             An integer value that represents the string, or otherwise raises.
         """
         return _atol(self)
-
-
-# Use a local memcmp rather than memory.memcpy to avoid #31139 and #25100.
-@always_inline("nodebug")
-fn _memcmp(
-    s1: DTypePointer[DType.int8], s2: DTypePointer[DType.int8], count: Int
-) -> Int:
-    for i in range(count):
-        var s1i = s1[i]
-        var s2i = s2[i]
-        if s1i == s2i:
-            continue
-        if s1i > s2i:
-            return 1
-        return -1
-    return 0

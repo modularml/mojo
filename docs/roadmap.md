@@ -201,7 +201,7 @@ in the next couple of months.  The basic support for ownership includes features
 like:
 
 - Capture declarations in closures.
-- Borrow checker: complain about invalid mutable references.
+- Lifetime checker: complain about invalid mutable references.
 
 Mojo has support for a safe `Reference` type, and it is used in the standard
 library, but it is still under active development and not very pretty or nice
@@ -231,7 +231,7 @@ We plan to expand traits support in future releases. Planned features include:
 - Support for a feature like Swift's extensions, allowing you to add a trait to
   a preexisting type.
 
-- Add support for conditional conformances.
+- Add support for conditional conformance.
 
 ## Classes
 
@@ -307,8 +307,7 @@ documented here.
 ### No list or dict comprehensions
 
 Mojo does not yet support Python list or dictionary comprehension expressions,
-like `[x for x in range(10)]`, because Mojo's standard library has not yet
-grown a standard list or dictionary type.
+like `[x for x in range(10)]`.
 
 ### No `lambda` syntax
 
@@ -603,13 +602,13 @@ fn call_it():
 ### The standard library has limited exceptions use
 
 For historic and performance reasons, core standard library types typically do
-not use exceptions. For instance, `DynamicVector` will not raise an
+not use exceptions. For instance, `List` will not raise an
 out-of-bounds access (it will crash), and `Int` does not throw on divide by
 zero. In other words, most standard library types are considered "unsafe".
 
 ```mojo
-var v = DynamicVector[Int](capacity=0)
-print(v[1]) # could crash or print garbage values (undefined behaviour)
+var l = List[Int](capacity=0)
+print(l[1]) # could crash or print garbage values (undefined behaviour)
 
 print(1//0) # does not raise and could print anything (undefined behaviour)
 ```
@@ -642,28 +641,6 @@ at the moment.
 The upstream dialects available in the Playground are the
 [`index`](https://mlir.llvm.org/docs/Dialects/IndexOps/) dialect and the
 [`LLVM`](https://mlir.llvm.org/docs/Dialects/LLVM/) dialect.
-
-### `@value` is limited with trait conformance check
-
-Structs with `@value` decorator still need to explicitly provide dunder
-methods such as `__init__`, `__copyinit__`, and `__moveinit__` when
-both of the following are true:
-
-- The struct has one or more fields that are self referencing
-  (such as `Pointer[Self]`).
-- The struct declares conformance to a trait that requires these dunder
-  methods.
-
-```mojo
-# test.mojo
-@value
-struct A(CollectionElement):
-    # error: 'DynamicVector' parameter #0 has 'CollectionElement' type, but value has type 'A'
-    var a: DynamicVector[Self]
-```
-
-In the example above, adding the `__moveinit__()` and `__copyinit__()` methods
-required by `CollectionElement` resolves this error.
 
 ### `or` expression is statically typed
 

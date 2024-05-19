@@ -56,7 +56,7 @@ trait RepresentableKeyElement(KeyElement, Representable):
 struct _DictEntryIter[
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
@@ -73,9 +73,7 @@ struct _DictEntryIter[
     alias imm_dict_lifetime = __mlir_attr[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
-    alias ref_type = Reference[
-        DictEntry[K, V], __mlir_attr.`0: i1`, Self.imm_dict_lifetime
-    ]
+    alias ref_type = Reference[DictEntry[K, V], False, Self.imm_dict_lifetime]
 
     var index: Int
     var seen: Int
@@ -122,7 +120,7 @@ struct _DictEntryIter[
 struct _DictKeyIter[
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
@@ -139,7 +137,7 @@ struct _DictKeyIter[
     alias imm_dict_lifetime = __mlir_attr[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
-    alias ref_type = Reference[K, __mlir_attr.`0: i1`, Self.imm_dict_lifetime]
+    alias ref_type = Reference[K, False, Self.imm_dict_lifetime]
 
     alias dict_entry_iter = _DictEntryIter[
         K, V, dict_mutability, dict_lifetime, forward
@@ -161,7 +159,7 @@ struct _DictKeyIter[
 struct _DictValueIter[
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
@@ -184,7 +182,7 @@ struct _DictValueIter[
         return self
 
     fn __reversed__[
-        mutability: __mlir_type.`i1`, self_life: AnyLifetime[mutability].type
+        mutability: Bool, self_life: AnyLifetime[mutability].type
     ](self) -> _DictValueIter[K, V, dict_mutability, dict_lifetime, False]:
         var src = self.iter.src
         return _DictValueIter(
@@ -553,7 +551,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return len(self).__bool__()
 
-    @staticmethod
     fn __str__[
         T: RepresentableKeyElement, U: RepresentableCollectionElement
     ](self: Dict[T, U]) -> String:
@@ -566,7 +563,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var my_dict = Dict[Int, Float64]()
         my_dict[1] = 1.1
         my_dict[2] = 2.2
-        dict_as_string = __type_of(my_dict).__str__(my_dict)
+        dict_as_string = my_dict.__str__()
         print(dict_as_string)
         # prints "{1: 1.1, 2: 2.2}"
         ```
@@ -576,9 +573,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
         Note that both they keys and values' types must implement the `__repr__()` method
         for this to work. See the `Representable` trait for more information.
-
-        Args:
-            self: The Dict to represent as a string.
 
         Parameters:
             T: The type of the keys in the Dict. Must implement the

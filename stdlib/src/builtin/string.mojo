@@ -15,32 +15,16 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from bit import countl_zero
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple
+from utils import StringRef, StaticIntTuple, Span, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
-
-# ===----------------------------------------------------------------------===#
-# Utilities
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _ctlz(val: Int) -> Int:
-    return llvm_intrinsic["llvm.ctlz", Int, has_side_effect=False](val, False)
-
-
-@always_inline("nodebug")
-fn _ctlz(val: SIMD) -> __type_of(val):
-    return llvm_intrinsic["llvm.ctlz", __type_of(val), has_side_effect=False](
-        val, False
-    )
-
 
 # ===----------------------------------------------------------------------===#
 # ord
@@ -65,20 +49,20 @@ fn ord(s: String) -> Int:
     # 2: 110aaaaa 10bbbbbb                   -> 00000000 00000000 00000aaa aabbbbbb     a << 6  | b
     # 3: 1110aaaa 10bbbbbb 10cccccc          -> 00000000 00000000 aaaabbbb bbcccccc     a << 12 | b << 6  | c
     # 4: 11110aaa 10bbbbbb 10cccccc 10dddddd -> 00000000 000aaabb bbbbcccc ccdddddd     a << 18 | b << 12 | c << 6 | d
-    var p = s.unsafe_ptr().bitcast[DType.uint8]()
-    var b1 = p.load()
+    var p = s.unsafe_ptr().bitcast[UInt8]()
+    var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(len(s) == 1, "input string length must be 1")
         return int(b1)
-    var num_bytes = _ctlz(~b1)
+    var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
     var result = int(b1 & b1_mask) << shift
-    for i in range(1, num_bytes):
+    for _ in range(1, num_bytes):
         p += 1
         shift -= 6
-        result |= int(p.load() & 0b00111111) << shift
+        result |= int(p[] & 0b00111111) << shift
     return result
 
 
@@ -129,7 +113,7 @@ fn chr(c: Int) -> String:
         shift -= 6
         p.store(i, ((c >> shift) & 0b00111111) | 0b10000000)
     p.store(num_bytes, 0)
-    return String(p.bitcast[DType.int8](), num_bytes + 1)
+    return String(p.bitcast[DType.uint8](), num_bytes + 1)
 
 
 # ===----------------------------------------------------------------------===#
@@ -138,7 +122,7 @@ fn chr(c: Int) -> String:
 
 
 @always_inline("nodebug")
-fn _chr_ascii(c: Int8) -> String:
+fn _chr_ascii(c: UInt8) -> String:
     """Returns a string based on the given ASCII code point.
 
     Args:
@@ -151,7 +135,7 @@ fn _chr_ascii(c: Int8) -> String:
 
 
 @always_inline("nodebug")
-fn _repr_ascii(c: Int8) -> String:
+fn _repr_ascii(c: UInt8) -> String:
     """Returns a printable representation of the given ASCII code point.
 
     Args:
@@ -236,7 +220,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
-        if isspace(buff[pos]):
+        if isspace(int(buff[pos])):
             continue
 
         if str_ref[pos] == "-":
@@ -303,7 +287,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
             break
         else:
             raise Error(_atol_error(base, str_ref))
-        if pos + 1 < str_len and not isspace(buff[pos + 1]):
+        if pos + 1 < str_len and not isspace(int(buff[pos + 1])):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
@@ -317,7 +301,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     if has_space_after_number:
         for pos in range(start, str_len):
-            if not isspace(buff[pos]):
+            if not isspace(int(buff[pos])):
                 raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
@@ -388,12 +372,136 @@ fn atol(str: String, base: Int = 10) raises -> Int:
     return _atol(str._strref_dangerous(), base)
 
 
+fn _atof_error(str_ref: StringRef) -> Error:
+    return Error("String is not convertible to float: '" + str(str_ref) + "'")
+
+
+@always_inline
+fn _atof(str_ref: StringRef) raises -> Float64:
+    """Parses the given string as a floating point and returns that value.
+
+    For example, `atof("2.25")` returns `2.25`. If the given string cannot be parsed
+    as an float value, an error is raised. For example, `atof("hi")` raises an
+    error.
+
+    Args:
+        str_ref: A string to be parsed as a floating point.
+
+    Returns:
+        An float value that represents the string, or otherwise raises.
+    """
+    if not str_ref:
+        raise Error(_atof_error(str_ref))
+
+    var result: Float64 = 0.0
+    var exponent: Int = 0
+    var sign: Int = 1
+
+    alias ord_0 = UInt8(ord("0"))
+    alias ord_9 = UInt8(ord("9"))
+    alias ord_dot = UInt8(ord("."))
+    alias ord_plus = UInt8(ord("+"))
+    alias ord_minus = UInt8(ord("-"))
+    alias ord_f = UInt8(ord("f"))
+    alias ord_F = UInt8(ord("F"))
+    alias ord_e = UInt8(ord("e"))
+    alias ord_E = UInt8(ord("E"))
+
+    var start: Int = 0
+    var str_ref_strip = str_ref.strip()
+    var str_len = len(str_ref_strip)
+    var buff = str_ref_strip.unsafe_ptr()
+
+    # check sign, inf, nan
+    if buff[start] == ord_plus:
+        start += 1
+    elif buff[start] == ord_minus:
+        start += 1
+        sign = -1
+    if (str_len - start) >= 3:
+        if StringRef(buff + start, 3) == "nan":
+            return FloatLiteral.nan
+        if StringRef(buff + start, 3) == "inf":
+            return FloatLiteral.infinity * sign
+    # read before dot
+    for pos in range(start, str_len):
+        if ord_0 <= buff[pos] <= ord_9:
+            result = result * 10.0 + int(buff[pos] - ord_0)
+            start += 1
+        else:
+            break
+    # if dot -> read after dot
+    if buff[start] == ord_dot:
+        start += 1
+        for pos in range(start, str_len):
+            if ord_0 <= buff[pos] <= ord_9:
+                result = result * 10.0 + int(buff[pos] - ord_0)
+                exponent -= 1
+            else:
+                break
+            start += 1
+    # if e/E -> read scientific notation
+    if buff[start] == ord_e or buff[start] == ord_E:
+        start += 1
+        var sign: Int = 1
+        var shift: Int = 0
+        var has_number: Bool = False
+        for pos in range(start, str_len):
+            if buff[start] == ord_plus:
+                pass
+            elif buff[pos] == ord_minus:
+                sign = -1
+            elif ord_0 <= buff[start] <= ord_9:
+                has_number = True
+                shift = shift * 10 + int(buff[pos] - ord_0)
+            else:
+                break
+            start += 1
+        exponent += sign * shift
+        if not has_number:
+            raise _atof_error(str_ref)
+    # check for f/F at the end
+    if buff[start] == ord_f or buff[start] == ord_F:
+        start += 1
+    # check if string got fully parsed
+    if start != str_len:
+        raise _atof_error(str_ref)
+    # apply shift
+    # NOTE: Instead of `var result *= 10.0 ** exponent`, we calculate a positive
+    # integer factor as shift and multiply or divide by it based on the shift
+    # direction. This allows for better precision.
+    # TODO: investigate if there is a floating point arithmethic problem.
+    var shift: Int = 10 ** abs(exponent)
+    if exponent > 0:
+        result *= shift
+    if exponent < 0:
+        result /= shift
+    # apply sign
+    return result * sign
+
+
+fn atof(str: String) raises -> Float64:
+    """Parses the given string as a floating point and returns that value.
+
+    For example, `atof("2.25")` returns `2.25`. If the given string cannot be parsed
+    as an floating point value, an error is raised. For example, `atof("hi")` raises an
+    error.
+
+    Args:
+        str: A string to be parsed as a floating point.
+
+    Returns:
+        An floating point value that represents the string, or otherwise raises.
+    """
+    return _atof(str._strref_dangerous())
+
+
 # ===----------------------------------------------------------------------===#
 # isdigit
 # ===----------------------------------------------------------------------===#
 
 
-fn isdigit(c: Int8) -> Bool:
+fn isdigit(c: UInt8) -> Bool:
     """Determines whether the given character is a digit [0-9].
 
     Args:
@@ -412,7 +520,7 @@ fn isdigit(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn isupper(c: Int8) -> Bool:
+fn isupper(c: UInt8) -> Bool:
     """Determines whether the given character is an uppercase character.
        This currently only respects the default "C" locale, i.e. returns
        True only if the character specified is one of ABCDEFGHIJKLMNOPQRSTUVWXYZ.
@@ -426,7 +534,7 @@ fn isupper(c: Int8) -> Bool:
     return _is_ascii_uppercase(c)
 
 
-fn _is_ascii_uppercase(c: Int8) -> Bool:
+fn _is_ascii_uppercase(c: UInt8) -> Bool:
     alias ord_a = ord("A")
     alias ord_z = ord("Z")
     return ord_a <= int(c) <= ord_z
@@ -437,7 +545,7 @@ fn _is_ascii_uppercase(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn islower(c: Int8) -> Bool:
+fn islower(c: UInt8) -> Bool:
     """Determines whether the given character is an lowercase character.
        This currently only respects the default "C" locale, i.e. returns
        True only if the character specified is one of abcdefghijklmnopqrstuvwxyz.
@@ -451,7 +559,7 @@ fn islower(c: Int8) -> Bool:
     return _is_ascii_lowercase(c)
 
 
-fn _is_ascii_lowercase(c: Int8) -> Bool:
+fn _is_ascii_lowercase(c: UInt8) -> Bool:
     alias ord_a = ord("a")
     alias ord_z = ord("z")
     return ord_a <= int(c) <= ord_z
@@ -462,7 +570,7 @@ fn _is_ascii_lowercase(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn isspace(c: Int8) -> Bool:
+fn isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
        This currently only respects the default "C" locale, i.e. returns
        True only if the character specified is one of
@@ -487,7 +595,7 @@ fn isspace(c: Int8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn isprintable(c: Int8) -> Bool:
+fn isprintable(c: UInt8) -> Bool:
     """Determines whether the given character is a printable character.
 
     Args:
@@ -516,7 +624,7 @@ struct String(
 ):
     """Represents a mutable string."""
 
-    alias _buffer_type = List[Int8]
+    alias _buffer_type = List[UInt8]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -562,35 +670,6 @@ struct String(
     # Initializers
     # ===------------------------------------------------------------------===#
 
-    # TODO: Remove this method when #2317 is done
-    @always_inline
-    fn __init__(inout self, owned impl: Self._buffer_type):
-        """Construct a string from a buffer of bytes.
-
-        The buffer must be terminated with a null byte:
-
-        ```mojo
-        var buf = List[Int8]()
-        buf.append(ord('H'))
-        buf.append(ord('i'))
-        buf.append(0)
-        var hi = String(buf)
-        ```
-
-        Note that you should use the constructor from `List[UInt8]` instead
-        as we are now storing the bytes as UInt8.
-
-        See https://github.com/modularml/mojo/issues/2317 for more information.
-
-        Args:
-            impl: The buffer.
-        """
-        debug_assert(
-            impl[-1] == 0,
-            "expected last element of String buffer to be null terminator",
-        )
-        self._buffer = impl^
-
     @always_inline
     fn __init__(inout self, owned impl: List[UInt8]):
         """Construct a string from a buffer of bytes.
@@ -615,8 +694,8 @@ struct String(
         # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
         var length = len(impl)
         var capacity = impl.capacity
-        self._buffer = List[Int8](
-            unsafe_pointer=impl.steal_data().bitcast[Int8](),
+        self._buffer = List[UInt8](
+            unsafe_pointer=impl.steal_data().bitcast[UInt8](),
             size=length,
             capacity=capacity,
         )
@@ -636,19 +715,48 @@ struct String(
         var length = len(str)
         var buffer = Self._buffer_type()
         buffer.resize(length + 1, 0)
-        memcpy(rebind[DTypePointer[DType.uint8]](buffer.data), str.data, length)
+        memcpy(
+            # TODO(modularml/mojo#2317):
+            #   Remove this bitcast after transition to UInt8 for string data
+            #   is complete.
+            dest=buffer.data.bitcast[UInt8](),
+            src=str.data,
+            count=length,
+        )
         buffer[length] = 0
         self._buffer = buffer^
 
     @always_inline
-    fn __init__(inout self, str: StringLiteral):
+    fn __init__(inout self, str_slice: StringSlice):
+        """Construct a string from a string slice.
+
+        This will allocate a new string that copies the string contents from
+        the provided string slice `str_slice`.
+
+        Args:
+            str_slice: The string slice from which to construct this string.
+        """
+
+        # Calculate length in bytes
+        var length: Int = len(str_slice.as_bytes_slice())
+        var buffer = Self._buffer_type()
+        buffer.resize(length + 1, 0)
+        memcpy(
+            dest=buffer.data,
+            src=str_slice.as_bytes_slice().unsafe_ptr(),
+            count=length,
+        )
+        buffer[length] = 0
+        self._buffer = buffer^
+
+    @always_inline
+    fn __init__(inout self, literal: StringLiteral):
         """Constructs a String value given a constant string.
 
         Args:
-            str: The input constant string.
+            literal: The input constant string.
         """
-
-        self = String(StringRef(str))
+        self = literal.__str__()
 
     fn __init__[stringable: Stringable](inout self, value: stringable):
         """Creates a string from a value that conforms to Stringable trait.
@@ -661,29 +769,6 @@ struct String(
         """
 
         self = str(value)
-
-    # TODO: Remove this method when #2317 is done
-    @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[Int8], len: Int):
-        """Creates a string from the buffer. Note that the string now owns
-        the buffer.
-
-        The buffer must be terminated with a null byte.
-
-        Note that you should use the constructor from `UnsafePointer[UInt8]` instead
-        as we are now storing the bytes as UInt8.
-
-        See https://github.com/modularml/mojo/issues/2317 for more information.
-
-        Args:
-            ptr: The pointer to the buffer.
-            len: The length of the buffer, including the null terminator.
-        """
-        # we don't know the capacity of ptr, but we'll assume it's the same or
-        # larger than len
-        self._buffer = Self._buffer_type(
-            unsafe_pointer=ptr, size=len, capacity=len
-        )
 
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
@@ -699,11 +784,11 @@ struct String(
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
         self._buffer = Self._buffer_type(
-            unsafe_pointer=ptr.bitcast[Int8](), size=len, capacity=len
+            unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
         )
 
     @always_inline
-    fn __init__(inout self, ptr: LegacyPointer[Int8], len: Int):
+    fn __init__(inout self, ptr: LegacyPointer[UInt8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -714,11 +799,11 @@ struct String(
             len: The length of the buffer, including the null terminator.
         """
         self._buffer = Self._buffer_type()
-        self._buffer.data = rebind[UnsafePointer[Int8]](ptr)
+        self._buffer.data = UnsafePointer(ptr.address)
         self._buffer.size = len
 
     @always_inline
-    fn __init__(inout self, ptr: DTypePointer[DType.int8], len: Int):
+    fn __init__(inout self, ptr: DTypePointer[DType.uint8], len: Int):
         """Creates a string from the buffer. Note that the string now owns
         the buffer.
 
@@ -750,7 +835,7 @@ struct String(
 
     @staticmethod
     @always_inline
-    fn _from_bytes(owned buff: DTypePointer[DType.int8]) -> String:
+    fn _from_bytes(owned buff: DTypePointer[DType.uint8]) -> String:
         """Construct a string from a sequence of bytes.
 
         This does no validation that the given bytes are valid in any specific
@@ -851,7 +936,7 @@ struct String(
         var buffer = Self._buffer_type()
         var adjusted_span_len = len(adjusted_span)
         buffer.resize(adjusted_span_len + 1, 0)
-        var ptr = self.unsafe_ptr()
+        var ptr = self.unsafe_uint8_ptr()
         for i in range(adjusted_span_len):
             buffer[i] = ptr[adjusted_span[i]]
         buffer[adjusted_span_len] = 0
@@ -881,13 +966,7 @@ struct String(
         Returns:
             True if the Strings are equal and False otherwise.
         """
-        if len(self) != len(other):
-            return False
-
-        if int(self.unsafe_ptr()) == int(other.unsafe_ptr()):
-            return True
-
-        return memcmp(self.unsafe_ptr(), other.unsafe_ptr(), len(self)) == 0
+        return not (self != other)
 
     @always_inline
     fn __ne__(self, other: String) -> Bool:
@@ -899,7 +978,7 @@ struct String(
         Returns:
             True if the Strings are not equal and False otherwise.
         """
-        return not (self == other)
+        return self._strref_dangerous() != other._strref_dangerous()
 
     @always_inline
     fn __lt__(self, rhs: String) -> Bool:
@@ -911,13 +990,7 @@ struct String(
         Returns:
             True if this String is strictly less than the RHS String and False otherwise.
         """
-        var len1 = len(self)
-        var len2 = len(rhs)
-
-        if len1 < len2:
-            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len1) <= 0
-        else:
-            return memcmp(self.unsafe_ptr(), rhs.unsafe_ptr(), len2) < 0
+        return self._strref_dangerous() < rhs._strref_dangerous()
 
     @always_inline
     fn __le__(self, rhs: String) -> Bool:
@@ -976,12 +1049,12 @@ struct String(
         buffer.resize(total_len + 1, 0)
         memcpy(
             DTypePointer(buffer.data),
-            self.unsafe_ptr(),
+            self.unsafe_uint8_ptr(),
             self_len,
         )
         memcpy(
             DTypePointer(buffer.data + self_len),
-            other.unsafe_ptr(),
+            other.unsafe_uint8_ptr(),
             other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
@@ -1016,9 +1089,9 @@ struct String(
         self._buffer.resize(total_len + 1, 0)
         # Copy the data alongside the terminator.
         memcpy(
-            self.unsafe_uint8_ptr() + self_len,
-            other.unsafe_uint8_ptr(),
-            other_len + 1,
+            dest=self.unsafe_ptr() + self_len,
+            src=other.unsafe_ptr(),
+            count=other_len + 1,
         )
 
     # ===------------------------------------------------------------------=== #
@@ -1142,7 +1215,7 @@ struct String(
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef {data: self.unsafe_uint8_ptr(), length: len(self)}
+        return StringRef(self.unsafe_ptr(), len(self))
 
     fn _strref_keepalive(self):
         """
@@ -1153,7 +1226,7 @@ struct String(
         pass
 
     # TODO: Remove this method when #2317 is done
-    fn unsafe_ptr(self) -> DTypePointer[DType.int8]:
+    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
         """Retrieves a pointer to the underlying memory.
 
         Note that you should use `unsafe_uint8_ptr()` if you need to access the
@@ -1164,19 +1237,17 @@ struct String(
         Returns:
             The pointer to the underlying memory.
         """
-        return rebind[DTypePointer[DType.int8]](self._buffer.data)
+        return self._buffer.data.bitcast[Int8]()
 
-    fn unsafe_uint8_ptr(self) -> DTypePointer[DType.uint8]:
+    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return rebind[DTypePointer[DType.uint8]](
-            self._buffer.data.bitcast[UInt8]()
-        )
+        return self._buffer.data.bitcast[UInt8]()
 
-    fn as_bytes(self) -> List[Int8]:
+    fn as_bytes(self) -> List[UInt8]:
         """Retrieves the underlying byte sequence encoding the characters in
         this string.
 
@@ -1196,6 +1267,59 @@ struct String(
 
         return copy
 
+    @always_inline
+    fn as_bytes_slice(
+        self: Reference[Self, _, _]
+    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+        """
+        Returns a contiguous slice of the bytes owned by this string.
+
+        This does not include the trailing null terminator.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        return Span[UInt8, self.is_mutable, self.lifetime](
+            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+            # Does NOT include the NUL terminator.
+            len=self[]._byte_length(),
+        )
+
+    @always_inline
+    fn as_string_slice(
+        self: Reference[Self, _, _]
+    ) -> StringSlice[self.is_mutable, self.lifetime]:
+        """Returns a string slice of the data owned by this string.
+
+        Returns:
+            A string slice pointing to the data owned by this string.
+        """
+        var bytes = self[].as_bytes_slice()
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in String so this is actually
+        #   guaranteed to be valid.
+        return StringSlice[self.is_mutable, self.lifetime](
+            unsafe_from_utf8=bytes
+        )
+
+    fn _byte_length(self) -> Int:
+        """Get the string length in bytes.
+
+        This does not include the trailing null terminator in the count.
+
+        Returns:
+            The length of this StringLiteral in bytes, excluding null terminator.
+        """
+
+        var buffer_len = len(self._buffer)
+
+        if buffer_len > 0:
+            return buffer_len - 1
+        else:
+            return buffer_len
+
     fn _steal_ptr(inout self) -> DTypePointer[DType.int8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
@@ -1204,7 +1328,7 @@ struct String(
             The pointer to the underlying memory.
         """
         var ptr = self.unsafe_ptr()
-        self._buffer.data = UnsafePointer[Int8]()
+        self._buffer.data = UnsafePointer[UInt8]()
         self._buffer.size = 0
         self._buffer.capacity = 0
         return ptr
@@ -1332,15 +1456,15 @@ struct String(
         if occurrences == -1:
             return self
 
-        var self_start = self.unsafe_ptr()
-        var self_ptr = self.unsafe_ptr()
-        var new_ptr = new.unsafe_ptr()
+        var self_start = self.unsafe_uint8_ptr()
+        var self_ptr = self.unsafe_uint8_ptr()
+        var new_ptr = new.unsafe_uint8_ptr()
 
         var self_len = len(self)
         var old_len = len(old)
         var new_len = len(new)
 
-        var res = List[Int8]()
+        var res = List[UInt8]()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
 
         for _ in range(occurrences):
@@ -1352,20 +1476,20 @@ struct String(
 
             # Copy preceding unchanged chars
             for _ in range(curr_offset, idx):
-                res.append(self_ptr.load())
+                res.append(self_ptr[])
                 self_ptr += 1
 
             # Insert a copy of the new replacement string
             for i in range(new_len):
-                res.append(new_ptr.load(i))
+                res.append(new_ptr[i])
 
             self_ptr += old_len
 
         while True:
-            var val = self_ptr.load()
+            var val = self_ptr[]
             if val == 0:
                 break
-            res.append(self_ptr.load())
+            res.append(self_ptr[])
             self_ptr += 1
 
         res.append(0)
@@ -1426,14 +1550,14 @@ struct String(
         return hash(self._strref_dangerous())
 
     fn _interleave(self, val: String) -> String:
-        var res = List[Int8]()
-        var val_ptr = val.unsafe_ptr()
-        var self_ptr = self.unsafe_ptr()
+        var res = List[UInt8]()
+        var val_ptr = val.unsafe_uint8_ptr()
+        var self_ptr = self.unsafe_uint8_ptr()
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
-                res.append(val_ptr.load(j))
-            res.append(self_ptr.load(i))
+                res.append(val_ptr[j])
+            res.append(self_ptr[i])
         res.append(0)
         return String(res^)
 
@@ -1464,13 +1588,13 @@ struct String(
         return self._toggle_ascii_case[_is_ascii_lowercase]()
 
     @always_inline
-    fn _toggle_ascii_case[check_case: fn (Int8) -> Bool](self) -> String:
+    fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
         var copy: String = self
 
-        var char_ptr = copy.unsafe_ptr()
+        var char_ptr = copy.unsafe_uint8_ptr()
 
         for i in range(len(self)):
-            var char: Int8 = char_ptr[i]
+            var char: UInt8 = char_ptr[i]
             if check_case(char):
                 var lower = _toggle_ascii_case(char)
                 char_ptr[i] = lower
@@ -1584,9 +1708,9 @@ struct String(
         buf.resize(count, 0)
         for i in range(n):
             memcpy(
-                rebind[DTypePointer[DType.int8]](buf.data) + len_self * i,
-                self.unsafe_ptr(),
-                len_self,
+                dest=buf.data + len_self * i,
+                src=self.unsafe_uint8_ptr(),
+                count=len_self,
             )
         return String(buf^)
 
@@ -1600,7 +1724,7 @@ struct String(
 fn _vec_fmt[
     *types: AnyType
 ](
-    str: UnsafePointer[Int8],
+    str: UnsafePointer[UInt8],
     size: Int,
     fmt: StringLiteral,
     *arguments: *types,
@@ -1608,7 +1732,7 @@ fn _vec_fmt[
     return _snprintf(str, size, fmt, arguments)
 
 
-fn _toggle_ascii_case(char: Int8) -> Int8:
+fn _toggle_ascii_case(char: UInt8) -> UInt8:
     """Assuming char is a cased ASCII character, this function will return the opposite-cased letter
     """
 
@@ -1656,7 +1780,7 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
     )
     var n = UInt32(n0)
-    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ _ctlz(n | 1))
+    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ countl_zero(n | 1))
     return (n0 + lookup_table[int(log2)]) >> 32
 
 

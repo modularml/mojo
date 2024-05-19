@@ -74,7 +74,7 @@ package, as described in the next section.
 
 :::note
 
-Mojo module may include a `main()` function and may also be
+A Mojo module may include a `main()` function and may also be
 executable, but that's generally not the practice and modules typically include
 APIs to be imported and used in other Mojo programs.
 

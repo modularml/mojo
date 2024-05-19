@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import KeyElement
 
-from builtin._math import Ceilable, CeilDivable, Floorable
+from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
@@ -25,7 +25,53 @@ from builtin.hex import _try_write_int
 
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._format import Formattable, Formatter
-from utils.inlined_string import _ArrayMem
+from utils import InlineArray
+
+# ===----------------------------------------------------------------------=== #
+#  Indexer
+# ===----------------------------------------------------------------------=== #
+
+
+trait Indexer:
+    """This trait denotes a type that can be used to index a container that
+    handles integral index values.
+
+    This solves the issue of being able to index data structures such as `List`
+    with the various integral types without being too broad and allowing types
+    that are coercible to `Int` (e.g. floating point values that have `__int__`
+    method). In contrast to `Intable`, types conforming to `Indexer` must be
+    convertible to `Int` in a lossless way.
+    """
+
+    fn __index__(self) -> Int:
+        """Return the index value.
+
+        Returns:
+            The index value of the object.
+        """
+        ...
+
+
+# ===----------------------------------------------------------------------=== #
+#  index
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn index[T: Indexer](idx: T, /) -> Int:
+    """Returns the value of `__index__` for the given value.
+
+    Parameters:
+        T: A type conforming to the `Indexer` trait.
+
+    Args:
+        idx: The value.
+
+    Returns:
+        An `Int` respresenting the index value.
+    """
+    return idx.__index__()
+
 
 # ===----------------------------------------------------------------------=== #
 #  Intable
@@ -204,6 +250,8 @@ struct Int(
     KeyElement,
     Roundable,
     Stringable,
+    Truncable,
+    Indexer,
 ):
     """This type represents an integer value."""
 
@@ -329,11 +377,11 @@ struct Int(
             # Stack allocate enough bytes to store any formatted 64-bit integer
             alias size: Int = 32
 
-            var buf = _ArrayMem[Int8, size]()
+            var buf = InlineArray[UInt8, size](fill=0)
 
             # Format the integer to the local byte array
             var len = _snprintf(
-                rebind[UnsafePointer[Int8]](buf.unsafe_ptr()),
+                buf.unsafe_ptr(),
                 size,
                 "%li",
                 self.value,
@@ -346,7 +394,7 @@ struct Int(
             #
             # SAFETY:
             #   `buf` is kept alive long enough for the use of this StringRef.
-            writer.write_str(StringRef(buf.as_ptr(), len))
+            writer.write_str(StringRef(buf.unsafe_ptr(), len))
 
             # Keep buf alive until we've finished with the StringRef
             _ = buf^
@@ -503,7 +551,7 @@ struct Int(
         Returns:
             The absolute value.
         """
-        return self if self > 0 else -self
+        return -self if self < 0 else self
 
     @always_inline("nodebug")
     fn __ceil__(self) -> Self:
@@ -526,6 +574,15 @@ struct Int(
     @always_inline("nodebug")
     fn __round__(self) -> Self:
         """Return the rounded value of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __trunc__(self) -> Self:
+        """Return the truncated Int value, which is itself.
 
         Returns:
             The Int value itself.

@@ -13,6 +13,7 @@ jobs:
     name: Check PR target branch
 
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     defaults:
       run:
