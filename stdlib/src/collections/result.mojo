@@ -140,7 +140,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         self = Self()
 
     fn __init__[A: CollectionElement](inout self, owned other: Result[A]):
-        """Create a `Result` with another `Result`.
+        """Create a `Result` by transferring another `Result`'s Error.
 
         Parameters:
             A: The type of the value contained in other.
@@ -148,12 +148,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         Args:
             other: The other `Result`.
         """
-
-        @parameter
-        if Variant[A](other._type).isa[T]():
-            self = Self(rebind[T, A](other.unsafe_take()))
-        else:
-            self = Self(err=other.err)
+        self = Self(err=other.err)
 
     fn __init__(inout self, owned value: T):
         """Create a `Result` containing a value.
@@ -347,7 +342,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         self = Self()
 
     fn __init__[A: CollectionElement](inout self, owned other: ResultReg[A]):
-        """Create a `ResultReg` with another `ResultReg`.
+        """Create a `ResultReg` by transferring another `ResultReg`'s Error.
 
         Parameters:
             A: The type of the value contained in other.
@@ -355,12 +350,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         Args:
             other: The other `ResultReg`.
         """
-
-        @parameter
-        if Variant[A](other._mlir_type).isa[T]():
-            self = Self(rebind[T, A](other.value()))
-        else:
-            self = Self(err=other.err)
+        self = Self(err=other.err)
 
     fn __init__(inout self, value: T):
         """Create a `ResultReg` with a value.
