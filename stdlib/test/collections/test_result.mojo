@@ -17,28 +17,32 @@ from collections import Result, ResultReg, Optional, OptionalReg
 from testing import assert_true, assert_false, assert_equal
 
 
-fn _returning_err[T: AnyRegType](value: T) -> ResultReg[T]:
+fn _returning_err[T: AnyRegType](value: T) raises -> ResultReg[T]:
     var result = ResultReg[T](ErrorReg("something"))
     if not result:
         return result.err
+    raise Error("shouldn't get here")
 
 
-fn _returning_ok[T: AnyRegType](value: T) -> ResultReg[T]:
+fn _returning_ok[T: AnyRegType](value: T) raises -> ResultReg[T]:
     var result = ResultReg[T](value)
     if result:
         return result
+    raise Error("shouldn't get here")
 
 
-fn _returning_err[T: CollectionElement](value: T) -> Result[T]:
+fn _returning_err[T: CollectionElement](value: T) raises -> Result[T]:
     var result = Result[T](Error("something"))
     if not result:
         return result
+    raise Error("shouldn't get here")
 
 
-fn _returning_ok[T: CollectionElement](value: T) -> Result[T]:
+fn _returning_ok[T: CollectionElement](value: T) raises -> Result[T]:
     var result = Result[T](value)
     if result:
         return result.take()
+    raise Error("shouldn't get here")
 
 
 def test_returning_err():
