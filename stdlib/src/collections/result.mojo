@@ -173,6 +173,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     var err: Error
     """The Error inside the `Result`."""
 
+    @always_inline("nodebug")
     fn __init__(
         inout self,
         value: NoneType = None,
@@ -187,6 +188,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         """
         self = Self(err=err)
 
+    @always_inline("nodebug")
     fn __init__(inout self, value: Tuple[NoneType, Error], /):
         """Create an empty `Result` with an `Error`.
 
@@ -198,6 +200,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         else:
             self = Self(err=value[1])
 
+    @always_inline("nodebug")
     fn __init__[A: CollectionElement](inout self, owned other: Result[A]):
         """Create a `Result` by transferring another `Result`'s Error.
 
@@ -209,6 +212,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         """
         self = Self(err=other.err)
 
+    @always_inline("nodebug")
     fn __init__(inout self, owned value: T):
         """Create a `Result` containing a value.
 
@@ -218,6 +222,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         self._value = Self._type(value^)
         self.err = Error()
 
+    @always_inline("nodebug")
     fn __init__(inout self, *, err: Error):
         """Create an empty `Result`.
 
@@ -324,6 +329,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
             return self._value[T]
         return default
 
+    @always_inline("nodebug")
     fn __is__(self, other: NoneType) -> Bool:
         """Return `True` if the `Result` has no value.
 
@@ -337,6 +343,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         """
         return not self
 
+    @always_inline("nodebug")
     fn __isnot__(self, other: NoneType) -> Bool:
         """Return `True` if the `Result` has a value.
 
@@ -350,6 +357,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         """
         return self
 
+    @always_inline("nodebug")
     fn __bool__(self) -> Bool:
         """Return true if the `Result` has a value.
 
@@ -358,6 +366,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         """
         return not self._value.isa[_NoneType]()
 
+    @always_inline("nodebug")
     fn __invert__(self) -> Bool:
         """Return False if the `Result` has a value.
 
@@ -388,6 +397,7 @@ struct ResultReg[T: AnyRegType](Boolable):
     var err: ErrorReg
     """The Error inside the `ResultReg`."""
 
+    @always_inline("nodebug")
     fn __init__(
         inout self,
         value: NoneType = None,
@@ -403,6 +413,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         """
         self = Self(err=err)
 
+    @always_inline("nodebug")
     fn __init__(inout self, value: Tuple[NoneType, ErrorReg], /):
         """Create a `ResultReg` without a value from a None literal
         and an `ErrorReg`.
@@ -415,6 +426,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         else:
             self = Self(err=value[1])
 
+    @always_inline("nodebug")
     fn __init__[A: CollectionElement](inout self, owned other: ResultReg[A]):
         """Create a `ResultReg` by transferring another `ResultReg`'s Error.
 
@@ -426,6 +438,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         """
         self = Self(err=other.err)
 
+    @always_inline("nodebug")
     fn __init__(inout self, value: T):
         """Create a `ResultReg` with a value.
 
@@ -437,6 +450,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         ](value)
         self.err = ErrorReg()
 
+    @always_inline("nodebug")
     fn __init__(inout self, *, err: ErrorReg):
         """Create a `ResultReg` without a value from an `ErrorReg`.
 
@@ -457,6 +471,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         """
         return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
 
+    @always_inline("nodebug")
     fn __is__(self, other: NoneType) -> Bool:
         """Return `True` if the `Result` has no value.
 
@@ -470,6 +485,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         """
         return not self
 
+    @always_inline("nodebug")
     fn __isnot__(self, other: NoneType) -> Bool:
         """Return `True` if the `ResultReg` has a value.
 
@@ -483,6 +499,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         """
         return self
 
+    @always_inline("nodebug")
     fn __bool__(self) -> Bool:
         """Return true if the `ResultReg` has a value.
 
