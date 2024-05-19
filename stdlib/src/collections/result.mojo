@@ -39,7 +39,7 @@ And if more information about the returned Error is wanted it is available.
 from collections import Result
 var a = Result(1)
 var b = Result[Int](err=Error("something went wrong"))
-var c = Result[Int](err=Error("error 1"))
+var c = Result[Int](None, Error("error 1"))
 var d = Result[Int](err=Error("error 2"))
 if a:
     print(a.err)  # prints ""
@@ -67,6 +67,7 @@ fn return_early_if_err[T: CollectionElement, A: CollectionElement]() -> Result[T
     if not result:
         # the internal err gets transferred to a Result[T]
         return result
+        # return None, result.err is also possible
     var val = result.value()
     var final_result: T
     ...
@@ -126,7 +127,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     from collections import Result
     var a = Result(1)
     var b = Result[Int](err=Error("something went wrong"))
-    var c = Result[Int](err=Error("error 1"))
+    var c = Result[Int](None, Error("error 1"))
     var d = Result[Int](err=Error("error 2"))
     if a:
         print(a.err)  # prints ""
@@ -154,6 +155,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         if not result:
             # the internal err gets transferred to a Result[T]
             return result
+            # return None, result.err is also possible
         var val = result.value()
         var final_result: T
         ...
@@ -174,13 +176,18 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         self._value = Self._type(_NoneType())
         self.err = Error("Result value was not set")
 
-    fn __init__(inout self, value: NoneType):
-        """Create an empty `Result`.
+    fn __init__(
+        inout self,
+        value: NoneType,
+        err: Error = Error("Result value was not set"),
+    ):
+        """Create an empty `Result` with an `Error`.
 
         Args:
             value: Must be exactly `None`.
+            err: The error to build the `Result` with.
         """
-        self = Self()
+        self = Self(err=err)
 
     fn __init__[A: CollectionElement](inout self, owned other: Result[A]):
         """Create a `Result` by transferring another `Result`'s Error.
@@ -376,13 +383,19 @@ struct ResultReg[T: AnyRegType](Boolable):
         """Create a `ResultReg` with a value of None."""
         self = Self(err=ErrorReg("Result value was not set"))
 
-    fn __init__(inout self, value: NoneType):
-        """Create a `ResultReg` without a value from a None literal.
+    fn __init__(
+        inout self,
+        value: NoneType,
+        err: ErrorReg = ErrorReg("Result value was not set"),
+    ):
+        """Create a `ResultReg` without a value from a None literal
+        and an `ErrorReg`.
 
         Args:
             value: The None value.
+            err: The error to build the `ResultReg` with.
         """
-        self = Self()
+        self = Self(err=err)
 
     fn __init__[A: CollectionElement](inout self, owned other: ResultReg[A]):
         """Create a `ResultReg` by transferring another `ResultReg`'s Error.
