@@ -202,6 +202,22 @@ struct Tuple[*element_types: Movable](Sized, Movable):
             True if the value is contained in the tuple, False otherwise.
         """
 
+        @parameter
+        fn T_in_ts() -> Bool:
+            var res = False
+
+            @parameter
+            for i in range(len(VariadicList(element_types))):
+
+                @parameter
+                if _type_is_eq[element_types[i], T]():
+                    res |= True
+            return res
+
+        @parameter
+        if not T_in_ts():
+            return False
+
         var result = False
 
         @parameter
