@@ -252,7 +252,7 @@ struct FloatLiteral(
 
         var truncated: IntLiteral = self.__int_literal__()
         var result: Self
-        if abs(self) - abs(truncated) <= 0.5:
+        if abs(self - truncated) <= 0.5:
             result = Self(truncated)
         elif self > 0:
             result = Self(truncated + 1)
@@ -285,7 +285,7 @@ struct FloatLiteral(
         var target: Self = self * Self(multiplier)
         var truncated: Self = target.__int_literal__()
         var result: Self
-        if abs(target) - abs(truncated) <= 0.5:
+        if abs(target - truncated) <= 0.5:
             result = truncated
         elif self > 0:
             result = truncated + 1
