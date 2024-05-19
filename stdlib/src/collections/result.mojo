@@ -187,20 +187,16 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         """
         self = Self(err=err)
 
-    fn __init__(
-        inout self,
-        value: Tuple[NoneType, Error] = (
-            None,
-            Error("Result value was not set"),
-        ),
-        /,
-    ):
+    fn __init__(inout self, value: Tuple[NoneType, Error], /):
         """Create an empty `Result` with an `Error`.
 
         Args:
             value: Must be exactly (`None`, `Error`).
         """
-        self = Self(err=value[1])
+        if len(value) < 2:
+            self = Self(None)
+        else:
+            self = Self(err=value[1])
 
     fn __init__[A: CollectionElement](inout self, owned other: Result[A]):
         """Create a `Result` by transferring another `Result`'s Error.
@@ -407,21 +403,17 @@ struct ResultReg[T: AnyRegType](Boolable):
         """
         self = Self(err=err)
 
-    fn __init__(
-        inout self,
-        value: Tuple[NoneType, ErrorReg] = (
-            None,
-            ErrorReg("Result value was not set"),
-        ),
-        /,
-    ):
+    fn __init__(inout self, value: Tuple[NoneType, ErrorReg], /):
         """Create a `ResultReg` without a value from a None literal
         and an `ErrorReg`.
 
         Args:
             value: The (`None`, `ErrorReg`) value.
         """
-        self = Self(err=value[1])
+        if len(value) < 2:
+            self = Self(None)
+        else:
+            self = Self(err=value[1])
 
     fn __init__[A: CollectionElement](inout self, owned other: ResultReg[A]):
         """Create a `ResultReg` by transferring another `ResultReg`'s Error.
