@@ -139,13 +139,18 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         """
         self = Self()
 
-    fn __init__(inout self, owned other: Self):
+    fn __init__[A: CollectionElement](inout self, owned other: Result[A]):
         """Create a `Result` with another `Result`.
 
         Args:
             other: The other `Result`.
         """
-        self = other
+
+        @parameter
+        if Variant[A](other._type).isa[T]():
+            self = Self(rebind[T, A](other.unsafe_take()))
+        else:
+            self = Self(err=other.err)
 
     fn __init__(inout self, owned value: T):
         """Create a `Result` containing a value.
@@ -154,7 +159,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
             value: The value to store in the `Result`.
         """
         self._value = Self._type(value^)
-        self.err = Error("")
+        self.err = Error()
 
     fn __init__(inout self, *, err: Error):
         """Create an empty `Result`.
@@ -338,13 +343,18 @@ struct ResultReg[T: AnyRegType](Boolable):
         """
         self = Self()
 
-    fn __init__(inout self, owned other: Self):
+    fn __init__[A: CollectionElement](inout self, owned other: ResultReg[A]):
         """Create a `ResultReg` with another `ResultReg`.
 
         Args:
             other: The other `ResultReg`.
         """
-        self = other
+
+        @parameter
+        if Variant[A](other._mlir_type).isa[T]():
+            self = Self(rebind[T, A](other.value()))
+        else:
+            self = Self(err=other.err)
 
     fn __init__(inout self, value: T):
         """Create a `ResultReg` with a value.
@@ -355,7 +365,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         self._value = __mlir_op.`kgen.variant.create`[
             _type = Self._mlir_type, index = Int(0).value
         ](value)
-        self.err = ErrorReg("")
+        self.err = ErrorReg()
 
     fn __init__(inout self, *, err: ErrorReg):
         """Create a `ResultReg` without a value from an `ErrorReg`.
