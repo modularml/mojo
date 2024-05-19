@@ -45,12 +45,13 @@ fn _returning_ok[T: CollectionElement](value: T) raises -> Result[T]:
     raise Error("shouldn't get here")
 
 
-fn _returning_transferred[T: CollectionElement](value: T) -> Result[T]:
+fn _returning_transferred[T: CollectionElement](value: T) raises -> Result[T]:
     # this value and err at the same time will never happen, just for testing
-    var res1 = Result[String](String("some other string"))
+    var res1 = Result(String("some other string"))
     res1.err = Error("some error")
     if res1:
         return res1
+    raise Error("shouldn't get here")
 
 
 def test_transferred():
@@ -62,8 +63,10 @@ def test_transferred():
     assert_true(
         res2.value()[] == "some other string" and res2.err == "some error"
     )
-    var res3 = _returning_transferred("some string")
+    var res3 = _returning_transferred[StringLiteral]("some string")
     assert_true(res3 is None and res3.err == "some error")
+    var res4 = _returning_transferred("some string")
+    assert_true(res4 is None and res4.err == "some error")
 
 
 def test_returning_err():
