@@ -20,7 +20,7 @@ from testing import assert_true, assert_false, assert_equal
 fn _returning_err_reg[T: AnyRegType](value: T) raises -> ResultReg[T]:
     var result = ResultReg[T](err=ErrorReg("something"))
     if not result:
-        return result.err
+        return result
     raise Error("shouldn't get here")
 
 
@@ -41,7 +41,7 @@ fn _returning_err[T: CollectionElement](value: T) raises -> Result[T]:
 fn _returning_ok[T: CollectionElement](value: T) raises -> Result[T]:
     var result = Result[T](value)
     if result:
-        return result.take()
+        return result
     raise Error("shouldn't get here")
 
 
@@ -162,8 +162,8 @@ def test_basic():
 
 
 def test_optional_reg_basic():
-    var val: ResultReg[Int] = ErrorReg("something")
-    var val2: Result[Int] = Error("something")
+    var val = ResultReg[Int](err=ErrorReg("something"))
+    var val2 = Result[Int](err=Error("something"))
     assert_false(val and val2)
 
     val = 15
