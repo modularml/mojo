@@ -175,7 +175,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
 
     fn __init__(
         inout self,
-        value: NoneType,
+        value: NoneType = None,
         err: Error = Error("Result value was not set"),
         /,
     ):
@@ -194,7 +194,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
             value: Must be exactly (`None`, `Error`).
         """
         if len(value) < 2:
-            self = Self(None)
+            self = Self()
         else:
             self = Self(err=value[1])
 
@@ -390,7 +390,7 @@ struct ResultReg[T: AnyRegType](Boolable):
 
     fn __init__(
         inout self,
-        value: NoneType,
+        value: NoneType = None,
         err: ErrorReg = ErrorReg("Result value was not set"),
         /,
     ):
@@ -411,7 +411,7 @@ struct ResultReg[T: AnyRegType](Boolable):
             value: The (`None`, `ErrorReg`) value.
         """
         if len(value) < 2:
-            self = Self(None)
+            self = Self()
         else:
             self = Self(err=value[1])
 
