@@ -18,7 +18,7 @@ from testing import assert_true, assert_false, assert_equal
 
 
 fn _returning_err_reg[T: AnyRegType](value: T) raises -> ResultReg[T]:
-    var result = ResultReg[T](ErrorReg("something"))
+    var result = ResultReg[T](err=ErrorReg("something"))
     if not result:
         return result.err
     raise Error("shouldn't get here")
@@ -32,7 +32,7 @@ fn _returning_ok_reg[T: AnyRegType](value: T) raises -> ResultReg[T]:
 
 
 fn _returning_err[T: CollectionElement](value: T) raises -> Result[T]:
-    var result = Result[T](Error("something"))
+    var result = Result[T](err=Error("something"))
     if not result:
         return result
     raise Error("shouldn't get here")
@@ -93,6 +93,7 @@ def test_returning_ok():
     var item_sl = _returning_ok_reg("stringliteral")
     assert_true(item_sl.value() == _returning_ok("stringliteral").value()[])
     assert_true(item_sl and not item_sl.err and item_sl.err == "")
+    # this one would fail if the String gets implicitly cast to Error(src: String)
     var item_s = _returning_ok(String("string"))
     assert_true(item_s and not item_s.err and item_s.err == "")
     # var item_ti = _returning_ok(Tuple[Int]())

@@ -19,7 +19,7 @@ and explicitly extract the value to get it out.
 ```mojo
 from collections import Result
 var a = Result(1)
-var b = Result[Int](Error())
+var b = Result[Int]()
 if a:
     print(a.value()[])  # prints 1
 if b:  # bool(b) is False, so no print
@@ -34,9 +34,9 @@ And if more information about the returned Error is wanted it is available.
 ```mojo
 from collections import Result
 var a = Result(1)
-var b = Result[Int](Error("something went wrong"))
-var c = Result[Int](Error("error 1"))
-var d = Result[Int](Error("error 2"))
+var b = Result[Int](err=Error("something went wrong"))
+var c = Result[Int](err=Error("error 1"))
+var d = Result[Int](err=Error("error 2"))
 if a:
     print(a.err)  # prints ""
 if not b:
@@ -97,9 +97,9 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     ```mojo
     from collections import Result
     var a = Result(1)
-    var b = Result[Int](Error("something went wrong"))
-    var c = Result[Int](Error("error 1"))
-    var d = Result[Int](Error("error 2"))
+    var b = Result[Int](err=Error("something went wrong"))
+    var c = Result[Int](err=Error("error 1"))
+    var d = Result[Int](err=Error("error 2"))
     if a:
         print(a.err)  # prints ""
     if not b:
@@ -156,14 +156,14 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         self._value = Self._type(value^)
         self.err = Error("")
 
-    fn __init__(inout self, value: Error):
+    fn __init__(inout self, *, err: Error):
         """Create an empty `Result`.
 
         Args:
-            value: Must be an `Error`.
+            err: Must be an `Error`.
         """
         self._value = Self._type(_NoneType())
-        self.err = value
+        self.err = err
 
     @always_inline
     fn value(
@@ -328,7 +328,7 @@ struct ResultReg[T: AnyRegType](Boolable):
 
     fn __init__(inout self):
         """Create a `ResultReg` with a value of None."""
-        self = Self(ErrorReg("Result value was not set"))
+        self = Self(err=ErrorReg("Result value was not set"))
 
     fn __init__(inout self, value: NoneType):
         """Create a `ResultReg` without a value from a None literal.
@@ -357,16 +357,16 @@ struct ResultReg[T: AnyRegType](Boolable):
         ](value)
         self.err = ErrorReg("")
 
-    fn __init__(inout self, value: ErrorReg):
+    fn __init__(inout self, *, err: ErrorReg):
         """Create a `ResultReg` without a value from an `ErrorReg`.
 
         Args:
-            value: The `ErrorReg`.
+            err: The `ErrorReg`.
         """
         self._value = __mlir_op.`kgen.variant.create`[
             _type = Self._mlir_type, index = Int(1).value
         ](__mlir_attr.false)
-        self.err = value
+        self.err = err
 
     @always_inline
     fn value(self) -> T:
