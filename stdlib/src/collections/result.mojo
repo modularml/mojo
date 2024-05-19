@@ -131,6 +131,14 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         self._value = Self._type(_NoneType())
         self.err = Error("Result value was not set")
 
+    fn __init__(inout self, value: NoneType):
+        """Construct an empty `Result`.
+
+        Args:
+            value: Must be exactly `None`.
+        """
+        self = Self()
+
     fn __init__(inout self, owned other: Self):
         """Create a `Result` with another `Result`.
 
@@ -321,6 +329,14 @@ struct ResultReg[T: AnyRegType](Boolable):
     fn __init__(inout self):
         """Create a `ResultReg` with a value of None."""
         self = Self(ErrorReg("Result value was not set"))
+
+    fn __init__(inout self, value: NoneType):
+        """Create a `ResultReg` without a value from a None literal.
+
+        Args:
+            value: The None value.
+        """
+        self = Self()
 
     fn __init__(inout self, owned other: Self):
         """Create a `ResultReg` with another `ResultReg`.
