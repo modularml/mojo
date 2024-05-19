@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 """Defines Result, a type modeling a value which may or may not be present.
-With a `Result.err` field which gives the error returned by the function.
+With an Error in the case of failure.
 
 Result values can be thought of as a type-safe nullable pattern.
 Your value can take on a value or `None`, and you need to check
@@ -56,7 +56,7 @@ elif d.err == "error 2":
     print("d had error 2")
 ```
 
-A Result with an Error cal also be retuned early:
+A Result with an Error can also be retuned early:
 
 ```mojo
 fn func_that_can_err[A: CollectionElement]() -> Result[A]:
@@ -92,6 +92,7 @@ struct _NoneType(CollectionElement):
 @value
 struct Result[T: CollectionElement](CollectionElement, Boolable):
     """A type modeling a value which may or may not be present.
+    With an Error in the case of failure.
 
     Result values can be thought of as a type-safe nullable pattern.
     Your value can take on a value or `None`, and you need to check
@@ -142,7 +143,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         print("d had error 2")
     ```
 
-    A Result with an Error cal also be retuned early:
+    A Result with an Error can also be retuned early:
 
     ```mojo
     fn func_that_can_err[A: CollectionElement]() -> Result[A]:
