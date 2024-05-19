@@ -175,10 +175,25 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
 
     fn __init__(
         inout self,
+        value: NoneType,
+        err: Error = Error("Result value was not set"),
+        /,
+    ):
+        """Create an empty `Result` with an `Error`.
+
+        Args:
+            value: Must be exactly `None`.
+            err: The `Error`.
+        """
+        self = Self(err=err)
+
+    fn __init__(
+        inout self,
         value: Tuple[NoneType, Error] = (
             None,
             Error("Result value was not set"),
         ),
+        /,
     ):
         """Create an empty `Result` with an `Error`.
 
@@ -379,10 +394,26 @@ struct ResultReg[T: AnyRegType](Boolable):
 
     fn __init__(
         inout self,
+        value: NoneType,
+        err: ErrorReg = ErrorReg("Result value was not set"),
+        /,
+    ):
+        """Create a `ResultReg` without a value from a None literal
+        and an `ErrorReg`.
+
+        Args:
+            value: The `None` value.
+            err: The `ErrorReg`.
+        """
+        self = Self(err=err)
+
+    fn __init__(
+        inout self,
         value: Tuple[NoneType, ErrorReg] = (
             None,
             ErrorReg("Result value was not set"),
         ),
+        /,
     ):
         """Create a `ResultReg` without a value from a None literal
         and an `ErrorReg`.
