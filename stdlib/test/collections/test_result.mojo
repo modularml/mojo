@@ -82,16 +82,16 @@ def test_returning_err():
 
 def test_returning_ok():
     var item_i = _returning_ok_reg(Int())
-    assert_true(item_i.value() == _returning_ok(Int()).unsafe_take())
+    assert_true(item_i.value() == _returning_ok(Int()).value()[])
     assert_true(item_i and not item_i.err and item_i.err == "")
     var item_i64 = _returning_ok_reg(Int64())
-    assert_true(item_i64.value() == _returning_ok(Int64()).unsafe_take())
+    assert_true(item_i64.value() == _returning_ok(Int64()).value()[])
     assert_true(item_i64 and not item_i64.err and item_i64.err == "")
     var item_f = _returning_ok_reg(Float64())
-    assert_true(item_f.value() == _returning_ok(Float64()).unsafe_take())
+    assert_true(item_f.value() == _returning_ok(Float64()).value()[])
     assert_true(item_f and not item_f.err and item_f.err == "")
     var item_sl = _returning_ok_reg("stringliteral")
-    assert_true(item_sl.value() == _returning_ok("stringliteral").unsafe_take())
+    assert_true(item_sl.value() == _returning_ok("stringliteral").value()[])
     assert_true(item_sl and not item_sl.err and item_sl.err == "")
     var item_s = _returning_ok(String())
     assert_true(item_s and not item_s.err and item_s.err == "")
@@ -150,7 +150,7 @@ def test_basic():
     assert_equal(1, a1)
     assert_equal(2, b1)
 
-    assert_equal(1, a.unsafe_take())
+    assert_equal(1, a.value()[])
 
     # TODO: this currently only checks for mutable references.
     # We may want to come back and add an immutable test once
