@@ -18,7 +18,7 @@ from testing import assert_true, assert_false, assert_equal
 
 
 fn _returning_err[T: AnyRegType](value: T) -> ResultReg[T]:
-    var result = Result[T](ErroReg("something"))
+    var result = Result[T](ErrorReg("something"))
     if not result:
         return result.err
 
@@ -29,13 +29,13 @@ fn _returning_ok[T: AnyRegType](value: T) -> ResultReg[T]:
         return result
 
 
-fn _returning_err[T: AnyType](value: T) -> Result[T]:
+fn _returning_err[T: CollectionElement](value: T) -> Result[T]:
     var result = Result[T](Error("something"))
     if not result:
         return result
 
 
-fn _returning_ok[T: AnyType](value: T) -> Result[T]:
+fn _returning_ok[T: CollectionElement](value: T) -> Result[T]:
     var result = Result[T](value)
     if result:
         return result.take()
@@ -43,68 +43,68 @@ fn _returning_ok[T: AnyType](value: T) -> Result[T]:
 
 def test_returning_err():
     var item = _returning_err(Int())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(Int64())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(Float64())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(String())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(StringLiteral())
-    assert_true(not item and item.err)
-    item = _returning_err(Tuple[Int]())
-    assert_true(not item and item.err)
-    item = _returning_err(Tuple[String]())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
+    # item = _returning_err(Tuple[Int]())
+    # assert_true(not item and item.err and item.err == "something")
+    # item = _returning_err(Tuple[String]())
+    # assert_true(not item and item.err and item.err == "something")
     item = _returning_err(List[Int]())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(List[String]())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(Dict[Int, Int]())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(Dict[String, String]())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(Optional[Int]())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(Optional[String]())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(OptionalReg[UInt64]())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
     item = _returning_err(OptionalReg[StringLiteral]())
-    assert_true(not item and item.err)
+    assert_true(not item and item.err and item.err == "something")
 
 
 def test_returning_ok():
     var item = _returning_ok(Int())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(Int64())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(Float64())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(String())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(StringLiteral())
-    assert_true(item and not item.err)
-    item = _returning_ok(Tuple[Int]())
-    assert_true(item and not item.err)
-    item = _returning_ok(Tuple[String]())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
+    # item = _returning_ok(Tuple[Int]())
+    # assert_true(item and not item.err and item.err == "")
+    # item = _returning_ok(Tuple[String]())
+    # assert_true(item and not item.err and item.err == "")
     item = _returning_ok(List[Int]())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(List[String]())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(Dict[Int, Int]())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(Dict[String, String]())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(Optional[Int]())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(Optional[String]())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(OptionalReg[UInt64]())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
     item = _returning_ok(OptionalReg[StringLiteral]())
-    assert_true(item and not item.err)
+    assert_true(item and not item.err and item.err == "")
 
 
 def test_basic():

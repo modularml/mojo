@@ -82,7 +82,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     ```mojo
     from collections import Result
     var a = Result(1)
-    var b = Result[Int](None)
+    var b = Result[Int]()
     if a:
         print(a.value()[])  # prints 1
     if b:  # bool(b) is False, so no print
@@ -97,9 +97,9 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     ```mojo
     from collections import Result
     var a = Result(1)
-    var b = Result[Int](None, Error("something went wrong"))
-    var c = Result[Int](None, Error("error 1"))
-    var d = Result[Int](None, Error("error 2"))
+    var b = Result[Int](Error("something went wrong"))
+    var c = Result[Int](Error("error 1"))
+    var d = Result[Int](Error("error 2"))
     if a:
         print(a.err)  # prints ""
     if not b:
@@ -129,7 +129,15 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     fn __init__(inout self):
         """Construct an empty `Result`."""
         self._value = Self._type(_NoneType())
-        self.err = Error()
+        self.err = Error("Result value was not set")
+
+    fn __init__(inout self, owned other: Self):
+        """Create a `Result` with another `Result`.
+
+        Args:
+            other: The other `Result`.
+        """
+        self = other
 
     fn __init__(inout self, owned value: T):
         """Construct a `Result` containing a value.
@@ -138,7 +146,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
             value: The value to store in the `Result`.
         """
         self._value = Self._type(value^)
-        self.err = Error()
+        self.err = Error("")
 
     fn __init__(inout self, value: Error):
         """Construct an empty `Result`.
@@ -312,7 +320,15 @@ struct ResultReg[T: AnyRegType](Boolable):
 
     fn __init__(inout self):
         """Create a `ResultReg` with a value of None."""
-        self = Self(ErrorReg())
+        self = Self(ErrorReg("Result value was not set"))
+
+    fn __init__(inout self, owned other: Self):
+        """Create a `ResultReg` with another `ResultReg`.
+
+        Args:
+            other: The other `ResultReg`.
+        """
+        self = other
 
     fn __init__(inout self, value: T):
         """Create a `ResultReg` with a value.
@@ -323,7 +339,7 @@ struct ResultReg[T: AnyRegType](Boolable):
         self._value = __mlir_op.`kgen.variant.create`[
             _type = Self._mlir_type, index = Int(0).value
         ](value)
-        self.err = ErrorReg()
+        self.err = ErrorReg("")
 
     fn __init__(inout self, value: ErrorReg):
         """Create a `ResultReg` without a value from an `ErrorReg`.
