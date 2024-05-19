@@ -142,6 +142,9 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     fn __init__[A: CollectionElement](inout self, owned other: Result[A]):
         """Create a `Result` with another `Result`.
 
+        Parameters:
+            A: The type of the value contained in other.
+
         Args:
             other: The other `Result`.
         """
@@ -345,6 +348,9 @@ struct ResultReg[T: AnyRegType](Boolable):
 
     fn __init__[A: CollectionElement](inout self, owned other: ResultReg[A]):
         """Create a `ResultReg` with another `ResultReg`.
+
+        Parameters:
+            A: The type of the value contained in other.
 
         Args:
             other: The other `ResultReg`.
