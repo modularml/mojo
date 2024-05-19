@@ -49,20 +49,21 @@ fn _returning_transferred[T: CollectionElement](value: T) -> Result[T]:
     # this value and err at the same time will never happen, just for testing
     var res1 = Result[String](String("some other string"))
     res1.err = Error("some error")
-    if res1 and condition:
+    if res1:
         return res1
-    return value
 
 
-def test_rebind():
+def test_transferred():
     var res1 = _returning_transferred(String("some string"))
     assert_true(
         res1.value()[] == "some other string" and res1.err == "some error"
     )
-    var res2 = _returning_transferred("some string")
-    assert_true(res2 is None and res2.err == "some error")
-    var res3 = _returning_transferred("some string", False)
-    assert_true(res3.value()[] == "some string" and res3.err == "")
+    var res2 = _returning_transferred[String]("some string")
+    assert_true(
+        res2.value()[] == "some other string" and res2.err == "some error"
+    )
+    var res3 = _returning_transferred("some string")
+    assert_true(res3 is None and res3.err == "some error")
 
 
 def test_returning_err():
@@ -239,4 +240,4 @@ def main():
     test_optional_reg_isnot()
     test_returning_ok()
     test_returning_err()
-    test_rebind()
+    test_transferred()
