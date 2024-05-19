@@ -17,14 +17,14 @@ from collections import Result, ResultReg, Optional, OptionalReg
 from testing import assert_true, assert_false, assert_equal
 
 
-fn _returning_err[T: AnyRegType](value: T) raises -> ResultReg[T]:
+fn _returning_err_reg[T: AnyRegType](value: T) raises -> ResultReg[T]:
     var result = ResultReg[T](ErrorReg("something"))
     if not result:
         return result.err
     raise Error("shouldn't get here")
 
 
-fn _returning_ok[T: AnyRegType](value: T) raises -> ResultReg[T]:
+fn _returning_ok_reg[T: AnyRegType](value: T) raises -> ResultReg[T]:
     var result = ResultReg[T](value)
     if result:
         return result
@@ -46,15 +46,20 @@ fn _returning_ok[T: CollectionElement](value: T) raises -> Result[T]:
 
 
 def test_returning_err():
-    var item_i = _returning_err(Int())
+    var item_i = _returning_err_reg(Int())
+    assert_true(item_i == _returning_err(Int()))
     assert_true(not item_i and item_i.err and item_i.err == "something")
-    var item_i64 = _returning_err(Int64())
+    var item_i64 = _returning_err_reg(Int64())
+    assert_true(item_i64 == _returning_err(Int64()))
     assert_true(not item_i64 and item_i64.err and item_i64.err == "something")
-    var item_f = _returning_err(Float64())
+    var item_f = _returning_err_reg(Float64())
+    assert_true(item_f == _returning_err(Float64()))
     assert_true(not item_f and item_f.err and item_f.err == "something")
-    var item_s = _returning_err(String())
+    var item_s = _returning_err_reg(String())
+    assert_true(item_s == _returning_err(String()))
     assert_true(not item_s and item_s.err and item_s.err == "something")
-    var item_sl = _returning_err("stringliteral")
+    var item_sl = _returning_err_reg("stringliteral")
+    assert_true(item_sl == _returning_err("stringliteral"))
     assert_true(not item_sl and item_sl.err and item_sl.err == "something")
     # var item_ti = _returning_err(Tuple[Int]())
     # assert_true(not item_ti and item_ti.err and item_ti.err == "something")
@@ -81,15 +86,20 @@ def test_returning_err():
 
 
 def test_returning_ok():
-    var item_i = _returning_ok(Int())
+    var item_i = _returning_ok_reg(Int())
+    assert_true(item_i == _returning_ok(Int()))
     assert_true(item_i and not item_i.err and item_i.err == "")
-    var item_i64 = _returning_ok(Int64())
+    var item_i64 = _returning_ok_reg(Int64())
+    assert_true(item_i64 == _returning_ok(Int64()))
     assert_true(item_i64 and not item_i64.err and item_i64.err == "")
-    var item_f = _returning_ok(Float64())
+    var item_f = _returning_ok_reg(Float64())
+    assert_true(item_f == _returning_ok(Float64()))
     assert_true(item_f and not item_f.err and item_f.err == "")
-    var item_s = _returning_ok(String())
+    var item_s = _returning_ok_reg(String())
+    assert_true(item_s == _returning_ok(String()))
     assert_true(item_s and not item_s.err and item_s.err == "")
-    var item_sl = _returning_ok("stringliteral")
+    var item_sl = _returning_ok_reg("stringliteral")
+    assert_true(item_sl == _returning_ok("stringliteral"))
     assert_true(item_sl and not item_sl.err and item_sl.err == "")
     # var item_ti = _returning_ok(Tuple[Int]())
     # assert_true(item_ti and not item_ti.err and item_ti.err == "")

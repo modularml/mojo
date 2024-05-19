@@ -127,12 +127,12 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     """The Error inside the `Result`."""
 
     fn __init__(inout self):
-        """Construct an empty `Result`."""
+        """Create an empty `Result`."""
         self._value = Self._type(_NoneType())
         self.err = Error("Result value was not set")
 
     fn __init__(inout self, value: NoneType):
-        """Construct an empty `Result`.
+        """Create an empty `Result`.
 
         Args:
             value: Must be exactly `None`.
@@ -148,7 +148,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         self = other
 
     fn __init__(inout self, owned value: T):
-        """Construct a `Result` containing a value.
+        """Create a `Result` containing a value.
 
         Args:
             value: The value to store in the `Result`.
@@ -157,7 +157,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         self.err = Error("")
 
     fn __init__(inout self, value: Error):
-        """Construct an empty `Result`.
+        """Create an empty `Result`.
 
         Args:
             value: Must be an `Error`.
