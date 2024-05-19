@@ -173,23 +173,19 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     var err: Error
     """The Error inside the `Result`."""
 
-    fn __init__(inout self):
-        """Create an empty `Result`."""
-        self._value = Self._type(_NoneType())
-        self.err = Error("Result value was not set")
-
     fn __init__(
         inout self,
-        value: NoneType,
-        err: Error = Error("Result value was not set"),
+        value: Tuple[NoneType, Error] = (
+            None,
+            Error("Result value was not set"),
+        ),
     ):
         """Create an empty `Result` with an `Error`.
 
         Args:
-            value: Must be exactly `None`.
-            err: The error to build the `Result` with.
+            value: Must be exactly (`None`, `Error`).
         """
-        self = Self(err=err)
+        self = Self(err=value[1])
 
     fn __init__[A: CollectionElement](inout self, owned other: Result[A]):
         """Create a `Result` by transferring another `Result`'s Error.
@@ -381,23 +377,20 @@ struct ResultReg[T: AnyRegType](Boolable):
     var err: ErrorReg
     """The Error inside the `ResultReg`."""
 
-    fn __init__(inout self):
-        """Create a `ResultReg` with a value of None."""
-        self = Self(err=ErrorReg("Result value was not set"))
-
     fn __init__(
         inout self,
-        value: NoneType,
-        err: ErrorReg = ErrorReg("Result value was not set"),
+        value: Tuple[NoneType, ErrorReg] = (
+            None,
+            ErrorReg("Result value was not set"),
+        ),
     ):
         """Create a `ResultReg` without a value from a None literal
         and an `ErrorReg`.
 
         Args:
-            value: The None value.
-            err: The error to build the `ResultReg` with.
+            value: The (`None`, `ErrorReg`) value.
         """
-        self = Self(err=err)
+        self = Self(err=value[1])
 
     fn __init__[A: CollectionElement](inout self, owned other: ResultReg[A]):
         """Create a `ResultReg` by transferring another `ResultReg`'s Error.
