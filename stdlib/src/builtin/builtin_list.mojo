@@ -172,7 +172,7 @@ struct _VariadicListMemIter[
     elt_type: AnyType,
     elt_is_mutable: Bool,
     elt_lifetime: AnyLifetime[elt_is_mutable].type,
-    list_lifetime: ImmLifetime,
+    list_lifetime: ImmutableLifetime,
 ]:
     """Iterator for VariadicListMem.
 

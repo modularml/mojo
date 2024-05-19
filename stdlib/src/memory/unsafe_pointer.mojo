@@ -48,7 +48,7 @@ struct UnsafePointer[
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful
     # lifetime for them anyway.
-    alias _ref_type = Reference[T, True, MutStaticLifetime, address_space]
+    alias _ref_type = Reference[T, True, MutableStaticLifetime, address_space]
 
     """The underlying pointer type."""
     var address: Self._mlir_type

@@ -117,7 +117,7 @@ fn test_heap_string_from_string_slice() raises:
     var string_lit: StringLiteral = "Hello"
 
     var static_str: StringSlice[
-        False, ImmStaticLifetime
+        False, ImmutableStaticLifetime
     ] = string_lit.as_string_slice()
 
     var heap_string = String(static_str)

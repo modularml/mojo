@@ -179,7 +179,9 @@ struct LegacyPointer[
     var address: Self._mlir_type
     """The pointed-to address."""
 
-    alias _ref_type = Reference[type, True, MutStaticLifetime, address_space]
+    alias _ref_type = Reference[
+        type, True, MutableStaticLifetime, address_space
+    ]
 
     @always_inline("nodebug")
     fn __init__() -> Self:
