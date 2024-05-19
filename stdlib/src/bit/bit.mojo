@@ -308,11 +308,10 @@ fn bit_width[
 # bit_ceil
 # ===----------------------------------------------------------------------===#
 
-
 @always_inline("nodebug")
 fn bit_ceil(val: Int) -> Int:
     """Computes the smallest power of 2 that is greater than or equal to the
-    input value.
+    input value. Any integral value less than or equal to 1 be ceiled to 1.
 
     Args:
         val: The input value.
@@ -334,7 +333,8 @@ fn bit_ceil[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Computes the smallest power of 2 that is greater than or equal to the
-    input value for each element of a SIMD vector.
+    input value for each element of a SIMD vector. Any integral value less than
+    or equal to 1 will be ceiled to 1.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -354,12 +354,10 @@ fn bit_ceil[
     constrained[type.is_integral(), "must be integral"]()
 
     alias ones = SIMD[type, simd_width].splat(1)
-    alias zeros = SIMD[type, simd_width].splat(0)
 
-    var ret = (val <= ones).select(ones, val)
-    ret = (val & (val - ones) == zeros).select(val, ret)
+    var less_then_one = (val <= ones).select(ones, val)
 
-    return (val > ones).select(1 << bit_width(val - ones), ret)
+    return (val > ones).select(1 << bit_width(val - ones), less_then_one)
 
 
 # ===----------------------------------------------------------------------===#
