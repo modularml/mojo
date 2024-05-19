@@ -16,6 +16,9 @@ With a `Result.err` field which gives the error returned by the function.
 Result values can be thought of as a type-safe nullable pattern.
 Your value can take on a value or `None`, and you need to check
 and explicitly extract the value to get it out.
+
+Examples:
+
 ```mojo
 from collections import Result
 var a = Result(1)
@@ -31,6 +34,7 @@ print(d)  # prints 2
 ```
 
 And if more information about the returned Error is wanted it is available.
+
 ```mojo
 from collections import Result
 var a = Result(1)
@@ -50,6 +54,23 @@ if d.err == "error 1":
     print("d had error 1")
 elif d.err == "error 2":
     print("d had error 2")
+```
+
+A Result with an Error cal also be retuned early:
+
+```mojo
+fn func_that_can_err[A: CollectionElement]() -> Result[A]:
+    ...
+
+fn return_early_if_err[T: CollectionElement, A: CollectionElement]() -> Result[T]:
+    var result: Result[A] = func_that_can_err[A]()
+    if not result:
+        # the internal err gets transferred to a Result[T]
+        return result
+    var val = result.value()
+    var final_result: T
+    ...
+    return final_result
 ```
 .
 """
@@ -79,6 +100,11 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     Currently T is required to be a `CollectionElement` so we can implement
     copy/move for Result and allow it to be used in collections itself.
 
+    Parameters:
+        T: The type of value stored in the `Result`.
+
+    Examples:
+
     ```mojo
     from collections import Result
     var a = Result(1)
@@ -94,6 +120,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     ```
 
     And if more information about the returned Error is wanted it is available.
+
     ```mojo
     from collections import Result
     var a = Result(1)
@@ -115,8 +142,23 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         print("d had error 2")
     ```
 
-    Parameters:
-        T: The type of value stored in the `Result`.
+    A Result with an Error cal also be retuned early:
+
+    ```mojo
+    fn func_that_can_err[A: CollectionElement]() -> Result[A]:
+        ...
+
+    fn return_early_if_err[T: CollectionElement, A: CollectionElement]() -> Result[T]:
+        var result: Result[A] = func_that_can_err[A]()
+        if not result:
+            # the internal err gets transferred to a Result[T]
+            return result
+        var val = result.value()
+        var final_result: T
+        ...
+        return final_result
+    ```
+    .
     """
 
     # _NoneType comes first so its index is 0.
