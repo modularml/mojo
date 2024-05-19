@@ -160,7 +160,7 @@ struct Error(Stringable, Boolable):
             other: The String to compare to.
 
         Returns:
-            A printable representation of the error message.
+            The comparison.
         """
         return str(self) == other
 
@@ -232,6 +232,6 @@ struct ErrorReg(Stringable, Boolable):
             other: The String to compare to.
 
         Returns:
-            A printable representation of the error message.
+            The comparison.
         """
         return str(self) == other
