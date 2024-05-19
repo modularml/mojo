@@ -24,6 +24,7 @@ from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
 from sys.intrinsics import _type_is_eq
 from .optional import Optional
+from utils import Span
 
 # ===----------------------------------------------------------------------===#
 # List
@@ -126,6 +127,16 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self = Self(capacity=len(values))
         for value in values:
+            self.append(value[])
+
+    fn __init__(inout self, span: Span[T]):
+        """Constructs a list from the a Span of values.
+
+        Args:
+            span: The span of values to populate the list with.
+        """
+        self = Self(capacity=len(span))
+        for value in span:
             self.append(value[])
 
     fn __init__(
