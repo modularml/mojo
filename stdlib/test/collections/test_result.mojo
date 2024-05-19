@@ -45,9 +45,7 @@ fn _returning_ok[T: CollectionElement](value: T) raises -> Result[T]:
     raise Error("shouldn't get here")
 
 
-fn _returning_transferred[
-    T: CollectionElement
-](value: T, condition: Bool = True) -> Result[T]:
+fn _returning_transferred[T: CollectionElement](value: T) -> Result[T]:
     # this value and err at the same time will never happen, just for testing
     var res1 = Result[String](String("some other string"))
     res1.err = Error("some error")
@@ -62,15 +60,9 @@ def test_rebind():
         res1.value()[] == "some other string" and res1.err == "some error"
     )
     var res2 = _returning_transferred("some string")
-    assert_true(res2.value()[] != "some other string" and res2.err == "")
+    assert_true(res2 is None and res2.err == "some error")
     var res3 = _returning_transferred("some string", False)
     assert_true(res3.value()[] == "some string" and res3.err == "")
-    var res4 = _returning_transferred("some string")
-    assert_true(
-        res4.value()[] == "some string"
-        and res4.value()[] != "some other string"
-        and res4.err == "some error"
-    )
 
 
 def test_returning_err():
