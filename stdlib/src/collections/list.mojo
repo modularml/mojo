@@ -519,18 +519,24 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Raises:
             ValueError: If the value is not found in the list.
         """
-        var size = self[].size
-        var normalized_start = max(size + start, 0) if start < 0 else start
+        var start_normalized = start
 
-        @parameter
-        fn normalized_stop() -> Int:
-            if stop is None:
-                return size
-            else:
-                var end = stop.value()[]
-                return end if end > 0 else min(end + size, size)
+        var stop_normalized: Int
+        if stop is None:
+            # Default end
+            stop_normalized = len(self[])
+        else:
+            stop_normalized = stop.value()[]
 
-        for i in range(normalized_start, normalized_stop()):
+        if start_normalized < 0:
+            start_normalized += len(self[])
+        if stop_normalized < 0:
+            stop_normalized += len(self[])
+
+        start_normalized = _clip(start_normalized, 0, len(self[]))
+        stop_normalized = _clip(stop_normalized, 0, len(self[]))
+
+        for i in range(start_normalized, stop_normalized):
             if self[][i] == value:
                 return i
         raise "ValueError: Given element is not in list"
@@ -814,3 +820,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             if i[] == rebind[T2](value):
                 return True
         return False
+
+
+fn _clip(value: Int, start: Int, end: Int) -> Int:
+    return max(start, min(value, end))
