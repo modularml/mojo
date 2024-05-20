@@ -682,6 +682,12 @@ fn get_zoneinfo[
     from the OS, then from the internet, then falls back
     on hardcoded values.
 
+    Parameters:
+        T: The type of storage for timezones with
+            Daylight Saving Time.
+        A: The type of storage for timezones with
+            no Daylight Saving Time.
+
     Returns:
         Optional ZoneInfo.
 
