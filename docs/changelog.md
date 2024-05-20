@@ -54,7 +54,15 @@ what we publish.
   non-inferred parameter. `dt` is inferred from the parameter itself to
   `DType.int32`.
 
-  Note that this only works on function parameter lists at the moment.
+  This also works with structs. For example:
+
+  ```mojo
+  struct ScalarContainer[inferred dt: DType, value: Scalar[dt]]:
+      pass
+
+  fn foo(x: ScalarContainer[Int32(0)]): # 'dt' is inferred
+      pass
+  ```
 
 - Mojo now supports adding a `@deprecated` decorator on structs, functions,
   traits, aliases, and global variables. The decorator marks the attached decl
