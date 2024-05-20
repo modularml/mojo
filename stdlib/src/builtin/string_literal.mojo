@@ -251,7 +251,7 @@ struct StringLiteral(
     @always_inline
     fn as_string_slice(
         self: Reference[Self, _, _]
-    ) -> StringSlice[False, ImmStaticLifetime]:
+    ) -> StringSlice[False, ImmutableStaticLifetime]:
         """Returns a string slice of this static string literal.
 
         Returns:
@@ -263,12 +263,14 @@ struct StringLiteral(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StringSlice[False, ImmStaticLifetime](unsafe_from_utf8=bytes)
+        return StringSlice[False, ImmutableStaticLifetime](
+            unsafe_from_utf8=bytes
+        )
 
     @always_inline
     fn as_bytes_slice(
         self: Reference[Self, _, _]
-    ) -> Span[UInt8, False, ImmStaticLifetime]:
+    ) -> Span[UInt8, False, ImmutableStaticLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -278,7 +280,7 @@ struct StringLiteral(
 
         var ptr = self[].unsafe_uint8_ptr()
 
-        return Span[UInt8, False, ImmStaticLifetime](
+        return Span[UInt8, False, ImmutableStaticLifetime](
             unsafe_ptr=ptr,
             len=self[]._byte_length(),
         )
