@@ -13,11 +13,13 @@
 # RUN: %mojo -debug-level full %s
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
-from datetime.timezone import TimeZone
+from datetime.timezone import TimeZone, ZoneInfo, ZoneInfoMem32, ZoneInfoMem8
+
+alias _IANA = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
 
 
 fn test_tz_no_iana() raises:
-    alias tz = TimeZone[iana=None, pyzoneinfo=False, native=False]
+    alias tz = TimeZone[iana = _IANA(None), pyzoneinfo=False, native=False]
     var tz0 = tz("Etc/UTC", 0, 0)
     var tz_1 = tz("Etc/UTC-1", 1, 0)
     var tz_2 = tz("Etc/UTC-2", 2, 30)
@@ -35,13 +37,23 @@ fn test_tz_no_iana() raises:
     var tz1__of = tz1_.offset_at(d[0], d[1], d[2], d[3], d[4], d[5])
     var tz2__of = tz2_.offset_at(d[0], d[1], d[2], d[3], d[4], d[5])
     var tz3__of = tz3_.offset_at(d[0], d[1], d[2], d[3], d[4], d[5])
-    assert_true(tz0_of[0] == 0 and tz0_of[1] == 0 and tz0_of[2] == 1)
-    assert_true(tz_1_of[0] == 1 and tz_1_of[1] == 0 and tz_1_of[2] == 1)
-    assert_true(tz_2_of[0] == 2 and tz_2_of[1] == 30 and tz_2_of[2] == 1)
-    assert_true(tz_3_of[0] == 3 and tz_3_of[1] == 45 and tz_3_of[2] == 1)
-    assert_true(tz1__of[0] == 1 and tz1__of[1] == 0 and tz1__of[2] == -1)
-    assert_true(tz2__of[0] == 2 and tz2__of[1] == 30 and tz2__of[2] == -1)
-    assert_true(tz3__of[0] == 3 and tz3__of[1] == 45 and tz3__of[2] == -1)
+    assert_true(tz0_of.hour == 0 and tz0_of.minute == 0 and tz0_of.sign == 1)
+    assert_true(tz_1_of.hour == 1 and tz_1_of.minute == 0 and tz_1_of.sign == 1)
+    assert_true(
+        tz_2_of.hour == 2 and tz_2_of.minute == 30 and tz_2_of.sign == 1
+    )
+    assert_true(
+        tz_3_of.hour == 3 and tz_3_of.minute == 45 and tz_3_of.sign == 1
+    )
+    assert_true(
+        tz1__of.hour == 1 and tz1__of.minute == 0 and tz1__of.sign == -1
+    )
+    assert_true(
+        tz2__of.hour == 2 and tz2__of.minute == 30 and tz2__of.sign == -1
+    )
+    assert_true(
+        tz3__of.hour == 3 and tz3__of.minute == 45 and tz3__of.sign == -1
+    )
 
 
 fn test_tz_iana_dst() raises:
