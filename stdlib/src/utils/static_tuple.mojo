@@ -315,7 +315,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         @parameter
         for i in range(size):
-            var ptr = self._get_reference_unsafe(i)
+            var ptr = self.unsafe_get(i)
             initialize_pointee_copy(UnsafePointer[Self.ElementType](ptr), fill)
 
     @always_inline
@@ -331,7 +331,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         @parameter
         for i in range(size):
-            var ref = self._get_reference_unsafe(i)
+            var ref = self.unsafe_get(i)
             initialize_pointee_move(
                 UnsafePointer[Self.ElementType](ref), elems[i]
             )
@@ -350,16 +350,38 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         return size
 
     @always_inline("nodebug")
-    fn _get_reference_unsafe(
-        self: Reference[Self, _, _], index: Int
-    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
+    fn unsafe_get[
+        IndexType: Indexer,
+    ](self: Reference[Self, _, _], idx: IndexType) -> Reference[
+        Self.ElementType, self.is_mutable, self.lifetime
+    ]:
         """Get a reference to an element of self without checking index bounds.
 
-        Users should opt for `__refitem__` instead of this method.
+        Users should opt for `__refitem__` instead of this method as it is unsafe.
+
+        Note that there is no wraparound for negative indices.
+        Using negative indices is considered undefined behavior.
+
+        Parameters:
+            IndexType: The type of the argument used as index.
+
+        Args:
+            idx: The index of the element to get.
+
+        Returns:
+            The element at the given index.
         """
+        var idx_as_int = index(idx)
+        debug_assert(
+            0 <= idx_as_int < size,
+            (
+                "Index must be within bounds when using"
+                " `InlineArray.unsafe_get()`."
+            ),
+        )
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self[]._array).address,
-            index.value,
+            index(idx).value,
         )
         return UnsafePointer(ptr)[]
 
@@ -384,11 +406,9 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Returns:
             A reference to the item at the given index.
         """
-        var normalized_index = normalize_index[container_name="InlineArray"](
-            index, self[]
-        )
+        var normalized_index = normalize_index["InlineArray"](index, self[])
 
-        return self[]._get_reference_unsafe(normalized_index)
+        return self[].unsafe_get(normalized_index)
 
     @always_inline("nodebug")
     fn __refitem__[
@@ -415,7 +435,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         if i < 0:
             normalized_idx += size
 
-        return self[]._get_reference_unsafe(normalized_idx)
+        return self[].unsafe_get(normalized_idx)
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[Self.ElementType]:

@@ -76,6 +76,24 @@ def test_tuple_literal():
     assert_equal(len(()), 0)
 
 
+def test_array_unsafe_get():
+    # Negative indexing is undefined behavior with unsafe_get
+    # so there are not test cases for it.
+    var arr = InlineArray[Int, 3](0, 0, 0)
+
+    assert_equal(arr.unsafe_get(0)[], 0)
+    assert_equal(arr.unsafe_get(1)[], 0)
+    assert_equal(arr.unsafe_get(2)[], 0)
+
+    arr[0] = 1
+    arr[1] = 2
+    arr[2] = 3
+
+    assert_equal(arr.unsafe_get(0)[], 1)
+    assert_equal(arr.unsafe_get(1)[], 2)
+    assert_equal(arr.unsafe_get(2)[], 3)
+
+
 def test_array_int():
     var arr = InlineArray[Int, 3](0, 0, 0)
 
@@ -193,6 +211,7 @@ def main():
     test_static_tuple()
     test_static_int_tuple()
     test_tuple_literal()
+    test_array_unsafe_get()
     test_array_int()
     test_array_str()
     test_array_int_pointer()
