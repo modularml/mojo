@@ -38,7 +38,10 @@ fn unroll[
           argument, which is the loop index value.
         count: A number of repetitions.
     """
-    _unroll_impl[func, 0, count]()
+
+    @parameter
+    for i in range(count):
+        func[i]()
 
 
 @always_inline
@@ -54,18 +57,6 @@ fn unroll[
         count: A number of repetitions.
     """
     _unroll_impl[func, 0, count]()
-
-
-@always_inline
-fn _unroll_impl[
-    func: fn[idx: Int] () capturing -> None,
-    idx: Int,
-    count: Int,
-]():
-    @parameter
-    if idx < count:
-        func[idx]()
-        _unroll_impl[func, idx + 1, count]()
 
 
 @always_inline
@@ -100,17 +91,12 @@ fn unroll[
         dim1: The second dimension size.
     """
 
-    @always_inline
     @parameter
-    fn outer_func_wrapper[idx0: Int]():
-        @always_inline
+    for i in range(dim0):
+
         @parameter
-        fn inner_func_wrapper[idx1: Int]():
-            func[idx0, idx1]()
-
-        unroll[inner_func_wrapper, dim1]()
-
-    unroll[outer_func_wrapper, dim0]()
+        for j in range(dim1):
+            func[i, j]()
 
 
 # ===----------------------------------------------------------------------===#
@@ -135,11 +121,12 @@ fn unroll[
         dim2: The second dimension size.
     """
 
-    @always_inline
     @parameter
-    fn func_wrapper[idx0: Int, idx1: Int]():
-        alias _idx1 = idx1 // dim2
-        alias _idx2 = idx1 % dim2
-        func[idx0, _idx1, _idx2]()
+    for i in range(dim0):
 
-    unroll[func_wrapper, dim0, dim1 * dim2]()
+        @parameter
+        for j in range(dim1):
+
+            @parameter
+            for k in range(dim2):
+                func[i, j, k]()
