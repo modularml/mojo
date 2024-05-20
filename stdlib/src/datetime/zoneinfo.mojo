@@ -14,6 +14,7 @@
 
 from pathlib import Path, cwd
 from utils import Variant
+from collections import OptionalReg
 
 from .calendar import PythonCalendar
 
@@ -33,11 +34,11 @@ struct Offset:
         https://es.wikipedia.org/wiki/Base_Troll ))."""
 
     var hour: UInt8
-    """Hour."""
+    """Hour: [0, 15]."""
     var minute: UInt8
-    """Minute."""
+    """Minute: {0, 30, 45}."""
     var sign: UInt8
-    """Sign."""
+    """Sign: {1, -1}. Positive means east of UTC."""
     var buf: UInt8
     """Buffer."""
 
@@ -325,7 +326,7 @@ struct ZoneInfoFile32(CollectionElement):
             f.write(value.buf << (32 - b_width32))
         return self._index
 
-    fn get(self, index: UInt8) raises -> Optional[ZoneDST]:
+    fn get(self, index: UInt8) raises -> OptionalReg[ZoneDST]:
         """Get a value from the file.
 
         Args:
@@ -403,7 +404,7 @@ struct ZoneInfoFile8(CollectionElement):
             f.write(buf << (32 - b_width32))
         return self._index
 
-    fn get(self, index: UInt8) raises -> Optional[Offset]:
+    fn get(self, index: UInt8) raises -> OptionalReg[Offset]:
         """Get a value from the file.
 
         Args:
@@ -456,7 +457,7 @@ struct ZoneInfoMem32(CollectionElement):
         self._zones[key] = value.buf
 
     @always_inline
-    fn get(self, key: StringLiteral) -> Optional[ZoneDST]:
+    fn get(self, key: StringLiteral) -> OptionalReg[ZoneDST]:
         """Get value from `ZoneInfoMem32`.
 
         Args:
@@ -493,7 +494,7 @@ struct ZoneInfoMem8(CollectionElement):
         self._zones[key] = value.buf
 
     @always_inline
-    fn get(self, key: StringLiteral) -> Optional[Offset]:
+    fn get(self, key: StringLiteral) -> OptionalReg[Offset]:
         """Get value from `ZoneInfoMem8`.
 
         Args:
@@ -610,7 +611,7 @@ trait ZoneStorageDST(CollectionElement):
     fn add(inout self, key: StringLiteral, value: ZoneDST):
         ...
 
-    fn get(self, key: StringLiteral) -> Optional[ZoneDST]:
+    fn get(self, key: StringLiteral) -> OptionalReg[ZoneDST]:
         ...
 
 
@@ -620,7 +621,7 @@ trait ZoneStorageNoDST(CollectionElement):
     fn add(inout self, key: StringLiteral, value: Offset):
         ...
 
-    fn get(self, key: StringLiteral) -> Optional[Offset]:
+    fn get(self, key: StringLiteral) -> OptionalReg[Offset]:
         ...
 
 
@@ -738,7 +739,7 @@ fn get_zoneinfo[
 # """All timezones available at compile time."""
 
 
-fn offset_no_dst_tz(owned no_dst: Optional[Offset]) -> Optional[Offset]:
+fn offset_no_dst_tz(owned no_dst: OptionalReg[Offset]) -> OptionalReg[Offset]:
     """Return the UTC offset for the `TimeZone` if it has no DST.
 
     Args:
@@ -751,7 +752,7 @@ fn offset_no_dst_tz(owned no_dst: Optional[Offset]) -> Optional[Offset]:
     """
 
     if no_dst:
-        var zone = no_dst.unsafe_take()
+        var zone = no_dst.value()
         var offset = zone.from_hash()
         var offset_h = offset[1]
         var offset_m = UInt8(
@@ -763,7 +764,7 @@ fn offset_no_dst_tz(owned no_dst: Optional[Offset]) -> Optional[Offset]:
 
 
 fn offset_at(
-    owned with_dst: Optional[ZoneDST],
+    owned with_dst: OptionalReg[ZoneDST],
     year: UInt16,
     month: UInt8,
     day: UInt8,
@@ -789,7 +790,7 @@ fn offset_at(
         - sign: Sign of the offset: {1, -1}.
     """
     if with_dst:
-        var zone = with_dst.unsafe_take()
+        var zone = with_dst.value()
         var items = zone.from_hash()
         var dst_start = items[0].from_hash()
         var dst_end = items[1].from_hash()

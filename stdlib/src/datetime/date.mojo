@@ -21,7 +21,14 @@
 from time import time
 from collections.optional import Optional
 
-from .timezone import TimeZone, ZoneInfo
+from .timezone import (
+    TimeZone,
+    ZoneInfo,
+    ZoneInfoMem32,
+    ZoneInfoMem8,
+    ZoneStorageDST,
+    ZoneStorageNoDST,
+)
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
 import .dt_str
 
@@ -37,7 +44,11 @@ trait _IntCollect(Intable, CollectionElement):
 @value
 # @register_passable("trivial")
 struct Date[
-    iana: Bool = True,
+    dst_storage: ZoneStorageDST = ZoneInfoMem32,
+    no_dst_storage: ZoneStorageNoDST = ZoneInfoMem8,
+    iana: Optional[ZoneInfo[dst_storage, no_dst_storage]] = get_zoneinfo[
+        dst_storage, no_dst_storage
+    ](),
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](Hashable, Stringable):
@@ -48,12 +59,18 @@ struct Date[
     is UTC.
 
     Parameters:
+        dst_storage: The type of storage to use for ZoneInfo
+            for zones with Dailight Saving Time. Default Memory.
+        no_dst_storage: The type of storage to use for ZoneInfo
+            for zones with no Dailight Saving Time. Default Memory.
         iana: What timezones from the [IANA database](
             http://www.iana.org/time-zones/repository/tz-link.html)
-            are used. [List of TZ identifiers (`tz_str`)](
-            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-            ). If None, defaults to only using the offsets
-            as is, no daylight saving or special exceptions.
+            are used. It defaults to using all available timezones,
+            if getting them fails at compile time, it tries using
+            python's zoneinfo if pyzoneinfo is set to True, otherwise
+            it uses the offsets as is, no daylight saving or
+            special exceptions. [List of TZ identifiers](
+            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
         pyzoneinfo: Whether to use python's zoneinfo and
             datetime to get full IANA support.
         native: (fast, partial IANA support) Whether to use a native Dict
@@ -87,7 +104,7 @@ struct Date[
     var day: UInt8
     """Day."""
     # TODO: tz and calendar should be references
-    alias _tz = TimeZone[iana, pyzoneinfo, native]
+    alias _tz = TimeZone[dst_storage, no_dst_storage, iana, pyzoneinfo, native]
     var tz: Self._tz
     """Tz."""
     var calendar: Calendar
@@ -213,14 +230,14 @@ struct Date[
             return self
         var new_self = self
         var offset = self.tz.offset_at(self.year, self.month, self.day, 0, 0, 0)
-        var of_h = int(offset[0])
-        var of_m = int(offset[1])
+        var of_h = int(offset.hour)
+        var of_m = int(offset.minute)
         var maxmin = self.calendar.max_minute
         var maxsec = self.calendar.max_typical_second + int(
             self.calendar.leapsecs_since_epoch(self.year, self.month, self.day)
         )
         var amnt = int(of_h * maxmin * maxsec + of_m * maxsec)
-        if offset[2] == -1:
+        if offset.sign == -1:
             new_self = self.add(seconds=amnt)
         else:
             new_self = self.subtract(seconds=amnt)
@@ -243,11 +260,11 @@ struct Date[
         var maxmin = self.calendar.max_minute
         var maxsec = self.calendar.max_typical_second
         var offset = tz.offset_at(self.year, self.month, self.day, 0, 0, 0)
-        var of_h = int(offset[0])
-        var of_m = int(offset[1])
+        var of_h = int(offset.hour)
+        var of_m = int(offset.minute)
         var amnt = int(of_h * maxmin * maxsec + of_m * maxsec)
         var new_self = self
-        if offset[2] == 1:
+        if offset.sign == 1:
             new_self = self.add(seconds=amnt)
         else:
             new_self = self.subtract(seconds=amnt)
@@ -918,7 +935,7 @@ struct Date[
         if not parsed:
             return None
         var p = parsed.take()
-        return Self(p[0], p[1], p[2], tz=tz, calendar=calendar)
+        return Self(p.year, p.month, p.day, tz, calendar)
 
     @staticmethod
     @parameter

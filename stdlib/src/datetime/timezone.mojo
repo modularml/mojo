@@ -19,16 +19,31 @@
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 """
 
-from .zoneinfo import Offset, ZoneInfo, offset_at, offset_no_dst_tz
+from collections import OptionalReg
 
-
-alias _all_zones = get_zoneinfo()
+from .zoneinfo import (
+    Offset,
+    ZoneDST,
+    ZoneInfo,
+    ZoneInfoMem32,
+    ZoneInfoMem8,
+    ZoneStorageDST,
+    ZoneStorageNoDST,
+    offset_at,
+    offset_no_dst_tz,
+    get_zoneinfo,
+)
 
 
 @value
-# @register_passable("trivial")
 struct TimeZone[
-    iana: Bool = True, pyzoneinfo: Bool = True, native: Bool = False
+    dst_storage: ZoneStorageDST = ZoneInfoMem32,
+    no_dst_storage: ZoneStorageNoDST = ZoneInfoMem8,
+    iana: Optional[ZoneInfo[dst_storage, no_dst_storage]] = get_zoneinfo[
+        dst_storage, no_dst_storage
+    ](),
+    pyzoneinfo: Bool = True,
+    native: Bool = False,
 ]:
     """`TimeZone` struct. Because of a POSIX standard, if you set
     the tz_str e.g. Etc/UTC-4 it means 4 hours east of UTC
@@ -39,6 +54,10 @@ struct TimeZone[
     offset_m and sign will remain the default 0, 0, 1 respectively.
 
     Parameters:
+        dst_storage: The type of storage to use for ZoneInfo
+            for zones with Dailight Saving Time. Default Memory.
+        no_dst_storage: The type of storage to use for ZoneInfo
+            for zones with no Dailight Saving Time. Default Memory.
         iana: What timezones from the [IANA database](
             http://www.iana.org/time-zones/repository/tz-link.html)
             are used. It defaults to using all available timezones,
@@ -69,6 +88,7 @@ struct TimeZone[
     """Sign: {1, -1}."""
     var has_dst: Bool
     """Whether the `TimeZone` has Daylight Saving Time."""
+    var _dst: OptionalReg[ZoneDST]
 
     fn __init__(
         inout self,
@@ -112,16 +132,18 @@ struct TimeZone[
         self.offset_m = offset_m
         self.sign = sign
         self.has_dst = has_dst
+        self._dst = None
 
         @parameter
         if iana:
-            if has_dst or not _all_zones:
+            if has_dst:
+                self._dst = iana.value()[].with_dst.get(tz_str)
                 return
-            var tz = _all_zones.value()[].with_no_dst.get(tz_str)
+            var tz = iana.value()[].with_no_dst.get(tz_str)
             var val = offset_no_dst_tz(tz)
             if not val:
                 return
-            var offset = val.unsafe_take()
+            var offset = val.value()
             self.offset_h = offset.hour
             self.offset_m = offset.minute
             self.sign = offset.sign
@@ -146,20 +168,16 @@ struct TimeZone[
             second: Second.
 
         Returns:
-            - offset_h: Offset for the hour: [0, 15].
-            - offset_m: Offset for the minute: {0, 30, 45}.
-            - sign: Sign of the offset: {1, -1}.
+            The Offset.
         """
 
         @parameter
         if iana and native:
-            if self.has_dst:
-                var dst = _all_zones.value()[].with_dst.get(self.tz_str)
-                var offset = offset_at(
-                    dst, year, month, day, hour, minute, second
-                )
-                if offset:
-                    return offset.value()[]
+            var offset = offset_at(
+                self._dst, year, month, day, hour, minute, second
+            )
+            if offset:
+                return offset.value()[]
         elif iana and pyzoneinfo:
             try:
                 from python import Python

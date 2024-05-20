@@ -22,7 +22,14 @@ from time import time
 from utils import Variant
 from collections.optional import Optional
 
-from .timezone import TimeZone, ZoneInfo
+from .timezone import (
+    TimeZone,
+    ZoneInfo,
+    ZoneInfoMem32,
+    ZoneInfoMem8,
+    ZoneStorageDST,
+    ZoneStorageNoDST,
+)
 from .calendar import Calendar, UTCCalendar, PythonCalendar, CalendarHashes
 import .dt_str
 
@@ -40,7 +47,13 @@ trait _IntCollect(Intable, CollectionElement):
 @value
 # @register_passable("trivial")
 struct DateTime[
-    iana: Bool = True, pyzoneinfo: Bool = True, native: Bool = False
+    dst_storage: ZoneStorageDST = ZoneInfoMem32,
+    no_dst_storage: ZoneStorageNoDST = ZoneInfoMem8,
+    iana: Optional[ZoneInfo[dst_storage, no_dst_storage]] = get_zoneinfo[
+        dst_storage, no_dst_storage
+    ](),
+    pyzoneinfo: Bool = True,
+    native: Bool = False,
 ](Hashable, Stringable):
     """Custom `Calendar` and `TimeZone` may be passed in.
     By default, it uses `PythonCalendar` which is a Gregorian
@@ -48,12 +61,18 @@ struct DateTime[
     [0001-01-01, 9999-12-31]. Default `TimeZone` is UTC.
 
     Parameters:
+        dst_storage: The type of storage to use for ZoneInfo
+            for zones with Dailight Saving Time. Default Memory.
+        no_dst_storage: The type of storage to use for ZoneInfo
+            for zones with no Dailight Saving Time. Default Memory.
         iana: What timezones from the [IANA database](
             http://www.iana.org/time-zones/repository/tz-link.html)
-            are used. [List of TZ identifiers (`tz_str`)](
-            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-            ). If None, defaults to only using the offsets
-            as is, no daylight saving or special exceptions.
+            are used. It defaults to using all available timezones,
+            if getting them fails at compile time, it tries using
+            python's zoneinfo if pyzoneinfo is set to True, otherwise
+            it uses the offsets as is, no daylight saving or
+            special exceptions. [List of TZ identifiers](
+            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
         pyzoneinfo: Whether to use python's zoneinfo and
             datetime to get full IANA support.
         native: (fast, partial IANA support) Whether to use a native Dict
@@ -101,7 +120,7 @@ struct DateTime[
     var n_second: UInt16
     """N_second."""
     # TODO: tz and calendar should be references
-    alias _tz = TimeZone[iana, pyzoneinfo, native]
+    alias _tz = TimeZone[dst_storage, no_dst_storage, iana, pyzoneinfo, native]
     var tz: Self._tz
     """Tz."""
     var calendar: Calendar
@@ -333,9 +352,9 @@ struct DateTime[
         var offset = self.tz.offset_at(
             self.year, self.month, self.day, self.hour, self.minute, self.second
         )
-        var of_h = int(offset[0])
-        var of_m = int(offset[1])
-        if offset[2] == -1:
+        var of_h = int(offset.hour)
+        var of_m = int(offset.minute)
+        if offset.sign == -1:
             new_self = self.add(hours=of_h, minutes=of_m)
         else:
             new_self = self.subtract(hours=of_h, minutes=of_m)
@@ -358,10 +377,10 @@ struct DateTime[
         var offset = tz.offset_at(
             self.year, self.month, self.day, self.hour, self.minute, self.second
         )
-        var h = int(offset[0])
-        var m = int(offset[1])
+        var h = int(offset.hour)
+        var m = int(offset.minute)
         var new_self: Self
-        if offset[2] == 1:
+        if offset.sign == 1:
             new_self = self.add(hours=h, minutes=m)
         else:
             new_self = self.subtract(hours=h, minutes=m)
@@ -1286,17 +1305,17 @@ struct DateTime[
             return None
         var p = parsed.take()
         return Self(
-            p[0],
-            p[1],
-            p[2],
-            p[3],
-            p[4],
-            p[5],
-            p[6],
-            p[7],
-            p[8],
-            tz=tz,
-            calendar=calendar,
+            p.year,
+            p.month,
+            p.day,
+            p.hour,
+            p.minute,
+            p.second,
+            p.m_second,
+            p.u_second,
+            p.n_second,
+            tz,
+            calendar,
         )
 
     @staticmethod
