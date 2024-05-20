@@ -351,8 +351,8 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
     @always_inline("nodebug")
     fn unsafe_get[
-        IndexType: Indexer,
-    ](self: Reference[Self, _, _], idx: IndexType) -> Reference[
+        IndexerType: Indexer,
+    ](self: Reference[Self, _, _], idx: IndexerType) -> Reference[
         Self.ElementType, self.is_mutable, self.lifetime
     ]:
         """Get a reference to an element of self without checking index bounds.
@@ -363,7 +363,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Using negative indices is considered undefined behavior.
 
         Parameters:
-            IndexType: The type of the argument used as index.
+            IndexerType: The type of the argument used as index.
 
         Args:
             idx: The index of the element to get.
