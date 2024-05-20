@@ -142,7 +142,7 @@ standard library, test it, and raise a PR.
 
 First, follow everything in the [prerequisites](#prerequisites).
 
-__IMPORTANT__ We'll be in the `mojo/stdlib` folder for this tutorial, check and
+**IMPORTANT** We'll be in the `mojo/stdlib` folder for this tutorial, check and
 make sure you're in that location if anything goes wrong:
 `cd [path-to-repo]/stdlib`
 
