@@ -32,6 +32,12 @@ struct Offset:
     and an [Antartica research station](
         https://es.wikipedia.org/wiki/Base_Troll ))."""
 
+    var hour: UInt8
+    """Hour."""
+    var minute: UInt8
+    """Minute."""
+    var sign: UInt8
+    """Sign."""
     var buf: UInt8
     """Buffer."""
 
@@ -41,9 +47,30 @@ struct Offset:
         Args:
             buf: The buffer.
         """
+        self.hour = (buf >> 3) & 0b111
+        self.minute = (buf >> 1) & 0b1
+        self.sign = buf >> 7
         self.buf = buf
 
-    fn __init__(inout self, hour: Int, minute: Int, sign: Int):
+    fn __init__(inout self, values: Tuple[UInt8, UInt8, UInt8], /):
+        """Construct an `Offset` from values.
+
+        Args:
+            values: Tuple.
+        """
+
+        self = Self(values[0], values[1], values[2])
+
+    fn __init__(inout self, values: Tuple[Int, Int, Int], /):
+        """Construct an `Offset` from values.
+
+        Args:
+            values: Tuple.
+        """
+
+        self = Self(values[0], values[1], values[2])
+
+    fn __init__(inout self, hour: UInt8, minute: UInt8, sign: UInt8):
         """Construct an `Offset` from values.
 
         Args:
@@ -51,6 +78,9 @@ struct Offset:
             minute: Minute.
             sign: Sign.
         """
+        self.hour = hour
+        self.minute = minute
+        self.sign = sign
         self.buf = (sign << 7) | (hour << 3) | (minute << 1) | 0
 
     fn __init__(
@@ -82,8 +112,14 @@ struct Offset:
                     std_m = 1
                 elif std_m == 45:
                     std_m = 2
+            self.hour = std_h
+            self.minute = std_m
+            self.sign = sign
             self.buf = (sign << 7) | (std_h << 3) | (std_m << 1) | weird
         except:
+            self.hour = 0
+            self.minute = 0
+            self.sign = 0
             self.buf = 0
 
     @always_inline("nodebug")
@@ -248,36 +284,31 @@ struct ZoneDST:
 
 
 @value
-struct ZoneInfoFile(CollectionElement):
-    """Zoneinfo that lives in a file. Smallest memory footprint
-    but only supports 256 timezones (there are ~ 418)."""
+struct ZoneInfoFile32(CollectionElement):
+    """ZoneInfoFile to store Offset of tz with DST.
+    Zoneinfo that lives in a file. Smallest memory footprint
+    but only supports 256 timezones (there are ~ 418).
+    """
 
     var _index: UInt8
-    var _BIT_WIDTH: UInt8
-    var _BIT_MASK: UInt32
+    alias _BIT_WIDTH: UInt8 = 32
+    alias _BIT_MASK: UInt32 = 0xFFFFFFFF
     var _file: Path
 
-    fn __init__(inout self, BIT_WIDTH: UInt8, BIT_MASK: UInt32):
-        """Construct a `ZoneInfoFile`.
-
-        Args:
-            BIT_WIDTH: Bit width of the values.
-            BIT_MASK: Bit mask for the values.
-        """
+    fn __init__(inout self):
+        """Construct a `ZoneInfoFile`."""
         try:
             self._file = Path(cwd()) / "zoneinfo_dump"
         except:
-            self._file = "./zoneinfo_dump"
+            self._file = Path(".") / "zoneinfo_dump"
         self._index = 0
-        self._BIT_WIDTH = BIT_WIDTH
-        self._BIT_MASK = BIT_MASK
 
-    fn add(inout self, key: StringLiteral, buf: UInt32) raises -> UInt8:
+    fn add(inout self, key: StringLiteral, value: ZoneDST) raises -> UInt8:
         """Add a value to the file.
 
         Args:
             key: The tz_str.
-            buf: The buffer with the hash.
+            value: The ZoneDST with the hash.
 
         Returns:
             The index in the file.
@@ -291,7 +322,7 @@ struct ZoneInfoFile(CollectionElement):
             self._index += 1
         with open(self._file, "rb") as f:
             _ = f.seek(b_width64 * (self._index).cast[DType.uint64]())
-            f.write(buf << (32 - b_width32))
+            f.write(value.buf << (32 - b_width32))
         return self._index
 
     fn get(self, index: UInt8) raises -> Optional[ZoneDST]:
@@ -330,10 +361,76 @@ struct ZoneInfoFile(CollectionElement):
             pass
 
 
-alias ZoneInfoFile32 = ZoneInfoFile(32, 0xFFFFFFFF)
-"""ZoneInfoFile to store Offset of tz with DST"""
-alias ZoneInfoFile8 = ZoneInfoFile(8, 0xFF)
-"""ZoneInfoFile to store Offset of tz with no DST"""
+@value
+struct ZoneInfoFile8(CollectionElement):
+    """ZoneInfoFile to store Offset of tz with no DST.
+    Zoneinfo that lives in a file. Smallest memory footprint
+    but only supports 256 timezones (there are ~ 418).
+    """
+
+    var _index: UInt8
+    alias _BIT_WIDTH: UInt8 = 8
+    alias _BIT_MASK: UInt8 = 0xFF
+    var _file: Path
+
+    fn __init__(inout self):
+        """Construct a `ZoneInfoFile`."""
+        try:
+            self._file = Path(cwd()) / "zoneinfo_dump"
+        except:
+            self._file = "./zoneinfo_dump"
+        self._index = 0
+
+    fn add(inout self, key: StringLiteral, buf: UInt8) raises -> UInt8:
+        """Add a value to the file.
+
+        Args:
+            key: The tz_str.
+            buf: The buffer with the hash.
+
+        Returns:
+            The index in the file.
+        """
+        _ = key
+        var b_width64 = self._BIT_WIDTH.cast[DType.uint64]()
+        var b_width32 = self._BIT_WIDTH.cast[DType.uint8]()
+        if self._index > 0xFF:
+            self._index = 0
+        else:
+            self._index += 1
+        with open(self._file, "rb") as f:
+            _ = f.seek(b_width64 * (self._index).cast[DType.uint64]())
+            f.write(buf << (32 - b_width32))
+        return self._index
+
+    fn get(self, index: UInt8) raises -> Optional[Offset]:
+        """Get a value from the file.
+
+        Args:
+            index: The index in the file.
+
+        Returns:
+            An Optional `Offset`.
+        """
+        if self._index > 0xFF:
+            return None
+        var value: UInt8
+        with open(self._file, "rb") as f:
+            _ = f.seek(
+                self._BIT_WIDTH.cast[DType.uint64]()
+                * index.cast[DType.uint64]()
+            )
+            value = f.read_bytes(1)
+        return Offset(value & self._BIT_MASK)
+
+    fn __del__(owned self):
+        """Delete the file."""
+        try:
+            import os
+
+            os.remove(self._file)
+        except:
+            pass
 
 
 @value
@@ -451,8 +548,39 @@ struct ZoneInfoMem8(CollectionElement):
 #     return leaps
 
 
+@register_passable("trivial")
+struct Leapsecs:
+    var day: UInt8
+    """Day in which the leap second was added."""
+    var month: UInt8
+    """Month in which the leap second was added."""
+    var year: UInt16
+    """Year in which the leap second was added."""
+
+    fn __init__(inout self, day: Int, month: Int, year: Int):
+        """Construct an `Leapsecs` from values.
+
+        Args:
+            day: Day.
+            month: Month.
+            year: Year.
+        """
+        self.day = day
+        self.month = month
+        self.year = year
+
+    fn __init__(inout self, values: Tuple[Int, Int, Int], /):
+        """Construct an `Leapsecs` from values.
+
+        Args:
+            values: Tuple.
+        """
+
+        self = Self(values[0], values[1], values[2])
+
+
 @always_inline
-fn get_leapsecs() -> Optional[List[(UInt8, UInt8, UInt16)]]:
+fn get_leapsecs() -> Optional[List[Leapsecs]]:
     """Get the leap seconds added to UTC.
 
     Returns:
@@ -470,25 +598,46 @@ fn get_leapsecs() -> Optional[List[(UInt8, UInt8, UInt16)]]:
     #     var leapsecs = _parse_iana_leapsecs(secs.text)
     #     return leapsecs
     # except:
-    #     # TODO: fallback to hardcoded
-    #     from ._lists import leapsecs
+    #    pass
+    from ._lists import leapsecs
 
-    #     return List[(UInt8, UInt8, UInt16)](
-    #         unsafe_pointer=leapsecs.data.address,
-    #         capacity=leapsecs.capacity,
-    #         size=leapsecs.size,
-    #     )
-    return List[(UInt8, UInt8, UInt16)]()
+    return leapsecs
 
 
-# TODO: get_zoneinfo should be able to return a ZoneInfoMem
-# or ZoneInfoFile according to parameter
-alias ZoneInfo = (ZoneInfoMem32, ZoneInfoMem8)
-"""ZoneInfo."""
+trait ZoneStorageDST(CollectionElement):
+    """Trait that defines ZoneInfo storage structs."""
+
+    fn add(inout self, key: StringLiteral, value: ZoneDST):
+        ...
+
+    fn get(self, key: StringLiteral) -> Optional[ZoneDST]:
+        ...
+
+
+trait ZoneStorageNoDST(CollectionElement):
+    """Trait that defines ZoneInfo storage structs."""
+
+    fn add(inout self, key: StringLiteral, value: Offset):
+        ...
+
+    fn get(self, key: StringLiteral) -> Optional[Offset]:
+        ...
+
+
+@value
+struct ZoneInfo[T: ZoneStorageDST, A: ZoneStorageNoDST]:
+    """ZoneInfo."""
+
+    var with_dst: T
+    """Zoneinfo for Zones with Daylight Saving Time."""
+    var with_no_dst: A
+    """Zoneinfo for Zones with no Daylight Saving Time."""
 
 
 # @always_inline
-fn get_zoneinfo() -> Optional[ZoneInfo]:
+fn get_zoneinfo[
+    T: ZoneStorageDST = ZoneInfoMem32, A: ZoneStorageNoDST = ZoneInfoMem8
+]() -> Optional[ZoneInfo[T, A]]:
     """Get all zoneinfo available. First tries to get it
     from the OS, then from the internet, then falls back
     on hardcoded values.
@@ -516,72 +665,70 @@ fn get_zoneinfo() -> Optional[ZoneInfo]:
     """
     # try:
     #     # TODO: this should get zoneinfo from the OS it's compiled in
-    #     for Linux the files are under /usr/share/zoneinfo
-    #     no idea where they're for Windows or MacOS
+    #     # for Linux the files are under /usr/share/zoneinfo
+    #     # no idea where they're for Windows or MacOS
+    #     pass
     # except:
     #     pass
-    # try:
-    #     var dst_zones = ZoneInfoMem32()
-    #     var no_dst_zones = ZoneInfoMem8()
-    #     from python import Python
+    try:
+        var dst_zones = ZoneInfoMem32()
+        var no_dst_zones = ZoneInfoMem8()
+        from python import Python
 
-    #     var json = Python.import_module("json")
-    #     var requests = Python.import_module("requests")
-    #     var datetime = Python.import_module("datetime")
-    #     var text = requests.get("https://worldtimeapi.org/api/timezone").text
-    #     var tz_list = json.loads(text)
+        var json = Python.import_module("json")
+        var requests = Python.import_module("requests")
+        var datetime = Python.import_module("datetime")
+        # var text = requests.get("https://worldtimeapi.org/api/timezone").text
+        # var tz_list = json.loads(text)
+        from ._lists import tz_list
 
-    #     for item in tz_list:
-    #         var tz = requests.get(
-    #             "https://timeapi.io/TimeZone/" + String(item[])
-    #         ).text
-    #         var data = json.loads(tz)
-    #         var utc_offset = data["standardUtcOffset"]["seconds"] // 60
-    #         var h = int(utc_offset // 60)
-    #         var m = int(utc_offset % 60)
-    #         var sign = 1 if utc_offset >= 0 else -1
+        for item in List(tz_list):
+            var tz = requests.get("https://timeapi.io/TimeZone/" + item[]).text
+            var data = json.loads(tz)
+            var utc_offset = data["standardUtcOffset"]["seconds"] // 60
+            var h = int(utc_offset // 60)
+            var m = int(utc_offset % 60)
+            var sign = 1 if utc_offset >= 0 else -1
 
-    #         var dst_start: PythonObject = ""
-    #         var dst_end: PythonObject = ""
-    #         if not data["hasDayLightSaving"]:
-    #             _ = h, m, sign
-    #             # TODO: somehow force cast python object to StringLiteral
-    #             no_dst_zones.add(
-    #                 str(item[]), Offset(abs(h), abs(m), sign)
-    #             )
-    #             continue
-    #         # -1 is to avoid Z timezone designation that
-    #         # python's datetime doesn't like
-    #         dst_start = data["dstInterval"]["dstStart"].__getitem__(0, -1)
-    #         dst_end = data["dstInterval"]["dstEnd"].__getitem__(0, -1)
+            var dst_start: PythonObject = ""
+            var dst_end: PythonObject = ""
+            if not data["hasDayLightSaving"]:
+                _ = h, m, sign
+                # TODO: somehow force cast python object to StringLiteral
+                no_dst_zones.add(item[], Offset(abs(h), abs(m), sign))
+                continue
+            # -1 is to avoid Z timezone designation that
+            # python's datetime doesn't like
+            dst_start = data["dstInterval"]["dstStart"].__getitem__(0, -1)
+            dst_end = data["dstInterval"]["dstEnd"].__getitem__(0, -1)
 
-    #         var dt_start = datetime.datetime(dst_start)
-    #         var month_start = UInt16(dst_start.month)
-    #         var dow_start = UInt16(dt_start.weekday())
-    #         var eom_start = UInt16(0 if dt_start <= 15 else 1)
-    #         var week_start = 0  # TODO
-    #         var h_start = UInt16(dt_start.hour)
-    #         var dt_end = datetime.datetime(dst_end)
-    #         var month_end = UInt16(dst_end.month)
-    #         var week_end = 0  # TODO
-    #         var h_end = UInt16(dt_end.hour)
-    #         var dow_end = UInt16(dt_end.weekday())
-    #         var eom_end = UInt16(0 if dt_end <= 15 else 1)
+            var dt_start = datetime.datetime(dst_start)
+            var month_start = UInt16(dst_start.month)
+            var dow_start = UInt16(dt_start.weekday())
+            var eom_start = UInt16(0 if dt_start <= 15 else 1)
+            var week_start = 0  # TODO
+            var h_start = UInt16(dt_start.hour)
+            var dt_end = datetime.datetime(dst_end)
+            var month_end = UInt16(dst_end.month)
+            var week_end = 0  # TODO
+            var h_end = UInt16(dt_end.hour)
+            var dow_end = UInt16(dt_end.weekday())
+            var eom_end = UInt16(0 if dt_end <= 15 else 1)
 
-    #         # TODO: somehow force cast python object to StringLiteral
-    #         dst_zones.add(
-    #             item[],
-    #             ZoneDST(
-    #                 TzDT(
-    #                     month_start, dow_start, eom_start, week_start, h_start
-    #                 ),
-    #                 TzDT(month_end, dow_end, eom_end, week_end, h_end),
-    #                 Offset(abs(h), abs(m), sign),
-    #             ),
-    #         )
-    #     return dst_zones, no_dst_zones
-    # except:
-    #     pass
+            # TODO: somehow force cast python object to StringLiteral
+            dst_zones.add(
+                item[],
+                ZoneDST(
+                    TzDT(
+                        month_start, dow_start, eom_start, week_start, h_start
+                    ),
+                    TzDT(month_end, dow_end, eom_end, week_end, h_end),
+                    Offset(abs(h), abs(m), sign),
+                ),
+            )
+        return ZoneInfo(dst_zones, no_dst_zones)
+    except:
+        pass
     # TODO: fallback to hardcoded
     # from ._lists import tz_list
     return None
@@ -591,9 +738,7 @@ fn get_zoneinfo() -> Optional[ZoneInfo]:
 # """All timezones available at compile time."""
 
 
-fn offset_no_dst_tz(
-    owned no_dst: Optional[Offset],
-) -> Optional[(UInt8, UInt8, UInt8)]:
+fn offset_no_dst_tz(owned no_dst: Optional[Offset]) -> Optional[Offset]:
     """Return the UTC offset for the `TimeZone` if it has no DST.
 
     Args:
@@ -613,7 +758,7 @@ fn offset_no_dst_tz(
             0 if offset[2] == 0 else (30 if offset[2] == 1 else 45)
         )
         var sign: UInt8 = 1 if offset[0] == 0 else -1
-        return offset_h, offset_m, sign
+        return Offset(offset_h, offset_m, sign)
     return None
 
 
@@ -625,7 +770,7 @@ fn offset_at(
     hour: UInt8,
     minute: UInt8,
     second: UInt8,
-) -> Optional[(UInt8, UInt8, UInt8)]:
+) -> Optional[Offset]:
     """Return the UTC offset for the `TimeZone` at the given date
     if it has DST.
 
@@ -665,12 +810,12 @@ fn offset_at(
                 std_m = 0
                 dst_m = 0
 
-        var std = offset[1], std_m, sign
-        var dst = dst_h, dst_m, sign
+        var std = Offset(offset[1], std_m, sign)
+        var dst = Offset(dst_h, dst_m, sign)
 
         fn eval_dst(
             dst_st: Bool, data: (UInt8, UInt8, UInt8, UInt8, UInt8)
-        ) -> (UInt8, UInt8, UInt8):
+        ) -> Offset:
             var is_end_mon = data[2] == 1
             var maxdays = _cal.max_days_in_month(year, month)
             var iterable = range(0, maxdays, step=1)

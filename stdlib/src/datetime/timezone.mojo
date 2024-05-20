@@ -19,7 +19,7 @@
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 """
 
-from .zoneinfo import ZoneInfo, offset_at, offset_no_dst_tz
+from .zoneinfo import Offset, ZoneInfo, offset_at, offset_no_dst_tz
 
 
 alias _all_zones = get_zoneinfo()
@@ -117,14 +117,14 @@ struct TimeZone[
         if iana:
             if has_dst or not _all_zones:
                 return
-            var tz = _all_zones.value()[][1].get(tz_str)
+            var tz = _all_zones.value()[].with_no_dst.get(tz_str)
             var val = offset_no_dst_tz(tz)
             if not val:
                 return
             var offset = val.unsafe_take()
-            self.offset_h = offset[0]
-            self.offset_m = offset[1]
-            self.sign = offset[2]
+            self.offset_h = offset.hour
+            self.offset_m = offset.minute
+            self.sign = offset.sign
 
     fn offset_at(
         self,
@@ -134,7 +134,7 @@ struct TimeZone[
         hour: UInt8,
         minute: UInt8,
         second: UInt8,
-    ) -> (UInt8, UInt8, UInt8):
+    ) -> Offset:
         """Return the UTC offset for the `TimeZone` at the given date.
 
         Args:
@@ -154,7 +154,7 @@ struct TimeZone[
         @parameter
         if iana and native:
             if self.has_dst:
-                var dst = _all_zones.value()[][0].get(self.tz_str)
+                var dst = _all_zones.value()[].with_dst.get(self.tz_str)
                 var offset = offset_at(
                     dst, year, month, day, hour, minute, second
                 )
@@ -170,9 +170,9 @@ struct TimeZone[
                 var local = dt.datetime(year, month, day, hour, tzinfo=zone)
                 var offset = local.utcoffset()
                 var sign = 1 if offset.days == -1 else -1
-                var hours = offset.seconds // (60 * 60) - hour
-                var minutes = offset.seconds % 60
-                return UInt8(hours), UInt8(minutes), UInt8(sign)
+                var hours = int(offset.seconds) // (60 * 60) - int(hour)
+                var minutes = int(offset.seconds) % 60
+                return hours, minutes, sign
             except:
                 pass
         return self.offset_h, self.offset_m, self.sign

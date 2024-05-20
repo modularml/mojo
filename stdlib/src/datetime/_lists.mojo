@@ -11,7 +11,10 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 """Hardcoded lists."""
-alias tz_list = List(
+
+from .zoneinfo import Leapsecs
+
+alias tz_list = List[StringLiteral](
     "Africa/Abidjan",
     "Africa/Algiers",
     "Africa/Bissau",
@@ -364,7 +367,7 @@ alias tz_list = List(
     "WET",
 )
 """List of tz_str."""
-alias leapsecs = List(
+alias leapsecs = List[Leapsecs](
     (1, 1, 1972),
     (1, 7, 1972),
     (1, 1, 1973),

@@ -201,21 +201,20 @@ fn from_iso[
     return result^
 
 
-fn strptime[
-    format_str: StringLiteral
-](s: String) -> Optional[
-    (
-        UInt16,
-        UInt8,
-        UInt8,
-        UInt8,
-        UInt8,
-        UInt8,
-        UInt16,
-        UInt16,
-        UInt16,
-    )
-]:
+@value
+struct _DateTime:
+    var year: UInt16
+    var month: UInt8
+    var day: UInt8
+    var hour: UInt8
+    var minute: UInt8
+    var second: UInt8
+    var m_second: UInt16
+    var u_second: UInt16
+    var n_second: UInt16
+
+
+fn strptime[format_str: StringLiteral](s: String) -> Optional[_DateTime]:
     """Parses time from a `String`.
 
     Parameters:
@@ -233,7 +232,7 @@ fn strptime[
 
     #     var dt = Python.import_module("datetime")
     #     var date = dt.datetime.strptime(s, format_str)
-    #     return (
+    #     return _DateTime(
     #         UInt16(date.year),
     #         UInt8(date.month),
     #         UInt8(date.day),
