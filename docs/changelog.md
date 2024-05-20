@@ -54,7 +54,15 @@ what we publish.
   non-inferred parameter. `dt` is inferred from the parameter itself to
   `DType.int32`.
 
-  Note that this only works on function parameter lists at the moment.
+  This also works with structs. For example:
+
+  ```mojo
+  struct ScalarContainer[inferred dt: DType, value: Scalar[dt]]:
+      pass
+
+  fn foo(x: ScalarContainer[Int32(0)]): # 'dt' is inferred
+      pass
+  ```
 
 - Mojo now supports adding a `@deprecated` decorator on structs, functions,
   traits, aliases, and global variables. The decorator marks the attached decl
@@ -77,6 +85,15 @@ what we publish.
   fn techdebt():
       bar() # warning: use another function!
   ```
+
+- Mojo has changed how `def` arguments are processed.  Previously, by default,
+  arguments to a `def` were treated as `owned` convention, which makes a copy of
+  the value, enabling that value to be mutable in the callee.  This is "worked",
+  but was a major performance footgun, and required you to declare non-copyable
+  types as `borrowed` explicitly.  Now Mojo takes a different approach: it takes
+  the arguments as `borrowed` (consistent with `fn`s) but will make a local copy
+  of the value **only if the argument is mutated** on the body of the function.
+  This improves consistency, performance, and ease of use.
 
 - `int()` can now take a string and a specified base to parse an integer from a
   string: `int("ff", 16)` returns `255`. Additionally, if a base of zero is
