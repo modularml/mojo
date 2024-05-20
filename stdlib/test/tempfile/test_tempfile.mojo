@@ -15,7 +15,7 @@
 import os
 from os.path import exists
 from pathlib import Path
-from tempfile import TemporaryDirectory, gettempdir, mkdtemp
+from tempfile import NamedTemporaryFile, TemporaryDirectory, gettempdir, mkdtemp
 
 from testing import assert_equal, assert_false, assert_true
 
@@ -178,7 +178,55 @@ fn test_temporary_directory() raises -> None:
     assert_false(exists(tmp_dir), "Failed to delete temp dir " + tmp_dir)
 
 
+fn test_named_temporary_file_deletion() raises:
+    var tmp_file: NamedTemporaryFile
+    var file_name: String
+
+    with NamedTemporaryFile(
+        prefix=String("my_prefix"), suffix=String("my_suffix")
+    ) as my_tmp_file:
+        file_name = my_tmp_file.name
+        assert_true(exists(file_name), "Failed to create file " + file_name)
+        assert_true(file_name.split("/")[-1].startswith(String("my_prefix")))
+    assert_false(exists(file_name), "Failed to delete file " + file_name)
+
+    with NamedTemporaryFile(delete=False) as my_tmp_file:
+        file_name = my_tmp_file.name
+        assert_true(exists(file_name), "Failed to create file " + file_name)
+    assert_true(exists(file_name), "File " + file_name + " should still exist")
+    os.remove(file_name)
+
+    tmp_file = NamedTemporaryFile()
+    file_name = tmp_file.name
+    assert_true(exists(file_name), "Failed to create file " + file_name)
+    tmp_file.close()
+    assert_false(exists(file_name), "Failed to delete file " + file_name)
+
+    tmp_file = NamedTemporaryFile(delete=False)
+    file_name = tmp_file.name
+    assert_true(exists(file_name), "Failed to create file " + file_name)
+    tmp_file.close()
+    assert_true(exists(file_name), "File " + file_name + " should still exist")
+    os.remove(file_name)
+
+
+fn test_named_temporary_file_write() raises:
+    var file_name: String
+    var contents: String
+
+    with NamedTemporaryFile(delete=False) as my_tmp_file:
+        file_name = my_tmp_file.name
+        my_tmp_file.write("hello world")
+
+    with open(file_name, "r") as my_file:
+        contents = my_file.read()
+    assert_equal("hello world", contents)
+    os.remove(file_name)
+
+
 fn main() raises:
     test_mkdtemp()
     test_gettempdir()
     test_temporary_directory()
+    test_named_temporary_file_write()
+    test_named_temporary_file_deletion()
