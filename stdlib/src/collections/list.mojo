@@ -728,7 +728,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         result += "]"
         return result
 
-    @staticmethod
     fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
         Note that since we can't condition methods on a trait yet,
@@ -736,16 +735,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(__type_of(my_list).__repr__(my_list))
+        print(my_list.__repr__(my_list))
         ```
 
         When the compiler supports conditional methods, then a simple `repr(my_list)` will
         be enough.
 
         The elements' type must implement the `__repr__()` for this to work.
-
-        Args:
-            self: The list to represent as a string.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
@@ -754,7 +750,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A string representation of the list.
         """
-        return __type_of(self).__str__(self)
+        return self.__str__()
 
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.

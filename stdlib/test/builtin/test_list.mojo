@@ -35,9 +35,9 @@ fn test_variadic_list() raises:
 
 fn test_repr_list() raises:
     var l = List(1, 2, 3)
-    assert_equal(__type_of(l).__repr__(l), "[1, 2, 3]")
+    assert_equal(l.__repr__(), "[1, 2, 3]")
     var empty = List[Int]()
-    assert_equal(__type_of(empty).__repr__(empty), "[]")
+    assert_equal(empty.__repr__(), "[]")
 
 
 def main():
