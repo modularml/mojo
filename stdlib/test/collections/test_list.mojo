@@ -16,6 +16,7 @@ from collections import List
 
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_true, assert_raises
+from utils import Span
 
 
 def test_mojo_issue_698():
@@ -757,6 +758,14 @@ def test_list_contains():
     # y.append(List(1,2))
     # assert_equal(List(1,2) in y,True)
     # assert_equal(List(0,1) in y,False)
+
+
+def test_list_init_span():
+    var l = List[String]("a", "bb", "cc", "def")
+    var sp = Span(l)
+    var l2 = List[String](sp)
+    for i in range(len(l)):
+        assert_equal(l[i], l2[i])
 
 
 def main():
