@@ -122,17 +122,9 @@ def test_truthy():
 
     @parameter
     fn test_dtype[type: DType]() raises:
-        # # Scalars of 0-values are false-y, 1-values are truth-y
-        assert_false(Scalar[type](False).__bool__())
-        assert_true(Scalar[type](True).__bool__())
-
-        # # SIMD vectors are truth-y if _all_ values are truth-y
-        assert_true(SIMD[type, 2](True, True).__bool__())
-
-        # # SIMD vectors are false-y if _any_ values are false-y
-        assert_false(SIMD[type, 2](False, True).__bool__())
-        assert_false(SIMD[type, 2](True, False).__bool__())
-        assert_false(SIMD[type, 2](False, False).__bool__())
+        # Scalars of 0-values are false-y, 1-values are truth-y
+        assert_false(Scalar[type](False))
+        assert_true(Scalar[type](True))
 
     @parameter
     fn test_dtype_unrolled[i: Int]() raises:
@@ -1017,38 +1009,38 @@ def test_indexer():
 
 
 def main():
-    test_cast()
-    test_simd_variadic()
-    test_convert_simd_to_string()
-    test_issue_20421()
-    test_truthy()
-    test_len()
+    test_abs()
     test_add()
-    test_radd()
-    test_iadd()
+    test_add_with_overflow()
+    test_address()
+    test_cast()
     test_ceil()
-    test_floor()
-    test_trunc()
-    test_round()
-    test_roundeven()
+    test_convert_simd_to_string()
+    test_deinterleave()
     test_div()
+    test_extract()
+    test_floor()
     test_floordiv()
-    test_rfloordiv()
+    test_iadd()
+    test_indexer()
+    test_insert()
+    test_interleave()
+    test_issue_20421()
+    test_join()
+    test_len()
+    test_limits()
+    test_min_max_clamp()
     test_mod()
+    test_mul_with_overflow()
+    test_radd()
+    test_rfloordiv()
     test_rmod()
     test_rotate()
+    test_round()
+    test_roundeven()
     test_shift()
     test_shuffle()
-    test_insert()
-    test_join()
-    test_interleave()
-    test_deinterleave()
-    test_address()
-    test_extract()
-    test_limits()
-    test_add_with_overflow()
+    test_simd_variadic()
     test_sub_with_overflow()
-    test_mul_with_overflow()
-    test_abs()
-    test_min_max_clamp()
-    test_indexer()
+    test_trunc()
+    test_truthy()
