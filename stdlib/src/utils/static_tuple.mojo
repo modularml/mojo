@@ -381,7 +381,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         )
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self[]._array).address,
-            index(idx).value,
+            idx_as_int.value,
         )
         return UnsafePointer(ptr)[]
 
