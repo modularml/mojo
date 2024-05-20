@@ -15,11 +15,10 @@ from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from datetime.timezone import TimeZone, ZoneInfo, ZoneInfoMem32, ZoneInfoMem8
 
-alias _IANA = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
-
 
 fn test_tz_no_iana() raises:
-    alias tz = TimeZone[iana = _IANA(None), pyzoneinfo=False, native=False]
+    alias iana = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
+    alias tz = TimeZone[iana = iana(None), pyzoneinfo=False, native=False]
     var tz0 = tz("Etc/UTC", 0, 0)
     var tz_1 = tz("Etc/UTC-1", 1, 0)
     var tz_2 = tz("Etc/UTC-2", 2, 30)

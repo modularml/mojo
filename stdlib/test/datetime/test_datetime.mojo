@@ -19,16 +19,16 @@ from time import time
 
 from datetime.datetime import DateTime
 from datetime.calendar import Calendar, PythonCalendar, UTCCalendar
-from datetime.timezone import TimeZone
 from datetime.dt_str import IsoFormat
+from datetime.timezone import TimeZone, ZoneInfo, ZoneInfoMem32, ZoneInfoMem8
 
 
 fn test_add() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias _IANA = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
-    alias dt = DateTime[iana = _IANA(None), pyzoneinfo=False, native=False]
+    alias iana = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
+    alias dt = DateTime[iana = iana(None), pyzoneinfo=False, native=False]
     alias TZ = dt._tz
     alias tz_0_ = TZ("Etc/UTC", 0, 0)
     alias tz_1 = TZ("Etc/UTC-1", 1, 0)
@@ -127,8 +127,8 @@ fn test_subtract() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias _IANA = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
-    alias dt = DateTime[iana = _IANA(None), pyzoneinfo=False, native=False]
+    alias iana = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
+    alias dt = DateTime[iana = iana(None), pyzoneinfo=False, native=False]
     alias TZ = dt._tz
     alias tz_0_ = TZ("Etc/UTC", 0, 0)
     alias tz_1 = TZ("Etc/UTC-1", 1, 0)
@@ -217,8 +217,8 @@ fn test_logic() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias _IANA = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
-    alias dt = DateTime[iana = _IANA(None), pyzoneinfo=False, native=False]
+    alias iana = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
+    alias dt = DateTime[iana = iana(None), pyzoneinfo=False, native=False]
     alias TZ = dt._tz
     alias tz_0_ = TZ("Etc/UTC", 0, 0)
     alias tz_1 = TZ("Etc/UTC-1", 1, 0)
@@ -239,8 +239,8 @@ fn test_bitwise() raises:
     # when using python and unix calendar there should be no difference in results
     alias pycal = PythonCalendar
     alias unixcal = UTCCalendar
-    alias _IANA = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
-    alias dt = DateTime[iana = _IANA(None), pyzoneinfo=False, native=False]
+    alias iana = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
+    alias dt = DateTime[iana = iana(None), pyzoneinfo=False, native=False]
     alias TZ = dt._tz
     alias tz_0_ = TZ("Etc/UTC", 0, 0)
     alias tz_1 = TZ("Etc/UTC-1", 1, 0)
@@ -261,8 +261,8 @@ fn test_bitwise() raises:
 
 fn test_iso() raises:
     alias pycal = PythonCalendar
-    alias _IANA = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
-    alias dt = DateTime[iana = _IANA(None), pyzoneinfo=False, native=False]
+    alias iana = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
+    alias dt = DateTime[iana = iana(None), pyzoneinfo=False, native=False]
     alias TZ = dt._tz
     alias tz_0_ = TZ("Etc/UTC", 0, 0)
 
@@ -299,8 +299,8 @@ fn test_iso() raises:
 
 
 fn test_time() raises:
-    alias _IANA = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
-    alias dt = DateTime[iana = _IANA(None), pyzoneinfo=False, native=False]
+    alias iana = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
+    alias dt = DateTime[iana = iana(None), pyzoneinfo=False, native=False]
 
     var start = dt.now()
     time.sleep(1e-9)  # nanosecond resolution
@@ -309,8 +309,8 @@ fn test_time() raises:
 
 
 fn test_hash() raises:
-    alias _IANA = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
-    alias dt = DateTime[iana = _IANA(None), pyzoneinfo=False, native=False]
+    alias iana = Optional[ZoneInfo[ZoneInfoMem32, ZoneInfoMem8]]
+    alias dt = DateTime[iana = iana(None), pyzoneinfo=False, native=False]
 
     var ref = dt(1970, 1, 1)
     var data = hash(ref)
