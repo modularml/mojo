@@ -354,6 +354,9 @@ what we publish.
       print("x contains 1")
   ```
 
+- Added `os.getsize` function, which gives the size in bytes of a path.
+    ([PR 2626](https://github.com/modularml/mojo/pull/2626) by [@artemiogr97](https://github.com/artemiogr97))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
