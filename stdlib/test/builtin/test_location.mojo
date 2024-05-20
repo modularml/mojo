@@ -182,13 +182,27 @@ fn get_four_call_locs_inlined() -> (
 
 
 fn test_builtin_call_loc() raises:
+    var l = (148, 149, 156, 157)
+    var c = (25, 33, 25, 33)
     var loc_pair = get_call_locs()
+    check_source_loc(l[0], c[0], loc_pair[0])
+    check_source_loc(l[1], c[1], loc_pair[1])
 
     loc_pair = get_call_locs_inlined()
+    check_source_loc(l[2], c[2], loc_pair[0])
+    check_source_loc(l[3], c[3], loc_pair[1])
 
     var loc_quad = get_four_call_locs()
+    check_source_loc(l[0], c[0], loc_quad[0])
+    check_source_loc(l[1], c[1], loc_quad[1])
+    check_source_loc(l[2], c[2], loc_quad[2])
+    check_source_loc(l[3], c[3], loc_quad[3])
 
     loc_quad = get_four_call_locs_inlined()
+    check_source_loc(l[0], c[0], loc_quad[0])
+    check_source_loc(l[1], c[1], loc_quad[1])
+    check_source_loc(l[2], c[2], loc_quad[2])
+    check_source_loc(l[3], c[3], loc_quad[3])
 
 
 @always_inline
