@@ -361,6 +361,59 @@ fn bit_ceil[
 
 
 # ===----------------------------------------------------------------------===#
+# bit_floor
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline("nodebug")
+fn bit_floor(val: Int) -> Int:
+    """Computes the largest power of 2 that is less than or equal to the input
+    value.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The largest power of 2 that is less than or equal to the input value.
+    """
+    if val <= 0:
+        return 0
+
+    return 1 << (bit_width(val) - 1)
+
+
+@always_inline("nodebug")
+fn bit_floor[
+    type: DType, simd_width: Int
+](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    """Computes the largest power of 2 that is less than or equal to the input
+    value for each element of a SIMD vector.
+
+    Parameters:
+        type: `dtype` used for the computation.
+        simd_width: SIMD width used for the computation.
+
+    Constraints:
+        The element type of the input vector must be integral.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        A SIMD value where the element at position `i` is the largest power of 2
+        that is less than or equal to the integer at position `i` of the input
+        value.
+    """
+    constrained[type.is_integral(), "must be integral and unsigned"]()
+
+    alias zeros = SIMD[type, simd_width].splat(0)
+
+    var less_then_zero = (val <= zeros).select(zeros, val)
+
+    return (val > zeros).select(1 << (bit_width(val) - 1), less_then_zero)
+
+
+# ===----------------------------------------------------------------------===#
 # rotate_bits_left
 # ===----------------------------------------------------------------------===#
 

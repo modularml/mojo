@@ -23,4 +23,5 @@ from .bit import (
     rotate_bits_left,
     rotate_bits_right,
     bit_ceil,
+    bit_floor,
 )
