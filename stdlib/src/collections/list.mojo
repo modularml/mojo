@@ -553,17 +553,25 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.capacity = 0
         return ptr
 
-    fn __setitem__(inout self, i: Int, owned value: T):
+    fn __setitem__[
+        IndexerType: Indexer
+    ](inout self, i: IndexerType, owned value: T):
         """Sets a list element at the given index.
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             i: The index of the element.
             value: The value to assign.
         """
-        debug_assert(-self.size <= i < self.size, "index must be within bounds")
+        var normalized_idx = index(i)
+        debug_assert(
+            -self.size <= normalized_idx < self.size,
+            "index must be within bounds",
+        )
 
-        var normalized_idx = i
-        if i < 0:
+        if normalized_idx < 0:
             normalized_idx += len(self)
 
         destroy_pointee(self.data + normalized_idx)
@@ -613,10 +621,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return res^
 
     @always_inline
-    fn __getitem__(self, i: Int) -> T:
+    fn __getitem__[IndexerType: Indexer](self, i: IndexerType) -> T:
         """Gets a copy of the list element at the given index.
 
         FIXME(lifetimes): This should return a reference, not a copy!
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             i: The index of the element.
@@ -624,10 +635,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A copy of the element at the given index.
         """
-        debug_assert(-self.size <= i < self.size, "index must be within bounds")
-
-        var normalized_idx = i
-        if i < 0:
+        var normalized_idx = index(i)
+        debug_assert(
+            -self.size <= normalized_idx < self.size,
+            "index must be within bounds",
+        )
+        if normalized_idx < 0:
             normalized_idx += len(self)
 
         return (self.data + normalized_idx)[]

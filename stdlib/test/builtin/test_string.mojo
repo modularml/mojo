@@ -899,6 +899,13 @@ def test_string_mul():
     assert_equal(String("ab") * 5, "ababababab")
 
 
+def test_indexing():
+    a = String("abc")
+    assert_equal(a[False], "a")
+    assert_equal(a[Int16(1)], "b")
+    assert_equal(a[2], "c")
+
+
 def main():
     test_constructors()
     test_copy()
@@ -941,3 +948,4 @@ def main():
     test_removesuffix()
     test_intable()
     test_string_mul()
+    test_indexing()
