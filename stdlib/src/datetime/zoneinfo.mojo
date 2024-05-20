@@ -660,7 +660,7 @@ trait ZoneStorageNoDST(CollectionElement):
 @value
 struct ZoneInfo[T: ZoneStorageDST, A: ZoneStorageNoDST]:
     """ZoneInfo.
-    
+
     Parameters:
         T: The type of storage for timezones with
             Daylight Saving Time.
