@@ -1161,7 +1161,7 @@ struct Gregorian(_Calendarized):
             result[5] = int(((value & cal_h.mask_64_s) >> cal_h.shift_64_s))
             result[6] = int(((value & cal_h.mask_64_ms) >> cal_h.shift_64_ms))
             result[7] = int(((value & cal_h.mask_64_us) >> cal_h.shift_64_us))
-        return result
+        return result^
 
     @staticmethod
     @always_inline("nodebug")
@@ -1684,7 +1684,7 @@ struct UTCFast(_Calendarized):
                 >> (cal_h.shift_64_s - cal_h.shift_64_ms)
             )
             result[6] = int(value & cal_h.mask_64_ms)
-        return result
+        return result^
 
     @staticmethod
     @always_inline("nodebug")

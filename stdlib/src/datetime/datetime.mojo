@@ -108,26 +108,41 @@ struct DateTime[
     """Calendar."""
 
     fn __init__[
-        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+        T1: _IntCollect = Int,
+        T2: _IntCollect = Int,
+        T3: _IntCollect = Int,
+        T4: _IntCollect = Int,
+        T5: _IntCollect = Int,
+        T6: _IntCollect = Int,
+        T7: _IntCollect = Int,
+        T8: _IntCollect = Int,
+        T9: _IntCollect = Int,
     ](
         inout self,
-        owned year: Optional[T] = None,
-        owned month: Optional[A] = None,
-        owned day: Optional[A] = None,
-        owned hour: Optional[A] = None,
-        owned minute: Optional[A] = None,
-        owned second: Optional[A] = None,
-        owned m_second: Optional[T] = None,
-        owned u_second: Optional[T] = None,
-        owned n_second: Optional[T] = None,
+        owned year: Optional[T1] = None,
+        owned month: Optional[T2] = None,
+        owned day: Optional[T3] = None,
+        owned hour: Optional[T4] = None,
+        owned minute: Optional[T5] = None,
+        owned second: Optional[T6] = None,
+        owned m_second: Optional[T7] = None,
+        owned u_second: Optional[T8] = None,
+        owned n_second: Optional[T9] = None,
         owned tz: Self._tz = Self._tz(),
         owned calendar: Calendar = _calendar,
     ):
         """Construct a `DateTime` from valid values.
 
         Parameters:
-            T: Any type that is Intable and Collectable.
-            A: Any type that is Intable and Collectable.
+            T1: Any type that is Intable and CollectionElement.
+            T2: Any type that is Intable and CollectionElement.
+            T3: Any type that is Intable and CollectionElement.
+            T4: Any type that is Intable and CollectionElement.
+            T5: Any type that is Intable and CollectionElement.
+            T6: Any type that is Intable and CollectionElement.
+            T7: Any type that is Intable and CollectionElement.
+            T8: Any type that is Intable and CollectionElement.
+            T9: Any type that is Intable and CollectionElement.
 
         Args:
             year: Year.
@@ -256,41 +271,53 @@ struct DateTime[
             Self.
         """
 
-        var new_self = self
         if year:
-            new_self.year = year.take()
+            self.year = year.take()
         if month:
-            new_self.month = month.take()
+            self.month = month.take()
         if day:
-            new_self.day = day.take()
+            self.day = day.take()
         if hour:
-            new_self.hour = hour.take()
+            self.hour = hour.take()
         if minute:
-            new_self.minute = minute.take()
+            self.minute = minute.take()
         if second:
-            new_self.second = second.take()
+            self.second = second.take()
         if m_second:
-            new_self.m_second = m_second.take()
+            self.m_second = m_second.take()
         if u_second:
-            new_self.u_second = u_second.take()
+            self.u_second = u_second.take()
         if n_second:
-            new_self.n_second = n_second.take()
+            self.n_second = n_second.take()
         if tz:
-            new_self.tz = tz.take()
+            self.tz = tz.take()
         if calendar:
-            var cal = calendar.take()
-            var tmpcal = self.calendar.from_year(self.year)
-            new_self.calendar = tmpcal
-            var ns = new_self.n_seconds_since_epoch()
-            new_self.year = cal.min_year
-            new_self.month = cal.min_month
-            new_self.day = cal.min_day
-            new_self.hour = cal.min_hour
-            new_self.minute = cal.min_minute
-            new_self.second = cal.min_second
-            new_self.calendar = cal
-            new_self = new_self.add(years=int(self.year), n_seconds=int(ns))
-        return new_self
+            self.calendar = calendar.take()
+        return self
+
+    fn to_calendar(owned self, calendar: Calendar) -> Self:
+        """Translates the `DateTime`'s values to be on the same
+        offset since it's current calendar's epoch to the new
+        calendar's epoch.
+
+        Args:
+            calendar: The new calendar.
+
+        Returns:
+            Self.
+        """
+        var year = self.year
+        var tmpcal = self.calendar.from_year(year)
+        self.calendar = tmpcal
+        var ns = self.n_seconds_since_epoch()
+        self.year = calendar.min_year
+        self.month = calendar.min_month
+        self.day = calendar.min_day
+        self.hour = calendar.min_hour
+        self.minute = calendar.min_minute
+        self.second = calendar.min_second
+        self.calendar = calendar
+        return self.add(years=int(year), n_seconds=int(ns))
 
     fn to_utc(owned self) -> Self:
         """Returns a new instance of `Self` transformed to UTC. If

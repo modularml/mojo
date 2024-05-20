@@ -160,7 +160,7 @@ fn from_iso[
         result[0] = atol(s[:4])
         result[1] = atol(s[4:6])
         if iso.selected == iso.YYYYMMDD:
-            return result
+            return result^
         result[2] = atol(s[6:8])
         result[3] = atol(s[8:10])
         result[4] = atol(s[10:12])
@@ -169,7 +169,7 @@ fn from_iso[
         result[0] = atol(s[:4])
         result[1] = atol(s[5:7])
         if iso.selected == iso.YYYY_MM_DD:
-            return result
+            return result^
         result[2] = atol(s[8:10])
         result[3] = atol(s[11:13])
         result[4] = atol(s[14:16])
@@ -198,7 +198,7 @@ fn from_iso[
             result[0], result[1], result[2], h, m, sign
         )
 
-    return result
+    return result^
 
 
 fn strptime[

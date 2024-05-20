@@ -38,8 +38,8 @@ trait _IntCollect(Intable, CollectionElement):
     ...
 
 
-@value
-# @register_passable("trivial")
+# @value
+@register_passable("trivial")
 struct DateTime64(Hashable, Stringable):
     """Fast `DateTime64` struct. This is a "normal"
     `DateTime` with milisecond resolution. Uses
@@ -74,24 +74,35 @@ struct DateTime64(Hashable, Stringable):
     alias _cal_h = CalendarHashes(64)
 
     fn __init__[
-        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+        T1: _IntCollect = Int,
+        T2: _IntCollect = Int,
+        T3: _IntCollect = Int,
+        T4: _IntCollect = Int,
+        T5: _IntCollect = Int,
+        T6: _IntCollect = Int,
+        T7: _IntCollect = Int,
     ](
         inout self,
-        owned year: Optional[T] = None,
-        owned month: Optional[A] = None,
-        owned day: Optional[A] = None,
-        owned hour: Optional[A] = None,
-        owned minute: Optional[A] = None,
-        owned second: Optional[A] = None,
-        owned m_second: Optional[T] = None,
+        owned year: Optional[T1] = None,
+        owned month: Optional[T2] = None,
+        owned day: Optional[T3] = None,
+        owned hour: Optional[T4] = None,
+        owned minute: Optional[T5] = None,
+        owned second: Optional[T6] = None,
+        owned m_second: Optional[T7] = None,
         owned hash_val: Optional[UInt64] = None,
     ):
         """Construct a `DateTime64` from valid values.
         UTCCalendar is the default.
 
         Parameters:
-            T: Any type that is Intable and Collectable.
-            A: Any type that is Intable and Collectable.
+            T1: Any type that is Intable and CollectionElement.
+            T2: Any type that is Intable and CollectionElement.
+            T3: Any type that is Intable and CollectionElement.
+            T4: Any type that is Intable and CollectionElement.
+            T5: Any type that is Intable and CollectionElement.
+            T6: Any type that is Intable and CollectionElement.
+            T7: Any type that is Intable and CollectionElement.
 
         Args:
             year: Year.
@@ -150,7 +161,7 @@ struct DateTime64(Hashable, Stringable):
                 self.hash & self._cal_h.mask_64_ms
             ) >> self._cal_h.shift_64_ms
         else:
-            constrained[name == "b", "that attr does not exist"]()
+            constrained[False, "that attr does not exist"]()
             return 0
 
     # @always_inline
@@ -553,8 +564,8 @@ struct DateTime64(Hashable, Stringable):
         return Self(d[0], d[1], d[2], d[3], d[4], d[5], hash_val=value)
 
 
-@value
-# @register_passable("trivial")
+# @value
+@register_passable("trivial")
 struct DateTime32(Hashable, Stringable):
     """Fast `DateTime32 ` struct. This is a "normal" `DateTime`
     with minute resolution. Uses UTCFastCal epoch
@@ -586,22 +597,33 @@ struct DateTime32(Hashable, Stringable):
     alias _cal_h = CalendarHashes(32)
 
     fn __init__[
-        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+        T1: _IntCollect = Int,
+        T2: _IntCollect = Int,
+        T3: _IntCollect = Int,
+        T4: _IntCollect = Int,
+        T5: _IntCollect = Int,
+        T6: _IntCollect = Int,
+        T7: _IntCollect = Int,
     ](
         inout self,
-        owned year: Optional[T] = None,
-        owned month: Optional[A] = None,
-        owned day: Optional[A] = None,
-        owned hour: Optional[A] = None,
-        owned minute: Optional[A] = None,
+        owned year: Optional[T1] = None,
+        owned month: Optional[T2] = None,
+        owned day: Optional[T3] = None,
+        owned hour: Optional[T4] = None,
+        owned minute: Optional[T5] = None,
         owned hash_val: Optional[UInt32] = None,
     ):
         """Construct a `DateTime32` from valid values.
         UTCCalendar is the default.
 
         Parameters:
-            T: Any type that is Intable and Collectable.
-            A: Any type that is Intable and Collectable.
+            T1: Any type that is Intable and CollectionElement.
+            T2: Any type that is Intable and CollectionElement.
+            T3: Any type that is Intable and CollectionElement.
+            T4: Any type that is Intable and CollectionElement.
+            T5: Any type that is Intable and CollectionElement.
+            T6: Any type that is Intable and CollectionElement.
+            T7: Any type that is Intable and CollectionElement.
 
         Args:
             year: Year.
@@ -651,7 +673,7 @@ struct DateTime32(Hashable, Stringable):
         elif name == "minute":
             return (self.hash & self._cal_h.mask_32_m) >> self._cal_h.shift_32_m
         else:
-            constrained[name == "b", "that attr does not exist"]()
+            constrained[False, "that attr does not exist"]()
             return 0
 
     # @always_inline("nodebug")
@@ -1028,11 +1050,11 @@ struct DateTime32(Hashable, Stringable):
             Self.
         """
         var d = Self._calendar.from_hash[Self._cal_h](int(value))
-        return Self(d[0], d[1], d[2], d[3], d[4], hash_val=value)
+        return Self(d[0], d[1], d[2], d[3], d[4], value)
 
 
-@value
-# @register_passable("trivial")
+# @value
+@register_passable("trivial")
 struct DateTime16(Hashable, Stringable):
     """Fast `DateTime16` struct. This is a `DateTime` with
     hour resolution, it can be used as a year, dayofyear,
@@ -1063,21 +1085,26 @@ struct DateTime16(Hashable, Stringable):
     alias _cal_h = CalendarHashes(16)
 
     fn __init__[
-        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+        T1: _IntCollect = Int,
+        T2: _IntCollect = Int,
+        T3: _IntCollect = Int,
+        T4: _IntCollect = Int,
     ](
         inout self,
-        owned year: Optional[T] = None,
-        owned month: Optional[A] = None,
-        owned day: Optional[A] = None,
-        owned hour: Optional[A] = None,
+        owned year: Optional[T1] = None,
+        owned month: Optional[T2] = None,
+        owned day: Optional[T3] = None,
+        owned hour: Optional[T4] = None,
         owned hash_val: Optional[UInt16] = None,
     ):
         """Construct a `DateTime16` from valid values.
         UTCCalendar is the default.
 
         Parameters:
-            T: Any type that is Intable and Collectable.
-            A: Any type that is Intable and Collectable.
+            T1: Any type that is Intable and CollectionElement.
+            T2: Any type that is Intable and CollectionElement.
+            T3: Any type that is Intable and CollectionElement.
+            T4: Any type that is Intable and CollectionElement.
 
         Args:
             year: Year.
@@ -1118,7 +1145,7 @@ struct DateTime16(Hashable, Stringable):
         elif name == "hour":
             return (self.hash & self._cal_h.mask_16_h) >> self._cal_h.shift_16_h
         else:
-            constrained[name == "b", "that attribute does not exist"]()
+            constrained[False, "that attribute does not exist"]()
             return 0
 
     # @always_inline
@@ -1477,11 +1504,13 @@ struct DateTime16(Hashable, Stringable):
             Self.
         """
         var d = Self._calendar.from_hash[Self._cal_h](int(value))
-        return Self(year=d[0], day=d[2], hour=d[3], hash_val=value)
+        return Self(
+            year=int(d[0]), day=int(d[2]), hour=int(d[3]), hash_val=value
+        )
 
 
-@value
-# @register_passable("trivial")
+# @value
+@register_passable("trivial")
 struct DateTime8(Hashable, Stringable):
     """Fast `DateTime8` struct. This is a `DateTime`
     with hour resolution, it can be used as a dayofweek,
@@ -1511,21 +1540,26 @@ struct DateTime8(Hashable, Stringable):
     alias _cal_h = CalendarHashes(8)
 
     fn __init__[
-        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+        T1: _IntCollect = Int,
+        T2: _IntCollect = Int,
+        T3: _IntCollect = Int,
+        T4: _IntCollect = Int,
     ](
         inout self,
-        owned year: Optional[T] = None,
-        owned month: Optional[A] = None,
-        owned day: Optional[A] = None,
-        owned hour: Optional[A] = None,
+        owned year: Optional[T1] = None,
+        owned month: Optional[T2] = None,
+        owned day: Optional[T3] = None,
+        owned hour: Optional[T4] = None,
         owned hash_val: Optional[UInt8] = None,
     ):
         """Construct a `DateTime8` from valid values.
         UTCCalendar is the default.
 
         Parameters:
-            T: Any type that is Intable and Collectable.
-            A: Any type that is Intable and Collectable.
+            T1: Any type that is Intable and CollectionElement.
+            T2: Any type that is Intable and CollectionElement.
+            T3: Any type that is Intable and CollectionElement.
+            T4: Any type that is Intable and CollectionElement.
 
         Args:
             year: Year.
@@ -1564,7 +1598,7 @@ struct DateTime8(Hashable, Stringable):
         elif name == "hour":
             return (self.hash & self._cal_h.mask_8_h) >> self._cal_h.shift_8_h
         else:
-            constrained[name == "b", "that attr does not exist"]()
+            constrained[False, "that attr does not exist"]()
             return 0
 
     # @always_inline
@@ -1923,4 +1957,4 @@ struct DateTime8(Hashable, Stringable):
             Self.
         """
         var d = Self._calendar.from_hash[Self._cal_h](int(value))
-        return Self(day=d[2], hour=d[3], hash_val=value)
+        return Self(day=int(d[2]), hour=int(d[3]), hash_val=value)

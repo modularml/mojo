@@ -94,20 +94,21 @@ struct Date[
     """Calendar."""
 
     fn __init__[
-        T: _IntCollect = IntLiteral, A: _IntCollect = IntLiteral
+        T1: _IntCollect = Int, T2: _IntCollect = Int, T3: _IntCollect = Int
     ](
         inout self,
-        owned year: Optional[T] = None,
-        owned month: Optional[A] = None,
-        owned day: Optional[A] = None,
+        owned year: Optional[T1] = None,
+        owned month: Optional[T2] = None,
+        owned day: Optional[T3] = None,
         owned tz: Self._tz = Self._tz(),
         owned calendar: Calendar = _calendar,
     ):
-        """Construct a `Date` from valid values.
+        """Construct a `DateTime` from valid values.
 
         Parameters:
-            T: Any type that is Intable and Collectable.
-            A: Any type that is Intable and Collectable.
+            T1: Any type that is Intable and CollectionElement.
+            T2: Any type that is Intable and CollectionElement.
+            T3: Any type that is Intable and CollectionElement.
 
         Args:
             year: Year.
@@ -179,14 +180,26 @@ struct Date[
         if tz:
             new_self.tz = tz.take()
         if calendar:
-            var cal = calendar.take()
-            var s = self.seconds_since_epoch()
-            new_self.year = cal.min_year
-            new_self.month = cal.min_month
-            new_self.day = cal.min_day
-            new_self.calendar = cal
-            new_self = new_self.add(years=int(self.year), seconds=int(s))
+            new_self.calendar = calendar.take()
         return new_self
+
+    fn to_calendar(owned self, calendar: Calendar) -> Self:
+        """Translates the `Date`'s values to be on the same
+        offset since it's current calendar's epoch to the new
+        calendar's epoch.
+
+        Args:
+            calendar: The new calendar.
+
+        Returns:
+            Self.
+        """
+        var s = self.seconds_since_epoch()
+        self.year = calendar.min_year
+        self.month = calendar.min_month
+        self.day = calendar.min_day
+        self.calendar = calendar
+        return self.add(seconds=int(s))
 
     fn to_utc(owned self) -> Self:
         """Returns a new instance of `Self` transformed to UTC. If
