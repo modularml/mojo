@@ -551,6 +551,10 @@ struct ZoneInfoMem8(CollectionElement):
 
 @register_passable("trivial")
 struct Leapsecs:
+    """Leap seconds added to UTC to keep in sync with [IAT](
+    https://en.wikipedia.org/wiki/International_Atomic_Time).
+    """
+
     var day: UInt8
     """Day in which the leap second was added."""
     var month: UInt8
@@ -609,9 +613,23 @@ trait ZoneStorageDST(CollectionElement):
     """Trait that defines ZoneInfo storage structs."""
 
     fn add(inout self, key: StringLiteral, value: ZoneDST):
+        """Add a value to `ZoneInfo`.
+
+        Args:
+            key: The tz_str.
+            value: ZoneDST.
+        """
         ...
 
     fn get(self, key: StringLiteral) -> OptionalReg[ZoneDST]:
+        """Get value from `ZoneInfo`.
+
+        Args:
+            key: The tz_str.
+
+        Returns:
+            An Optional `ZoneDST`.
+        """
         ...
 
 
@@ -619,15 +637,36 @@ trait ZoneStorageNoDST(CollectionElement):
     """Trait that defines ZoneInfo storage structs."""
 
     fn add(inout self, key: StringLiteral, value: Offset):
+        """Add a value to `ZoneInfo`.
+
+        Args:
+            key: The tz_str.
+            value: Offset.
+        """
         ...
 
     fn get(self, key: StringLiteral) -> OptionalReg[Offset]:
+        """Get value from `ZoneInfo`.
+
+        Args:
+            key: The tz_str.
+
+        Returns:
+            An Optional `Offset`.
+        """
         ...
 
 
 @value
 struct ZoneInfo[T: ZoneStorageDST, A: ZoneStorageNoDST]:
-    """ZoneInfo."""
+    """ZoneInfo.
+    
+    Parameters:
+        T: The type of storage for timezones with
+            Daylight Saving Time.
+        A: The type of storage for timezones with
+            no Daylight Saving Time.
+    """
 
     var with_dst: T
     """Zoneinfo for Zones with Daylight Saving Time."""
