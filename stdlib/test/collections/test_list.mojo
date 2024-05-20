@@ -768,6 +768,15 @@ def test_list_init_span():
         assert_equal(l[i], l2[i])
 
 
+def test_indexing():
+    var l = List[Int](1, 2, 3)
+    assert_equal(l[Int8(1)], 2)
+    assert_equal(l[UInt64(2)], 3)
+    assert_equal(l[False], 1)
+    assert_equal(l[True], 2)
+    assert_equal(l[2], 3)
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -796,3 +805,4 @@ def main():
     test_list_add()
     test_list_mult()
     test_list_contains()
+    test_indexing()

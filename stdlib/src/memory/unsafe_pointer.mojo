@@ -362,8 +362,13 @@ struct UnsafePointer[
         ](self.address)
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self._ref_type:
+    fn __refitem__[
+        IndexerType: Indexer
+    ](self, offset: IndexerType) -> Self._ref_type:
         """Return a reference to the underlying data, offset by the offset index.
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             offset: The offset index.
@@ -371,7 +376,7 @@ struct UnsafePointer[
         Returns:
             An offset reference.
         """
-        return (self + offset).__refitem__()
+        return (self + index(offset)).__refitem__()
 
 
 # ===----------------------------------------------------------------------=== #
