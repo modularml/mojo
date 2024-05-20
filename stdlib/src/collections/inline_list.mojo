@@ -106,7 +106,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         Args:
             values: The values to populate the list with.
         """
-        debug_assert(len(values) < capacity, "List is full.")
+        debug_assert(len(values) <= capacity, "List is full.")
         self = Self()
         for value in values:
             self.append(value[])
