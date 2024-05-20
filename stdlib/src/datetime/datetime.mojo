@@ -1344,16 +1344,11 @@ struct DateTime[
             An Optional Self.
         """
         try:
-            var p = dt_str.from_iso[iso, iana, pyzoneinfo, native](s)
+            var p = dt_str.from_iso[
+                iso, dst_storage, no_dst_storage, iana, pyzoneinfo, native
+            ](s)
             var dt = Self(
-                int(p[0]),
-                int(p[1]),
-                int(p[2]),
-                int(p[3]),
-                int(p[4]),
-                int(p[5]),
-                tz=p[6],
-                calendar=calendar,
+                p[0], p[1], p[2], p[3], p[4], p[5], tz=p[6], calendar=calendar
             )
             if tz:
                 var t = tz.value()[]
@@ -1382,15 +1377,7 @@ struct DateTime[
             Self.
         """
         var d = calendar.from_hash(value)
+        var ns = calendar.min_nanosecond
         return Self(
-            int(d[0]),
-            int(d[1]),
-            int(d[2]),
-            int(d[3]),
-            int(d[4]),
-            int(d[5]),
-            int(d[6]),
-            int(d[7]),
-            tz=tz,
-            calendar=calendar,
+            d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], ns, tz, calendar
         )

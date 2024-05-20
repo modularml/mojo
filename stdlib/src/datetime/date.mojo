@@ -963,7 +963,9 @@ struct Date[
             An Optional Self.
         """
         try:
-            var p = dt_str.from_iso[iso, iana, pyzoneinfo, native](s)
+            var p = dt_str.from_iso[
+                iso, dst_storage, no_dst_storage, iana, pyzoneinfo, native
+            ](s)
             var dt = Self(p[0], p[1], p[2], tz=p[6], calendar=calendar)
             if tz:
                 var t = tz.value()[]
@@ -990,4 +992,4 @@ struct Date[
             Self.
         """
         var d = calendar.from_hash[_cal_hash](int(value))
-        return Self(d[0], d[1], d[2], tz=tz, calendar=calendar)
+        return Self(d[0], d[1], d[2], tz, calendar)

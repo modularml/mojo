@@ -12,7 +12,14 @@
 # ===----------------------------------------------------------------------=== #
 """`DateTime` and `Date` String parsing module."""
 
-from .timezone import TimeZone
+from .timezone import (
+    TimeZone,
+    ZoneInfo,
+    ZoneInfoMem32,
+    ZoneInfoMem8,
+    ZoneStorageDST,
+    ZoneStorageNoDST,
+)
 
 
 @value
@@ -125,7 +132,11 @@ fn to_iso[
 
 fn from_iso[
     iso: IsoFormat = IsoFormat(),
-    iana: Bool = True,
+    dst_storage: ZoneStorageDST = ZoneInfoMem32,
+    no_dst_storage: ZoneStorageNoDST = ZoneInfoMem8,
+    iana: Optional[ZoneInfo[dst_storage, no_dst_storage]] = get_zoneinfo[
+        dst_storage, no_dst_storage
+    ](),
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](s: String) raises -> (
@@ -135,15 +146,33 @@ fn from_iso[
     UInt8,
     UInt8,
     UInt8,
-    TimeZone[iana, pyzoneinfo, native],
+    TimeZone[dst_storage, no_dst_storage, iana, pyzoneinfo, native],
 ):
     """Parses a string expecting given format.
 
     Parameters:
         iso: The chosen IsoFormat.
-        iana: The IANA timezones to support.
-        pyzoneinfo: Whether to use pyzoneinfo.
-        native: Whether to use native support.
+        dst_storage: The type of storage to use for ZoneInfo
+            for zones with Dailight Saving Time. Default Memory.
+        no_dst_storage: The type of storage to use for ZoneInfo
+            for zones with no Dailight Saving Time. Default Memory.
+        iana: What timezones from the [IANA database](
+            http://www.iana.org/time-zones/repository/tz-link.html)
+            are used. It defaults to using all available timezones,
+            if getting them fails at compile time, it tries using
+            python's zoneinfo if pyzoneinfo is set to True, otherwise
+            it uses the offsets as is, no daylight saving or
+            special exceptions. [List of TZ identifiers](
+            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
+        pyzoneinfo: Whether to use python's zoneinfo and
+            datetime to get full IANA support.
+        native: (fast, partial IANA support) Whether to use a native Dict
+            with the current timezones from the [List of TZ identifiers](
+            https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+            at the time of compilation (for now they're hardcoded
+            at stdlib release time, in the future it should get them
+            from the OS). If it fails at compile time, it defaults to
+            using the given offsets when the timezone was constructed.
 
     Args:
         s: The string.
@@ -151,9 +180,9 @@ fn from_iso[
     Returns:
         A tuple with the result.
     """
-    var result = UInt16(0), UInt8(0), UInt8(0), UInt8(0), UInt8(0), UInt8(
-        0
-    ), TimeZone[iana, pyzoneinfo, native]()
+    alias tz = TimeZone[dst_storage, no_dst_storage, iana, pyzoneinfo, native]
+    var num0 = UInt8(0)
+    var result = UInt16(0), num0, num0, num0, num0, num0, tz()
 
     @parameter
     if iso.YYYYMMDD in iso.selected:
@@ -194,9 +223,7 @@ fn from_iso[
             m = atol(s[23:25])
         else:
             m = atol(s[22:24])
-        result[6] = TimeZone[iana, pyzoneinfo, native].from_offset(
-            result[0], result[1], result[2], h, m, sign
-        )
+        result[6] = tz.from_offset(result[0], result[1], result[2], h, m, sign)
 
     return result^
 
