@@ -18,7 +18,7 @@ You can import these APIs from the `utils` package. For example:
 from utils import StaticTuple
 ```
 """
-
+from collections._index_normalization import normalize_index
 from memory import Pointer
 
 from utils import unroll
@@ -369,14 +369,14 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
     @always_inline("nodebug")
     fn __refitem__[
-        IntableType: Intable,
-    ](self: Reference[Self, _, _], index: IntableType) -> Reference[
+        IndexerType: Indexer,
+    ](self: Reference[Self, _, _], index: IndexerType) -> Reference[
         Self.ElementType, self.is_mutable, self.lifetime
     ]:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
-            IntableType: The inferred type of an intable argument.
+            IndexerType: The inferred type of an indexer argument.
 
         Args:
             index: The index of the item.
@@ -384,12 +384,11 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Returns:
             A reference to the item at the given index.
         """
-        debug_assert(-size <= int(index) < size, "Index must be within bounds.")
-        var normalized_idx = int(index)
-        if normalized_idx < 0:
-            normalized_idx += size
+        var normalized_index = normalize_index[container_name="InlineArray"](
+            index, self[]
+        )
 
-        return self[]._get_reference_unsafe(normalized_idx)
+        return self[]._get_reference_unsafe(normalized_index)
 
     @always_inline("nodebug")
     fn __refitem__[
