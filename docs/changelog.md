@@ -60,8 +60,25 @@ what we publish.
   struct ScalarContainer[inferred dt: DType, value: Scalar[dt]]:
       pass
 
-  fn foo(x: ScalarContainer[Int32(0)]): # 'dt' is inferred
+  fn foo(x: ScalarContainer[Int32(0)]): # 'dt' is inferred as `DType.int32`
       pass
+  ```
+
+  This should make working with dependent parameters more ergonomic.
+
+- Mojo now allows functions overloaded on parameters to be resolved when forming
+  references to, but not calling, those functions. For example, the following
+  now works:
+
+  ```mojo
+  fn overloaded_parameters[value: Int32]():
+      pass
+
+  fn overloaded_parameters[value: Float32]():
+      pass
+
+  fn form_reference():
+      alias ref = overloaded_parameters[Int32()] # works!
   ```
 
 - Mojo now supports adding a `@deprecated` decorator on structs, functions,
