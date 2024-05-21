@@ -122,17 +122,9 @@ def test_truthy():
 
     @parameter
     fn test_dtype[type: DType]() raises:
-        # # Scalars of 0-values are false-y, 1-values are truth-y
-        assert_false(Scalar[type](False).__bool__())
-        assert_true(Scalar[type](True).__bool__())
-
-        # # SIMD vectors are truth-y if _all_ values are truth-y
-        assert_true(SIMD[type, 2](True, True).__bool__())
-
-        # # SIMD vectors are false-y if _any_ values are false-y
-        assert_false(SIMD[type, 2](False, True).__bool__())
-        assert_false(SIMD[type, 2](True, False).__bool__())
-        assert_false(SIMD[type, 2](False, False).__bool__())
+        # Scalars of 0-values are false-y, 1-values are truth-y
+        assert_false(Scalar[type](False))
+        assert_true(Scalar[type](True))
 
     @parameter
     fn test_dtype_unrolled[i: Int]() raises:
@@ -240,6 +232,66 @@ def test_iadd():
     var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
     f1.__iadd__(f2)
     assert_equal(f1, F(0, 0, 0, 0, 0, 0, 0, 0))
+
+
+def test_sub():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    assert_equal(i.__sub__(0), I(-2, -4, 0, 1))
+    assert_equal(i.__sub__(Int32(0)), I(-2, -4, 0, 1))
+    assert_equal(i.__sub__(2), I(-4, -6, -2, -1))
+    assert_equal(i.__sub__(Int32(2)), I(-4, -6, -2, -1))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    assert_equal(i1.__sub__(i2), I(-1, -9, -6, 1))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    assert_equal(f1.__sub__(f2), F(2, -2, 2, -2, 2, -2, 2, -2))
+
+
+def test_rsub():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    assert_equal(i.__rsub__(0), I(2, 4, 0, -1))
+    assert_equal(i.__rsub__(Int32(0)), I(2, 4, 0, -1))
+    assert_equal(i.__rsub__(2), I(4, 6, 2, 1))
+    assert_equal(i.__rsub__(Int32(2)), I(4, 6, 2, 1))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    assert_equal(i1.__rsub__(i2), I(1, 9, 6, -1))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    assert_equal(f1.__rsub__(f2), F(-2, 2, -2, 2, -2, 2, -2, 2))
+
+
+def test_isub():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    i.__isub__(0)
+    assert_equal(i, I(-2, -4, 0, 1))
+    i.__isub__(Int32(0))
+    assert_equal(i, I(-2, -4, 0, 1))
+    i.__isub__(2)
+    assert_equal(i, I(-4, -6, -2, -1))
+    i.__isub__(I(0, -2, 2, 3))
+    assert_equal(i, I(-4, -4, -4, -4))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    i1.__isub__(i2)
+    assert_equal(i1, I(-1, -9, -6, 1))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    f1.__isub__(f2)
+    assert_equal(f1, F(2, -2, 2, -2, 2, -2, 2, -2))
 
 
 def test_ceil():
@@ -1016,39 +1068,50 @@ def test_indexer():
     assert_equal(0, Scalar[DType.bool](False).__index__())
 
 
+def test_indexing():
+    var s = SIMD[DType.int32, 4](1, 2, 3, 4)
+    assert_equal(s[False], 1)
+    assert_equal(s[Int32(2)], 3)
+    assert_equal(s[3], 4)
+
+
 def main():
-    test_cast()
-    test_simd_variadic()
-    test_convert_simd_to_string()
-    test_issue_20421()
-    test_truthy()
-    test_len()
+    test_abs()
     test_add()
-    test_radd()
-    test_iadd()
+    test_add_with_overflow()
+    test_address()
+    test_cast()
     test_ceil()
-    test_floor()
-    test_trunc()
-    test_round()
-    test_roundeven()
+    test_convert_simd_to_string()
+    test_deinterleave()
     test_div()
+    test_extract()
+    test_floor()
     test_floordiv()
-    test_rfloordiv()
+    test_iadd()
+    test_indexer()
+    test_indexing()
+    test_insert()
+    test_interleave()
+    test_issue_20421()
+    test_isub()
+    test_join()
+    test_len()
+    test_limits()
+    test_min_max_clamp()
     test_mod()
+    test_mul_with_overflow()
+    test_radd()
+    test_rfloordiv()
     test_rmod()
     test_rotate()
+    test_round()
+    test_roundeven()
+    test_rsub()
     test_shift()
     test_shuffle()
-    test_insert()
-    test_join()
-    test_interleave()
-    test_deinterleave()
-    test_address()
-    test_extract()
-    test_limits()
-    test_add_with_overflow()
+    test_simd_variadic()
+    test_sub()
     test_sub_with_overflow()
-    test_mul_with_overflow()
-    test_abs()
-    test_min_max_clamp()
-    test_indexer()
+    test_trunc()
+    test_truthy()

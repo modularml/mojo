@@ -179,7 +179,9 @@ struct LegacyPointer[
     var address: Self._mlir_type
     """The pointed-to address."""
 
-    alias _ref_type = Reference[type, True, MutStaticLifetime, address_space]
+    alias _ref_type = Reference[
+        type, True, MutableStaticLifetime, address_space
+    ]
 
     @always_inline("nodebug")
     fn __init__() -> Self:
@@ -287,11 +289,13 @@ struct LegacyPointer[
         ](self.address)
 
     @always_inline("nodebug")
-    fn __refitem__[T: Intable](self, offset: T) -> Self._ref_type:
+    fn __refitem__[
+        IndexerType: Indexer
+    ](self, offset: IndexerType) -> Self._ref_type:
         """Enable subscript syntax `ref[idx]` to access the element.
 
         Parameters:
-            T: The Intable type of the offset.
+            IndexerType: The type of the indexer..
 
         Args:
             offset: The offset to load from.
@@ -299,7 +303,7 @@ struct LegacyPointer[
         Returns:
             The MLIR reference for the Mojo compiler to use.
         """
-        return (self + offset).__refitem__()
+        return (self + index(offset)).__refitem__()
 
     # ===------------------------------------------------------------------=== #
     # Load/Store
@@ -712,12 +716,14 @@ struct DTypePointer[
         return LegacyPointer.address_of(arg[])
 
     @always_inline("nodebug")
-    fn __getitem__[T: Intable](self, offset: T) -> Scalar[type]:
+    fn __getitem__[
+        IndexerType: Indexer
+    ](self, offset: IndexerType) -> Scalar[type]:
         """Loads a single element (SIMD of size 1) from the pointer at the
         specified index.
 
         Parameters:
-            T: The Intable type of the offset.
+            IndexerType: The type of the indexer.
 
         Args:
             offset: The offset to load from.
@@ -725,20 +731,22 @@ struct DTypePointer[
         Returns:
             The loaded value.
         """
-        return self.load(offset)
+        return self.load(index(offset))
 
     @always_inline("nodebug")
-    fn __setitem__[T: Intable](self, offset: T, val: Scalar[type]):
+    fn __setitem__[
+        IndexerType: Indexer
+    ](self, offset: IndexerType, val: Scalar[type]):
         """Stores a single element value at the given offset.
 
         Parameters:
-            T: The Intable type of the offset.
+            IndexerType: The type of the indexer.
 
         Args:
             offset: The offset to store to.
             val: The value to store.
         """
-        return self.store(offset, val)
+        return self.store(index(offset), val)
 
     # ===------------------------------------------------------------------=== #
     # Comparisons

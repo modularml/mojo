@@ -54,7 +54,13 @@ struct _OwnedStringRef(Boolable):
         # Don't free self.data in our dtor.
         self.data = DTypePointer[DType.int8]()
         var length = self.length
-        return Error {data: data.bitcast[DType.uint8](), loaded_length: -length}
+        return Error {
+            data: UnsafePointer[UInt8]._from_dtype_ptr(
+                # TODO: Remove cast once string UInt8 transition is complete.
+                data.bitcast[DType.uint8]()
+            ),
+            loaded_length: -length,
+        }
 
     fn __bool__(self) -> Bool:
         return self.length != 0
@@ -276,7 +282,7 @@ struct FileHandle:
             raise (err_msg^).consume_as_error()
         return size_copy
 
-    fn read_bytes(self, size: Int64 = -1) raises -> List[Int8]:
+    fn read_bytes(self, size: Int64 = -1) raises -> List[UInt8]:
         """Reads data from a file and sets the file handle seek position. If
         size is left as default of -1, it will read to the end of the file.
         Setting size to a number larger than what's in the file will be handled
@@ -331,7 +337,7 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
 
         var buf = external_call[
-            "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[Int8]
+            "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[UInt8]
         ](
             self.handle,
             UnsafePointer.address_of(size_copy),
@@ -341,7 +347,7 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-        var list = List[Int8](
+        var list = List[UInt8](
             unsafe_pointer=buf, size=int(size_copy), capacity=int(size_copy)
         )
 
@@ -423,7 +429,8 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        self._write(data.unsafe_ptr(), len(data))
+        # TODO: Remove cast when transition to UInt8 strings is complete.
+        self._write(data.unsafe_ptr().bitcast[Int8](), len(data))
 
     @always_inline
     fn _write[
@@ -455,6 +462,13 @@ struct FileHandle:
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
         return self^
+
+    fn _get_raw_fd(self) -> Int:
+        var i64_res = external_call[
+            "KGEN_CompilerRT_IO_GetFD",
+            Int64,
+        ](self.handle)
+        return Int(i64_res.value)
 
 
 fn open(path: String, mode: String) raises -> FileHandle:

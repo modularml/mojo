@@ -81,7 +81,7 @@ fn test_constructors() raises:
     assert_equal(3, len(s2))
 
     # Construction from UnsafePointer
-    var ptr = UnsafePointer[Int8].alloc(4)
+    var ptr = UnsafePointer[UInt8].alloc(4)
     ptr[0] = ord("a")
     ptr[1] = ord("b")
     ptr[2] = ord("c")
@@ -410,6 +410,66 @@ fn test_atol_base_0() raises:
         contains="String is not convertible to integer with base 0: '0of_'"
     ):
         _ = atol("0of_", base=0)
+
+
+fn test_atof() raises:
+    assert_equal(375.0, atof(String("375.f")))
+    assert_equal(1.0, atof(String("001.")))
+    assert_equal(+5.0, atof(String(" +005.")))
+    assert_equal(13.0, atof(String(" 013.f  ")))
+    assert_equal(-89, atof(String("-89")))
+    assert_equal(-0.3, atof(String(" -0.3")))
+    assert_equal(-69e3, atof(String(" -69E+3  ")))
+    assert_equal(123.2e1, atof(String(" 123.2E1  ")))
+    assert_equal(23e3, atof(String(" 23E3  ")))
+    assert_equal(989343e-13, atof(String(" 989343E-13  ")))
+    assert_equal(1.123, atof(String(" 1.123f")))
+    assert_equal(0.78, atof(String(" .78 ")))
+    assert_equal(121234.0, atof(String(" 121234.  ")))
+    assert_equal(985031234.0, atof(String(" 985031234.F  ")))
+    assert_equal(FloatLiteral.negative_zero, atof(String("-0")))
+    assert_equal(FloatLiteral.nan, atof(String("  nan")))
+    assert_equal(FloatLiteral.infinity, atof(String(" inf ")))
+    assert_equal(FloatLiteral.negative_infinity, atof(String("-inf  ")))
+
+    # Negative cases
+    with assert_raises(contains="String is not convertible to float: ''"):
+        _ = atof(String(""))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 123 asd'"
+    ):
+        _ = atof(String(" 123 asd"))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' f.9123 '"
+    ):
+        _ = atof(String(" f.9123 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 989343E-1A3 '"
+    ):
+        _ = atof(String(" 989343E-1A3 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 124124124_2134124124 '"
+    ):
+        _ = atof(String(" 124124124_2134124124 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' 123.2E '"
+    ):
+        _ = atof(String(" 123.2E "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' --958.23 '"
+    ):
+        _ = atof(String(" --958.23 "))
+
+    with assert_raises(
+        contains="String is not convertible to float: ' ++94. '"
+    ):
+        _ = atof(String(" ++94. "))
 
 
 fn test_calc_initial_buffer_size_int32() raises:
@@ -769,22 +829,22 @@ fn test_strip() raises:
 
 
 fn test_hash() raises:
-    fn assert_hash_equals_literal_hash(s: StringLiteral) raises:
+    fn assert_hash_equals_literal_hash[s: StringLiteral]() raises:
         assert_equal(hash(s), hash(String(s)))
 
-    assert_hash_equals_literal_hash("a")
-    assert_hash_equals_literal_hash("b")
-    assert_hash_equals_literal_hash("c")
-    assert_hash_equals_literal_hash("d")
-    assert_hash_equals_literal_hash("this is a longer string")
-    assert_hash_equals_literal_hash(
+    assert_hash_equals_literal_hash["a"]()
+    assert_hash_equals_literal_hash["b"]()
+    assert_hash_equals_literal_hash["c"]()
+    assert_hash_equals_literal_hash["d"]()
+    assert_hash_equals_literal_hash["this is a longer string"]()
+    assert_hash_equals_literal_hash[
         """
 Blue: We have to take the amulet to the Banana King.
 Charlie: Oh, yes, The Banana King, of course. ABSOLUTELY NOT!
 Pink: He, he's counting on us, Charlie! (Pink starts floating) ah...
 Blue: If we don't give the amulet to the Banana King, the vortex will open and let out a thousand years of darkness.
 Pink: No! Darkness! (Pink is floating in the air)"""
-    )
+    ]()
 
 
 fn test_startswith() raises:
@@ -839,6 +899,13 @@ def test_string_mul():
     assert_equal(String("ab") * 5, "ababababab")
 
 
+def test_indexing():
+    a = String("abc")
+    assert_equal(a[False], "a")
+    assert_equal(a[Int16(1)], "b")
+    assert_equal(a[2], "c")
+
+
 def main():
     test_constructors()
     test_copy()
@@ -856,6 +923,7 @@ def main():
     test_string_indexing()
     test_atol()
     test_atol_base_0()
+    test_atof()
     test_calc_initial_buffer_size_int32()
     test_calc_initial_buffer_size_int64()
     test_contains()
@@ -868,9 +936,7 @@ def main():
     test_islower()
     test_lower()
     test_upper()
-    # TODO(37393): Re-enable once we debug why we are depending on some debug behavior
-    # on graviton.  Showing an error in our O3 LLVM pipeline; could be a bug in LLVM.
-    # test_isspace()
+    test_isspace()
     test_ascii_aliases()
     test_rstrip()
     test_lstrip()
@@ -882,3 +948,4 @@ def main():
     test_removesuffix()
     test_intable()
     test_string_mul()
+    test_indexing()
