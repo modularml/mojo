@@ -143,6 +143,17 @@ def test_list_boolable():
     assert_false(InlineList[Int]())
 
 
+def test_indexing():
+    var list = InlineList[Int]()
+
+    for i in range(5):
+        list.append(i)
+
+    assert_equal(list[True], 1)
+    assert_equal(list[Int32(4)], 4)
+    assert_equal(list[0], 0)
+
+
 def main():
     test_list()
     test_append_triggers_a_move()
@@ -152,3 +163,4 @@ def main():
     test_list_contains()
     test_list_variadic_constructor()
     test_list_boolable()
+    test_indexing()
