@@ -32,9 +32,9 @@ what we publish.
               print("found 10!")
   ```
 
-  Currently, `@parameter for` does not allow early exits in the body (`return`,
-  `break`, `continue`, etc.) and requires the sequence's `__iter__` method to
-  return a `_StridedRangeIterator`. These restrictions will be lifted soon.
+  Currently, `@parameter for` requires the sequence's `__iter__` method to
+  return a `_StridedRangeIterator`, meaning the induction variables must be
+  `Int`. The intention is to lift these restrictions in the future.
 
 - Mojo added support for the `inferred` passing kind on parameters. `inferred`
   parameters must appear at the beginning of the parameter list and cannot be
