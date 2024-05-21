@@ -237,6 +237,66 @@ def test_iadd():
     assert_equal(f1, F(0, 0, 0, 0, 0, 0, 0, 0))
 
 
+def test_sub():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    assert_equal(i.__sub__(0), I(-2, -4, 0, 1))
+    assert_equal(i.__sub__(Int32(0)), I(-2, -4, 0, 1))
+    assert_equal(i.__sub__(2), I(-4, -6, -2, -1))
+    assert_equal(i.__sub__(Int32(2)), I(-4, -6, -2, -1))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    assert_equal(i1.__sub__(i2), I(-1, -9, -6, 1))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    assert_equal(f1.__sub__(f2), F(2, -2, 2, -2, 2, -2, 2, -2))
+
+
+def test_rsub():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    assert_equal(i.__rsub__(0), I(2, 4, 0, -1))
+    assert_equal(i.__rsub__(Int32(0)), I(2, 4, 0, -1))
+    assert_equal(i.__rsub__(2), I(4, 6, 2, 1))
+    assert_equal(i.__rsub__(Int32(2)), I(4, 6, 2, 1))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    assert_equal(i1.__rsub__(i2), I(1, 9, 6, -1))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    assert_equal(f1.__rsub__(f2), F(-2, 2, -2, 2, -2, 2, -2, 2))
+
+
+def test_isub():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    i.__isub__(0)
+    assert_equal(i, I(-2, -4, 0, 1))
+    i.__isub__(Int32(0))
+    assert_equal(i, I(-2, -4, 0, 1))
+    i.__isub__(2)
+    assert_equal(i, I(-4, -6, -2, -1))
+    i.__isub__(I(0, -2, 2, 3))
+    assert_equal(i, I(-4, -4, -4, -4))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    i1.__isub__(i2)
+    assert_equal(i1, I(-1, -9, -6, 1))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    f1.__isub__(f2)
+    assert_equal(f1, F(2, -2, 2, -2, 2, -2, 2, -2))
+
+
 def test_ceil():
     assert_equal(Float32.__ceil__(Float32(1.5)), 2.0)
     assert_equal(Float32.__ceil__(Float32(-1.5)), -1.0)
@@ -1011,6 +1071,13 @@ def test_indexer():
     assert_equal(0, Scalar[DType.bool](False).__index__())
 
 
+def test_indexing():
+    var s = SIMD[DType.int32, 4](1, 2, 3, 4)
+    assert_equal(s[False], 1)
+    assert_equal(s[Int32(2)], 3)
+    assert_equal(s[3], 4)
+
+
 def main():
     test_abs()
     test_add()
@@ -1026,9 +1093,11 @@ def main():
     test_floordiv()
     test_iadd()
     test_indexer()
+    test_indexing()
     test_insert()
     test_interleave()
     test_issue_20421()
+    test_isub()
     test_join()
     test_len()
     test_limits()
@@ -1041,9 +1110,11 @@ def main():
     test_rotate()
     test_round()
     test_roundeven()
+    test_rsub()
     test_shift()
     test_shuffle()
     test_simd_variadic()
+    test_sub()
     test_sub_with_overflow()
     test_trunc()
     test_truthy()

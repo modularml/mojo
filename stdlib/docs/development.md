@@ -66,13 +66,24 @@ We provide a simple Bash script to build the standard library package and
 `test_utils` package that is used by the test suite.
 
 Just run `./stdlib/scripts/run-tests.sh` which will produce the necessary
-`mojopkg` files inside your `build` directory, and then run `lit -sv
-stdlib/test`.
+`mojopkg` files inside your `build` directory, after this is done, the script will
+run all the tests automatically.
 
 ```bash
 ./stdlib/scripts/run-tests.sh
+```
 
-lit -sv stdlib/test
+If you wish to run the unit tests that are in a specific test file, you can do
+so with
+
+```bash
+./stdlib/scripts/run-tests.sh ./stdlib/test/utils/test_span.mojo 
+```
+
+You can do the same for a directory with
+
+```bash
+./stdlib/scripts/run-tests.sh ./stdlib/test/utils
 ```
 
 All the tests should pass on the `nightly` branch with the nightly Mojo

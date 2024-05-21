@@ -29,6 +29,7 @@ from .._linux_x86 import _lstat as _lstat_linux_x86
 from .._linux_x86 import _stat as _stat_linux_x86
 from .._macos import _lstat as _lstat_macos
 from .._macos import _stat as _stat_macos
+from ..fstat import stat
 
 
 # ===----------------------------------------------------------------------=== #
@@ -91,7 +92,7 @@ fn isdir[pathlike: os.PathLike](path: pathlike) -> Bool:
     symbolic links, so both islink() and isdir() can be true for the same path.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      pathlike: The type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -131,7 +132,7 @@ fn isfile[pathlike: os.PathLike](path: pathlike) -> Bool:
     """Test whether a path is a regular file.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      pathlike: The type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -167,7 +168,7 @@ fn islink[pathlike: os.PathLike](path: pathlike) -> Bool:
     symbolic link.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      pathlike: The type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -204,7 +205,7 @@ fn exists[pathlike: os.PathLike](path: pathlike) -> Bool:
     """Return True if path exists.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      pathlike: The type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -241,7 +242,7 @@ fn lexists[pathlike: os.PathLike](path: pathlike) -> Bool:
     """Return True if path exists or is a broken symlink.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      pathlike: The type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -250,3 +251,35 @@ fn lexists[pathlike: os.PathLike](path: pathlike) -> Bool:
       Returns True if the path exists or is a broken symbolic link.
     """
     return exists(path.__fspath__())
+
+
+# ===----------------------------------------------------------------------=== #
+# getsize
+# ===----------------------------------------------------------------------=== #
+
+
+fn getsize(path: String) raises -> Int:
+    """Return the size, in bytes, of the specified path.
+
+    Args:
+      path: The path to the file.
+
+    Returns:
+      The size of the path in bytes.
+    """
+    return stat(path).st_size
+
+
+fn getsize[pathlike: os.PathLike](path: pathlike) raises -> Int:
+    """Return the size, in bytes, of the specified path.
+
+    Parameters:
+      pathlike: The type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the file.
+
+    Returns:
+      The size of the path in bytes.
+    """
+    return getsize(path.__fspath__())
