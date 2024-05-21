@@ -1222,7 +1222,7 @@ struct String(
         Args:
             start: Offset from the start of the string. If the start is greater than the
                 length of the string, an empty string is returned.
-            length: Length of StringRef. If -1, the length is the remaining length of the string. If
+            length: Length of StringRef. If None, the length is the remaining length of the string. If
                 the length is greater than the remaining length of the string, the length is truncated.
 
         Returns:
