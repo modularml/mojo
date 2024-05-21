@@ -56,19 +56,10 @@ fn unroll[
           argument, which is the loop index value.
         count: A number of repetitions.
     """
-    _unroll_impl[func, 0, count]()
 
-
-@always_inline
-fn _unroll_impl[
-    func: fn[idx: Int] () raises capturing -> None,
-    idx: Int,
-    count: Int,
-]() raises:
     @parameter
-    if idx < count:
-        func[idx]()
-        _unroll_impl[func, idx + 1, count]()
+    for i in range(count):
+        func[i]()
 
 
 # ===----------------------------------------------------------------------===#
