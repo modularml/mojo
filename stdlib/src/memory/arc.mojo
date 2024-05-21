@@ -23,6 +23,7 @@ print(3 == p.get())
 ```
 """
 
+from os.atomic import Atomic
 from memory import UnsafePointer, stack_allocation
 
 

@@ -183,7 +183,7 @@ fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
     @parameter
     if n < 5:
 
-        @unroll
+        @parameter
         for i in range(n):
             dest_data[i] = src_data[i]
         return

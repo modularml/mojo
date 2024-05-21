@@ -38,7 +38,7 @@ struct StringSlice[
         lifetime: The lifetime of the underlying string data.
     """
 
-    var _slice: Span[Int8, is_mutable, lifetime]
+    var _slice: Span[UInt8, is_mutable, lifetime]
 
     # ===------------------------------------------------------------------===#
     # Initializers
@@ -46,7 +46,7 @@ struct StringSlice[
 
     @always_inline
     fn __init__(
-        inout self, owned unsafe_from_utf8: Span[Int8, is_mutable, lifetime]
+        inout self, owned unsafe_from_utf8: Span[UInt8, is_mutable, lifetime]
     ):
         """
         Construct a new StringSlice from a sequence of UTF-8 encoded bytes.
@@ -72,7 +72,7 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[Int8, is_mutable, lifetime]:
+    fn as_bytes_slice(self) -> Span[UInt8, is_mutable, lifetime]:
         """
         Get the sequence of encoded bytes as a slice of the underlying string.
 

@@ -149,8 +149,11 @@ struct Slice(Sized, Stringable, EqualityComparable):
         return len(range(self.start, self.end, self.step))
 
     @always_inline
-    fn __getitem__(self, idx: Int) -> Int:
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> Int:
         """Get the slice index.
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             idx: The index.
@@ -158,7 +161,7 @@ struct Slice(Sized, Stringable, EqualityComparable):
         Returns:
             The slice index.
         """
-        return self.start + idx * self.step
+        return self.start + index(idx) * self.step
 
     @always_inline("nodebug")
     fn _has_end(self) -> Bool:

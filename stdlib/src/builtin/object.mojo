@@ -17,16 +17,13 @@ These are Mojo built-ins, so you don't need to import them.
 
 from collections import Dict, List
 
-from os import Atomic
 from sys.intrinsics import _type_is_eq
 
-from memory import memcmp, memcpy, DTypePointer
+from memory import memcmp, memcpy
 from memory import Arc
 from memory.unsafe_pointer import move_from_pointee
 
 from utils import StringRef, unroll, Variant
-
-from .io import _printf, _put
 
 # ===----------------------------------------------------------------------=== #
 # _ObjectImpl
@@ -749,7 +746,12 @@ struct object(IntableRaising, Boolable, Stringable):
         var impl = _ImmutableString(
             UnsafePointer[Int8].alloc(value.length), value.length
         )
-        memcpy(impl.data, value.unsafe_ptr(), value.length)
+        memcpy(
+            impl.data,
+            # TODO: Remove bitcast once transition to UInt8 strings is complete.
+            value.unsafe_ptr().bitcast[Int8](),
+            value.length,
+        )
         self._value = impl
 
     @always_inline

@@ -178,14 +178,14 @@ def test_file_write_again():
 @value
 @register_passable
 struct Word:
-    var first_letter: Int8
-    var second_letter: Int8
-    var third_letter: Int8
-    var fourth_letter: Int8
-    var fith_letter: Int8
+    var first_letter: UInt8
+    var second_letter: UInt8
+    var third_letter: UInt8
+    var fourth_letter: UInt8
+    var fith_letter: UInt8
 
     fn __str__(self) -> String:
-        var word = List[Int8](capacity=6)
+        var word = List[UInt8](capacity=6)
         word.append(self.first_letter)
         word.append(self.second_letter)
         word.append(self.third_letter)
@@ -211,6 +211,39 @@ def test_file_read_to_dtype_pointer():
     )
 
 
+def test_file_get_raw_fd():
+    # since JIT and build give different file descriptors, we test by checking
+    # if we printed to the right file.
+    var f1 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_1", "rw")
+    var f2 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_2", "rw")
+    var f3 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_2", "rw")
+
+    print(
+        "test from file 1",
+        file=f1._get_raw_fd(),
+        flush=True,
+        end="",
+    )
+    _ = f1.seek(0)
+    assert_equal(f1.read(), "test from file 1")
+    assert_equal(f2.read(), "")
+    assert_equal(f3.read(), "")
+
+    _ = f1.seek(0)
+    _ = f2.seek(0)
+    _ = f3.seek(0)
+
+    print("test from file 2", file=f2._get_raw_fd(), flush=True, end="")
+    print("test from file 3", file=f3._get_raw_fd(), flush=True, end="")
+
+    _ = f2.seek(0)
+    _ = f3.seek(0)
+
+    assert_equal(f3.read(), "test from file 3")
+    assert_equal(f2.read(), "test from file 2")
+    assert_equal(f1.read(), "test from file 1")
+
+
 def main():
     test_file_read()
     test_file_read_multi()
@@ -223,3 +256,4 @@ def main():
     test_file_write()
     test_file_write_again()
     test_file_read_to_dtype_pointer()
+    test_file_get_raw_fd()

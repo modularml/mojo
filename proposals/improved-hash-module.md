@@ -38,7 +38,7 @@ struct Person(Hashable):
         hashes.append(hash(self.age))
         for friend in self.friends_names:
             hashes.append(hash(friend[]))
-        
+
         # How to combine a hash of hashes ???
 ```
 
@@ -75,8 +75,8 @@ trait Hasher:
         """Contribute to the hash value with a Hashable value. Should be used by implementors of Hashable types which are a composition of Hashable types."""
         ...
     fn _finish[dt: DType = DType.uint64](owned self) -> Scalar[dt]:
-        """Used internally to generate the final hash value, should be simplified to `_finish(owned self) -> Scalar[hash_value_dt]` 
-        once trait declarations support parameters and we can switch to `trait Hasher[hash_value_dt: DType]`. 
+        """Used internally to generate the final hash value, should be simplified to `_finish(owned self) -> Scalar[hash_value_dt]`
+        once trait declarations support parameters and we can switch to `trait Hasher[hash_value_dt: DType]`.
         This is beneficial as hash functions have different implementations based on the type """
         ...
 ```
@@ -173,8 +173,8 @@ trait Hasher:
         """Contribute to the hash value with a Hashable value. Should be used by implementors of Hashable types which are a composition of Hashable types."""
         ...
     fn _finish[dt: DType = DType.uint64](owned self) -> Scalar[dt]:
-        """Used internally to generate the final hash value, should be simplified to `_finish(owned self) -> Scalar[hash_value_dt]` 
-        once trait declarations support parameters and we can switch to `trait Hasher[hash_value_dt: DType]`. 
+        """Used internally to generate the final hash value, should be simplified to `_finish(owned self) -> Scalar[hash_value_dt]`
+        once trait declarations support parameters and we can switch to `trait Hasher[hash_value_dt: DType]`.
         This is beneficial as hash functions have different implementations based on the type """
         ...
 
@@ -182,7 +182,7 @@ trait Hasher:
 struct MyInt(Hashable):
     """An example for the Int type."""
     var value: Int
-    
+
     @always_inline
     fn __hash__[H: Hasher](self, inout hasher: H):
         hasher._update_with_simd(Int64(self.value))
@@ -229,7 +229,7 @@ fn _DJBX33A_SECRET() -> UInt64:
 
 struct DJBX33A_Hasher[custom_secret: UInt64 = 0](Hasher):
     """Example of a simple Hasher, with an option to provide a custom secret at compile time.
-    When custom secret is set to 0 the secret will be looked up in env var DJBX33A_SECRET. 
+    When custom secret is set to 0 the secret will be looked up in env var DJBX33A_SECRET.
     In case env var DJBX33A_SECRET is not set a random int will be generated."""
     var hash_data: UInt64
     var secret: UInt64
@@ -254,10 +254,10 @@ struct DJBX33A_Hasher[custom_secret: UInt64 = 0](Hasher):
         """The algorithm is not optimal."""
         alias size_in_bytes = size * dt.sizeof()
         var bytes = bitcast[DType.uint8, size_in_bytes](value)
-        @unroll
+        @parameter
         for i in range(size_in_bytes):
             self.hash_data = self.hash_data * 33 + bytes[i].cast[DType.uint64]()
-    
+
     @always_inline
     fn update[T: Hashable](inout self, value: T):
         value.__hash__(self)

@@ -158,6 +158,16 @@ def test_unsafepointer_address_space():
     p2.free()
 
 
+def test_indexing():
+    var ptr = UnsafePointer[Int].alloc(4)
+    for i in range(4):
+        ptr[i] = i
+
+    assert_equal(ptr[False], 0)
+    assert_equal(ptr[Int32(1)], 1)
+    assert_equal(ptr[3], 3)
+
+
 def main():
     test_address_of()
 
@@ -173,3 +183,4 @@ def main():
     test_comparisons()
 
     test_unsafepointer_address_space()
+    test_indexing()

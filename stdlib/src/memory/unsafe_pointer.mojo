@@ -48,7 +48,7 @@ struct UnsafePointer[
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful
     # lifetime for them anyway.
-    alias _ref_type = Reference[T, True, MutStaticLifetime, address_space]
+    alias _ref_type = Reference[T, True, MutableStaticLifetime, address_space]
 
     """The underlying pointer type."""
     var address: Self._mlir_type
@@ -362,8 +362,13 @@ struct UnsafePointer[
         ](self.address)
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self._ref_type:
+    fn __refitem__[
+        IndexerType: Indexer
+    ](self, offset: IndexerType) -> Self._ref_type:
         """Return a reference to the underlying data, offset by the offset index.
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             offset: The offset index.
@@ -371,7 +376,7 @@ struct UnsafePointer[
         Returns:
             An offset reference.
         """
-        return (self + offset).__refitem__()
+        return (self + index(offset)).__refitem__()
 
 
 # ===----------------------------------------------------------------------=== #

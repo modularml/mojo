@@ -464,6 +464,40 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = existing._index.copy(existing._reserved)
         self._entries = existing._entries
 
+    @staticmethod
+    fn fromkeys(keys: List[K], value: V) -> Self:
+        """Create a new dictionary with keys from list and values set to value.
+
+        Args:
+            keys: The keys to set.
+            value: The value to set.
+
+        Returns:
+            The new dictionary.
+        """
+        var dict = Dict[K, V]()
+        for key in keys:
+            dict[key[]] = value
+        return dict
+
+    @staticmethod
+    fn fromkeys(
+        keys: List[K], value: Optional[V] = None
+    ) -> Dict[K, Optional[V]]:
+        """Create a new dictionary with keys from list and values set to value.
+
+        Args:
+            keys: The keys to set.
+            value: The value to set.
+
+        Returns:
+            The new dictionary.
+        """
+        var dict = Dict[K, Optional[V]]()
+        for key in keys:
+            dict[key[]] = value
+        return dict
+
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing dictiontary.
 
