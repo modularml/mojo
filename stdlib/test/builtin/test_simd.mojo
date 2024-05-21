@@ -164,6 +164,8 @@ def test_len():
         assert_equal(2, f2.__len__())
 
     alias F = SIMD[DType.float64, 8]
+    var f3 = F(1.0)
+    assert_equal(8, f3.__len__())
     var f4 = F(0, -1.0, 1.0, -1.111, 1.111, -2.2222, 2.2222, 3.1415)
     assert_equal(8, f4.__len__())
 
