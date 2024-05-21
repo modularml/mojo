@@ -129,6 +129,9 @@ struct Offset:
     fn from_hash(buf: UInt8) -> Self:
         """Get the values from hash.
 
+        Args:
+            buf: The hash.
+
         Returns:
             Self.
         """
@@ -209,6 +212,9 @@ struct TzDT:
     fn from_hash(buf: UInt16) -> Self:
         """Get the values from hash.
 
+        Args:
+            buf: The hash.
+
         Returns:
             Self.
         """
@@ -265,6 +271,7 @@ struct ZoneDST:
         """
         self.buf = buf
 
+    @always_inline("nodebug")
     fn from_hash(self) -> (TzDT, TzDT, Offset):
         """Get the values from hash.
 
