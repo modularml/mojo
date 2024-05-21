@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from memory import DTypePointer
 
 from utils import StringRef
+from collections import InlineList
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._format import Formattable, Formatter
 
@@ -338,3 +339,37 @@ struct StringLiteral(
             An integer value that represents the string, or otherwise raises.
         """
         return _atol(self)
+
+    @always_inline
+    fn format[
+        *Ts: Stringable
+    ](self, *args: *Ts, **kwargs: String) raises -> String:
+        """Format a template with *args and **kwargs.
+
+        Example:
+
+        ```mojo
+        var x = "{0} %2 == {1} {mojo} {number}".format(
+            1024, True, mojo="❤️‍🔥", number=str(1.125)
+        )
+        print(x) #1024 %2 == True ❤️‍🔥 1.225
+        ```
+
+        ⚠️ Does not work in the parameter domain (`alias`) yet
+
+        Args:
+            args: Values passed as variadic arguments.
+            kwargs: Values passed a keyword variadic arguments.
+
+        Parameters:
+            Ts: The types of the variadic arguments.
+
+        Returns:
+            The formated template.
+
+        Variadic arguments are required to implement `Stringable`.
+
+        """
+        var res = String(self)
+        res._format(args, kwargs)
+        return res^

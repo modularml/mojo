@@ -23,7 +23,8 @@ from sys.ffi import C_char
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import StringRef, StaticIntTuple, Span, StringSlice
-from utils._format import Formattable, Formatter, ToFormatter
+from utils._format import Formattable, Formatter, ToFormatter, FormatCurlyEntry
+from collections.dict import OwnedKwargsDict
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -1969,6 +1970,115 @@ struct String(
                 count=len_self,
             )
         return String(buf^)
+
+    @always_inline
+    fn _format[
+        *Ts: Stringable
+    ](
+        inout self,
+        args: VariadicPack[_, _, Stringable, Ts],
+        kwargs: OwnedKwargsDict[String],
+    ) raises:
+        """
+        Internally used by the `format()` methods for:
+
+        - variadic arguments without unpack.
+
+        - variadic keyword arguments without unpack.
+        """
+        var Entries = FormatCurlyEntry.create_entries(self)
+        var manual_indexing_count = 0
+        var automatic_indexing_count = 0
+        var kwargs_indexing_count = 0
+        for e in Entries:
+            if e[].value.isa[Int]():
+                manual_indexing_count += 1
+            elif e[].value.isa[NoneType]():
+                automatic_indexing_count += 1
+            elif e[].value.isa[String]():
+                kwargs_indexing_count += 1
+        if manual_indexing_count and automatic_indexing_count:
+            raise "Cannot both use manual and automatic indexing for *args"
+        for e in Entries:
+            if e[].value.isa[String]():
+                if e[].value[String] not in kwargs:
+                    raise "Index " + e[].value[String] + " not in kwargs"
+            if manual_indexing_count:
+                if e[].value.isa[Int]() and e[].value[Int] >= len(args):
+                    raise ("Index " + str(e[].value[Int]) + " not in *args")
+            if automatic_indexing_count:
+                if automatic_indexing_count > len(args):
+                    raise ("Automatic indexing require more args in *args")
+        var res: String = ""
+        var start = 0
+
+        if manual_indexing_count:
+            for e in Entries:
+                debug_assert(start < len(self), "start >= len(self)")
+                res += self[start : e[].first_curly]
+                if e[].value.isa[String]():
+                    res += kwargs[e[].value[String]]
+                if e[].value.isa[Int]():
+
+                    @parameter
+                    for i in range(len(VariadicList(Ts))):
+                        if i == e[].value[Int]:
+                            res += str(args[i])
+                start = e[].last_curly + 1
+
+        if automatic_indexing_count:
+            var current_arg_index = 0
+            for e in Entries:
+                debug_assert(start < len(self), "start >= len(self)")
+                res += self[start : e[].first_curly]
+                if e[].value.isa[String]():
+                    res += kwargs[e[].value[String]]
+                if e[].value.isa[NoneType]():
+
+                    @parameter
+                    for i in range(len(VariadicList(Ts))):
+                        if i == current_arg_index:
+                            res += str(args[i])
+                    current_arg_index += 1
+                start = e[].last_curly + 1
+        if start < len(self):
+            res += self[start : len(self)]
+        self = res
+
+    @always_inline
+    fn format[
+        *Ts: Stringable
+    ](self, *args: *Ts, **kwargs: String) raises -> String:
+        """Format a template with *args and **kwargs.
+
+        Example:
+
+        ```mojo
+        var x = "{0} %2 == {1} {mojo} {number}".format(
+            1024, True, mojo="❤️‍🔥", number=str(1.125)
+        )
+        print(x) #1024 %2 == True ❤️‍🔥 1.225
+        ```
+
+        ⚠️ Does not work in the parameter domain (`alias`) yet
+
+        Args:
+            args: Values passed as variadic arguments.
+            kwargs: Values passed a keyword variadic arguments.
+
+        Parameters:
+            Ts: The types of the variadic arguments.
+
+        Returns:
+            The formated template.
+
+        Variadic arguments are required to implement `Stringable`.
+
+        """
+        var res: String
+        String.__copyinit__(res, self)
+        res._format(args, kwargs)
+        return res^
 
 
 # ===----------------------------------------------------------------------=== #

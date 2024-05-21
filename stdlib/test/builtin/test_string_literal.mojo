@@ -142,6 +142,65 @@ fn test_repr() raises:
     assert_equal(StringLiteral.__repr__("\x7f"), r"'\x7f'")
 
 
+def test_format_args():
+    with assert_raises(contains="Index 1 not in *args"):
+        print("A {0} B {1}".format("First"))
+
+    with assert_raises(
+        contains="Automatic indexing require more args in *args"
+    ):
+        print("A {} B {}".format("First"))
+
+    with assert_raises(
+        contains="Cannot both use manual and automatic indexing for *args"
+    ):
+        print("A {} B {1}".format("First", "Second"))
+
+    with assert_raises(contains="Index second not in kwargs"):
+        print("A {first} B {second}".format(first="A"))
+
+    assert_equal(
+        "A {} B {First} {Second} {} {Third} {} C".format(
+            "Hello",
+            "World",
+            "🔥",
+            First=str(True),
+            Second=str(1.125),
+            Third=str(123),
+        ),
+        "A Hello B True 1.125 World 123 🔥 C",
+    )
+
+    assert_equal(
+        "{0} {Second} {First} {1} {Second} {0}".format(
+            "🔥",
+            "Mojo",
+            First="Love",
+            Second="❤️‍🔥",
+        ),
+        "🔥 ❤️‍🔥 Love Mojo ❤️‍🔥 🔥",
+    )
+
+    assert_equal("{0} {1}".format("🔥", "Mojo"), "🔥 Mojo")
+
+    assert_equal("{0} {1}".format("{1}", "Mojo"), "{1} Mojo")
+
+    # Does not work in the parameter domain
+    # alias A = "Love"
+    # alias B = String("❤️‍🔥")
+    # alias C = "🔥"
+    # alias D = String("Mojo")
+    # alias Result = "{0} {Second} {First} {1} {Second} {0}".format(
+    #    C,
+    #    D,
+    #    First=A,
+    #    Second=B
+    # )
+    # @parameter
+    # if Result != "🔥 ❤️‍🔥 Love Mojo ❤️‍🔥 🔥":
+    #    raise "Assertion failed (alias): " + Result
+
+
 def main():
     test_basics()
     test_contains()
@@ -151,3 +210,4 @@ def main():
     test_hash()
     test_intable()
     test_repr()
+    test_format_args()
