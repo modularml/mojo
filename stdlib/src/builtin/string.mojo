@@ -1167,12 +1167,9 @@ struct String(
             UnsafePointer.address_of(self).bitcast[NoneType](),
         )
 
-    fn join[rank: Int](self, elems: StaticIntTuple[rank]) -> String:
+    fn join(self, *elems: Int) -> String:
         """Joins the elements from the tuple using the current string as a
         delimiter.
-
-        Parameters:
-            rank: The size of the tuple.
 
         Args:
             elems: The input tuple.
