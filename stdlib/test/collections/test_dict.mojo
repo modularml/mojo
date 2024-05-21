@@ -10,8 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %bare-mojo %s
 
+# TODO: Replace %bare-mojo with %mojo
+# when  https://github.com/modularml/mojo/pull/2691 is merged.
 from collections import Dict, KeyElement, Optional
 from collections.dict import OwnedKwargsDict
 

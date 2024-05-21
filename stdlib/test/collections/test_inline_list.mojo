@@ -10,7 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %bare-mojo %s
+
+# TODO: Replace %bare-mojo with %mojo
+# when  https://github.com/modularml/mojo/pull/2744 is merged.
 
 from collections import InlineList, Set
 from testing import assert_equal, assert_false, assert_true, assert_raises
