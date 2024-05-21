@@ -308,6 +308,7 @@ fn bit_width[
 # bit_ceil
 # ===----------------------------------------------------------------------===#
 
+
 @always_inline("nodebug")
 fn bit_ceil(val: Int) -> Int:
     """Computes the smallest power of 2 that is greater than or equal to the
