@@ -25,6 +25,39 @@ def test_dict_construction():
     _ = Dict[String, Int]()
 
 
+def test_dict_fromkeys():
+    alias keys = List[String]("a", "b")
+    var expected_dict = Dict[String, Int]()
+    expected_dict["a"] = 1
+    expected_dict["b"] = 1
+    var dict = Dict.fromkeys(keys, 1)
+
+    assert_equal(len(dict), len(expected_dict))
+
+    for k_v in expected_dict.items():
+        var k = k_v[].key
+        var v = k_v[].value
+        assert_true(k in dict)
+        assert_equal(dict[k], v)
+
+
+def test_dict_fromkeys_optional():
+    alias keys = List[String]("a", "b", "c")
+    var expected_dict = Dict[String, Optional[Int]]()
+    expected_dict["a"] = None
+    expected_dict["b"] = None
+    expected_dict["c"] = None
+    var dict = Dict[_, Int].fromkeys(keys)
+
+    assert_equal(len(dict), len(expected_dict))
+
+    for k_v in expected_dict.items():
+        var k = k_v[].key
+        var v = k_v[].value
+        assert_true(k in dict)
+        assert_false(v)
+
+
 def test_basic():
     var dict = Dict[String, Int]()
     dict["a"] = 1
@@ -481,6 +514,8 @@ def test_find_get():
 
 def main():
     test_dict()
+    test_dict_fromkeys()
+    test_dict_fromkeys_optional()
     test_dict_string_representation_string_int()
     test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
