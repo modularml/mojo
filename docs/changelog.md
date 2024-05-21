@@ -474,6 +474,9 @@ what we publish.
   - `math.limit.max_finite`: use `utils.numerics.max_finite`
   - `math.limit.min_finite`: use `utils.numerics.min_finite`
 
+- The `tensor.random` module has been removed. The same functionality is now
+  accessible via the `Tensor.rand` and `Tensor.randn` static methods.
+
 ### 🛠️ Fixed
 
 - [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on
