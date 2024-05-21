@@ -95,7 +95,9 @@ fn chr(c: Int) -> String:
 
     @always_inline
     fn _utf8_len(val: Int) -> Int:
-        debug_assert(val > 0x10FFFF, "Value is not a valid Unicode code point")
+        debug_assert(
+            0 <= val <= 0x10FFFF, "Value is not a valid Unicode code point"
+        )
         alias sizes = SIMD[DType.int32, 4](
             0, 0b1111_111, 0b1111_1111_111, 0b1111_1111_1111_1111
         )
