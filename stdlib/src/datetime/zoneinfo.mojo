@@ -680,6 +680,11 @@ fn get_zoneinfo[
         A: The type of storage for timezones with
             no Daylight Saving Time.
 
+    Args:
+        timezones: A list of the timezones to look for info. If the
+            list is empty, it defaults to using the hardcoded tz_list
+            in `._lists.mojo`.
+
     Returns:
         Optional ZoneInfo.
 
