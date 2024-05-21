@@ -95,7 +95,9 @@ fn chr(c: Int) -> String:
 
     @always_inline
     fn _utf8_len(val: Int) -> Int:
-        debug_assert(val > 0x10FFFF, "Value is not a valid Unicode code point")
+        debug_assert(
+            0 <= val <= 0x10FFFF, "Value is not a valid Unicode code point"
+        )
         alias sizes = SIMD[DType.int32, 4](
             0, 0b1111_111, 0b1111_1111_111, 0b1111_1111_1111_1111
         )
@@ -877,15 +879,19 @@ struct String(
         """
         return len(self) > 0
 
-    fn __getitem__(self, idx: Int) -> String:
+    fn __getitem__[IndexerType: Indexer](self, i: IndexerType) -> String:
         """Gets the character at the specified position.
 
+        Parameters:
+            IndexerType: The type of the indexer.
+
         Args:
-            idx: The index value.
+            i: The index value.
 
         Returns:
             A new string containing the character at the specified position.
         """
+        var idx = index(i)
         if idx < 0:
             return self.__getitem__(len(self) + idx)
 
@@ -1161,12 +1167,9 @@ struct String(
             UnsafePointer.address_of(self).bitcast[NoneType](),
         )
 
-    fn join[rank: Int](self, elems: StaticIntTuple[rank]) -> String:
+    fn join(self, *elems: Int) -> String:
         """Joins the elements from the tuple using the current string as a
         delimiter.
-
-        Parameters:
-            rank: The size of the tuple.
 
         Args:
             elems: The input tuple.
