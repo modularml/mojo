@@ -361,8 +361,9 @@ what we publish.
   and value.
   ([PR 2622](https://github.com/modularml/mojo/pull/2622) by [@artemiogr97](https://github.com/artemiogr97))
 
-- `StringRef` now implements `split()` which can be used to split a `StringRef` into a `List[StringRef]` by a delimiter.
-  ([PR #2705](https://github.com/modularml/mojo/pull/2705) by [@fknfilewalker](https://github.com/fknfilewalker))
+- `StringRef` now implements `split()` which can be used to split a `StringRef`
+  into a `List[StringRef]` by a delimiter. ([PR #2705](https://github.com/modularml/mojo/pull/2705)
+  by [@fknfilewalker](https://github.com/fknfilewalker))
 
 ### 🦋 Changed
 
