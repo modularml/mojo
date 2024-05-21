@@ -144,7 +144,8 @@ def test_len():
     assert_equal(i1.__len__(), 1)
 
     alias I32 = SIMD[DType.int32, 4]
-
+    var i2 = I32(-1)
+    assert_equal(4, i2.__len__())
     var i3 = I32(-1, 0, 1, 3)
     assert_equal(4, i3.__len__())
 
@@ -153,13 +154,16 @@ def test_len():
     assert_equal(1, i4.__len__())
 
     alias UI64 = SIMD[DType.uint64, 16]
-
+    var i5 = UI64(10)
+    assert_equal(16, i5.__len__())
     var i6 = UI64(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     assert_equal(16, i6.__len__())
 
     @parameter
     if not has_neon():
         alias BF16 = SIMD[DType.bfloat16, 2]
+        var f1 = BF16(0.0)
+        assert_equal(2, f1.__len__())
         var f2 = BF16(0.1, 0.2)
         assert_equal(2, f2.__len__())
 
