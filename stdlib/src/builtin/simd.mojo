@@ -460,7 +460,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             size == 1,
             (
                 "The truth value of a SIMD vector with more than one element is"
-                " ambiguous. Use `reduce_and()` or `reduce_or()`"
+                " ambiguous. Use the builtin `any()` or `all()` functions"
+                " instead."
             ),
         ]()
         return rebind[Scalar[DType.bool]](self.cast[DType.bool]()).value
@@ -2298,39 +2299,93 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return self.reduce[mul_reduce_body, size_out]()
 
     @always_inline
-    fn reduce_and(self) -> Bool:
-        """Reduces the boolean vector using the `and` operator.
+    fn reduce_and[size_out: Int = 1](self) -> SIMD[type, size_out]:
+        """Reduces the vector using the bitwise `&` operator.
+
+        Parameters:
+            size_out: The width of the reduction.
 
         Constraints:
-            The element type of the vector must be boolean.
+            `size_out` must not exceed width of the vector.
+            The element type of the vector must be integer or boolean.
 
         Returns:
-            True if all element in the vector is True and False otherwise.
+            The reduced vector.
         """
+        constrained[
+            size_out <= size, "`size_out` must not exceed width of the vector."
+        ]()
+        constrained[
+            type.is_integral() or type.is_bool(),
+            "The element type of the vector must be integer or boolean.",
+        ]()
+
+        @parameter
+        if size_out > 1:
+
+            @always_inline
+            @parameter
+            fn and_reduce_body[
+                type: DType, width: Int
+            ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
+                type, width
+            ]:
+                return v1 & v2
+
+            return self.reduce[and_reduce_body, size_out]()
 
         @parameter
         if size == 1:
-            return self.cast[DType.bool]()[0].value
+            return rebind[SIMD[type, size_out]](self)
+
         return llvm_intrinsic[
-            "llvm.vector.reduce.and", Scalar[DType.bool], has_side_effect=False
+            "llvm.vector.reduce.and",
+            SIMD[type, size_out],
+            has_side_effect=False,
         ](self)
 
     @always_inline
-    fn reduce_or(self) -> Bool:
-        """Reduces the boolean vector using the `or` operator.
+    fn reduce_or[size_out: Int = 1](self) -> SIMD[type, size_out]:
+        """Reduces the vector using the bitwise `|` operator.
+
+        Parameters:
+            size_out: The width of the reduction.
 
         Constraints:
-            The element type of the vector must be boolean.
+            `size_out` must not exceed width of the vector.
+            The element type of the vector must be integer or boolean.
 
         Returns:
-            True if any element in the vector is True and False otherwise.
+            The reduced vector.
         """
+        constrained[
+            size_out <= size, "`size_out` must not exceed width of the vector."
+        ]()
+        constrained[
+            type.is_integral() or type.is_bool(),
+            "The element type of the vector must be integer or boolean.",
+        ]()
+
+        @parameter
+        if size_out > 1:
+
+            @always_inline
+            @parameter
+            fn or_reduce_body[
+                type: DType, width: Int
+            ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
+                type, width
+            ]:
+                return v1 | v2
+
+            return self.reduce[or_reduce_body, size_out]()
 
         @parameter
         if size == 1:
-            return self.cast[DType.bool]()[0].value
+            return rebind[SIMD[type, size_out]](self)
+
         return llvm_intrinsic[
-            "llvm.vector.reduce.or", Scalar[DType.bool], has_side_effect=False
+            "llvm.vector.reduce.or", SIMD[type, size_out], has_side_effect=False
         ](self)
 
     @always_inline
@@ -2340,10 +2395,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             `True` if and only if **all** elements in this vector are non-zero.
         """
-
-        @parameter
-        if type == DType.bool:
-            return self.reduce_and()
         return self.cast[DType.bool]().reduce_and()
 
     @always_inline
@@ -2354,10 +2405,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `True` if this vector contains **any** non-zero elements, `False`
             otherwise.
         """
-
-        @parameter
-        if type == DType.bool:
-            return self.reduce_or()
         return self.cast[DType.bool]().reduce_or()
 
     # ===-------------------------------------------------------------------===#
