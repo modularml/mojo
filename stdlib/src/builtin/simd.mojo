@@ -326,8 +326,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 ]
             ](elems[0].value)
             return
-
-        debug_assert(size == num_elements, "mismatch in the number of elements")
+        # TODO: Make this a compile-time check when possible.
+        debug_assert(
+            size == num_elements,
+            (
+                "mismatch in the number of elements in the SIMD variadic"
+                " constructor"
+            ),
+        )
         self = Self()
 
         @parameter
