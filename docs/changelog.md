@@ -166,9 +166,13 @@ what we publish.
           return Self(trunc(re), trunc(im))
   ```
 
-- Add builtin `any()` and `all()` functions to check for truthy elements in a collection.
-  This also works to get the truthy value of a SIMD vector.
-  ([PR #2600](https://github.com/modularml/mojo/pull/2600) by [@helehex](https://github.com/helehex))
+- You can now use the builtin `any()` and `all()` functions to check for truthy
+  elements in a collection. Because `SIMD.__bool__()` is now constrained to
+  `size=1`, You must explicity use these to get the truthy value of a SIMD
+  vector. This avoids common bugs around implicit conversion of `SIMD` to
+  `Bool`.
+    ([PR #2600](https://github.com/modularml/mojo/pull/2600) by [@helehex](https://github.com/helehex))
+
   For example:
 
   ```mojo
@@ -386,9 +390,13 @@ what we publish.
   `swap` and `partition` will likely shuffle around as we're reworking
   our builtin `sort` function and optimizing it.
 
-- `SIMD.bool()` is constrained only for when the `size` is `1` now.  Instead,
-  explicitly use `SIMD.reduce_and()` or `SIMD.reduce_or()`.
+- `SIMD.bool()` is constrained only for when the `size` is `1` now. Instead,
+  explicitly use `any()` or `all()`.
     ([PR #2502](https://github.com/modularml/mojo/pull/2502) by [@helehex](https://github.com/helehex))
+
+- The `SIMD.reduce_or()` and `SIMD.reduce_and()` methods are now bitwise
+  operations, and support integer types.
+    ([PR #2671](https://github.com/modularml/mojo/pull/2671) by [@helehex](https://github.com/helehex))
 
 - `ListLiteral` and `Tuple` now only require that element types be `Copyable`.
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
