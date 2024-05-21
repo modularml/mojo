@@ -712,7 +712,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the type must be numeric"]()
 
-        if (rhs == 0).reduce_and():
+        if not any(rhs):
             # this should raise an exception.
             return 0
 
@@ -724,7 +724,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         elif type.is_unsigned():
             return div
         else:
-            if ((self > 0) & (rhs > 0)).reduce_and():
+            if all((self > 0) & (rhs > 0)):
                 return div
 
             var mod = self - div * rhs
@@ -760,7 +760,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the type must be numeric"]()
 
-        if (rhs == 0).reduce_and():
+        if not any(rhs):
             # this should raise an exception.
             return 0
 
@@ -1573,7 +1573,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self << rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert((rhs >= 0).reduce_and(), "unhandled negative value")
+        debug_assert(all(rhs >= 0), "unhandled negative value")
         return __mlir_op.`pop.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -1590,7 +1590,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self >> rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert((rhs >= 0).reduce_and(), "unhandled negative value")
+        debug_assert(all(rhs >= 0), "unhandled negative value")
         return __mlir_op.`pop.shr`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -2586,7 +2586,7 @@ fn _pow[
     @parameter
     if rhs_type.is_floating_point() and lhs_type == rhs_type:
         var rhs_quotient = rhs.__floor__()
-        if ((rhs >= 0) & (rhs_quotient == rhs)).reduce_and():
+        if all((rhs >= 0) & (rhs_quotient == rhs)):
             return _pow(lhs, rhs_quotient.cast[_integral_type_of[rhs_type]()]())
 
         var result = SIMD[lhs_type, simd_width]()
@@ -2609,9 +2609,9 @@ fn _pow[
         return result
     elif rhs_type.is_integral():
         # Common cases
-        if (rhs == 2).reduce_and():
+        if all(rhs == 2):
             return lhs * lhs
-        if (rhs == 3).reduce_and():
+        if all(rhs == 3):
             return lhs * lhs * lhs
 
         var result = SIMD[lhs_type, simd_width]()

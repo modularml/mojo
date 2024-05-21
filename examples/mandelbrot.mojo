@@ -57,7 +57,7 @@ fn mandelbrot_kernel_SIMD[
     var t: SIMD[DType.bool, simd_width] = True
 
     for _ in range(MAX_ITERS):
-        if not t.reduce_or():
+        if not any(t):
             break
         y2 = y * y
         y = x.fma(y + y, cy)

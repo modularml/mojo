@@ -46,7 +46,7 @@ fn _isclose(
         return a == b
     else:
         var both_nan = isnan(a) & isnan(b)
-        if equal_nan and both_nan.reduce_and():
+        if equal_nan and all(both_nan):
             return True
 
         var res = (a == b)
@@ -171,9 +171,7 @@ fn assert_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    # `if lhs != rhs:` is not enough. `reduce_or()` must be used here,
-    # otherwise, if any of the elements are equal, the error is not triggered.
-    if (lhs != rhs).reduce_or():
+    if any(lhs != rhs):
         raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
 
 
@@ -235,7 +233,7 @@ fn assert_not_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    if (lhs == rhs).reduce_and():
+    if all(lhs == rhs):
         raise _assert_not_equal_error(
             str(lhs), str(rhs), msg, __call_location()
         )
@@ -289,7 +287,7 @@ fn assert_almost_equal[
         lhs, rhs, atol=atol, rtol=rtol, equal_nan=equal_nan
     )
 
-    if not almost_equal.reduce_and():
+    if not all(almost_equal):
         var err = str(lhs) + " is not close to " + str(rhs)
 
         @parameter
