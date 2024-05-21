@@ -30,7 +30,6 @@ from .zoneinfo import (
     ZoneStorageDST,
     ZoneStorageNoDST,
     offset_at,
-    offset_no_dst_tz,
     get_zoneinfo,
 )
 
@@ -142,10 +141,9 @@ struct TimeZone[
                 self._dst.add(tz_str, dst.value())
                 return
             var tz = zi.with_no_dst.get(tz_str)
-            var val = offset_no_dst_tz(tz)
-            if not val:
+            if not tz:
                 return
-            self._no_dst.add(tz_str, val.value())
+            self._no_dst.add(tz_str, tz.value())
 
     fn __getattr__(self, name: StringLiteral) raises -> UInt8:
         """Get the attribute.
@@ -213,7 +211,7 @@ struct TimeZone[
             var tz = self._dst.get(self.tz_str)
             var offset = offset_at(tz, year, month, day, hour, minute, second)
             if offset:
-                return offset.value()[]
+                return offset.value()
         elif iana and pyzoneinfo:
             try:
                 from python import Python
@@ -226,7 +224,7 @@ struct TimeZone[
                 var sign = 1 if offset.days == -1 else -1
                 var hours = int(offset.seconds) // (60 * 60) - int(hour)
                 var minutes = int(offset.seconds) % 60
-                return hours, minutes, sign
+                return Offset(hours, minutes, sign)
             except:
                 pass
 

@@ -24,13 +24,14 @@ alias _cal = PythonCalendar
 # @value
 @register_passable("trivial")
 struct Offset:
-    """Only supports hour offsets less than 16 hours and minute offsets
-    that are in (00, 30, 45). Offset sign and minute are assumed
+    """Only supports hour offsets: [0, 15] and minute offsets
+    that are: {0, 30, 45}. Offset sign and minute are assumed
     to be equal in DST and STD and DST adds 1 hour to STD hour,
-    unless 2 reserved bits are unequal to 0 which means the offset is
-    one of 2 weird time zones (this was added because of literally [one
-    small island](https://en.wikipedia.org/wiki/Lord_Howe_Island)
-    and an [Antartica research station](
+    unless 2 reserved bits are set which means the offset jumps 30
+    minutes or 2 hours from its STD time (this was added because
+    of literally [one small island](
+        https://en.wikipedia.org/wiki/Lord_Howe_Island)
+    and an [Antarctica research station](
         https://es.wikipedia.org/wiki/Base_Troll ))."""
 
     var hour: UInt8
@@ -49,8 +50,8 @@ struct Offset:
             buf: The buffer.
         """
         self.hour = (buf >> 3) & 0b111
-        self.minute = (buf >> 1) & 0b1
-        self.sign = buf >> 7
+        self.minute = (buf >> 1) & 0b11
+        self.sign = buf >> 7 & 0b1
         self.buf = buf
 
     fn __init__(inout self, values: Tuple[UInt8, UInt8, UInt8], /):
@@ -103,11 +104,11 @@ struct Offset:
 
             var std_m: UInt8 = atol(iso_tzd_std[4:6])
             var dst_m: UInt8 = atol(iso_tzd_std[4:6])
-            var weird: UInt8 = 0
-            if std_m - dst_m == 30:
-                std_m = 3
-            elif (dst_h - std_h) ^ 0b10 == 0:
-                weird = 1
+            var jumps_2hours: UInt8 = 0
+            if std_m - dst_m == 30:  # "Australia/Lord_Howe"
+                std_m = 3  # jumps 30 minutes
+            elif (dst_h - std_h) ^ 0b10 == 0:  # "Antarctica/Troll"
+                jumps_2hours = 1
             else:
                 if std_m == 30:
                     std_m = 1
@@ -116,37 +117,29 @@ struct Offset:
             self.hour = std_h
             self.minute = std_m
             self.sign = sign
-            self.buf = (sign << 7) | (std_h << 3) | (std_m << 1) | weird
+            self.buf = (sign << 7) | (std_h << 3) | (std_m << 1) | jumps_2hours
         except:
             self.hour = 0
             self.minute = 0
-            self.sign = 0
-            self.buf = 0
+            self.sign = 1
+            self.buf = 1 << 7
 
     @always_inline("nodebug")
-    fn from_hash(self) -> (UInt8, UInt8, UInt8, UInt8):
+    @staticmethod
+    fn from_hash(buf: UInt8) -> Self:
         """Get the values from hash.
 
         Returns:
-            - negative: (1 bit) Whether the offset is negative.
-            - std_hour: (4 bits).
-            - minute: (2 bits) Values: {0, 1, 2}, 0 means 0 minutes
-                1 means 30 minutes, 2 means 45 minutes. 3 means
-                it is a weird offset and the nex bit is read.
-            - weird: (1 bit) Whether its one of two weird tzs.
-                0 means dst adds 30 minutes, 1 means adds 2 hours.
-                This is for [Lord_Howe_Island](
-                    https://en.wikipedia.org/wiki/Lord_Howe_Island)
-                and [Base_Troll](
-                    https://es.wikipedia.org/wiki/Base_Troll)
-                respectively.
+            Self.
         """
-        return (
-            (self.buf >> 7) & 0b1,
-            (self.buf >> 3) & 0b1111,
-            (self.buf >> 1) & 0b11,
-            self.buf & 0b1,
-        )
+        var self = Self()
+        var s = (buf >> 7) & 0b1
+        self.sign = 1 if s == 0 else -1
+        self.hour = (buf >> 3) & 0b1111
+        var m = (buf >> 1) & 0b11
+        self.minute = 0 if m == 0 else (30 if m == 1 else 45)
+        self.buf = buf
+        return self
 
 
 # @value
@@ -154,24 +147,30 @@ struct Offset:
 struct TzDT:
     """`TzDT` stores the rules for DST start/end."""
 
+    var month: UInt8
+    """Month: Month: [1, 12]."""
+    var dow: UInt8
+    """Dow: Day of week: [0, 6] (monday - sunday)."""
+    var eomon: UInt8
+    """Eomon: End of month: {0, 1} Whether to count from the
+    beginning of the month or the end."""
+    var week: UInt8
+    """Week: {0, 1} If week=0 -> first week of the month,
+    if it's week=1 -> second week. In the case that
+    eomon=1, fw=0 -> last week of the month
+    and fw=1 -> second to last."""
+    var hour: UInt8
+    """Hour: {20, 21, 22, 23, 0, 1, 2, 3} Hour at which DST starts/ends."""
     var buf: UInt16
     """Buffer."""
 
-    fn __init__(inout self, buf: UInt16):
-        """Construct a `TzDT` from a buffer.
-
-        Args:
-            buf: The buffer.
-        """
-        self.buf = buf
-
     fn __init__(
         inout self,
-        month: UInt16 = 1,
-        dow: UInt16 = 0,
-        eomon: UInt16 = 0,
-        week: UInt16 = 0,
-        hour: UInt16 = 0,
+        month: UInt8 = 1,
+        dow: UInt8 = 0,
+        eomon: UInt8 = 0,
+        week: UInt8 = 0,
+        hour: UInt8 = 0,
     ):
         """Construct a `TzDT` buffer (12 bits total) for DST start/end.
 
@@ -186,44 +185,41 @@ struct TzDT:
                 and fw=1 -> second to last.
             hour: {20, 21, 22, 23, 0, 1, 2, 3} Hour at which DST starts/ends.
         """
-        var h = 0
+        var h: UInt16 = 0
         var i = 0
         for item in List(20, 21, 22, 23, 0, 1, 2, 3):
             if hour == item[]:
                 h = i
                 break
             i += 1
+        var mon = month.cast[DType.uint16]()
+        var d = dow.cast[DType.uint16]()
+        var eo = eomon.cast[DType.uint16]()
+        var w = week.cast[DType.uint16]()
 
-        self.buf = (month << 8) | (dow << 5) | (eomon << 4) | (week << 3) | h
+        self.month = month
+        self.dow = dow
+        self.eomon = eomon
+        self.week = week
+        self.hour = hour
+        self.buf = (mon << 8) | (d << 5) | (eo << 4) | (w << 3) | h
 
     @always_inline("nodebug")
-    fn from_hash(self) -> (UInt8, UInt8, UInt8, UInt8, UInt8):
+    @staticmethod
+    fn from_hash(buf: UInt16) -> Self:
         """Get the values from hash.
 
         Returns:
-            - month: (4 bits) Month: [1, 12].
-            - dow: (3 bits) Day of week: [0, 6].
-            - eomon: (1 bit) End of month: {0, 1}.
-            - fw: (1 bit) First week: {0, 1}.
-            - hour: (3 bits) Hour: [0, 8] represents:
-                {20, 21, 22, 23, 0, 1, 2, 3}.
+            Self.
         """
-        return (
-            ((self.buf >> 8) & 0b1111).cast[DType.uint8](),
-            ((self.buf >> 5) & 0b111).cast[DType.uint8](),
-            ((self.buf >> 4) & 0b1).cast[DType.uint8](),
-            ((self.buf >> 3) & 0b1).cast[DType.uint8](),
-            (self.buf & 0b111).cast[DType.uint8](),
-        )
-
-    @always_inline("nodebug")
-    fn __bool__(self) -> Bool:
-        """If self.buf == 0.
-
-        Returns:
-            Bool.
-        """
-        return self.buf == 0
+        var self = Self()
+        self.month = (buf >> 8) & 0b1111
+        self.dow = (buf >> 5) & 0b111
+        self.eomon = (buf >> 4) & 0b1
+        self.week = (buf >> 3) & 0b1
+        self.hour = buf & 0b111
+        self.buf = buf
+        return self
 
     @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
@@ -278,9 +274,13 @@ struct ZoneDST:
             - offset: Offset hash (8 bits in a UInt16 buffer).
         """
         return (
-            TzDT(buf=((self.buf >> 20) & 0b11111111).cast[DType.uint16]()),
-            TzDT(buf=((self.buf >> 12) & 0b11111111).cast[DType.uint16]()),
-            Offset((self.buf & 0b111111111111).cast[DType.uint8]()),
+            TzDT.from_hash(
+                ((self.buf >> 20) & 0b11111111).cast[DType.uint16]()
+            ),
+            TzDT.from_hash(
+                ((self.buf >> 12) & 0b11111111).cast[DType.uint16]()
+            ),
+            Offset.from_hash((self.buf & 0b111111111111).cast[DType.uint8]()),
         )
 
 
@@ -664,7 +664,6 @@ struct ZoneInfo[T: ZoneStorageDST, A: ZoneStorageNoDST]:
     """Zoneinfo for Zones with no Daylight Saving Time."""
 
 
-# @always_inline
 fn get_zoneinfo[
     T: ZoneStorageDST = ZoneInfoMem32, A: ZoneStorageNoDST = ZoneInfoMem8
 ](owned timezones: List[StringLiteral] = List[StringLiteral]()) -> Optional[
@@ -718,8 +717,8 @@ fn get_zoneinfo[
     # except:
     #     pass
     try:
-        var dst_zones = ZoneInfoMem32()
-        var no_dst_zones = ZoneInfoMem8()
+        var dst_zones = T()
+        var no_dst_zones = A()
         from python import Python
 
         var json = Python.import_module("json")
@@ -749,17 +748,17 @@ fn get_zoneinfo[
             dst_end = data["dstInterval"]["dstEnd"].__getitem__(0, -1)
 
             var dt_start = datetime.datetime(dst_start)
-            var month_start = UInt16(dst_start.month)
-            var dow_start = UInt16(dt_start.weekday())
-            var eom_start = UInt16(0 if dt_start <= 15 else 1)
+            var month_start = UInt8(dst_start.month)
+            var dow_start = UInt8(dt_start.weekday())
+            var eom_start = UInt8(0 if dt_start <= 15 else 1)
             var week_start = 0  # TODO
-            var h_start = UInt16(dt_start.hour)
+            var h_start = UInt8(dt_start.hour)
             var dt_end = datetime.datetime(dst_end)
-            var month_end = UInt16(dst_end.month)
+            var month_end = UInt8(dst_end.month)
             var week_end = 0  # TODO
-            var h_end = UInt16(dt_end.hour)
-            var dow_end = UInt16(dt_end.weekday())
-            var eom_end = UInt16(0 if dt_end <= 15 else 1)
+            var h_end = UInt8(dt_end.hour)
+            var dow_end = UInt8(dt_end.weekday())
+            var eom_end = UInt8(0 if dt_end <= 15 else 1)
 
             # TODO: somehow force cast python object to StringLiteral
             dst_zones.add(
@@ -776,35 +775,6 @@ fn get_zoneinfo[
     except:
         pass
     # TODO: fallback to hardcoded
-    # from ._lists import tz_list
-    return None
-
-
-# alias all_zones = get_zoneinfo()
-# """All timezones available at compile time."""
-
-
-fn offset_no_dst_tz(owned no_dst: OptionalReg[Offset]) -> OptionalReg[Offset]:
-    """Return the UTC offset for the `TimeZone` if it has no DST.
-
-    Args:
-        no_dst: Optional zone with no dst.
-
-    Returns:
-        - offset_h: Offset for the hour: [0, 15].
-        - offset_m: Offset for the minute: {0, 30, 45}.
-        - sign: Sign of the offset: {1, -1}.
-    """
-
-    if no_dst:
-        var zone = no_dst.value()
-        var offset = zone.from_hash()
-        var offset_h = offset[1]
-        var offset_m = UInt8(
-            0 if offset[2] == 0 else (30 if offset[2] == 1 else 45)
-        )
-        var sign: UInt8 = 1 if offset[0] == 0 else -1
-        return Offset(offset_h, offset_m, sign)
     return None
 
 
@@ -816,7 +786,7 @@ fn offset_at(
     hour: UInt8,
     minute: UInt8,
     second: UInt8,
-) -> Optional[Offset]:
+) -> OptionalReg[Offset]:
     """Return the UTC offset for the `TimeZone` at the given date
     if it has DST.
 
@@ -834,76 +804,74 @@ fn offset_at(
         - offset_m: Offset for the minute: {0, 30, 45}.
         - sign: Sign of the offset: {1, -1}.
     """
-    if with_dst:
-        var zone = with_dst.value()
-        var items = zone.from_hash()
-        var dst_start = items[0].from_hash()
-        var dst_end = items[1].from_hash()
-        var offset = items[2].from_hash()
-        var sign: UInt8 = 1 if offset[0] == 0 else -1
-        var m = UInt8(0 if offset[2] == 0 else (30 if offset[2] == 1 else 45))
-        var dst_h = offset[1] + 1
-        var std_m = m
-        var dst_m = m
-        # if it's a weird tz
-        if offset[2] == 3:
-            if offset[3] == 0:  # "Australia/Lord_Howe"
-                dst_h = 0
-                std_m = 0
-                dst_m = 30
-            elif offset[3] == 1:  # "Antarctica/Troll"
-                dst_h += 1
-                std_m = 0
-                dst_m = 0
+    if not with_dst:
+        return None
+    var zone = with_dst.value()
+    var items = zone.from_hash()
+    var dst_start = items[0]
+    var dst_end = items[1]
+    var offset = items[2]
+    var sign: UInt8 = offset.sign
+    var m: UInt8 = offset.minute
+    var dst_h = offset.hour + 1
+    var std_m = m
+    var dst_m = m
+    # if it's a weird tz
+    if offset.minute == 3:
+        if (offset.buf & 0b1) == 0:  # "Australia/Lord_Howe"
+            dst_h = 0
+            std_m = 0
+            dst_m = 30
+        elif (offset.buf & 0b1) == 1:  # "Antarctica/Troll"
+            dst_h += 1
+            std_m = 0
+            dst_m = 0
 
-        var std = Offset(offset[1], std_m, sign)
-        var dst = Offset(dst_h, dst_m, sign)
+    var std = Offset(offset.hour, std_m, sign)
+    var dst = Offset(dst_h, dst_m, sign)
 
-        fn eval_dst(
-            dst_st: Bool, data: (UInt8, UInt8, UInt8, UInt8, UInt8)
-        ) -> Offset:
-            var is_end_mon = data[2] == 1
-            var maxdays = _cal.max_days_in_month(year, month)
-            var iterable = range(0, maxdays, step=1)
-            if is_end_mon:
-                iterable = range(maxdays - 1, -1, step=-1)
+    fn eval_dst(dst_st: Bool, data: TzDT) -> Offset:
+        var is_end_mon = data.eomon == 1
+        var maxdays = _cal.max_days_in_month(year, month)
+        var iterable = range(0, maxdays, step=1)
+        if is_end_mon:
+            iterable = range(maxdays - 1, -1, step=-1)
 
-            var dow_target = data[1]
-            var dow = _cal.dayofweek(year, month, day)
-            var amnt_weeks_target = data[3]
-            var is_later = hour > data[4] and minute > 0 and second >= 0
-            var accum: UInt8 = 0
-            for i in iterable:
-                if _cal.dayofweek(year, month, i) == dow_target:
-                    if accum != amnt_weeks_target:
-                        accum += 1
-                        continue
-                var is_less = dow < dow_target
-                var is_more = dow > dow_target
-                var is_start_mon = not is_end_mon
-                var is_dst_start_and_dow_is_less = dst_st and is_less
-                var is_dst_end_and_dow_is_more = not dst_st and is_more
+        var dow_target = data.dow
+        var dow = _cal.dayofweek(year, month, day)
+        var amnt_weeks_target = data.week
+        var is_later = hour > data.hour and minute > 0 and second >= 0
+        var accum: UInt8 = 0
+        for i in iterable:
+            if _cal.dayofweek(year, month, i) == dow_target:
+                if accum != amnt_weeks_target:
+                    accum += 1
+                    continue
+            var is_less = dow < dow_target
+            var is_more = dow > dow_target
+            var is_start_mon = not is_end_mon
+            var is_dst_start_and_dow_is_less = dst_st and is_less
+            var is_dst_end_and_dow_is_more = not dst_st and is_more
 
-                if is_start_mon and is_dst_start_and_dow_is_less:
-                    return std
-                elif is_start_mon and is_dst_end_and_dow_is_more:
-                    return std
-                elif is_end_mon and is_dst_start_and_dow_is_less:
-                    return std
-                elif is_end_mon and is_dst_end_and_dow_is_more:
-                    return std
-                elif is_start_mon and not is_later:
-                    return std
-                elif is_end_mon and is_later:
-                    return std
-                break
-            return dst
+            if is_start_mon and is_dst_start_and_dow_is_less:
+                return std
+            elif is_start_mon and is_dst_end_and_dow_is_more:
+                return std
+            elif is_end_mon and is_dst_start_and_dow_is_less:
+                return std
+            elif is_end_mon and is_dst_end_and_dow_is_more:
+                return std
+            elif is_start_mon and not is_later:
+                return std
+            elif is_end_mon and is_later:
+                return std
+            break
+        return dst
 
-        if month == dst_start[0]:
-            return eval_dst(True, dst_start)
-        elif month == dst_end[0]:
-            return eval_dst(False, dst_end)
-        elif month > dst_start[0] and month < dst_end[0]:
-            return dst
-        return std
-    return None
+    if month == dst_start.month:
+        return eval_dst(True, dst_start)
+    elif month == dst_end.month:
+        return eval_dst(False, dst_end)
+    elif month > dst_start.month and month < dst_end.month:
+        return dst
+    return std
