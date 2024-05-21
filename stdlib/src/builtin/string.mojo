@@ -1723,18 +1723,6 @@ struct String(
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline
-fn _vec_fmt[
-    *types: AnyType
-](
-    str: UnsafePointer[UInt8],
-    size: Int,
-    fmt: StringLiteral,
-    *arguments: *types,
-) -> Int:
-    return _snprintf(str, size, fmt, arguments)
-
-
 fn _toggle_ascii_case(char: UInt8) -> UInt8:
     """Assuming char is a cased ASCII character, this function will return the opposite-cased letter
     """
