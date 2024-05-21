@@ -8,6 +8,7 @@ listing:
   - id: docs
     contents:
       - always-inline.ipynb
+      - copy-capture.ipynb
       - nonmaterializable.ipynb
       - parameter.ipynb
       - register-passable.ipynb
