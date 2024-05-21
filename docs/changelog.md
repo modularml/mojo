@@ -525,6 +525,15 @@ by [@jayzhan211](https://github.com/jayzhan211))
   method. This makes it explicit that this implementation does not check if the
   slice bounds are concrete or within any given object's length.
 
+- `gcd` is now more pythonic and accepts a `List`, `Span` and `VariadicList` to
+  compute the gcd of many elements.
+  ([PR #2777](https://github.com/modularml/mojo/pull/2777) by [@bgreni](https://github.com/bgreni))
+
+```mojo
+  gcd(2, 4, 6, 8, 16) # returns 2
+  gcd(List(2, 4, 6, 8, 16))
+```
+
 ### ❌ Removed
 
 - The `@unroll` decorator has been deprecated and removed. The decorator was
