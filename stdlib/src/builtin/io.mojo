@@ -97,8 +97,8 @@ fn _flush(file: Int = stdout):
 
 @no_inline
 fn _printf[
-    *types: AnyType
-](fmt: StringLiteral, *arguments: *types, file: Int = stdout):
+    fmt: StringLiteral, *types: AnyType
+](*arguments: *types, file: Int = stdout):
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C snprintf call. Load
     # all the members of the pack.
@@ -246,7 +246,7 @@ fn _put(x: Int, file: Int = stdout):
         x: The value to print.
         file: The output stream.
     """
-    _printf(_get_dtype_printf_format[DType.index](), x, file=file)
+    _printf[_get_dtype_printf_format[DType.index]()](x, file=file)
 
 
 @no_inline
@@ -265,12 +265,12 @@ fn _put_simd_scalar[type: DType](x: Scalar[type]):
     if type == DType.bool:
         _put("True") if x else _put("False")
     elif type.is_integral() or type == DType.address:
-        _printf(format, x)
+        _printf[format](x)
     elif type.is_floating_point():
 
         @parameter
         if triple_is_nvidia_cuda():
-            _printf(format, x.cast[DType.float64]())
+            _printf[format](x.cast[DType.float64]())
         else:
             _put(str(x))
     else:
@@ -332,14 +332,14 @@ fn _put(x: StringRef, file: Int = stdout):
 
         # The string can be printed, so that's fine.
         if str_len < MAX_STR_LEN:
-            _printf("%.*s", x.length, x.data, file=file)
+            _printf["%.*s"](x.length, x.data, file=file)
             return
 
         # The string is large, then we need to chunk it.
         var p = x.data
         while str_len:
             var ll = min(str_len, MAX_STR_LEN)
-            _printf("%.*s", ll, p, file=file)
+            _printf["%.*s"](ll, p, file=file)
             str_len -= ll
             p += ll
 

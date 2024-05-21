@@ -829,22 +829,22 @@ fn test_strip() raises:
 
 
 fn test_hash() raises:
-    fn assert_hash_equals_literal_hash(s: StringLiteral) raises:
+    fn assert_hash_equals_literal_hash[s: StringLiteral]() raises:
         assert_equal(hash(s), hash(String(s)))
 
-    assert_hash_equals_literal_hash("a")
-    assert_hash_equals_literal_hash("b")
-    assert_hash_equals_literal_hash("c")
-    assert_hash_equals_literal_hash("d")
-    assert_hash_equals_literal_hash("this is a longer string")
-    assert_hash_equals_literal_hash(
+    assert_hash_equals_literal_hash["a"]()
+    assert_hash_equals_literal_hash["b"]()
+    assert_hash_equals_literal_hash["c"]()
+    assert_hash_equals_literal_hash["d"]()
+    assert_hash_equals_literal_hash["this is a longer string"]()
+    assert_hash_equals_literal_hash[
         """
 Blue: We have to take the amulet to the Banana King.
 Charlie: Oh, yes, The Banana King, of course. ABSOLUTELY NOT!
 Pink: He, he's counting on us, Charlie! (Pink starts floating) ah...
 Blue: If we don't give the amulet to the Banana King, the vortex will open and let out a thousand years of darkness.
 Pink: No! Darkness! (Pink is floating in the air)"""
-    )
+    ]()
 
 
 fn test_startswith() raises:

@@ -608,23 +608,23 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
             @parameter
             if triple_is_nvidia_cuda():
-                # FIXME(MSTDL-406):
-                #   This prints "out of band" with the `Formatter` passed in,
-                #   meaning this will only work if `Formatter` is an unbuffered
-                #   wrapper around printf (which Formatter.stdout currently
-                #   is by default).
-                #
-                #   This is a workaround to permit debug formatting of
-                #   floating-point values on GPU, where printing to stdout is
-                #   the only way the Formatter framework is currently used.
-                var format = _get_dtype_printf_format[type]()
 
                 @parameter
                 if type.is_floating_point():
                     # get_dtype_printf_format hardcodes 17 digits of precision.
-                    format = "%g"
-
-                _printf(format, element)
+                    _printf["%g"](element)
+                else:
+                    # FIXME(MSTDL-406):
+                    #   This prints "out of band" with the `Formatter` passed
+                    #   in, meaning this will only work if `Formatter` is an
+                    #   unbuffered wrapper around printf (which Formatter.stdout
+                    #   currently is by default).
+                    #
+                    #   This is a workaround to permit debug formatting of
+                    #   floating-point values on GPU, where printing to stdout
+                    #   is the only way the Formatter framework is currently
+                    #   used.
+                    _printf[_get_dtype_printf_format[type]()](element)
             else:
                 _format_scalar(writer, element)
 
