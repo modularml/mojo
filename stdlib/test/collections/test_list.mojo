@@ -13,8 +13,7 @@
 # RUN: %bare-mojo %s
 
 # TODO: Replace %bare-mojo with %mojo
-# when https://github.com/modularml/mojo/pull/2745 and
-# https://github.com/modularml/mojo/pull/2691 are merged.
+# when https://github.com/modularml/mojo/pull/2691 is merged.
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
