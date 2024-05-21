@@ -614,23 +614,23 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
             @parameter
             if triple_is_nvidia_cuda():
-                # FIXME(MSTDL-406):
-                #   This prints "out of band" with the `Formatter` passed in,
-                #   meaning this will only work if `Formatter` is an unbuffered
-                #   wrapper around printf (which Formatter.stdout currently
-                #   is by default).
-                #
-                #   This is a workaround to permit debug formatting of
-                #   floating-point values on GPU, where printing to stdout is
-                #   the only way the Formatter framework is currently used.
-                var format = _get_dtype_printf_format[type]()
 
                 @parameter
                 if type.is_floating_point():
                     # get_dtype_printf_format hardcodes 17 digits of precision.
-                    format = "%g"
-
-                _printf(format, element)
+                    _printf["%g"](element)
+                else:
+                    # FIXME(MSTDL-406):
+                    #   This prints "out of band" with the `Formatter` passed
+                    #   in, meaning this will only work if `Formatter` is an
+                    #   unbuffered wrapper around printf (which Formatter.stdout
+                    #   currently is by default).
+                    #
+                    #   This is a workaround to permit debug formatting of
+                    #   floating-point values on GPU, where printing to stdout
+                    #   is the only way the Formatter framework is currently
+                    #   used.
+                    _printf[_get_dtype_printf_format[type]()](element)
             else:
                 _format_scalar(writer, element)
 
@@ -1830,8 +1830,13 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> Scalar[type]:
+    fn __getitem__[
+        IndexerType: Indexer
+    ](self, idx: IndexerType) -> Scalar[type]:
         """Gets an element from the vector.
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             idx: The element index.
@@ -1841,32 +1846,44 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         return __mlir_op.`pop.simd.extractelement`[
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-        ](self.value, idx.value)
+        ](self.value, index(idx).value)
 
     @always_inline("nodebug")
-    fn __setitem__(inout self, idx: Int, val: Scalar[type]):
+    fn __setitem__[
+        IndexerType: Indexer
+    ](inout self, idx: IndexerType, val: Scalar[type]):
         """Sets an element in the vector.
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             idx: The index to set.
             val: The value to set.
         """
         self.value = __mlir_op.`pop.simd.insertelement`(
-            self.value, val.value, idx.value
+            self.value, val.value, index(idx).value
         )
 
     @always_inline("nodebug")
-    fn __setitem__(
-        inout self, idx: Int, val: __mlir_type[`!pop.scalar<`, type.value, `>`]
+    fn __setitem__[
+        IndexerType: Indexer
+    ](
+        inout self,
+        idx: IndexerType,
+        val: __mlir_type[`!pop.scalar<`, type.value, `>`],
     ):
         """Sets an element in the vector.
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             idx: The index to set.
             val: The value to set.
         """
         self.value = __mlir_op.`pop.simd.insertelement`(
-            self.value, val, idx.value
+            self.value, val, index(idx).value
         )
 
     fn __hash__(self) -> Int:

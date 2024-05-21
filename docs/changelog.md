@@ -32,9 +32,9 @@ what we publish.
               print("found 10!")
   ```
 
-  Currently, `@parameter for` does not allow early exits in the body (`return`,
-  `break`, `continue`, etc.) and requires the sequence's `__iter__` method to
-  return a `_StridedRangeIterator`. These restrictions will be lifted soon.
+  Currently, `@parameter for` requires the sequence's `__iter__` method to
+  return a `_StridedRangeIterator`, meaning the induction variables must be
+  `Int`. The intention is to lift these restrictions in the future.
 
 - Mojo added support for the `inferred` passing kind on parameters. `inferred`
   parameters must appear at the beginning of the parameter list and cannot be
@@ -54,7 +54,32 @@ what we publish.
   non-inferred parameter. `dt` is inferred from the parameter itself to
   `DType.int32`.
 
-  Note that this only works on function parameter lists at the moment.
+  This also works with structs. For example:
+
+  ```mojo
+  struct ScalarContainer[inferred dt: DType, value: Scalar[dt]]:
+      pass
+
+  fn foo(x: ScalarContainer[Int32(0)]): # 'dt' is inferred as `DType.int32`
+      pass
+  ```
+
+  This should make working with dependent parameters more ergonomic.
+
+- Mojo now allows functions overloaded on parameters to be resolved when forming
+  references to, but not calling, those functions. For example, the following
+  now works:
+
+  ```mojo
+  fn overloaded_parameters[value: Int32]():
+      pass
+
+  fn overloaded_parameters[value: Float32]():
+      pass
+
+  fn form_reference():
+      alias ref = overloaded_parameters[Int32()] # works!
+  ```
 
 - Mojo now supports adding a `@deprecated` decorator on structs, functions,
   traits, aliases, and global variables. The decorator marks the attached decl
@@ -77,6 +102,15 @@ what we publish.
   fn techdebt():
       bar() # warning: use another function!
   ```
+
+- Mojo has changed how `def` arguments are processed.  Previously, by default,
+  arguments to a `def` were treated as `owned` convention, which makes a copy of
+  the value, enabling that value to be mutable in the callee.  This is "worked",
+  but was a major performance footgun, and required you to declare non-copyable
+  types as `borrowed` explicitly.  Now Mojo takes a different approach: it takes
+  the arguments as `borrowed` (consistent with `fn`s) but will make a local copy
+  of the value **only if the argument is mutated** on the body of the function.
+  This improves consistency, performance, and ease of use.
 
 - `int()` can now take a string and a specified base to parse an integer from a
   string: `int("ff", 16)` returns `255`. Additionally, if a base of zero is
@@ -272,10 +306,8 @@ what we publish.
 - Added the `Indexer` trait to denote types that implement the `__index__()`
   method which allow these types to be accepted in common `__getitem__` and
   `__setitem__` implementations, as well as allow a new builtin `index` function
-  to be called on them.
-  ([PR #2685](https://github.com/modularml/mojo/pull/2685) by
-  [@bgreni](https://github.com/bgreni))
-  For example:
+  to be called on them. Most stdlib containers are now able to be indexed by
+  any type that implements `Indexer`. For example:
 
   ```mojo
   @value
@@ -295,6 +327,8 @@ what we publish.
   print(MyList()[AlwaysZero()])  # prints `1`
   ```
 
+  ([PR #2685](https://github.com/modularml/mojo/pull/2685) by [@bgreni](https://github.com/bgreni))
+
 - `StringRef` now implements `strip()` which can be used to remove leading and
   trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
   by [@fknfilewalker](https://github.com/fknfilewalker))
@@ -310,6 +344,22 @@ what we publish.
 
 - Added `atof()` function which can convert a `String` to a `float64`.
   ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))
+
+- `Tuple()` now supports `__contains__`. ([PR #2709](https://github.com/modularml/mojo/pull/2709)
+  by [@rd4com](https://github.com/rd4com)) For example:
+
+  ```mojo
+  var x = Tuple(1, 2, True)
+  if 1 in x:
+      print("x contains 1")
+  ```
+
+- Added `os.getsize` function, which gives the size in bytes of a path.
+    ([PR 2626](https://github.com/modularml/mojo/pull/2626) by [@artemiogr97](https://github.com/artemiogr97))
+
+- Added `fromkeys` method to `Dict` to return a `Dict` with the specified keys
+  and value.
+  ([PR 2622](https://github.com/modularml/mojo/pull/2622) by [@artemiogr97](https://github.com/artemiogr97))
 
 ### 🦋 Changed
 
@@ -423,6 +473,9 @@ what we publish.
   - `math.limit.neginf`: use `utils.numerics.min_or_neg_inf`
   - `math.limit.max_finite`: use `utils.numerics.max_finite`
   - `math.limit.min_finite`: use `utils.numerics.min_finite`
+
+- The `tensor.random` module has been removed. The same functionality is now
+  accessible via the `Tensor.rand` and `Tensor.randn` static methods.
 
 ### 🛠️ Fixed
 

@@ -463,6 +463,13 @@ struct FileHandle:
         """The function to call when entering the context."""
         return self^
 
+    fn _get_raw_fd(self) -> Int:
+        var i64_res = external_call[
+            "KGEN_CompilerRT_IO_GetFD",
+            Int64,
+        ](self.handle)
+        return Int(i64_res.value)
+
 
 fn open(path: String, mode: String) raises -> FileHandle:
     """Opens the file specified by path using the mode provided, returning a
