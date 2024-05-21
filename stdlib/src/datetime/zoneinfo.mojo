@@ -449,7 +449,7 @@ struct ZoneInfoMem32(CollectionElement):
             An Optional `ZoneDST`.
         """
 
-        var value = self._zones.find(key)
+        var value = self._zones.get(key)
         if not value:
             return None
         return ZoneDST(value.unsafe_take())
@@ -485,7 +485,7 @@ struct ZoneInfoMem8(CollectionElement):
         Returns:
             An Optional `Offset`.
         """
-        var value = self._zones.find(key)
+        var value = self._zones.get(key)
         if not value:
             return None
         return Offset(value.unsafe_take())

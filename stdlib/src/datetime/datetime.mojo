@@ -49,9 +49,7 @@ trait _IntCollect(Intable, CollectionElement):
 struct DateTime[
     dst_storage: ZoneStorageDST = ZoneInfoMem32,
     no_dst_storage: ZoneStorageNoDST = ZoneInfoMem8,
-    iana: Optional[ZoneInfo[dst_storage, no_dst_storage]] = get_zoneinfo[
-        dst_storage, no_dst_storage
-    ](),
+    iana: Bool = True,
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](Hashable, Stringable):

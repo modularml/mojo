@@ -229,10 +229,11 @@ struct TimeZone[
                 return hours, minutes, sign
             except:
                 pass
-        try:
-            return self.offset_h, self.offset_m, self.sign
-        except:
-            return 0, 0, 1
+
+        var data = self._no_dst.get(self.tz_str)
+        if not data:
+            return Offset(0, 0, 1)
+        return data.value()
 
     @always_inline("nodebug")
     fn __str__(self) -> StringLiteral:
@@ -276,7 +277,7 @@ struct TimeZone[
         Returns:
             Bool.
         """
-        return not (self == other)
+        return self.tz_str != other.tz_str
 
     @always_inline("nodebug")
     fn to_iso(self) -> String:
