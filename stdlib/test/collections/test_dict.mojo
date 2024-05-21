@@ -512,6 +512,18 @@ def test_find_get():
     assert_equal(some_dict.get("not_key", 0), 0)
 
 
+fn test_clear() raises:
+    var some_dict = Dict[String, Int]()
+    some_dict["key"] = 1
+    some_dict.clear()
+    assert_equal(len(some_dict), 0)
+    assert_false(some_dict.get("key"))
+
+    some_dict = Dict[String, Int]()
+    some_dict.clear()
+    assert_equal(len(some_dict), 0)
+
+
 def main():
     test_dict()
     test_dict_fromkeys()
@@ -521,3 +533,4 @@ def main():
     test_owned_kwargs_dict()
     test_bool_conversion()
     test_find_get()
+    test_clear()
