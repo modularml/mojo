@@ -46,9 +46,7 @@ trait _IntCollect(Intable, CollectionElement):
 struct Date[
     dst_storage: ZoneStorageDST = ZoneInfoMem32,
     no_dst_storage: ZoneStorageNoDST = ZoneInfoMem8,
-    iana: Optional[ZoneInfo[dst_storage, no_dst_storage]] = get_zoneinfo[
-        dst_storage, no_dst_storage
-    ](),
+    iana: Bool = True,
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ](Hashable, Stringable):
@@ -63,7 +61,7 @@ struct Date[
             for zones with Dailight Saving Time. Default Memory.
         no_dst_storage: The type of storage to use for ZoneInfo
             for zones with no Dailight Saving Time. Default Memory.
-        iana: What timezones from the [IANA database](
+        iana: Whether timezones from the [IANA database](
             http://www.iana.org/time-zones/repository/tz-link.html)
             are used. It defaults to using all available timezones,
             if getting them fails at compile time, it tries using

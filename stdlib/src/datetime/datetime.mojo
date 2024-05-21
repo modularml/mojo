@@ -65,7 +65,7 @@ struct DateTime[
             for zones with Dailight Saving Time. Default Memory.
         no_dst_storage: The type of storage to use for ZoneInfo
             for zones with no Dailight Saving Time. Default Memory.
-        iana: What timezones from the [IANA database](
+        iana: Whether timezones from the [IANA database](
             http://www.iana.org/time-zones/repository/tz-link.html)
             are used. It defaults to using all available timezones,
             if getting them fails at compile time, it tries using

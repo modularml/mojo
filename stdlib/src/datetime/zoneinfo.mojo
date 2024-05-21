@@ -291,9 +291,6 @@ struct ZoneInfoFile32(CollectionElement):
     but only supports 256 timezones (there are ~ 418).
     """
 
-    var _index: UInt8
-    alias _BIT_WIDTH: UInt8 = 32
-    alias _BIT_MASK: UInt32 = 0xFFFFFFFF
     var _file: Path
 
     fn __init__(inout self):
@@ -302,55 +299,46 @@ struct ZoneInfoFile32(CollectionElement):
             self._file = Path(cwd()) / "zoneinfo_dump"
         except:
             self._file = Path(".") / "zoneinfo_dump"
-        self._index = 0
 
-    fn add(inout self, key: StringLiteral, value: ZoneDST) raises -> UInt8:
+    fn add(inout self, key: StringLiteral, value: ZoneDST):
         """Add a value to the file.
 
         Args:
             key: The tz_str.
             value: The ZoneDST with the hash.
-
-        Returns:
-            The index in the file.
         """
-        _ = key
-        var b_width64 = self._BIT_WIDTH.cast[DType.uint64]()
-        var b_width32 = self._BIT_WIDTH.cast[DType.uint32]()
-        if self._index > 0xFF:
-            self._index = 0
-        else:
-            self._index += 1
-        with open(self._file, "rb") as f:
-            _ = f.seek(b_width64 * (self._index).cast[DType.uint64]())
-            f.write(value.buf << (32 - b_width32))
-        return self._index
+        try:
+            with open(self._file, "wb") as f:
+                _ = f.seek(hash(key) * 32)
+                f.write(value.buf)
+        except:
+            # TODO: propper logging
+            print("could not save zoneinfo to file")
+            pass
 
-    fn get(self, index: UInt8) raises -> OptionalReg[ZoneDST]:
+    fn get(self, key: StringLiteral) -> OptionalReg[ZoneDST]:
         """Get a value from the file.
 
         Args:
-            index: The index in the file.
+            key: The tz_str.
 
         Returns:
             An Optional `ZoneDST`.
         """
-        if self._index > 0xFF:
+        try:
+            var value: UInt32
+            with open(self._file, "rb") as f:
+                _ = f.seek(hash(key) * 32)
+                var bufs = f.read_bytes(4)
+                value = (
+                    (bufs[0].cast[DType.uint32]() << 24)
+                    | (bufs[1].cast[DType.uint32]() << 16)
+                    | (bufs[2].cast[DType.uint32]() << 8)
+                    | bufs[3].cast[DType.uint32]()
+                )
+            return ZoneDST(value)
+        except:
             return None
-        var value: UInt32
-        with open(self._file, "rb") as f:
-            _ = f.seek(
-                self._BIT_WIDTH.cast[DType.uint64]()
-                * index.cast[DType.uint64]()
-            )
-            var bufs = f.read_bytes(4)
-            value = (
-                (bufs[0].cast[DType.uint32]() << 24)
-                | (bufs[1].cast[DType.uint32]() << 16)
-                | (bufs[2].cast[DType.uint32]() << 8)
-                | bufs[3].cast[DType.uint32]()
-            )
-        return ZoneDST(value & self._BIT_MASK)
 
     fn __del__(owned self):
         """Delete the file."""
@@ -359,6 +347,8 @@ struct ZoneInfoFile32(CollectionElement):
 
             os.remove(self._file)
         except:
+            # TODO: propper logging
+            print("could not delete zoneinfo file")
             pass
 
 
@@ -369,9 +359,6 @@ struct ZoneInfoFile8(CollectionElement):
     but only supports 256 timezones (there are ~ 418).
     """
 
-    var _index: UInt8
-    alias _BIT_WIDTH: UInt8 = 8
-    alias _BIT_MASK: UInt8 = 0xFF
     var _file: Path
 
     fn __init__(inout self):
@@ -380,49 +367,42 @@ struct ZoneInfoFile8(CollectionElement):
             self._file = Path(cwd()) / "zoneinfo_dump"
         except:
             self._file = "./zoneinfo_dump"
-        self._index = 0
 
-    fn add(inout self, key: StringLiteral, buf: UInt8) raises -> UInt8:
+    fn add(inout self, key: StringLiteral, value: Offset):
         """Add a value to the file.
 
         Args:
             key: The tz_str.
-            buf: The buffer with the hash.
-
-        Returns:
-            The index in the file.
+            value: The buffer with the hash.
         """
-        _ = key
-        var b_width64 = self._BIT_WIDTH.cast[DType.uint64]()
-        var b_width32 = self._BIT_WIDTH.cast[DType.uint8]()
-        if self._index > 0xFF:
-            self._index = 0
-        else:
-            self._index += 1
-        with open(self._file, "rb") as f:
-            _ = f.seek(b_width64 * (self._index).cast[DType.uint64]())
-            f.write(buf << (32 - b_width32))
-        return self._index
+        var index = hash(key)
+        try:
+            with open(self._file, "wb") as f:
+                _ = f.seek(index * 8)
+                f.write(value.buf)
+        except:
+            # TODO: propper logging
+            print("could not save zoneinfo to file")
+            pass
 
-    fn get(self, index: UInt8) raises -> OptionalReg[Offset]:
+    fn get(self, key: StringLiteral) -> OptionalReg[Offset]:
         """Get a value from the file.
 
         Args:
-            index: The index in the file.
+            key: The tz_str.
 
         Returns:
             An Optional `Offset`.
         """
-        if self._index > 0xFF:
+        var index = hash(key)
+        try:
+            var value: UInt8
+            with open(self._file, "rb") as f:
+                _ = f.seek(index * 8)
+                value = f.read_bytes(1)
+            return Offset(value)
+        except:
             return None
-        var value: UInt8
-        with open(self._file, "rb") as f:
-            _ = f.seek(
-                self._BIT_WIDTH.cast[DType.uint64]()
-                * index.cast[DType.uint64]()
-            )
-            value = f.read_bytes(1)
-        return Offset(value & self._BIT_MASK)
 
     fn __del__(owned self):
         """Delete the file."""
@@ -431,6 +411,8 @@ struct ZoneInfoFile8(CollectionElement):
 
             os.remove(self._file)
         except:
+            # TODO: propper logging
+            print("could not delete zoneinfo file")
             pass
 
 
@@ -612,6 +594,10 @@ fn get_leapsecs() -> Optional[List[Leapsecs]]:
 trait ZoneStorageDST(CollectionElement):
     """Trait that defines ZoneInfo storage structs."""
 
+    fn __init__(inout self):
+        """Construct a `ZoneInfo`."""
+        ...
+
     fn add(inout self, key: StringLiteral, value: ZoneDST):
         """Add a value to `ZoneInfo`.
 
@@ -635,6 +621,10 @@ trait ZoneStorageDST(CollectionElement):
 
 trait ZoneStorageNoDST(CollectionElement):
     """Trait that defines ZoneInfo storage structs."""
+
+    fn __init__(inout self):
+        """Construct a `ZoneInfo`."""
+        ...
 
     fn add(inout self, key: StringLiteral, value: Offset):
         """Add a value to `ZoneInfo`.
@@ -677,7 +667,9 @@ struct ZoneInfo[T: ZoneStorageDST, A: ZoneStorageNoDST]:
 # @always_inline
 fn get_zoneinfo[
     T: ZoneStorageDST = ZoneInfoMem32, A: ZoneStorageNoDST = ZoneInfoMem8
-]() -> Optional[ZoneInfo[T, A]]:
+](owned timezones: List[StringLiteral] = List[StringLiteral]()) -> Optional[
+    ZoneInfo[T, A]
+]:
     """Get all zoneinfo available. First tries to get it
     from the OS, then from the internet, then falls back
     on hardcoded values.
@@ -709,6 +701,10 @@ fn get_zoneinfo[
         Meanwhile 2 public APIs can be used https://worldtimeapi.org/api
         and https://timeapi.io/swagger/index.html .
     """
+    if len(timezones) == 0:
+        from ._lists import tz_list
+
+        timezones = List[StringLiteral](tz_list)
     # try:
     #     # TODO: this should get zoneinfo from the OS it's compiled in
     #     # for Linux the files are under /usr/share/zoneinfo
@@ -726,9 +722,8 @@ fn get_zoneinfo[
         var datetime = Python.import_module("datetime")
         # var text = requests.get("https://worldtimeapi.org/api/timezone").text
         # var tz_list = json.loads(text)
-        from ._lists import tz_list
 
-        for item in List(tz_list):
+        for item in timezones:
             var tz = requests.get("https://timeapi.io/TimeZone/" + item[]).text
             var data = json.loads(tz)
             var utc_offset = data["standardUtcOffset"]["seconds"] // 60

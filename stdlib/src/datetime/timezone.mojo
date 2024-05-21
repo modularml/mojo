@@ -39,9 +39,7 @@ from .zoneinfo import (
 struct TimeZone[
     dst_storage: ZoneStorageDST = ZoneInfoMem32,
     no_dst_storage: ZoneStorageNoDST = ZoneInfoMem8,
-    iana: Optional[ZoneInfo[dst_storage, no_dst_storage]] = get_zoneinfo[
-        dst_storage, no_dst_storage
-    ](),
+    iana: Bool = True,
     pyzoneinfo: Bool = True,
     native: Bool = False,
 ]:
@@ -58,7 +56,7 @@ struct TimeZone[
             for zones with Dailight Saving Time. Default Memory.
         no_dst_storage: The type of storage to use for ZoneInfo
             for zones with no Dailight Saving Time. Default Memory.
-        iana: What timezones from the [IANA database](
+        iana: Whether timezones from the [IANA database](
             http://www.iana.org/time-zones/repository/tz-link.html)
             are used. It defaults to using all available timezones,
             if getting them fails at compile time, it tries using
@@ -80,15 +78,10 @@ struct TimeZone[
     var tz_str: StringLiteral
     """[`TZ identifier`](
         https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)."""
-    var offset_h: UInt8
-    """Offset for the hour."""
-    var offset_m: UInt8
-    """Offset for the minute."""
-    var sign: UInt8
-    """Sign: {1, -1}."""
     var has_dst: Bool
     """Whether the `TimeZone` has Daylight Saving Time."""
-    var _dst: OptionalReg[ZoneDST]
+    var _dst: dst_storage
+    var _no_dst: no_dst_storage
 
     fn __init__(
         inout self,
@@ -96,7 +89,8 @@ struct TimeZone[
         offset_h: UInt8 = 0,
         offset_m: UInt8 = 0,
         sign: UInt8 = 1,
-        has_dst: Bool = True,
+        has_dst: Bool = False,
+        zoneinfo: Optional[ZoneInfo[dst_storage, no_dst_storage]] = None,
     ):
         """Construct a `TimeZone`.
 
@@ -107,6 +101,8 @@ struct TimeZone[
             offset_m: Offset for the minute.
             sign: Sign: {1, -1}.
             has_dst: Whether the `TimeZone` has Daylight Saving Time.
+            zoneinfo: The ZoneInfo for the `TimeZone` to instantiate.
+                defaults to looking for info on all available timezones.
         """
         debug_assert(
             offset_h < 100
@@ -120,33 +116,74 @@ struct TimeZone[
             ),
         )
 
-        # @parameter
-        # if iana:
-        #     debug_assert(
-        #         iana.value()[][0].get(tz_str) or iana.value()[][1].get(tz_str),
-        #         msg="that timezone is not in the given IANA ZoneInfo",
-        #     )
-
         self.tz_str = tz_str
-        self.offset_h = offset_h
-        self.offset_m = offset_m
-        self.sign = sign
         self.has_dst = has_dst
-        self._dst = None
+        self._dst = dst_storage()
+        self._no_dst = no_dst_storage()
+        if not has_dst:
+            self._no_dst.add(tz_str, Offset(offset_h, offset_m, sign))
+
+        var z = zoneinfo
+
+        @parameter
+        if native:
+            if not zoneinfo:
+                z = get_zoneinfo[dst_storage, no_dst_storage]()
+            if not z:
+                return
 
         @parameter
         if iana:
+            var zi = z.value()[]
             if has_dst:
-                self._dst = iana.value()[].with_dst.get(tz_str)
+                var dst = zi.with_dst.get(tz_str)
+                if not dst:
+                    return
+                self._dst.add(tz_str, dst.value())
                 return
-            var tz = iana.value()[].with_no_dst.get(tz_str)
+            var tz = zi.with_no_dst.get(tz_str)
             var val = offset_no_dst_tz(tz)
             if not val:
                 return
-            var offset = val.value()
-            self.offset_h = offset.hour
-            self.offset_m = offset.minute
-            self.sign = offset.sign
+            self._no_dst.add(tz_str, val.value())
+
+    fn __getattr__(self, name: StringLiteral) raises -> UInt8:
+        """Get the attribute.
+
+        Args:
+            name: The name of the attribute.
+
+        Returns:
+            The attribute.
+
+        Raises:
+            "ZoneInfo not found".
+        """
+
+        if name not in List("offset_h", "offset_m", "sign"):
+            constrained[False, "there is no such attribute"]()
+            return 0
+
+        var offset: Offset
+        if self.has_dst:
+            var data = self._dst.get(self.tz_str)
+            if not data:
+                raise Error("ZoneInfo not found")
+            offset = data.value().from_hash()[2]
+        else:
+            var data = self._no_dst.get(self.tz_str)
+            if not data:
+                raise Error("ZoneInfo not found")
+            offset = data.value()
+
+        if name == "offset_h":
+            return offset.hour
+        elif name == "offset_m":
+            return offset.minute
+        elif name == "sign":
+            return offset.sign
+        constrained[False, "there is no such attribute"]()
+        return 0
 
     fn offset_at(
         self,
@@ -173,9 +210,8 @@ struct TimeZone[
 
         @parameter
         if iana and native:
-            var offset = offset_at(
-                self._dst, year, month, day, hour, minute, second
-            )
+            var tz = self._dst.get(self.tz_str)
+            var offset = offset_at(tz, year, month, day, hour, minute, second)
             if offset:
                 return offset.value()[]
         elif iana and pyzoneinfo:
@@ -193,7 +229,10 @@ struct TimeZone[
                 return hours, minutes, sign
             except:
                 pass
-        return self.offset_h, self.offset_m, self.sign
+        try:
+            return self.offset_h, self.offset_m, self.sign
+        except:
+            return 0, 0, 1
 
     @always_inline("nodebug")
     fn __str__(self) -> StringLiteral:
@@ -215,7 +254,8 @@ struct TimeZone[
 
     @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
-        """Eq.
+        """Whether the tz_str from both TimeZones
+        are the same.
 
         Args:
             other: Other.
@@ -223,15 +263,12 @@ struct TimeZone[
         Returns:
             Bool.
         """
-        return (
-            self.tz_str == other.tz_str
-            and self.offset_h == other.offset_h
-            and self.offset_m == other.offset_m
-        )
+        return self.tz_str == other.tz_str
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
-        """Ne.
+        """Whether the tz_str from both TimeZones
+        are different.
 
         Args:
             other: Other.
@@ -248,13 +285,27 @@ struct TimeZone[
         Returns:
             String.
         """
-        var sign = "+" if self.sign == 1 else "-"
-        var hh = self.offset_h if self.offset_h > 9 else "0" + str(
-            self.offset_h
-        )
-        var mm = self.offset_m if self.offset_m > 9 else "0" + str(
-            self.offset_m
-        )
+        var h: UInt8 = 0
+        var m: UInt8 = 0
+        var ss: UInt8 = 1
+        if self.has_dst:
+            var data = self._dst.get(self.tz_str)
+            if data:
+                var d = data.value().from_hash()[2]
+                h = d.hour
+                m = d.minute
+                ss = d.sign
+        else:
+            var data = self._no_dst.get(self.tz_str)
+            if data:
+                var d = data.value()
+                h = d.hour
+                m = d.minute
+                ss = d.sign
+
+        var sign = "+" if ss == 1 else "-"
+        var hh = h if h > 9 else "0" + str(h)
+        var mm = m if m > 9 else "0" + str(m)
         return sign + hh + ":" + mm
 
     @staticmethod

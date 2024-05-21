@@ -544,7 +544,7 @@ struct DateTime64(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[
-                iso, iana=None, pyzoneinfo=False, native=False
+                iso, iana=False, pyzoneinfo=False, native=False
             ](s)
             var dt = Self(p[0], p[1], p[2], p[3], p[4], p[5])
             return dt
@@ -1035,7 +1035,7 @@ struct DateTime32(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[
-                iso, iana=None, pyzoneinfo=False, native=False
+                iso, iana=False, pyzoneinfo=False, native=False
             ](s)
             var dt = Self(p[0], p[1], p[2], p[3], p[4])
             return dt
@@ -1491,7 +1491,7 @@ struct DateTime16(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[
-                iso, iana=None, pyzoneinfo=False, native=False
+                iso, iana=False, pyzoneinfo=False, native=False
             ](s)
             var dt = Self(p[0], p[1], p[2], p[3])
             return dt
@@ -1946,7 +1946,7 @@ struct DateTime8(Hashable, Stringable):
         """
         try:
             var p = dt_str.from_iso[
-                iso, iana=None, pyzoneinfo=False, native=False
+                iso, iana=False, pyzoneinfo=False, native=False
             ](s)
             var dt = Self(p[0], p[1], p[2], p[3])
             return dt
