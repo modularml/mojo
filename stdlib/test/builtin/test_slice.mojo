@@ -82,9 +82,16 @@ def test_slice_stringable():
     assert_equal(s[:-1], "0:-1:1")
 
 
+def test_indexing():
+    var s = slice(1, 10)
+    assert_equal(s[True], 2)
+    assert_equal(s[UInt64(0)], 1)
+    assert_equal(s[2], 3)
+
+
 def main():
     test_none_end_folds()
     test_slicable()
     test_has_end()
-
     test_slice_stringable()
+    test_indexing()
