@@ -693,14 +693,7 @@ struct String(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
-        # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
-        var length = len(impl)
-        var capacity = impl.capacity
-        self._buffer = List[UInt8](
-            unsafe_pointer=impl.steal_data().bitcast[UInt8](),
-            size=length,
-            capacity=capacity,
-        )
+        self._buffer = impl^
 
     @always_inline
     fn __init__(inout self):
@@ -716,17 +709,14 @@ struct String(
         """
         var length = len(str)
         var buffer = Self._buffer_type()
+        # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
         memcpy(
-            # TODO(modularml/mojo#2317):
-            #   Remove this bitcast after transition to UInt8 for string data
-            #   is complete.
-            dest=buffer.data.bitcast[UInt8](),
+            dest=buffer.data,
             src=str.data,
             count=length,
         )
-        buffer[length] = 0
-        self._buffer = buffer^
+        self = Self(buffer^)
 
     @always_inline
     fn __init__(inout self, str_slice: StringSlice):
@@ -742,14 +732,14 @@ struct String(
         # Calculate length in bytes
         var length: Int = len(str_slice.as_bytes_slice())
         var buffer = Self._buffer_type()
+        # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
         memcpy(
             dest=buffer.data,
             src=str_slice.as_bytes_slice().unsafe_ptr(),
             count=length,
         )
-        buffer[length] = 0
-        self._buffer = buffer^
+        self = Self(buffer^)
 
     @always_inline
     fn __init__(inout self, literal: StringLiteral):
@@ -785,8 +775,10 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self._buffer = Self._buffer_type(
-            unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
+        self = Self(
+            Self._buffer_type(
+                unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
+            )
         )
 
     @always_inline
@@ -800,9 +792,13 @@ struct String(
             ptr: The pointer to the buffer.
             len: The length of the buffer, including the null terminator.
         """
-        self._buffer = Self._buffer_type()
-        self._buffer.data = UnsafePointer(ptr.address)
-        self._buffer.size = len
+        self = Self(
+            Self._buffer_type(
+                unsafe_pointer=UnsafePointer(ptr.address),
+                size=len,
+                capacity=len,
+            )
+        )
 
     @always_inline
     fn __init__(inout self, ptr: DTypePointer[DType.uint8], len: Int):
