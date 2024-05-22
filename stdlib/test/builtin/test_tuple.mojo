@@ -112,6 +112,4 @@ def test_tuple_contains():
 
 
 def main():
-    # FIXME(MSTDL-516)
-    if not os_is_macos():
-        test_tuple_contains()
+    test_tuple_contains()
