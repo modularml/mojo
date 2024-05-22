@@ -186,12 +186,12 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         T: ComparableCollectionElement
     ](self: Self, value: T) -> Bool:
         """Verify if a given value is present in the tuple.
-        
+
         ```mojo
         var x = Tuple(1,2,True)
         if 1 in x: print("x contains 1")
         ```
-        
+
         Args:
             value: The value to find.
         Parameters:
