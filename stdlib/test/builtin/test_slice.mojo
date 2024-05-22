@@ -85,7 +85,7 @@ def test_slice_stringable():
 def test_indexing():
     var s = slice(1, 10)
     assert_equal(s[True], 2)
-    assert_equal(s[UInt64(0)], 1)
+    assert_equal(s[int(0)], 1)
     assert_equal(s[2], 3)
 
 

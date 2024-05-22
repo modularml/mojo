@@ -780,8 +780,7 @@ def test_list_init_span():
 
 def test_indexing():
     var l = List[Int](1, 2, 3)
-    assert_equal(l[Int8(1)], 2)
-    assert_equal(l[UInt64(2)], 3)
+    assert_equal(l[int(1)], 2)
     assert_equal(l[False], 1)
     assert_equal(l[True], 2)
     assert_equal(l[2], 3)

@@ -514,7 +514,7 @@ def test_indexing():
         ptr[i] = i
 
     assert_equal(ptr[True], 1)
-    assert_equal(ptr[Int32(2)], 2)
+    assert_equal(ptr[int(2)], 2)
     assert_equal(ptr[1], 1)
 
 

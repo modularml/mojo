@@ -28,7 +28,7 @@ fn bin(b: Scalar[DType.bool], /) -> String:
     Returns:
         The binary string representation of b.
     """
-    return bin(index(b))
+    return bin(index(int(b)))
 
 
 fn bin[type: DType](num: Scalar[type], /) -> String:

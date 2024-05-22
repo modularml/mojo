@@ -118,7 +118,7 @@ def test_range_reversed():
 def test_indexing():
     var r = range(10)
     assert_equal(r[True], 1)
-    assert_equal(r[Int8(4)], 4)
+    assert_equal(r[int(4)], 4)
     assert_equal(r[3], 3)
 
 
