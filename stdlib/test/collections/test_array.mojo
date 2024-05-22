@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from collections import Array, Set
+from collections import Set
+from collections.array import Array
 from testing import assert_equal, assert_false, assert_true, assert_raises
 from test_utils import MoveCounter
 
