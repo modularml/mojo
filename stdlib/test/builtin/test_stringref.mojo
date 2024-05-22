@@ -17,6 +17,15 @@ from testing import assert_equal, assert_true, assert_false, assert_raises
 from utils import StringRef
 
 
+def test_strref_string_constructor():
+    var s = String("abc")
+    var s_ref = StringRef(s)
+
+    assert_equal(s_ref, "abc")
+
+    _ = s
+
+
 def test_strref_from_start():
     var str = StringRef("Hello")
 
@@ -87,3 +96,4 @@ def main():
     test_comparison_operators()
     test_intable()
     test_indexing()
+    test_strref_string_constructor()
