@@ -152,6 +152,25 @@ def test_pop_default():
     assert_equal(-1, dict.pop("c", -1))
 
 
+def test_popitem():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    var t1: (String, Int) = dict.popitem()
+    assert_equal(t1[0], "a")
+    assert_equal(t1[1], 1)
+    assert_equal(1, len(dict))
+
+    var t2: (String, Int) = dict.popitem()
+    assert_equal(t2[0], "b")
+    assert_equal(t2[1], 2)
+    assert_equal(0, len(dict))
+
+    with assert_raises(contains="KeyError"):
+        _ = dict.popitem()
+
+
 def test_key_error():
     var dict = Dict[String, Int]()
 
@@ -434,6 +453,7 @@ def test_dict():
     test["test_compact", test_compact]()
     test["test_compact_with_elements", test_compact_with_elements]()
     test["test_pop_default", test_pop_default]()
+    test["test_popitem", test_popitem]()
     test["test_key_error", test_key_error]()
     test["test_iter", test_iter]()
     test["test_iter_keys", test_iter_keys]()

@@ -745,6 +745,23 @@ struct Dict[K: KeyElement, V: CollectionElement](
             return default.value()[]
         raise "KeyError"
 
+    fn popitem(inout self) raises -> (K, V):
+        """Remove and return an arbitrary key-value pair from the dictionary.
+
+        Returns:
+            A tuple containing the key and value of the removed item.
+
+        Raises:
+            "KeyError" if the dictionary is empty.
+        """
+        if self.size == 0:
+            raise "KeyError"
+        var entry = self._entries.pop(0)
+        var entry_value = entry.value()
+        self.size -= 1
+        self._n_entries -= 1
+        return (entry_value[].key, entry_value[].value)
+
     fn __iter__(
         self: Reference[Self, _, _],
     ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
