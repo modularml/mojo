@@ -346,7 +346,8 @@ what we publish.
   by [@bgreni](https://github.com/bgreni))
 
 - Added `atof()` function which can convert a `String` to a `float64`.
-  ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))
+  ([PR #2649](https://github.com/modularml/mojo/pull/2649)
+  by [@fknfilewalker](https://github.com/fknfilewalker))
 
 - `Tuple()` now supports `__contains__`. ([PR #2709](https://github.com/modularml/mojo/pull/2709)
   by [@rd4com](https://github.com/rd4com)) For example:
