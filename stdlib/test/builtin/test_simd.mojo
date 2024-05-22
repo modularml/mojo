@@ -10,10 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %bare-mojo %s
-
-# TODO: Replace %bare-mojo with %mojo
-# when https://github.com/modularml/mojo/pull/2720 is merged
+# RUN: %mojo %s
 
 from sys import has_neon
 from utils.numerics import isfinite, isinf, isnan
