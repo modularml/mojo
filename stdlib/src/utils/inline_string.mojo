@@ -26,12 +26,12 @@ from utils._format import ToFormatter
 
 
 # ===----------------------------------------------------------------------===#
-# InlinedString
+# InlineString
 # ===----------------------------------------------------------------------===#
 
 
 @value
-struct InlinedString(Sized, Stringable, CollectionElement):
+struct InlineString(Sized, Stringable, CollectionElement):
     """A string that performs small-string optimization to avoid heap allocations for short strings.
     """
 
@@ -59,7 +59,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         self._storage = Self.Layout(fixed^)
 
     fn __init__(inout self, literal: StringLiteral):
-        """Constructs a InlinedString value given a string literal.
+        """Constructs a InlineString value given a string literal.
 
         Args:
             literal: The input constant string.
@@ -129,7 +129,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
                 self._storage[_FixedString[Self.SMALL_CAP]] += strref
             except e:
                 abort(
-                    "unreachable: InlinedString append to FixedString failed: "
+                    "unreachable: InlineString append to FixedString failed: "
                     + str(e),
                 )
         else:
@@ -191,7 +191,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         string += other._strref_dangerous()
         return string
 
-    fn __add__(self, other: InlinedString) -> Self:
+    fn __add__(self, other: InlineString) -> Self:
         """Construct a string by appending another string at the end of this string.
 
         Args:
