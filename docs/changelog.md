@@ -490,6 +490,9 @@ what we publish.
 - The `tensor.random` module has been removed. The same functionality is now
   accessible via the `Tensor.rand` and `Tensor.randn` static methods.
 
+- The builtin `SIMD` struct no longer conforms to `Indexer`; users must
+  explicitly cast `Scalar` values using `int`.
+
 ### 🛠️ Fixed
 
 - [#1837](https://github.com/modularml/mojo/issues/1837) Fix self-referential

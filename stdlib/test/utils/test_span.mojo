@@ -114,7 +114,7 @@ def test_indexing():
     var l = InlineArray[Int, 7](1, 2, 3, 4, 5, 6, 7)
     var s = Span(l)
     assert_equal(s[True][], 2)
-    assert_equal(s[Int32(0)][], 1)
+    assert_equal(s[int(0)][], 1)
     assert_equal(s[3][], 4)
 
 
