@@ -364,7 +364,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             + len(self) * 3  # str(x) and ", "
             - 2  # remove the last ", "
         )
-        var result = String(List[UInt8](capacity=minimum_capacity))
+        var string_buffer = List[UInt8](capacity=minimum_capacity)
+        string_buffer.append(0)  # Null terminator
+        var result = String(string_buffer^)
         result += "["
         for i in range(len(self)):
             result += repr(self[i])
