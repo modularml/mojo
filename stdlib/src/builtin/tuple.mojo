@@ -182,9 +182,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         return rebind[T](self[i])
 
     @always_inline("nodebug")
-    fn __contains__[
-        T: ComparableCollectionElement
-    ](self, value: T) -> Bool:
+    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
         """Verify if a given value is present in the tuple.
 
         ```mojo
@@ -205,7 +203,6 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         @parameter
         fn T_in_ts() -> Bool:
-
             @parameter
             for i in range(len(VariadicList(element_types))):
 
