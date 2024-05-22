@@ -180,13 +180,13 @@ def test_object_bitwise():
     assert_true(15 ^ object(7) == 8)
 
 
-def test_function(borrowed lhs, borrowed rhs) -> object:
+def test_function(lhs, rhs) -> object:
     return lhs + rhs
 
 
 # These are all marked borrowed because 'object' doesn't support function
 # types with owned arguments.
-def test_function_raises(borrowed a) -> object:
+def test_function_raises(a) -> object:
     raise Error("Error from function type")
 
 
@@ -205,22 +205,16 @@ def test_non_object_getattr():
         a.foo(2)
 
 
-# These are all marked borrowed because 'object' doesn't support function
-# types with owned arguments.
-def matrix_getitem(borrowed self, borrowed i) -> object:
+def matrix_getitem(self, i) -> object:
     return self.value[i]
 
 
-# These are all marked borrowed because 'object' doesn't support function
-# types with owned arguments.
-def matrix_setitem(borrowed self, borrowed i, borrowed value) -> object:
+def matrix_setitem(self, i, value) -> object:
     self.value[i] = value
     return None
 
 
-# These are all marked borrowed because 'object' doesn't support function
-# types with owned arguments.
-def matrix_append(borrowed self, borrowed value) -> object:
+def matrix_append(self, value) -> object:
     var impl = self.value
     impl.append(value)
     return None

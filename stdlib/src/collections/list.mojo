@@ -24,6 +24,7 @@ from memory import UnsafePointer, Reference
 from memory.unsafe_pointer import move_pointee, move_from_pointee
 from sys.intrinsics import _type_is_eq
 from .optional import Optional
+from utils import Span
 
 # ===----------------------------------------------------------------------===#
 # List
@@ -126,6 +127,16 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self = Self(capacity=len(values))
         for value in values:
+            self.append(value[])
+
+    fn __init__(inout self, span: Span[T]):
+        """Constructs a list from the a Span of values.
+
+        Args:
+            span: The span of values to populate the list with.
+        """
+        self = Self(capacity=len(span))
+        for value in span:
             self.append(value[])
 
     fn __init__(
@@ -508,18 +519,24 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Raises:
             ValueError: If the value is not found in the list.
         """
-        var size = self[].size
-        var normalized_start = max(size + start, 0) if start < 0 else start
+        var start_normalized = start
 
-        @parameter
-        fn normalized_stop() -> Int:
-            if stop is None:
-                return size
-            else:
-                var end = stop.value()[]
-                return end if end > 0 else min(end + size, size)
+        var stop_normalized: Int
+        if stop is None:
+            # Default end
+            stop_normalized = len(self[])
+        else:
+            stop_normalized = stop.value()[]
 
-        for i in range(normalized_start, normalized_stop()):
+        if start_normalized < 0:
+            start_normalized += len(self[])
+        if stop_normalized < 0:
+            stop_normalized += len(self[])
+
+        start_normalized = _clip(start_normalized, 0, len(self[]))
+        stop_normalized = _clip(stop_normalized, 0, len(self[]))
+
+        for i in range(start_normalized, stop_normalized):
             if self[][i] == value:
                 return i
         raise "ValueError: Given element is not in list"
@@ -542,17 +559,25 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.capacity = 0
         return ptr
 
-    fn __setitem__(inout self, i: Int, owned value: T):
+    fn __setitem__[
+        IndexerType: Indexer
+    ](inout self, i: IndexerType, owned value: T):
         """Sets a list element at the given index.
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             i: The index of the element.
             value: The value to assign.
         """
-        debug_assert(-self.size <= i < self.size, "index must be within bounds")
+        var normalized_idx = index(i)
+        debug_assert(
+            -self.size <= normalized_idx < self.size,
+            "index must be within bounds",
+        )
 
-        var normalized_idx = i
-        if i < 0:
+        if normalized_idx < 0:
             normalized_idx += len(self)
 
         destroy_pointee(self.data + normalized_idx)
@@ -602,10 +627,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return res^
 
     @always_inline
-    fn __getitem__(self, i: Int) -> T:
+    fn __getitem__[IndexerType: Indexer](self, i: IndexerType) -> T:
         """Gets a copy of the list element at the given index.
 
         FIXME(lifetimes): This should return a reference, not a copy!
+
+        Parameters:
+            IndexerType: The type of the indexer.
 
         Args:
             i: The index of the element.
@@ -613,10 +641,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A copy of the element at the given index.
         """
-        debug_assert(-self.size <= i < self.size, "index must be within bounds")
-
-        var normalized_idx = i
-        if i < 0:
+        var normalized_idx = index(i)
+        debug_assert(
+            -self.size <= normalized_idx < self.size,
+            "index must be within bounds",
+        )
+        if normalized_idx < 0:
             normalized_idx += len(self)
 
         return (self.data + normalized_idx)[]
@@ -698,7 +728,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         result += "]"
         return result
 
-    @staticmethod
     fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
         Note that since we can't condition methods on a trait yet,
@@ -706,16 +735,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(__type_of(my_list).__repr__(my_list))
+        print(my_list.__repr__(my_list))
         ```
 
         When the compiler supports conditional methods, then a simple `repr(my_list)` will
         be enough.
 
         The elements' type must implement the `__repr__()` for this to work.
-
-        Args:
-            self: The list to represent as a string.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
@@ -724,7 +750,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A string representation of the list.
         """
-        return __type_of(self).__str__(self)
+        return self.__str__()
 
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
@@ -790,3 +816,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             if i[] == rebind[T2](value):
                 return True
         return False
+
+
+fn _clip(value: Int, start: Int, end: Int) -> Int:
+    return max(start, min(value, end))

@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_raises, assert_equal
+from testing import assert_raises, assert_equal, assert_true
 
 
 fn test_assert_raises_catches_error() raises:
@@ -35,11 +35,13 @@ fn test_assert_raises_catches_matched_error() raises:
 
 fn test_assert_raises_no_error() raises:
     try:
-        with assert_raises():
+        with assert_raises():  # col 27
             pass
         raise Error("This should not be reachable.")
     except e:
-        assert_equal(str(e), "AssertionError: Didn't raise")
+        assert_true(str(e).startswith("AssertionError: Didn't raise"))
+        assert_true(str(e).endswith(":27"))  # col 27
+        assert_true(str(e) != "This should not be reachable.")
 
 
 fn test_assert_raises_no_match() raises:

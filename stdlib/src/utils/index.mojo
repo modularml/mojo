@@ -297,7 +297,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         var tup = Self()
 
-        @unroll
+        @parameter
         for idx in range(size):
             tup[idx] = elems[idx]
 
@@ -335,19 +335,19 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         return size
 
     @always_inline("nodebug")
-    fn __getitem__[intable: Intable](self, index: intable) -> Int:
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> Int:
         """Gets an element from the tuple by index.
 
         Parameters:
-            intable: The intable type.
+            IndexerType: The type of the indexer.
 
         Args:
-            index: The element index.
+            idx: The element index.
 
         Returns:
             The tuple element value.
         """
-        return self.data[index]
+        return self.data[index(idx)]
 
     @always_inline("nodebug")
     fn __setitem__[index: Int](inout self, val: Int):
@@ -362,17 +362,19 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         self.data.__setitem__[index](val)
 
     @always_inline("nodebug")
-    fn __setitem__[intable: Intable](inout self, index: intable, val: Int):
+    fn __setitem__[
+        IndexerType: Indexer
+    ](inout self, idx: IndexerType, val: Int):
         """Sets an element in the tuple at the given index.
 
         Parameters:
-            intable: The intable type.
+            IndexerType: The type of the indexer.
 
         Args:
-            index: The element index.
+            idx: The element index.
             val: The value to store.
         """
-        self.data[index] = val
+        self.data[index(idx)] = val
 
     @always_inline("nodebug")
     fn as_tuple(self) -> StaticTuple[Int, size]:
@@ -392,7 +394,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         """
         var length: Int = 1
 
-        @unroll
+        @parameter
         for i in range(size):
             length *= self[i]
 

@@ -38,6 +38,11 @@ no-inline-html: false
 # MD045: Images don't require alt text
 no-alt-text: false
 
+# MD050: Use **something** instead of __something__ for bold text
+MD050:
+  # Strong style
+  style: "asterisk"
+
 # MD051: Disable link checker because it false-flags custom anchors
 #        https://github.com/DavidAnson/markdownlint/issues/570
 link-fragments: false

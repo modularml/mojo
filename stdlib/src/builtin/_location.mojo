@@ -66,11 +66,10 @@ fn __source_location() -> _SourceLocation:
 fn __call_location() -> _SourceLocation:
     """Returns the location where the enclosing function is called.
 
-    This should only be used in `@always_inline` and `@always_inline("nodebug")`
-    functions. When the enclosing function is `@always_inline`, the call
-    location will not be correct if inside a `@always_inline("nodebug")`
-    function. This is intended behavior since `@always_inline("nodebug")` is
-    meant to erase debug information, including locations.
+    This should only be used in `@always_inline` or `@always_inline("nodebug")`
+    functions so that it returns the source location of where the enclosing
+    function is called at (even if inside another `@always_inline("nodebug")`
+    function).
 
     This currently doesn't work when this or the enclosing function is called in
     a parameter expression.
