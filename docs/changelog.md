@@ -461,6 +461,9 @@ what we publish.
   `nan`, `nextafter`, and `ulp`. The functions continue to be exposed in the
   `math` module.
 
+- `InlinedString` has been renamed to `InlineString` to be consistent with other
+  types.
+
 ### ❌ Removed
 
 - The `@unroll` decorator has been deprecated and removed. The decorator was
