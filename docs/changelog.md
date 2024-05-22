@@ -367,8 +367,9 @@ what we publish.
 - Added `clear` method  to `Dict`.
   ([PR 2627](https://github.com/modularml/mojo/pull/2627) by [@artemiogr97](https://github.com/artemiogr97))
 
-- `StringRef` now implements `rstrip()` and `lstrip()` which are used by `strip()`. Custom characters can now be used.
-  `String` delegated to `StringRef`. ([PR #2700](https://github.com/modularml/mojo/pull/2700)
+- `StringRef` now implements `rstrip()` and `lstrip()` which are used by `strip()`.
+  Custom characters can now be used. `String` delegated to `StringRef`.
+  ([PR #2700](https://github.com/modularml/mojo/pull/2700)
   by [@fknfilewalker](https://github.com/fknfilewalker))
 
 ### 🦋 Changed
