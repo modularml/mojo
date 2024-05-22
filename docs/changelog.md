@@ -346,8 +346,7 @@ what we publish.
   by [@bgreni](https://github.com/bgreni))
 
 - Added `atof()` function which can convert a `String` to a `float64`.
-  ([PR #2649](https://github.com/modularml/mojo/pull/2649)
-  by [@fknfilewalker](https://github.com/fknfilewalker))
+  ([PR #2649](https://github.com/modularml/mojo/pull/2649) by [@fknfilewalker](https://github.com/fknfilewalker))
 
 - `Tuple()` now supports `__contains__`. ([PR #2709](https://github.com/modularml/mojo/pull/2709)
   by [@rd4com](https://github.com/rd4com)) For example:
@@ -368,7 +367,8 @@ what we publish.
 - Added `clear` method  to `Dict`.
   ([PR 2627](https://github.com/modularml/mojo/pull/2627) by [@artemiogr97](https://github.com/artemiogr97))
 
-- `StringRef` now implements `rstrip()` and `lstrip()` which are used by `strip()`. Custom characters can now be used. `String` delegated to `StringRef`. ([PR #2700](https://github.com/modularml/mojo/pull/2700)
+- `StringRef` now implements `rstrip()` and `lstrip()` which are used by `strip()`. Custom characters can now be used.
+  `String` delegated to `StringRef`. ([PR #2700](https://github.com/modularml/mojo/pull/2700)
   by [@fknfilewalker](https://github.com/fknfilewalker))
 
 ### 🦋 Changed
