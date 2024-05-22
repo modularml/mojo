@@ -250,7 +250,7 @@ struct LegacyPointer[
             A String containing the hexadecimal representation of the memory
             location destination of this pointer.
         """
-        return hex(self)
+        return hex(int(self))
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
