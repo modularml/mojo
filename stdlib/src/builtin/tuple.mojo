@@ -219,8 +219,6 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         if not T_in_ts():
             return False
 
-        var result = False
-
         @parameter
         for i in range(len(VariadicList(element_types))):
 
@@ -236,6 +234,6 @@ struct Tuple[*element_types: Movable](Sized, Movable):
                     ]
                 ](tmp_ref)
                 if tmp[].__eq__(value):
-                    result = True
+                    return True
 
-        return result
+        return False
