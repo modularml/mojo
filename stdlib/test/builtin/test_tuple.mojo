@@ -99,6 +99,9 @@ def test_tuple_contains():
     assert_false(False in c_alias)
 
     alias d_alias = (123, True, String("Mojo is awesome"))
+    # Ensure `contains` itself works in comp-time domain
+    alias ok = 123 in d_alias
+    assert_true(ok)
 
     assert_true(String("Mojo is awesome") in d_alias)
     assert_false("Mojo is awesome" in d_alias)
