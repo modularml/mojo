@@ -1696,9 +1696,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 ]
             ]()
 
-            @always_inline
             @parameter
-            fn fill[idx: Int]():
+            for idx in range(output_size):
                 alias val = mask[idx]
                 constrained[
                     0 <= val < 2 * size,
@@ -1709,7 +1708,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 )
                 __mlir_op.`pop.store`(val, ptr)
 
-            unroll[fill, output_size]()
             return array
 
         alias length = variadic_len[mask]()
@@ -1745,13 +1743,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @parameter
-        fn _check[i: Int]():
+        for i in range(output_size):
             constrained[
                 0 <= mask[i] < 2 * size,
                 "invalid index in the shuffle operation",
             ]()
-
-        unroll[_check, output_size]()
 
         return __mlir_op.`pop.simd.shuffle`[
             mask = mask.data.array,
@@ -2003,10 +1999,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             var indices = StaticIntTuple[2 * size]()
 
             @parameter
-            fn _fill[i: Int]():
+            for i in range(2 * size):
                 indices[i] = i
 
-            unroll[_fill, 2 * size]()
             return indices
 
         return self._shuffle_list[2 * size, build_indices()](other)
