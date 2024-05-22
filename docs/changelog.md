@@ -367,6 +367,9 @@ what we publish.
 - Added `clear` method  to `Dict`.
   ([PR 2627](https://github.com/modularml/mojo/pull/2627) by [@artemiogr97](https://github.com/artemiogr97))
 
+- `StringRef` now implements `startswith()` and `endswith()`.
+    ([PR #2710](https://github.com/modularml/mojo/pull/2710) by [@fknfilewalker](https://github.com/fknfilewalker))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
