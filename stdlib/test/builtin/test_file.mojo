@@ -149,7 +149,7 @@ def test_file_open_nodir():
 
 
 def test_file_write():
-    var content = "The quick brown fox jumps over the lazy dog"
+    var content: String = "The quick brown fox jumps over the lazy dog"
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write"
     var f = open(TEMP_FILE, "w")
     f.write(content)
@@ -161,8 +161,8 @@ def test_file_write():
 
 
 def test_file_write_again():
-    var unexpected_content = "foo bar baz"
-    var expected_content = "foo bar"
+    var unexpected_content: String = "foo bar baz"
+    var expected_content: String = "foo bar"
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write_again"
     with open(TEMP_FILE, "w") as f:
         f.write(unexpected_content)
@@ -211,6 +211,39 @@ def test_file_read_to_dtype_pointer():
     )
 
 
+def test_file_get_raw_fd():
+    # since JIT and build give different file descriptors, we test by checking
+    # if we printed to the right file.
+    var f1 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_1", "rw")
+    var f2 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_2", "rw")
+    var f3 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_2", "rw")
+
+    print(
+        "test from file 1",
+        file=f1._get_raw_fd(),
+        flush=True,
+        end="",
+    )
+    _ = f1.seek(0)
+    assert_equal(f1.read(), "test from file 1")
+    assert_equal(f2.read(), "")
+    assert_equal(f3.read(), "")
+
+    _ = f1.seek(0)
+    _ = f2.seek(0)
+    _ = f3.seek(0)
+
+    print("test from file 2", file=f2._get_raw_fd(), flush=True, end="")
+    print("test from file 3", file=f3._get_raw_fd(), flush=True, end="")
+
+    _ = f2.seek(0)
+    _ = f3.seek(0)
+
+    assert_equal(f3.read(), "test from file 3")
+    assert_equal(f2.read(), "test from file 2")
+    assert_equal(f1.read(), "test from file 1")
+
+
 def main():
     test_file_read()
     test_file_read_multi()
@@ -223,3 +256,4 @@ def main():
     test_file_write()
     test_file_write_again()
     test_file_read_to_dtype_pointer()
+    test_file_get_raw_fd()

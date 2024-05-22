@@ -406,14 +406,6 @@ struct FileHandle:
 
         return pos
 
-    fn write(self, data: StringLiteral) raises:
-        """Write the data to the file.
-
-        Args:
-          data: The data to write to the file.
-        """
-        self.write(StringRef(data))
-
     fn write(self, data: String) raises:
         """Write the data to the file.
 
@@ -462,6 +454,13 @@ struct FileHandle:
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
         return self^
+
+    fn _get_raw_fd(self) -> Int:
+        var i64_res = external_call[
+            "KGEN_CompilerRT_IO_GetFD",
+            Int64,
+        ](self.handle)
+        return Int(i64_res.value)
 
 
 fn open(path: String, mode: String) raises -> FileHandle:

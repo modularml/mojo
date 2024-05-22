@@ -106,7 +106,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         Args:
             values: The values to populate the list with.
         """
-        debug_assert(len(values) < capacity, "List is full.")
+        debug_assert(len(values) <= capacity, "List is full.")
         self = Self()
         for value in values:
             self.append(value[])
@@ -129,19 +129,22 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
 
     @always_inline
     fn __refitem__[
-        IntableType: Intable,
-    ](self: Reference[Self, _, _], index: IntableType) -> Reference[
+        IndexerType: Indexer,
+    ](self: Reference[Self, _, _], idx: IndexerType) -> Reference[
         Self.ElementType, self.is_mutable, self.lifetime
     ]:
         """Get a `Reference` to the element at the given index.
 
+        Parameters:
+            IndexerType: The type of the indexer.
+
         Args:
-            index: The index of the item.
+            idx: The index of the item.
 
         Returns:
             A reference to the item at the given index.
         """
-        var i = int(index)
+        var i = index(idx)
         debug_assert(
             -self[]._size <= i < self[]._size, "Index must be within bounds."
         )
@@ -195,3 +198,12 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
             if value == rebind[C](i[]):
                 return True
         return False
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        """Checks whether the list has any elements or not.
+
+        Returns:
+            `False` if the list is empty, `True` if there is at least one element.
+        """
+        return len(self) > 0

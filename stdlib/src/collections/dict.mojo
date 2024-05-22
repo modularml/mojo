@@ -431,6 +431,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     alias EMPTY = _EMPTY
     alias REMOVED = _REMOVED
+    alias _initial_reservation = 8
 
     var size: Int
     """The number of elements currently stored in the dict."""
@@ -447,7 +448,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """Initialize an empty dictiontary."""
         self.size = 0
         self._n_entries = 0
-        self._reserved = 8
+        self._reserved = Self._initial_reservation
         self._index = _DictIndex(self._reserved)
         self._entries = Self._new_entries(self._reserved)
 
@@ -463,6 +464,40 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._reserved = existing._reserved
         self._index = existing._index.copy(existing._reserved)
         self._entries = existing._entries
+
+    @staticmethod
+    fn fromkeys(keys: List[K], value: V) -> Self:
+        """Create a new dictionary with keys from list and values set to value.
+
+        Args:
+            keys: The keys to set.
+            value: The value to set.
+
+        Returns:
+            The new dictionary.
+        """
+        var dict = Dict[K, V]()
+        for key in keys:
+            dict[key[]] = value
+        return dict
+
+    @staticmethod
+    fn fromkeys(
+        keys: List[K], value: Optional[V] = None
+    ) -> Dict[K, Optional[V]]:
+        """Create a new dictionary with keys from list and values set to value.
+
+        Args:
+            keys: The keys to set.
+            value: The value to set.
+
+        Returns:
+            The new dictionary.
+        """
+        var dict = Dict[K, Optional[V]]()
+        for key in keys:
+            dict[key[]] = value
+        return dict
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing dictiontary.
@@ -487,6 +522,14 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._reserved = existing._reserved
         self._index = existing._index^
         self._entries = existing._entries^
+
+    fn clear(inout self):
+        """Remove all elements from the dictionary."""
+        self.size = 0
+        self._n_entries = 0
+        self._reserved = Self._initial_reservation
+        self._index = _DictIndex(self._reserved)
+        self._entries = Self._new_entries(self._reserved)
 
     fn __getitem__(self, key: K) raises -> V:
         """Retrieve a value out of the dictionary.

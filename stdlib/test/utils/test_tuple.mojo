@@ -189,6 +189,12 @@ def test_array_int_pointer():
     _ = arr
 
 
+def test_array_contains():
+    var arr = InlineArray[String, 3]("hi", "hello", "hey")
+    assert_true(str("hi") in arr)
+    assert_true(not str("greetings") in arr)
+
+
 def main():
     test_static_tuple()
     test_static_int_tuple()
@@ -196,3 +202,4 @@ def main():
     test_array_int()
     test_array_str()
     test_array_int_pointer()
+    test_array_contains()
