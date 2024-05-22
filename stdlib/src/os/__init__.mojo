@@ -16,6 +16,7 @@ from .atomic import Atomic
 from .env import setenv, getenv
 from .fstat import lstat, stat, stat_result
 from .os import (
+    sep,
     abort,
     listdir,
     remove,

@@ -367,6 +367,9 @@ what we publish.
 - Added `clear` method  to `Dict`.
   ([PR 2627](https://github.com/modularml/mojo/pull/2627) by [@artemiogr97](https://github.com/artemiogr97))
 
+- Added `os.path.join` function.
+  ([PR 2792](https://github.com/modularml/mojo/pull/2792)) by [@artemiogr97](https://github.com/artemiogr97))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
