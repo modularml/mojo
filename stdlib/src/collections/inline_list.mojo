@@ -198,3 +198,12 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
             if value == rebind[C](i[]):
                 return True
         return False
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        """Checks whether the list has any elements or not.
+
+        Returns:
+            `False` if the list is empty, `True` if there is at least one element.
+        """
+        return len(self) > 0
