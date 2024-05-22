@@ -711,11 +711,7 @@ struct String(
         var buffer = Self._buffer_type()
         # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
-        memcpy(
-            dest=buffer.data,
-            src=str.data,
-            count=length,
-        )
+        memcpy(dest=buffer.data, src=str.data, count=length)
         self = Self(buffer^)
 
     @always_inline
