@@ -44,12 +44,13 @@ struct InlinedString(Sized, Stringable, CollectionElement):
     layout of this string, even if the given string would fit within the
     small-string capacity of this type."""
 
+    # Fields
     alias Layout = Variant[String, _FixedString[Self.SMALL_CAP]]
 
     var _storage: Self.Layout
 
     # ===------------------------------------------------------------------===#
-    # Constructors
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     fn __init__(inout self):
@@ -91,24 +92,8 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         self._storage = Self.Layout(heap_string^)
 
     # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
+    # Operator dunders
     # ===------------------------------------------------------------------=== #
-
-    fn __len__(self) -> Int:
-        if self._is_small():
-            return len(self._storage[_FixedString[Self.SMALL_CAP]])
-        else:
-            debug_assert(
-                self._storage.isa[String](),
-                "expected non-small string variant to be String",
-            )
-            return len(self._storage[String])
-
-    fn __str__(self) -> String:
-        if self._is_small():
-            return str(self._storage[_FixedString[Self.SMALL_CAP]])
-        else:
-            return self._storage[String]
 
     fn __iadd__(inout self, literal: StringLiteral):
         """Appends another string to this string.
@@ -221,6 +206,26 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         return string
 
     # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    fn __len__(self) -> Int:
+        if self._is_small():
+            return len(self._storage[_FixedString[Self.SMALL_CAP]])
+        else:
+            debug_assert(
+                self._storage.isa[String](),
+                "expected non-small string variant to be String",
+            )
+            return len(self._storage[String])
+
+    fn __str__(self) -> String:
+        if self._is_small():
+            return str(self._storage[_FixedString[Self.SMALL_CAP]])
+        else:
+            return self._storage[String]
+
+    # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
 
@@ -278,13 +283,14 @@ struct _FixedString[CAP: Int](
         CAP: The fixed-size count of bytes of string storage capacity available.
     """
 
+    # Fields
     var buffer: InlineArray[UInt8, CAP]
     """The underlying storage for the fixed string."""
     var size: Int
     """The number of elements in the vector."""
 
     # ===------------------------------------------------------------------===#
-    # Constructors
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     fn __init__(inout self):
@@ -314,15 +320,39 @@ struct _FixedString[CAP: Int](
         memcpy(self.buffer.unsafe_ptr(), literal.as_uint8_ptr(), len(literal))
 
     # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
+    # Factor methods
     # ===------------------------------------------------------------------=== #
 
-    @always_inline
-    fn __str__(self) -> String:
-        return String(self._strref_dangerous())
+    @staticmethod
+    fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
+        """
+        Construct a string by concatenating a sequence of formattable arguments.
 
-    fn __len__(self) -> Int:
-        return self.size
+        Args:
+            args: A sequence of formattable arguments.
+
+        Parameters:
+            Ts: The types of the arguments to format. Each type must be satisfy
+              `Formattable`.
+
+        Returns:
+            A string formed by formatting the argument sequence.
+        """
+
+        var output = Self()
+        var writer = output._unsafe_to_formatter()
+
+        @parameter
+        fn write_arg[T: Formattable](arg: T):
+            arg.format_to(writer)
+
+        args.each[write_arg]()
+
+        return output^
+
+    # ===------------------------------------------------------------------=== #
+    # Operator dunders
+    # ===------------------------------------------------------------------=== #
 
     fn __iadd__(inout self, literal: StringLiteral) raises:
         """Appends another string to this string.
@@ -350,6 +380,21 @@ struct _FixedString[CAP: Int](
         var err = self._iadd_non_raising(strref)
         if err:
             raise err.value()[]
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline
+    fn __str__(self) -> String:
+        return String(self._strref_dangerous())
+
+    fn __len__(self) -> Int:
+        return self.size
+
+    # ===------------------------------------------------------------------=== #
+    # Methods
+    # ===------------------------------------------------------------------=== #
 
     fn _iadd_non_raising(inout self, strref: StringRef) -> Optional[Error]:
         var total_len = len(self) + len(strref)
@@ -401,37 +446,6 @@ struct _FixedString[CAP: Int](
             # Arg data
             UnsafePointer.address_of(self).bitcast[NoneType](),
         )
-
-    # ===------------------------------------------------------------------=== #
-    # Methods
-    # ===------------------------------------------------------------------=== #
-
-    @staticmethod
-    fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
-        """
-        Construct a string by concatenating a sequence of formattable arguments.
-
-        Args:
-            args: A sequence of formattable arguments.
-
-        Parameters:
-            Ts: The types of the arguments to format. Each type must be satisfy
-              `Formattable`.
-
-        Returns:
-            A string formed by formatting the argument sequence.
-        """
-
-        var output = Self()
-        var writer = output._unsafe_to_formatter()
-
-        @parameter
-        fn write_arg[T: Formattable](arg: T):
-            arg.format_to(writer)
-
-        args.each[write_arg]()
-
-        return output^
 
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.

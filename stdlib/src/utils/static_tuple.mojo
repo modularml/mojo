@@ -255,6 +255,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         size: The size of the array.
     """
 
+    # Fields
     alias type = __mlir_type[
         `!pop.array<`, size.value, `, `, Self.ElementType, `>`
     ]
@@ -262,7 +263,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     """The underlying storage for the array."""
 
     # ===------------------------------------------------------------------===#
-    # Initializers
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
@@ -335,33 +336,6 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
                 UnsafePointer[Self.ElementType](ref), elems[i]
             )
 
-    # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
-    # ===------------------------------------------------------------------=== #
-
-    @always_inline("nodebug")
-    fn __len__(self) -> Int:
-        """Returns the length of the array. This is a known constant value.
-
-        Returns:
-            The size of the array.
-        """
-        return size
-
-    @always_inline("nodebug")
-    fn _get_reference_unsafe(
-        self: Reference[Self, _, _], index: Int
-    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
-        """Get a reference to an element of self without checking index bounds.
-
-        Users should opt for `__refitem__` instead of this method.
-        """
-        var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(self[]._array).address,
-            index.value,
-        )
-        return UnsafePointer(ptr)[]
-
     # ===------------------------------------------------------------------===#
     # Operator dunders
     # ===------------------------------------------------------------------===#
@@ -416,6 +390,37 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             normalized_idx += size
 
         return self[]._get_reference_unsafe(normalized_idx)
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        """Returns the length of the array. This is a known constant value.
+
+        Returns:
+            The size of the array.
+        """
+        return size
+
+    # ===------------------------------------------------------------------===#
+    # Methods
+    # ===------------------------------------------------------------------===#
+
+    @always_inline("nodebug")
+    fn _get_reference_unsafe(
+        self: Reference[Self, _, _], index: Int
+    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
+        """Get a reference to an element of self without checking index bounds.
+
+        Users should opt for `__refitem__` instead of this method.
+        """
+        var ptr = __mlir_op.`pop.array.gep`(
+            UnsafePointer.address_of(self[]._array).address,
+            index.value,
+        )
+        return UnsafePointer(ptr)[]
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[Self.ElementType]:

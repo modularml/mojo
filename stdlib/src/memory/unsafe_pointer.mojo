@@ -39,6 +39,7 @@ struct UnsafePointer[
         address_space: The address space associated with the UnsafePointer allocated memory.
     """
 
+    # Fields
     alias _mlir_type = __mlir_type[
         `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
     ]
@@ -55,7 +56,7 @@ struct UnsafePointer[
     """The underlying pointer."""
 
     # ===-------------------------------------------------------------------===#
-    # Initializers
+    # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
     @always_inline
@@ -174,72 +175,35 @@ struct UnsafePointer[
         return Self(arg)
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Operator dunders
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn free(self):
-        """Free the memory referenced by the pointer."""
-        Pointer[Int8, address_space=address_space](address=int(self)).free()
-
-    @always_inline("nodebug")
-    fn bitcast[
-        new_type: AnyType = T,
-        /,
-        address_space: AddressSpace = Self.address_space,
-    ](self) -> UnsafePointer[new_type, address_space]:
-        """Bitcasts a UnsafePointer to a different type.
-
-        Parameters:
-            new_type: The target type.
-            address_space: The address space of the result.
+    fn __refitem__(
+        self,
+    ) -> Self._ref_type:
+        """Return a reference to the underlying data, offset by the offset index.
 
         Returns:
-            A new UnsafePointer object with the specified type and the same address,
-            as the original UnsafePointer.
+            A reference to the value.
         """
-        return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[new_type, address_space]._mlir_type,
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Self._ref_type._mlir_type
         ](self.address)
 
     @always_inline
-    fn offset(self, offset: Int) -> Self:
-        """Return a pointer at an offset from the current one.
+    fn __refitem__[
+        IndexerType: Indexer
+    ](self, offset: IndexerType) -> Self._ref_type:
+        """Return a reference to the underlying data, offset by the offset index.
 
         Args:
             offset: The offset index.
 
         Returns:
-            An offset pointer.
+            An offset reference.
         """
-        return Self(address=int(self) + offset * sizeof[T]())
-
-    @always_inline
-    fn __int__(self) -> Int:
-        """Returns the pointer address as an integer.
-
-        Returns:
-          The address of the pointer as an Int.
-        """
-        return __mlir_op.`pop.pointer_to_index`[
-            _type = __mlir_type.`!pop.scalar<index>`
-        ](self.address)
-
-    fn __str__(self) -> String:
-        return hex(self)
-
-    # ===-------------------------------------------------------------------===#
-    # Operator dunders
-    # ===-------------------------------------------------------------------===#
-
-    @always_inline
-    fn __bool__(self) -> Bool:
-        """Return true if the pointer is non-null.
-
-        Returns:
-            Whether the pointer is null.
-        """
-        return int(self) != 0
+        return (self + index(offset)).__refitem__()
 
     @always_inline
     fn __add__(self, offset: Int) -> Self:
@@ -357,35 +321,73 @@ struct UnsafePointer[
         """
         return int(self) >= int(rhs)
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
-    fn __refitem__(
-        self,
-    ) -> Self._ref_type:
-        """Return a reference to the underlying data, offset by the offset index.
+    fn __bool__(self) -> Bool:
+        """Return true if the pointer is non-null.
 
         Returns:
-            A reference to the value.
+            Whether the pointer is null.
         """
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Self._ref_type._mlir_type
+        return int(self) != 0
+
+    @always_inline
+    fn __int__(self) -> Int:
+        """Returns the pointer address as an integer.
+
+        Returns:
+          The address of the pointer as an Int.
+        """
+        return __mlir_op.`pop.pointer_to_index`[
+            _type = __mlir_type.`!pop.scalar<index>`
+        ](self.address)
+
+    fn __str__(self) -> String:
+        return hex(self)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn free(self):
+        """Free the memory referenced by the pointer."""
+        Pointer[Int8, address_space=address_space](address=int(self)).free()
+
+    @always_inline("nodebug")
+    fn bitcast[
+        new_type: AnyType = T,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> UnsafePointer[new_type, address_space]:
+        """Bitcasts a UnsafePointer to a different type.
+
+        Parameters:
+            new_type: The target type.
+            address_space: The address space of the result.
+
+        Returns:
+            A new UnsafePointer object with the specified type and the same address,
+            as the original UnsafePointer.
+        """
+        return __mlir_op.`pop.pointer.bitcast`[
+            _type = UnsafePointer[new_type, address_space]._mlir_type,
         ](self.address)
 
     @always_inline
-    fn __refitem__[
-        IndexerType: Indexer
-    ](self, offset: IndexerType) -> Self._ref_type:
-        """Return a reference to the underlying data, offset by the offset index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
+    fn offset(self, offset: Int) -> Self:
+        """Return a pointer at an offset from the current one.
 
         Args:
             offset: The offset index.
 
         Returns:
-            An offset reference.
+            An offset pointer.
         """
-        return (self + index(offset)).__refitem__()
+        return Self(address=int(self) + offset * sizeof[T]())
 
 
 # ===----------------------------------------------------------------------=== #
