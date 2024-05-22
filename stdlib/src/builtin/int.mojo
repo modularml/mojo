@@ -340,6 +340,18 @@ struct Int(
         self = value.__int__()
 
     @always_inline("nodebug")
+    fn __init__[IndexerTy: Indexer](inout self, value: IndexerTy):
+        """Construct Int from the given Indexer value.
+
+        Parameters:
+            IndexerTy: A type conforming to Indexer.
+
+        Args:
+            value: The init value.
+        """
+        self = value.__index__()
+
+    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Gets the integral value (this is an identity function for Int).
 

@@ -332,6 +332,25 @@ what we publish.
 
   ([PR #2685](https://github.com/modularml/mojo/pull/2685) by [@bgreni](https://github.com/bgreni))
 
+  Types conforming to the `Indexer` trait are implicitly convertible to Int.
+  This means you can write generic APIs that take `Int` instead of making them
+  take a generic type that conforms to `Indexer`, e.g.
+
+  ```mojo
+  @value
+  struct AlwaysZero(Indexer):
+      fn __index__(self) -> Int:
+          return 0
+
+  @value
+  struct Incrementer:
+      fn __getitem__(self, idx: Int) -> Int:
+          return idx + 1
+
+  var a = Incrementer()
+  print(a[AlwaysZero()])  # works and prints 1
+  ```
+
 - `StringRef` now implements `strip()` which can be used to remove leading and
   trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
   by [@fknfilewalker](https://github.com/fknfilewalker))
