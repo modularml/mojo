@@ -406,14 +406,6 @@ struct FileHandle:
 
         return pos
 
-    fn write(self, data: StringLiteral) raises:
-        """Write the data to the file.
-
-        Args:
-          data: The data to write to the file.
-        """
-        self.write(StringRef(data))
-
     fn write(self, data: String) raises:
         """Write the data to the file.
 

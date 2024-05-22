@@ -158,6 +158,19 @@ def test_unsafepointer_address_space():
     p2.free()
 
 
+# NOTE: Tests fails due to a `UnsafePointer` size
+# and alignment constraint failing to be satisfied.
+#
+# def test_unsafepointer_zero_size():
+#     alias T = SIMD[DType.int32, 0]
+#
+#     var start_ptr = UnsafePointer[T].alloc(10)
+#     var dest_ptr = start_ptr + 5
+#
+#     assert_true(start_ptr < dest_ptr)
+#     assert_true(start_ptr != dest_ptr)
+
+
 def test_indexing():
     var ptr = UnsafePointer[Int].alloc(4)
     for i in range(4):

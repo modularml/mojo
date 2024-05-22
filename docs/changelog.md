@@ -19,9 +19,8 @@ what we publish.
 ### ⭐️ New
 
 - Mojo has introduced `@parameter for`, a new feature for compile-time
-  programming. `@parameter for` defines a for loop where the sequence must be a
-  parameter value and the induction variables are also parameter values in that
-  sequence. For example:
+  programming. `@parameter for` defines a for loop where the sequence and the
+  induction values in the sequence must be parameter values. For example:
 
   ```mojo
   fn parameter_for[max: Int]():
@@ -36,10 +35,10 @@ what we publish.
   return a `_StridedRangeIterator`, meaning the induction variables must be
   `Int`. The intention is to lift these restrictions in the future.
 
-- Mojo added support for the `inferred` passing kind on parameters. `inferred`
+- Mojo added support for the `inferred` parameter convention. `inferred`
   parameters must appear at the beginning of the parameter list and cannot be
-  explicitly specified by the user. This allows users to define functions with
-  dependent parameters to be called without the caller specifying all the
+  explicitly specified by the user. This allows programmers to define functions
+  with dependent parameters to be called without the caller specifying all the
   necessary parameters. For example:
 
   ```mojo
@@ -51,7 +50,7 @@ what we publish.
   ```
 
   In the above example, `Int32(42)` is passed directly into `value`, the first
-  non-inferred parameter. `dt` is inferred from the parameter itself to
+  non-inferred parameter. `dt` is inferred from the parameter itself to be
   `DType.int32`.
 
   This also works with structs. For example:
@@ -104,12 +103,12 @@ what we publish.
   ```
 
 - Mojo has changed how `def` arguments are processed.  Previously, by default,
-  arguments to a `def` were treated as `owned` convention, which makes a copy of
-  the value, enabling that value to be mutable in the callee.  This is "worked",
-  but was a major performance footgun, and required you to declare non-copyable
-  types as `borrowed` explicitly.  Now Mojo takes a different approach: it takes
-  the arguments as `borrowed` (consistent with `fn`s) but will make a local copy
-  of the value **only if the argument is mutated** on the body of the function.
+  arguments to a `def` were treated treated according to the `owned` convention,
+  which makes a copy of the value, enabling that value to be mutable in the callee.
+  This "worked", but was a major performance footgun, and required you to declare
+  non-copyable types as `borrowed` explicitly.  Now Mojo takes a different approach:
+  it takes the arguments as `borrowed` (consistent with `fn`s) but will make a local
+  copy of the value **only if the argument is mutated** in the body of the function.
   This improves consistency, performance, and ease of use.
 
 - `int()` can now take a string and a specified base to parse an integer from a
@@ -167,9 +166,13 @@ what we publish.
           return Self(trunc(re), trunc(im))
   ```
 
-- Add builtin `any()` and `all()` functions to check for truthy elements in a collection.
-  This also works to get the truthy value of a SIMD vector.
-  ([PR #2600](https://github.com/modularml/mojo/pull/2600) by [@helehex](https://github.com/helehex))
+- You can now use the builtin `any()` and `all()` functions to check for truthy
+  elements in a collection. Because `SIMD.__bool__()` is now constrained to
+  `size=1`, You must explicity use these to get the truthy value of a SIMD
+  vector. This avoids common bugs around implicit conversion of `SIMD` to
+  `Bool`.
+    ([PR #2600](https://github.com/modularml/mojo/pull/2600) by [@helehex](https://github.com/helehex))
+
   For example:
 
   ```mojo
@@ -243,7 +246,7 @@ what we publish.
 - Added a new `Span` type for taking slices of contiguous collections.
   ([PR #2595](https://github.com/modularml/mojo/pull/2595) by [lsh](https://github.com/lsh))
 
-- Added new `as_bytes_slice()` methods to `String` and `StringLiteral`, which
+- Added a new `as_bytes_slice()` method to `String` and `StringLiteral`, which
   returns a `Span` of the bytes owned by the string.
 
 - Add new `ImmStaticLifetime` and `MutStaticLifetime` helpers
@@ -256,7 +259,7 @@ what we publish.
 - Debugger users can now set breakpoints on function calls in O0 builds even if
   the call has been inlined by the compiler.
 
-- The `os` module now provides functionalty for adding and removing directories
+- The `os` module now provides functionality for adding and removing directories
   using `mkdir` and `rmdir`.
     ([PR #2430](https://github.com/modularml/mojo/pull/2430) by [@artemiogr97](https://github.com/artemiogr97))
 
@@ -304,7 +307,7 @@ what we publish.
     ([PR #2673](https://github.com/modularml/mojo/pull/2673) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - Added the `Indexer` trait to denote types that implement the `__index__()`
-  method which allow these types to be accepted in common `__getitem__` and
+  method which allows these types to be accepted in common `__getitem__` and
   `__setitem__` implementations, as well as allow a new builtin `index` function
   to be called on them. Most stdlib containers are now able to be indexed by
   any type that implements `Indexer`. For example:
@@ -361,6 +364,9 @@ what we publish.
   and value.
   ([PR 2622](https://github.com/modularml/mojo/pull/2622) by [@artemiogr97](https://github.com/artemiogr97))
 
+- Added `clear` method  to `Dict`.
+  ([PR 2627](https://github.com/modularml/mojo/pull/2627) by [@artemiogr97](https://github.com/artemiogr97))
+
 - Optional `start` and `length` argument added for `String._strref_dangerous()`.
   ([PR #2719](https://github.com/modularml/mojo/pull/2719) by [@fknfilewalker](https://github.com/fknfilewalker))
 
@@ -390,11 +396,15 @@ what we publish.
   `swap` and `partition` will likely shuffle around as we're reworking
   our builtin `sort` function and optimizing it.
 
-- `SIMD.bool()` is constrained only for when the `size` is `1` now.  Instead,
-  explicitly use `SIMD.reduce_and()` or `SIMD.reduce_or()`.
+- `SIMD.bool()` is constrained only for when the `size` is `1` now. Instead,
+  explicitly use `any()` or `all()`.
     ([PR #2502](https://github.com/modularml/mojo/pull/2502) by [@helehex](https://github.com/helehex))
 
-- `ListLiteral` and `Tuple` now only requires that element types be `Copyable`.
+- The `SIMD.reduce_or()` and `SIMD.reduce_and()` methods are now bitwise
+  operations, and support integer types.
+    ([PR #2671](https://github.com/modularml/mojo/pull/2671) by [@helehex](https://github.com/helehex))
+
+- `ListLiteral` and `Tuple` now only require that element types be `Copyable`.
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
@@ -482,6 +492,8 @@ what we publish.
 
 ### 🛠️ Fixed
 
+- [#1837](https://github.com/modularml/mojo/issues/1837) Fix self-referential
+  variant crashing the compiler.
 - [#2363](https://github.com/modularml/mojo/issues/2363) Fix LSP crashing on
   simple trait definitions.
 - [#1787](https://github.com/modularml/mojo/issues/1787) Fix error when using

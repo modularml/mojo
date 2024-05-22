@@ -629,13 +629,12 @@ fn isnan[
     if not type.is_floating_point():
         return False
 
-    # @parameter
-    # if type == DType.bfloat16:
-    #     alias int_dtype = _integral_type_of[type]()
-    #     var int_val = bitcast[int_dtype, simd_width](val)
-    #     return int_val & SIMD[int_dtype, simd_width](0x7FFF) > SIMD[
-    #         int_dtype, simd_width
-    #     ](0x7F80)
+    @parameter
+    if type == DType.bfloat16:
+        alias int_dtype = _integral_type_of[type]()
+        alias x7FFF = SIMD[int_dtype, simd_width](0x7FFF)
+        alias x7F80 = SIMD[int_dtype, simd_width](0x7F80)
+        return bitcast[int_dtype, simd_width](val) & x7FFF > x7F80
 
     alias signaling_nan_test: UInt32 = 0x0001
     alias quiet_nan_test: UInt32 = 0x0002
