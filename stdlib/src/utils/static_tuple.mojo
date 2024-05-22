@@ -89,12 +89,10 @@ fn _create_array[
             _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
         ]()
 
-        @always_inline
         @parameter
-        fn fill[idx: Int]():
+        for idx in range(size):
             _set_array_elem[idx, size, type](lst[idx], array)
 
-        unroll[fill, size]()
         return array
 
 
