@@ -704,10 +704,13 @@ fn test_isspace() raises:
 
 fn test_isspace_unicode() raises:
     # test all utf8 and unicode separators
-    var _line_sep_utf8 = List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38)
+    # 0 is to build a String with null terminator
+    var _line_sep_utf8 = List[UInt8](
+        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
+    )
     """Unicode Line Separator: \\u2028."""
     var _paragraph_sep_utf8 = List[UInt8](
-        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39
+        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
     )
     """Unicode Paragraph Separator: \\u2029."""
     # TODO add line and paragraph separator as stringliteral once unicode

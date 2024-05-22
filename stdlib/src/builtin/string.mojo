@@ -1422,6 +1422,7 @@ struct String(
         # once unicode escape secuences are accepted
         # Unicode Line Separator: \ u2028
         # Unicode Paragraph Separator: \ u2029
+        # 0 is to build a String with null terminator
         return self in List[String](
             String(" "),
             String("\t"),
@@ -1432,8 +1433,8 @@ struct String(
             String("\x1c"),
             String("\x1e"),
             String("\x85"),
-            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38)),
-            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39)),
+            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0)),
+            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0)),
         )
 
     fn split(self, delimiter: String) raises -> List[String]:
