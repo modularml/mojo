@@ -25,6 +25,7 @@ from sys import (
 
 from builtin.dtype import _get_dtype_printf_format
 from builtin.builtin_list import _LITRefPackHelper
+from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
 from utils import StringRef, unroll
@@ -51,11 +52,11 @@ struct _fdopen:
     alias STDERR = 2
     var handle: UnsafePointer[NoneType]
 
-    fn __init__(inout self, stream_id: Int):
+    fn __init__(inout self, stream_id: FileDescriptor):
         """Creates a file handle to the stdout/stderr stream.
 
         Args:
-            stream_id: The stream id (either `STDOUT` or `STDERR`)
+            stream_id: The stream id
         """
         alias mode = "a"
         var handle: UnsafePointer[NoneType]
@@ -63,11 +64,11 @@ struct _fdopen:
         @parameter
         if os_is_windows():
             handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_ptr()
             )
         else:
             handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_ptr()
             )
         self.handle = handle
 
@@ -85,7 +86,7 @@ struct _fdopen:
 
 
 @no_inline
-fn _flush(file: Int = stdout):
+fn _flush(file: FileDescriptor = stdout):
     with _fdopen(file) as fd:
         _ = external_call["fflush", Int32](fd)
 
@@ -98,7 +99,7 @@ fn _flush(file: Int = stdout):
 @no_inline
 fn _printf[
     fmt: StringLiteral, *types: AnyType
-](*arguments: *types, file: Int = stdout):
+](*arguments: *types, file: FileDescriptor = stdout):
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C snprintf call. Load
     # all the members of the pack.
@@ -239,7 +240,7 @@ fn _float_repr(buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
 
 
 @no_inline
-fn _put(x: Int, file: Int = stdout):
+fn _put(x: Int, file: FileDescriptor = stdout):
     """Prints a scalar value.
 
     Args:
@@ -307,13 +308,13 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
 
 
 @no_inline
-fn _put(x: String, file: Int = stdout):
+fn _put(x: String, file: FileDescriptor = stdout):
     # 'x' is borrowed, so we know it will outlive the call to print.
     _put(x._strref_dangerous(), file=file)
 
 
 @no_inline
-fn _put(x: StringRef, file: Int = stdout):
+fn _put(x: StringRef, file: FileDescriptor = stdout):
     # Avoid printing "(null)" for an empty/default constructed `String`
     var str_len = len(x)
 
@@ -345,12 +346,12 @@ fn _put(x: StringRef, file: Int = stdout):
 
 
 @no_inline
-fn _put(x: StringLiteral, file: Int = stdout):
+fn _put(x: StringLiteral, file: FileDescriptor = stdout):
     _put(StringRef(x), file=file)
 
 
 @no_inline
-fn _put(x: DType, file: Int = stdout):
+fn _put(x: DType, file: FileDescriptor = stdout):
     _put(str(x), file=file)
 
 
@@ -367,7 +368,7 @@ fn print[
     sep: StringLiteral = " ",
     end: StringLiteral = "\n",
     flush: Bool = False,
-    file: Int = stdout,
+    file: FileDescriptor = stdout,
 ):
     """Prints elements to the text stream. Each element is separated by `sep`
     and followed by `end`.
@@ -383,6 +384,19 @@ fn print[
         file: The output stream.
     """
 
+    _print(values=values, sep=sep, end=end, flush=flush, file=file.value)
+
+
+@no_inline
+fn _print[
+    *Ts: Stringable
+](
+    values: VariadicPack[_, _, Stringable, Ts],
+    sep: StringLiteral = " ",
+    end: StringLiteral = "\n",
+    flush: Bool = False,
+    file: Int = 1,
+):
     @parameter
     fn print_with_separator[i: Int, T: Stringable](value: T):
         _put(str(value), file=file)
