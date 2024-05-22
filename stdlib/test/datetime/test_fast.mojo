@@ -25,6 +25,8 @@ fn test_add64() raises:
     # test february leapyear
     var result = DateTime64(2024, 2, 28) + DateTime64(day=1)
     var offset_0 = DateTime64(2024, 3, 1)
+    print(result.m_second)
+    print(offset_0.m_second)
     assert_true(result == offset_0)
     var add_seconds = DateTime64(2024, 2, 28).add(seconds=24 * 3600)
     assert_true(result == add_seconds)
