@@ -10,12 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Defines InlinedFixedVector.
+"""Defines Vector.
 
 You can import these APIs from the `collections` package. For example:
 
 ```mojo
-from collections.vector import InlinedFixedVector
+from collections.vector import Vector
 ```
 """
 
@@ -48,7 +48,7 @@ struct _VecIter[
 
 
 # ===----------------------------------------------------------------------===#
-# InlinedFixedVector
+# Vector
 # ===----------------------------------------------------------------------===#
 
 
@@ -61,20 +61,18 @@ fn _calculate_fixed_vector_default_size[type: AnyRegType]() -> Int:
     if sizeof_type >= 256:
         return 0
 
-    alias prefered_inline_bytes = prefered_bytecount - sizeof[
-        InlinedFixedVector[type, 0]
-    ]()
+    alias prefered_inline_bytes = prefered_bytecount - sizeof[Vector[type, 0]]()
     alias num_elements = prefered_inline_bytes // sizeof_type
     return num_elements or 1
 
 
-struct InlinedFixedVector[
+struct Vector[
     type: AnyRegType, size: Int = _calculate_fixed_vector_default_size[type]()
 ](Sized):
     """A dynamically-allocated vector with small-vector optimization and a fixed
     maximum capacity.
 
-    The `InlinedFixedVector` does not resize or implement bounds checks. It is
+    The `Vector` does not resize or implement bounds checks. It is
     initialized with both a small-vector size (specified at compile time) and a
     maximum capacity (specified at runtime).
 
@@ -108,7 +106,7 @@ struct InlinedFixedVector[
 
     @always_inline
     fn __init__(inout self, capacity: Int):
-        """Constructs `InlinedFixedVector` with the given capacity.
+        """Constructs `Vector` with the given capacity.
 
         The dynamically allocated portion is `capacity - size`.
 
@@ -129,7 +127,7 @@ struct InlinedFixedVector[
         """Creates a shallow copy (doesn't copy the underlying elements).
 
         Args:
-            existing: The `InlinedFixedVector` to copy.
+            existing: The `Vector` to copy.
         """
         self.static_data = existing.static_data
         self.dynamic_data = existing.dynamic_data

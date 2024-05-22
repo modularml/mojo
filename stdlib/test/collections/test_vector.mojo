@@ -12,14 +12,14 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from collections.vector import InlinedFixedVector
+from collections.vector import Vector
 
 from test_utils import MoveCounter
 from testing import assert_equal
 
 
 def test_inlined_fixed_vector():
-    var vector = InlinedFixedVector[Int, 5](10)
+    var vector = Vector[Int, 5](10)
 
     for i in range(5):
         vector.append(i)
@@ -73,12 +73,12 @@ def test_inlined_fixed_vector():
     vector.clear()
     assert_equal(0, len(vector))
 
-    # Free the memory since we manage it ourselves in `InlinedFixedVector` for now.
+    # Free the memory since we manage it ourselves in `Vector` for now.
     vector._del_old()
 
 
 def test_inlined_fixed_vector_with_default():
-    var vector = InlinedFixedVector[Int](10)
+    var vector = Vector[Int](10)
 
     for i in range(5):
         vector.append(i)
@@ -110,7 +110,7 @@ def test_inlined_fixed_vector_with_default():
 
 
 def test_indexing():
-    var vector = InlinedFixedVector[Int](10)
+    var vector = Vector[Int](10)
     for i in range(5):
         vector.append(i)
     assert_equal(1, vector[Int16(1)])
