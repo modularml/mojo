@@ -180,7 +180,7 @@ fn _snprintf[
 @no_inline
 fn _snprintf_scalar[
     type: DType
-](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type],) -> Int:
+](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type]) -> Int:
     alias format = _get_dtype_printf_format[type]()
 
     @parameter
@@ -264,7 +264,7 @@ fn _put_simd_scalar[type: DType](x: Scalar[type]):
 
     @parameter
     if type == DType.bool:
-        _put("True") if x else _put("False")
+        _put["True"]() if x else _put["False"]()
     elif type.is_integral() or type == DType.address:
         _printf[format](x)
     elif type.is_floating_point():
@@ -295,14 +295,14 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
     if simd_width == 1:
         _put_simd_scalar(x[0])
     elif type.is_integral():
-        _put("[")
+        _put["["]()
 
         @parameter
         for i in range(simd_width):
             _put_simd_scalar(x[i])
             if i != simd_width - 1:
-                _put(", ")
-        _put("]")
+                _put[", "]()
+        _put["]"]()
     else:
         _put(str(x))
 
@@ -346,7 +346,7 @@ fn _put(x: StringRef, file: FileDescriptor = stdout):
 
 
 @no_inline
-fn _put(x: StringLiteral, file: FileDescriptor = stdout):
+fn _put[x: StringLiteral](file: FileDescriptor = stdout):
     _put(StringRef(x), file=file)
 
 
@@ -403,11 +403,11 @@ fn _print[
 
         @parameter
         if i < values.__len__() - 1:
-            _put(sep, file=file)
+            _put(StringRef(sep), file=file)
 
     values.each_idx[print_with_separator]()
 
-    _put(end, file=file)
+    _put(StringRef(end), file=file)
     if flush:
         _flush(file=file)
 
