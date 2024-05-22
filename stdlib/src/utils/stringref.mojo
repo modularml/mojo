@@ -171,6 +171,18 @@ struct StringRef(
         return StringRef(ptr.bitcast[DType.int8](), len)
 
     @always_inline
+    fn __init__(str: String) -> StringRef:
+        """Construct a StringRef value given a string.
+
+        Args:
+            str: The input string.
+
+        Returns:
+            Constructed `StringRef` object.
+        """
+        return StringRef(str.unsafe_uint8_ptr(), len(str))
+
+    @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
