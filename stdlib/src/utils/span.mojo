@@ -81,11 +81,12 @@ struct Span[
         lifetime: The lifetime of the Span.
     """
 
+    # Field
     var _data: UnsafePointer[T]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
-    # Initializers
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
@@ -125,19 +126,6 @@ struct Span[
         self._len = size
 
     # ===------------------------------------------------------------------===#
-    # Trait impls
-    # ===------------------------------------------------------------------===#
-
-    @always_inline
-    fn __len__(self) -> Int:
-        """Returns the length of the span. This is a known constant value.
-
-        Returns:
-            The size of the span.
-        """
-        return self._len
-
-    # ===------------------------------------------------------------------===#
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
@@ -153,26 +141,6 @@ struct Span[
         if offset < 0:
             offset += len(self)
         return (self._data + offset)[]
-
-    @always_inline
-    fn _adjust_span(self, span: Slice) -> Slice:
-        """Adjusts the span based on the list length."""
-        var adjusted_span = span
-
-        if adjusted_span.start < 0:
-            adjusted_span.start = len(self) + adjusted_span.start
-
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
-            adjusted_span.end = len(self) + adjusted_span.end
-
-        if span.step < 0:
-            var tmp = adjusted_span.end
-            adjusted_span.end = adjusted_span.start - 1
-            adjusted_span.start = tmp - 1
-
-        return adjusted_span
 
     @always_inline
     fn __getitem__[
@@ -244,8 +212,41 @@ struct Span[
         return _SpanIter(0, self)
 
     # ===------------------------------------------------------------------===#
+    # Trait implementations
+    # ===------------------------------------------------------------------===#
+
+    @always_inline
+    fn __len__(self) -> Int:
+        """Returns the length of the span. This is a known constant value.
+
+        Returns:
+            The size of the span.
+        """
+        return self._len
+
+    # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
+
+    @always_inline
+    fn _adjust_span(self, span: Slice) -> Slice:
+        """Adjusts the span based on the list length."""
+        var adjusted_span = span
+
+        if adjusted_span.start < 0:
+            adjusted_span.start = len(self) + adjusted_span.start
+
+        if not adjusted_span._has_end():
+            adjusted_span.end = len(self)
+        elif adjusted_span.end < 0:
+            adjusted_span.end = len(self) + adjusted_span.end
+
+        if span.step < 0:
+            var tmp = adjusted_span.end
+            adjusted_span.end = adjusted_span.start - 1
+            adjusted_span.start = tmp - 1
+
+        return adjusted_span
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """
