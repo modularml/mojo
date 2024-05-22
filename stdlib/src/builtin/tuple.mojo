@@ -194,9 +194,11 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         Args:
             value: The value to find.
+
         Parameters:
             T: The type of the value argument. Must implement the
               trait `ComparableCollectionElement`.
+        
         Returns:
             True if the value is contained in the tuple, False otherwise.
         """
