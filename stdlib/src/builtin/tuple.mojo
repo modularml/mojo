@@ -205,15 +205,14 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         @parameter
         fn T_in_ts() -> Bool:
-            var res = False
 
             @parameter
             for i in range(len(VariadicList(element_types))):
 
                 @parameter
                 if _type_is_eq[element_types[i], T]():
-                    res |= True
-            return res
+                    return True
+            return False
 
         @parameter
         if not T_in_ts():
