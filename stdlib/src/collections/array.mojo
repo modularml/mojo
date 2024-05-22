@@ -1,0 +1,200 @@
+# ===----------------------------------------------------------------------=== #
+# Copyright (c) 2024, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ===----------------------------------------------------------------------=== #
+"""Defines the `Array` type.
+
+You can import these APIs from the `collections` package. For example:
+
+```mojo
+from collections import Array
+```
+"""
+
+from utils import InlineArray
+from sys.intrinsics import _type_is_eq
+
+
+# ===----------------------------------------------------------------------===#
+# Array
+# ===----------------------------------------------------------------------===#
+@value
+struct _ArrayIter[
+    T: CollectionElement,
+    capacity: Int,
+    list_mutability: Bool,
+    list_lifetime: AnyLifetime[list_mutability].type,
+    forward: Bool = True,
+]:
+    """Iterator for Array.
+
+    Parameters:
+        T: The type of the elements in the list.
+        capacity: The maximum number of elements that the list can hold.
+        list_mutability: Whether the reference to the list is mutable.
+        list_lifetime: The lifetime of the List
+        forward: The iteration direction. `False` is backwards.
+    """
+
+    alias list_type = Array[T, capacity]
+
+    var index: Int
+    var src: Reference[Self.list_type, list_mutability, list_lifetime]
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(
+        inout self,
+    ) -> Reference[T, list_mutability, list_lifetime]:
+        @parameter
+        if forward:
+            self.index += 1
+            return self.src[].__refitem__(self.index - 1)
+        else:
+            self.index -= 1
+            return self.src[].__refitem__(self.index)
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return len(self.src[]) - self.index
+        else:
+            return self.index
+
+
+# TODO: Provide a smarter default for the capacity.
+struct Array[ElementType: CollectionElement, capacity: Int = 16](Sized):
+    """An Array allocated on the stack with a maximum size known at compile time.
+
+    It is backed by an `InlineArray` and an `Int` to represent the size.
+    This struct has the same API as a regular `List`, but it is not possible to change the
+    capacity. In other words, it has a fixed maximum size.
+
+    This is typically faster than a `List` as it is only stack-allocated and does not require
+    any dynamic memory allocation.
+
+    Parameters:
+        ElementType: The type of the elements in the list.
+        capacity: The maximum number of elements that the list can hold.
+    """
+
+    var _array: InlineArray[ElementType, capacity]
+    var _size: Int
+
+    @always_inline
+    fn __init__(inout self):
+        """This constructor creates an empty Array."""
+        self._array = InlineArray[ElementType, capacity](
+            unsafe_uninitialized=True
+        )
+        self._size = 0
+
+    # TODO: Avoid copying elements in once owned varargs
+    # allow transfers.
+    fn __init__(inout self, *values: ElementType):
+        """Constructs a list from the given values.
+
+        Args:
+            values: The values to populate the list with.
+        """
+        debug_assert(len(values) <= capacity, "List is full.")
+        self = Self()
+        for value in values:
+            self.append(value[])
+
+    @always_inline
+    fn __len__(self) -> Int:
+        """Returns the length of the list."""
+        return self._size
+
+    @always_inline
+    fn append(inout self, owned value: ElementType):
+        """Appends a value to the list.
+
+        Args:
+            value: The value to append.
+        """
+        debug_assert(self._size < capacity, "List is full.")
+        self._array[self._size] = value^
+        self._size += 1
+
+    @always_inline
+    fn __refitem__[
+        IndexerType: Indexer,
+    ](self: Reference[Self, _, _], idx: IndexerType) -> Reference[
+        Self.ElementType, self.is_mutable, self.lifetime
+    ]:
+        """Get a `Reference` to the element at the given index.
+
+        Parameters:
+            IndexerType: The type of the indexer.
+
+        Args:
+            idx: The index of the item.
+
+        Returns:
+            A reference to the item at the given index.
+        """
+        var i = index(idx)
+        debug_assert(
+            -self[]._size <= i < self[]._size, "Index must be within bounds."
+        )
+
+        if i < 0:
+            i += len(self[])
+
+        return self[]._array[i]
+
+    @always_inline
+    fn __del__(owned self):
+        """Destroy all the elements in the list and free the memory."""
+        for i in range(self._size):
+            destroy_pointee(UnsafePointer(self._array[i]))
+
+    fn __iter__(
+        self: Reference[Self, _, _],
+    ) -> _ArrayIter[ElementType, capacity, self.is_mutable, self.lifetime]:
+        """Iterate over elements of the list, returning immutable references.
+
+        Returns:
+            An iterator of immutable references to the list elements.
+        """
+        return _ArrayIter(0, self)
+
+    @always_inline
+    fn __contains__[
+        C: ComparableCollectionElement
+    ](self: Self, value: C) -> Bool:
+        """Verify if a given value is present in the list.
+
+        ```mojo
+        var x = Array[Int](1,2,3)
+        if 3 in x: print("x contains 3")
+        ```
+        Parameters:
+            C: The type of the elements in the list. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            value: The value to find.
+
+        Returns:
+            True if the value is contained in the list, False otherwise.
+        """
+
+        constrained[
+            _type_is_eq[ElementType, C](), "value type is not self.ElementType"
+        ]()
+        for i in self:
+            if value == rebind[C](i[]):
+                return True
+        return False
