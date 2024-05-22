@@ -15,9 +15,8 @@
 import os
 from os.path import split
 from pathlib import Path
-from builtin._location import __source_location
 
-from testing import assert_true, assert_false, assert_equal
+from testing import assert_equal
 
 
 fn main() raises:
@@ -26,35 +25,62 @@ fn main() raises:
     head, tail = split("/path/to/file")
     assert_equal(head, "/path/to")
     assert_equal(tail, "file")
+    head, tail = split(Path("/path/to/file"))
+    assert_equal(head, "/path/to")
+    assert_equal(tail, "file")
 
-    head, tail = split("/path/to/file/")
-    assert_equal(head, "/path/to/file")
+    head, tail = split("/path/to/dir/")
+    assert_equal(head, "/path/to/dir")
+    assert_equal(tail, "")
+    head, tail = split(Path("/path/to/dir/"))
+    assert_equal(head, "/path/to/dir")
     assert_equal(tail, "")
 
     head, tail = split("/path")
+    assert_equal(head, "/")
+    assert_equal(tail, "path")
+    head, tail = split(Path("/path"))
     assert_equal(head, "/")
     assert_equal(tail, "path")
 
     head, tail = split("/")
     assert_equal(head, "/")
     assert_equal(tail, "")
+    head, tail = split(Path("/"))
+    assert_equal(head, "/")
+    assert_equal(tail, "")
 
     head, tail = split("")
+    assert_equal(head, "")
+    assert_equal(tail, "")
+    head, tail = split(Path(""))
     assert_equal(head, "")
     assert_equal(tail, "")
 
     head, tail = split("/path/to///file")
     assert_equal(head, "/path/to")
     assert_equal(tail, "file")
+    head, tail = split(Path("/path/to///file"))
+    assert_equal(head, "/path/to")
+    assert_equal(tail, "file")
 
     head, tail = split("/path///")
+    assert_equal(head, "/path")
+    assert_equal(tail, "")
+    head, tail = split(Path("/path///"))
     assert_equal(head, "/path")
     assert_equal(tail, "")
 
     head, tail = split("file")
     assert_equal(head, "")
     assert_equal(tail, "file")
+    head, tail = split(Path("file"))
+    assert_equal(head, "")
+    assert_equal(tail, "file")
 
     head, tail = split("///")
+    assert_equal(head, "///")
+    assert_equal(tail, "")
+    head, tail = split(Path("///"))
     assert_equal(head, "///")
     assert_equal(tail, "")
