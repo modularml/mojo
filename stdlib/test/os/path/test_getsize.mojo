@@ -26,6 +26,6 @@ fn main() raises:
         pass
     assert_equal(getsize(file_name), 0)
     with open(file_name, "w") as my_file:
-        my_file.write("test")
+        my_file.write(String("test"))
     assert_equal(getsize(file_name), 4)
     os.remove(file_name)

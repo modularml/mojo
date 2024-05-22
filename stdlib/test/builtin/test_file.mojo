@@ -149,7 +149,7 @@ def test_file_open_nodir():
 
 
 def test_file_write():
-    var content = "The quick brown fox jumps over the lazy dog"
+    var content: String = "The quick brown fox jumps over the lazy dog"
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write"
     var f = open(TEMP_FILE, "w")
     f.write(content)
@@ -161,8 +161,8 @@ def test_file_write():
 
 
 def test_file_write_again():
-    var unexpected_content = "foo bar baz"
-    var expected_content = "foo bar"
+    var unexpected_content: String = "foo bar baz"
+    var expected_content: String = "foo bar"
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write_again"
     with open(TEMP_FILE, "w") as f:
         f.write(unexpected_content)
