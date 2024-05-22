@@ -1408,6 +1408,34 @@ struct String(
             substr._strref_dangerous(), start=start
         )
 
+    fn isspace(self) -> Bool:
+        """Determines whether the given String is a python
+        whitespace String. This corresponds to Python's
+        [universal separators](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `" \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
+
+        Returns:
+            True if the String is one of the whitespace characters
+                listed above, otherwise False."""
+        # TODO add line and paragraph separator as stringliteral
+        # once unicode escape secuences are accepted
+        # Unicode Line Separator: \ u2028
+        # Unicode Paragraph Separator: \ u2029
+        return self in List[String](
+            String(" "),
+            String("\t"),
+            String("\n"),
+            String("\r"),
+            String("\v"),
+            String("\f"),
+            String("\x1c"),
+            String("\x1e"),
+            String("\x85"),
+            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38)),
+            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39)),
+        )
+
     fn split(self, delimiter: String) raises -> List[String]:
         """Split the string by a delimiter.
 

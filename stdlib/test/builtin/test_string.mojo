@@ -702,6 +702,34 @@ fn test_isspace() raises:
     assert_false(isspace(ord(".")))
 
 
+fn test_isspace_unicode() raises:
+    # test all utf8 and unicode separators
+    var _line_sep_utf8 = List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38)
+    """Unicode Line Separator: \\u2028."""
+    var _paragraph_sep_utf8 = List[UInt8](
+        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39
+    )
+    """Unicode Paragraph Separator: \\u2029."""
+    # TODO add line and paragraph separator as stringliteral once unicode
+    # escape secuences are accepted
+    var _universal_separators = List[String](
+        String("\n"),
+        String("\r"),
+        String("\v"),
+        String("\f"),
+        String("\x1c"),
+        String("\x1e"),
+        String("\x85"),
+        String(_line_sep_utf8),
+        String(_paragraph_sep_utf8),
+    )
+    for i in _universal_separators:
+        assert_true(i[].isspace())
+
+    for i in List[String]("not", "space", "", "s", "a", "c"):
+        assert_false(i[].isspace())
+
+
 fn test_ascii_aliases() raises:
     var whitespaces = String(" \n\t\r\f\v")
     for i in range(len(whitespaces)):
@@ -937,6 +965,7 @@ def main():
     test_lower()
     test_upper()
     test_isspace()
+    test_isspace_unicode()
     test_ascii_aliases()
     test_rstrip()
     test_lstrip()
