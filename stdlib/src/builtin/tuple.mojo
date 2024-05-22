@@ -184,7 +184,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
     @always_inline("nodebug")
     fn __contains__[
         T: ComparableCollectionElement
-    ](self: Self, value: T) -> Bool:
+    ](self, value: T) -> Bool:
         """Verify if a given value is present in the tuple.
 
         ```mojo
