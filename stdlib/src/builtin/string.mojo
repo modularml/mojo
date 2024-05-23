@@ -875,19 +875,15 @@ struct String(
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
-    fn __getitem__[IndexerType: Indexer](self, i: IndexerType) -> String:
+    fn __getitem__(self, idx: Int) -> String:
         """Gets the character at the specified position.
 
-        Parameters:
-            IndexerType: The type of the indexer.
-
         Args:
-            i: The index value.
+            idx: The index value.
 
         Returns:
             A new string containing the character at the specified position.
         """
-        var idx = index(i)
         if idx < 0:
             return self.__getitem__(len(self) + idx)
 

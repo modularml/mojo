@@ -194,19 +194,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __setitem__[
-        IndexerType: Indexer
-    ](inout self, i: IndexerType, owned value: T):
+    fn __setitem__(inout self, idx: Int, owned value: T):
         """Sets a list element at the given index.
 
-        Parameters:
-            IndexerType: The type of the indexer.
-
         Args:
-            i: The index of the element.
+            idx: The index of the element.
             value: The value to assign.
         """
-        var normalized_idx = index(i)
+        var normalized_idx = idx
         debug_assert(
             -self.size <= normalized_idx < self.size,
             "index must be within bounds",
@@ -756,21 +751,18 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return res^
 
     @always_inline
-    fn __getitem__[IndexerType: Indexer](self, i: IndexerType) -> T:
+    fn __getitem__(self, idx: Int) -> T:
         """Gets a copy of the list element at the given index.
 
         FIXME(lifetimes): This should return a reference, not a copy!
 
-        Parameters:
-            IndexerType: The type of the indexer.
-
         Args:
-            i: The index of the element.
+            idx: The index of the element.
 
         Returns:
             A copy of the element at the given index.
         """
-        var normalized_idx = index(i)
+        var normalized_idx = idx
         debug_assert(
             -self.size <= normalized_idx < self.size,
             "index must be within bounds",
