@@ -18,6 +18,11 @@ what we publish.
 
 ### ⭐️ New
 
+- `Dict` now implements `setdefault`, to get a value from the dictionary by
+  key, or set it to a default if it doesn't exist
+  ([PR #2803](https://github.com/modularml/mojo/pull/2803)
+  by [@msaelices](https://github.com/msaelices))
+
 - Mojo has introduced `@parameter for`, a new feature for compile-time
   programming. `@parameter for` defines a for loop where the sequence and the
   induction values in the sequence must be parameter values. For example:
