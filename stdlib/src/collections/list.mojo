@@ -798,7 +798,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     ]:
         """Get a reference to an element of self without checking index bounds.
 
-        Users should opt for `__getitem__` instead of this method as it is unsafe.
+        Users should consider using `__getitem__` instead of this method as it is unsafe.
         If an index is out of bounds, this method will not abort, it will be considered
         undefined behavior.
 
