@@ -200,8 +200,13 @@ struct Array[
         """
 
         if self.in_stack:
-            if len(self) + 1 < current_capacity:
-                self.stack_left -= 1
+            if len(self) + capacity_jump > max_stack_size:
+                var stack = self._stack^
+                self._heap = List[T](stack)
+                self._stack = Self._stack_type(unsafe_uninitialized=True)
+                self.in_stack = False
+                self.stack_left = 0
+                return
             elif len(self) + capacity_jump < max_stack_size:
                 self = Array[
                     T,
@@ -209,14 +214,8 @@ struct Array[
                     capacity_jump,
                     max_stack_size,
                 ](self^)
-                self.stack_left -= 1
-            else:
-                var stack = self._stack^
-                self._heap = List[T](stack)
-                self._stack = Self._stack_type(unsafe_uninitialized=True)
-                self.in_stack = False
-                self.stack_left = 0
             self[len(self)] = value
+            self.stack_left -= 1
             return
         self._heap.append(value)
 
