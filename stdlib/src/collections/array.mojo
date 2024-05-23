@@ -700,8 +700,8 @@ struct Array[
         print(my_list.count(1))
         ```
 
-        When the compiler supports conditional methods, then a simple `my_list.count(1)` will
-        be enough.
+        When the compiler supports conditional methods, then a simple `my_list.count(1)` 
+        will be enough.
 
         Parameters:
             C: The type of the elements in the list. Must implement the
@@ -732,3 +732,49 @@ struct Array[
         if self.in_stack:
             return self._stack.unsafe_ptr()[]
         return self._heap.unsafe_ptr()[]
+
+    @always_inline
+    fn unsafe_get(
+        self: Reference[Self, _, _], idx: Int
+    ) -> Reference[Self.T, self.is_mutable, self.lifetime]:
+        """Get a reference to an element of self without checking index bounds.
+        Users should consider using `__getitem__` instead of this method as it is unsafe.
+        If an index is out of bounds, this method will not abort, it will be considered
+        undefined behavior.
+
+        Note that there is no wraparound for negative indices, caution is advised.
+        Using negative indices is considered undefined behavior.
+        Never use `my_list.unsafe_get(-1)` to get the last element of the list. It will 
+        not work. Instead, do `my_list.unsafe_get(len(my_list) - 1)`.
+
+        Args:
+            idx: The index of the element to get.
+
+        Returns:
+            A reference to the element at the given index.
+        """
+        debug_assert(abs(idx) > len(self[]), "index must be within bounds")
+        if self[].in_stack:
+            return self[]._stack.unsafe_ptr()[idx]
+        return self[]._heap.unsafe_ptr()[idx]
+
+    @always_inline
+    fn unsafe_set(self: Reference[Self, _, _], idx: Int, value: T):
+        """Set a reference to an element of self without checking index bounds.
+        Users should consider using `__setitem__` instead of this method as it is unsafe.
+        If an index is out of bounds, this method will not abort, it will be considered
+        undefined behavior.
+
+        Note that there is no wraparound for negative indices, caution is advised.
+        Using negative indices is considered undefined behavior.
+        Never use `my_list.unsafe_set(-1)` to set the last element of the list. It will 
+        not work. Instead, do `my_list.unsafe_set(len(my_list) - 1)`.
+
+        Args:
+            idx: The index to set the element.
+            value: The element.
+        """
+        debug_assert(abs(idx) > len(self[]), "index must be within bounds")
+        if self[].in_stack:
+            self[]._stack.unsafe_ptr()[idx] = value
+        self[]._heap.unsafe_ptr()[idx] = value

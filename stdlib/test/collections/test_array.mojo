@@ -959,6 +959,26 @@ def test_destructor():
     for i in range(8):
         assert_equal(destructor_counter[i], i)
 
+def test_list_unsafe_set_and_get():
+    var arr = Array[Int]()
+
+    for i in range(5):
+        arr.unsafe_set(i, i)
+
+    assert_equal(5, len(arr))
+    assert_equal(0, arr.unsafe_get(0)[])
+    assert_equal(1, arr.unsafe_get(1)[])
+    assert_equal(2, arr.unsafe_get(2)[])
+    assert_equal(3, arr.unsafe_get(3)[])
+    assert_equal(4, arr.unsafe_get(4)[])
+
+    arr[2] = -2
+    assert_equal(-2, arr.unsafe_get(2)[])
+
+    arr.clear()
+    arr.unsafe_set(0, 2)
+    assert_equal(2, arr.unsafe_get(0)[])
+
 
 def main():
     # from InlinedFixedVector
@@ -997,3 +1017,5 @@ def main():
     test_list_mult()
     test_list_contains()
     test_indexing_list()
+    # from array
+    test_list_unsafe_set_and_get()
