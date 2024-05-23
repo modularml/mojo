@@ -10,10 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %bare-mojo %s
+# RUN: %mojo %s
 
-# TODO: Replace %bare-mojo with %mojo
-# when https://github.com/modularml/mojo/pull/2691 is merged.
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
