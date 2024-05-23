@@ -19,7 +19,8 @@ what we publish.
 ### ⭐️ New
 
 - `Dict` now support `popitem`, which removes and returns the last item in the `Dict`. 
-([PR #2701](https://github.com/modularml/mojo/pull/2701) by [@jayzhan211](https://github.com/jayzhan211))
+([PR #2701](https://github.com/modularml/mojo/pull/2701) 
+by [@jayzhan211](https://github.com/jayzhan211))
 
 - Add a `sort` function for list of `ComparableCollectionElement`s.
   [PR #2609](https://github.com/modularml/mojo/pull/2609) by
