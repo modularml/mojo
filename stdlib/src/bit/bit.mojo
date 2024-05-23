@@ -307,6 +307,7 @@ fn bit_width[
 # ===----------------------------------------------------------------------===#
 # bit_ceil
 # ===----------------------------------------------------------------------===#
+# reference: https://en.cppreference.com/w/cpp/numeric/bit_ceil
 
 
 @always_inline("nodebug")
@@ -354,22 +355,19 @@ fn bit_ceil[
     """
     constrained[type.is_integral(), "must be integral"]()
 
-    alias ones = SIMD[type, simd_width].splat(1)
-
-    var less_then_one = (val <= ones).select(ones, val)
-
-    return (val > ones).select(1 << bit_width(val - ones), less_then_one)
+    return (val <= 1).select(1, 1 << bit_width(val - 1))
 
 
 # ===----------------------------------------------------------------------===#
 # bit_floor
 # ===----------------------------------------------------------------------===#
+# reference: https://en.cppreference.com/w/cpp/numeric/bit_floor
 
 
 @always_inline("nodebug")
 fn bit_floor(val: Int) -> Int:
     """Computes the largest power of 2 that is less than or equal to the input
-    value.
+    value. Any integral value less than or equal to 0 will be floored to 0.
 
     Args:
         val: The input value.
@@ -388,7 +386,8 @@ fn bit_floor[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Computes the largest power of 2 that is less than or equal to the input
-    value for each element of a SIMD vector.
+    value for each element of a SIMD vector. Any integral value less than or
+    equal to 0 will be floored to 0.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -407,11 +406,7 @@ fn bit_floor[
     """
     constrained[type.is_integral(), "must be integral and unsigned"]()
 
-    alias zeros = SIMD[type, simd_width].splat(0)
-
-    var less_then_zero = (val <= zeros).select(zeros, val)
-
-    return (val > zeros).select(1 << (bit_width(val) - 1), less_then_zero)
+    return (val <= 0).select(0, 1 << (bit_width(val) - 1))
 
 
 # ===----------------------------------------------------------------------===#
