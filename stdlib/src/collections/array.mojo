@@ -165,7 +165,7 @@ struct Array[
         elif existing.in_stack:
             self._heap = Self._heap_type(existing._stack)
         self.stack_left = 0
-        self._heap = existing._heap^
+        self._heap = existing._heap
 
     fn __init__(inout self, owned existing: List[T]):
         """Constructs a Array from an existing List.
@@ -207,7 +207,7 @@ struct Array[
                 self.in_stack = False
                 self.stack_left = 0
                 return
-            elif len(self) + capacity_jump < max_stack_size:
+            elif len(self) + 1 > current_capacity:
                 self = Array[
                     T,
                     current_capacity + capacity_jump,
