@@ -13,7 +13,7 @@
 # RUN: %mojo -debug-level full %s
 
 from utils._format import Formattable, write_to, Formatter
-from utils.inlined_string import _FixedString
+from utils.inline_string import _FixedString
 from testing import assert_equal
 
 

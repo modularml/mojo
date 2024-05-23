@@ -35,14 +35,15 @@ what we publish.
   return a `_StridedRangeIterator`, meaning the induction variables must be
   `Int`. The intention is to lift these restrictions in the future.
 
-- Mojo added support for the `inferred` parameter convention. `inferred`
-  parameters must appear at the beginning of the parameter list and cannot be
-  explicitly specified by the user. This allows programmers to define functions
+- Mojo added support for the inferred parameters. Inferred parameters must
+  appear at the beginning of the parameter list and cannot be explicitly
+  specified by the user. They are declared to the left of a `//` marker, much
+  like positional-only parameters. This allows programmers to define functions
   with dependent parameters to be called without the caller specifying all the
   necessary parameters. For example:
 
   ```mojo
-  fn parameter_simd[inferred dt: DType, value: Scalar[dt]]():
+  fn parameter_simd[dt: DType, //, value: Scalar[dt]]():
       print(value)
 
   fn call_it():
@@ -56,7 +57,7 @@ what we publish.
   This also works with structs. For example:
 
   ```mojo
-  struct ScalarContainer[inferred dt: DType, value: Scalar[dt]]:
+  struct ScalarContainer[dt: DType, //, value: Scalar[dt]]:
       pass
 
   fn foo(x: ScalarContainer[Int32(0)]): # 'dt' is inferred as `DType.int32`
@@ -332,6 +333,25 @@ what we publish.
 
   ([PR #2685](https://github.com/modularml/mojo/pull/2685) by [@bgreni](https://github.com/bgreni))
 
+  Types conforming to the `Indexer` trait are implicitly convertible to Int.
+  This means you can write generic APIs that take `Int` instead of making them
+  take a generic type that conforms to `Indexer`, e.g.
+
+  ```mojo
+  @value
+  struct AlwaysZero(Indexer):
+      fn __index__(self) -> Int:
+          return 0
+
+  @value
+  struct Incrementer:
+      fn __getitem__(self, idx: Int) -> Int:
+          return idx + 1
+
+  var a = Incrementer()
+  print(a[AlwaysZero()])  # works and prints 1
+  ```
+
 - `StringRef` now implements `strip()` which can be used to remove leading and
   trailing whitespaces. ([PR #2683](https://github.com/modularml/mojo/pull/2683)
   by [@fknfilewalker](https://github.com/fknfilewalker))
@@ -366,6 +386,9 @@ what we publish.
 
 - Added `clear` method  to `Dict`.
   ([PR 2627](https://github.com/modularml/mojo/pull/2627) by [@artemiogr97](https://github.com/artemiogr97))
+
+- `StringRef` now implements `startswith()` and `endswith()`.
+    ([PR #2710](https://github.com/modularml/mojo/pull/2710) by [@fknfilewalker](https://github.com/fknfilewalker))
 
 ### 🦋 Changed
 
@@ -439,6 +462,9 @@ what we publish.
   `nan`, `nextafter`, and `ulp`. The functions continue to be exposed in the
   `math` module.
 
+- `InlinedString` has been renamed to `InlineString` to be consistent with other
+  types.
+
 ### ❌ Removed
 
 - The `@unroll` decorator has been deprecated and removed. The decorator was
@@ -486,6 +512,9 @@ what we publish.
 
 - The `tensor.random` module has been removed. The same functionality is now
   accessible via the `Tensor.rand` and `Tensor.randn` static methods.
+
+- The builtin `SIMD` struct no longer conforms to `Indexer`; users must
+  explicitly cast `Scalar` values using `int`.
 
 ### 🛠️ Fixed
 
