@@ -35,14 +35,15 @@ what we publish.
   return a `_StridedRangeIterator`, meaning the induction variables must be
   `Int`. The intention is to lift these restrictions in the future.
 
-- Mojo added support for the `inferred` parameter convention. `inferred`
-  parameters must appear at the beginning of the parameter list and cannot be
-  explicitly specified by the user. This allows programmers to define functions
+- Mojo added support for the inferred parameters. Inferred parameters must
+  appear at the beginning of the parameter list and cannot be explicitly
+  specified by the user. They are declared to the left of a `//` marker, much
+  like positional-only parameters. This allows programmers to define functions
   with dependent parameters to be called without the caller specifying all the
   necessary parameters. For example:
 
   ```mojo
-  fn parameter_simd[inferred dt: DType, value: Scalar[dt]]():
+  fn parameter_simd[dt: DType, //, value: Scalar[dt]]():
       print(value)
 
   fn call_it():
@@ -56,7 +57,7 @@ what we publish.
   This also works with structs. For example:
 
   ```mojo
-  struct ScalarContainer[inferred dt: DType, value: Scalar[dt]]:
+  struct ScalarContainer[dt: DType, //, value: Scalar[dt]]:
       pass
 
   fn foo(x: ScalarContainer[Int32(0)]): # 'dt' is inferred as `DType.int32`
