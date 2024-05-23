@@ -41,6 +41,8 @@ trait Indexer:
     that are coercible to `Int` (e.g. floating point values that have `__int__`
     method). In contrast to `Intable`, types conforming to `Indexer` must be
     convertible to `Int` in a lossless way.
+
+    Note that types conforming to `Indexer` are implicitly convertible to `Int`.
     """
 
     fn __index__(self) -> Int:

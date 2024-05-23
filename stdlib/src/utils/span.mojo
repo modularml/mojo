@@ -132,24 +132,19 @@ struct Span[
     @always_inline
     fn _refitem__[
         intable: Intable
-    ](self, index: intable) -> Reference[T, is_mutable, lifetime]:
+    ](self, idx: intable) -> Reference[T, is_mutable, lifetime]:
         debug_assert(
-            -self._len <= int(index) < self._len, "index must be within bounds"
+            -self._len <= int(idx) < self._len, "index must be within bounds"
         )
 
-        var offset = int(index)
+        var offset = int(idx)
         if offset < 0:
             offset += len(self)
         return (self._data + offset)[]
 
     @always_inline
-    fn __getitem__[
-        IndexerType: Indexer
-    ](self, idx: IndexerType) -> Reference[T, is_mutable, lifetime]:
+    fn __getitem__(self, idx: Int) -> Reference[T, is_mutable, lifetime]:
         """Get a `Reference` to the element at the given index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The index of the item.
@@ -158,16 +153,11 @@ struct Span[
             A reference to the item at the given index.
         """
         # note that self._refitem__ is already bounds checking
-        return self._refitem__(index(idx))
+        return self._refitem__(idx)
 
     @always_inline
-    fn __setitem__[
-        IndexerType: Indexer
-    ](inout self, idx: IndexerType, value: T):
+    fn __setitem__(inout self, idx: Int, value: T):
         """Get a `Reference` to the element at the given index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The index of the item.
@@ -175,7 +165,7 @@ struct Span[
         """
         # note that self._refitem__ is already bounds checking
         var ref = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
-            UnsafePointer(self._refitem__(index(idx)))[]
+            UnsafePointer(self._refitem__(idx))[]
         )
         ref[] = value
 

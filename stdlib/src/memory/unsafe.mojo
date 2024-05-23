@@ -289,13 +289,8 @@ struct LegacyPointer[
         ](self.address)
 
     @always_inline("nodebug")
-    fn __refitem__[
-        IndexerType: Indexer
-    ](self, offset: IndexerType) -> Self._ref_type:
+    fn __refitem__(self, offset: Int) -> Self._ref_type:
         """Enable subscript syntax `ref[idx]` to access the element.
-
-        Parameters:
-            IndexerType: The type of the indexer..
 
         Args:
             offset: The offset to load from.
@@ -303,7 +298,7 @@ struct LegacyPointer[
         Returns:
             The MLIR reference for the Mojo compiler to use.
         """
-        return (self + index(offset)).__refitem__()
+        return (self + offset).__refitem__()
 
     # ===------------------------------------------------------------------=== #
     # Load/Store
@@ -716,14 +711,9 @@ struct DTypePointer[
         return LegacyPointer.address_of(arg[])
 
     @always_inline("nodebug")
-    fn __getitem__[
-        IndexerType: Indexer
-    ](self, offset: IndexerType) -> Scalar[type]:
+    fn __getitem__(self, offset: Int) -> Scalar[type]:
         """Loads a single element (SIMD of size 1) from the pointer at the
         specified index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             offset: The offset to load from.
@@ -731,22 +721,17 @@ struct DTypePointer[
         Returns:
             The loaded value.
         """
-        return self.load(index(offset))
+        return self.load(offset)
 
     @always_inline("nodebug")
-    fn __setitem__[
-        IndexerType: Indexer
-    ](self, offset: IndexerType, val: Scalar[type]):
+    fn __setitem__(self, offset: Int, val: Scalar[type]):
         """Stores a single element value at the given offset.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             offset: The offset to store to.
             val: The value to store.
         """
-        return self.store(index(offset), val)
+        return self.store(offset, val)
 
     # ===------------------------------------------------------------------=== #
     # Comparisons

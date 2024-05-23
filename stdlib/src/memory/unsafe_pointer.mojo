@@ -179,10 +179,8 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __refitem__(
-        self,
-    ) -> Self._ref_type:
-        """Return a reference to the underlying data, offset by the offset index.
+    fn __refitem__(self) -> Self._ref_type:
+        """Return a reference to the underlying data.
 
         Returns:
             A reference to the value.
@@ -192,10 +190,8 @@ struct UnsafePointer[
         ](self.address)
 
     @always_inline
-    fn __refitem__[
-        IndexerType: Indexer
-    ](self, offset: IndexerType) -> Self._ref_type:
-        """Return a reference to the underlying data, offset by the offset index.
+    fn __refitem__(self, offset: Int) -> Self._ref_type:
+        """Return a reference to the underlying data, offset by the given index.
 
         Args:
             offset: The offset index.
@@ -203,7 +199,7 @@ struct UnsafePointer[
         Returns:
             An offset reference.
         """
-        return (self + index(offset)).__refitem__()
+        return (self + offset).__refitem__()
 
     @always_inline
     fn __add__(self, offset: Int) -> Self:

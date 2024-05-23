@@ -1810,13 +1810,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__[
-        IndexerType: Indexer
-    ](self, idx: IndexerType) -> Scalar[type]:
+    fn __getitem__(self, idx: Int) -> Scalar[type]:
         """Gets an element from the vector.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The element index.
@@ -1829,13 +1824,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](self.value, index(idx).value)
 
     @always_inline("nodebug")
-    fn __setitem__[
-        IndexerType: Indexer
-    ](inout self, idx: IndexerType, val: Scalar[type]):
+    fn __setitem__(inout self, idx: Int, val: Scalar[type]):
         """Sets an element in the vector.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The index to set.
@@ -1846,17 +1836,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __setitem__[
-        IndexerType: Indexer
-    ](
-        inout self,
-        idx: IndexerType,
-        val: __mlir_type[`!pop.scalar<`, type.value, `>`],
+    fn __setitem__(
+        inout self, idx: Int, val: __mlir_type[`!pop.scalar<`, type.value, `>`]
     ):
         """Sets an element in the vector.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The index to set.
