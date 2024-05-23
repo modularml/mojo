@@ -825,7 +825,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             _ = self.pop(key.value()[])
             return DictEntry[K, V](key.value()[], val.value()[])
 
-        raise "KeyError"
+        raise "KeyError: popitem(): dictionary is empty"
 
     fn keys(
         self: Reference[Self, _, _]
