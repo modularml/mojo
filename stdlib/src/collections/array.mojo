@@ -154,18 +154,18 @@ struct Array[
             existing: The existing Array.
             in_stack: Whether the new Array will be on the stack.
         """
-        self._heap = existing._heap^
-        self._stack = Self._stack_type(unsafe_uninitialized=True)
+        self = Self()
         self.in_stack = in_stack
         if in_stack and existing.in_stack:
-            for i in range(current_capacity):  # FIXME ?
-                self[i] = existing._stack[i]
+            for i in range(current_capacity):  # FIXME
+                self.append(existing[i])
             var delta = current_capacity - existing.current_capacity
             self.stack_left = max(0, delta)
             return
         elif existing.in_stack:
             self._heap = Self._heap_type(existing._stack)
         self.stack_left = 0
+        self._heap = existing._heap^
 
     fn __init__(inout self, owned existing: List[T]):
         """Constructs a Array from an existing List.
