@@ -130,13 +130,18 @@ struct Array[
             self.append(value)
 
     fn __init__[
-        cap: Int, tr_size: Int, max_stack: Int
+        cap: Int, cap_j: Int, max_stack: Int
     ](
         inout self,
-        owned existing: Array[T, cap, tr_size, max_stack],
+        owned existing: Array[T, cap, cap_j, max_stack],
         in_stack: Bool = True,
     ):
         """Constructs a Array from an existing Array.
+
+        Parameters:
+            cap: The number of elements that the Array can hold.
+            cap_j: The amount of capacity to expand in each stack enlargment.
+            max_stack: The maximum size in the stack.
 
         Args:
             existing: The existing Array.
