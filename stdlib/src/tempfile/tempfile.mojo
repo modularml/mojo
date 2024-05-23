@@ -29,9 +29,8 @@ alias TMP_MAX = 10_000
 
 
 fn _get_random_name(size: Int = 8) -> String:
-    var characters = String("abcdefghijklmnopqrstuvwxyz0123456789_")
+    alias characters = String("abcdefghijklmnopqrstuvwxyz0123456789_")
     var name = String("")
-    random.seed()
     for _ in range(size):
         var rand_index = int(random.random_ui64(0, len(characters) - 1))
         name += characters[rand_index]
@@ -41,6 +40,8 @@ fn _get_random_name(size: Int = 8) -> String:
 fn _candidate_tempdir_list() -> List[String]:
     """Generate a list of candidate temporary directories which
     _get_default_tempdir will try."""
+
+    constrained[not sys.os_is_windows(), "windows not supported yet"]()
 
     var dirlist = List[String]()
     var possible_env_vars = List("TMPDIR", "TEMP", "TMP")
@@ -132,6 +133,7 @@ fn mkdtemp(
     suffix: String = "", prefix: String = "tmp", dir: Optional[String] = None
 ) raises -> String:
     """Create a temporary directory.
+    If the directory can not be created an error is raised.
     Caller is responsible for deleting the directory when done with it.
 
     Args:
