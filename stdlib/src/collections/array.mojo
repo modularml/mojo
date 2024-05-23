@@ -700,7 +700,7 @@ struct Array[
         print(my_list.count(1))
         ```
 
-        When the compiler supports conditional methods, then a simple `my_list.count(1)` 
+        When the compiler supports conditional methods, then a simple `my_list.count(1)`
         will be enough.
 
         Parameters:
@@ -744,7 +744,7 @@ struct Array[
 
         Note that there is no wraparound for negative indices, caution is advised.
         Using negative indices is considered undefined behavior.
-        Never use `my_list.unsafe_get(-1)` to get the last element of the list. It will 
+        Never use `my_list.unsafe_get(-1)` to get the last element of the list. It will
         not work. Instead, do `my_list.unsafe_get(len(my_list) - 1)`.
 
         Args:
@@ -767,7 +767,7 @@ struct Array[
 
         Note that there is no wraparound for negative indices, caution is advised.
         Using negative indices is considered undefined behavior.
-        Never use `my_list.unsafe_set(-1)` to set the last element of the list. It will 
+        Never use `my_list.unsafe_set(-1)` to set the last element of the list. It will
         not work. Instead, do `my_list.unsafe_set(len(my_list) - 1)`.
 
         Args:
@@ -777,4 +777,5 @@ struct Array[
         debug_assert(abs(idx) > len(self[]), "index must be within bounds")
         if self[].in_stack:
             self[]._stack.unsafe_ptr()[idx] = value
+            return
         self[]._heap.unsafe_ptr()[idx] = value
