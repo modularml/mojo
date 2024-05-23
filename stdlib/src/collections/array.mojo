@@ -184,6 +184,31 @@ struct Array[
         self.in_stack = False
         self._heap = existing^
 
+    # fn __init__(
+    #     inout self: Self,
+    #     *,
+    #     unsafe_pointer: UnsafePointer[T, 0],
+    #     size: Int,
+    # ):
+    #     """Constructs an Array from a pointer and its size.
+
+    #     Args:
+    #         unsafe_pointer: The pointer to the data.
+    #         size: The number of elements in the Array.
+    #     """
+    #     self._stack = Self._stack_type(unsafe_uninitialized=True)
+    #     var delta = current_capacity - size
+    #     if delta < 0:
+    #         self.in_stack = False
+    #         self.stack_left = 0
+    #         # self._heap = Self._heap_type( # FIXME doesn't work for some reason
+    #         #     unsafe_pointer=unsafe_pointer, size=size, capacity=size
+    #         # )
+    #         return
+    #     self.in_stack = True
+    #     self.stack_left = delta
+    #     self._stack[0] = unsafe_pointer[] # FIXME will this even work?
+
     @always_inline
     fn __len__(self) -> Int:
         """Returns the length of the Array."""
@@ -693,7 +718,7 @@ struct Array[
 
     @always_inline
     fn __getitem__(self, idx: Int) -> T:
-        """Gets a copy of the list element at the given index.
+        """Gets a copy of the element at the given index.
 
         Args:
             idx: The index of the element.

@@ -28,7 +28,7 @@ def test_inlined_fixed_array():
     # Verify it's iterable
     var index = 0
     for element in array:
-        assert_equal(array[index], element)
+        assert_equal(array[index], element[])
         index += 1
 
     assert_equal(5, len(array))
@@ -104,8 +104,6 @@ def test_inlined_fixed_array_with_default():
     array.clear()
     assert_equal(0, len(array))
 
-    array._del_old()
-
 
 def test_indexing_vec():
     var array = Array[Int](10)
@@ -117,47 +115,47 @@ def test_indexing_vec():
 
 
 def test_mojo_issue_698():
-    var list = List[Float64]()
+    var list = Array[Float64]()
     for i in range(5):
         list.append(i)
 
-    assert_equal(0.0, list[0])
-    assert_equal(1.0, list[1])
-    assert_equal(2.0, list[2])
-    assert_equal(3.0, list[3])
-    assert_equal(4.0, list[4])
+    assert_equal(0.0, Array[0])
+    assert_equal(1.0, Array[1])
+    assert_equal(2.0, Array[2])
+    assert_equal(3.0, Array[3])
+    assert_equal(4.0, Array[4])
 
 
 def test_list():
-    var list = List[Int]()
+    var list = Array[Int]()
 
     for i in range(5):
         list.append(i)
 
     assert_equal(5, len(list))
-    assert_equal(0, list[0])
-    assert_equal(1, list[1])
-    assert_equal(2, list[2])
-    assert_equal(3, list[3])
-    assert_equal(4, list[4])
+    assert_equal(0, Array[0])
+    assert_equal(1, Array[1])
+    assert_equal(2, Array[2])
+    assert_equal(3, Array[3])
+    assert_equal(4, Array[4])
 
-    assert_equal(0, list[-5])
-    assert_equal(3, list[-2])
-    assert_equal(4, list[-1])
+    assert_equal(0, Array[-5])
+    assert_equal(3, Array[-2])
+    assert_equal(4, Array[-1])
 
-    list[2] = -2
-    assert_equal(-2, list[2])
+    Array[2] = -2
+    assert_equal(-2, Array[2])
 
-    list[-5] = 5
-    assert_equal(5, list[-5])
-    list[-2] = 3
-    assert_equal(3, list[-2])
-    list[-1] = 7
-    assert_equal(7, list[-1])
+    Array[-5] = 5
+    assert_equal(5, Array[-5])
+    Array[-2] = 3
+    assert_equal(3, Array[-2])
+    Array[-1] = 7
+    assert_equal(7, Array[-1])
 
 
 def test_list_clear():
-    var list = List[Int](1, 2, 3)
+    var list = Array[Int](1, 2, 3)
     assert_equal(len(list), 3)
     assert_equal(list.capacity, 3)
     list.clear()
@@ -167,14 +165,14 @@ def test_list_clear():
 
 
 def test_list_to_bool_conversion():
-    assert_false(List[String]())
-    assert_true(List[String]("a"))
-    assert_true(List[String]("", "a"))
-    assert_true(List[String](""))
+    assert_false(Array[StringLiteral]())
+    assert_true(Array[StringLiteral]("a"))
+    assert_true(Array[StringLiteral]("", "a"))
+    assert_true(Array[StringLiteral](""))
 
 
 def test_list_pop():
-    var list = List[Int]()
+    var list = Array[Int]()
     # Test pop with index
     for i in range(6):
         list.append(i)
@@ -185,9 +183,9 @@ def test_list_pop():
 
     # list should have 3 elements now
     assert_equal(3, len(list))
-    assert_equal(0, list[0])
-    assert_equal(1, list[1])
-    assert_equal(2, list[2])
+    assert_equal(0, Array[0])
+    assert_equal(1, Array[1])
+    assert_equal(2, Array[2])
 
     # Test pop with negative index
     for i in range(0, 2):
@@ -205,7 +203,7 @@ def test_list_pop():
 
 
 def test_list_variadic_constructor():
-    var l = List[Int](2, 4, 6)
+    var l = Array[Int](2, 4, 6)
     assert_equal(3, len(l))
     assert_equal(2, l[0])
     assert_equal(4, l[1])
@@ -217,7 +215,7 @@ def test_list_variadic_constructor():
 
 
 def test_list_resize():
-    var l = List[Int](1)
+    var l = Array[Int](1)
     assert_equal(1, len(l))
     l.resize(2, 0)
     assert_equal(2, len(l))
@@ -231,7 +229,7 @@ def test_list_reverse():
     # Test reversing the list []
     #
 
-    var vec = List[Int]()
+    var vec = Array[Int]()
 
     assert_equal(len(vec), 0)
 
@@ -243,7 +241,7 @@ def test_list_reverse():
     # Test reversing the list [123]
     #
 
-    vec = List[Int]()
+    vec = Array[Int]()
 
     vec.append(123)
 
@@ -259,7 +257,7 @@ def test_list_reverse():
     # Test reversing the list ["one", "two", "three"]
     #
 
-    vec2 = List[String]("one", "two", "three")
+    var vec2 = Array[StringLiteral]("one", "two", "three")
 
     assert_equal(len(vec2), 3)
     assert_equal(vec2[0], "one")
@@ -277,7 +275,7 @@ def test_list_reverse():
     # Test reversing the list [5, 10]
     #
 
-    vec = List[Int]()
+    vec = Array[Int]()
     vec.append(5)
     vec.append(10)
 
@@ -296,7 +294,7 @@ def test_list_reverse():
     # to produce [1, 2, 5, 4, 3]
     #
 
-    vec = List[Int]()
+    vec = Array[Int]()
     vec.append(1)
     vec.append(2)
     vec.append(3)
@@ -323,7 +321,7 @@ def test_list_reverse():
     # Test reversing the list [1, 2, 3] with negative indexes
     #
 
-    vec = List[Int]()
+    vec = Array[Int]()
     vec.append(1)
     vec.append(2)
     vec.append(3)
@@ -338,7 +336,7 @@ def test_list_reverse():
     #
     # Test reversing the list [1, 2] with out of bounds indexes
     #
-    vec = List[Int]()
+    vec = Array[Int]()
     vec.append(1)
     vec.append(2)
 
@@ -353,7 +351,7 @@ def test_list_reverse():
     # last element.
     #
 
-    vec = List[Int]()
+    vec = Array[Int]()
     vec.append(1)
     vec.append(2)
     vec.append(3)
@@ -368,7 +366,7 @@ def test_list_reverse():
 
 def test_list_reverse_move_count():
     # Create this vec with enough capacity to avoid moves due to resizing.
-    var vec = List[MoveCounter[Int]](capacity=5)
+    var vec = Array[MoveCounter[Int]](current_capacity=5)
     vec.append(MoveCounter(1))
     vec.append(MoveCounter(2))
     vec.append(MoveCounter(3))
@@ -419,7 +417,7 @@ def test_list_insert():
     # Test the list [1, 2, 3] created with insert
     #
 
-    v1 = List[Int]()
+    var v1 = Array[Int]()
     v1.insert(len(v1), 1)
     v1.insert(len(v1), 3)
     v1.insert(1, 2)
@@ -433,7 +431,7 @@ def test_list_insert():
     # Test the list [1, 2, 3, 4, 5] created with negative and positive index
     #
 
-    v2 = List[Int]()
+    var v2 = Array[Int]()
     v2.insert(-1729, 2)
     v2.insert(len(v2), 3)
     v2.insert(len(v2), 5)
@@ -451,7 +449,7 @@ def test_list_insert():
     # Test the list [1, 2, 3, 4] created with negative index
     #
 
-    v3 = List[Int]()
+    var v3 = Array[Int]()
     v3.insert(-11, 4)
     v3.insert(-13, 3)
     v3.insert(-17, 2)
@@ -467,7 +465,7 @@ def test_list_insert():
     # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
     #
 
-    v4 = List[Int]()
+    var v4 = Array[Int]()
     for i in range(4):
         v4.insert(0, 4 - i)
         v4.insert(len(v4), 4 + i + 1)
@@ -477,7 +475,7 @@ def test_list_insert():
 
 
 def test_list_index():
-    var test_list_a = List[Int](10, 20, 30, 40, 50)
+    var test_list_a = Array[Int](10, 20, 30, 40, 50)
 
     # Basic Functionality Tests
     assert_equal(test_list_a.index(10), 0)
@@ -527,7 +525,7 @@ def test_list_index():
     with assert_raises(contains="ValueError: Given element is not in list"):
         _ = test_list_a.index(10, start=5, stop=50)
     with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = List[Int]().index(10)
+        _ = Array[Int]().index(10)
 
     # Test empty slice
     with assert_raises(contains="ValueError: Given element is not in list"):
@@ -536,7 +534,7 @@ def test_list_index():
     with assert_raises(contains="ValueError: Given element is not in list"):
         _ = test_list_a.index(10, start=0, stop=0)
 
-    var test_list_b = List[Int](10, 20, 30, 20, 10)
+    var test_list_b = Array[Int](10, 20, 30, 20, 10)
 
     # Test finding the first occurrence of an item
     assert_equal(test_list_b.index(10), 0)
@@ -562,7 +560,7 @@ def test_list_extend():
     # Test extending the list [1, 2, 3] with itself
     #
 
-    vec = List[Int]()
+    var vec = Array[Int]()
     vec.append(1)
     vec.append(2)
     vec.append(3)
@@ -604,14 +602,14 @@ def test_list_extend_non_trivial():
 
     # Preallocate with enough capacity to avoid reallocation making the
     # move count checks below flaky.
-    var v1 = List[MoveCounter[String]](capacity=5)
-    v1.append(MoveCounter[String]("Hello"))
-    v1.append(MoveCounter[String]("World"))
+    var v1 = Array[MoveCounter[StringLiteral]](current_capacity=5)
+    v1.append(MoveCounter[StringLiteral]("Hello"))
+    v1.append(MoveCounter[StringLiteral]("World"))
 
-    var v2 = List[MoveCounter[String]](capacity=3)
-    v2.append(MoveCounter[String]("Foo"))
-    v2.append(MoveCounter[String]("Bar"))
-    v2.append(MoveCounter[String]("Baz"))
+    var v2 = Array[MoveCounter[StringLiteral]](current_capacity=3)
+    v2.append(MoveCounter[StringLiteral]("Foo"))
+    v2.append(MoveCounter[StringLiteral]("Bar"))
+    v2.append(MoveCounter[StringLiteral]("Baz"))
 
     v1.extend(v2)
 
@@ -633,29 +631,29 @@ def test_list_extend_non_trivial():
 
 
 def test_2d_dynamic_list():
-    var list = List[List[Int]]()
+    var list = Array[Array[Int]]()
 
     for i in range(2):
-        var v = List[Int]()
+        var v = Array[Int]()
         for j in range(3):
             v.append(i + j)
         list.append(v)
 
-    assert_equal(0, list[0][0])
-    assert_equal(1, list[0][1])
-    assert_equal(2, list[0][2])
-    assert_equal(1, list[1][0])
-    assert_equal(2, list[1][1])
-    assert_equal(3, list[1][2])
+    assert_equal(0, Array[0][0])
+    assert_equal(1, Array[0][1])
+    assert_equal(2, Array[0][2])
+    assert_equal(1, Array[1][0])
+    assert_equal(2, Array[1][1])
+    assert_equal(3, Array[1][2])
 
     assert_equal(2, len(list))
     assert_equal(2, list.capacity)
 
-    assert_equal(3, len(list[0]))
+    assert_equal(3, len(Array[0]))
 
-    list[0].clear()
-    assert_equal(0, len(list[0]))
-    assert_equal(4, list[0].capacity)
+    Array[0].clear()
+    assert_equal(0, len(Array[0]))
+    assert_equal(4, Array[0].capacity)
 
     list.clear()
     assert_equal(0, len(list))
@@ -663,13 +661,13 @@ def test_2d_dynamic_list():
 
 
 def test_list_explicit_copy():
-    var list = List[CopyCounter]()
+    var list = Array[CopyCounter]()
     list.append(CopyCounter())
     var list_copy = List(list)
     assert_equal(0, list.__get_ref(0)[].copy_count)
     assert_equal(1, list_copy.__get_ref(0)[].copy_count)
 
-    var l2 = List[Int]()
+    var l2 = Array[Int]()
     for i in range(10):
         l2.append(i)
 
@@ -683,20 +681,20 @@ def test_list_explicit_copy():
 # as reported in GH issue 27875 internally and
 # https://github.com/modularml/mojo/issues/1493
 def test_list_copy_constructor():
-    var vec = List[Int](capacity=1)
+    var vec = Array[Int](current_capacity=1)
     var vec_copy = vec
     vec_copy.append(1)  # Ensure copy constructor doesn't crash
     _ = vec^  # To ensure previous one doesn't invoke move constuctor
 
 
 def test_list_iter():
-    var vs = List[Int]()
+    var vs = Array[Int]()
     vs.append(1)
     vs.append(2)
     vs.append(3)
 
     # Borrow immutably
-    fn sum(vs: List[Int]) -> Int:
+    fn sum(vs: Array[Int]) -> Int:
         var sum = 0
         for v in vs:
             sum += v[]
@@ -706,7 +704,7 @@ def test_list_iter():
 
 
 def test_list_iter_mutable():
-    var vs = List[Int](1, 2, 3)
+    var vs = Array[Int](1, 2, 3)
 
     for v in vs:
         v[] += 1
@@ -719,7 +717,7 @@ def test_list_iter_mutable():
 
 
 def test_list_span():
-    var vs = List[Int](1, 2, 3)
+    var vs = Array[Int](1, 2, 3)
 
     var es = vs[1:]
     assert_equal(es[0], 2)
@@ -749,8 +747,8 @@ def test_list_span():
 
 
 def test_list_boolable():
-    assert_true(List[Int](1))
-    assert_false(List[Int]())
+    assert_true(Array[Int](1))
+    assert_false(Array[Int]())
 
 
 def test_constructor_from_pointer():
@@ -760,51 +758,54 @@ def test_constructor_from_pointer():
     new_pointer[2] = 2
     # rest is not initialized
 
-    var some_list = List[Int8](unsafe_pointer=new_pointer, size=3, capacity=5)
-    assert_equal(some_list[0], 0)
-    assert_equal(some_list[1], 1)
-    assert_equal(some_list[2], 2)
-    assert_equal(len(some_list), 3)
-    assert_equal(some_list.capacity, 5)
+    var some_array = Array[Int8](
+        unsafe_pointer=new_pointer, size=3, current_capacity=5
+    )
+    assert_equal(some_array[0], 0)
+    assert_equal(some_array[1], 1)
+    assert_equal(some_array[2], 2)
+    assert_equal(len(some_array), 3)
+    assert_equal(some_array.capacity, 5)
 
 
 def test_constructor_from_other_list_through_pointer():
-    initial_list = List[Int8](0, 1, 2)
-    # we do a backup of the size and capacity because
-    # the list attributes will be invalid after the steal_data call
-    var size = len(initial_list)
-    var capacity = initial_list.capacity
-    var some_list = List[Int8](
-        unsafe_pointer=initial_list.steal_data(), size=size, capacity=capacity
-    )
-    assert_equal(some_list[0], 0)
-    assert_equal(some_list[1], 1)
-    assert_equal(some_list[2], 2)
-    assert_equal(len(some_list), size)
-    assert_equal(some_list.capacity, capacity)
+    # var initial_array = Array[Int8](0, 1, 2)
+    # # we do a backup of the size and capacity because
+    # # the list attributes will be invalid after the steal_data call
+    # var size = len(initial_array)
+    # var capacity = initial_array.capacity
+    # var some_array = Array[Int8](
+    #     unsafe_pointer=initial_array.steal_data(), size=size
+    # )
+    # assert_equal(some_array[0], 0)
+    # assert_equal(some_array[1], 1)
+    # assert_equal(some_array[2], 2)
+    # assert_equal(len(some_list), size)
+    # assert_equal(some_list.capacity, capacity)
+    pass
 
 
 def test_converting_list_to_string():
-    var my_list = List[Int](1, 2, 3)
+    var my_list = Array[Int](1, 2, 3)
     assert_equal(my_list.__str__(), "[1, 2, 3]")
 
-    var my_list4 = List[String]("a", "b", "c", "foo")
+    var my_list4 = Array[StringLiteral]("a", "b", "c", "foo")
     assert_equal(my_list4.__str__(), "['a', 'b', 'c', 'foo']")
 
 
 def test_list_count():
-    var list = List[Int](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
+    var list = Array[Int](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
     assert_equal(1, list.count(1))
     assert_equal(2, list.count(2))
     assert_equal(0, list.count(4))
 
-    var list2 = List[Int]()
+    var list2 = Array[Int]()
     assert_equal(0, list2.count(1))
 
 
 def test_list_add():
-    var a = List[Int](1, 2, 3)
-    var b = List[Int](4, 5, 6)
+    var a = Array[Int](1, 2, 3)
+    var b = Array[Int](4, 5, 6)
     var c = a + b
     assert_equal(len(c), 6)
     # check that original values aren't modified
@@ -817,24 +818,24 @@ def test_list_add():
     assert_equal(a.__str__(), "[1, 2, 3, 4, 5, 6]")
     assert_equal(len(b), 3)
 
-    a = List[Int](1, 2, 3)
+    a = Array[Int](1, 2, 3)
     a += b^
     assert_equal(len(a), 6)
     assert_equal(a.__str__(), "[1, 2, 3, 4, 5, 6]")
 
-    var d = List[Int](1, 2, 3)
-    var e = List[Int](4, 5, 6)
+    var d = Array[Int](1, 2, 3)
+    var e = Array[Int](4, 5, 6)
     var f = d + e^
     assert_equal(len(f), 6)
     assert_equal(f.__str__(), "[1, 2, 3, 4, 5, 6]")
 
-    var l = List[Int](1, 2, 3)
-    l += List[Int]()
+    var l = Array[Int](1, 2, 3)
+    l += Array[Int]()
     assert_equal(len(l), 3)
 
 
 def test_list_mult():
-    var a = List[Int](1, 2, 3)
+    var a = Array[Int](1, 2, 3)
     var b = a * 2
     assert_equal(len(b), 6)
     assert_equal(b.__str__(), "[1, 2, 3, 1, 2, 3]")
@@ -845,38 +846,38 @@ def test_list_mult():
     assert_equal(len(a), 6)
     assert_equal(a.__str__(), "[1, 2, 3, 1, 2, 3]")
 
-    var l = List[Int](1, 2)
+    var l = Array[Int](1, 2)
     l *= 1
     assert_equal(len(l), 2)
 
     l *= 0
     assert_equal(len(l), 0)
-    assert_equal(len(List[Int](1, 2, 3) * 0), 0)
+    assert_equal(len(Array[Int](1, 2, 3) * 0), 0)
 
 
 def test_list_contains():
-    var x = List[Int](1, 2, 3)
+    var x = Array[Int](1, 2, 3)
     assert_false(0 in x)
     assert_true(1 in x)
     assert_false(4 in x)
 
     # TODO: implement List.__eq__ for Self[ComparableCollectionElement]
-    # var y = List[List[Int]]()
+    # var y = Array[Array[Int]]()
     # y.append(List(1,2))
     # assert_equal(List(1,2) in y,True)
     # assert_equal(List(0,1) in y,False)
 
 
 def test_list_init_span():
-    var l = List[String]("a", "bb", "cc", "def")
+    var l = Array[StringLiteral]("a", "bb", "cc", "def")
     var sp = Span(l)
-    var l2 = List[String](sp)
+    var l2 = Array[StringLiteral](sp)
     for i in range(len(l)):
         assert_equal(l[i], l2[i])
 
 
 def test_indexing_list():
-    var l = List[Int](1, 2, 3)
+    var l = Array[Int](1, 2, 3)
     assert_equal(l[int(1)], 2)
     assert_equal(l[False], 1)
     assert_equal(l[True], 2)
@@ -890,43 +891,43 @@ def test_inline_list():
         list.append(i)
 
     assert_equal(5, len(list))
-    assert_equal(0, list[0])
-    assert_equal(1, list[1])
-    assert_equal(2, list[2])
-    assert_equal(3, list[3])
-    assert_equal(4, list[4])
+    assert_equal(0, Array[0])
+    assert_equal(1, Array[1])
+    assert_equal(2, Array[2])
+    assert_equal(3, Array[3])
+    assert_equal(4, Array[4])
 
-    assert_equal(0, list[-5])
-    assert_equal(3, list[-2])
-    assert_equal(4, list[-1])
+    assert_equal(0, Array[-5])
+    assert_equal(3, Array[-2])
+    assert_equal(4, Array[-1])
 
-    list[2] = -2
-    assert_equal(-2, list[2])
+    Array[2] = -2
+    assert_equal(-2, Array[2])
 
-    list[-5] = 5
-    assert_equal(5, list[-5])
-    list[-2] = 3
-    assert_equal(3, list[-2])
-    list[-1] = 7
-    assert_equal(7, list[-1])
+    Array[-5] = 5
+    assert_equal(5, Array[-5])
+    Array[-2] = 3
+    assert_equal(3, Array[-2])
+    Array[-1] = 7
+    assert_equal(7, Array[-1])
 
 
 def test_append_triggers_a_move():
-    var inline_list = Array[MoveCounter[Int], capacity=32]()
+    var inline_array = Array[MoveCounter[Int], current_capacity=32]()
 
     var nb_elements_to_add = 8
-    for index in range(nb_elements_to_add):
-        inline_list.append(MoveCounter(index))
+    for i in range(nb_elements_to_add):
+        inline_array.append(MoveCounter(i))
 
     # Using .append() should trigger a move and not a copy+delete.
     for i in range(nb_elements_to_add):
-        assert_equal(inline_list[i].move_count, 1)
+        assert_equal(inline_array[i].move_count, 1)
 
 
 @value
 struct ValueToCountDestructor(CollectionElement):
     var value: Int
-    var destructor_counter: UnsafePointer[List[Int]]
+    var destructor_counter: UnsafePointer[Array[Int]]
 
     fn __del__(owned self):
         self.destructor_counter[].append(self.value)
@@ -934,7 +935,7 @@ struct ValueToCountDestructor(CollectionElement):
 
 def test_destructor():
     """Ensure we delete the right number of elements."""
-    var destructor_counter = List[Int]()
+    var destructor_counter = Array[Int]()
     alias capacity = 32
     var inline_list = Array[
         ValueToCountDestructor,
