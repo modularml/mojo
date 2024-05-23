@@ -355,7 +355,9 @@ fn bit_ceil[
     """
     constrained[type.is_integral(), "must be integral"]()
 
-    return (val <= 1).select(1, 1 << bit_width(val - 1))
+    alias ones = SIMD[type, simd_width].splat(1)
+
+    return (val > 1).select(1 << bit_width(val - ones), ones)
 
 
 # ===----------------------------------------------------------------------===#
@@ -406,7 +408,9 @@ fn bit_floor[
     """
     constrained[type.is_integral(), "must be integral and unsigned"]()
 
-    return (val <= 0).select(0, 1 << (bit_width(val) - 1))
+    alias zeros = SIMD[type, simd_width].splat(0)
+
+    return (val > 0).select(1 << (bit_width(val) - 1), zeros)
 
 
 # ===----------------------------------------------------------------------===#
