@@ -111,6 +111,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         for e in existing:
             self.append(e[])
 
+    fn __init__[s: Int](inout self, owned existing: InlineArray[T, s]):
+        """Creates a deep copy of the given list.
+
+        Args:
+            existing: The list to copy.
+        """
+        self = Self(unsafe_pointer=existing.unsafe_ptr(), size=s, capacity=s)
+
     fn __init__(inout self, *, capacity: Int):
         """Constructs a list with the given capacity.
 
