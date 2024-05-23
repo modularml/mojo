@@ -959,6 +959,7 @@ def test_destructor():
     for i in range(8):
         assert_equal(destructor_counter[i], i)
 
+
 def test_list_unsafe_set_and_get():
     var arr = Array[Int]()
 
