@@ -120,9 +120,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Args:
             existing: The list to copy.
         """
-        self = Self(
-            unsafe_pointer=existing.unsafe_ptr(), size=cap, capacity=cap
-        )
+        self.__init__(capacity=cap)
+        for i in range(cap):
+            self.append(existing[i])
 
     fn __init__(inout self, *, capacity: Int):
         """Constructs a list with the given capacity.
