@@ -39,7 +39,18 @@ fn test_repr_list() raises:
     assert_equal(empty.__repr__(), "[]")
 
 
+fn test_copy_list() raises:
+    var l = List(1, 2, 3)
+    var l2 = l.copy()
+    for i in range(3):
+        assert_equal(l[i], l2[i])
+    l2[0] = 5
+    assert_equal(l[0], 1)
+    assert_equal(l2[0], 5)
+
+
 def main():
+    test_copy_list()
     test_list()
-    test_variadic_list()
     test_repr_list()
+    test_variadic_list()

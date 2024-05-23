@@ -819,6 +819,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 count += 1
         return count
 
+    fn copy(self) -> Self:
+        """Creates a shallow copy of the list.
+
+        Returns:
+            A new list with the same elements as the original.
+        """
+        return Self(self)
+
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """Retrieves a pointer to the underlying memory.
