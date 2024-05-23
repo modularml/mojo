@@ -106,14 +106,15 @@ struct Array[
     var _heap: Self._heap_type
     var in_stack: Bool
     """Whether the Array is stored in the Stack."""
-    var _size: UInt8
+    var stack_left: UInt8
+    """The capacity left in the Stack."""
 
     @always_inline
     fn __init__(inout self):
         """This constructor creates an empty Array."""
         self._stack = Self._stack_type(unsafe_uninitialized=True)
         self.in_stack = True
-        self._size = 0
+        self.stack_left = current_capacity
         self._heap = Self._heap_type()
 
     # TODO: Avoid copying elements in once owned varargs
@@ -125,7 +126,13 @@ struct Array[
             values: The values to populate the Array with.
         """
         self = Self()
-        self.in_stack = True if len(values) < current_capacity else True
+        var delta = current_capacity - len(values)
+        if delta > -1:
+            self.in_stack = True
+            self.stack_left = delta
+        else:
+            self.in_stack = False
+            self.stack_left = 0
         for value in values:
             self.append(value)
 
@@ -147,23 +154,21 @@ struct Array[
             existing: The existing Array.
             in_stack: Whether the new Array will be on the stack.
         """
-        if in_stack and current_capacity < cap:
-            var ex = existing._stack
-            var s = Self()
+        if in_stack and existing.in_stack and current_capacity < cap:
             for i in range(current_capacity):
-                s[i] = ex[i]
-            self._stack = s._stack^
-            self._size = current_capacity
-            self._heap = Self._heap_type()
+                self[i] = existing._stack[i]
+            self.stack_left = 0
             return
         elif existing.in_stack:
+            self.in_stack = False
+            self.stack_left = 0
             self._stack = Self._stack_type()
             self._heap = Self._heap_type(existing._stack)
-            self._size = existing._size
             return
+        self.in_stack = False
+        self.stack_left = 0
         self._stack = Self._stack_type()
         self._heap = existing._heap^
-        self._size = existing._size
 
     fn __init__(inout self, owned existing: List[T]):
         """Constructs a Array from an existing List.
@@ -172,6 +177,7 @@ struct Array[
             existing: The existing Array.
         """
         self._stack = Self._stack_type(unsafe_uninitialized=True)
+        self.stack_left = current_capacity
         if current_capacity >= existing.size:
             self.in_stack = True
             for val in existing:  # FIXME
@@ -179,12 +185,13 @@ struct Array[
             return
         self.in_stack = False
         self._heap = existing^
-        self._size = existing.size
 
     @always_inline
     fn __len__(self) -> Int:
         """Returns the length of the Array."""
-        return int(self._size) if self.in_stack else len(self._heap)
+        if self.in_stack:
+            return int(current_capacity - self.stack_left)
+        return len(self._heap)
 
     @always_inline
     fn append(inout self, owned value: T):
@@ -195,22 +202,25 @@ struct Array[
         """
 
         if self.in_stack:
-            if self._size + 1 < current_capacity:
-                pass
-            elif self._size + capacity_jump < max_stack_size:
+            if len(self) + 1 < current_capacity:
+                self.stack_left -= 1
+            elif len(self) + capacity_jump < max_stack_size:
                 self = Array[
                     T,
                     current_capacity + capacity_jump,
                     capacity_jump,
                     max_stack_size,
                 ](self^)
+                self.stack_left -= 1
             else:
-                self._heap = List[T](self._stack)
+                var stack = self._stack^
+                self._heap = List[T](stack)
+                self._stack = Self._stack_type(unsafe_uninitialized=True)
+                self.in_stack = False
+                self.stack_left = 0
             self[len(self)] = value
-            self._size += 1
             return
         self._heap.append(value)
-        self._size += 1
 
     @always_inline
     fn __refitem__(
@@ -235,7 +245,7 @@ struct Array[
     @always_inline
     fn __del__(owned self):
         """Destroy all the elements in the Array and free the memory."""
-        for i in range(self._size):
+        for i in range(len(self)):
             destroy_pointee(UnsafePointer(self._stack[i]))
 
     fn __iter__(
@@ -320,7 +330,8 @@ struct Array[
         """
         self._stack = existing._stack^
         self._heap = existing._heap^
-        self._size = existing._size
+        self.stack_left = existing.stack_left
+        self.in_stack = existing.in_stack
 
     fn __copyinit__(inout self, existing: Self):
         """Creates a deepcopy of the given Array.
@@ -368,7 +379,7 @@ struct Array[
             pass
 
         var result = List(self._heap)
-        result.extend(other._heap^)
+        result.extend(other._heap)
         return Self(result^)
 
     @always_inline("nodebug")
@@ -495,7 +506,7 @@ struct Array[
             self._heap.extend(Self._heap_type(other._stack))
 
         alias cap_sum = current_capacity + other.current_capacity
-        if self._size + other._size < current_capacity:
+        if self.stack_left - len(other) < current_capacity:
             for val in other:
                 self.append(val[])  # FIXME
             return
@@ -522,7 +533,7 @@ struct Array[
 
         debug_assert(abs(i) > len(self), "pop index out of range")
         var norm_idx = i if i > 0 else len(self) + i
-        self._size -= 1
+        self.stack_left += 1
         return self._stack[norm_idx]
 
     @always_inline
@@ -617,6 +628,10 @@ struct Array[
 
     fn clear(inout self):
         """Clears the elements in the heap for the Array."""
+        if self.in_stack:
+            var ptr = self._stack.unsafe_ptr()
+            for i in range(len(self)):
+                destroy_pointee(ptr + i)
         self._heap.clear()
 
     fn steal_data(inout self) -> UnsafePointer[T]:
