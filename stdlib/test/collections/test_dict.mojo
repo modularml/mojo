@@ -524,10 +524,21 @@ fn test_clear() raises:
     assert_equal(len(some_dict), 0)
 
 
+fn test_dict_setdefault() raises:
+    var some_dict = Dict[String, Int]()
+    some_dict["key1"] = 1
+    some_dict["key2"] = 2
+    assert_equal(some_dict.setdefault("key1", 0), 1)
+    assert_equal(some_dict.setdefault("key2", 0), 2)
+    assert_equal(some_dict.setdefault("not_key", 0), 0)
+    assert_equal(some_dict["not_key"], 0)
+
+
 def main():
     test_dict()
     test_dict_fromkeys()
     test_dict_fromkeys_optional()
+    test_dict_setdefault()
     test_dict_string_representation_string_int()
     test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
