@@ -15,21 +15,15 @@ set -e
 
 # Usage
 # ==========
-# ./build-image.sh --auth-key <your-auth-key>
+# ./build-image.sh --mojo-version
 #
 
 # CLI option handling code
-DEFAULT_KEY=5ca1ab1e
-user_key=${user_key:=${DEFAULT_KEY}}
 mojo_ver=${mojo_ver:=0.3}
 container_engine=${container_engine:=docker}
 extra_cap=${extra_cap:=}
 while [ $# -gt 0 ]; do
         case "$1" in
-                --auth-key)
-                        user_key="$2"
-                        shift
-                        ;;
                 --use-podman)
                         container_engine=podman
                         extra_cap="--cap-add SYS_PTRACE"
@@ -45,18 +39,9 @@ while [ $# -gt 0 ]; do
         shift $(( $# > 0 ? 1 : 0 ))
 done
 
-check_options() {
-        if [ "${user_key}" = "${DEFAULT_KEY}" ]; then
-                echo "# No auth token specified; use --auth-key to specify your token"
-                exit 1
-        fi
-}
-
 build_image() {
-        check_options
         echo "# Building image with ${container_engine}..."
         ${container_engine} build --no-cache ${extra_cap} \
-           --build-arg AUTH_KEY=${user_key} \
            --pull -t modular/mojo-v${mojo_ver}-`date '+%Y%d%m-%H%M'` \
            --file Dockerfile.mojosdk .
 }
