@@ -1446,10 +1446,10 @@ struct String(
 
         return output
 
-    fn splitlines(self, keepends: Bool = False) -> List[String]:
+    fn splitlines[keepends: Bool = False](self) -> List[String]:
         """Split the string at line boundaries.
 
-        Args:
+        Parameters:
           keepends: If True, line breaks are kept in the resulting strings.
 
         Returns:
@@ -1479,6 +1479,7 @@ struct String(
             if self[loc] == "\r" and loc + 1 < length and self[loc + 1] == "\n":
                 loc += 1  # Handle \r\n as a single line break
 
+            @parameter
             if keepends:
                 output.append(self[current_offset : loc + 1])
             else:
