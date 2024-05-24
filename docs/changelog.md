@@ -18,8 +18,8 @@ what we publish.
 
 ### ⭐️ New
 
-- Add a `sort` function for list of `Scalar`s and `ComparableCollectionElement`s 
-  in `builtin`. [PR #2609](https://github.com/modularml/mojo/pull/2609) by
+- Add a `sort` function for list of `ComparableCollectionElement`s.
+  [PR #2609](https://github.com/modularml/mojo/pull/2609) by
   [@mzaks](https://github.com/mzaks)
 
 - Mojo has introduced `@parameter for`, a new feature for compile-time
