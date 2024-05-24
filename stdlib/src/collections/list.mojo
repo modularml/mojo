@@ -825,7 +825,10 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A new list with the same elements as the original.
         """
-        return Self(self)
+        var self_copy = Self(capacity=self.capacity)
+        for i in range(self.size):
+            initialize_pointee_copy(self_copy.data + i, self[i])
+        return self_copy
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[T]:
