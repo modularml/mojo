@@ -181,19 +181,16 @@ struct InlinedFixedVector[
         return self.current_size
 
     @always_inline
-    fn __getitem__[IndexerType: Indexer](self, i: IndexerType) -> type:
+    fn __getitem__(self, idx: Int) -> type:
         """Gets a vector element at the given index.
 
-        Parameters:
-            IndexerType: The type of the indexer.
-
         Args:
-            i: The index of the element.
+            idx: The index of the element.
 
         Returns:
             The element at the given index.
         """
-        var normalized_idx = index(i)
+        var normalized_idx = idx
         debug_assert(
             -self.current_size <= normalized_idx < self.current_size,
             "index must be within bounds",
@@ -208,19 +205,14 @@ struct InlinedFixedVector[
         return self.dynamic_data[normalized_idx - Self.static_size]
 
     @always_inline
-    fn __setitem__[
-        IndexerType: Indexer
-    ](inout self, i: IndexerType, value: type):
+    fn __setitem__(inout self, idx: Int, value: type):
         """Sets a vector element at the given index.
 
-        Parameters:
-            IndexerType: The type of the indexer.
-
         Args:
-            i: The index of the element.
+            idx: The index of the element.
             value: The value to assign.
         """
-        var normalized_idx = index(i)
+        var normalized_idx = idx
         debug_assert(
             -self.current_size <= normalized_idx < self.current_size,
             "index must be within bounds",

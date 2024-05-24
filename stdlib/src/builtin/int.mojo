@@ -41,6 +41,8 @@ trait Indexer:
     that are coercible to `Int` (e.g. floating point values that have `__int__`
     method). In contrast to `Intable`, types conforming to `Indexer` must be
     convertible to `Int` in a lossless way.
+
+    Note that types conforming to `Indexer` are implicitly convertible to `Int`.
     """
 
     fn __index__(self) -> Int:
@@ -338,6 +340,18 @@ struct Int(
             value: The init value.
         """
         self = value.__int__()
+
+    @always_inline("nodebug")
+    fn __init__[IndexerTy: Indexer](inout self, value: IndexerTy):
+        """Construct Int from the given Indexer value.
+
+        Parameters:
+            IndexerTy: A type conforming to Indexer.
+
+        Args:
+            value: The init value.
+        """
+        self = value.__index__()
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:

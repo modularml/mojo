@@ -42,7 +42,7 @@ from utils._visualizers import lldb_formatter_wrapping_type
 from utils import InlineArray
 
 from .dtype import _integral_type_of, _get_dtype_printf_format
-from .io import _snprintf_scalar, _snprintf, _printf, _print_fmt
+from .io import _snprintf_scalar, _printf, _print_fmt
 from .string import _calc_initial_buffer_size, _calc_format_buffer_size
 
 # ===------------------------------------------------------------------------===#
@@ -139,7 +139,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Sized,
     Stringable,
     Truncable,
-    Indexer,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -179,22 +178,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
-
-    @always_inline("nodebug")
-    fn __index__(self) -> Int:
-        """Returns the value as an int if it is an integral value.
-
-        Constraints:
-            Must be a scalar integral value.
-
-        Returns:
-            The value as an integer.
-        """
-        constrained[
-            type.is_integral() or type.is_bool(),
-            "expected integral or bool type",
-        ]()
-        return self.__int__()
 
     @always_inline("nodebug")
     fn __init__(inout self, value: SIMD[DType.float64, 1]):
@@ -1696,9 +1679,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 ]
             ]()
 
-            @always_inline
             @parameter
-            fn fill[idx: Int]():
+            for idx in range(output_size):
                 alias val = mask[idx]
                 constrained[
                     0 <= val < 2 * size,
@@ -1709,7 +1691,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 )
                 __mlir_op.`pop.store`(val, ptr)
 
-            unroll[fill, output_size]()
             return array
 
         alias length = variadic_len[mask]()
@@ -1745,13 +1726,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @parameter
-        fn _check[i: Int]():
+        for i in range(output_size):
             constrained[
                 0 <= mask[i] < 2 * size,
                 "invalid index in the shuffle operation",
             ]()
-
-        unroll[_check, output_size]()
 
         return __mlir_op.`pop.simd.shuffle`[
             mask = mask.data.array,
@@ -1831,13 +1810,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__[
-        IndexerType: Indexer
-    ](self, idx: IndexerType) -> Scalar[type]:
+    fn __getitem__(self, idx: Int) -> Scalar[type]:
         """Gets an element from the vector.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The element index.
@@ -1850,13 +1824,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](self.value, index(idx).value)
 
     @always_inline("nodebug")
-    fn __setitem__[
-        IndexerType: Indexer
-    ](inout self, idx: IndexerType, val: Scalar[type]):
+    fn __setitem__(inout self, idx: Int, val: Scalar[type]):
         """Sets an element in the vector.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The index to set.
@@ -1867,17 +1836,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __setitem__[
-        IndexerType: Indexer
-    ](
-        inout self,
-        idx: IndexerType,
-        val: __mlir_type[`!pop.scalar<`, type.value, `>`],
+    fn __setitem__(
+        inout self, idx: Int, val: __mlir_type[`!pop.scalar<`, type.value, `>`]
     ):
         """Sets an element in the vector.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The index to set.
@@ -2003,10 +1965,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             var indices = StaticIntTuple[2 * size]()
 
             @parameter
-            fn _fill[i: Int]():
+            for i in range(2 * size):
                 indices[i] = i
 
-            unroll[_fill, 2 * size]()
             return indices
 
         return self._shuffle_list[2 * size, build_indices()](other)
