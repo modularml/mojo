@@ -395,6 +395,8 @@ what we publish.
 - `StringRef` now implements `startswith()` and `endswith()`.
     ([PR #2710](https://github.com/modularml/mojo/pull/2710) by [@fknfilewalker](https://github.com/fknfilewalker))
 
+- The Mojo Language Server now supports renaming local variables.
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
