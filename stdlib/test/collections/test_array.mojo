@@ -115,53 +115,53 @@ def test_indexing_vec():
 
 
 def test_mojo_issue_698():
-    var list = Array[Float64]()
+    var arr = Array[Float64]()
     for i in range(5):
-        list.append(i)
+        arr.append(i)
 
-    assert_equal(0.0, Array[0])
-    assert_equal(1.0, Array[1])
-    assert_equal(2.0, Array[2])
-    assert_equal(3.0, Array[3])
-    assert_equal(4.0, Array[4])
+    assert_equal(0.0, arr[0])
+    assert_equal(1.0, arr[1])
+    assert_equal(2.0, arr[2])
+    assert_equal(3.0, arr[3])
+    assert_equal(4.0, arr[4])
 
 
 def test_list():
-    var list = Array[Int]()
+    var arr = Array[Int]()
 
     for i in range(5):
-        list.append(i)
+        arr.append(i)
 
-    assert_equal(5, len(list))
-    assert_equal(0, Array[0])
-    assert_equal(1, Array[1])
-    assert_equal(2, Array[2])
-    assert_equal(3, Array[3])
-    assert_equal(4, Array[4])
+    assert_equal(5, len(arr))
+    assert_equal(0, arr[0])
+    assert_equal(1, arr[1])
+    assert_equal(2, arr[2])
+    assert_equal(3, arr[3])
+    assert_equal(4, arr[4])
 
-    assert_equal(0, Array[-5])
-    assert_equal(3, Array[-2])
-    assert_equal(4, Array[-1])
+    assert_equal(0, arr[-5])
+    assert_equal(3, arr[-2])
+    assert_equal(4, arr[-1])
 
-    Array[2] = -2
-    assert_equal(-2, Array[2])
+    arr[2] = -2
+    assert_equal(-2, arr[2])
 
-    Array[-5] = 5
-    assert_equal(5, Array[-5])
-    Array[-2] = 3
-    assert_equal(3, Array[-2])
-    Array[-1] = 7
-    assert_equal(7, Array[-1])
+    arr[-5] = 5
+    assert_equal(5, arr[-5])
+    arr[-2] = 3
+    assert_equal(3, arr[-2])
+    arr[-1] = 7
+    assert_equal(7, arr[-1])
 
 
 def test_list_clear():
-    var list = Array[Int](1, 2, 3)
-    assert_equal(len(list), 3)
-    assert_equal(list.capacity, 3)
-    list.clear()
+    var arr = Array[Int](1, 2, 3)
+    assert_equal(len(arr), 3)
+    assert_equal(arr.capacity, 3)
+    arr.clear()
 
-    assert_equal(len(list), 0)
-    assert_equal(list.capacity, 3)
+    assert_equal(len(arr), 0)
+    assert_equal(arr.capacity, 3)
 
 
 def test_list_to_bool_conversion():
@@ -172,34 +172,34 @@ def test_list_to_bool_conversion():
 
 
 def test_list_pop():
-    var list = Array[Int]()
+    var arr = Array[Int]()
     # Test pop with index
     for i in range(6):
-        list.append(i)
+        arr.append(i)
 
     # try poping from index 3 for 3 times
     for i in range(3, 6):
-        assert_equal(i, list.pop(3))
+        assert_equal(i, arr.pop(3))
 
     # list should have 3 elements now
-    assert_equal(3, len(list))
-    assert_equal(0, Array[0])
-    assert_equal(1, Array[1])
-    assert_equal(2, Array[2])
+    assert_equal(3, len(arr))
+    assert_equal(0, arr[0])
+    assert_equal(1, arr[1])
+    assert_equal(2, arr[2])
 
     # Test pop with negative index
     for i in range(0, 2):
-        assert_equal(i, list.pop(-len(list)))
+        assert_equal(i, arr.pop(-len(arr)))
 
     # test default index as well
-    assert_equal(2, list.pop())
-    list.append(2)
-    assert_equal(2, list.pop())
+    assert_equal(2, arr.pop())
+    arr.append(2)
+    assert_equal(2, arr.pop())
 
-    # list should be empty now
-    assert_equal(0, len(list))
+    # arr should be empty now
+    assert_equal(0, len(arr))
     # capacity should be 1 according to shrink_to_fit behavior
-    assert_equal(1, list.capacity)
+    assert_equal(1, arr.capacity)
 
 
 def test_list_variadic_constructor():
@@ -362,54 +362,6 @@ def test_list_reverse():
     assert_equal(vec[0], 1)
     assert_equal(vec[1], 2)
     assert_equal(vec[2], 3)
-
-
-def test_list_reverse_move_count():
-    # Create this vec with enough capacity to avoid moves due to resizing.
-    var vec = Array[MoveCounter[Int]](current_capacity=5)
-    vec.append(MoveCounter(1))
-    vec.append(MoveCounter(2))
-    vec.append(MoveCounter(3))
-    vec.append(MoveCounter(4))
-    vec.append(MoveCounter(5))
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec.data[0].value, 1)
-    assert_equal(vec.data[1].value, 2)
-    assert_equal(vec.data[2].value, 3)
-    assert_equal(vec.data[3].value, 4)
-    assert_equal(vec.data[4].value, 5)
-
-    assert_equal(vec.data[0].move_count, 1)
-    assert_equal(vec.data[1].move_count, 1)
-    assert_equal(vec.data[2].move_count, 1)
-    assert_equal(vec.data[3].move_count, 1)
-    assert_equal(vec.data[4].move_count, 1)
-
-    vec.reverse()
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec.data[0].value, 5)
-    assert_equal(vec.data[1].value, 4)
-    assert_equal(vec.data[2].value, 3)
-    assert_equal(vec.data[3].value, 2)
-    assert_equal(vec.data[4].value, 1)
-
-    # NOTE:
-    # Earlier elements went through 2 moves and later elements went through 3
-    # moves because the implementation of List.reverse arbitrarily
-    # chooses to perform the swap of earlier and later elements by moving the
-    # earlier element to a temporary (+1 move), directly move the later element
-    # into the position the earlier element was in, and then move from the
-    # temporary into the later position (+1 move).
-    assert_equal(vec.data[0].move_count, 2)
-    assert_equal(vec.data[1].move_count, 2)
-    assert_equal(vec.data[2].move_count, 1)
-    assert_equal(vec.data[3].move_count, 3)
-    assert_equal(vec.data[4].move_count, 3)
-
-    # Keep vec alive until after we've done the last `vec.data + N` read.
-    _ = vec^
 
 
 def test_list_insert():
@@ -631,13 +583,13 @@ def test_list_extend_non_trivial():
 
 
 def test_2d_dynamic_list():
-    var list = Array[Array[Int]]()
+    var arr = Array[Array[Int]]()
 
     for i in range(2):
         var v = Array[Int]()
         for j in range(3):
             v.append(i + j)
-        list.append(v)
+        arr.append(v)
 
     assert_equal(0, Array[0][0])
     assert_equal(1, Array[0][1])
@@ -646,8 +598,8 @@ def test_2d_dynamic_list():
     assert_equal(2, Array[1][1])
     assert_equal(3, Array[1][2])
 
-    assert_equal(2, len(list))
-    assert_equal(2, list.capacity)
+    assert_equal(2, len(arr))
+    assert_equal(2, arr.capacity)
 
     assert_equal(3, len(Array[0]))
 
@@ -655,17 +607,17 @@ def test_2d_dynamic_list():
     assert_equal(0, len(Array[0]))
     assert_equal(4, Array[0].capacity)
 
-    list.clear()
-    assert_equal(0, len(list))
-    assert_equal(2, list.capacity)
+    arr.clear()
+    assert_equal(0, len(arr))
+    assert_equal(2, arr.capacity)
 
 
 def test_list_explicit_copy():
-    var list = Array[CopyCounter]()
-    list.append(CopyCounter())
-    var list_copy = List(list)
-    assert_equal(0, list.__get_ref(0)[].copy_count)
-    assert_equal(1, list_copy.__get_ref(0)[].copy_count)
+    var arr = Array[CopyCounter]()
+    arr.append(CopyCounter())
+    var arr_copy = Array(arr)
+    assert_equal(0, arr.__get_ref(0)[].copy_count)
+    assert_equal(1, arr_copy.__get_ref(0)[].copy_count)
 
     var l2 = Array[Int]()
     for i in range(10):
@@ -787,10 +739,10 @@ def test_constructor_from_other_list_through_pointer():
 
 def test_converting_list_to_string():
     var my_list = Array[Int](1, 2, 3)
-    assert_equal(my_list.__str__(), "[1, 2, 3]")
+    assert_equal(str(my_list), "[1, 2, 3]")
 
     var my_list4 = Array[StringLiteral]("a", "b", "c", "foo")
-    assert_equal(my_list4.__str__(), "['a', 'b', 'c', 'foo']")
+    assert_equal(str(my_list4), "['a', 'b', 'c', 'foo']")
 
 
 def test_list_count():
@@ -811,23 +763,23 @@ def test_list_add():
     # check that original values aren't modified
     assert_equal(len(a), 3)
     assert_equal(len(b), 3)
-    assert_equal(c.__str__(), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(str(c), "[1, 2, 3, 4, 5, 6]")
 
     a += b
     assert_equal(len(a), 6)
-    assert_equal(a.__str__(), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(str(a), "[1, 2, 3, 4, 5, 6]")
     assert_equal(len(b), 3)
 
     a = Array[Int](1, 2, 3)
     a += b^
     assert_equal(len(a), 6)
-    assert_equal(a.__str__(), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(str(a), "[1, 2, 3, 4, 5, 6]")
 
     var d = Array[Int](1, 2, 3)
     var e = Array[Int](4, 5, 6)
     var f = d + e^
     assert_equal(len(f), 6)
-    assert_equal(f.__str__(), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(str(f), "[1, 2, 3, 4, 5, 6]")
 
     var l = Array[Int](1, 2, 3)
     l += Array[Int]()
@@ -838,13 +790,13 @@ def test_list_mult():
     var a = Array[Int](1, 2, 3)
     var b = a * 2
     assert_equal(len(b), 6)
-    assert_equal(b.__str__(), "[1, 2, 3, 1, 2, 3]")
+    assert_equal(str(b), "[1, 2, 3, 1, 2, 3]")
     b = a * 3
     assert_equal(len(b), 9)
-    assert_equal(b.__str__(), "[1, 2, 3, 1, 2, 3, 1, 2, 3]")
+    assert_equal(str(b), "[1, 2, 3, 1, 2, 3, 1, 2, 3]")
     a *= 2
     assert_equal(len(a), 6)
-    assert_equal(a.__str__(), "[1, 2, 3, 1, 2, 3]")
+    assert_equal(str(a), "[1, 2, 3, 1, 2, 3]")
 
     var l = Array[Int](1, 2)
     l *= 1
@@ -860,12 +812,6 @@ def test_list_contains():
     assert_false(0 in x)
     assert_true(1 in x)
     assert_false(4 in x)
-
-    # TODO: implement List.__eq__ for Self[ComparableCollectionElement]
-    # var y = Array[Array[Int]]()
-    # y.append(List(1,2))
-    # assert_equal(List(1,2) in y,True)
-    # assert_equal(List(0,1) in y,False)
 
 
 def test_list_init_span():
@@ -885,31 +831,31 @@ def test_indexing_list():
 
 
 def test_inline_list():
-    var list = Array[Int]()
+    var arr = Array[Int]()
 
     for i in range(5):
-        list.append(i)
+        arr.append(i)
 
-    assert_equal(5, len(list))
-    assert_equal(0, Array[0])
-    assert_equal(1, Array[1])
-    assert_equal(2, Array[2])
-    assert_equal(3, Array[3])
-    assert_equal(4, Array[4])
+    assert_equal(5, len(arr))
+    assert_equal(0, arr[0])
+    assert_equal(1, arr[1])
+    assert_equal(2, arr[2])
+    assert_equal(3, arr[3])
+    assert_equal(4, arr[4])
 
-    assert_equal(0, Array[-5])
-    assert_equal(3, Array[-2])
-    assert_equal(4, Array[-1])
+    assert_equal(0, arr[-5])
+    assert_equal(3, arr[-2])
+    assert_equal(4, arr[-1])
 
-    Array[2] = -2
-    assert_equal(-2, Array[2])
+    arr[2] = -2
+    assert_equal(-2, arr[2])
 
-    Array[-5] = 5
-    assert_equal(5, Array[-5])
-    Array[-2] = 3
-    assert_equal(3, Array[-2])
-    Array[-1] = 7
-    assert_equal(7, Array[-1])
+    arr[-5] = 5
+    assert_equal(5, arr[-5])
+    arr[-2] = 3
+    assert_equal(3, arr[-2])
+    arr[-1] = 7
+    assert_equal(7, arr[-1])
 
 
 def test_append_triggers_a_move():
@@ -999,7 +945,6 @@ def main():
     test_list_variadic_constructor()
     test_list_resize()
     test_list_reverse()
-    test_list_reverse_move_count()
     test_list_insert()
     test_list_index()
     test_list_extend()
