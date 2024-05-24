@@ -30,7 +30,7 @@ from sys.intrinsics import _type_is_eq
 
 @value
 struct _ArrayIter[
-    T: AnyRegType,
+    T: DType,
     current_capacity: Int,
     capacity_jump: Int,
     max_stack_size: Int,
@@ -60,7 +60,7 @@ struct _ArrayIter[
 
     fn __next__(
         inout self,
-    ) -> Reference[T, mutability, lifetime]:
+    ) -> Reference[T.type, mutability, lifetime]:
         @parameter
         if forward:
             self.index += 1
@@ -78,7 +78,7 @@ struct _ArrayIter[
 
 
 struct Array[
-    T: AnyRegType,
+    T: DType,
     current_capacity: Int = 8,
     capacity_jump: Int = 8,
     max_stack_size: Int = 4 * current_capacity,
@@ -100,26 +100,21 @@ struct Array[
         max_stack_size: The maximum size in the stack.
     """
 
-    alias _stack_type = InlineArray[T, current_capacity]
+    alias _stack_type = SIMD[T, current_capacity]
     var _stack: Self._stack_type
-    alias _heap_type = List[T]
-    var _heap: Self._heap_type
-    var in_stack: Bool
-    """Whether the Array is stored in the Stack."""
+    alias _scalar_type = Scalar[T]
     var stack_left: UInt8
     """The capacity left in the Stack."""
 
     @always_inline
     fn __init__(inout self):
         """This constructor creates an empty Array."""
-        self._stack = Self._stack_type(unsafe_uninitialized=True)
-        self.in_stack = True
+        self._stack = Self._stack_type()
         self.stack_left = current_capacity
-        self._heap = Self._heap_type()
 
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
-    fn __init__(inout self, *values: T):
+    fn __init__(inout self, *values: Self._scalar_type):
         """Constructs a Array from the given values.
 
         Args:
@@ -128,21 +123,26 @@ struct Array[
         self = Self()
         var delta = current_capacity - len(values)
         if delta > -1:
-            self.in_stack = True
             self.stack_left = delta
         else:
-            self.in_stack = False
             self.stack_left = 0
         for value in values:
             self.append(value)
 
+    fn __init__(inout self, values: Self._stack_type):
+        """Constructs a Array from the given values.
+
+        Args:
+            values: The values to populate the Array with.
+        """
+        self = Self()
+        var delta = max(0, current_capacity - len(values))
+        for value in range(current_capacity - delta):
+            self.append(value)
+
     fn __init__[
         cap: Int, cap_j: Int, max_stack: Int
-    ](
-        inout self,
-        owned existing: Array[T, cap, cap_j, max_stack],
-        in_stack: Bool = True,
-    ):
+    ](inout self, owned existing: Array[T, cap, cap_j, max_stack]):
         """Constructs a Array from an existing Array.
 
         Parameters:
@@ -152,42 +152,27 @@ struct Array[
 
         Args:
             existing: The existing Array.
-            in_stack: Whether the new Array will be on the stack.
         """
         self = Self()
-        self.in_stack = in_stack
-        if in_stack and existing.in_stack:
-            for i in range(current_capacity):  # FIXME
-                self.append(existing[i])
-            var delta = current_capacity - existing.current_capacity
-            self.stack_left = max(0, delta)
-            return
-        elif existing.in_stack:
-            self._heap = Self._heap_type(existing._stack)
-        self.stack_left = 0
-        self._heap = existing._heap
+        for i in range(current_capacity):
+            self[i] = existing[i]
+        # TODO enlargement if necessary to fit existing
 
-    fn __init__(inout self, owned existing: List[T]):
-        """Constructs a Array from an existing List.
+    # fn __init__(inout self, owned existing: List[T.type]):
+    #     """Constructs a Array from an existing List.
 
-        Args:
-            existing: The existing Array.
-        """
-        self._stack = Self._stack_type(unsafe_uninitialized=True)
-        self.stack_left = current_capacity
-        if current_capacity >= existing.size:
-            self.in_stack = True
-            self._heap = Self._heap_type()
-            for val in existing:  # FIXME
-                self.append(val[])
-            return
-        self.in_stack = False
-        self._heap = existing^
+    #     Args:
+    #         existing: The existing Array.
+    #     """
+    #     var size = min(current_capacity, existing.size)
+    #     # TODO: need a SIMD constructor from DTypePointer/UnsafePointer
+    #     self._stack = Self._stack_type(existing.unsafe_ptr(), size)
+    #     self.stack_left =  current_capacity - size
 
     # fn __init__(
     #     inout self: Self,
     #     *,
-    #     unsafe_pointer: UnsafePointer[T, 0],
+    #     unsafe_pointer: DTypePointer[T, 0],
     #     size: Int,
     # ):
     #     """Constructs an Array from a pointer and its size.
@@ -196,58 +181,30 @@ struct Array[
     #         unsafe_pointer: The pointer to the data.
     #         size: The number of elements in the Array.
     #     """
-    #     self._stack = Self._stack_type(unsafe_uninitialized=True)
-    #     var delta = current_capacity - size
-    #     if delta < 0:
-    #         self.in_stack = False
-    #         self.stack_left = 0
-    #         # self._heap = Self._heap_type( # FIXME doesn't work for some reason
-    #         #     unsafe_pointer=unsafe_pointer, size=size, capacity=size
-    #         # )
-    #         return
-    #     self.in_stack = True
-    #     self.stack_left = delta
-    #     self._stack[0] = unsafe_pointer[] # FIXME will this even work?
+    #     var s = min(current_capacity, size)
+    #     # TODO: need a SIMD constructor from DTypePointer/UnsafePointer
+    #     self._stack = Self._stack_type(unsafe_pointer, s)
+    #     self.stack_left = current_capacity - s
 
     @always_inline
     fn __len__(self) -> Int:
         """Returns the length of the Array."""
-        if self.in_stack:
-            return int(current_capacity - self.stack_left)
-        return len(self._heap)
+        return int(current_capacity - self.stack_left)
 
     @always_inline
-    fn append(inout self, owned value: T):
+    fn append(inout self, owned value: Self._scalar_type):
         """Appends a value to the Array.
 
         Args:
             value: The value to append.
         """
-
-        if self.in_stack:
-            if len(self) + capacity_jump > max_stack_size:
-                var stack = self._stack^
-                self._heap = List[T](stack)
-                self._stack = Self._stack_type(unsafe_uninitialized=True)
-                self.in_stack = False
-                self.stack_left = 0
-                return
-            elif len(self) + 1 > current_capacity:
-                self = Array[
-                    T,
-                    current_capacity + capacity_jump,
-                    capacity_jump,
-                    max_stack_size,
-                ](self^)
-            self[len(self)] = value
-            self.stack_left -= 1
-            return
-        self._heap.append(value)
+        self[len(self) - 1] = value
+        self.stack_left = max(0, self.stack_left - 1)
 
     @always_inline
     fn __refitem__(
         self: Reference[Self, _, _], owned idx: Int
-    ) -> Reference[Self.T, self.is_mutable, self.lifetime]:
+    ) -> Reference[Self.T.type, self.is_mutable, self.lifetime]:
         """Get a `Reference` to the element at the given index.
 
         Args:
@@ -258,17 +215,8 @@ struct Array[
         """
         debug_assert(abs(idx) > len(self[]), "Index must be within bounds.")
 
-        if idx < 0:
-            idx += len(self[])
-        if self[].in_stack:
-            return self[]._stack[idx]
-        return self[]._heap.__get_ref(idx)[]  # FIXME
-
-    @always_inline
-    fn __del__(owned self):
-        """Destroy all the elements in the Array and free the memory."""
-        for i in range(len(self)):
-            destroy_pointee(UnsafePointer(self._stack[i]))
+        var i = idx if idx > 0 else len(self[]) + idx
+        return self[][i]
 
     fn __iter__(
         self: Reference[Self, _, _],
@@ -307,8 +255,13 @@ struct Array[
 
     @always_inline
     fn __contains__[
-        C: ComparableCollectionElement, cap: Int, cap_j: Int, max_stack: Int
-    ](self: Reference[Array[C, cap, cap_j, max_stack]], value: C) -> Bool:
+        C: ComparableCollectionElement
+    ](
+        self: Reference[
+            Array[C, current_capacity, capacity_jump, max_stack_size]
+        ],
+        value: Scalar[C],
+    ) -> Bool:
         """Verify if a given value is present in the Array.
 
         ```mojo
@@ -316,11 +269,7 @@ struct Array[
         if 3 in x: print("x contains 3")
         ```
         Parameters:
-            C: The type of the elements in the Array. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
-            cap: The maximum number of elements that the Array can hold.
-            cap_j: The amount of items to expand in each stack enlargment.
-            max_stack: The maximum size in the stack.
+            C: The type of the elements in the Array.
 
         Args:
             value: The value to find.
@@ -329,9 +278,9 @@ struct Array[
             True if the value is contained in the Array, False otherwise.
         """
 
-        constrained[_type_is_eq[T, C](), "value type is not self.T"]()
-        for i in self[]:
-            if value == rebind[C](i[]):
+        constrained[_type_is_eq[T.type, C.type](), "value type is not self.T"]()
+        for i in range(len(self[])):
+            if value == self[]._stack[i]:
                 return True
         return False
 
@@ -350,10 +299,9 @@ struct Array[
         Args:
             existing: The existing Array.
         """
-        self._stack = existing._stack^
-        self._heap = existing._heap^
+        self._stack = existing._stack
         self.stack_left = existing.stack_left
-        self.in_stack = existing.in_stack
+        # TODO deal with different capacities ?
 
     fn __copyinit__(inout self, existing: Self):
         """Creates a deepcopy of the given Array.
@@ -363,19 +311,15 @@ struct Array[
         """
         self = Self()
         for i in range(len(existing)):
-            self.append(existing[i])
+            self[i] = existing[i]
 
-    fn __setitem__(inout self, idx: Int, owned value: T):
+    fn __setitem__(inout self, idx: Int, owned value: Self._scalar_type):
         """Sets a Array element at the given index.
 
         Args:
             idx: The index of the element.
             value: The value to assign.
         """
-        if not self.in_stack:
-            self._heap[idx] = value
-            return
-
         debug_assert(abs(idx) > len(self), "index must be within bounds")
         var norm_idx = idx if idx > 0 else min(0, len(self) + idx)
         self._stack[norm_idx] = value
@@ -390,19 +334,7 @@ struct Array[
         Returns:
             The newly created list.
         """
-        if self.in_stack and other.in_stack:
-            # TODO
-            pass
-        elif self.in_stack:
-            # TODO
-            pass
-        elif other.in_stack:
-            # TODO
-            pass
-
-        var result = List(self._heap)
-        result.extend(other._heap)
-        return Self(result^)
+        return Self(self._stack + other._stack)
 
     @always_inline("nodebug")
     fn __iadd__(inout self, owned other: Self):
@@ -413,87 +345,87 @@ struct Array[
         """
         self.extend(other^)
 
-    # TODO: Remove explicit self type when issue 1876 is resolved.
-    fn __str__[
-        U: RepresentableCollectionElement
-    ](
-        self: Reference[
-            Array[U, current_capacity, capacity_jump, max_stack_size]
-        ]
-    ) -> String:
-        """Returns a string representation of an `Array`.
+    # # TODO: Remove explicit self type when issue 1876 is resolved.
+    # fn __str__[
+    #     U: DType
+    # ](
+    #     self: Reference[
+    #         Array[U, current_capacity, capacity_jump, max_stack_size]
+    #     ]
+    # ) -> String:
+    #     """Returns a string representation of an `Array`.
 
-        Note that since we can't condition methods on a trait yet,
-        the way to call this method is a bit special. Here is an example below:
+    #     Note that since we can't condition methods on a trait yet,
+    #     the way to call this method is a bit special. Here is an example below:
 
-        ```mojo
-        var my_array = Array[Int](1, 2, 3)
-        print(my_array.__str__())
-        ```
+    #     ```mojo
+    #     var my_array = Array[Int](1, 2, 3)
+    #     print(my_array.__str__())
+    #     ```
 
-        When the compiler supports conditional methods, then a simple `str(my_array)` will
-        be enough.
+    #     When the compiler supports conditional methods, then a simple `str(my_array)` will
+    #     be enough.
 
-        The elements' type must implement the `__repr__()` for this to work.
+    #     The elements' type must implement the `__repr__()` for this to work.
 
-        Parameters:
-            U: The type of the elements in the array. Must implement the
-              traits `Representable` and `CollectionElement`.
+    #     Parameters:
+    #         U: The type of the elements in the array. Must implement the
+    #           traits `Representable` and `CollectionElement`.
 
-        Returns:
-            A string representation of the array.
-        """
-        # we do a rough estimation of the number of chars that we'll see
-        # in the final string, we assume that str(x) will be at least one char.
-        var minimum_capacity = (
-            2  # '[' and ']'
-            + len(self[]) * 3  # str(x) and ", "
-            - 2  # remove the last ", "
-        )
-        var string_buffer = List[UInt8](capacity=minimum_capacity)
-        string_buffer.append(0)  # Null terminator
-        var result = String(string_buffer^)
-        result += "["
-        for i in range(len(self[])):
-            result += repr(self[][i])
-            if i < len(self[]) - 1:
-                result += ", "
-        result += "]"
-        return result
+    #     Returns:
+    #         A string representation of the array.
+    #     """
+    #     # we do a rough estimation of the number of chars that we'll see
+    #     # in the final string, we assume that str(x) will be at least one char.
+    #     var minimum_capacity = (
+    #         2  # '[' and ']'
+    #         + len(self[]) * 3  # str(x) and ", "
+    #         - 2  # remove the last ", "
+    #     )
+    #     var string_buffer = List[UInt8](capacity=minimum_capacity)
+    #     string_buffer.append(0)  # Null terminator
+    #     var result = String(string_buffer^)
+    #     result += "["
+    #     for i in range(len(self[])):
+    #         result += repr(self[][i])
+    #         if i < len(self[]) - 1:
+    #             result += ", "
+    #     result += "]"
+    #     return result
 
-    # TODO: Remove explicit self type when issue 1876 is resolved.
-    fn __repr__[
-        U: RepresentableCollectionElement
-    ](
-        self: Reference[
-            Array[U, current_capacity, capacity_jump, max_stack_size]
-        ]
-    ) -> String:
-        """Returns a string representation of an `Array`.
-        Note that since we can't condition methods on a trait yet,
-        the way to call this method is a bit special. Here is an example below:
+    # # TODO: Remove explicit self type when issue 1876 is resolved.
+    # fn __repr__[
+    #     U: DType
+    # ](
+    #     self: Reference[
+    #         Array[U, current_capacity, capacity_jump, max_stack_size]
+    #     ]
+    # ) -> String:
+    #     """Returns a string representation of an `Array`.
+    #     Note that since we can't condition methods on a trait yet,
+    #     the way to call this method is a bit special. Here is an example below:
 
-        ```mojo
-        var my_array = Array[Int](1, 2, 3)
-        print(my_array.__repr__(my_array))
-        ```
+    #     ```mojo
+    #     var my_array = Array[Int](1, 2, 3)
+    #     print(my_array.__repr__(my_array))
+    #     ```
 
-        When the compiler supports conditional methods, then a simple `repr(my_array)` will
-        be enough.
+    #     When the compiler supports conditional methods, then a simple `repr(my_array)` will
+    #     be enough.
 
-        The elements' type must implement the `__repr__()` for this to work.
+    #     The elements' type must implement the `__repr__()` for this to work.
 
-        Parameters:
-            U: The type of the elements in the array. Must implement the
-              traits `Representable` and `CollectionElement`.
+    #     Parameters:
+    #         U: The type of the elements in the array. Must implement the
+    #           traits `Representable` and `CollectionElement`.
 
-        Returns:
-            A string representation of the array.
-        """
-        return self[].__str__()
+    #     Returns:
+    #         A string representation of the array.
+    #     """
+    #     return self[].__str__()
 
     @always_inline
-    fn insert(inout self, i: Int, owned value: T):
+    fn insert(inout self, i: Int, owned value: Self._scalar_type):
         """Inserts a value to the list at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
 
@@ -501,9 +433,6 @@ struct Array[
             i: The index for the value.
             value: The value to insert.
         """
-        if not self.in_stack:
-            self._heap.insert(i, value)
-            return
         debug_assert(abs(i) > len(self), "insert index out of range")
 
         var norm_idx = i if i > 0 else min(0, len(self) + i)
@@ -522,26 +451,24 @@ struct Array[
         Args:
             other: Array whose elements will be added in order at the end of this Array.
         """
-        if not self.in_stack:
-            if not other.in_stack:
-                self._heap.extend(other._heap)
-            self._heap.extend(Self._heap_type(other._stack))
-
         alias cap_sum = current_capacity + other.current_capacity
         if self.stack_left - len(other) < current_capacity:
             for val in other:
-                self.append(val[])  # FIXME
+                self.append(Self._scalar_type(val[]))  # FIXME
             return
         elif cap_sum < max_stack_size:
-            self = Array[T, cap_sum, capacity_jump, max_stack_size](self._stack)
+            alias new_arr = Array[T, cap_sum, capacity_jump, max_stack_size]
+            var s = rebind[SIMD[T, cap_sum]](self._stack)
+            self = new_arr(s)
             self.extend(other)
             return
-        self = Self(self, in_stack=False)
-        self._heap.extend(other._heap)
-        return
+        alias new_arr = Array[T, max_stack_size, capacity_jump, max_stack_size]
+        var s = rebind[SIMD[T, max_stack_size]](self._stack)
+        self = new_arr(s)
+        self.extend(other)
 
     @always_inline
-    fn pop(inout self, i: Int = -1) -> T:
+    fn pop(inout self, i: Int = -1) -> Self._scalar_type:
         """Pops a value from the list at the given index.
 
         Args:
@@ -550,51 +477,10 @@ struct Array[
         Returns:
             The popped value.
         """
-        if not self.in_stack:
-            return self._heap.pop(i)
-
         debug_assert(abs(i) > len(self), "pop index out of range")
         var norm_idx = i if i > 0 else len(self) + i
         self.stack_left += 1
         return self._stack[norm_idx]
-
-    @always_inline
-    fn reserve(inout self, new_capacity: Int):
-        """Reserves the requested capacity in the heap.
-
-        If the current capacity is greater or equal, this is a no-op.
-        Otherwise, the storage is reallocated and the data is moved.
-
-        Args:
-            new_capacity: The new capacity.
-        """
-        self._heap.reserve(new_capacity)
-
-    @always_inline
-    fn resize(inout self, new_size: Int, value: T):
-        """Resizes the list to the given new size in the heap.
-
-        If the new size is smaller than the current one, elements at the end
-        are discarded. If the new size is larger than the current one, the
-        list is appended with new values elements up to the requested size.
-
-        Args:
-            new_size: The new size.
-            value: The value to use to populate new elements.
-        """
-        self._heap.resize(new_size, value)
-
-    @always_inline
-    fn resize(inout self, new_size: Int):
-        """Resizes the list to the given new size in the heap.
-
-        With no new value provided, the new size must be smaller than or equal
-        to the current one. Elements at the end are discarded.
-
-        Args:
-            new_size: The new size.
-        """
-        self._heap.resize(new_size)
 
     # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
@@ -648,25 +534,13 @@ struct Array[
                 return i
         return None
 
-    fn clear(inout self):
-        """Clears the elements in the heap for the Array."""
-        if self.in_stack:
-            var ptr = self._stack.unsafe_ptr()
-            for i in range(len(self)):
-                destroy_pointee(ptr + i)
-        self._heap.clear()
-
-    fn steal_data(inout self) -> UnsafePointer[T]:
+    fn steal_data(inout self) -> Self._stack_type:
         """Take ownership of the underlying pointer from the list.
 
         Returns:
             The underlying data.
         """
-        if self.in_stack:
-            var ptr = self._stack.unsafe_ptr()
-            self._stack = Self._stack_type(unsafe_uninitialized=True)
-            return ptr[]
-        return self._heap.steal_data()[]
+        return self._stack
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
@@ -705,19 +579,13 @@ struct Array[
         if not adjusted_span_len:
             return Self()
 
-        if self.in_stack:
-            var res = Self()
-            for i in range(len(adjusted_span)):  # FIXME using memcpy?
-                res.append(self[adjusted_span[i]])
-            return res^
-
-        var res = Self._heap_type(capacity=len(adjusted_span))
-        for i in range(len(adjusted_span)):
-            res.append(self[adjusted_span[i]])
+        var res = Self()
+        for i in range(len(adjusted_span)):  # FIXME using memcpy?
+            res[i] = self[adjusted_span[i]]
         return res^
 
     @always_inline
-    fn __getitem__(self, idx: Int) -> T:
+    fn __getitem__(self, idx: Int) -> Self._scalar_type:
         """Gets a copy of the element at the given index.
 
         Args:
@@ -726,9 +594,7 @@ struct Array[
         Returns:
             A copy of the element at the given index.
         """
-        if self.in_stack:
-            return self._stack[idx]
-        return self._heap[idx]
+        return self._stack[idx]
 
     fn count[
         C: ComparableCollectionElement, cap: Int, cap_j: Int, max_stack: Int
@@ -765,20 +631,16 @@ struct Array[
         return count
 
     @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[T]:
+    fn unsafe_ptr(self) -> UnsafePointer[Self._scalar_type]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The UnsafePointer to the underlying memory.
         """
-        if self.in_stack:
-            return self._stack.unsafe_ptr()[]
-        return self._heap.unsafe_ptr()[]
+        return UnsafePointer(self._stack)
 
     @always_inline
-    fn unsafe_get(
-        self: Reference[Self, _, _], idx: Int
-    ) -> Reference[Self.T, self.is_mutable, self.lifetime]:
+    fn unsafe_get(self: Reference[Self, _, _], idx: Int) -> Self._scalar_type:
         """Get a reference to an element of self without checking index bounds.
         Users should consider using `__getitem__` instead of this method as it is unsafe.
         If an index is out of bounds, this method will not abort, it will be considered
@@ -796,12 +658,10 @@ struct Array[
             A reference to the element at the given index.
         """
         debug_assert(abs(idx) > len(self[]), "index must be within bounds")
-        if self[].in_stack:
-            return self[]._stack.unsafe_ptr()[idx]
-        return self[]._heap.unsafe_ptr()[idx]
+        return self[]._stack[idx]
 
     @always_inline
-    fn unsafe_set(self: Reference[Self, _, _], idx: Int, value: T):
+    fn unsafe_set(inout self, idx: Int, value: Self._scalar_type):
         """Set a reference to an element of self without checking index bounds.
         Users should consider using `__setitem__` instead of this method as it is unsafe.
         If an index is out of bounds, this method will not abort, it will be considered
@@ -816,8 +676,5 @@ struct Array[
             idx: The index to set the element.
             value: The element.
         """
-        debug_assert(abs(idx) > len(self[]), "index must be within bounds")
-        if self[].in_stack:
-            self[]._stack.unsafe_ptr()[idx] = value
-            return
-        self[]._heap.unsafe_ptr()[idx] = value
+        debug_assert(abs(idx) > len(self), "index must be within bounds")
+        self._stack[idx] = value
