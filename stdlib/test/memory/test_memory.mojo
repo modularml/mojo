@@ -518,6 +518,37 @@ def test_indexing():
     assert_equal(ptr[1], 1)
 
 
+def test_wide_load():
+    var ptr = DTypePointer[DType.bool].alloc(4)
+    ptr.store(0, True)
+    ptr.store(1, True)
+    ptr.store(2, True)
+    ptr.store(3, True)
+    assert_equal(
+        ptr.load[width=4](0), SIMD[DType.bool, 4](True, True, True, True)
+    )
+
+    var ptr2 = DTypePointer[DType.int32].alloc(4)
+    ptr2.store(0, 1)
+    ptr2.store(1, 2)
+    ptr2.store(2, 3)
+    ptr2.store(3, 4)
+    assert_equal(ptr2.load[width=4](0), SIMD[DType.int32, 4](1, 2, 3, 4))
+    assert_equal(ptr2.load[width=2](2), SIMD[DType.int32, 2](3, 4))
+
+
+def test_wide_store():
+    var ptr = DTypePointer[DType.int32].alloc(4)
+    ptr.store[width=4](SIMD[DType.int32, 4](1, 2, 3, 4))
+    assert_equal(ptr.load[width=4](), SIMD[DType.int32, 4](1, 2, 3, 4))
+
+    var ptr2 = DTypePointer[DType.bool].alloc(4)
+    ptr2.store[width=4](SIMD[DType.bool, 4](True, True, True, True))
+    assert_equal(
+        ptr2.load[width=4](), SIMD[DType.bool, 4](True, True, True, True)
+    )
+
+
 def main():
     test_memcpy()
     test_memcpy_dtype()
@@ -537,3 +568,5 @@ def main():
     test_dtypepointer_gather()
     test_dtypepointer_scatter()
     test_indexing()
+    test_wide_load()
+    test_wide_store()

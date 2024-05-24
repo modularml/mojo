@@ -910,11 +910,23 @@ struct DTypePointer[
                 ]()
             return v
 
-        return (
-            self.address.offset(offset)
-            .bitcast[SIMD[type, width]]()
-            .load[alignment=alignment]()
-        )
+        # TODO: This is a temp fix for #2813
+        @parameter
+        if type.is_bool():
+            var v = SIMD[type, width]()
+
+            @parameter
+            for i in range(width):
+                v[i] = self.address.offset(int(offset) + i).load[
+                    alignment=alignment
+                ]()
+            return v
+        else:
+            return (
+                self.address.offset(offset)
+                .bitcast[SIMD[type, width]]()
+                .load[alignment=alignment]()
+            )
 
     @always_inline("nodebug")
     fn store[
@@ -960,9 +972,17 @@ struct DTypePointer[
         constrained[
             alignment > 0, "alignment must be a positive integer value"
         ]()
-        self.address.bitcast[SIMD[type, width]]().store[alignment=alignment](
-            val
-        )
+
+        @parameter
+        if type.is_bool():
+
+            @parameter
+            for i in range(width):
+                self.address.store[alignment=alignment](val[i])
+        else:
+            self.address.bitcast[SIMD[type, width]]().store[
+                alignment=alignment
+            ](val)
 
     @always_inline("nodebug")
     fn simd_nt_store[
