@@ -274,7 +274,7 @@ what we publish.
 - `String` now has a `splitlines()` method, which allows splitting strings at line 
   boundaries. This method supports line breaks `\n` and `\r`, and provides an option
   to retain or remove the line break characters. 
-    ([PR #2808](https://github.com/modularml/mojo/pull/2808)) by [@YichengDWu](https://github.com/YichengDWu)
+    ([PR #2810](https://github.com/modularml/mojo/pull/2810)) by [@YichengDWu](https://github.com/YichengDWu)
 
 - `List` has a simplified syntax to call the `count` method: `my_list.count(x)`.
     ([PR #2675](https://github.com/modularml/mojo/pull/2675) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
