@@ -484,26 +484,6 @@ fn _is_ascii_lowercase(c: Int8) -> Bool:
 # isspace
 # ===----------------------------------------------------------------------===#
 
-alias _whitespaces = List[String](String(" "), String("\t"))
-alias _line_sep_utf8 = List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38)
-"""Unicode Line Separator: \\u2028."""
-alias _paragraph_sep_utf8 = List[UInt8](
-    0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39
-)
-"""Unicode Paragraph Separator: \\u2029."""
-# TODO add line and paragraph separator as stringliteral once unicode escape secuences are accepted
-alias _universal_separators = List[String](
-    String("\n"),
-    String("\r"),
-    String("\v"),
-    String("\f"),
-    String("\x1c"),
-    String("\x1e"),
-    String("\x85"),
-    String(_line_sep_utf8),
-    String(_paragraph_sep_utf8),
-)
-
 
 fn isspace(c: Int8) -> Bool:
     """Determines whether the given character is a whitespace character.
@@ -564,11 +544,8 @@ struct String(
     """The underlying storage for the string."""
 
     """ Useful string aliases. """
-    alias WHITESPACES = _whitespaces + _universal_separators
+    alias WHITESPACE = " \t\n\r\v\f\x1c\x1e\x85"
     """Whitespaces " ", "\\t", and [universal separators](
-        https://docs.python.org/3/library/stdtypes.html#str.splitlines)."""
-    alias UNIVERSAL_SEPARATORS = _universal_separators
-    """[Universal separators](
         https://docs.python.org/3/library/stdtypes.html#str.splitlines)."""
     alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
     alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -577,7 +554,7 @@ struct String(
     alias HEX_DIGITS = String.DIGITS + String("abcdef") + String("ABCDEF")
     alias OCT_DIGITS = String("01234567")
     alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
-    alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACES
+    alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
 
     @always_inline
     fn __str__(self) -> String:
@@ -1329,78 +1306,135 @@ struct String(
             substr._strref_dangerous(), start=start
         )
 
-    fn split[
-        maxsplit: Int = -1
-    ](self, owned delimiter: String = "") -> List[String]:
-        """Split the string by a delimiter. This defaults to universal
-        newlines [just as Python](https://docs.python.org/3/library/stdtypes.html).
+    fn split(self, sep: String, maxsplit: Int = -1) -> List[String]:
+        """Split the string by a separator. Defaults to whitespaces and
+        universal newlines [just like Python](
+            https://docs.python.org/3/library/stdtypes.html) EXCEPT
+        for the `u2028` and `u2029` unicode separators.
 
-        Parameters:
+        Args:
+            sep: The string to split on.
             maxsplit: The maximum amount of items to split from String.
                 Defaults to unlimited.
 
-        Args:
-            delimiter: The string to split on.
-
         Returns:
-            A List of Strings containing the input split by the delimiter.
+            A List of Strings containing the input split by the separator.
 
         Examples:
 
-        Splitting a space:
         ```mojo
-        var s = String("hello world").split(" ") # ["hello", "world"]
-        ```
-
-        Splitting adjacent delimiters:
-        ```mojo
-        var s = String("hello,,world").split(",") # ["hello", "", "world"]
-        ```
-
-        Splitting adjacent universal newlines:
-        ```mojo
-        var s = String("hello \t\n\r\v\fworld").split() # ["hello", "world"]
-        ```
-
-        Splitting with maxsplit:
-        ```mojo
-        var s = String("1,2,3").split[maxsplit=1](",") # ['1', '2,3']
+        # Splitting a space
+        _ = String("hello world").split(" ") # ["hello", "world"]
+        # Splitting adjacent separators
+        _ = String("hello,,world").split(",") # ["hello", "", "world"]
+        # Splitting with maxsplit
+        _ = String("1,2,3").split(",", 1) # ['1', '2,3']
+        # Splitting an empty string or filled with whitespaces
+        _ = String("      ").split() # []
+        _ = String("").split() # []
+        # Splitting a string with leading, trailing, and middle whitespaces
+        _ = String("      hello    world     ").split() # ["hello", "world"]
+        # Splitting a string full of the separator
+        _ = String(",,,").split(",") # ["", "", "", ""]
+        # Splitting adjacent universal newlines:
+        # _ = String("hello \\t\\n\\r\\f\\v\\x1c\\x1e\\x85world").split() # ["hello", "world"]
         ```
         .
         """
         var output = List[String]()
 
-        var current_offset = 0
+        var str_iter_len = len(self) - 1
+        var lhs = 0
+        var rhs = 0
         var items = 0
-        while True:
-            var loc = self.find(delimiter, current_offset)
-            if loc == -1:
-                output.append(self[current_offset:])
+        var sep_len = len(sep)
+        if sep_len == 0:
+            for i in range(str_iter_len + 1):
+                output.append(self[i])
+            return output
+
+        while lhs <= str_iter_len:
+            rhs = self.find(sep, lhs)
+            if rhs == -1:
+                output.append(self[lhs:])
                 break
 
-            # Python adds all "whitespace chars" as one delimeter
-            # if no delimeter was specified
-            if delimiter == "":
-                var start_loc = loc
-                var str_len = len(self)
-                while loc < str_len:
-                    if self[loc + 1] in String.WHITESPACES:
-                        loc += 1
-                # if it went until the end of the String, then
-                # it should be sliced up until the original
-                # start of the whitespace
-                if loc == str_len:
-                    loc = start_loc
-
-            output.append(self[current_offset:loc])
-            current_offset = loc + len(delimiter)
-
-            @parameter
             if maxsplit > -1:
-                items += 1
                 if items == maxsplit:
-                    output.append(self[current_offset:])
+                    output.append(self[lhs:])
                     break
+                items += 1
+
+            output.append(self[lhs:rhs])
+            lhs = rhs + sep_len
+
+        if self.endswith(sep):
+            output.append("")
+        return output
+
+    fn split(self, *, maxsplit: Int = -1) -> List[String]:
+        """Split the string by every Whitespace separator. Uses whitespaces and
+        universal newlines [just like Python](
+            https://docs.python.org/3/library/stdtypes.html) EXCEPT
+        for the `u2028` and `u2029` unicode separators.
+
+        Args:
+            maxsplit: The maximum amount of items to split from String.
+                Defaults to unlimited.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting an empty string or filled with whitespaces
+        _ = String("      ").split() # []
+        _ = String("").split() # []
+        # Splitting a string with leading, trailing, and middle whitespaces
+        _ = String("      hello    world     ").split() # ["hello", "world"]
+        # Splitting adjacent universal newlines:
+        # _ = String("hello \\t\\n\\r\\f\\v\\x1c\\x1e\\x85world").split() # ["hello", "world"]
+        ```
+        .
+        """
+        var output = List[String]()
+
+        var str_iter_len = len(self) - 1
+        var lhs = 0
+        var rhs = 0
+        var items = 0
+
+        while lhs <= str_iter_len:
+            # Python adds all "whitespace chars" as one separator
+            # if no separator was specified
+            while lhs <= str_iter_len:
+                if not self[lhs] in String.WHITESPACE:
+                    break
+                lhs += 1
+            # if it went until the end of the String, then
+            # it should be sliced up until the original
+            # start of the whitespace which was already appended
+            if lhs - 1 == str_iter_len:
+                break
+            elif lhs == str_iter_len:
+                # if the last char is not whitespace
+                output.append(self[str_iter_len])
+                break
+            rhs = lhs + 1
+            while rhs <= str_iter_len:
+                if self[rhs] in String.WHITESPACE:
+                    break
+                rhs += 1
+
+            if maxsplit > -1:
+                if items == maxsplit:
+                    output.append(self[lhs:])
+                    break
+                items += 1
+
+            output.append(self[lhs:rhs])
+            lhs = rhs
 
         return output
 
@@ -1461,7 +1495,7 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self, chars: String = String.WHITESPACES) -> String:
+    fn strip(self, chars: String = String.WHITESPACE) -> String:
         """Return a copy of the string with leading and trailing characters removed.
 
         Args:
@@ -1473,7 +1507,7 @@ struct String(
 
         return self.lstrip(chars).rstrip(chars)
 
-    fn rstrip(self, chars: String = String.WHITESPACES) -> String:
+    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
         """Return a copy of the string with trailing characters removed.
 
         Args:
@@ -1489,7 +1523,7 @@ struct String(
 
         return self[:r_idx]
 
-    fn lstrip(self, chars: String = String.WHITESPACES) -> String:
+    fn lstrip(self, chars: String = String.WHITESPACE) -> String:
         """Return a copy of the string with leading characters removed.
 
         Args:

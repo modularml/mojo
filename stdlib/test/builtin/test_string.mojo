@@ -523,47 +523,58 @@ fn test_rfind() raises:
 
 
 fn test_split() raises:
-    alias _line_sep_utf8 = List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38)
-    """Unicode Line Separator: \\u2028."""
-    alias _paragraph_sep_utf8 = List[UInt8](
-        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39
-    )
-    """Unicode Paragraph Separator: \\u2029."""
-    # TODO add line and paragraph separator as stringliteral once unicode escape secuences are accepted
-    alias _universal_separators = List[String](
-        String("\n"),
-        String("\r"),
-        String("\v"),
-        String("\f"),
-        String("\x1c"),
-        String("\x1e"),
-        String("\x85"),
-        String(_line_sep_utf8),
-        String(_paragraph_sep_utf8),
-    )
-    alias spaces = List[String](
-        String(" "), String("\t")
-    ) + _universal_separators
-    # empty delimiters default to whitespace
-    var d = String("hello world").split("")
+    # empty separators default to whitespace
+    var d = String("hello world").split()
+    assert_true(len(d) == 2)
     assert_true(d[0] == "hello", d[1] == "world")
     d = String("hello \t\n\n\v\fworld").split("\n")
-    assert_true(d[0] == "hello \t", d[1] == "", d[2] == "\v\fworld")
-    # Python adds all whitespace like chars as one
-    var s = ""
-    # test leading whitespace
-    for i in range(len(spaces)):
-        s += spaces[i]
-    s += "hello"
-    # test middle whitespace
-    for i in range(len(spaces)):
-        s += spaces[i]
-    s += "world"
+    assert_true(len(d) == 3)
+    assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
+
+    # Should add all whitespace-like chars as one
+    alias utf8_spaces = String(" \t\n\r\v\f\x1c\x1e\x85")
+    var s = utf8_spaces + "hello" + utf8_spaces + "world" + utf8_spaces
     d = s.split()
-    # test trailing whitespace
-    for i in range(len(spaces)):
-        s += spaces[i]
-    assert_true(d[0] == "hello", d[1] == "world")
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello" and d[1] == "world")
+
+    # should split into empty strings between separators
+    d = String("1,,,3").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "1" and d[1] == "" and d[2] == "" and d[3] == "3")
+    d = String(",,,").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "" and d[2] == "" and d[3] == "")
+    d = String(" a b ").split(" ")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "a" and d[2] == "b" and d[3] == "")
+
+    # should split into maxsplit + 1 items
+    d = String("1,2,3").split(",", 0)
+    assert_true(len(d) == 1)
+    assert_true(d[0] == "1,2,3")
+    d = String("1,2,3").split(",", 1)
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "1" and d[1] == "2,3")
+
+    assert_true(len(String("").split()) == 0)
+    assert_true(len(String(" ").split()) == 0)
+    assert_true(len(String("").split(" ")) == 1)
+    assert_true(len(String(" ").split(" ")) == 2)
+    assert_true(len(String("  ").split(" ")) == 3)
+    assert_true(len(String("   ").split(" ")) == 4)
+
+    # separator = "" returns all char split
+    d = String("hello ").split("")
+    assert_true(len(d) == 6)
+    assert_true(
+        d[0] == "h"
+        and d[1] == "e"
+        and d[2] == "l"
+        and d[3] == "l"
+        and d[4] == "o"
+        and d[5] == " "
+    )
 
     # Split in middle
     var d1 = String("n")
