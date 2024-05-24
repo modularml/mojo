@@ -210,6 +210,11 @@ what we publish.
 
 - The Mojo Language Server now reports a warning when a local variable is unused.
 
+- Implicit variable definitions in a `def` are more flexible: you can now
+  implicitly declare variables as the result of a tuple return, using
+  `a,b,c = foo()`, and can now shadow global immutable symbols using
+  `slice = foo()` without getting a compiler error.
+
 - The `math` module now has `CeilDivable` and `CeilDivableRaising` traits that
   allow users to opt into the `math.ceildiv` function.
 
