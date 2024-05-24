@@ -77,7 +77,7 @@ struct Array[
     T: DType = DType.index,
     current_capacity: Int = T.bitwidth() // 8,
     capacity_jump: Int = T.bitwidth() // 8,
-    max_stack_size: Int = 4 * (T.bitwidth() // 8),
+    max_stack_size: Int = 32 * (T.bitwidth() // 8),
 ](CollectionElement, Sized, Boolable):
     """A Array allocated on the stack with a current_capacity and
     max_stack_size known at compile time.
@@ -810,3 +810,8 @@ struct Array[
             other: The other Array.
         """
         self = self - other
+
+    fn clear(inout self):
+        """Zeroes the Array."""
+        self.vec = self.vec.splat(0)
+        self.stack_left = current_capacity

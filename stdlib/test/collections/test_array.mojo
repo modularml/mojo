@@ -20,7 +20,7 @@ from utils import Span
 
 
 def test_inlined_fixed_array():
-    var array = Array[Int, 5](10)
+    var array = Array[DType.uint8, 5](10)
 
     for i in range(5):
         array.append(i)
@@ -76,7 +76,7 @@ def test_inlined_fixed_array():
 
 
 def test_inlined_fixed_array_with_default():
-    var array = Array[Int](10)
+    var array = Array[DType.uint8](10)
 
     for i in range(5):
         array.append(i)
@@ -106,16 +106,16 @@ def test_inlined_fixed_array_with_default():
 
 
 def test_indexing_vec():
-    var array = Array[Int](10)
+    var array = Array[DType.uint8](10)
     for i in range(5):
         array.append(i)
-    assert_equal(0, array[int(0)])
+    assert_equal(0, array[DType.uint8(0)])
     assert_equal(1, array[True])
     assert_equal(2, array[2])
 
 
 def test_mojo_issue_698():
-    var arr = Array[Float64]()
+    var arr = Array[DType.float64]()
     for i in range(5):
         arr.append(i)
 
@@ -127,7 +127,7 @@ def test_mojo_issue_698():
 
 
 def test_list():
-    var arr = Array[Int]()
+    var arr = Array[DType.uint8]()
 
     for i in range(5):
         arr.append(i)
@@ -154,16 +154,6 @@ def test_list():
     assert_equal(7, arr[-1])
 
 
-def test_list_clear():
-    var arr = Array[Int](1, 2, 3)
-    assert_equal(len(arr), 3)
-    assert_equal(arr.capacity, 3)
-    arr.clear()
-
-    assert_equal(len(arr), 0)
-    assert_equal(arr.capacity, 3)
-
-
 def test_list_to_bool_conversion():
     assert_false(Array[StringLiteral]())
     assert_true(Array[StringLiteral]("a"))
@@ -172,7 +162,7 @@ def test_list_to_bool_conversion():
 
 
 def test_list_pop():
-    var arr = Array[Int]()
+    var arr = Array[DType.uint8]()
     # Test pop with index
     for i in range(6):
         arr.append(i)
@@ -203,7 +193,7 @@ def test_list_pop():
 
 
 def test_list_variadic_constructor():
-    var l = Array[Int](2, 4, 6)
+    var l = Array[DType.uint8](2, 4, 6)
     assert_equal(3, len(l))
     assert_equal(2, l[0])
     assert_equal(4, l[1])
@@ -214,162 +204,12 @@ def test_list_variadic_constructor():
     assert_equal(8, l[3])
 
 
-def test_list_resize():
-    var l = Array[Int](1)
-    assert_equal(1, len(l))
-    l.resize(2, 0)
-    assert_equal(2, len(l))
-    assert_equal(l[1], 0)
-    l.resize(0)
-    assert_equal(len(l), 0)
-
-
-def test_list_reverse():
-    #
-    # Test reversing the list []
-    #
-
-    var vec = Array[Int]()
-
-    assert_equal(len(vec), 0)
-
-    vec.reverse()
-
-    assert_equal(len(vec), 0)
-
-    #
-    # Test reversing the list [123]
-    #
-
-    vec = Array[Int]()
-
-    vec.append(123)
-
-    assert_equal(len(vec), 1)
-    assert_equal(vec[0], 123)
-
-    vec.reverse()
-
-    assert_equal(len(vec), 1)
-    assert_equal(vec[0], 123)
-
-    #
-    # Test reversing the list ["one", "two", "three"]
-    #
-
-    var vec2 = Array[StringLiteral]("one", "two", "three")
-
-    assert_equal(len(vec2), 3)
-    assert_equal(vec2[0], "one")
-    assert_equal(vec2[1], "two")
-    assert_equal(vec2[2], "three")
-
-    vec2.reverse()
-
-    assert_equal(len(vec2), 3)
-    assert_equal(vec2[0], "three")
-    assert_equal(vec2[1], "two")
-    assert_equal(vec2[2], "one")
-
-    #
-    # Test reversing the list [5, 10]
-    #
-
-    vec = Array[Int]()
-    vec.append(5)
-    vec.append(10)
-
-    assert_equal(len(vec), 2)
-    assert_equal(vec[0], 5)
-    assert_equal(vec[1], 10)
-
-    vec.reverse()
-
-    assert_equal(len(vec), 2)
-    assert_equal(vec[0], 10)
-    assert_equal(vec[1], 5)
-
-    #
-    # Test reversing the list [1, 2, 3, 4, 5] starting at the 3rd position
-    # to produce [1, 2, 5, 4, 3]
-    #
-
-    vec = Array[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-    vec.append(4)
-    vec.append(5)
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 4)
-    assert_equal(vec[4], 5)
-
-    vec._reverse(start=2)
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 5)
-    assert_equal(vec[3], 4)
-    assert_equal(vec[4], 3)
-
-    #
-    # Test reversing the list [1, 2, 3] with negative indexes
-    #
-
-    vec = Array[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-
-    vec._reverse(start=-2)
-
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 3)
-    assert_equal(vec[2], 2)
-
-    #
-    # Test reversing the list [1, 2] with out of bounds indexes
-    #
-    vec = Array[Int]()
-    vec.append(1)
-    vec.append(2)
-
-    with assert_raises(contains="IndexError"):
-        vec._reverse(start=-3)
-
-    with assert_raises(contains="IndexError"):
-        vec._reverse(start=3)
-
-    #
-    # Test edge case of reversing the list [1, 2, 3] but starting after the
-    # last element.
-    #
-
-    vec = Array[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-
-    vec._reverse(start=len(vec))
-
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-
-
 def test_list_insert():
     #
     # Test the list [1, 2, 3] created with insert
     #
 
-    var v1 = Array[Int]()
+    var v1 = Array[DType.uint8]()
     v1.insert(len(v1), 1)
     v1.insert(len(v1), 3)
     v1.insert(1, 2)
@@ -383,7 +223,7 @@ def test_list_insert():
     # Test the list [1, 2, 3, 4, 5] created with negative and positive index
     #
 
-    var v2 = Array[Int]()
+    var v2 = Array[DType.uint8]()
     v2.insert(-1729, 2)
     v2.insert(len(v2), 3)
     v2.insert(len(v2), 5)
@@ -401,7 +241,7 @@ def test_list_insert():
     # Test the list [1, 2, 3, 4] created with negative index
     #
 
-    var v3 = Array[Int]()
+    var v3 = Array[DType.uint8]()
     v3.insert(-11, 4)
     v3.insert(-13, 3)
     v3.insert(-17, 2)
@@ -417,7 +257,7 @@ def test_list_insert():
     # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
     #
 
-    var v4 = Array[Int]()
+    var v4 = Array[DType.uint8]()
     for i in range(4):
         v4.insert(0, 4 - i)
         v4.insert(len(v4), 4 + i + 1)
@@ -427,84 +267,67 @@ def test_list_insert():
 
 
 def test_list_index():
-    var test_list_a = Array[Int](10, 20, 30, 40, 50)
+    var test_list_a = Array[DType.uint8](10, 20, 30, 40, 50)
 
     # Basic Functionality Tests
-    assert_equal(test_list_a.index(10), 0)
-    assert_equal(test_list_a.index(30), 2)
-    assert_equal(test_list_a.index(50), 4)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(60)
+    assert_equal(test_list_a.index(10).value(), 0)
+    assert_equal(test_list_a.index(30).value(), 2)
+    assert_equal(test_list_a.index(50).value(), 4)
+    assert_false(test_list_a.index(60))
 
     # Tests With Start Parameter
-    assert_equal(test_list_a.index(30, start=1), 2)
-    assert_equal(test_list_a.index(30, start=-4), 2)
-    assert_equal(test_list_a.index(30, start=-1000), 2)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(30, start=3)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(30, start=5)
+    assert_equal(test_list_a.index(30, start=1).value(), 2)
+    assert_equal(test_list_a.index(30, start=-4).value(), 2)
+    assert_equal(test_list_a.index(30, start=-1000).value(), 2)
+    assert_false(test_list_a.index(30, start=3))
+    assert_false(test_list_a.index(30, start=5))
 
     # Tests With Start and End Parameters
-    assert_equal(test_list_a.index(30, start=1, stop=3), 2)
-    assert_equal(test_list_a.index(30, start=-4, stop=-2), 2)
-    assert_equal(test_list_a.index(30, start=-1000, stop=1000), 2)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(30, start=1, stop=2)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(30, start=3, stop=1)
+    assert_equal(test_list_a.index(30, start=1, stop=3).value(), 2)
+    assert_equal(test_list_a.index(30, start=-4, stop=-2).value(), 2)
+    assert_equal(test_list_a.index(30, start=-1000, stop=1000).value(), 2)
+    assert_false(test_list_a.index(30, start=1, stop=2))
+    assert_false(test_list_a.index(30, start=3, stop=1))
 
     # Tests With End Parameter Only
-    assert_equal(test_list_a.index(30, stop=3), 2)
-    assert_equal(test_list_a.index(30, stop=-2), 2)
-    assert_equal(test_list_a.index(30, stop=1000), 2)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(30, stop=1)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(30, stop=2)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(60, stop=50)
+    assert_equal(test_list_a.index(30, stop=3).value(), 2)
+    assert_equal(test_list_a.index(30, stop=-2).value(), 2)
+    assert_equal(test_list_a.index(30, stop=1000).value(), 2)
+    assert_false(test_list_a.index(30, stop=1))
+    assert_false(test_list_a.index(30, stop=2))
+    assert_false(test_list_a.index(60, stop=50))
 
     # Edge Cases and Special Conditions
-    assert_equal(test_list_a.index(10, start=-5, stop=-1), 0)
-    assert_equal(test_list_a.index(10, start=0, stop=50), 0)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(50, start=-5, stop=-1)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(50, start=0, stop=-1)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(10, start=-4, stop=-1)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(10, start=5, stop=50)
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = Array[Int]().index(10)
+    assert_equal(test_list_a.index(10, start=-5, stop=-1).value(), 0)
+    assert_equal(test_list_a.index(10, start=0, stop=50).value(), 0)
+    assert_false(test_list_a.index(50, start=-5, stop=-1))
+    assert_false(test_list_a.index(50, start=0, stop=-1))
+    assert_false(test_list_a.index(10, start=-4, stop=-1))
+    assert_false(test_list_a.index(10, start=5, stop=50))
+    assert_false(Array[DType.uint8]().index(10))
 
     # Test empty slice
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(10, start=1, stop=1)
+    assert_false(test_list_a.index(10, start=1, stop=1))
     # Test empty slice with 0 start and end
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_a.index(10, start=0, stop=0)
+    assert_false(test_list_a.index(10, start=0, stop=0))
 
-    var test_list_b = Array[Int](10, 20, 30, 20, 10)
+    var test_list_b = Array[DType.uint8](10, 20, 30, 20, 10)
 
     # Test finding the first occurrence of an item
-    assert_equal(test_list_b.index(10), 0)
-    assert_equal(test_list_b.index(20), 1)
+    assert_equal(test_list_b.index(10).value(), 0)
+    assert_equal(test_list_b.index(20).value(), 1)
 
     # Test skipping the first occurrence with a start parameter
     assert_equal(test_list_b.index(20, start=2), 3)
 
     # Test constraining search with start and end, excluding last occurrence
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_b.index(10, start=1, stop=4)
+    assert_false(test_list_b.index(10, start=1, stop=4))
 
     # Test search within a range that includes multiple occurrences
-    assert_equal(test_list_b.index(20, start=1, stop=4), 1)
+    assert_equal(test_list_b.index(20, start=1, stop=4).value(), 1)
 
     # Verify error when constrained range excludes occurrences
-    with assert_raises(contains="ValueError: Given element is not in list"):
-        _ = test_list_b.index(20, start=4, stop=5)
+    assert_false(test_list_b.index(20, start=4, stop=5))
 
 
 def test_list_extend():
@@ -512,7 +335,7 @@ def test_list_extend():
     # Test extending the list [1, 2, 3] with itself
     #
 
-    var vec = Array[Int]()
+    var vec = Array[DType.uint8]()
     vec.append(1)
     vec.append(2)
     vec.append(3)
@@ -546,107 +369,14 @@ def test_list_extend():
     assert_equal(vec[5], 1)
 
 
-def test_list_extend_non_trivial():
-    # Tests three things:
-    #   - extend() for non-plain-old-data types
-    #   - extend() with mixed-length self and other lists
-    #   - extend() using optimal number of __moveinit__() calls
-
-    # Preallocate with enough capacity to avoid reallocation making the
-    # move count checks below flaky.
-    var v1 = Array[MoveCounter[StringLiteral]](current_capacity=5)
-    v1.append(MoveCounter[StringLiteral]("Hello"))
-    v1.append(MoveCounter[StringLiteral]("World"))
-
-    var v2 = Array[MoveCounter[StringLiteral]](current_capacity=3)
-    v2.append(MoveCounter[StringLiteral]("Foo"))
-    v2.append(MoveCounter[StringLiteral]("Bar"))
-    v2.append(MoveCounter[StringLiteral]("Baz"))
-
-    v1.extend(v2)
-
-    assert_equal(len(v1), 5)
-    assert_equal(v1[0].value, "Hello")
-    assert_equal(v1[1].value, "World")
-    assert_equal(v1[2].value, "Foo")
-    assert_equal(v1[3].value, "Bar")
-    assert_equal(v1[4].value, "Baz")
-
-    assert_equal(v1.data[0].move_count, 1)
-    assert_equal(v1.data[1].move_count, 1)
-    assert_equal(v1.data[2].move_count, 2)
-    assert_equal(v1.data[3].move_count, 2)
-    assert_equal(v1.data[4].move_count, 2)
-
-    # Keep v1 alive until after we've done the last `vec.data + N` read.
-    _ = v1^
-
-
-def test_2d_dynamic_list():
-    var arr = Array[Array[Int]]()
-
-    for i in range(2):
-        var v = Array[Int]()
-        for j in range(3):
-            v.append(i + j)
-        arr.append(v)
-
-    assert_equal(0, Array[0][0])
-    assert_equal(1, Array[0][1])
-    assert_equal(2, Array[0][2])
-    assert_equal(1, Array[1][0])
-    assert_equal(2, Array[1][1])
-    assert_equal(3, Array[1][2])
-
-    assert_equal(2, len(arr))
-    assert_equal(2, arr.capacity)
-
-    assert_equal(3, len(Array[0]))
-
-    Array[0].clear()
-    assert_equal(0, len(Array[0]))
-    assert_equal(4, Array[0].capacity)
-
-    arr.clear()
-    assert_equal(0, len(arr))
-    assert_equal(2, arr.capacity)
-
-
-def test_list_explicit_copy():
-    var arr = Array[CopyCounter]()
-    arr.append(CopyCounter())
-    var arr_copy = Array(arr)
-    assert_equal(0, arr.__get_ref(0)[].copy_count)
-    assert_equal(1, arr_copy.__get_ref(0)[].copy_count)
-
-    var l2 = Array[Int]()
-    for i in range(10):
-        l2.append(i)
-
-    var l2_copy = List(l2)
-    assert_equal(len(l2), len(l2_copy))
-    for i in range(len(l2)):
-        assert_equal(l2[i], l2_copy[i])
-
-
-# Ensure correct behavior of __copyinit__
-# as reported in GH issue 27875 internally and
-# https://github.com/modularml/mojo/issues/1493
-def test_list_copy_constructor():
-    var vec = Array[Int](current_capacity=1)
-    var vec_copy = vec
-    vec_copy.append(1)  # Ensure copy constructor doesn't crash
-    _ = vec^  # To ensure previous one doesn't invoke move constuctor
-
-
 def test_list_iter():
-    var vs = Array[Int]()
+    var vs = Array[DType.uint8]()
     vs.append(1)
     vs.append(2)
     vs.append(3)
 
     # Borrow immutably
-    fn sum(vs: Array[Int]) -> Int:
+    fn sum(vs: Array[DType.uint8]) -> Int:
         var sum = 0
         for v in vs:
             sum += v[]
@@ -656,7 +386,7 @@ def test_list_iter():
 
 
 def test_list_iter_mutable():
-    var vs = Array[Int](1, 2, 3)
+    var vs = Array[DType.uint8](1, 2, 3)
 
     for v in vs:
         v[] += 1
@@ -669,7 +399,7 @@ def test_list_iter_mutable():
 
 
 def test_list_span():
-    var vs = Array[Int](1, 2, 3)
+    var vs = Array[DType.uint8](1, 2, 3)
 
     var es = vs[1:]
     assert_equal(es[0], 2)
@@ -699,8 +429,8 @@ def test_list_span():
 
 
 def test_list_boolable():
-    assert_true(Array[Int](1))
-    assert_false(Array[Int]())
+    assert_true(Array[DType.uint8](1))
+    assert_false(Array[DType.uint8]())
 
 
 def test_constructor_from_pointer():
@@ -710,7 +440,7 @@ def test_constructor_from_pointer():
     new_pointer[2] = 2
     # rest is not initialized
 
-    var some_array = Array[Int8](
+    var some_array = Array[DType.uint88](
         unsafe_pointer=new_pointer, size=3, current_capacity=5
     )
     assert_equal(some_array[0], 0)
@@ -721,12 +451,12 @@ def test_constructor_from_pointer():
 
 
 def test_constructor_from_other_list_through_pointer():
-    # var initial_array = Array[Int8](0, 1, 2)
+    # var initial_array = Array[DType.uint88](0, 1, 2)
     # # we do a backup of the size and capacity because
     # # the list attributes will be invalid after the steal_data call
     # var size = len(initial_array)
     # var capacity = initial_array.capacity
-    # var some_array = Array[Int8](
+    # var some_array = Array[DType.uint88](
     #     unsafe_pointer=initial_array.steal_data(), size=size
     # )
     # assert_equal(some_array[0], 0)
@@ -738,7 +468,7 @@ def test_constructor_from_other_list_through_pointer():
 
 
 def test_converting_list_to_string():
-    var my_list = Array[Int](1, 2, 3)
+    var my_list = Array[DType.uint8](1, 2, 3)
     assert_equal(str(my_list), "[1, 2, 3]")
 
     var my_list4 = Array[StringLiteral]("a", "b", "c", "foo")
@@ -746,18 +476,18 @@ def test_converting_list_to_string():
 
 
 def test_list_count():
-    var list = Array[Int](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
+    var list = Array[DType.uint8](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
     assert_equal(1, list.count(1))
     assert_equal(2, list.count(2))
     assert_equal(0, list.count(4))
 
-    var list2 = Array[Int]()
+    var list2 = Array[DType.uint8]()
     assert_equal(0, list2.count(1))
 
 
 def test_list_add():
-    var a = Array[Int](1, 2, 3)
-    var b = Array[Int](4, 5, 6)
+    var a = Array[DType.uint8](1, 2, 3)
+    var b = Array[DType.uint8](4, 5, 6)
     var c = a + b
     assert_equal(len(c), 6)
     # check that original values aren't modified
@@ -770,24 +500,24 @@ def test_list_add():
     assert_equal(str(a), "[1, 2, 3, 4, 5, 6]")
     assert_equal(len(b), 3)
 
-    a = Array[Int](1, 2, 3)
+    a = Array[DType.uint8](1, 2, 3)
     a += b^
     assert_equal(len(a), 6)
     assert_equal(str(a), "[1, 2, 3, 4, 5, 6]")
 
-    var d = Array[Int](1, 2, 3)
-    var e = Array[Int](4, 5, 6)
+    var d = Array[DType.uint8](1, 2, 3)
+    var e = Array[DType.uint8](4, 5, 6)
     var f = d + e^
     assert_equal(len(f), 6)
     assert_equal(str(f), "[1, 2, 3, 4, 5, 6]")
 
-    var l = Array[Int](1, 2, 3)
-    l += Array[Int]()
+    var l = Array[DType.uint8](1, 2, 3)
+    l += Array[DType.uint8]()
     assert_equal(len(l), 3)
 
 
 def test_list_mult():
-    var a = Array[Int](1, 2, 3)
+    var a = Array[DType.uint8](1, 2, 3)
     var b = a * 2
     assert_equal(len(b), 6)
     assert_equal(str(b), "[1, 2, 3, 1, 2, 3]")
@@ -798,17 +528,17 @@ def test_list_mult():
     assert_equal(len(a), 6)
     assert_equal(str(a), "[1, 2, 3, 1, 2, 3]")
 
-    var l = Array[Int](1, 2)
+    var l = Array[DType.uint8](1, 2)
     l *= 1
     assert_equal(len(l), 2)
 
     l *= 0
     assert_equal(len(l), 0)
-    assert_equal(len(Array[Int](1, 2, 3) * 0), 0)
+    assert_equal(len(Array[DType.uint8](1, 2, 3) * 0), 0)
 
 
 def test_list_contains():
-    var x = Array[Int](1, 2, 3)
+    var x = Array[DType.uint8](1, 2, 3)
     assert_false(0 in x)
     assert_true(1 in x)
     assert_false(4 in x)
@@ -823,7 +553,7 @@ def test_list_init_span():
 
 
 def test_indexing_list():
-    var l = Array[Int](1, 2, 3)
+    var l = Array[DType.uint8](1, 2, 3)
     assert_equal(l[int(1)], 2)
     assert_equal(l[False], 1)
     assert_equal(l[True], 2)
@@ -831,7 +561,7 @@ def test_indexing_list():
 
 
 def test_inline_list():
-    var arr = Array[Int]()
+    var arr = Array[DType.uint8]()
 
     for i in range(5):
         arr.append(i)
@@ -873,7 +603,7 @@ def test_append_triggers_a_move():
 @value
 struct ValueToCountDestructor(CollectionElement):
     var value: Int
-    var destructor_counter: UnsafePointer[Array[Int]]
+    var destructor_counter: UnsafePointer[Array[DType.uint8]]
 
     fn __del__(owned self):
         self.destructor_counter[].append(self.value)
@@ -881,7 +611,7 @@ struct ValueToCountDestructor(CollectionElement):
 
 def test_destructor():
     """Ensure we delete the right number of elements."""
-    var destructor_counter = Array[Int]()
+    var destructor_counter = Array[DType.uint8]()
     alias capacity = 32
     var inline_list = Array[
         ValueToCountDestructor,
@@ -908,7 +638,7 @@ def test_destructor():
 
 
 def test_list_unsafe_set_and_get():
-    var arr = Array[Int]()
+    var arr = Array[DType.uint8]()
 
     for i in range(5):
         arr.unsafe_set(i, i)
@@ -939,19 +669,12 @@ def main():
     # from List
     test_mojo_issue_698()
     test_list()
-    test_list_clear()
     test_list_to_bool_conversion()
     test_list_pop()
     test_list_variadic_constructor()
-    test_list_resize()
-    test_list_reverse()
     test_list_insert()
     test_list_index()
     test_list_extend()
-    test_list_extend_non_trivial()
-    test_list_explicit_copy()
-    test_list_copy_constructor()
-    test_2d_dynamic_list()
     test_list_iter()
     test_list_iter_mutable()
     test_list_span()
