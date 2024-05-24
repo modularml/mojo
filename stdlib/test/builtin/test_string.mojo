@@ -634,6 +634,57 @@ fn test_split() raises:
     assert_equal(res4[1], "o")
 
 
+fn test_splitlines() raises:
+    # Test with no line breaks
+    var in1 = String("hello world")
+    var res1 = in1.splitlines()
+    assert_equal(len(res1), 1)
+    assert_equal(res1[0], "hello world")
+
+    # Test with \n line break
+    var in2 = String("hello\nworld")
+    var res2 = in2.splitlines()
+    assert_equal(len(res2), 2)
+    assert_equal(res2[0], "hello")
+    assert_equal(res2[1], "world")
+
+    # Test with \r\n line break
+    var in3 = String("hello\r\nworld")
+    var res3 = in3.splitlines()
+    assert_equal(len(res3), 2)
+    assert_equal(res3[0], "hello")
+    assert_equal(res3[1], "world")
+
+    # Test with \r line break
+    var in4 = String("hello\rworld")
+    var res4 = in4.splitlines()
+    assert_equal(len(res4), 2)
+    assert_equal(res4[0], "hello")
+    assert_equal(res4[1], "world")
+
+    # Test with multiple different line breaks
+    var in5 = String("hello\nworld\r\nmojo\rlanguage")
+    var res5 = in5.splitlines()
+    assert_equal(len(res5), 4)
+    assert_equal(res5[0], "hello")
+    assert_equal(res5[1], "world")
+    assert_equal(res5[2], "mojo")
+    assert_equal(res5[3], "language")
+
+    # Test with keepends=True
+    var res6 = in5.splitlines(keepends=True)
+    assert_equal(len(res6), 4)
+    assert_equal(res6[0], "hello\n")
+    assert_equal(res6[1], "world\r\n")
+    assert_equal(res6[2], "mojo\r")
+    assert_equal(res6[3], "language")
+
+    # Test with an empty string
+    var in7 = String("")
+    var res7 = in7.splitlines()
+    assert_equal(len(res7), 0)
+
+
 fn test_isupper() raises:
     assert_true(isupper(ord("A")))
     assert_true(isupper(ord("B")))
@@ -932,6 +983,7 @@ def main():
     test_replace()
     test_rfind()
     test_split()
+    test_splitlines()
     test_isupper()
     test_islower()
     test_lower()

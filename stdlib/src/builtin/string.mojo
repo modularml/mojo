@@ -1446,6 +1446,48 @@ struct String(
 
         return output
 
+    fn splitlines(self, keepends: Bool = False) -> List[String]:
+        """Split the string at line boundaries.
+
+        Args:
+          keepends: If True, line breaks are kept in the resulting strings.
+
+        Returns:
+          A List of Strings containing the input split by line boundaries.
+        """
+        var output = List[String]()
+        var length = len(self)
+        var current_offset = 0
+
+        while current_offset < length:
+            # Find the position of the next newline character
+            var loc_n = self.find("\n", current_offset)
+            var loc_r = self.find("\r", current_offset)
+
+            if loc_n == -1 and loc_r == -1:
+                # No more newlines found, add the remaining part of the string
+                output.append(self[current_offset:])
+                break
+
+            # Determine the earliest newline character
+            var loc = loc_n
+            if loc_r != -1 and (loc_r < loc_n or loc_n == -1):
+                loc = loc_r
+
+            # Determine the end of line (eol) position
+            var eol = loc
+            if self[loc] == "\r" and loc + 1 < length and self[loc + 1] == "\n":
+                loc += 1  # Handle \r\n as a single line break
+
+            if keepends:
+                output.append(self[current_offset : loc + 1])
+            else:
+                output.append(self[current_offset:eol])
+
+            current_offset = loc + 1
+
+        return output
+
     fn replace(self, old: String, new: String) -> String:
         """Return a copy of the string with all occurrences of substring `old`
         if replaced by `new`.
