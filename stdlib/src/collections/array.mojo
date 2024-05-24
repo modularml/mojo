@@ -34,8 +34,6 @@ struct _ArrayIter[
     current_capacity: Int,
     capacity_jump: Int,
     max_stack_size: Int,
-    mutability: Bool,
-    lifetime: AnyLifetime[mutability].type,
     forward: Bool = True,
 ](Sized):
     """Iterator for Array.
@@ -45,53 +43,50 @@ struct _ArrayIter[
         current_capacity: The maximum number of elements that the Array can hold.
         capacity_jump: The amount of items to expand in each stack enlargment.
         max_stack_size: The maximum size in the stack.
-        mutability: Whether the reference to the Array is mutable.
-        lifetime: The lifetime of the Array
         forward: The iteration direction. `False` is backwards.
     """
 
     alias type = Array[T, current_capacity, capacity_jump, max_stack_size]
 
     var index: Int
-    var src: Reference[Self.type, mutability, lifetime]
+    var src: Self.type
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T.type, mutability, lifetime]:
+    ) -> Scalar[T]:
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__refitem__(self.index - 1)
+            return self.src[self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__refitem__(self.index)
+            return self.src[self.index]
 
     fn __len__(self) -> Int:
         @parameter
         if forward:
-            return len(self.src[]) - self.index
+            return len(self.src) - self.index
         else:
             return self.index
 
 
 struct Array[
-    T: DType,
-    current_capacity: Int = 8,
-    capacity_jump: Int = 8,
-    max_stack_size: Int = 4 * current_capacity,
+    T: DType = DType.index,
+    current_capacity: Int = T.bitwidth() // 8,
+    capacity_jump: Int = T.bitwidth() // 8,
+    max_stack_size: Int = 4 * (T.bitwidth() // 8),
 ](CollectionElement, Sized, Boolable):
     """A Array allocated on the stack with a current_capacity and
     max_stack_size known at compile time.
 
-    It is backed by an `InlineArray` and an `List` for its stack and heap.
-    This struct has the same API as a regular `Array`.
+    It is backed by a `SIMD` vector. This struct has the same API
+    as a regular `Array`.
 
-    This is typically faster than Python's `Array` as it is mostly stack-allocated and
-    does not require any dynamic memory allocation unless max_stack_size is
-    exceeded, at which point the InlineArray morphs into a List under the hood.
+    This is typically faster than Python's `Array` as it is stack-allocated
+    and does not require any dynamic memory allocation.
 
     Parameters:
         T: The type of the elements in the Array.
@@ -100,8 +95,8 @@ struct Array[
         max_stack_size: The maximum size in the stack.
     """
 
-    alias _stack_type = SIMD[T, current_capacity]
-    var _stack: Self._stack_type
+    alias _vec_type = SIMD[T, current_capacity]
+    var vec: Self._vec_type
     alias _scalar_type = Scalar[T]
     var stack_left: UInt8
     """The capacity left in the Stack."""
@@ -109,7 +104,18 @@ struct Array[
     @always_inline
     fn __init__(inout self):
         """This constructor creates an empty Array."""
-        self._stack = Self._stack_type()
+        self.vec = Self._vec_type()
+        self.stack_left = current_capacity
+
+    @always_inline
+    fn __init__(inout self, value: Self._scalar_type):
+        """Constructs a Array by filling it with the
+        given value.
+
+        Args:
+            value: The value to populate the Array with.
+        """
+        self.vec = Self._vec_type(value)
         self.stack_left = current_capacity
 
     # TODO: Avoid copying elements in once owned varargs
@@ -129,7 +135,7 @@ struct Array[
         for value in values:
             self.append(value)
 
-    fn __init__(inout self, values: Self._stack_type):
+    fn __init__(inout self, values: Self._vec_type):
         """Constructs a Array from the given values.
 
         Args:
@@ -137,7 +143,7 @@ struct Array[
         """
         self = Self()
         var delta = max(0, current_capacity - len(values))
-        for value in range(current_capacity - delta):
+        for value in range(current_capacity - delta):  # FIXME
             self.append(value)
 
     fn __init__[
@@ -166,7 +172,7 @@ struct Array[
     #     """
     #     var size = min(current_capacity, existing.size)
     #     # TODO: need a SIMD constructor from DTypePointer/UnsafePointer
-    #     self._stack = Self._stack_type(existing.unsafe_ptr(), size)
+    #     self.vec = Self._vec_type(existing.unsafe_ptr(), size)
     #     self.stack_left =  current_capacity - size
 
     # fn __init__(
@@ -183,7 +189,7 @@ struct Array[
     #     """
     #     var s = min(current_capacity, size)
     #     # TODO: need a SIMD constructor from DTypePointer/UnsafePointer
-    #     self._stack = Self._stack_type(unsafe_pointer, s)
+    #     self.vec = Self._vec_type(unsafe_pointer, s)
     #     self.stack_left = current_capacity - s
 
     @always_inline
@@ -202,32 +208,21 @@ struct Array[
         self.stack_left = max(0, self.stack_left - 1)
 
     @always_inline
-    fn __refitem__(
-        self: Reference[Self, _, _], owned idx: Int
-    ) -> Reference[Self.T.type, self.is_mutable, self.lifetime]:
-        """Get a `Reference` to the element at the given index.
+    fn append[cap: Int](inout self, owned other: Array[T, cap]):
+        """Appends another Array to the Array. Can only append up to
+        current_capacity.
 
         Args:
-            idx: The index of the item.
-
-        Returns:
-            A reference to the item at the given index.
+            other: The Array to append.
         """
-        debug_assert(abs(idx) > len(self[]), "Index must be within bounds.")
-
-        var i = idx if idx > 0 else len(self[]) + idx
-        return self[][i]
+        var r = min(Self.current_capacity, other.current_capacity)
+        for i in range(r):
+            self[len(self) - 1 + i] = other[i]
+        self.stack_left = max(0, self.stack_left - r)
 
     fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _ArrayIter[
-        T,
-        current_capacity,
-        capacity_jump,
-        max_stack_size,
-        self.is_mutable,
-        self.lifetime,
-    ]:
+        self,
+    ) -> _ArrayIter[T, current_capacity, capacity_jump, max_stack_size]:
         """Iterate over elements of the Array, returning immutable references.
 
         Returns:
@@ -236,40 +231,23 @@ struct Array[
         return _ArrayIter(0, self)
 
     fn __reversed__(
-        self: Reference[Self, _, _]
-    ) -> _ArrayIter[
-        T,
-        current_capacity,
-        capacity_jump,
-        max_stack_size,
-        self.is_mutable,
-        self.lifetime,
-        False,
-    ]:
+        self,
+    ) -> _ArrayIter[T, current_capacity, capacity_jump, max_stack_size, False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the list elements.
         """
-        return _ArrayIter[forward=False](len(self[]), self)
+        return _ArrayIter[forward=False](len(self), self)
 
     @always_inline
-    fn __contains__[
-        C: ComparableCollectionElement
-    ](
-        self: Reference[
-            Array[C, current_capacity, capacity_jump, max_stack_size]
-        ],
-        value: Scalar[C],
-    ) -> Bool:
+    fn __contains__(self, value: Self._scalar_type) -> Bool:
         """Verify if a given value is present in the Array.
 
         ```mojo
-        var x = Array[Int](1,2,3)
+        var x = Array(1,2,3)
         if 3 in x: print("x contains 3")
         ```
-        Parameters:
-            C: The type of the elements in the Array.
 
         Args:
             value: The value to find.
@@ -277,10 +255,8 @@ struct Array[
         Returns:
             True if the value is contained in the Array, False otherwise.
         """
-
-        constrained[_type_is_eq[T.type, C.type](), "value type is not self.T"]()
-        for i in range(len(self[])):
-            if value == self[]._stack[i]:
+        for i in range(len(self)):
+            if value == self.vec[i]:
                 return True
         return False
 
@@ -299,9 +275,8 @@ struct Array[
         Args:
             existing: The existing Array.
         """
-        self._stack = existing._stack
+        self.vec = existing.vec
         self.stack_left = existing.stack_left
-        # TODO deal with different capacities ?
 
     fn __copyinit__(inout self, existing: Self):
         """Creates a deepcopy of the given Array.
@@ -322,107 +297,89 @@ struct Array[
         """
         debug_assert(abs(idx) > len(self), "index must be within bounds")
         var norm_idx = idx if idx > 0 else min(0, len(self) + idx)
-        self._stack[norm_idx] = value
+        self.vec[norm_idx] = value
 
     @always_inline("nodebug")
-    fn __add__(self, owned other: Self) -> Self:
-        """Concatenates self with other and returns the result as a new list.
+    fn concat(
+        self, owned other: Self
+    ) -> Array[
+        T,
+        min(
+            Self.max_stack_size, Self.current_capacity + other.current_capacity
+        ),
+    ]:
+        """Concatenates self with other and returns the result as a new Array.
 
         Args:
-            other: List whose elements will be combined with the elements of self.
+            other: Array whose elements will be combined with the elements of self.
 
         Returns:
-            The newly created list.
+            The newly created Array.
         """
-        return Self(self._stack + other._stack)
+        if Self.current_capacity + other.current_capacity > max_stack_size:
+            # TODO
+            pass
+        var arr = Array[T, Self.current_capacity + other.current_capacity]()
+        arr.extend(self.vec)
+        arr.extend(other.vec)
+        return arr
 
-    @always_inline("nodebug")
-    fn __iadd__(inout self, owned other: Self):
-        """Appends the elements of other into self.
+    fn __str__(self) -> String:
+        """Returns a string representation of an `Array`.
 
-        Args:
-            other: List whose elements will be appended to self.
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_array = Array(1, 2, 3)
+        print(str(my_array))
+        ```
+
+        When the compiler supports conditional methods, then a simple `str(my_array)` will
+        be enough.
+
+        The elements' type must implement the `__str__()` for this to work.
+
+        Returns:
+            A string representation of the array.
         """
-        self.extend(other^)
+        # we do a rough estimation of the number of chars that we'll see
+        # in the final string, we assume that str(x) will be at least one char.
+        var minimum_capacity = (
+            2  # '[' and ']'
+            + len(self) * 3  # str(x) and ", "
+            - 2  # remove the last ", "
+        )
+        var string_buffer = List[UInt8](capacity=minimum_capacity)
+        string_buffer.append(0)  # Null terminator
+        var result = String(string_buffer^)
+        result += "["
+        for i in range(len(self)):
+            result += str(self[i])
+            if i < len(self) - 1:
+                result += ", "
+        result += "]"
+        return result
 
-    # # TODO: Remove explicit self type when issue 1876 is resolved.
-    # fn __str__[
-    #     U: DType
-    # ](
-    #     self: Reference[
-    #         Array[U, current_capacity, capacity_jump, max_stack_size]
-    #     ]
-    # ) -> String:
-    #     """Returns a string representation of an `Array`.
+    fn __repr__(self) -> String:
+        """Returns a string representation of an `Array`.
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
 
-    #     Note that since we can't condition methods on a trait yet,
-    #     the way to call this method is a bit special. Here is an example below:
+        ```mojo
+        var my_array = Array(1, 2, 3)
+        print(repr(my_array))
+        ```
 
-    #     ```mojo
-    #     var my_array = Array[Int](1, 2, 3)
-    #     print(my_array.__str__())
-    #     ```
+        When the compiler supports conditional methods, then a simple `repr(my_array)` will
+        be enough.
 
-    #     When the compiler supports conditional methods, then a simple `str(my_array)` will
-    #     be enough.
+        The elements' type must implement the `__repr__()` for this to work.
 
-    #     The elements' type must implement the `__repr__()` for this to work.
-
-    #     Parameters:
-    #         U: The type of the elements in the array. Must implement the
-    #           traits `Representable` and `CollectionElement`.
-
-    #     Returns:
-    #         A string representation of the array.
-    #     """
-    #     # we do a rough estimation of the number of chars that we'll see
-    #     # in the final string, we assume that str(x) will be at least one char.
-    #     var minimum_capacity = (
-    #         2  # '[' and ']'
-    #         + len(self[]) * 3  # str(x) and ", "
-    #         - 2  # remove the last ", "
-    #     )
-    #     var string_buffer = List[UInt8](capacity=minimum_capacity)
-    #     string_buffer.append(0)  # Null terminator
-    #     var result = String(string_buffer^)
-    #     result += "["
-    #     for i in range(len(self[])):
-    #         result += repr(self[][i])
-    #         if i < len(self[]) - 1:
-    #             result += ", "
-    #     result += "]"
-    #     return result
-
-    # # TODO: Remove explicit self type when issue 1876 is resolved.
-    # fn __repr__[
-    #     U: DType
-    # ](
-    #     self: Reference[
-    #         Array[U, current_capacity, capacity_jump, max_stack_size]
-    #     ]
-    # ) -> String:
-    #     """Returns a string representation of an `Array`.
-    #     Note that since we can't condition methods on a trait yet,
-    #     the way to call this method is a bit special. Here is an example below:
-
-    #     ```mojo
-    #     var my_array = Array[Int](1, 2, 3)
-    #     print(my_array.__repr__(my_array))
-    #     ```
-
-    #     When the compiler supports conditional methods, then a simple `repr(my_array)` will
-    #     be enough.
-
-    #     The elements' type must implement the `__repr__()` for this to work.
-
-    #     Parameters:
-    #         U: The type of the elements in the array. Must implement the
-    #           traits `Representable` and `CollectionElement`.
-
-    #     Returns:
-    #         A string representation of the array.
-    #     """
-    #     return self[].__str__()
+        Returns:
+            A string representation of the array.
+        """
+        return str(self)
 
     @always_inline
     fn insert(inout self, i: Int, owned value: Self._scalar_type):
@@ -439,13 +396,13 @@ struct Array[
 
         var previous = value
         for i in range(norm_idx, len(self)):
-            var tmp = self._stack[i]
-            self._stack[i] = previous
+            var tmp = self.vec[i]
+            self.vec[i] = previous
             previous = tmp
         self.append(previous)
 
     @always_inline
-    fn extend(inout self, owned other: Self):
+    fn extend[cap: Int](inout self, owned other: Array[T, cap]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -453,19 +410,18 @@ struct Array[
         """
         alias cap_sum = current_capacity + other.current_capacity
         if self.stack_left - len(other) < current_capacity:
-            for val in other:
-                self.append(Self._scalar_type(val[]))  # FIXME
+            self.append(other)
             return
         elif cap_sum < max_stack_size:
             alias new_arr = Array[T, cap_sum, capacity_jump, max_stack_size]
-            var s = rebind[SIMD[T, cap_sum]](self._stack)
+            var s = rebind[SIMD[T, cap_sum]](self.vec)
             self = new_arr(s)
-            self.extend(other)
+            self.append(other)
             return
         alias new_arr = Array[T, max_stack_size, capacity_jump, max_stack_size]
-        var s = rebind[SIMD[T, max_stack_size]](self._stack)
+        var s = rebind[SIMD[T, max_stack_size]](self.vec)
         self = new_arr(s)
-        self.extend(other)
+        self.append(other)
 
     @always_inline
     fn pop(inout self, i: Int = -1) -> Self._scalar_type:
@@ -480,14 +436,12 @@ struct Array[
         debug_assert(abs(i) > len(self), "pop index out of range")
         var norm_idx = i if i > 0 else len(self) + i
         self.stack_left += 1
-        return self._stack[norm_idx]
+        return self.vec[norm_idx]
 
     # TODO: Remove explicit self type when issue 1876 is resolved.
-    fn index[
-        C: ComparableCollectionElement, cap: Int, cap_j: Int, max_stack: Int
-    ](
-        self: Reference[Array[C, cap, cap_j, max_stack]],
-        value: C,
+    fn index(
+        self,
+        value: Self._scalar_type,
         start: Int = 0,
         stop: Optional[Int] = None,
     ) -> Optional[Int]:
@@ -496,7 +450,7 @@ struct Array[
         restricted by the range given the start and stop bounds.
 
         ```mojo
-        var my_array = Array[Int](1, 2, 3)
+        var my_array = Array(1, 2, 3)
         print(my_array.index(2)) # prints `1`
         ```
 
@@ -507,17 +461,10 @@ struct Array[
             stop: The ending index of the search, treated as a slice index
                 (defaults to None, which means the end of the Array).
 
-        Parameters:
-            C: The type of the elements in the Array. Must implement the
-                `ComparableCollectionElement` trait.
-            cap: The maximum number of elements that the Array can hold.
-            cap_j: The amount of items to expand in each stack enlargment.
-            max_stack: The maximum size in the stack.
-
         Returns:
             The Optional index of the first occurrence of the value in the Array.
         """
-        var size = len(self[])
+        var size = len(self)
         debug_assert(abs(start) > size, "start index must be within bounds")
         var start_norm = start if start > 0 else min(0, size + start)
 
@@ -530,47 +477,46 @@ struct Array[
         stop_norm = max(stop_norm, min(0, size))
 
         for i in range(start_norm, stop_norm):
-            if self[][i] == value:
+            if self[i] == value:
                 return i
         return None
 
-    fn steal_data(inout self) -> Self._stack_type:
-        """Take ownership of the underlying pointer from the list.
+    fn steal_data(inout self) -> Self._vec_type:
+        """Take ownership of the underlying pointer from the Array.
 
         Returns:
             The underlying data.
         """
-        return self._stack
+        return self.vec
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
-        """Adjusts the span based on the list length."""
-        var adjusted_span = span
+        """Adjusts the span based on the Array length."""
+        var new_span = span
 
-        if adjusted_span.start < 0:
-            adjusted_span.start = len(self) + adjusted_span.start
+        if new_span.start < 0:
+            new_span.start = max(0, len(self) + new_span.start)
 
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
-            adjusted_span.end = len(self) + adjusted_span.end
+        if not new_span._has_end():
+            new_span.end = len(self)
+        elif new_span.end < 0:
+            new_span.end = max(0, len(self) + new_span.end)
 
         if span.step < 0:
-            var tmp = adjusted_span.end
-            adjusted_span.end = adjusted_span.start - 1
-            adjusted_span.start = tmp - 1
-
-        return adjusted_span
+            var tmp = new_span.end
+            new_span.end = new_span.start - 1
+            new_span.start = tmp - 1
+        return new_span
 
     @always_inline
     fn __getitem__(self, span: Slice) -> Self:
         """Gets the sequence of elements at the specified positions.
 
         Args:
-            span: A slice that specifies positions of the new list.
+            span: A slice that specifies positions of the new Array.
 
         Returns:
-            A new list containing the list at the specified span.
+            A new Array containing the Array at the specified span.
         """
 
         var adjusted_span = self._adjust_span(span)
@@ -594,29 +540,17 @@ struct Array[
         Returns:
             A copy of the element at the given index.
         """
-        return self._stack[idx]
+        return self.vec[idx]
 
-    fn count[
-        C: ComparableCollectionElement, cap: Int, cap_j: Int, max_stack: Int
-    ](self: Reference[Array[C, cap, cap_j, max_stack]], value: C) -> Int:
-        """Counts the number of occurrences of a value in the list.
+    fn count(self, value: Self._scalar_type) -> Int:
+        """Counts the number of occurrences of a value in the Array.
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below.
 
         ```mojo
-        var my_list = List[Int](1, 2, 3)
-        print(my_list.count(1))
+        var my_array = Array(1, 2, 3)
+        print(my_array.count(1))
         ```
-
-        When the compiler supports conditional methods, then a simple `my_list.count(1)`
-        will be enough.
-
-        Parameters:
-            C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
-            cap: The maximum number of elements that the Array can hold.
-            cap_j: The amount of items to expand in each stack enlargment.
-            max_stack: The maximum size in the stack.
 
         Args:
             value: The value to count.
@@ -625,22 +559,22 @@ struct Array[
             The number of occurrences of the value in the list.
         """
         var count = 0
-        for elem in self[]:
-            if elem[] == value:
+        for elem in self:
+            if elem == value:
                 count += 1
         return count
 
-    @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[Self._scalar_type]:
-        """Retrieves a pointer to the underlying memory.
+    # @always_inline
+    # fn unsafe_ptr(self) -> UnsafePointer[Self._scalar_type]:
+    #     """Retrieves a pointer to the underlying memory.
 
-        Returns:
-            The UnsafePointer to the underlying memory.
-        """
-        return UnsafePointer(self._stack)
+    #     Returns:
+    #         The UnsafePointer to the underlying memory.
+    #     """
+    #     var asd =  UnsafePointer[Self._scalar_type](self.vec[0]) # FIXME
 
     @always_inline
-    fn unsafe_get(self: Reference[Self, _, _], idx: Int) -> Self._scalar_type:
+    fn unsafe_get(self, idx: Int) -> Self._scalar_type:
         """Get a reference to an element of self without checking index bounds.
         Users should consider using `__getitem__` instead of this method as it is unsafe.
         If an index is out of bounds, this method will not abort, it will be considered
@@ -657,8 +591,8 @@ struct Array[
         Returns:
             A reference to the element at the given index.
         """
-        debug_assert(abs(idx) > len(self[]), "index must be within bounds")
-        return self[]._stack[idx]
+        debug_assert(abs(idx) > len(self), "index must be within bounds")
+        return self.vec[idx]
 
     @always_inline
     fn unsafe_set(inout self, idx: Int, value: Self._scalar_type):
@@ -677,4 +611,202 @@ struct Array[
             value: The element.
         """
         debug_assert(abs(idx) > len(self), "index must be within bounds")
-        self._stack[idx] = value
+        self.vec[idx] = value
+
+    @always_inline("nodebug")
+    fn sum(self) -> Self._scalar_type:
+        """Calculates the sum of all elements.
+
+        Returns:
+            The result.
+        """
+        return self.vec.reduce_add()
+
+    @always_inline("nodebug")
+    fn avg(self) -> Self._scalar_type:
+        """Calculates the average of all elements.
+
+        Returns:
+            The result.
+        """
+        return self.vec.reduce_add() / len(self)
+
+    @always_inline("nodebug")
+    fn min(self) -> Self._scalar_type:
+        """Calculates the minimum of all elements.
+
+        Returns:
+            The result.
+        """
+        return self.vec.reduce_min()
+
+    @always_inline("nodebug")
+    fn max(self) -> Self._scalar_type:
+        """Calculates the maximum of all elements.
+
+        Returns:
+            The result.
+        """
+        return self.vec.reduce_max()
+
+    @always_inline("nodebug")
+    fn min[cap: Int](self, other: Array[T, cap]) -> Self._scalar_type:
+        """Computes the elementwise minimum between the two vectors.
+
+        Args:
+            other: The other SIMD vector.
+
+        Returns:
+            A new SIMD vector where each element at position
+                i is min(self[i], other[i]).
+        """
+        alias delta = Self.current_capacity - other.current_capacity
+
+        @parameter
+        if delta == 0:
+            return self.vec.min(rebind[Self._vec_type](other.vec))
+        elif delta > 0:
+            var s = Self()
+            s.extend(other.vec)
+            return self.vec.min(s.vec)
+        else:
+            var s = Array[T, cap]()
+            s.extend(self.vec)
+            return other.vec.min(s.vec)
+
+    @always_inline("nodebug")
+    fn max[cap: Int](self, other: Array[T, cap]) -> Self._scalar_type:
+        """Computes the elementwise maximum between the two Arrays.
+
+        Args:
+            other: The other SIMD vector.
+
+        Returns:
+            A new SIMD vector where each element at position
+                i is max(self[i], other[i]).
+        """
+        alias delta = Self.current_capacity - other.current_capacity
+
+        @parameter
+        if delta == 0:
+            return self.vec.max(rebind[Self._vec_type](other.vec))
+        elif delta > 0:
+            var s = Self()
+            s.extend(other.vec)
+            return self.vec.max(s.vec)
+        else:
+            var s = Array[T, cap]()
+            s.extend(self.vec)
+            return other.vec.max(s.vec)
+
+    @always_inline("nodebug")
+    fn dot(self, other: Self) -> Self._scalar_type:
+        """Calculates the dot product between two Arrays.
+
+        Returns:
+            The result.
+        """
+        return (self.vec + other.vec).reduce_add()
+
+    @always_inline("nodebug")
+    fn __mul__(self, other: Self) -> Self._scalar_type:
+        """Calculates the dot product between two Arrays.
+
+        Returns:
+            The result.
+        """
+        return self.dot(self)
+
+    @always_inline("nodebug")
+    fn cross(self, other: Self) -> Self:
+        """Calculates the cross product between two Arrays.
+
+        Returns:
+            The result.
+        """
+        # TODO
+        return self
+
+    @always_inline
+    fn __add__[
+        cap: Int
+    ](self, other: Array[T, cap]) -> Array[T, max(current_capacity, cap)]:
+        """Computes the elementwise addition between the two Arrays.
+
+        Args:
+            other: The other SIMD vector.
+
+        Returns:
+            A new SIMD vector where each element at position
+                i is self[i] + other[i].
+        """
+        alias new_simd = SIMD[T, max(current_capacity, cap)]
+        alias new_arr = Array[T, max(current_capacity, cap)]
+        alias delta = Self.current_capacity - other.current_capacity
+
+        @parameter
+        if delta == 0:
+            # FIXME no idea why but this doesn't currently accept using the alias
+            return rebind[SIMD[T, max(current_capacity, cap)]](
+                self.vec
+            ) + rebind[new_simd](other.vec)
+        elif delta > 0:
+            var s = new_arr()
+            s.extend(other.vec)
+            return rebind[new_simd](self.vec) + s.vec
+        else:
+            var s = new_arr()
+            s.extend(self.vec)
+            return rebind[new_simd](other.vec) + s.vec
+
+    @always_inline
+    fn __sub__[
+        cap: Int
+    ](self, other: Array[T, cap]) -> Array[T, max(current_capacity, cap)]:
+        """Computes the elementwise subtraction between the two Arrays.
+
+        Args:
+            other: The other SIMD vector.
+
+        Returns:
+            A new SIMD vector where each element at position
+                i is self[i] - other[i].
+        """
+        alias new_simd = SIMD[T, max(current_capacity, cap)]
+        alias new_arr = Array[T, max(current_capacity, cap)]
+        alias delta = Self.current_capacity - other.current_capacity
+
+        @parameter
+        if delta == 0:
+            # FIXME no idea why but this doesn't currently accept using the alias
+            return rebind[SIMD[T, max(current_capacity, cap)]](
+                self.vec
+            ) - rebind[new_simd](other.vec)
+        elif delta > 0:
+            var s = new_arr()
+            s.extend(other.vec)
+            return rebind[new_simd](self.vec) - s.vec
+        else:
+            var s = new_arr()
+            s.extend(self.vec)
+            return rebind[new_simd](other.vec) - s.vec
+
+    @always_inline("nodebug")
+    fn __iadd__[cap: Int](inout self, owned other: Array[T, cap]):
+        """Computes the elementwise addition between the two Arrays
+        inplace.
+
+        Args:
+            other: The other Array.
+        """
+        self = self + other
+
+    @always_inline("nodebug")
+    fn __isub__[cap: Int](inout self, owned other: Array[T, cap]):
+        """Computes the elementwise subtraction between the two Arrays
+        inplace.
+
+        Args:
+            other: The other Array.
+        """
+        self = self - other
