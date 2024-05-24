@@ -49,11 +49,13 @@ config.available_features.add(platform.system().lower())
 # to allow running the tests with LLVM sanitizers.
 config.substitutions.insert(0, ("%mojo", "mojo"))
 
-# The `mojo` nightly compiler ships with its own `stdlib.mojopkg`
-# For the open-source stdlib, we need to specify the paths to the
-# just-built `stdlib.mojopkg` and `test_utils.mojopkg`.  Otherwise,
-# without this, the `mojo` compiler would use its own `stdlib.mojopkg`
-# it ships with which is not what we want.
+# The `mojo` nightly compiler ships with its own `stdlib.mojopkg`. For the
+# open-source stdlib, we need to specify the paths to the just-built
+# `stdlib.mojopkg` and `test_utils.mojopkg`. Otherwise, without this, the
+# `mojo` compiler would use its own `stdlib.mojopkg` it ships with which is not
+# what we want. We override both the stable and nightly `mojo` import paths
+# here to support both versions of the compiler.
+os.environ["MODULAR_MOJO_IMPORT_PATH"] = str(build_root)
 os.environ["MODULAR_MOJO_NIGHTLY_IMPORT_PATH"] = str(build_root)
 
 
@@ -71,6 +73,7 @@ lit.llvm.initialize(lit_config, config)
 lit.llvm.llvm_config.with_system_environment(
     [
         "MODULAR_HOME",
+        "MODULAR_MOJO_IMPORT_PATH",
         "MODULAR_MOJO_NIGHTLY_IMPORT_PATH",
     ]
 )

@@ -59,7 +59,7 @@ systems-level code for AI workloads.
 ## A member of the Python family
 
 Our core mission for Mojo includes innovations in compiler internals and
-support for current and emerging accelerators, but don't see any need to
+support for current and emerging accelerators, but we don't see any need to
 innovate in language _syntax_ or _community_. So we chose to embrace the Python
 ecosystem because it is so widely used, it is loved by the AI ecosystem, and
 because we believe it is a really nice language.
@@ -206,7 +206,7 @@ which makes Python single-threaded. While there are many active projects
 underway to improve these challenges, the issues brought by Python go deeper
 and are particularly impactful in the AI field. Instead of talking about those
 technical limitations in detail, we'll talk about their implications here in
-2023.
+the present.
 
 Note that everywhere we refer to Python in this section is referring to the
 CPython implementation. We'll talk about other implementations later.
@@ -233,7 +233,7 @@ significant challenges in this regard.
 Beyond the fundamental nature of how the two-world problem creates system
 complexity, it makes everything else in the ecosystem more complicated.
 Debuggers generally can't step across Python and C code, and those that can
-aren't widely accepted. It's painful that the Python package ecosystems has to
+aren't widely accepted. It's painful that the Python package ecosystem has to
 deal with C/C++ code in addition to Python. Projects like PyTorch, with
 significant C++ investments, are intentionally trying to move more of their
 codebase to Python because they know it gains usability.
@@ -283,9 +283,14 @@ This work is fantastic because it incrementally improves the current CPython
 implementation. For example, Python 3.11 has increased performance 10-60% over
 Python 3.10 through internal improvements, and [Python
 3.12](https://github.com/faster-cpython/ideas/wiki/Python-3.12-Goals) aims to
-go further with a trace optimizer. Many other projects are attempting to tame
-the GIL, and projects like PyPy (among many others) have used JIT compilation
-and tracing approaches to speed up Python.
+go further with a trace optimizer. [Python
+3.13](https://github.com/faster-cpython/ideas/blob/main/3.13/README.md) adds a
+[JIT compiler](https://peps.python.org/pep-0744/) to CPython, enables the use
+of [multiple subinterpreters](https://peps.python.org/pep-0554/) in a single
+Python process (thus sidestepping the GIL) and speeds up memory management.
+Many other projects are attempting to tame the GIL, and projects like PyPy
+(among many others) have used JIT compilation and tracing approaches to speed
+up Python.
 
 While we are fans of these great efforts, and feel they are valuable and
 exciting to the community, they unfortunately do not satisfy our needs at
@@ -344,8 +349,8 @@ wide range of hardware.
 
 ### Embedded DSLs in Python
 
-Another common approach is to build an embedded domain-specific languages
-(DSLs) in Python, typically installed with a Python decorator. There are many
+Another common approach is to build embedded domain-specific languages (DSLs)
+in Python, typically installed with a Python decorator. There are many
 examples of this (the `@tf.function` decorator in TensorFlow, the
 `@triton.jit` in OpenAI's Triton programming model, etc.). A major benefit of
 these systems is that they maintain compatibility with the Python

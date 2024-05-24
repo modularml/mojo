@@ -115,7 +115,15 @@ def test_range_reversed():
         test_sum_reversed(20, end, -3)
 
 
+def test_indexing():
+    var r = range(10)
+    assert_equal(r[True], 1)
+    assert_equal(r[int(4)], 4)
+    assert_equal(r[3], 3)
+
+
 def main():
     test_range_len()
     test_range_getitem()
     test_range_reversed()
+    test_indexing()

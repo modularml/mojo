@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from .range import _StridedRangeIterator
+from .range import _StridedRange
 
 from collections.list import _ListIter
 
@@ -43,7 +43,7 @@ trait ReversibleRange:
     # iterators currently check __len__() instead of raising an exception
     # so there is no ReversibleRaising trait yet.
 
-    fn __reversed__(self) -> _StridedRangeIterator:
+    fn __reversed__(self) -> _StridedRange:
         """Get a reversed iterator for the type.
 
         **Note**: iterators are currently non-raising.
@@ -59,7 +59,7 @@ trait ReversibleRange:
 # ===----------------------------------------------------------------------=== #
 
 
-fn reversed[T: ReversibleRange](value: T) -> _StridedRangeIterator:
+fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
     """Get a reversed iterator of the input range.
 
     **Note**: iterators are currently non-raising.
@@ -125,11 +125,11 @@ fn reversed[
 
 
 fn reversed[
-    mutability: __mlir_type.`i1`,
+    mutability: Bool,
     self_life: AnyLifetime[mutability].type,
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
 ](
     value: Reference[
@@ -160,11 +160,11 @@ fn reversed[
 
 
 fn reversed[
-    mutability: __mlir_type.`i1`,
+    mutability: Bool,
     self_life: AnyLifetime[mutability].type,
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: __mlir_type.`i1`,
+    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
 ](
     value: Reference[

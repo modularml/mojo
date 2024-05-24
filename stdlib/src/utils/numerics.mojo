@@ -15,23 +15,25 @@
 You can import these APIs from the `utils` package. For example:
 
 ```mojo
-from utils._numerics import FPUtils
+from utils.numerics import FPUtils
 ```
 """
 
 from sys import llvm_intrinsic, bitwidthof, has_neon, has_sse4
+from sys.ffi import _external_call_const
 from sys._assembly import inlined_assembly
 
 from builtin.dtype import _integral_type_of
+from builtin.simd import _simd_apply
 from memory import UnsafePointer, bitcast
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # _digits
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
-fn _digits[type: DType]() -> Int:
+fn _digits[type: DType]() -> IntLiteral:
     """Returns the number of digits in base-radix that can be represented by
     the type without change.
 
@@ -52,34 +54,29 @@ fn _digits[type: DType]() -> Int:
     @parameter
     if type == DType.bool:
         return 1
+    elif type.is_integral():
 
-    @parameter
-    if type.is_integral():
-        var bitwidth = bitwidthof[mlir_type]()
-        return bitwidth - 1 if type.is_signed() else bitwidth
-
-    @parameter
-    if type == DType.float16:
+        @parameter
+        if type.is_signed():
+            return bitwidthof[mlir_type]() - 1
+        else:
+            return bitwidthof[mlir_type]()
+    elif type == DType.float16:
         return 11
-
-    @parameter
-    if type == DType.bfloat16:
+    elif type == DType.bfloat16:
         return 8
-
-    @parameter
-    if type == DType.float32:
+    elif type == DType.float32:
         return 24
-
-    @parameter
-    if type == DType.float64:
+    elif type == DType.float64:
         return 53
-    # Unreachable.
-    return -1
+    else:
+        constrained[False, "unsupported DType"]()
+        return -1
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # _fp_bitcast_to_integer
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
@@ -99,9 +96,9 @@ fn _fp_bitcast_to_integer[type: DType](value: Scalar[type]) -> Int:
     return int(bitcast[integer_type, 1](value))
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # _fp_bitcast_from_integer
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
@@ -122,9 +119,9 @@ fn _fp_bitcast_from_integer[type: DType](value: Int) -> Scalar[type]:
     return bitcast[type, 1](int_val)
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # FPUtils
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 struct FPUtils[type: DType]:
@@ -142,7 +139,7 @@ struct FPUtils[type: DType]:
 
     @staticmethod
     @always_inline("nodebug")
-    fn mantissa_width() -> Int:
+    fn mantissa_width() -> IntLiteral:
         """Returns the mantissa width of a floating point type.
 
         Returns:
@@ -156,7 +153,7 @@ struct FPUtils[type: DType]:
 
     @staticmethod
     @always_inline("nodebug")
-    fn max_exponent() -> Int:
+    fn max_exponent() -> IntLiteral:
         """Returns the max exponent of a floating point type.
 
         Returns:
@@ -172,13 +169,13 @@ struct FPUtils[type: DType]:
             return 16
         elif type == DType.float32 or type == DType.bfloat16:
             return 128
-
-        debug_assert(type == DType.float64, "must be float64")
-        return 1024
+        else:
+            debug_assert(type == DType.float64, "must be float64")
+            return 1024
 
     @staticmethod
     @always_inline("nodebug")
-    fn exponent_width() -> Int:
+    fn exponent_width() -> IntLiteral:
         """Returns the exponent width of a floating point type.
 
         Returns:
@@ -194,9 +191,9 @@ struct FPUtils[type: DType]:
             return 5
         elif type == DType.float32 or type == DType.bfloat16:
             return 8
-
-        debug_assert(type == DType.float64, "must be float64")
-        return 11
+        else:
+            debug_assert(type == DType.float64, "must be float64")
+            return 11
 
     @staticmethod
     @always_inline
@@ -214,7 +211,7 @@ struct FPUtils[type: DType]:
 
     @staticmethod
     @always_inline
-    fn exponent_bias() -> Int:
+    fn exponent_bias() -> IntLiteral:
         """Returns the exponent bias of a floating point type.
 
         Returns:
@@ -239,7 +236,8 @@ struct FPUtils[type: DType]:
             type.is_floating_point(),
             "dtype must be a floating point type",
         ]()
-        return 1 << (Self.exponent_width() + Self.mantissa_width())
+        alias shift = int(Self.exponent_width() + Self.mantissa_width())
+        return 1 << shift
 
     @staticmethod
     @always_inline
@@ -289,7 +287,7 @@ struct FPUtils[type: DType]:
             type.is_floating_point(),
             "dtype must be a floating point type",
         ]()
-        var mantissa_width_val = Self.mantissa_width()
+        alias mantissa_width_val = Self.mantissa_width()
         return (1 << Self.exponent_width() - 1) << mantissa_width_val + (
             1 << (mantissa_width_val - 1)
         )
@@ -380,8 +378,8 @@ struct FPUtils[type: DType]:
         Returns:
             Returns the exponent bits.
         """
-
-        return Self.get_exponent(value) - Self.exponent_bias()
+        alias bias = int(Self.exponent_bias())
+        return Self.get_exponent(value) - bias
 
     @staticmethod
     @always_inline
@@ -451,9 +449,9 @@ struct FPUtils[type: DType]:
         return res
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # FlushDenormals
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 struct FlushDenormals:
@@ -552,9 +550,9 @@ struct FlushDenormals:
         return fpcr64.cast[DType.int32]()
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # nan
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -602,13 +600,12 @@ fn nan[type: DType]() -> Scalar[type]:
         )
     else:
         constrained[False, "nan only support on floating point types"]()
+        return 0
 
-    return 0
 
-
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # isnan
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -635,10 +632,9 @@ fn isnan[
     @parameter
     if type == DType.bfloat16:
         alias int_dtype = _integral_type_of[type]()
-        var int_val = bitcast[int_dtype, simd_width](val)
-        return int_val & SIMD[int_dtype, simd_width](0x7FFF) > SIMD[
-            int_dtype, simd_width
-        ](0x7F80)
+        alias x7FFF = SIMD[int_dtype, simd_width](0x7FFF)
+        alias x7F80 = SIMD[int_dtype, simd_width](0x7F80)
+        return bitcast[int_dtype, simd_width](val) & x7FFF > x7F80
 
     alias signaling_nan_test: UInt32 = 0x0001
     alias quiet_nan_test: UInt32 = 0x0002
@@ -647,9 +643,9 @@ fn isnan[
     ](val.value, (signaling_nan_test | quiet_nan_test).value)
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # inf
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -697,13 +693,195 @@ fn inf[type: DType]() -> Scalar[type]:
         )
     else:
         constrained[False, "+inf only support on floating point types"]()
+        return 0
 
-    return 0
+
+# ===----------------------------------------------------------------------=== #
+# neg_inf
+# ===----------------------------------------------------------------------=== #
 
 
-# ===----------------------------------------------------------------------===#
+@always_inline("nodebug")
+fn neg_inf[type: DType]() -> Scalar[type]:
+    """Gets a -inf value for the given dtype.
+
+    Constraints:
+        Can only be used for FP dtypes.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The -inf value of the given dtype.
+    """
+
+    @parameter
+    if type == DType.float16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f16>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<f16>`],
+            ]()
+        )
+    elif type == DType.bfloat16:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<bf16>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<bf16>`],
+            ]()
+        )
+    elif type == DType.float32:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f32>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<f32>`],
+            ]()
+        )
+    elif type == DType.float64:
+        return rebind[__mlir_type[`!pop.scalar<`, type.value, `>`]](
+            __mlir_op.`kgen.param.constant`[
+                _type = __mlir_type[`!pop.scalar<f64>`],
+                value = __mlir_attr[`#pop.simd<"-inf"> : !pop.scalar<f64>`],
+            ]()
+        )
+    else:
+        constrained[False, "+inf only support on floating point types"]()
+        return 0
+
+
+# ===----------------------------------------------------------------------=== #
+# max_finite
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn max_finite[type: DType]() -> Scalar[type]:
+    """Returns the maximum finite value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The maximum representable value of the type. Does not include infinity
+        for floating-point types.
+    """
+
+    @parameter
+    if type == DType.int8:
+        return 127
+    elif type == DType.uint8:
+        return 255
+    elif type == DType.int16:
+        return 32767
+    elif type == DType.uint16:
+        return 65535
+    elif type == DType.int32 or type.is_index32():
+        return 2147483647
+    elif type == DType.uint32:
+        return 4294967295
+    elif type == DType.int64 or type.is_index64():
+        return 9223372036854775807
+    elif type == DType.uint64:
+        return 18446744073709551615
+    elif type == DType.float16:
+        return 65504
+    elif type == DType.bfloat16:
+        return 3.38953139e38
+    elif type == DType.float32:
+        return 3.40282346638528859812e38
+    elif type == DType.float64:
+        return 1.79769313486231570815e308
+    else:
+        constrained[False, "max_finite() called on unsupported type"]()
+        return 0
+
+
+# ===----------------------------------------------------------------------=== #
+# min_finite
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn min_finite[type: DType]() -> Scalar[type]:
+    """Returns the minimum (lowest) finite value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The minimum representable value of the type. Does not include negative
+        infinity for floating-point types.
+    """
+
+    @parameter
+    if type.is_unsigned():
+        return 0
+    elif type == DType.int8:
+        return -128
+    elif type == DType.int16:
+        return -32768
+    elif type == DType.int32 or type.is_index32():
+        return -2147483648
+    elif type == DType.int64 or type.is_index64():
+        return -9223372036854775808
+    elif type.is_floating_point():
+        return -max_finite[type]()
+    else:
+        constrained[False, "min_finite() called on unsupported type"]()
+        return 0
+
+
+# ===----------------------------------------------------------------------=== #
+# max_or_inf
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn max_or_inf[type: DType]() -> Scalar[type]:
+    """Returns the maximum (potentially infinite) value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The maximum representable value of the type. Can include infinity for
+        floating-point types.
+    """
+
+    @parameter
+    if type.is_floating_point():
+        return inf[type]()
+    else:
+        return max_finite[type]()
+
+
+# ===----------------------------------------------------------------------=== #
+# min_or_neg_inf
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn min_or_neg_inf[type: DType]() -> Scalar[type]:
+    """Returns the minimum (potentially negative infinite) value of type.
+
+    Parameters:
+        type: The value dtype.
+
+    Returns:
+        The minimum representable value of the type. Can include negative
+        infinity for floating-point types.
+    """
+
+    @parameter
+    if type.is_floating_point():
+        return neg_inf[type]()
+    else:
+        return min_finite[type]()
+
+
+# ===----------------------------------------------------------------------=== #
 # isinf
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -736,9 +914,9 @@ fn isinf[
     )
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # isfinite
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -769,9 +947,9 @@ fn isfinite[
     )
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # get_accum_type
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
@@ -791,3 +969,100 @@ fn get_accum_type[type: DType]() -> DType:
     """
 
     return DType.float32 if type.is_half_float() else type
+
+
+# ===----------------------------------------------------------------------=== #
+# nextafter
+# ===----------------------------------------------------------------------=== #
+
+
+fn nextafter[
+    type: DType, simd_width: Int
+](arg0: SIMD[type, simd_width], arg1: SIMD[type, simd_width]) -> SIMD[
+    type, simd_width
+]:
+    """Computes next representable value of `arg0` in the direction of `arg1`.
+
+    Constraints:
+        The element type of the input must be a floating-point type.
+
+    Parameters:
+        type: The `dtype` of the input and output SIMD vector.
+        simd_width: The width of the input and output SIMD vector.
+
+    Args:
+        arg0: The first input argument.
+        arg1: The second input argument.
+
+    Returns:
+        The `nextafter` of the inputs.
+    """
+
+    @always_inline("nodebug")
+    @parameter
+    fn _float32_dispatch[
+        lhs_type: DType, rhs_type: DType, result_type: DType
+    ](arg0: SIMD[lhs_type, 1], arg1: SIMD[rhs_type, 1]) -> SIMD[result_type, 1]:
+        return _external_call_const["nextafterf", SIMD[result_type, 1]](
+            arg0, arg1
+        )
+
+    @always_inline("nodebug")
+    @parameter
+    fn _float64_dispatch[
+        lhs_type: DType, rhs_type: DType, result_type: DType
+    ](arg0: SIMD[lhs_type, 1], arg1: SIMD[rhs_type, 1]) -> SIMD[result_type, 1]:
+        return _external_call_const["nextafter", SIMD[result_type, 1]](
+            arg0, arg1
+        )
+
+    constrained[type.is_floating_point(), "input type must be floating point"]()
+
+    @parameter
+    if type == DType.float64:
+        return _simd_apply[_float64_dispatch, type, simd_width](arg0, arg1)
+    return _simd_apply[_float32_dispatch, type, simd_width](arg0, arg1)
+
+
+# ===----------------------------------------------------------------------=== #
+# ulp
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline("nodebug")
+fn ulp[
+    type: DType, simd_width: Int
+](x: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    """Computes the ULP (units of last place) or (units of least precision) of
+    the number.
+
+    Constraints:
+        The element type of the inpiut must be a floating-point type.
+
+    Parameters:
+        type: The `dtype` of the input and output SIMD vector.
+        simd_width: The width of the input and output SIMD vector.
+
+    Args:
+        x: SIMD vector input.
+
+    Returns:
+        The ULP of x.
+    """
+
+    constrained[type.is_floating_point(), "the type must be floating point"]()
+
+    var nan_mask = isnan(x)
+    var xabs = abs(x)
+    var inf_mask = isinf(xabs)
+    alias inf_val = SIMD[type, simd_width](inf[type]())
+    var x2 = nextafter(xabs, inf_val)
+    var x2_inf_mask = isinf(x2)
+
+    return nan_mask.select(
+        x,
+        inf_mask.select(
+            xabs,
+            x2_inf_mask.select(xabs - nextafter(xabs, -inf_val), x2 - xabs),
+        ),
+    )

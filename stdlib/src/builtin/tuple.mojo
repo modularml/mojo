@@ -23,13 +23,15 @@ from memory.unsafe_pointer import (
     move_pointee,
 )
 
+from sys.intrinsics import _type_is_eq
+
 # ===----------------------------------------------------------------------===#
 # Tuple
 # ===----------------------------------------------------------------------===#
 
 
 @lldb_formatter_wrapping_type
-struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
+struct Tuple[*element_types: Movable](Sized, Movable):
     """The type of a literal tuple expression.
 
     A tuple consists of zero or more values, separated by commas.
@@ -40,7 +42,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
     alias _mlir_type = __mlir_type[
         `!kgen.pack<:!kgen.variadic<`,
-        CollectionElement,
+        Movable,
         `> `,
         +element_types,
         `>`,
@@ -50,40 +52,43 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     """The underlying storage for the tuple."""
 
     @always_inline("nodebug")
-    fn __init__(inout self, *args: *element_types):
+    fn __init__(inout self, owned *args: *element_types):
         """Construct the tuple.
 
         Args:
             args: Initial values.
         """
-        self = Self(storage=args)
+        self = Self(storage=args^)
 
     @always_inline("nodebug")
     fn __init__(
         inout self,
         *,
-        storage: VariadicPack[_, _, CollectionElement, element_types],
+        owned storage: VariadicPack[_, _, Movable, element_types],
     ):
         """Construct the tuple from a low-level internal representation.
 
         Args:
             storage: The variadic pack storage to construct from.
         """
-        # Mark 'storage' as being initialized so we can work on it.
+
+        # Mark 'self.storage' as being initialized so we can work on it.
         __mlir_op.`lit.ownership.mark_initialized`(
             __get_mvalue_as_litref(self.storage)
         )
 
         @parameter
         fn initialize_elt[idx: Int]():
-            # TODO: We could be fancier and take the values out of an owned
-            # pack. For now just keep everything simple and copy the element.
-            initialize_pointee_copy(
-                UnsafePointer(self[idx]),
-                storage[idx],
+            move_pointee(
+                dst=UnsafePointer(self[idx]),
+                src=UnsafePointer(storage[idx]),
             )
 
+        # Move each element into the tuple storage.
         unroll[initialize_elt, Self.__len__()]()
+
+        # Mark the elements as already destroyed.
+        storage._is_owned = False
 
     fn __del__(owned self):
         """Destructor that destroys all of the elements."""
@@ -95,24 +100,6 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             destroy_pointee(UnsafePointer(self[idx]))
 
         unroll[destroy_elt, Self.__len__()]()
-
-    @always_inline("nodebug")
-    fn __copyinit__(inout self, existing: Self):
-        """Copy construct the tuple.
-
-        Args:
-            existing: The value to copy from.
-        """
-        # Mark 'storage' as being initialized so we can work on it.
-        __mlir_op.`lit.ownership.mark_initialized`(
-            __get_mvalue_as_litref(self.storage)
-        )
-
-        @parameter
-        fn initialize_elt[idx: Int]():
-            initialize_pointee_copy(UnsafePointer(self[idx]), existing[idx])
-
-        unroll[initialize_elt, Self.__len__()]()
 
     @always_inline("nodebug")
     fn __moveinit__(inout self, owned existing: Self):
@@ -146,7 +133,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
 
         @parameter
         fn variadic_size(
-            x: __mlir_type[`!kgen.variadic<`, CollectionElement, `>`]
+            x: __mlir_type[`!kgen.variadic<`, Movable, `>`]
         ) -> Int:
             return __mlir_op.`pop.variadic.size`(x)
 
@@ -182,7 +169,7 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
     # TODO(#38268): Remove this method when references and parameter expressions
     # cooperate better.  We can't handle the use in test_simd without this.
     @always_inline("nodebug")
-    fn get[i: Int, T: CollectionElement](self) -> T:
+    fn get[i: Int, T: Movable](self) -> T:
         """Get a tuple element and rebind to the specified type.
 
         Parameters:
@@ -193,3 +180,56 @@ struct Tuple[*element_types: CollectionElement](Sized, CollectionElement):
             The tuple element at the requested index.
         """
         return rebind[T](self[i])
+
+    @always_inline("nodebug")
+    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
+        """Verify if a given value is present in the tuple.
+
+        ```mojo
+        var x = Tuple(1,2,True)
+        if 1 in x: print("x contains 1")
+        ```
+
+        Args:
+            value: The value to find.
+
+        Parameters:
+            T: The type of the value argument. Must implement the
+              trait `ComparableCollectionElement`.
+
+        Returns:
+            True if the value is contained in the tuple, False otherwise.
+        """
+
+        @parameter
+        fn T_in_ts() -> Bool:
+            @parameter
+            for i in range(len(VariadicList(element_types))):
+
+                @parameter
+                if _type_is_eq[element_types[i], T]():
+                    return True
+            return False
+
+        @parameter
+        if not T_in_ts():
+            return False
+
+        @parameter
+        for i in range(len(VariadicList(element_types))):
+
+            @parameter
+            if _type_is_eq[T, element_types[i]]():
+                var tmp_ref = self.__refitem__[i]()
+                var tmp = rebind[
+                    Reference[
+                        T,
+                        tmp_ref.is_mutable,
+                        tmp_ref.lifetime,
+                        tmp_ref.address_space,
+                    ]
+                ](tmp_ref)
+                if tmp[].__eq__(value):
+                    return True
+
+        return False

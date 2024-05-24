@@ -18,6 +18,9 @@ These are Mojo built-ins, so you don't need to import them.
 
 from python import PythonObject
 
+# FIXME(MOCO-658): Explicit conformance to these traits shouldn't be needed.
+from builtin._stubs import _IntIterable, _StridedIterable
+
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
@@ -58,14 +61,14 @@ fn _sign(x: Int) -> Int:
 
 
 @register_passable("trivial")
-struct _ZeroStartingRange(Sized, ReversibleRange):
+struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
     var curr: Int
     var end: Int
 
     @always_inline("nodebug")
     fn __init__(inout self, end: Int):
         self.curr = max(0, end)
-        self.end = end
+        self.end = self.curr
 
     @always_inline("nodebug")
     fn __iter__(self) -> Self:
@@ -83,16 +86,16 @@ struct _ZeroStartingRange(Sized, ReversibleRange):
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
-        return idx
+        return index(idx)
 
     @always_inline("nodebug")
-    fn __reversed__(self) -> _StridedRangeIterator:
-        return _StridedRangeIterator(self.end - 1, -1, -1)
+    fn __reversed__(self) -> _StridedRange:
+        return range(self.end - 1, -1, -1)
 
 
 @value
 @register_passable("trivial")
-struct _SequentialRange(Sized, ReversibleRange):
+struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
     var start: Int
     var end: Int
 
@@ -114,11 +117,11 @@ struct _SequentialRange(Sized, ReversibleRange):
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
-        return self.start + idx
+        return self.start + index(idx)
 
     @always_inline("nodebug")
-    fn __reversed__(self) -> _StridedRangeIterator:
-        return _StridedRangeIterator(self.end - 1, self.start - 1, -1)
+    fn __reversed__(self) -> _StridedRange:
+        return range(self.end - 1, self.start - 1, -1)
 
 
 @value
@@ -127,10 +130,6 @@ struct _StridedRangeIterator(Sized):
     var start: Int
     var end: Int
     var step: Int
-
-    @always_inline("nodebug")
-    fn __iter__(self) -> Self:
-        return self
 
     @always_inline
     fn __len__(self) -> Int:
@@ -150,7 +149,7 @@ struct _StridedRangeIterator(Sized):
 
 @value
 @register_passable("trivial")
-struct _StridedRange(Sized, ReversibleRange):
+struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     var start: Int
     var end: Int
     var step: Int
@@ -186,15 +185,15 @@ struct _StridedRange(Sized, ReversibleRange):
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
-        return self.start + idx * self.step
+        return self.start + index(idx) * self.step
 
     @always_inline("nodebug")
-    fn __reversed__(self) -> _StridedRangeIterator:
+    fn __reversed__(self) -> _StridedRange:
         var shifted_end = self.end - _sign(self.step)
         var start = shifted_end - ((shifted_end - self.start) % self.step)
         var end = self.start - self.step
         var step = -self.step
-        return _StridedRangeIterator(start, end, step)
+        return range(start, end, step)
 
 
 @always_inline("nodebug")

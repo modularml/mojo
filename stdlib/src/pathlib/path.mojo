@@ -244,7 +244,7 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         with open(self, "r") as f:
             return f.read()
 
-    fn read_bytes(self) raises -> List[Int8]:
+    fn read_bytes(self) raises -> List[UInt8]:
         """Returns content of the file as bytes.
 
         Returns:

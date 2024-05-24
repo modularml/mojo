@@ -39,6 +39,7 @@ struct UnsafePointer[
         address_space: The address space associated with the UnsafePointer allocated memory.
     """
 
+    # Fields
     alias _mlir_type = __mlir_type[
         `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
     ]
@@ -48,16 +49,15 @@ struct UnsafePointer[
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful
     # lifetime for them anyway.
-    alias _ref_type = Reference[
-        T,
-        __mlir_attr.`1: i1`,
-        __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`,
-        address_space,
-    ]
+    alias _ref_type = Reference[T, True, MutableStaticLifetime, address_space]
 
     """The underlying pointer type."""
     var address: Self._mlir_type
     """The underlying pointer."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __init__() -> Self:
@@ -108,6 +108,19 @@ struct UnsafePointer[
             )
         }
 
+    # ===-------------------------------------------------------------------===#
+    # Factory methods
+    # ===-------------------------------------------------------------------===#
+
+    @staticmethod
+    fn _from_dtype_ptr[
+        dtype: DType
+    ](ptr: DTypePointer[dtype]) -> UnsafePointer[Scalar[dtype]]:
+        # TODO:
+        #   Is there a better way to create an UnsafePointer from a
+        #   DTypePointer?
+        return UnsafePointer[Scalar[dtype]](address=int(ptr))
+
     @staticmethod
     @always_inline("nodebug")
     fn get_null() -> Self:
@@ -131,10 +144,19 @@ struct UnsafePointer[
         Returns:
             The pointer to the newly allocated array.
         """
+        alias sizeof_t = sizeof[T]()
+        alias alignof_t = alignof[T]()
+
+        constrained[sizeof_t > 0, "size must be greater than zero"]()
+        constrained[alignof_t > 0, "alignment must be greater than zero"]()
+        constrained[
+            sizeof_t % alignof_t == 0, "size must be a multiple of alignment"
+        ]()
+
         return Self(
             address=int(
                 _malloc[Int8, address_space=address_space](
-                    sizeof[T]() * count, alignment=alignof[T]()
+                    sizeof_t * count, alignment=alignof_t
                 )
             )
         )
@@ -152,53 +174,32 @@ struct UnsafePointer[
         """
         return Self(arg)
 
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
-    fn free(self):
-        """Free the memory referenced by the pointer."""
-        Pointer[Int8, address_space=address_space](address=int(self)).free()
-
-    @always_inline("nodebug")
-    fn bitcast[
-        new_type: AnyType = T,
-        /,
-        address_space: AddressSpace = Self.address_space,
-    ](self) -> UnsafePointer[new_type, address_space]:
-        """Bitcasts a UnsafePointer to a different type.
-
-        Parameters:
-            new_type: The target type.
-            address_space: The address space of the result.
+    fn __refitem__(self) -> Self._ref_type:
+        """Return a reference to the underlying data.
 
         Returns:
-            A new UnsafePointer object with the specified type and the same address,
-            as the original UnsafePointer.
+            A reference to the value.
         """
-        return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[new_type, address_space]._mlir_type,
+        return __mlir_op.`lit.ref.from_pointer`[
+            _type = Self._ref_type._mlir_type
         ](self.address)
 
     @always_inline
-    fn __int__(self) -> Int:
-        """Returns the pointer address as an integer.
+    fn __refitem__(self, offset: Int) -> Self._ref_type:
+        """Return a reference to the underlying data, offset by the given index.
+
+        Args:
+            offset: The offset index.
 
         Returns:
-          The address of the pointer as an Int.
+            An offset reference.
         """
-        return __mlir_op.`pop.pointer_to_index`[
-            _type = __mlir_type.`!pop.scalar<index>`
-        ](self.address)
-
-    fn __str__(self) -> String:
-        return hex(self)
-
-    @always_inline
-    fn __bool__(self) -> Bool:
-        """Return true if the pointer is non-null.
-
-        Returns:
-            Whether the pointer is null.
-        """
-        return int(self) != 0
+        return (self + offset).__refitem__()
 
     @always_inline
     fn __add__(self, offset: Int) -> Self:
@@ -210,7 +211,7 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return Self(address=int(self) + offset * sizeof[T]())
+        return self.offset(offset)
 
     @always_inline
     fn __sub__(self, offset: Int) -> Self:
@@ -316,30 +317,73 @@ struct UnsafePointer[
         """
         return int(self) >= int(rhs)
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
-    fn __refitem__(
-        self,
-    ) -> Self._ref_type:
-        """Return a reference to the underlying data, offset by the offset index.
+    fn __bool__(self) -> Bool:
+        """Return true if the pointer is non-null.
 
         Returns:
-            A reference to the value.
+            Whether the pointer is null.
         """
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Self._ref_type._mlir_type
+        return int(self) != 0
+
+    @always_inline
+    fn __int__(self) -> Int:
+        """Returns the pointer address as an integer.
+
+        Returns:
+          The address of the pointer as an Int.
+        """
+        return __mlir_op.`pop.pointer_to_index`[
+            _type = __mlir_type.`!pop.scalar<index>`
+        ](self.address)
+
+    fn __str__(self) -> String:
+        return hex(self)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn free(self):
+        """Free the memory referenced by the pointer."""
+        Pointer[Int8, address_space=address_space](address=int(self)).free()
+
+    @always_inline("nodebug")
+    fn bitcast[
+        new_type: AnyType = T,
+        /,
+        address_space: AddressSpace = Self.address_space,
+    ](self) -> UnsafePointer[new_type, address_space]:
+        """Bitcasts a UnsafePointer to a different type.
+
+        Parameters:
+            new_type: The target type.
+            address_space: The address space of the result.
+
+        Returns:
+            A new UnsafePointer object with the specified type and the same address,
+            as the original UnsafePointer.
+        """
+        return __mlir_op.`pop.pointer.bitcast`[
+            _type = UnsafePointer[new_type, address_space]._mlir_type,
         ](self.address)
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self._ref_type:
-        """Return a reference to the underlying data, offset by the offset index.
+    fn offset(self, offset: Int) -> Self:
+        """Return a pointer at an offset from the current one.
 
         Args:
             offset: The offset index.
 
         Returns:
-            An offset reference.
+            An offset pointer.
         """
-        return (self + offset).__refitem__()
+        return Self(address=int(self) + offset * sizeof[T]())
 
 
 # ===----------------------------------------------------------------------=== #

@@ -74,10 +74,15 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         T: The type of value stored in the Optional.
     """
 
+    # Fields
     # _NoneType comes first so its index is 0.
     # This means that Optionals that are 0-initialized will be None.
     alias _type = Variant[_NoneType, T]
     var _value: Self._type
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self):
         """Construct an empty Optional."""
@@ -99,64 +104,9 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         """
         self = Self()
 
-    @always_inline
-    fn value(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
-        """Unsafely retrieve a reference to the value of the Optional.
-
-        This doesn't check to see if the optional contains a value.
-        If you call this without first verifying the optional with __bool__()
-        eg. by `if my_option:` or without otherwise knowing that it contains a
-        value (for instance with `or_else`), you'll get garbage unsafe data out.
-
-        Returns:
-            A reference to the contained data of the option as a Reference[T].
-        """
-        debug_assert(self[].__bool__(), ".value() on empty Optional")
-        return self[]._value[T]
-
-    @always_inline
-    fn _value_copy(self) -> T:
-        """Unsafely retrieve the value out of the Optional.
-
-        Note: only used for Optionals when used in a parameter context
-        due to compiler bugs.  In general, prefer using the public `Optional.value()`
-        function that returns a `Reference[T]`.
-        """
-
-        debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value[T]
-
-    fn unsafe_take(inout self) -> T:
-        """Unsafely move the value out of the Optional.
-
-        The caller takes ownership over the new value, and the Optional is
-        destroyed.
-
-        This doesn't check to see if the optional contains a value.
-        If you call this without first verifying the optional with __bool__()
-        eg. by `if my_option:` or without otherwise knowing that it contains a
-        value (for instance with `or_else`), you'll get garbage unsafe data out.
-
-        Returns:
-            The contained data of the option as an owned T value.
-        """
-        debug_assert(self.__bool__(), ".unsafe_take() on empty Optional")
-        return self._value.unsafe_take[T]()
-
-    fn or_else(self, default: T) -> T:
-        """Return the underlying value contained in the Optional or a default value if the Optional's underlying value is not present.
-
-        Args:
-            default: The new value to use if no value was present.
-
-        Returns:
-            The underlying value contained in the Optional or a default value.
-        """
-        if self.__bool__():
-            return self._value[T]
-        return default
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     fn __is__(self, other: NoneType) -> Bool:
         """Return `True` if the Optional has no value.
@@ -184,6 +134,10 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         """
         return self.__bool__()
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     fn __bool__(self) -> Bool:
         """Return true if the Optional has a value.
 
@@ -199,6 +153,106 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             False if the optional has a value and True otherwise.
         """
         return not self
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn value(
+        self: Reference[Self, _, _]
+    ) -> Reference[T, self.is_mutable, self.lifetime]:
+        """Retrieve a reference to the value of the Optional.
+
+        This check to see if the optional contains a value.
+        If you call this without first verifying the optional with __bool__()
+        eg. by `if my_option:` or without otherwise knowing that it contains a
+        value (for instance with `or_else`), the program will abort
+
+        Returns:
+            A reference to the contained data of the option as a Reference[T].
+        """
+        if not self[].__bool__():
+            abort(".value() on empty Optional")
+
+        return self[].unsafe_value()
+
+    @always_inline
+    fn unsafe_value(
+        self: Reference[Self, _, _]
+    ) -> Reference[T, self.is_mutable, self.lifetime]:
+        """Unsafely retrieve a reference to the value of the Optional.
+
+        This doesn't check to see if the optional contains a value.
+        If you call this without first verifying the optional with __bool__()
+        eg. by `if my_option:` or without otherwise knowing that it contains a
+        value (for instance with `or_else`), you'll get garbage unsafe data out.
+
+        Returns:
+            A reference to the contained data of the option as a Reference[T].
+        """
+        debug_assert(self[].__bool__(), ".value() on empty Optional")
+        return self[]._value[T]
+
+    @always_inline
+    fn _value_copy(self) -> T:
+        """Unsafely retrieve the value out of the Optional.
+
+        Note: only used for Optionals when used in a parameter context
+        due to compiler bugs.  In general, prefer using the public `Optional.value()`
+        function that returns a `Reference[T]`.
+        """
+
+        debug_assert(self.__bool__(), ".value() on empty Optional")
+        return self._value[T]
+
+    fn take(inout self) -> T:
+        """Move the value out of the Optional.
+
+        The caller takes ownership over the new value, which is moved
+        out of the Optional, and the Optional is left in an empty state.
+
+        This check to see if the optional contains a value.
+        If you call this without first verifying the optional with __bool__()
+        eg. by `if my_option:` or without otherwise knowing that it contains a
+        value (for instance with `or_else`), you'll get garbage unsafe data out.
+
+        Returns:
+            The contained data of the option as an owned T value.
+        """
+        if not self.__bool__():
+            abort(".take() on empty Optional")
+        return self.unsafe_take()
+
+    fn unsafe_take(inout self) -> T:
+        """Unsafely move the value out of the Optional.
+
+        The caller takes ownership over the new value, which is moved
+        out of the Optional, and the Optional is left in an empty state.
+
+        This check to see if the optional contains a value.
+        If you call this without first verifying the optional with __bool__()
+        eg. by `if my_option:` or without otherwise knowing that it contains a
+        value (for instance with `or_else`), the program will abort!
+
+        Returns:
+            The contained data of the option as an owned T value.
+        """
+        debug_assert(self.__bool__(), ".unsafe_take() on empty Optional")
+        return self._value.unsafe_replace[_NoneType, T](_NoneType())
+
+    fn or_else(self, default: T) -> T:
+        """Return the underlying value contained in the Optional or a default value if the Optional's underlying value is not present.
+
+        Args:
+            default: The new value to use if no value was present.
+
+        Returns:
+            The underlying value contained in the Optional or a default value.
+        """
+        if self.__bool__():
+            return self._value[T]
+        return default
 
 
 # ===----------------------------------------------------------------------===#
@@ -217,8 +271,13 @@ struct OptionalReg[T: AnyRegType](Boolable):
         T: The type of value stored in the Optional.
     """
 
+    # Fields
     alias _mlir_type = __mlir_type[`!kgen.variant<`, T, `, i1>`]
     var _value: Self._mlir_type
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self):
         """Create an optional with a value of None."""
@@ -244,14 +303,9 @@ struct OptionalReg[T: AnyRegType](Boolable):
             _type = Self._mlir_type, index = Int(1).value
         ](__mlir_attr.false)
 
-    @always_inline
-    fn value(self) -> T:
-        """Get the optional value.
-
-        Returns:
-            The contained value.
-        """
-        return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     fn __is__(self, other: NoneType) -> Bool:
         """Return `True` if the Optional has no value.
@@ -279,6 +333,10 @@ struct OptionalReg[T: AnyRegType](Boolable):
         """
         return self.__bool__()
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     fn __bool__(self) -> Bool:
         """Return true if the optional has a value.
 
@@ -286,3 +344,16 @@ struct OptionalReg[T: AnyRegType](Boolable):
             True if the optional has a value and False otherwise.
         """
         return __mlir_op.`kgen.variant.is`[index = Int(0).value](self._value)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn value(self) -> T:
+        """Get the optional value.
+
+        Returns:
+            The contained value.
+        """
+        return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)

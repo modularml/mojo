@@ -1,0 +1,51 @@
+##===----------------------------------------------------------------------===##
+# Copyright (c) 2024, Modular Inc. All rights reserved.
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions:
+# https://llvm.org/LICENSE.txt
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+##===----------------------------------------------------------------------===##
+
+# This configures the lint rules for markdownlint, used in markdownlint.sh
+# It overrides for the default lint config here:
+# https://github.com/DavidAnson/markdownlint/blob/main/schema/.markdownlint.yaml
+# Also see the definition for all markdownlint rules here:
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+# MD004: Unordered list style
+ul-style:
+  style: dash # Always use - for bullet lists to avoid confusion/inconsistency
+
+# MD013: Allow lines >80 char if in heading, table, or code block
+line-length:
+  line_length: 80
+  headings: false # But pleaaase keep them as short as possible
+  tables: false
+  code_blocks: false
+
+# MD024: Headings with the same title are okay if they're not siblings
+no-duplicate-heading:
+  siblings_only: true
+
+# MD033: HTML is okay
+no-inline-html: false
+
+# MD045: Images don't require alt text
+no-alt-text: false
+
+# MD050: Use **something** instead of __something__ for bold text
+MD050:
+  # Strong style
+  style: "asterisk"
+
+# MD051: Disable link checker because it false-flags custom anchors
+#        https://github.com/DavidAnson/markdownlint/issues/570
+link-fragments: false
+
+# MD041: Don't force first line to be H1 as this prevents branded image headers
+first-line-h1: false

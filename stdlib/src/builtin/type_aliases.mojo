@@ -21,17 +21,22 @@ alias AnyRegType = __mlir_type.`!kgen.type`
 alias NoneType = __mlir_type.`!kgen.none`
 """Represents the absence of a value."""
 
-alias ImmLifetime = __mlir_type.`!lit.lifetime<0>`
-"""Immutable lifetime reference."""
+alias ImmutableLifetime = __mlir_type.`!lit.lifetime<0>`
+"""Immutable lifetime reference type."""
 
-alias MutLifetime = __mlir_type.`!lit.lifetime<1>`
-"""Mutable lifetime reference."""
+alias MutableLifetime = __mlir_type.`!lit.lifetime<1>`
+"""Mutable lifetime reference type."""
+
+alias ImmutableStaticLifetime = __mlir_attr.`#lit.lifetime<0>: !lit.lifetime<0>`
+"""The immutable lifetime that lasts for the entire duration of program execution."""
+
+alias MutableStaticLifetime = __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`
+"""The mutable lifetime that lasts for the entire duration of program execution."""
 
 
 # Helper to build !lit.lifetime type.
 # TODO: Should be a parametric alias.
-# TODO: Should take a Bool, not an i1.
-struct AnyLifetime[is_mutable: __mlir_type.i1]:
+struct AnyLifetime[is_mutable: Bool]:
     """This represents a lifetime reference of potentially parametric type.
     TODO: This should be replaced with a parametric type alias.
 
@@ -41,6 +46,6 @@ struct AnyLifetime[is_mutable: __mlir_type.i1]:
 
     alias type = __mlir_type[
         `!lit.lifetime<`,
-        is_mutable,
+        is_mutable.value,
         `>`,
     ]

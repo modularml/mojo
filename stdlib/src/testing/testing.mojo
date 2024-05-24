@@ -19,7 +19,7 @@ from testing import assert_true
 ```
 """
 from collections import Optional
-from utils._numerics import isfinite, isnan
+from utils.numerics import isfinite, isnan
 from builtin._location import __call_location, _SourceLocation
 
 # ===----------------------------------------------------------------------=== #
@@ -46,7 +46,7 @@ fn _isclose(
         return a == b
     else:
         var both_nan = isnan(a) & isnan(b)
-        if equal_nan and both_nan.reduce_and():
+        if equal_nan and all(both_nan):
             return True
 
         var res = (a == b)
@@ -171,9 +171,7 @@ fn assert_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    # `if lhs != rhs:` is not enough. `reduce_or()` must be used here,
-    # otherwise, if any of the elements are equal, the error is not triggered.
-    if (lhs != rhs).reduce_or():
+    if any(lhs != rhs):
         raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
 
 
@@ -235,7 +233,7 @@ fn assert_not_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    if lhs == rhs:
+    if all(lhs == rhs):
         raise _assert_not_equal_error(
             str(lhs), str(rhs), msg, __call_location()
         )
@@ -289,7 +287,7 @@ fn assert_almost_equal[
         lhs, rhs, atol=atol, rtol=rtol, equal_nan=equal_nan
     )
 
-    if not almost_equal.reduce_and():
+    if not all(almost_equal):
         var err = str(lhs) + " is not close to " + str(rhs)
 
         @parameter
@@ -360,10 +358,16 @@ struct assert_raises:
     var message_contains: Optional[String]
     """If present, check that the error message contains this literal string."""
 
+    var call_location: _SourceLocation
+    """Assigned the value returned by __call_locations() at Self.__init__."""
+
+    @always_inline
     fn __init__(inout self):
         """Construct a context manager with no message pattern."""
         self.message_contains = None
+        self.call_location = __call_location()
 
+    @always_inline
     fn __init__(inout self, *, contains: String):
         """Construct a context manager matching specific errors.
 
@@ -372,6 +376,7 @@ struct assert_raises:
                 includes the literal text passed.
         """
         self.message_contains = contains
+        self.call_location = __call_location()
 
     fn __enter__(self):
         """Enter the context manager."""
@@ -383,7 +388,9 @@ struct assert_raises:
         Raises:
             AssertionError: Always. The block must raise to pass the test.
         """
-        raise Error("AssertionError: Didn't raise")
+        raise Error(
+            "AssertionError: Didn't raise at " + str(self.call_location)
+        )
 
     fn __exit__(self, error: Error) raises -> Bool:
         """Exit the context manager with an error.

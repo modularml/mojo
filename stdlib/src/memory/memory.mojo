@@ -64,7 +64,7 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         var s1i = s1.load[width=simd_width](i)
         var s2i = s2.load[width=simd_width](i)
         var diff = s1i != s2i
-        if diff.reduce_or():
+        if any(diff):
             var index = int(
                 diff.select(
                     iota, SIMD[DType.uint8, simd_width](255)
@@ -79,7 +79,7 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
     var s1i = s1.load[width=simd_width](last)
     var s2i = s2.load[width=simd_width](last)
     var diff = s1i != s2i
-    if diff.reduce_or():
+    if any(diff):
         var index = int(
             diff.select(iota, SIMD[DType.uint8, simd_width](255)).reduce_min()
         )
@@ -183,7 +183,7 @@ fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
     @parameter
     if n < 5:
 
-        @unroll
+        @parameter
         for i in range(n):
             dest_data[i] = src_data[i]
         return
@@ -307,6 +307,27 @@ fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
         count: The number of elements to copy (not bytes!).
     """
     memcpy(dest.address, src.address, count)
+
+
+@always_inline
+fn memcpy[
+    dtype: DType, //
+](*, dest: UnsafePointer[Scalar[dtype]], src: __type_of(dest), count: Int):
+    """Copies a memory area.
+
+    Parameters:
+        dtype: *Inferred* The dtype of the data to copy.
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+        count: The number of elements to copy (not bytes!).
+    """
+    memcpy(
+        dest=DTypePointer(dest),
+        src=DTypePointer(src),
+        count=count,
+    )
 
 
 # ===----------------------------------------------------------------------===#

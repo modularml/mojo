@@ -66,13 +66,24 @@ We provide a simple Bash script to build the standard library package and
 `test_utils` package that is used by the test suite.
 
 Just run `./stdlib/scripts/run-tests.sh` which will produce the necessary
-`mojopkg` files inside your `build` directory, and then run `lit -sv
-stdlib/test`.
+`mojopkg` files inside your `build` directory, after this is done, the script will
+run all the tests automatically.
 
 ```bash
 ./stdlib/scripts/run-tests.sh
+```
 
-lit -sv stdlib/test
+If you wish to run the unit tests that are in a specific test file, you can do
+so with
+
+```bash
+./stdlib/scripts/run-tests.sh ./stdlib/test/utils/test_span.mojo 
+```
+
+You can do the same for a directory with
+
+```bash
+./stdlib/scripts/run-tests.sh ./stdlib/test/utils
 ```
 
 All the tests should pass on the `nightly` branch with the nightly Mojo
@@ -142,7 +153,7 @@ standard library, test it, and raise a PR.
 
 First, follow everything in the [prerequisites](#prerequisites).
 
-__IMPORTANT__ We'll be in the `mojo/stdlib` folder for this tutorial, check and
+**IMPORTANT** We'll be in the `mojo/stdlib` folder for this tutorial, check and
 make sure you're in that location if anything goes wrong:
 `cd [path-to-repo]/stdlib`
 
@@ -226,7 +237,7 @@ import os
 
 def main():
     all_paths = os.get_cwd_and_paths()
-    print(__type_of(all_paths).__str__(all_paths))
+    print(all_paths.__str__())
 ```
 
 We also need to set the following environment variable that tells Mojo to
