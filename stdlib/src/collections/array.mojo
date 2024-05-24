@@ -108,14 +108,14 @@ struct Array[
         self.stack_left = current_capacity
 
     @always_inline
-    fn __init__(inout self, value: Self._scalar_type):
+    fn __init__(inout self, *, fill: Self._scalar_type):
         """Constructs a Array by filling it with the
         given value.
 
         Args:
-            value: The value to populate the Array with.
+            fill: The value to populate the Array with.
         """
-        self.vec = Self._vec_type(value)
+        self.vec = Self._vec_type(fill)
         self.stack_left = current_capacity
 
     # TODO: Avoid copying elements in once owned varargs
@@ -135,7 +135,7 @@ struct Array[
         for value in values:
             self.append(value)
 
-    fn __init__(inout self, values: Self._vec_type):
+    fn __init__[cap: Int](inout self, values: SIMD[T, cap]):
         """Constructs a Array from the given values.
 
         Args:
@@ -402,7 +402,9 @@ struct Array[
         self.append(previous)
 
     @always_inline
-    fn extend[cap: Int](inout self, owned other: Array[T, cap]):
+    fn extend[
+        cap: Int = current_capacity
+    ](inout self, owned other: Array[T, cap]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -444,7 +446,7 @@ struct Array[
         value: Self._scalar_type,
         start: Int = 0,
         stop: Optional[Int] = None,
-    ) -> Optional[Int]:
+    ) -> OptionalReg[Int]:
         """
         Returns the index of the first occurrence of a value in an Array
         restricted by the range given the start and stop bounds.
@@ -650,7 +652,9 @@ struct Array[
         return self.vec.reduce_max()
 
     @always_inline("nodebug")
-    fn min[cap: Int](self, other: Array[T, cap]) -> Self._scalar_type:
+    fn min[
+        cap: Int = current_capacity
+    ](self, other: Array[T, cap]) -> Self._scalar_type:
         """Computes the elementwise minimum between the two vectors.
 
         Args:
@@ -675,7 +679,9 @@ struct Array[
             return other.vec.min(s.vec)
 
     @always_inline("nodebug")
-    fn max[cap: Int](self, other: Array[T, cap]) -> Self._scalar_type:
+    fn max[
+        cap: Int = current_capacity
+    ](self, other: Array[T, cap]) -> Self._scalar_type:
         """Computes the elementwise maximum between the two Arrays.
 
         Args:
@@ -729,7 +735,7 @@ struct Array[
 
     @always_inline
     fn __add__[
-        cap: Int
+        cap: Int = current_capacity
     ](self, other: Array[T, cap]) -> Array[T, max(current_capacity, cap)]:
         """Computes the elementwise addition between the two Arrays.
 
@@ -761,7 +767,7 @@ struct Array[
 
     @always_inline
     fn __sub__[
-        cap: Int
+        cap: Int = current_capacity
     ](self, other: Array[T, cap]) -> Array[T, max(current_capacity, cap)]:
         """Computes the elementwise subtraction between the two Arrays.
 
@@ -792,7 +798,9 @@ struct Array[
             return rebind[new_simd](other.vec) - s.vec
 
     @always_inline("nodebug")
-    fn __iadd__[cap: Int](inout self, owned other: Array[T, cap]):
+    fn __iadd__[
+        cap: Int = current_capacity
+    ](inout self, owned other: Array[T, cap]):
         """Computes the elementwise addition between the two Arrays
         inplace.
 
@@ -802,7 +810,9 @@ struct Array[
         self = self + other
 
     @always_inline("nodebug")
-    fn __isub__[cap: Int](inout self, owned other: Array[T, cap]):
+    fn __isub__[
+        cap: Int = current_capacity
+    ](inout self, owned other: Array[T, cap]):
         """Computes the elementwise subtraction between the two Arrays
         inplace.
 

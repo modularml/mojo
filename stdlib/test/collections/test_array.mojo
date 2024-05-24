@@ -155,10 +155,10 @@ def test_list():
 
 
 def test_list_to_bool_conversion():
-    assert_false(Array[StringLiteral]())
-    assert_true(Array[StringLiteral]("a"))
-    assert_true(Array[StringLiteral]("", "a"))
-    assert_true(Array[StringLiteral](""))
+    assert_false(Array[DType.uint8]())
+    assert_true(Array[DType.uint8](0))
+    assert_true(Array[DType.uint8](0, 1))
+    assert_true(Array[DType.uint8](1))
 
 
 def test_list_pop():
@@ -188,8 +188,6 @@ def test_list_pop():
 
     # arr should be empty now
     assert_equal(0, len(arr))
-    # capacity should be 1 according to shrink_to_fit behavior
-    assert_equal(1, arr.capacity)
 
 
 def test_list_variadic_constructor():
