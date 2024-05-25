@@ -19,9 +19,7 @@ from collections import Array
 ```
 """
 
-from utils import InlineArray
-from sys.intrinsics import _type_is_eq
-
+from bit import countr_zero
 
 # ===----------------------------------------------------------------------===#
 # Array
@@ -110,13 +108,13 @@ struct Array[
     @always_inline
     fn __init__(inout self, *, fill: Self._scalar_type):
         """Constructs a Array by filling it with the
-        given value.
+        given value. Sets the stack_left var to 0.
 
         Args:
             fill: The value to populate the Array with.
         """
         self.vec = Self._vec_type(fill)
-        self.stack_left = current_capacity
+        self.stack_left = 0
 
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
@@ -175,22 +173,23 @@ struct Array[
     #     self.vec = Self._vec_type(existing.unsafe_ptr(), size)
     #     self.stack_left =  current_capacity - size
 
-    # fn __init__(
-    #     inout self: Self,
-    #     *,
-    #     unsafe_pointer: DTypePointer[T, 0],
-    #     size: Int,
-    # ):
-    #     """Constructs an Array from a pointer and its size.
+    fn __init__(
+        inout self: Self,
+        *,
+        unsafe_pointer: UnsafePointer[T.type],
+        size: Int,
+    ):
+        """Constructs an Array from a pointer and its size.
 
-    #     Args:
-    #         unsafe_pointer: The pointer to the data.
-    #         size: The number of elements in the Array.
-    #     """
-    #     var s = min(current_capacity, size)
-    #     # TODO: need a SIMD constructor from DTypePointer/UnsafePointer
-    #     self.vec = Self._vec_type(unsafe_pointer, s)
-    #     self.stack_left = current_capacity - s
+        Args:
+            unsafe_pointer: The pointer to the data.
+            size: The number of elements in the Array.
+        """
+        var s = min(current_capacity, size)
+        self.vec = Self._vec_type()
+        for i in range(s):  # FIXME: will this even work?
+            self.vec[i] = rebind[SIMD[T, 0]](unsafe_pointer[i])
+        self.stack_left = current_capacity - s
 
     @always_inline
     fn __len__(self) -> Int:
@@ -255,10 +254,7 @@ struct Array[
         Returns:
             True if the value is contained in the Array, False otherwise.
         """
-        for i in range(len(self)):
-            if value == self.vec[i]:
-                return True
-        return False
+        return (value & self.vec).reduce_or()
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -286,7 +282,7 @@ struct Array[
         """
         self = Self()
         for i in range(len(existing)):
-            self[i] = existing[i]
+            self.unsafe_set(i, existing[i])
 
     fn __setitem__(inout self, idx: Int, owned value: Self._scalar_type):
         """Sets a Array element at the given index.
@@ -316,10 +312,10 @@ struct Array[
         Returns:
             The newly created Array.
         """
-        if Self.current_capacity + other.current_capacity > max_stack_size:
-            # TODO
-            pass
-        var arr = Array[T, Self.current_capacity + other.current_capacity]()
+        alias size = min(
+            Self.current_capacity + other.current_capacity, max_stack_size
+        )
+        var arr = Array[T, size, capacity_jump, max_stack_size]()
         arr.extend(self.vec)
         arr.extend(other.vec)
         return arr
@@ -466,6 +462,7 @@ struct Array[
         Returns:
             The Optional index of the first occurrence of the value in the Array.
         """
+
         var size = len(self)
         debug_assert(abs(start) > size, "start index must be within bounds")
         var start_norm = start if start > 0 else min(0, size + start)
@@ -477,10 +474,12 @@ struct Array[
 
         start_norm = max(start_norm, min(0, size))
         stop_norm = max(stop_norm, min(0, size))
-
-        for i in range(start_norm, stop_norm):
-            if self[i] == value:
-                return i
+        # FIXME ? maybe building a range 0..stop_norm and multiplying it
+        # to the bitwise & comparison's result and doing reduce_min()?
+        var s = (self[start_norm:stop_norm].vec & value).cast[DType.bool]()
+        for i in range(stop_norm - start_norm):
+            if s[i]:
+                return i + start_norm
         return None
 
     fn steal_data(inout self) -> Self._vec_type:
@@ -489,6 +488,7 @@ struct Array[
         Returns:
             The underlying data.
         """
+        # TODO: is this even possible?
         return self.vec
 
     @always_inline
@@ -560,20 +560,16 @@ struct Array[
         Returns:
             The number of occurrences of the value in the list.
         """
-        var count = 0
-        for elem in self:
-            if elem == value:
-                count += 1
-        return count
+        return int((value & self.vec).reduce_add())
 
-    # @always_inline
-    # fn unsafe_ptr(self) -> UnsafePointer[Self._scalar_type]:
-    #     """Retrieves a pointer to the underlying memory.
+    @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[Self._vec_type]:
+        """Retrieves a pointer to the SIMD vector.
 
-    #     Returns:
-    #         The UnsafePointer to the underlying memory.
-    #     """
-    #     var asd =  UnsafePointer[Self._scalar_type](self.vec[0]) # FIXME
+        Returns:
+            The UnsafePointer to the SIMD vector.
+        """
+        return UnsafePointer.address_of(self.vec)
 
     @always_inline
     fn unsafe_get(self, idx: Int) -> Self._scalar_type:
@@ -712,7 +708,7 @@ struct Array[
         Returns:
             The result.
         """
-        return (self.vec + other.vec).reduce_add()
+        return (self.vec * other.vec).reduce_add()
 
     @always_inline("nodebug")
     fn __mul__(self, other: Self) -> Self._scalar_type:
@@ -721,17 +717,16 @@ struct Array[
         Returns:
             The result.
         """
-        return self.dot(self)
+        return self.dot(other)
 
     @always_inline("nodebug")
-    fn cross(self, other: Self) -> Self:
-        """Calculates the cross product between two Arrays.
+    fn __abs__(self) -> Self._scalar_type:
+        """Calculates the magnitude of the Array.
 
         Returns:
             The result.
         """
-        # TODO
-        return self
+        return abs(self.vec)
 
     @always_inline
     fn __add__[
@@ -784,7 +779,7 @@ struct Array[
 
         @parameter
         if delta == 0:
-            # FIXME no idea why but this doesn't currently accept using the alias
+            # FIXME no idea why but this currently doesn't accept using the alias
             return rebind[SIMD[T, max(current_capacity, cap)]](
                 self.vec
             ) - rebind[new_simd](other.vec)
@@ -825,3 +820,23 @@ struct Array[
         """Zeroes the Array."""
         self.vec = self.vec.splat(0)
         self.stack_left = current_capacity
+
+    # @always_inline
+    # fn theta(self, other: Self) -> Float64:
+    #     """Calculates the angle between two Arrays.
+
+    #     Returns:
+    #         The result.
+    #     """ # TODO: need math funcs
+    #     return acos((self * other) / (abs(self.vec) * abs(other.vec)))
+
+    # fn cross(self, other: Self) -> Self:
+    #     """Calculates the cross product between two Arrays.
+
+    #     Returns:
+    #         The result.
+    #     """
+    #     # TODO using matmul for big vectors
+    #     # TODO quaternions/fma for 3d vectors
+    #     var magns = abs(self.vec) * abs(other.vec)
+    #     return magns * sin((self * other) / magns) # TODO: need math funcs
