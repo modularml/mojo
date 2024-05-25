@@ -628,7 +628,11 @@ struct String(
     """Represents a mutable string."""
 
     # Fields
-    alias _buffer_type = List[UInt8]
+    # It's of size 15 because one byte is taken in the List with small
+    # buffer optimization. We can put back 16 when
+    # the flag has been removed from List.
+    alias _small_buffer_size = 15
+    alias _buffer_type = List[UInt8, Self._small_buffer_size]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
 
@@ -648,13 +652,15 @@ struct String(
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self, owned impl: List[UInt8]):
+    fn __init__(inout self, owned impl: Self._buffer_type):
         """Construct a string from a buffer of bytes.
 
+        The buffer must have a small buffer optimization size of 16 bytes exactly
+        for this constructor to be called.
         The buffer must be terminated with a null byte:
 
         ```mojo
-        var buf = List[UInt8]()
+        var buf = List[UInt8, 16]()
         buf.append(ord('H'))
         buf.append(ord('i'))
         buf.append(0)
@@ -671,9 +677,38 @@ struct String(
         self._buffer = impl^
 
     @always_inline
+    fn __init__(inout self, owned impl: List[UInt8, _]):
+        """Construct a string from a buffer of bytes.
+        The buffer must be terminated with a null byte:
+        ```mojo
+        var buf = List[Int8]()
+        buf.append(ord('H'))
+        buf.append(ord('i'))
+        buf.append(0)
+        var hi = String(buf)
+        ```
+        Args:
+            impl: The buffer.
+        """
+        debug_assert(
+            impl[-1] == 0,
+            "expected last element of String buffer to be null terminator",
+        )
+        # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
+        var length = len(impl)
+        var capacity = impl.capacity
+        self._buffer = Self._buffer_type(
+            unsafe_pointer=impl.steal_data(),
+            size=length,
+            capacity=capacity,
+        )
+
+    @always_inline
     fn __init__(inout self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
+        # The Null terminator is cheap because it is on the stack
+        self._buffer.append(0)
 
     @always_inline
     fn __init__(inout self, str: StringRef):
@@ -1248,7 +1283,7 @@ struct String(
         """
         return self._buffer.data.bitcast[UInt8]()
 
-    fn as_bytes(self) -> List[UInt8]:
+    fn as_bytes(self) -> Self._buffer_type:
         """Retrieves the underlying byte sequence encoding the characters in
         this string.
 
@@ -1465,7 +1500,7 @@ struct String(
         var old_len = len(old)
         var new_len = len(new)
 
-        var res = List[UInt8]()
+        var res = Self._buffer_type()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
 
         for _ in range(occurrences):
@@ -1551,7 +1586,7 @@ struct String(
         return hash(self._strref_dangerous())
 
     fn _interleave(self, val: String) -> String:
-        var res = List[UInt8]()
+        var res = Self._buffer_type()
         var val_ptr = val.unsafe_uint8_ptr()
         var self_ptr = self.unsafe_uint8_ptr()
         res.reserve(len(val) * len(self) + 1)
