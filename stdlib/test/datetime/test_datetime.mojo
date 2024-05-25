@@ -302,12 +302,21 @@ fn test_time() raises:
 
 
 fn test_hash() raises:
+    alias pycal = PythonCalendar
+    alias unixcal = UTCCalendar
     alias dt = DateTime[iana=False, pyzoneinfo=False, native=False]
-
-    var ref = dt(1970, 1, 1)
+    alias TZ = dt._tz
+    alias tz_0_ = TZ("Etc/UTC", 0, 0)
+    var ref = dt(1970, 1, 1, tz=tz_0_, calendar=pycal)
     var data = hash(ref)
     var parsed = dt.from_hash(data)
     assert_true(ref == parsed)
+    var ref2 = dt(1970, 1, 1, tz=tz_0_, calendar=unixcal)
+    var data2 = hash(ref2)
+    var parsed2 = dt.from_hash(data2)
+    assert_true(ref2 == parsed2)
+    # both should be the same
+    assert_true(ref == ref2)
 
 
 fn main() raises:

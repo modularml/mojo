@@ -49,7 +49,7 @@ struct Offset:
         Args:
             buf: The buffer.
         """
-        self.hour = (buf >> 3) & 0b111
+        self.hour = (buf >> 3) & 0b1111
         self.minute = (buf >> 1) & 0b11
         self.sign = buf >> 7 & 0b1
         self.buf = buf
@@ -143,6 +143,17 @@ struct Offset:
         self.minute = 0 if m == 0 else (30 if m == 1 else 45)
         self.buf = buf
         return self
+
+    fn __eq__(self, other: Self) -> Bool:
+        """Whether the given Offset is equal to self.
+
+        Args:
+            other: The other Offset.
+
+        Returns:
+            The result.
+        """
+        return self.buf == other.buf
 
 
 # @value
@@ -712,10 +723,12 @@ fn get_zoneinfo[
         Meanwhile 2 public APIs can be used https://worldtimeapi.org/api
         and https://timeapi.io/swagger/index.html .
     """
-    if len(timezones) == 0:
-        from ._lists import tz_list
+    var dst_zones = T()
+    var no_dst_zones = A()
+    # if len(timezones) == 0:
+    #     from ._lists import tz_list
 
-        timezones = List[StringLiteral](tz_list)
+    #     timezones = List[StringLiteral](tz_list)
     # try:
     #     # TODO: this should get zoneinfo from the OS it's compiled in
     #     # for Linux the files are under /usr/share/zoneinfo
@@ -723,64 +736,62 @@ fn get_zoneinfo[
     #     pass
     # except:
     #     pass
-    try:
-        var dst_zones = T()
-        var no_dst_zones = A()
-        from python import Python
+    # try:
+    #     from python import Python
 
-        var json = Python.import_module("json")
-        var requests = Python.import_module("requests")
-        var datetime = Python.import_module("datetime")
-        # var text = requests.get("https://worldtimeapi.org/api/timezone").text
-        # var tz_list = json.loads(text)
+    #     var json = Python.import_module("json")
+    #     var requests = Python.import_module("requests")
+    #     var datetime = Python.import_module("datetime")
+    #     # var text = requests.get("https://worldtimeapi.org/api/timezone").text
+    #     # var tz_list = json.loads(text)
 
-        for item in timezones:
-            var tz = requests.get("https://timeapi.io/TimeZone/" + item[]).text
-            var data = json.loads(tz)
-            var utc_offset = data["standardUtcOffset"]["seconds"] // 60
-            var h = int(utc_offset // 60)
-            var m = int(utc_offset % 60)
-            var sign = 1 if utc_offset >= 0 else -1
+    #     for item in timezones:
+    #         var tz = requests.get("https://timeapi.io/TimeZone/" + item[]).text
+    #         var data = json.loads(tz)
+    #         var utc_offset = data["standardUtcOffset"]["seconds"] // 60
+    #         var h = int(utc_offset // 60)
+    #         var m = int(utc_offset % 60)
+    #         var sign = 1 if utc_offset >= 0 else -1
 
-            var dst_start: PythonObject = ""
-            var dst_end: PythonObject = ""
-            if not data["hasDayLightSaving"]:
-                _ = h, m, sign
-                # TODO: somehow force cast python object to StringLiteral
-                no_dst_zones.add(item[], Offset(abs(h), abs(m), sign))
-                continue
-            # -1 is to avoid Z timezone designation that
-            # python's datetime doesn't like
-            dst_start = data["dstInterval"]["dstStart"].__getitem__(0, -1)
-            dst_end = data["dstInterval"]["dstEnd"].__getitem__(0, -1)
+    #         var dst_start: PythonObject = ""
+    #         var dst_end: PythonObject = ""
+    #         if not data["hasDayLightSaving"]:
+    #             _ = h, m, sign
+    #             # TODO: somehow force cast python object to StringLiteral
+    #             no_dst_zones.add(item[], Offset(abs(h), abs(m), sign))
+    #             continue
+    #         # -1 is to avoid Z timezone designation that
+    #         # python's datetime doesn't like
+    #         dst_start = data["dstInterval"]["dstStart"].__getitem__(0, -1)
+    #         dst_end = data["dstInterval"]["dstEnd"].__getitem__(0, -1)
 
-            var dt_start = datetime.datetime(dst_start)
-            var month_start = UInt8(dst_start.month)
-            var dow_start = UInt8(dt_start.weekday())
-            var eom_start = UInt8(0 if dt_start <= 15 else 1)
-            var week_start = 0  # TODO
-            var h_start = UInt8(dt_start.hour)
-            var dt_end = datetime.datetime(dst_end)
-            var month_end = UInt8(dst_end.month)
-            var week_end = 0  # TODO
-            var h_end = UInt8(dt_end.hour)
-            var dow_end = UInt8(dt_end.weekday())
-            var eom_end = UInt8(0 if dt_end <= 15 else 1)
+    #         var dt_start = datetime.datetime(dst_start)
+    #         var month_start = UInt8(int(dst_start.month))
+    #         var dow_start = UInt8(int(dt_start.weekday()))
+    #         var eom_start = UInt8(0 if dt_start <= 15 else 1)
+    #         var week_start = 0  # TODO
+    #         var h_start = UInt8(int(dt_start.hour))
+    #         var dt_end = datetime.datetime(dst_end)
+    #         var month_end = UInt8(int(dst_end.month))
+    #         var week_end = 0  # TODO
+    #         var h_end = UInt8(int(dt_end.hour))
+    #         var dow_end = UInt8(int(dt_end.weekday()))
+    #         var eom_end = UInt8(0 if dt_end <= 15 else 1)
 
-            # TODO: somehow force cast python object to StringLiteral
-            dst_zones.add(
-                item[],
-                ZoneDST(
-                    TzDT(
-                        month_start, dow_start, eom_start, week_start, h_start
-                    ),
-                    TzDT(month_end, dow_end, eom_end, week_end, h_end),
-                    Offset(abs(h), abs(m), sign),
-                ),
-            )
-        return ZoneInfo(dst_zones, no_dst_zones)
-    except:
-        pass
+    #         # TODO: somehow force cast python object to StringLiteral
+    #         dst_zones.add(
+    #             item[],
+    #             ZoneDST(
+    #                 TzDT(
+    #                     month_start, dow_start, eom_start, week_start, h_start
+    #                 ),
+    #                 TzDT(month_end, dow_end, eom_end, week_end, h_end),
+    #                 Offset(abs(h), abs(m), sign),
+    #             ),
+    #         )
+    #     return ZoneInfo(dst_zones, no_dst_zones)
+    # except:
+    #     pass
     # TODO: fallback to hardcoded
     return None
 
