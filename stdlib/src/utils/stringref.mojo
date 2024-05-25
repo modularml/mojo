@@ -43,7 +43,7 @@ struct StringRef(
     Stringable,
     Hashable,
     Boolable,
-    EqualityComparable,
+    Comparable,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters

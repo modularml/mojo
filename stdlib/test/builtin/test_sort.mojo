@@ -10,17 +10,66 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo -D CURRENT_DIR=%S %s
 
-# RUN: %mojo %s | FileCheck %s
-from collections import List
-from random import random_si64, seed
+from pathlib import Path
+from sys import os_is_windows, env_get_string
+
+alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
+from testing import assert_true, assert_equal, assert_false
+from random import random_si64, random_ui64, random_float64, seed
 
 from builtin.sort import _quicksort, _small_sort
 
 
-# CHECK-LABEL: test_sort_small_3
-fn test_sort_small_3():
-    print("== test_sort_small_3")
+fn random_numbers[
+    dtype: DType
+](size: Int, max: Int = 3000) -> List[Scalar[dtype]]:
+    var result = List[Scalar[dtype]](size)
+    for _ in range(size):
+
+        @parameter
+        if (
+            dtype == DType.int8
+            or dtype == DType.int16
+            or dtype == DType.int32
+            or dtype == DType.int64
+        ):
+            result.append(random_si64(0, max).cast[dtype]())
+        elif (
+            dtype == DType.float16
+            or dtype == DType.float32
+            or dtype == DType.float64
+        ):
+            result.append(random_float64(0, max).cast[dtype]())
+        else:
+            result.append(random_ui64(0, max).cast[dtype]())
+    return result
+
+
+# fn assert_sorted[dtype: DType](inout list: List[Scalar[dtype]]) raises:
+#     sort[dtype](list)
+#     for i in range(1, len(list)):
+#         assert_true(
+#             list[i] >= list[i - 1], str(list[i - 1]) + " > " + str(list[i])
+#         )
+
+
+fn assert_sorted_string(inout list: List[String]) raises:
+    for i in range(1, len(list)):
+        assert_true(
+            list[i] >= list[i - 1], str(list[i - 1]) + " > " + str(list[i])
+        )
+
+
+fn assert_sorted[
+    type: ComparableCollectionElement
+](inout list: List[type]) raises:
+    for i in range(1, len(list)):
+        assert_true(list[i] >= list[i - 1], "error at index: " + str(i))
+
+
+fn test_sort_small_3() raises:
     alias length = 3
 
     var list = List[Int]()
@@ -36,16 +85,12 @@ fn test_sort_small_3():
     var ptr = rebind[Pointer[Int]](list.data)
     _small_sort[length, Int, _less_than_equal](ptr)
 
-    # CHECK: 1
-    # CHECK: 2
-    # CHECK: 9
+    var expected = List[Int](1, 2, 9)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-# CHECK-LABEL: test_sort_small_5
-fn test_sort_small_5():
-    print("== test_sort_small_5")
+fn test_sort_small_5() raises:
     alias length = 5
 
     var list = List[Int]()
@@ -63,28 +108,18 @@ fn test_sort_small_5():
     var ptr = rebind[Pointer[Int]](list.data)
     _small_sort[length, Int, _less_than_equal](ptr)
 
-    # CHECK: 1
-    # CHECK: 2
-    # CHECK: 3
-    # CHECK: 4
-    # CHECK: 9
+    var expected = List[Int](1, 2, 3, 4, 9)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-# CHECK-LABEL: test_sort0
 fn test_sort0():
-    print("== test_sort0")
-
     var list = List[Int]()
 
     sort(list)
 
 
-# CHECK-LABEL: test_sort2
-fn test_sort2():
-    print("== test_sort2")
-
+fn test_sort2() raises:
     alias length = 2
     var list = List[Int]()
 
@@ -93,26 +128,21 @@ fn test_sort2():
 
     sort(list)
 
-    # CHECK: -1
-    # CHECK: 0
+    var expected = List[Int](-1, 0)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
     list[0] = 2
     list[1] = -2
 
     sort(list)
 
-    # CHECK: -2
-    # CHECK: 2
+    expected = List[Int](-2, 2)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-# CHECK-LABEL: test_sort3
-fn test_sort3():
-    print("== test_sort3")
-
+fn test_sort3() raises:
     alias length = 3
     var list = List[Int]()
 
@@ -122,11 +152,9 @@ fn test_sort3():
 
     sort(list)
 
-    # CHECK: -1
-    # CHECK: 0
-    # CHECK: 1
+    var expected = List[Int](-1, 0, 1)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
     list[0] = 2
     list[1] = -2
@@ -134,22 +162,17 @@ fn test_sort3():
 
     sort(list)
 
-    # CHECK: -2
-    # CHECK: 0
-    # CHECK: 2
+    expected = List[Int](-2, 0, 2)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-# CHECK-LABEL test_sort3_dupe_elements
-fn test_sort3_dupe_elements():
-    print("== test_sort3_dupe_elements")
-
+fn test_sort3_dupe_elements() raises:
     alias length = 3
 
     fn test[
         cmp_fn: fn[type: AnyRegType] (type, type) capturing -> Bool,
-    ]():
+    ]() raises:
         var list = List[Int](capacity=3)
         list.append(5)
         list.append(3)
@@ -158,11 +181,9 @@ fn test_sort3_dupe_elements():
         var ptr = rebind[Pointer[Int]](list.data)
         _quicksort[Int, cmp_fn](ptr, len(list))
 
-        # CHECK: 3
-        # CHECK: 3
-        # CHECK: 5
+        var expected = List[Int](3, 3, 5)
         for i in range(length):
-            print(list[i])
+            assert_equal(expected[i], list[i])
 
     @parameter
     fn _lt[type: AnyRegType](lhs: type, rhs: type) -> Bool:
@@ -176,10 +197,7 @@ fn test_sort3_dupe_elements():
     test[_leq]()
 
 
-# CHECK-LABEL: test_sort4
-fn test_sort4():
-    print("== test_sort4")
-
+fn test_sort4() raises:
     alias length = 4
     var list = List[Int]()
 
@@ -190,12 +208,9 @@ fn test_sort4():
 
     sort(list)
 
-    # CHECK: -1
-    # CHECK: 0
-    # CHECK: 1
-    # CHECK: 2
+    var expected = List[Int](-1, 0, 1, 2)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
     list[0] = 2
     list[1] = -2
@@ -204,18 +219,12 @@ fn test_sort4():
 
     sort(list)
 
-    # CHECK: -4
-    # CHECK: -2
-    # CHECK: 0
-    # CHECK: 2
+    expected = List[Int](-4, -2, 0, 2)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-# CHECK-LABEL: test_sort5
-fn test_sort5():
-    print("== test_sort5")
-
+fn test_sort5() raises:
     alias length = 5
     var list = List[Int]()
 
@@ -224,13 +233,9 @@ fn test_sort5():
 
     sort(list)
 
-    # CHECK: 0
-    # CHECK: 1
-    # CHECK: 2
-    # CHECK: 3
-    # CHECK: 4
+    var expected = List[Int](0, 1, 2, 3, 4)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
     list[0] = 2
     list[1] = -2
@@ -240,19 +245,12 @@ fn test_sort5():
 
     sort(list)
 
-    # CHECK: -4
-    # CHECK: -2
-    # CHECK: 0
-    # CHECK: 1
-    # CHECK: 2
+    expected = List[Int](-4, -2, 0, 1, 2)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-# CHECK-LABEL: test_sort_reverse
-fn test_sort_reverse():
-    print("== test_sort_reverse")
-
+fn test_sort_reverse() raises:
     alias length = 5
     var list = List[Int](capacity=length)
 
@@ -261,19 +259,12 @@ fn test_sort_reverse():
 
     sort(list)
 
-    # CHECK: 0
-    # CHECK: 1
-    # CHECK: 2
-    # CHECK: 3
-    # CHECK: 4
+    var expected = List[Int](0, 1, 2, 3, 4)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-# CHECK-LABEL: test_sort_semi_random
-fn test_sort_semi_random():
-    print("== test_sort_semi_random")
-
+fn test_sort_semi_random() raises:
     alias length = 8
     var list = List[Int](capacity=length)
 
@@ -285,22 +276,12 @@ fn test_sort_semi_random():
 
     sort(list)
 
-    # CHECK: 7
-    # CHECK: 5
-    # CHECK: 3
-    # CHECK: 1
-    # CHECK: 0
-    # CHECK: 2
-    # CHECK: 4
-    # CHECK: 6
+    var expected = List[Int](-7, -5, -3, -1, 0, 2, 4, 6)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-# CHECK-LABEL: test_sort9
-fn test_sort9():
-    print("== test_sort9")
-
+fn test_sort9() raises:
     alias length = 9
     var list = List[Int](capacity=length)
 
@@ -309,23 +290,12 @@ fn test_sort9():
 
     sort(list)
 
-    # CHECK: 0
-    # CHECK: 1
-    # CHECK: 2
-    # CHECK: 3
-    # CHECK: 4
-    # CHECK: 5
-    # CHECK: 6
-    # CHECK: 7
-    # CHECK: 8
+    var expected = List[Int](0, 1, 2, 3, 4, 5, 6, 7, 8)
     for i in range(length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-# CHECK-LABEL: test_sort103
-fn test_sort103():
-    print("== test_sort103")
-
+fn test_sort103() raises:
     alias length = 103
     var list = List[Int](capacity=length)
 
@@ -334,16 +304,11 @@ fn test_sort103():
 
     sort(list)
 
-    # CHECK-NOT: unsorted
     for i in range(1, length):
-        if list[i - 1] > list[i]:
-            print("error: unsorted")
+        assert_false(list[i - 1] > list[i])
 
 
-# CHECK-LABEL: test_sort_any_103
-fn test_sort_any_103():
-    print("== test_sort_any_103")
-
+fn test_sort_any_103() raises:
     alias length = 103
     var list = List[Float32](capacity=length)
 
@@ -352,15 +317,11 @@ fn test_sort_any_103():
 
     sort[DType.float32](list)
 
-    # CHECK-NOT: unsorted
     for i in range(1, length):
-        if list[i - 1] > list[i]:
-            print("error: unsorted")
+        assert_false(list[i - 1] > list[i])
 
 
-fn test_quick_sort_repeated_val():
-    print("==  test_quick_sort_repeated_val")
-
+fn test_quick_sort_repeated_val() raises:
     alias length = 36
     var list = List[Float32](capacity=length)
 
@@ -377,98 +338,96 @@ fn test_quick_sort_repeated_val():
     var ptr = rebind[Pointer[Float32]](list.data)
     _quicksort[Float32, _greater_than](ptr, len(list))
 
-    # CHECK: 9.0
-    # CHECK: 9.0
-    # CHECK: 9.0
-    # CHECK: 9.0
-    # CHECK: 8.0
-    # CHECK: 8.0
-    # CHECK: 8.0
-    # CHECK: 8.0
-    # CHECK: 7.0
-    # CHECK: 7.0
-    # CHECK: 7.0
-    # CHECK: 7.0
-    # CHECK: 6.0
-    # CHECK: 6.0
-    # CHECK: 6.0
-    # CHECK: 6.0
-    # CHECK: 5.0
-    # CHECK: 5.0
-    # CHECK: 5.0
-    # CHECK: 5.0
-    # CHECK: 4.0
-    # CHECK: 4.0
-    # CHECK: 4.0
-    # CHECK: 4.0
-    # CHECK: 3.0
-    # CHECK: 3.0
-    # CHECK: 3.0
-    # CHECK: 3.0
-    # CHECK: 2.0
-    # CHECK: 2.0
-    # CHECK: 2.0
-    # CHECK: 2.0
-    # CHECK: 1.0
-    # CHECK: 1.0
-    # CHECK: 1.0
-    # CHECK: 1.0
+    var expected = List[Float32](
+        9.0,
+        9.0,
+        9.0,
+        9.0,
+        8.0,
+        8.0,
+        8.0,
+        8.0,
+        7.0,
+        7.0,
+        7.0,
+        7.0,
+        6.0,
+        6.0,
+        6.0,
+        6.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        3.0,
+        3.0,
+        3.0,
+        3.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+    )
     for i in range(0, length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
     @parameter
     fn _less_than[type: AnyRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Float32](lhs) < rebind[Float32](rhs)
 
-    # CHECK: 1.0
-    # CHECK: 1.0
-    # CHECK: 1.0
-    # CHECK: 1.0
-    # CHECK: 2.0
-    # CHECK: 2.0
-    # CHECK: 2.0
-    # CHECK: 2.0
-    # CHECK: 3.0
-    # CHECK: 3.0
-    # CHECK: 3.0
-    # CHECK: 3.0
-    # CHECK: 4.0
-    # CHECK: 4.0
-    # CHECK: 4.0
-    # CHECK: 4.0
-    # CHECK: 5.0
-    # CHECK: 5.0
-    # CHECK: 5.0
-    # CHECK: 5.0
-    # CHECK: 6.0
-    # CHECK: 6.0
-    # CHECK: 6.0
-    # CHECK: 6.0
-    # CHECK: 7.0
-    # CHECK: 7.0
-    # CHECK: 7.0
-    # CHECK: 7.0
-    # CHECK: 8.0
-    # CHECK: 8.0
-    # CHECK: 8.0
-    # CHECK: 8.0
-    # CHECK: 9.0
-    # CHECK: 9.0
-    # CHECK: 9.0
-    # CHECK: 9.0
+    expected = List[Float32](
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        3.0,
+        3.0,
+        3.0,
+        3.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        6.0,
+        6.0,
+        6.0,
+        6.0,
+        7.0,
+        7.0,
+        7.0,
+        7.0,
+        8.0,
+        8.0,
+        8.0,
+        8.0,
+        9.0,
+        9.0,
+        9.0,
+        9.0,
+    )
     var sptr = rebind[Pointer[Float32]](list.data)
     _quicksort[Float32, _less_than](sptr, len(list))
     for i in range(0, length):
-        print(list[i])
+        assert_equal(expected[i], list[i])
 
 
-fn test_partition_top_k(length: Int, k: Int):
-    print("== test_partition_top_k_", end="")
-    print(length, end="")
-    print("_", end="")
-    print(k, end="")
-    print("")
-
+fn test_partition_top_k(length: Int, k: Int) raises:
     var list = List[Float32](capacity=length)
 
     for i in range(0, length):
@@ -483,12 +442,10 @@ fn test_partition_top_k(length: Int, k: Int):
 
     for i in range(0, k):
         if list[i] < length - k:
-            print("error: incorrect top-k element", list[i])
+            assert_true(False)
 
 
-# CHECK-LABEL: test_sort_stress
-fn test_sort_stress():
-    print("== test_sort_stress")
+fn test_sort_stress() raises:
     var lens = VariadicList[Int](3, 100, 117, 223, 500, 1000, 1500, 2000, 3000)
     var random_seed = 0
     seed(random_seed)
@@ -498,19 +455,16 @@ fn test_sort_stress():
     fn test[
         cmp_fn: fn[type: AnyRegType] (type, type) capturing -> Bool,
         check_fn: fn[type: AnyRegType] (type, type) capturing -> Bool,
-    ](length: Int):
+    ](length: Int) raises:
         var list = List[Int](capacity=length)
-        for i in range(length):
+        for _ in range(length):
             list.append(int(random_si64(-length, length)))
 
         var ptr = rebind[Pointer[Int]](list.data)
         _quicksort[Int, cmp_fn](ptr, len(list))
 
-        # CHECK-NOT: error
         for i in range(length - 1):
-            if not check_fn[Int](list[i], list[i + 1]):
-                print("error: unsorted, seed is", random_seed)
-                return
+            assert_true(check_fn[Int](list[i], list[i + 1]))
 
     @parameter
     @always_inline
@@ -545,10 +499,7 @@ struct MyStruct:
     var val: Int
 
 
-# CHECK-LABEL: test_sort_custom
-fn test_sort_custom():
-    print("== test_sort_custom")
-
+fn test_sort_custom() raises:
     alias length = 103
     var list = List[MyStruct](capacity=length)
 
@@ -561,13 +512,97 @@ fn test_sort_custom():
 
     sort[MyStruct, compare_fn](list)
 
-    # CHECK-NOT: unsorted
     for i in range(1, length):
-        if list[i - 1].val > list[i].val:
-            print("error: unsorted")
+        assert_false(list[i - 1].val > list[i].val)
 
 
-fn main():
+def test_sort_string_small_list():
+    var list = random_numbers[DType.int32](10)
+    var string_list = List[String]()
+    for n in list:
+        string_list.append(str(int(n[])))
+    sort(string_list)
+    assert_sorted_string(string_list)
+
+
+def test_sort_string_big_list():
+    var list = random_numbers[DType.int32](1000)
+    var string_list = List[String]()
+    for n in list:
+        string_list.append(str(int(n[])))
+    sort(string_list)
+    assert_sorted_string(string_list)
+
+
+def test_sort_strings():
+    var text = (Path(CURRENT_DIR) / "test_file_dummy_input.txt").read_text()
+    var strings = text.split(" ")
+    sort(strings)
+    assert_sorted_string(strings)
+
+
+@value
+struct Person(ComparableCollectionElement):
+    var name: String
+    var age: Int
+
+    fn __lt__(self, other: Self) -> Bool:
+        if self.age < other.age:
+            return True
+        if self.age == other.age:
+            return self.name < other.name
+        return False
+
+    fn __le__(self, other: Self) -> Bool:
+        return not (other < self)
+
+    fn __gt__(self, other: Self) -> Bool:
+        return other < self
+
+    fn __ge__(self, other: Self) -> Bool:
+        return not (self < other)
+
+    fn __eq__(self, other: Self) -> Bool:
+        return self.age == other.age and self.name == other.name
+
+    fn __ne__(self, other: Self) -> Bool:
+        return self.age != other.age or self.name != other.name
+
+
+def test_sort_comparamble_elements_list():
+    var list = List[Person]()
+
+    @parameter
+    fn gen_list(count: Int):
+        list = List[Person]()
+        var ages = random_numbers[DType.uint8](count)
+        var names = List[String]("Maxim", "Max", "Alex", "Bob", "Joe")
+        for age in ages:
+            var name = names[int(age[]) % len(names)]
+            list.append(Person(name, int(age[])))
+
+    gen_list(10)
+    sort(list)
+    assert_sorted(list)
+
+    gen_list(100)
+    sort(list)
+    assert_sorted(list)
+
+    gen_list(1000)
+    sort(list)
+    assert_sorted(list)
+
+
+fn test_sort_empty_comparamble_elements_list() raises:
+    var person_list = List[Person]()
+    sort(person_list)
+    insertion_sort(person_list)
+    quick_sort(person_list)
+    assert_true(len(person_list) == 0)
+
+
+def main():
     test_sort_small_3()
     test_sort_small_5()
     test_sort0()
@@ -587,12 +622,12 @@ fn main():
 
     test_sort_custom()
 
-    # CHECK-LABEL: test_partition_top_k_7_5
-    # CHECK-NOT: incorrect top-k
     test_partition_top_k(7, 5)
-    # CHECK-LABEL: test_partition_top_k_11_2
-    # CHECK-NOT: incorrect top-k
     test_partition_top_k(11, 2)
-    # CHECK-LABEL: test_partition_top_k_4_1
-    # CHECK-NOT: incorrect top-k
     test_partition_top_k(4, 1)
+
+    test_sort_string_small_list()
+    test_sort_string_big_list()
+    test_sort_strings()
+    test_sort_comparamble_elements_list()
+    test_sort_empty_comparamble_elements_list()
