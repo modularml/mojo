@@ -101,7 +101,12 @@ struct Span[
         self._len = len
 
     @always_inline
-    fn __init__(inout self, list: Reference[List[T], is_mutable, lifetime]):
+    fn __init__[
+        small_buffer_size: Int
+    ](
+        inout self,
+        list: Reference[List[T, small_buffer_size], is_mutable, lifetime],
+    ):
         """Construct a Span from a List.
 
         Args:
