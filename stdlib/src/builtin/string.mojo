@@ -620,6 +620,7 @@ struct String(
     Representable,
     IntableRaising,
     KeyElement,
+    Comparable,
     Boolable,
     Formattable,
     ToFormatter,
