@@ -331,9 +331,9 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         @parameter
         for i in range(size):
-            var ref = self._get_reference_unsafe(i)
+            var eltref = self._get_reference_unsafe(i)
             initialize_pointee_move(
-                UnsafePointer[Self.ElementType](ref), elems[i]
+                UnsafePointer[Self.ElementType](eltref), elems[i]
             )
 
     # ===------------------------------------------------------------------===#
