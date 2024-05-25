@@ -29,22 +29,18 @@ from bit import countl_zero
 @value
 struct _ArrayIter[
     T: DType,
-    current_capacity: Int,
-    max_capacity: Int,
-    capacity_jump: Int,
+    capacity: Int,
     forward: Bool = True,
 ](Sized):
     """Iterator for Array.
 
     Parameters:
         T: The type of the elements in the Array.
-        current_capacity: The maximum number of elements that the Array can hold.
-        max_capacity: The maximum size in the stack.
-        capacity_jump: The amount of items to expand in each stack expansion.
+        capacity: The maximum number of elements that the Array can hold.
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias type = Array[T, current_capacity, max_capacity, capacity_jump]
+    alias type = Array[T, capacity]
 
     var index: Int
     var src: Self.type
@@ -84,13 +80,10 @@ fn _closest_upper_pow_2(val: Int) -> Int:
 
 
 @register_passable("trivial")
-struct Array[
-    T: DType = DType.index,
-    current_capacity: Int = 1,  # T.bitwidth() // 8,
-    max_capacity: Int = 32,  # 256 // T.bitwidth(),
-    capacity_jump: Int = 16,  # 128 // T.bitwidth(),
-](CollectionElement, Sized, Boolable):
-    """An Array allocated on the stack with a current_capacity and
+struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
+    CollectionElement, Sized, Boolable
+):
+    """An Array allocated on the stack with a capacity and
     max_capacity known at compile time.
 
     It is backed by a `SIMD` vector. This struct has the same API
@@ -99,37 +92,39 @@ struct Array[
     This is typically faster than Python's `Array` as it is stack-allocated
     and does not require any dynamic memory allocation.
 
+    Notes:
+        Setting Array items directly doesn't update self.capacity_left,
+            methods like append(), extend(), concat() do.
+
     Parameters:
         T: The type of the elements in the Array.
-        current_capacity: The number of elements that the Array can hold.
+        capacity: The number of elements that the Array can hold.
             Should be a power of two, otherwise space on the SIMD vector
             is wasted.
-        max_capacity: The maximum size in the stack.
-        capacity_jump: The amount of capacity to expand in each stack expansion.
     """
 
-    alias _vec_type = SIMD[T, _closest_upper_pow_2(current_capacity)]
+    alias _vec_type = SIMD[T, _closest_upper_pow_2(capacity)]
     var vec: Self._vec_type
     alias _scalar_type = Scalar[T]
-    var current_capacity_left: UInt8
+    var capacity_left: UInt8
     """The current capacity left until expansion."""
 
     @always_inline
     fn __init__(inout self):
         """This constructor creates an empty Array."""
         self.vec = Self._vec_type()
-        self.current_capacity_left = current_capacity
+        self.capacity_left = capacity
 
     @always_inline
     fn __init__(inout self, *, fill: Self._scalar_type):
         """Constructs a Array by filling it with the
-        given value. Sets the current_capacity_left var to 0.
+        given value. Sets the capacity_left var to 0.
 
         Args:
             fill: The value to populate the Array with.
         """
         self.vec = Self._vec_type(fill)
-        self.current_capacity_left = 0
+        self.capacity_left = 0
 
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
@@ -140,11 +135,11 @@ struct Array[
             values: The values to populate the Array with.
         """
         self = Self()
-        var delta = current_capacity - len(values)
+        var delta = capacity - len(values)
         if delta > -1:
-            self.current_capacity_left = delta
+            self.capacity_left = delta
         else:
-            self.current_capacity_left = 0
+            self.capacity_left = 0
         for value in values:
             self.append(value)
 
@@ -155,26 +150,24 @@ struct Array[
             values: The values to populate the Array with.
         """
         self = Self()
-        var delta = max(0, current_capacity - len(values))
-        for value in range(current_capacity - delta):  # FIXME
+        var delta = max(0, capacity - len(values))
+        for value in range(capacity - delta):  # FIXME
             self.append(value)
+        self.capacity_left = capacity - delta
 
-    fn __init__[
-        cap: Int, cap_j: Int, max_stack: Int
-    ](inout self, owned existing: Array[T, cap, cap_j, max_stack]):
+    fn __init__[cap: Int](inout self, owned existing: Array[T, cap]):
         """Constructs a Array from an existing Array.
 
         Parameters:
             cap: The number of elements that the Array can hold.
-            cap_j: The amount of capacity to expand in each stack expansion.
-            max_stack: The maximum size in the stack.
 
         Args:
             existing: The existing Array.
         """
         self = Self()
-        for i in range(current_capacity):
+        for i in range(capacity):
             self[i] = existing[i]
+        self.capacity_left = existing.capacity_left
         # TODO enlargement if necessary to fit existing
 
     # FIXME
@@ -190,12 +183,12 @@ struct Array[
     #         unsafe_pointer: The pointer to the data.
     #         size: The number of elements pointed to.
     #     """
-    #     var s = min(current_capacity, size)
+    #     var s = min(capacity, size)
     #     self.vec = Self._vec_type()
     #     # FIXME: will this even work? is there no faster way?
     #     for i in range(s):
     #         self.vec[i] = unsafe_pointer[i]
-    #     self.current_capacity_left = current_capacity - s
+    #     self.capacity_left = capacity - s
 
     # FIXME
     # fn __init__[
@@ -209,13 +202,13 @@ struct Array[
     #     Args:
     #         unsafe_pointer: The pointer to the data.
     #     """
-    #     alias s = min(current_capacity, size)
+    #     alias s = min(capacity, size)
     #     self.vec = Self._vec_type()
 
     #     @parameter
     #     for i in range(s):
     #         self.vec[i] = unsafe_pointer[i]
-    #     self.current_capacity_left = current_capacity - s
+    #     self.capacity_left = capacity - s
 
     # FIXME
     # fn __init__[
@@ -229,13 +222,13 @@ struct Array[
     #     Args:
     #         unsafe_pointer: The pointer to the data.
     #     """
-    #     alias s = min(current_capacity, size)
+    #     alias s = min(capacity, size)
     #     self.vec = Self._vec_type()
 
     #     @parameter
     #     for i in range(s):
     #         self.vec[i] = rebind[SIMD[T, 0]](unsafe_pointer[i])
-    #     self.current_capacity_left = current_capacity - s
+    #     self.capacity_left = capacity - s
 
     # FIXME
     # fn __init__[
@@ -251,45 +244,46 @@ struct Array[
     fn __init__[size: Int](inout self, owned existing: List[Self._scalar_type]):
         """Constructs a Array from an existing List.
 
+        Parameters:
+            size: The size of the List.
+
         Args:
             existing: The existing List.
         """
         self.vec = Self._vec_type()
-        var amnt = min(current_capacity, existing.size)
-        self.current_capacity_left = current_capacity - amnt
+        alias amnt = min(capacity, size)
+        self.capacity_left = capacity - amnt
+
+        @parameter
         for i in range(amnt):
             self.unsafe_set(i, existing[i])
 
     @always_inline
     fn __len__(self) -> Int:
         """Returns the length of the Array."""
-        return int(current_capacity - self.current_capacity_left)
+        return int(capacity - self.capacity_left)
 
     @always_inline
     fn append(inout self, owned value: Self._scalar_type):
-        """Appends a value to the Array.
+        """Appends a value to the Array. If full, sets
+        the last element to the given value.
 
         Args:
             value: The value to append.
         """
-        if self.current_capacity_left == 0 and current_capacity == max_capacity:
-            self.unsafe_set(current_capacity - 1, value)
+        if self.capacity_left == 0:
+            self.unsafe_set(capacity - 1, value)
             return
-        elif len(self) + 1 <= current_capacity:
-            self.unsafe_set(len(self), value)
-            self.current_capacity_left = max(0, self.current_capacity_left - 1)
-            return
-        alias val = min(current_capacity + capacity_jump, max_capacity)
-        self.vec = Array[T, val, max_capacity, capacity_jump](self.vec)
         self.unsafe_set(len(self), value)
+        self.capacity_left = max(0, self.capacity_left - 1)
 
     @always_inline
-    fn append[
-        cap: Int
-    ](inout self, other: Array[T, cap]) -> Array[
-        T, min(max_capacity, current_capacity + cap)
-    ]:
-        """Appends another Array to the Array.
+    fn append[cap: Int](inout self, other: Array[T, cap]) -> Self:
+        """Appends another Array to the Array up to
+        Self.capacity.
+
+        Parameters:
+            cap: The capacity of the other Array.
 
         Args:
             other: The Array to append.
@@ -303,7 +297,7 @@ struct Array[
 
     fn __iter__(
         self,
-    ) -> _ArrayIter[T, current_capacity, max_capacity, capacity_jump]:
+    ) -> _ArrayIter[T, capacity]:
         """Iterate over elements of the Array, returning immutable references.
 
         Returns:
@@ -313,7 +307,7 @@ struct Array[
 
     fn __reversed__(
         self,
-    ) -> _ArrayIter[T, current_capacity, max_capacity, capacity_jump, False]:
+    ) -> _ArrayIter[T, capacity, False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
@@ -354,7 +348,7 @@ struct Array[
     #         existing: The existing Array.
     #     """
     #     self.vec = existing.vec
-    #     self.current_capacity_left = existing.current_capacity_left
+    #     self.capacity_left = existing.capacity_left
 
     # fn __copyinit__(inout self, existing: Self):
     #     """Creates a deepcopy of the given Array.
@@ -367,7 +361,8 @@ struct Array[
     #         self.unsafe_set(i, existing[i])
 
     fn __setitem__(inout self, idx: Int, owned value: Self._scalar_type):
-        """Sets a Array element at the given index.
+        """Sets a Array element at the given index. This will
+        not update self.capacity_left.
 
         Args:
             idx: The index of the element.
@@ -378,13 +373,15 @@ struct Array[
         self.vec[norm_idx] = value
 
     @always_inline("nodebug")
-    fn concat(
-        self, owned other: Self
-    ) -> Array[
-        T,
-        min(Self.max_capacity, Self.current_capacity + other.current_capacity),
+    fn concat[
+        cap: Int
+    ](self, owned other: Array[T, cap]) -> Array[
+        T, Self.capacity + other.capacity
     ]:
         """Concatenates self with other and returns the result as a new Array.
+
+        Parameters:
+            cap: The capacity of the other Array.
 
         Args:
             other: Array whose elements will be combined with the elements of self.
@@ -392,12 +389,8 @@ struct Array[
         Returns:
             The newly created Array.
         """
-        alias size = min(
-            Self.current_capacity + other.current_capacity, max_capacity
-        )
-        var arr = Array[T, size, max_capacity, capacity_jump]()
-        arr.extend(self.vec)
-        arr.extend(other.vec)
+        var arr = Array[T, Self.capacity + other.capacity](self)
+        arr.extend(other)
         return arr
 
     fn __str__(self) -> String:
@@ -478,26 +471,19 @@ struct Array[
         self.append(previous)
 
     @always_inline
-    fn extend[
-        cap: Int = current_capacity
-    ](inout self, owned other: Array[T, cap]):
-        """Extends this list by consuming the elements of `other`.
+    fn extend[cap: Int = capacity](inout self, owned other: Array[T, cap]):
+        """Extends this list by consuming the elements of `other` up
+        to Self.capacity.
 
         Args:
             other: Array whose elements will be added in order at the end of this Array.
         """
-        alias cap_sum = current_capacity + other.current_capacity
-        if self.current_capacity_left - len(other) < current_capacity:
-            pass
-        elif cap_sum < max_capacity:
-            alias new_arr = Array[T, cap_sum, max_capacity, capacity_jump]
-            self = new_arr(self.vec)
-        else:
-            alias new_arr = Array[T, max_capacity, max_capacity, capacity_jump]
-            self = new_arr(self.vec)
-        for i in range(len(other)):
+        alias cap_sum = capacity + other.capacity
+        if len(self) + len(other) > capacity:
+            return
+        for i in range(capacity):
             self.unsafe_set(len(self) + i, other.unsafe_get(i))
-            self.current_capacity_left -= 1
+            self.capacity_left -= 1
 
     @always_inline
     fn pop(inout self, i: Int = -1) -> Self._scalar_type:
@@ -511,8 +497,8 @@ struct Array[
         """
         debug_assert(abs(i) > len(self), "pop index out of range")
         var norm_idx = i if i > 0 else len(self) + i
-        self.current_capacity_left += 1
-        return self.unsafe_get(i)
+        self.capacity_left += 1
+        return self.unsafe_get(norm_idx)
 
     fn index(
         self,
@@ -559,15 +545,6 @@ struct Array[
                 return i + start_norm
         return None
 
-    fn steal_data(inout self) -> Self._vec_type:
-        """Take ownership of the underlying pointer from the Array.
-
-        Returns:
-            The underlying data.
-        """
-        # TODO: is this even possible?
-        return self.vec
-
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
         """Adjusts the span based on the Array length."""
@@ -605,10 +582,10 @@ struct Array[
     #         A reference to the item at the given index.
     #     """
     #     debug_assert(
-    #         abs(int(index)) < current_capacity, "Index must be within bounds."
+    #         abs(int(index)) < capacity, "Index must be within bounds."
     #     )
     #     var idx = int(index)
-    #     var norm_idx = idx if idx > 0 else max(0, idx + current_capacity)
+    #     var norm_idx = idx if idx > 0 else max(0, idx + capacity)
     #     return UnsafePointer(self[][norm_idx])[]
 
     @always_inline
@@ -751,7 +728,7 @@ struct Array[
 
     @always_inline("nodebug")
     fn min[
-        cap: Int = current_capacity
+        cap: Int = capacity
     ](self, other: Array[T, cap]) -> Self._scalar_type:
         """Computes the elementwise minimum between the two vectors.
 
@@ -762,23 +739,21 @@ struct Array[
             A new SIMD vector where each element at position
                 i is min(self[i], other[i]).
         """
-        alias delta = Self.current_capacity - other.current_capacity
+        alias delta = Self.capacity - other.capacity
 
         @parameter
         if delta == 0:
             return self.vec.min(rebind[Self._vec_type](other.vec))
         elif delta > 0:
-            var s = Self()
-            s.extend(other.vec)
+            var s = Self(other)
             return self.vec.min(s.vec)
         else:
-            var s = Array[T, cap]()
-            s.extend(self.vec)
+            var s = Array[T, cap](self)
             return other.vec.min(s.vec)
 
     @always_inline("nodebug")
     fn max[
-        cap: Int = current_capacity
+        cap: Int = capacity
     ](self, other: Array[T, cap]) -> Self._scalar_type:
         """Computes the elementwise maximum between the two Arrays.
 
@@ -789,20 +764,16 @@ struct Array[
             A new SIMD vector where each element at position
                 i is max(self[i], other[i]).
         """
-        alias delta = _closest_upper_pow_2(
-            Self.current_capacity - other.current_capacity
-        )
+        alias delta = _closest_upper_pow_2(Self.capacity - other.capacity)
 
         @parameter
         if delta == 0:
             return self.vec.max(rebind[Self._vec_type](other.vec))
         elif delta > 0:
-            var s = Self()
-            s.extend(other.vec)
+            var s = Self(other)
             return self.vec.max(s.vec)
         else:
-            var s = Array[T, cap]()
-            s.extend(self.vec)
+            var s = Array[T, cap](self)
             return other.vec.max(s.vec)
 
     @always_inline("nodebug")
@@ -834,9 +805,9 @@ struct Array[
 
     @always_inline
     fn __add__[
-        cap: Int = current_capacity
+        cap: Int = capacity
     ](self, other: Array[T, cap]) -> Array[
-        T, _closest_upper_pow_2(max(current_capacity, cap))
+        T, _closest_upper_pow_2(max(capacity, cap))
     ]:
         """Computes the elementwise addition between the two Arrays.
 
@@ -847,29 +818,27 @@ struct Array[
             A new SIMD vector where each element at position
                 i is self[i] + other[i].
         """
-        alias size = _closest_upper_pow_2(max(current_capacity, cap))
+        alias size = _closest_upper_pow_2(max(capacity, cap))
         alias new_simd = SIMD[T, size]
         alias new_arr = Array[T, size]
-        alias delta = Self.current_capacity - other.current_capacity
+        alias delta = Self.capacity - other.capacity
 
         # FIXME no idea why but this doesn't currently accept using the alias
         @parameter
         if delta == 0:
             return rebind[SIMD[T, size]](self.vec) + rebind[new_simd](other.vec)
         elif delta > 0:
-            var s = new_arr()
-            s.extend(other.vec)
+            var s = new_arr(other)
             return rebind[SIMD[T, size]](self.vec) + rebind[new_simd](s.vec)
         else:
-            var s = new_arr()
-            s.extend(self.vec)
+            var s = new_arr(self)
             return rebind[SIMD[T, size]](other.vec) + rebind[new_simd](s.vec)
 
     @always_inline
     fn __sub__[
-        cap: Int = current_capacity
+        cap: Int = capacity
     ](self, other: Array[T, cap]) -> Array[
-        T, _closest_upper_pow_2(max(current_capacity, cap))
+        T, _closest_upper_pow_2(max(capacity, cap))
     ]:
         """Computes the elementwise subtraction between the two Arrays.
 
@@ -880,28 +849,24 @@ struct Array[
             A new SIMD vector where each element at position
                 i is self[i] - other[i].
         """
-        alias size = _closest_upper_pow_2(max(current_capacity, cap))
+        alias size = _closest_upper_pow_2(max(capacity, cap))
         alias new_simd = SIMD[T, size]
         alias new_arr = Array[T, size]
-        alias delta = Self.current_capacity - other.current_capacity
+        alias delta = Self.capacity - other.capacity
 
         # FIXME no idea why but this currently doesn't accept using the alias
         @parameter
         if delta == 0:
             return rebind[SIMD[T, size]](self.vec) - rebind[new_simd](other.vec)
         elif delta > 0:
-            var s = new_arr()
-            s.extend(other.vec)
+            var s = new_arr(other)
             return rebind[SIMD[T, size]](self.vec) - rebind[new_simd](s.vec)
         else:
-            var s = new_arr()
-            s.extend(self.vec)
+            var s = new_arr(self)
             return rebind[SIMD[T, size]](other.vec) - rebind[new_simd](s.vec)
 
     @always_inline("nodebug")
-    fn __iadd__[
-        cap: Int = current_capacity
-    ](inout self, owned other: Array[T, cap]):
+    fn __iadd__[cap: Int = capacity](inout self, owned other: Array[T, cap]):
         """Computes the elementwise addition between the two Arrays
         inplace.
 
@@ -911,9 +876,7 @@ struct Array[
         self = self + other
 
     @always_inline("nodebug")
-    fn __isub__[
-        cap: Int = current_capacity
-    ](inout self, owned other: Array[T, cap]):
+    fn __isub__[cap: Int = capacity](inout self, owned other: Array[T, cap]):
         """Computes the elementwise subtraction between the two Arrays
         inplace.
 
@@ -925,7 +888,7 @@ struct Array[
     fn clear(inout self):
         """Zeroes the Array."""
         self.vec = self.vec.splat(0)
-        self.current_capacity_left = current_capacity
+        self.capacity_left = capacity
 
     # @always_inline
     # fn theta(self, other: Self) -> Float64:
