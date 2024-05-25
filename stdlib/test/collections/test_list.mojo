@@ -832,8 +832,7 @@ def test_indexing[sbo_size: Int]():
 
 
 def test_materialization[sbo_size: Int]():
-    # TODO: Fix materialization when sbo is used
-    alias l = List[Int](10, 20, 30)
+    alias l = List[Int, sbo_size](10, 20, 30)
     var l2 = l
     assert_equal(l[0], l2[0])
     assert_equal(l[1], l2[1])

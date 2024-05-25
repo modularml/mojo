@@ -92,6 +92,14 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
     # Fields
     alias _small_buffer_type = InlineArray[T, small_buffer_size]
     alias sbo_enabled = Self.small_buffer_size != 0
+    # This flag is here to avoid a compiler bug documented here:
+    # https://github.com/modularml/mojo/issues/2637
+    # TODO: Remove this flag when the bug is fixed.
+    # We use an InlineArray of size 1 to store the flag because we can make it
+    # of size null if small buffer optimization is not used, thus
+    # not using any more memory and not adding instructions in this case.
+    alias _sbo_flag_type = InlineArray[Bool, Int(Self.sbo_enabled)]
+    var _sbo_in_use_flag: Self._sbo_flag_type
     var _small_buffer: Self._small_buffer_type
     var data: UnsafePointer[T]
     """The underlying storage for the list."""
@@ -99,6 +107,11 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
     """The number of elements in the list."""
     var capacity: Int
     """The amount of elements that can fit in the list without resizing it."""
+
+    @always_inline
+    fn _set_sbo_in_use_flag[new_value: Bool](inout self):
+        if Self.sbo_enabled:
+            self._sbo_in_use_flag[0] = new_value
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -109,10 +122,15 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
         self.data = UnsafePointer[T]()
         self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
 
+        self._sbo_in_use_flag = Self._sbo_flag_type(unsafe_uninitialized=True)
+
+        self.size = 0
+
         @parameter
         if Self.sbo_enabled:
             self.data = self._small_buffer.unsafe_ptr()
             self.capacity = Self.small_buffer_size
+            self._set_sbo_in_use_flag[True]()
         else:
             # `self.data = UnsafePointer[T]()` is not there because
             # we need to call it before calling
@@ -120,8 +138,6 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
             # Otherwise, we get the following compiler error:
             # "potential indirect access to uninitialized value 'self.data'"
             self.capacity = 0
-
-        self.size = 0
 
     fn __init__(inout self, existing: List[T, _]):
         """Creates a deep copy of the given list.
@@ -141,6 +157,7 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
         """
         self.size = 0
         self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
+        self._sbo_in_use_flag = Self._sbo_flag_type(unsafe_uninitialized=True)
 
         @parameter
         if Self.sbo_enabled:
@@ -149,10 +166,12 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
                 # needed to avoid "potential indirect access to uninitialized value 'self.data'"
                 self.data = UnsafePointer[T]()
                 self.data = self._small_buffer.unsafe_ptr()
+                self._set_sbo_in_use_flag[True]()
                 return
 
         self.data = UnsafePointer[T].alloc(capacity)
         self.capacity = capacity
+        self._set_sbo_in_use_flag[False]()
 
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
@@ -195,12 +214,21 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
         self.capacity = capacity
         self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
 
+        # Those should be in theory no-op if the small buffer optimization is not used.
+        self._sbo_in_use_flag = Self._sbo_flag_type(unsafe_uninitialized=True)
+        self._set_sbo_in_use_flag[False]()
+
     @always_inline
     fn _sbo_is_in_use(self) -> Bool:
         @parameter
         if not Self.sbo_enabled:
             return False
-        return self.data == self._small_buffer.unsafe_ptr()
+        # This condition can't be trusted when materializing
+        # because of a compiler bug.
+        # See https://github.com/modularml/mojo/issues/2637
+        # return self.data == self._small_buffer.unsafe_ptr()
+        # TODO: re-enable it when fixed.
+        return self._sbo_in_use_flag[0]
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing list into a new one.
@@ -211,6 +239,7 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
         self.size = existing.size
         self.capacity = existing.capacity
         self._small_buffer = existing._small_buffer
+        self._sbo_in_use_flag = existing._sbo_in_use_flag
 
         @parameter
         if Self.sbo_enabled:
@@ -488,6 +517,12 @@ struct List[T: CollectionElement, small_buffer_size: Int = 0](
 
         self._free_data_if_possible()
         self.data = new_data
+        # We don't see it before as _free_data_if_possible() uses the
+        # flag to know if memory needs to be freed or not.
+        if self.data == self._small_buffer.unsafe_ptr():
+            self._set_sbo_in_use_flag[True]()
+        else:
+            self._set_sbo_in_use_flag[False]()
 
     @always_inline
     fn _realloc_without_sbo(inout self, new_capacity: Int):
