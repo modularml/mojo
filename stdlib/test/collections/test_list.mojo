@@ -59,6 +59,27 @@ def test_list():
     assert_equal(7, list[-1])
 
 
+def test_list_unsafe_get():
+    var list = List[Int]()
+
+    for i in range(5):
+        list.append(i)
+
+    assert_equal(5, len(list))
+    assert_equal(0, list.unsafe_get(0)[])
+    assert_equal(1, list.unsafe_get(1)[])
+    assert_equal(2, list.unsafe_get(2)[])
+    assert_equal(3, list.unsafe_get(3)[])
+    assert_equal(4, list.unsafe_get(4)[])
+
+    list[2] = -2
+    assert_equal(-2, list.unsafe_get(2)[])
+
+    list.clear()
+    list.append(2)
+    assert_equal(2, list.unsafe_get(0)[])
+
+
 def test_list_clear():
     var list = List[Int](1, 2, 3)
     assert_equal(len(list), 3)
@@ -789,6 +810,7 @@ def test_indexing():
 def main():
     test_mojo_issue_698()
     test_list()
+    test_list_unsafe_get()
     test_list_clear()
     test_list_to_bool_conversion()
     test_list_pop()
