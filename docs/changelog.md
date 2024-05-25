@@ -18,6 +18,10 @@ what we publish.
 
 ### ⭐️ New
 
+- Add a `sort` function for list of `ComparableCollectionElement`s.
+  [PR #2609](https://github.com/modularml/mojo/pull/2609) by
+  [@mzaks](https://github.com/mzaks)
+
 - Mojo has introduced `@parameter for`, a new feature for compile-time
   programming. `@parameter for` defines a for loop where the sequence and the
   induction values in the sequence must be parameter values. For example:
@@ -384,6 +388,11 @@ what we publish.
 
 - Added `os.getsize` function, which gives the size in bytes of a path.
     ([PR 2626](https://github.com/modularml/mojo/pull/2626) by [@artemiogr97](https://github.com/artemiogr97))
+
+- `List` now has a method `unsafe_get` to get the reference to an
+    element without bounds check or wraparound for negative indices.
+    Note that this method is unsafe. Use with caution.
+    ([PR #2800](https://github.com/modularml/mojo/pull/2800) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - Added `fromkeys` method to `Dict` to return a `Dict` with the specified keys
   and value.
