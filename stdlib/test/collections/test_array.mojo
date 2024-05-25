@@ -52,31 +52,24 @@ def test_inlined_fixed_array():
     array[-1] = 7
     assert_equal(7, array[-1])
 
-    # Can assign past the static size into the regrowable dynamic data portion
+    # Can't assign past the static size
     for j in range(5, 10):
         array.append(j)
 
-    assert_equal(10, len(array))
+    assert_equal(5, len(array))
 
-    # Verify the dynamic data got properly assigned to from above
-    assert_equal(5, array[5])
-    assert_equal(6, array[6])
-    assert_equal(7, array[7])
-    assert_equal(8, array[8])
-    assert_equal(9, array[9])
-
+    assert_equal(5, array[-1])
+    assert_equal(6, array[-1])
+    assert_equal(7, array[-1])
+    assert_equal(8, array[-1])
     assert_equal(9, array[-1])
-
-    # Assign a specified index in the dynamic_data portion
-    array[5] = -2
-    assert_equal(-2, array[5])
 
     array.clear()
     assert_equal(0, len(array))
 
 
 def test_inlined_fixed_array_with_default():
-    var array = Array[DType.int8](10)
+    var array = Array[DType.int8]()
 
     for i in range(5):
         array.append(i)
@@ -106,7 +99,7 @@ def test_inlined_fixed_array_with_default():
 
 
 def test_indexing_vec():
-    var array = Array[DType.int8](10)
+    var array = Array[DType.int8]()
     for i in range(5):
         array.append(i)
     assert_equal(0, array[0])
