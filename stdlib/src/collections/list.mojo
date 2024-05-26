@@ -772,7 +772,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         return (self.data + normalized_idx)[]
 
-    # TODO(30737): Replace __getitem__ with this as __refitem__, but lots of places use it
+    # TODO(30737): Replace __getitem__ with this, but lots of places use it
     fn __get_ref(
         self: Reference[Self, _, _], i: Int
     ) -> Reference[T, self.is_mutable, self.lifetime]:

@@ -22,6 +22,20 @@ what we publish.
   [PR #2609](https://github.com/modularml/mojo/pull/2609) by
   [@mzaks](https://github.com/mzaks)
 
+- Mojo functions can return an auto-dereferenced refeference to storage with a
+  new `ref` keyword in the result type specifier.  For example:
+
+  ```mojo
+  struct Pair:
+    var first: Int
+    var second: Int
+    fn get_first_ref(inout self) -> ref[__lifetime_of(self)] Int:
+      return self.first
+  fn show_mutation():
+    var somePair = ...
+    get_first_ref(somePair) = 1
+  ```
+
 - Mojo has introduced `@parameter for`, a new feature for compile-time
   programming. `@parameter for` defines a for loop where the sequence and the
   induction values in the sequence must be parameter values. For example:

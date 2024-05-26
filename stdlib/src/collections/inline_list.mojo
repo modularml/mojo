@@ -58,10 +58,10 @@ struct _InlineListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__refitem__(self.index - 1)
+            return self.src[][self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__refitem__(self.index)
+            return self.src[][self.index]
 
     fn __len__(self) -> Int:
         @parameter
@@ -128,9 +128,9 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         self._size += 1
 
     @always_inline
-    fn __refitem__(
+    fn __getitem__(
         self: Reference[Self, _, _], owned idx: Int
-    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
+    ) -> ref [self.lifetime] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Args:
