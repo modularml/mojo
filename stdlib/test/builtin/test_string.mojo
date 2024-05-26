@@ -746,14 +746,16 @@ fn test_isspace_unicode() raises:
         assert_true(univ_sep_var[i] in univ_sep_alias)
 
     for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0):
-        assert_false(b[] in univ_sep_var)
-        assert_false(b[] in univ_sep_alias)
-        assert_false(String(List[UInt8](b[], 0)).isspace())
+        var val = String(List[UInt8](b[], 0))
+        assert_false(val in univ_sep_var)
+        assert_false(val in univ_sep_alias)
+        assert_false(val.isspace())
 
     for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0):
-        assert_false(b[] in univ_sep_var)
-        assert_false(b[] in univ_sep_alias)
-        assert_false(String(List[UInt8](b[], 0)).isspace())
+        var val = String(List[UInt8](b[], 0))
+        assert_false(val in univ_sep_var)
+        assert_false(val in univ_sep_alias)
+        assert_false(val.isspace())
 
     for i in univ_sep_var:
         assert_true(i[].isspace())
