@@ -533,6 +533,18 @@ fn test_dict_setdefault() raises:
     assert_equal(some_dict.setdefault("not_key", 0)[], 0)
     assert_equal(some_dict["not_key"], 0)
 
+    # Check that there is no copy of the default value, so it's performant
+    var other_dict = Dict[String, CopyCounter]()
+    var a = CopyCounter()
+    var a_def = CopyCounter()
+    var b_def = CopyCounter()
+    other_dict["a"] = a
+    assert_equal(1, other_dict["a"].copy_count)
+    _ = other_dict.setdefault("a", a_def)
+    _ = other_dict.setdefault("b", b_def)
+    assert_equal(1, other_dict["a"].copy_count)
+    assert_equal(1, other_dict["b"].copy_count)
+
 
 def main():
     test_dict()
