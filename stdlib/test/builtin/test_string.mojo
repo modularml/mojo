@@ -965,7 +965,7 @@ def test_string_mul():
 def test_indexing():
     a = String("abc")
     assert_equal(a[False], "a")
-    assert_equal(a[Int16(1)], "b")
+    assert_equal(a[int(1)], "b")
     assert_equal(a[2], "c")
 
 

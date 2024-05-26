@@ -49,15 +49,6 @@ struct Atomic[type: DType]:
         self.value = value
 
     @always_inline
-    fn __init__(inout self, value: Int):
-        """Constructs a new atomic value.
-
-        Args:
-            value: Initial value represented as `mlir.index` type.
-        """
-        self.value = value
-
-    @always_inline
     fn load(inout self) -> Scalar[type]:
         """Loads the current value from the atomic.
 

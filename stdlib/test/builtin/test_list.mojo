@@ -26,7 +26,6 @@ fn test_variadic_list() raises:
         assert_equal(nums[1], 8)
         assert_equal(nums[2], 6)
         assert_equal(nums[True], 8)
-        assert_equal(nums[Int32(0)], 5)
 
         assert_equal(len(nums), 3)
 
