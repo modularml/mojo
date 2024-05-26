@@ -1410,34 +1410,64 @@ struct String(
             substr._strref_dangerous(), start=start
         )
 
-    fn isspace(self) -> Bool:
+    fn isspace[str_len: Int = -1](self) -> Bool:
         """Determines whether the given String is a python
         whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `" \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
 
+        Parameters:
+            str_len: The length of the string to check. -1 means
+                it is determined at runtime.
+
         Returns:
             True if the String is one of the whitespace characters
                 listed above, otherwise False."""
         # TODO add line and paragraph separator as stringliteral
         # once unicode escape secuences are accepted
-        # Unicode Line Separator: \ u2028
-        # Unicode Paragraph Separator: \ u2029
         # 0 is to build a String with null terminator
-        return self in List[String](
-            String(" "),
-            String("\t"),
-            String("\n"),
-            String("\r"),
-            String("\v"),
-            String("\f"),
-            String("\x1c"),
-            String("\x1e"),
-            String("\x85"),
-            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0)),
-            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0)),
+        alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+        """TODO: \\x85"""
+        alias unicode_line_sep = List[UInt8](
+            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
         )
+        """TODO: \\u2028"""
+        alias unicode_paragraph_sep = List[UInt8](
+            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
+        )
+        """TODO: \\u2029"""
+        alias utf8_separators = (
+            ord(" "),
+            ord("\t"),
+            ord("\n"),
+            ord("\r"),
+            ord("\f"),
+            ord("\v"),
+            ord("\x1c"),
+            ord("\x1e"),
+        )
+
+        # TODO: SBO
+        @parameter
+        if str_len == 1:
+            return int(self._buffer.unsafe_get(0)[]) in utf8_separators
+        elif str_len == 3:
+            return self == String(next_line)
+        elif str_len == 7:
+            return self == String(unicode_line_sep) or self == String(
+                unicode_paragraph_sep
+            )
+        else:
+            if len(self) == 1:
+                return int(self._buffer.unsafe_get(0)[]) in utf8_separators
+            elif len(self) == 3:
+                return self == String(next_line)
+            elif len(self) == 7:
+                return self == String(unicode_line_sep) or self == String(
+                    unicode_paragraph_sep
+                )
+            return False
 
     fn split(self, delimiter: String) raises -> List[String]:
         """Split the string by a delimiter.

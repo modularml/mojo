@@ -704,14 +704,16 @@ fn test_isspace() raises:
 
     # test all utf8 and unicode separators
     # 0 is to build a String with null terminator
-    var _line_sep_utf8 = List[UInt8](
+    alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+    """TODO: \\x85"""
+    alias unicode_line_sep = List[UInt8](
         0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
     )
-    """Unicode Line Separator: \\u2028."""
-    var _paragraph_sep_utf8 = List[UInt8](
+    """TODO: \\u2028"""
+    alias unicode_paragraph_sep = List[UInt8](
         0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
     )
-    """Unicode Paragraph Separator: \\u2029."""
+    """TODO: \\u2029"""
     # TODO add line and paragraph separator as stringliteral once unicode
     # escape secuences are accepted
     var univ_sep_var = List[String](
@@ -723,9 +725,9 @@ fn test_isspace() raises:
         String("\f"),
         String("\x1c"),
         String("\x1e"),
-        String("\x85"),
-        String(_line_sep_utf8),
-        String(_paragraph_sep_utf8),
+        String(next_line),
+        String(unicode_line_sep),
+        String(unicode_paragraph_sep),
     )
 
     for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0):
@@ -739,6 +741,7 @@ fn test_isspace() raises:
             assert_false(val.isspace())
 
     for i in univ_sep_var:
+        print(len(i[]))
         assert_true(i[].isspace())
 
     for i in List[String]("not", "space", "", "s", "a", "c"):
