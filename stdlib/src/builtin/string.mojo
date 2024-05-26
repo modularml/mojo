@@ -633,9 +633,8 @@ struct String(
     """The underlying storage for the string."""
 
     """ Useful string aliases. """
-    alias WHITESPACE = " \t\n\r\v\f\x1c\x1e\x85"
-    """Whitespaces " ", "\\t", and [universal separators](
-        https://docs.python.org/3/library/stdtypes.html#str.splitlines)."""
+    alias WHITESPACE = " \t\n\r\v\f"
+    """C style Whitespaces ."""
     alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
     alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
@@ -1409,10 +1408,7 @@ struct String(
         )
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
-        """Split the string by a separator. Defaults to whitespaces and
-        universal newlines [just like Python](
-            https://docs.python.org/3/library/stdtypes.html) EXCEPT
-        for the `u2028` and `u2029` unicode separators.
+        """Split the string by a separator.
 
         Args:
             sep: The string to split on.
@@ -1467,10 +1463,8 @@ struct String(
         return output
 
     fn split(self, *, maxsplit: Int = -1) -> List[String]:
-        """Split the string by every Whitespace separator. Uses whitespaces and
-        universal newlines [just like Python](
-            https://docs.python.org/3/library/stdtypes.html) EXCEPT
-        for the `u2028` and `u2029` unicode separators.
+        """Split the string by every Whitespace separator.
+        Currently only uses C style separators.
 
         Args:
             maxsplit: The maximum amount of items to split from String.
@@ -1498,7 +1492,8 @@ struct String(
         var lhs = 0
         var rhs = 0
         var items = 0
-
+        # FIXME: this should iterate and build unicode strings
+        # and use self.isspace()
         while lhs <= str_iter_len:
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
