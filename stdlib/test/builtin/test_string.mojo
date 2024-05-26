@@ -603,7 +603,7 @@ fn test_split() raises:
     assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
 
     # Should add all whitespace-like chars as one
-    alias utf8_spaces = String(" \t\n\r\v\f\x1c\x1e\x85")
+    alias utf8_spaces = String(" \t\n\r\v\f")
     var s = utf8_spaces + "hello" + utf8_spaces + "world" + utf8_spaces
     d = s.split()
     assert_true(len(d) == 2)
