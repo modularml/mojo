@@ -157,7 +157,7 @@ trait StringableCollectionElement(CollectionElement, Stringable):
     pass
 
 
-trait ComparableCollectionElement(CollectionElement, EqualityComparable):
+trait ComparableCollectionElement(CollectionElement, Comparable):
     """
     This trait is a temporary solution to enable comparison of
     collection elements as utilized in the `index` and `count` methods of

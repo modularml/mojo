@@ -38,6 +38,7 @@ struct StringLiteral(
     KeyElement,
     Boolable,
     Formattable,
+    Comparable,
 ):
     """This type represents a string literal.
 

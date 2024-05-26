@@ -11,5 +11,5 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 """IO constants and functions."""
-alias stdout: Int = 1
-alias stderr: Int = 2
+alias stdout: FileDescriptor = 1
+alias stderr: FileDescriptor = 2

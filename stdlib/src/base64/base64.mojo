@@ -183,8 +183,8 @@ fn b16encode(str: String) -> String:
         var str_byte = str_bytes(i)
         var hi = str_byte >> 4
         var lo = str_byte & 0b1111
-        out.append(b16chars[hi])
-        out.append(b16chars[lo])
+        out.append(b16chars[int(hi)])
+        out.append(b16chars[int(lo)])
 
     out.append(0)
 

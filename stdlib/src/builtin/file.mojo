@@ -81,7 +81,7 @@ struct FileHandle:
 
         Args:
           path: The file path.
-          mode: The mode to open the file in (the mode can be "r" or "w").
+          mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
         """
         self.__init__(path._strref_dangerous(), mode._strref_dangerous())
 
@@ -93,7 +93,7 @@ struct FileHandle:
 
         Args:
           path: The file path.
-          mode: The mode to open the file in (the mode can be "r" or "w").
+          mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
         """
         var err_msg = _OwnedStringRef()
         var handle = external_call[

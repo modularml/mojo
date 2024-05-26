@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the `bin()` function
+"""Implements the `bin()` function.
 
 These are Mojo built-ins, so you don't need to import them.
 """
@@ -28,7 +28,7 @@ fn bin(b: Scalar[DType.bool], /) -> String:
     Returns:
         The binary string representation of b.
     """
-    return bin(index(b))
+    return bin(int(b))
 
 
 fn bin[type: DType](num: Scalar[type], /) -> String:

@@ -105,6 +105,38 @@ def test_indexer():
     assert_equal(0, Bool.__index__(False))
 
 
+def test_comparisons():
+    assert_true(False == False)
+    assert_true(True == True)
+    assert_false(False == True)
+    assert_false(True == False)
+
+    assert_true(False != True)
+    assert_true(True != False)
+    assert_false(False != False)
+    assert_false(True != True)
+
+    assert_true(True > False)
+    assert_false(False > True)
+    assert_false(False > False)
+    assert_false(True > True)
+
+    assert_true(True >= False)
+    assert_false(False >= True)
+    assert_true(False >= False)
+    assert_true(True >= True)
+
+    assert_false(True < False)
+    assert_true(False < True)
+    assert_false(False < False)
+    assert_false(True < True)
+
+    assert_false(True <= False)
+    assert_true(False <= True)
+    assert_true(False <= False)
+    assert_true(True <= True)
+
+
 def main():
     test_bool_cast_to_int()
     test_bool_none()
@@ -113,3 +145,4 @@ def main():
     test_bitwise()
     test_neg()
     test_indexer()
+    test_comparisons()

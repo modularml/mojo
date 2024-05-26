@@ -581,23 +581,16 @@ struct DType(Stringable, Representable, KeyElement):
             dtypes: A list of DTypes on which to do dispatch.
         """
         alias dtype_var = VariadicList[DType](dtypes)
-        var matched = False
 
         @parameter
-        @always_inline
-        fn _func[idx: Int]():
+        for idx in range(len(dtype_var)):
             alias dtype = dtype_var[idx]
             if self == dtype:
-                matched = True
                 return func[dtype]()
 
-        unroll[_func, len(dtype_var)]()
-
-        if not matched:
-            raise Error(
-                "dispatch_custom: dynamic_type does not match any dtype"
-                " parameters"
-            )
+        raise Error(
+            "dispatch_custom: dynamic_type does not match any dtype parameters"
+        )
 
     # ===----------------------------------------------------------------------===#
     # dispatch_arithmetic
@@ -754,19 +747,13 @@ fn _get_runtime_dtype_size(type: DType) -> Int:
         DType.index,
         DType.address,
     )
-    var size = -1
 
     @parameter
-    @always_inline
-    fn func[idx: Int]():
+    for idx in range(len(type_list)):
         alias concrete_type = type_list[idx]
         if concrete_type == type:
-            size = sizeof[concrete_type]()
-            return
+            return sizeof[concrete_type]()
 
-    unroll[func, len(type_list)]()
+    abort("unable to get the dtype size of " + str(type))
 
-    if size == -1:
-        abort("unable to get the dtype size of " + str(type))
-
-    return size
+    return -1

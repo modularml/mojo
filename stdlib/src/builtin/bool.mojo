@@ -60,9 +60,8 @@ trait Boolable:
 @register_passable("trivial")
 struct Bool(
     Stringable,
-    CollectionElement,
+    ComparableCollectionElement,
     Boolable,
-    EqualityComparable,
     Intable,
     Indexer,
 ):
@@ -197,6 +196,66 @@ struct Bool(
             False if the two values do match and True otherwise.
         """
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
+
+    @always_inline("nodebug")
+    fn __lt__(self, rhs: Self) -> Bool:
+        """Compare this Bool to RHS using less-than comparison.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if self is False and rhs is True.
+        """
+
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred lt>`](
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
+
+    @always_inline("nodebug")
+    fn __le__(self, rhs: Self) -> Bool:
+        """Compare this Bool to RHS using less-than-or-equal comparison.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if self is False and rhs is True or False.
+        """
+
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred le>`](
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
+
+    @always_inline("nodebug")
+    fn __gt__(self, rhs: Self) -> Bool:
+        """Compare this Bool to RHS using greater-than comparison.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if self is True and rhs is False.
+        """
+
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred gt>`](
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
+
+    @always_inline("nodebug")
+    fn __ge__(self, rhs: Self) -> Bool:
+        """Compare this Bool to RHS using greater-than-or-equal comparison.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if self is True and rhs is True or False.
+        """
+
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ge>`](
             self._as_scalar_bool(), rhs._as_scalar_bool()
         )
 

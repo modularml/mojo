@@ -18,8 +18,8 @@ from utils import Span
 
 
 fn test_string_literal_byte_slice() raises:
-    var string: StringLiteral = "Hello"
-    var slice = string.as_bytes_slice()
+    alias string: StringLiteral = "Hello"
+    alias slice = string.as_bytes_slice()
 
     assert_equal(len(slice), 5)
     assert_equal(slice[0][], ord("H"))
@@ -114,13 +114,13 @@ fn test_string_byte_slice() raises:
 
 
 fn test_heap_string_from_string_slice() raises:
-    var string_lit: StringLiteral = "Hello"
+    alias string_lit: StringLiteral = "Hello"
 
-    var static_str: StringSlice[
+    alias static_str: StringSlice[
         False, ImmutableStaticLifetime
     ] = string_lit.as_string_slice()
 
-    var heap_string = String(static_str)
+    alias heap_string = String(static_str)
 
     assert_equal(heap_string, "Hello")
 
