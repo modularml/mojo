@@ -1226,10 +1226,9 @@ struct String(
         Returns:
             A StringRef of the inner string.
         """
-        if start >= len(self):
-            return StringRef(self.unsafe_ptr() + len(self), 0)
-        var _length = min(length.or_else(len(self)), len(self) - start)
-        return StringRef(self.unsafe_ptr() + start, _length)
+        var _start = min(max(start, 0), len(self))
+        var _length = min(max(length.or_else(len(self)), 0), len(self) - _start)
+        return StringRef(self.unsafe_ptr() + _start, _length)
 
     fn _strref_keepalive(self):
         """
