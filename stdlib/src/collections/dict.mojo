@@ -856,7 +856,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._entries = Self._new_entries(self._reserved)
 
     fn setdefault(
-        inout self: Reference[Self, _, _], key: K, owned default: V
+        self: Reference[Self, True, _], key: K, owned default: V
     ) raises -> Reference[V, self.is_mutable, self.lifetime]:
         """Get a value from the dictionary by key, or set it to a default if it doesn't exist.
 
