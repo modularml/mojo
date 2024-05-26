@@ -715,7 +715,7 @@ fn test_isspace_unicode() raises:
     """Unicode Paragraph Separator: \\u2029."""
     # TODO add line and paragraph separator as stringliteral once unicode
     # escape secuences are accepted
-    var _universal_separators = List[String](
+    var univ_sep_var = List[String](
         String("\n"),
         String("\r"),
         String("\v"),
@@ -726,7 +726,39 @@ fn test_isspace_unicode() raises:
         String(_line_sep_utf8),
         String(_paragraph_sep_utf8),
     )
-    for i in _universal_separators:
+    alias univ_sep_alias = List[String](
+        String(" "),
+        String("\t"),
+        String("\n"),
+        String("\r"),
+        String("\v"),
+        String("\f"),
+        String("\x1c"),
+        String("\x1e"),
+        String("\x85"),
+        String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0)),
+        String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0)),
+    )
+    for i in range(len(univ_sep_var)):
+        assert_equal(univ_sep_alias[i], univ_sep_var[i])
+
+    for i in range(len(univ_sep_alias)):
+        assert_true(univ_sep_var[i] in univ_sep_alias)
+
+    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0):
+        assert_false(b[] in univ_sep_var)
+        assert_false(b[] in univ_sep_alias)
+        assert_false(String(List[UInt8](b[], 0)).isspace())
+
+    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0):
+        assert_false(b[] in univ_sep_var)
+        assert_false(b[] in univ_sep_alias)
+        assert_false(String(List[UInt8](b[], 0)).isspace())
+
+    for i in univ_sep_var:
+        assert_true(i[].isspace())
+
+    for i in univ_sep_alias:
         assert_true(i[].isspace())
 
     for i in List[String]("not", "space", "", "s", "a", "c"):
