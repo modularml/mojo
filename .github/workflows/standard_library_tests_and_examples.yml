@@ -48,9 +48,6 @@ jobs:
 
       - name: Install nightly Mojo compiler
         run: |
-          # The <auth_token> of "examples" is arbitrary but something
-          # needs to be provided.
-          modular auth examples
           modular install nightly/mojo
 
           # Put Mojo on the PATH
