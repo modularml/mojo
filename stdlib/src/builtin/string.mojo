@@ -1415,7 +1415,7 @@ struct String(
             substr._strref_dangerous(), start=start
         )
 
-    fn split(self, sep: String, maxsplit: Int = -1) -> List[String]:
+    fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string by a separator. Defaults to whitespaces and
         universal newlines [just like Python](
             https://docs.python.org/3/library/stdtypes.html) EXCEPT
@@ -1438,15 +1438,6 @@ struct String(
         _ = String("hello,,world").split(",") # ["hello", "", "world"]
         # Splitting with maxsplit
         _ = String("1,2,3").split(",", 1) # ['1', '2,3']
-        # Splitting an empty string or filled with whitespaces
-        _ = String("      ").split() # []
-        _ = String("").split() # []
-        # Splitting a string with leading, trailing, and middle whitespaces
-        _ = String("      hello    world     ").split() # ["hello", "world"]
-        # Splitting a string full of the separator
-        _ = String(",,,").split(",") # ["", "", "", ""]
-        # Splitting adjacent universal newlines:
-        # _ = String("hello \\t\\n\\r\\f\\v\\x1c\\x1e\\x85world").split() # ["hello", "world"]
         ```
         .
         """
@@ -1458,9 +1449,10 @@ struct String(
         var items = 0
         var sep_len = len(sep)
         if sep_len == 0:
-            for i in range(str_iter_len + 1):
-                output.append(self[i])
-            return output
+            raise Error("ValueError: empty separator")
+            # for i in range(str_iter_len + 1):
+            #     output.append(self[i])
+            # return output
 
         while lhs <= str_iter_len:
             rhs = self.find(sep, lhs)
