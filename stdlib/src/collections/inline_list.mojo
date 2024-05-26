@@ -58,10 +58,10 @@ struct _InlineListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__refitem__(self.index - 1)
+            return self.src[][self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__refitem__(self.index)
+            return self.src[][self.index]
 
     fn __len__(self) -> Int:
         @parameter
@@ -128,15 +128,10 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         self._size += 1
 
     @always_inline
-    fn __refitem__[
-        IndexerType: Indexer,
-    ](self: Reference[Self, _, _], idx: IndexerType) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
+    fn __getitem__(
+        self: Reference[Self, _, _], owned idx: Int
+    ) -> ref [self.lifetime] Self.ElementType:
         """Get a `Reference` to the element at the given index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The index of the item.
@@ -144,15 +139,14 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         Returns:
             A reference to the item at the given index.
         """
-        var i = index(idx)
         debug_assert(
-            -self[]._size <= i < self[]._size, "Index must be within bounds."
+            -self[]._size <= idx < self[]._size, "Index must be within bounds."
         )
 
-        if i < 0:
-            i += len(self[])
+        if idx < 0:
+            idx += len(self[])
 
-        return self[]._array[i]
+        return self[]._array[idx]
 
     @always_inline
     fn __del__(owned self):

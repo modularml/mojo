@@ -85,7 +85,7 @@ struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
         return self.curr
 
     @always_inline("nodebug")
-    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> Int:
+    fn __getitem__(self, idx: Int) -> Int:
         return index(idx)
 
     @always_inline("nodebug")
@@ -116,7 +116,7 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
         return self.end - self.start if self.start < self.end else 0
 
     @always_inline("nodebug")
-    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> Int:
+    fn __getitem__(self, idx: Int) -> Int:
         return self.start + index(idx)
 
     @always_inline("nodebug")
@@ -184,7 +184,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
         return _div_ceil_positive(abs(self.start - self.end), abs(self.step))
 
     @always_inline("nodebug")
-    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> Int:
+    fn __getitem__(self, idx: Int) -> Int:
         return self.start + index(idx) * self.step
 
     @always_inline("nodebug")

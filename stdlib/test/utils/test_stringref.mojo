@@ -78,7 +78,7 @@ def test_intable():
 def test_indexing():
     a = StringRef("abc")
     assert_equal(a[False], "a")
-    assert_equal(a[Int16(1)], "b")
+    assert_equal(a[int(1)], "b")
     assert_equal(a[0], "a")
 
 
