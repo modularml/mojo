@@ -190,7 +190,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         return rebind[T](self[i])
 
     @always_inline("nodebug")
-    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
+    fn __contains__[T: EqualityComparable](self, value: T) -> Bool:
         """Verify if a given value is present in the tuple.
 
         ```mojo
@@ -203,7 +203,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         Parameters:
             T: The type of the value argument. Must implement the
-              trait `ComparableCollectionElement`.
+              trait `EqualityComparable`.
 
         Returns:
             True if the value is contained in the tuple, False otherwise.
