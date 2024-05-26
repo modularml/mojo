@@ -829,9 +829,16 @@ fn normalize_idx(
     msg: StringLiteral = "index must be in range",
 ) -> Int:
     """Normalize an Index to be between start and end e.g.
-    `0, len(self)`, negative can be up to -1*end, positive
-    up to end -1. Has a builtin debug_assert that can be
+    `0, len(self)`, negative can be up to `-1 * end`, positive
+    up to `end -1`. Has a builtin debug_assert that can be
     passed a custom message.
+
+    - Notes:
+        - positive index:
+            - bigger than `end -1` defaults to `end -1`.
+            - less than `start` defaults to `start`.
+        - negative index:
+            - less than `-1 * end` defaults to `start`.
 
     Args:
         idx: The index to normalize.
