@@ -819,3 +819,27 @@ fn product[
     for i in range(start_idx, end_idx):
         product *= tuple[i]
     return product
+
+
+@always_inline
+fn normalize_idx(
+    idx: Int,
+    start: Int,
+    end: Int,
+    msg: StringLiteral = "index must be in range",
+) -> Int:
+    """Normalize an Index to be between start and end. Has a builtin
+    debug_assert that can be passed a custom message.
+
+    Args:
+        idx: The index to normalize.
+        start: The start of the secuence.
+        end: The end of the secuence.
+        msg: The message for the debug_assert that the index is in
+            range.
+
+    Returns:
+        The normalized Index.
+    """
+    debug_assert(abs(idx) < end or idx == -1 * end, msg)
+    return min(idx, end) if idx > -1 else max(start, end + idx)

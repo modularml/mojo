@@ -16,6 +16,7 @@ from .index import (
     StaticIntTuple,
     Index,
     product,
+    normalize_idx,
 )
 from .inline_string import InlineString
 from .loop import unroll

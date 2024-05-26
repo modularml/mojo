@@ -21,7 +21,7 @@ from sys import llvm_intrinsic, bitwidthof
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, Span, StringSlice
+from utils import StringRef, StaticIntTuple, Span, StringSlice, normalize_idx
 from utils._format import Formattable, Formatter, ToFormatter
 
 from .io import _snprintf
@@ -877,14 +877,9 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
-        if idx < 0:
-            return self.__getitem__(len(self) + idx)
-
-        debug_assert(0 <= idx < len(self), "index must be in range")
-        var buf = Self._buffer_type(capacity=1)
-        buf.append(self._buffer[idx])
-        buf.append(0)
-        return String(buf^)
+        var norm_idx = normalize_idx(idx, 0, len(self))
+        # TODO: unsafe_get once it's merged
+        return String(List[UInt8](self._buffer[norm_idx], 0))
 
     @always_inline
     fn __getitem__(self, span: Slice) -> String:
