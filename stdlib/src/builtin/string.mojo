@@ -222,7 +222,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
-        if isspace(int(buff[pos])):
+        if _isspace(int(buff[pos])):
             continue
 
         if str_ref[pos] == "-":
@@ -283,13 +283,13 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         elif ord_letter_min[1] <= ord_current <= ord_letter_max[1]:
             result += ord_current - ord_letter_min[1] + 10
             found_valid_chars_after_start = True
-        elif isspace(ord_current):
+        elif _isspace(ord_current):
             has_space_after_number = True
             start = pos + 1
             break
         else:
             raise Error(_atol_error(base, str_ref))
-        if pos + 1 < str_len and not isspace(int(buff[pos + 1])):
+        if pos + 1 < str_len and not _isspace(int(buff[pos + 1])):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
@@ -303,7 +303,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     if has_space_after_number:
         for pos in range(start, str_len):
-            if not isspace(int(buff[pos])):
+            if not _isspace(int(buff[pos])):
                 raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
@@ -572,11 +572,11 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn isspace(c: UInt8) -> Bool:
+fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
        This currently only respects the default "C" locale, i.e. returns
        True only if the character specified is one of
-       " \n\t\r\f\v".
+       " \\t\\n\\r\\f\\v".
 
     Args:
         c: The character to check.

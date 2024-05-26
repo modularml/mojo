@@ -497,9 +497,9 @@ struct StringRef(
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
-        while start < end and isspace(int(ptr[start])):
+        while start < end and _isspace(int(ptr[start])):
             start += 1
-        while end > start and isspace(int(ptr[end - 1])):
+        while end > start and _isspace(int(ptr[end - 1])):
             end -= 1
         return StringRef(ptr + start, end - start)
 

@@ -684,25 +684,23 @@ fn test_upper() raises:
 
 fn test_isspace() raises:
     # checking true cases
-    assert_true(isspace(ord(" ")))
-    assert_true(isspace(ord("\n")))
-    assert_true(isspace(ord("\t")))
-    assert_true(isspace(ord("\r")))
-    assert_true(isspace(ord("\v")))
-    assert_true(isspace(ord("\f")))
+    assert_true(_isspace(ord(" ")))
+    assert_true(_isspace(ord("\n")))
+    assert_true(_isspace(ord("\t")))
+    assert_true(_isspace(ord("\r")))
+    assert_true(_isspace(ord("\v")))
+    assert_true(_isspace(ord("\f")))
 
     # Checking false cases
-    assert_false(isspace(ord("a")))
-    assert_false(isspace(ord("u")))
-    assert_false(isspace(ord("s")))
-    assert_false(isspace(ord("t")))
-    assert_false(isspace(ord("i")))
-    assert_false(isspace(ord("n")))
-    assert_false(isspace(ord("z")))
-    assert_false(isspace(ord(".")))
+    assert_false(_isspace(ord("a")))
+    assert_false(_isspace(ord("u")))
+    assert_false(_isspace(ord("s")))
+    assert_false(_isspace(ord("t")))
+    assert_false(_isspace(ord("i")))
+    assert_false(_isspace(ord("n")))
+    assert_false(_isspace(ord("z")))
+    assert_false(_isspace(ord(".")))
 
-
-fn test_isspace_unicode() raises:
     # test all utf8 and unicode separators
     # 0 is to build a String with null terminator
     var _line_sep_utf8 = List[UInt8](
@@ -981,7 +979,6 @@ def main():
     test_lower()
     test_upper()
     test_isspace()
-    test_isspace_unicode()
     test_ascii_aliases()
     test_rstrip()
     test_lstrip()
