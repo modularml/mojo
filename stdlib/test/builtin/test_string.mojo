@@ -15,7 +15,6 @@
 from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
-    _isspace,
 )
 from testing import (
     assert_equal,
@@ -685,25 +684,29 @@ fn test_upper() raises:
 
 fn test_isspace() raises:
     # checking true cases
-    assert_true(_isspace(ord(" ")))
-    assert_true(_isspace(ord("\n")))
-    assert_true(_isspace(ord("\t")))
-    assert_true(_isspace(ord("\r")))
-    assert_true(_isspace(ord("\v")))
-    assert_true(_isspace(ord("\f")))
+    assert_true(isspace(ord(" ")))
+    assert_true(isspace(ord("\n")))
+    assert_true(isspace(ord("\t")))
+    assert_true(isspace(ord("\r")))
+    assert_true(isspace(ord("\v")))
+    assert_true(isspace(ord("\f")))
 
     # Checking false cases
-    assert_false(_isspace(ord("a")))
-    assert_false(_isspace(ord("u")))
-    assert_false(_isspace(ord("s")))
-    assert_false(_isspace(ord("t")))
-    assert_false(_isspace(ord("i")))
-    assert_false(_isspace(ord("n")))
-    assert_false(_isspace(ord("z")))
-    assert_false(_isspace(ord(".")))
+    assert_false(isspace(ord("a")))
+    assert_false(isspace(ord("u")))
+    assert_false(isspace(ord("s")))
+    assert_false(isspace(ord("t")))
+    assert_false(isspace(ord("i")))
+    assert_false(isspace(ord("n")))
+    assert_false(isspace(ord("z")))
+    assert_false(isspace(ord(".")))
 
     # test all utf8 and unicode separators
     # 0 is to build a String with null terminator
+    alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
+    """TODO: \\x1c"""
+    alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
+    """TODO: \\x1e"""
     alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
     """TODO: \\x85"""
     alias unicode_line_sep = List[UInt8](
@@ -723,8 +726,8 @@ fn test_isspace() raises:
         String("\r"),
         String("\v"),
         String("\f"),
-        String("\x1c"),
-        String("\x1e"),
+        String(information_sep_four),
+        String(information_sep_two),
         String(next_line),
         String(unicode_line_sep),
         String(unicode_paragraph_sep),

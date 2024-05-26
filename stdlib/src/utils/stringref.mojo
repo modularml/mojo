@@ -495,20 +495,12 @@ struct StringRef(
         Returns:
             A StringRef with leading and trailing whitespaces removed.
         """
-        alias c_spaces = (
-            ord(" "),
-            ord("\t"),
-            ord("\n"),
-            ord("\r"),
-            ord("\f"),
-            ord("\v"),
-        )
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
-        while start < end and (int(ptr[start]) in c_spaces):
+        while start < end and isspace(ptr[start]):
             start += 1
-        while end > start and (int(ptr[end - 1]) in c_spaces):
+        while end > start and isspace(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
 

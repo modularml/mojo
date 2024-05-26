@@ -222,7 +222,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
-        if _isspace(int(buff[pos])):
+        if isspace(buff[pos]):
             continue
 
         if str_ref[pos] == "-":
@@ -283,13 +283,13 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         elif ord_letter_min[1] <= ord_current <= ord_letter_max[1]:
             result += ord_current - ord_letter_min[1] + 10
             found_valid_chars_after_start = True
-        elif _isspace(ord_current):
+        elif isspace(ord_current):
             has_space_after_number = True
             start = pos + 1
             break
         else:
             raise Error(_atol_error(base, str_ref))
-        if pos + 1 < str_len and not _isspace(int(buff[pos + 1])):
+        if pos + 1 < str_len and not isspace(buff[pos + 1]):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
@@ -303,7 +303,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     if has_space_after_number:
         for pos in range(start, str_len):
-            if not _isspace(int(buff[pos])):
+            if not isspace(buff[pos]):
                 raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
@@ -572,28 +572,32 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn _isspace(c: UInt8) -> Bool:
+fn isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
-       This currently only respects the default "C" locale, i.e. returns
-       True only if the character specified is one of
-       " \\t\\n\\r\\f\\v".
+    This only respects the default "C" locale, i.e. returns True only
+    if the character specified is one of " \\t\\n\\r\\f\\v".
+    For full Python support use `String.isspace()`.
 
     Args:
         c: The character to check.
 
     Returns:
-        True if the character is one of the whitespace characters listed above, otherwise False.
+        True if the character is one of the whitespace characters
+            listed above, otherwise False.
     """
-
-    alias c_spaces = (
-        ord(" "),
-        ord("\t"),
-        ord("\n"),
-        ord("\r"),
-        ord("\f"),
-        ord("\v"),
-    )
-    return int(c) in c_spaces
+    # alias spaces = SIMD[DType.uint8, 8](
+    #     ord(" "),
+    #     ord("\t"),
+    #     ord("\n"),
+    #     ord("\r"),
+    #     ord("\f"),
+    #     ord("\v"),
+    #     ord("\v"),
+    #     ord("\v"),
+    # )
+    # return (c & spaces).cast[DType.bool]().reduce_or()
+    # TODO: workaround until issue #2844 is solved
+    return String(List[UInt8](c, 0)) in String.WHITESPACE
 
 
 # ===----------------------------------------------------------------------===#
@@ -1427,6 +1431,10 @@ struct String(
         # TODO add line and paragraph separator as stringliteral
         # once unicode escape secuences are accepted
         # 0 is to build a String with null terminator
+        alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
+        """TODO: \\x1c"""
+        alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
+        """TODO: \\x1e"""
         alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
         """TODO: \\x85"""
         alias unicode_line_sep = List[UInt8](
@@ -1437,32 +1445,30 @@ struct String(
             0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
         )
         """TODO: \\u2029"""
-        alias utf8_separators = (
-            ord(" "),
-            ord("\t"),
-            ord("\n"),
-            ord("\r"),
-            ord("\f"),
-            ord("\v"),
-            ord("\x1c"),
-            ord("\x1e"),
-        )
 
         # TODO: SBO
         @parameter
         if str_len == 1:
-            return int(self._buffer.unsafe_get(0)[]) in utf8_separators
+            return self in String.WHITESPACE
         elif str_len == 3:
             return self == String(next_line)
+        elif str_len == 4:
+            return self == String(information_sep_four) or self == String(
+                information_sep_two
+            )
         elif str_len == 7:
             return self == String(unicode_line_sep) or self == String(
                 unicode_paragraph_sep
             )
         else:
             if len(self) == 1:
-                return int(self._buffer.unsafe_get(0)[]) in utf8_separators
+                return self in String.WHITESPACE
             elif len(self) == 3:
                 return self == String(next_line)
+            elif len(self) == 4:
+                return self == String(information_sep_four) or self == String(
+                    information_sep_two
+                )
             elif len(self) == 7:
                 return self == String(unicode_line_sep) or self == String(
                     unicode_paragraph_sep
