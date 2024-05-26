@@ -236,7 +236,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     alias ord_0 = ord("0")
     # FIXME:
-    #   Change this to `alias` after fixing support for __refitem__ of alias.
+    #   Change this to `alias` after fixing support for __getitem__ of alias.
     var ord_letter_min = (ord("a"), ord("A"))
     alias ord_underscore = ord("_")
 
