@@ -35,12 +35,13 @@ fn main() raises:
     assert_equal("path", join("path"))
     # assert_equal("path", join(Path("path")))
     assert_equal("", join(""))
+    assert_equal("path", join("", "path"))
 
     assert_equal("/path/to/file", join("ignored", "/path/to", "file"))
     # assert_equal("/path/to/file", join(Path("ignored"), Path("/path/to/file")))
     assert_equal(
-        "/path/to/file",
-        join("ignored", "/path/to/file/but/ignored/again", "/path/to", "file"),
+        "/absolute/path",
+        join("ignored", "/ignored/absolute/path", "/absolute", "path"),
     )
     # assert_equal(
     #     "/path/to/file",

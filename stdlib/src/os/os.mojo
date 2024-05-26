@@ -32,7 +32,7 @@ from utils import StringRef, InlineArray
 from .path import isdir
 from .pathlike import PathLike
 
-# TODO move this to a more adecuate location once nt/posix like modules are in stdlib
+# TODO move this to a more accurate location once nt/posix like modules are in stdlib
 alias sep = "\\" if os_is_windows() else "/"
 
 

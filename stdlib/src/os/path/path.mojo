@@ -309,7 +309,7 @@ fn join(path: String, *paths: String) -> String:
     for cur_path in paths:
         if cur_path[].startswith(sep):
             joined_path = cur_path[]
-        elif not path or path.endswith(sep):
+        elif not joined_path or path.endswith(sep):
             joined_path += cur_path[]
         else:
             joined_path += sep + cur_path[]
