@@ -311,7 +311,7 @@ fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
 
 @always_inline
 fn memcpy[
-    inferred dtype: DType
+    dtype: DType, //
 ](*, dest: UnsafePointer[Scalar[dtype]], src: __type_of(dest), count: Int):
     """Copies a memory area.
 

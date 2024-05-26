@@ -89,12 +89,10 @@ fn _create_array[
             _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
         ]()
 
-        @always_inline
         @parameter
-        fn fill[idx: Int]():
+        for idx in range(size):
             _set_array_elem[idx, size, type](lst[idx], array)
 
-        unroll[fill, size]()
         return array
 
 
@@ -257,6 +255,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         size: The size of the array.
     """
 
+    # Fields
     alias type = __mlir_type[
         `!pop.array<`, size.value, `, `, Self.ElementType, `>`
     ]
@@ -264,7 +263,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     """The underlying storage for the array."""
 
     # ===------------------------------------------------------------------===#
-    # Initializers
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
@@ -316,7 +315,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         @parameter
         for i in range(size):
-            var ptr = self.unsafe_get(i)
+            var ptr = self._get_reference_unsafe(i)
             initialize_pointee_copy(UnsafePointer[Self.ElementType](ptr), fill)
 
     @always_inline
@@ -332,13 +331,63 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         @parameter
         for i in range(size):
-            var ref = self.unsafe_get(i)
+            var eltref = self._get_reference_unsafe(i)
             initialize_pointee_move(
-                UnsafePointer[Self.ElementType](ref), elems[i]
+                UnsafePointer[Self.ElementType](eltref), elems[i]
             )
 
+    # ===------------------------------------------------------------------===#
+    # Operator dunders
+    # ===------------------------------------------------------------------===#
+
+    @always_inline("nodebug")
+    fn __getitem__[
+        IndexerType: Indexer,
+    ](self: Reference[Self, _, _], index: IndexerType) -> ref [
+        self.lifetime
+    ] Self.ElementType:
+        """Get a `Reference` to the element at the given index.
+
+        Parameters:
+            IndexerType: The inferred type of an indexer argument.
+
+        Args:
+            index: The index of the item.
+
+        Returns:
+            A reference to the item at the given index.
+        """
+        var normalized_index = normalize_index["InlineArray"](index, self[])
+
+        return self[]._get_reference_unsafe(normalized_index)[]
+
+    @always_inline("nodebug")
+    fn __getitem__[
+        IntableType: Intable,
+        index: IntableType,
+    ](self: Reference[Self, _, _]) -> ref [self.lifetime] Self.ElementType:
+        """Get a `Reference` to the element at the given index.
+
+        Parameters:
+            IntableType: The inferred type of an intable argument.
+            index: The index of the item.
+
+        Returns:
+            A reference to the item at the given index.
+        """
+        alias i = int(index)
+        constrained[-size <= i < size, "Index must be within bounds."]()
+
+        var normalized_idx = i
+
+        @parameter
+        if i < 0:
+            normalized_idx += size
+
+        return self[]._get_reference_unsafe(normalized_idx)[]
+
     # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
+    # Trait implementations
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
@@ -350,9 +399,13 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         """
         return size
 
+    # ===------------------------------------------------------------------===#
+    # Methods
+    # ===------------------------------------------------------------------===#
+
     @always_inline("nodebug")
-    fn unsafe_get[
-        IndexerType: Indexer,
+    fn _get_reference_unsafe[
+        IndexerType: Indexer
     ](self: Reference[Self, _, _], idx: IndexerType) -> Reference[
         Self.ElementType, self.is_mutable, self.lifetime
     ]:
@@ -385,58 +438,6 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             idx_as_int.value,
         )
         return UnsafePointer(ptr)[]
-
-    # ===------------------------------------------------------------------===#
-    # Operator dunders
-    # ===------------------------------------------------------------------===#
-
-    @always_inline("nodebug")
-    fn __refitem__[
-        IndexerType: Indexer,
-    ](self: Reference[Self, _, _], index: IndexerType) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
-        """Get a `Reference` to the element at the given index.
-
-        Parameters:
-            IndexerType: The inferred type of an indexer argument.
-
-        Args:
-            index: The index of the item.
-
-        Returns:
-            A reference to the item at the given index.
-        """
-        var normalized_index = normalize_index["InlineArray"](index, self[])
-
-        return self[].unsafe_get(normalized_index)
-
-    @always_inline("nodebug")
-    fn __refitem__[
-        IntableType: Intable,
-        index: IntableType,
-    ](self: Reference[Self, _, _]) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
-        """Get a `Reference` to the element at the given index.
-
-        Parameters:
-            IntableType: The inferred type of an intable argument.
-            index: The index of the item.
-
-        Returns:
-            A reference to the item at the given index.
-        """
-        alias i = int(index)
-        constrained[-size <= i < size, "Index must be within bounds."]()
-
-        var normalized_idx = i
-
-        @parameter
-        if i < 0:
-            normalized_idx += size
-
-        return self[].unsafe_get(normalized_idx)
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[Self.ElementType]:

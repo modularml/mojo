@@ -1352,12 +1352,13 @@ fn strided_load[
     if simd_width == 1:
         return addr.load() if mask else Scalar[type]()
 
+    alias IndexTy = SIMD[DType.index, simd_width]
     var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector",
-        SIMD[DType.index, simd_width],
-        has_side_effect=False,
+        "llvm.experimental.stepvector", IndexTy, has_side_effect=False
     ]()
-    var offset = (int(addr) + stride * iota * sizeof[type]())
+    var offset = IndexTy(int(addr)) + IndexTy(stride) * iota * IndexTy(
+        sizeof[type]()
+    )
     var passthrough = SIMD[type, simd_width]()
     return gather[type, simd_width](
         offset.cast[DType.address](), mask, passthrough
@@ -1433,12 +1434,14 @@ fn strided_store[
             addr.store(value[0])
         return
 
+    alias IndexTy = SIMD[DType.index, simd_width]
     var iota = llvm_intrinsic[
-        "llvm.experimental.stepvector",
-        SIMD[DType.index, simd_width],
-        has_side_effect=False,
+        "llvm.experimental.stepvector", IndexTy, has_side_effect=False
     ]()
-    var offset = int(addr) + stride * iota * sizeof[type]()
+    var offset = IndexTy(int(addr)) + IndexTy(stride) * iota * IndexTy(
+        sizeof[type]()
+    )
+
     scatter[type, simd_width](value, offset.cast[DType.address](), mask)
 
 
@@ -1471,7 +1474,7 @@ fn strided_store[
         addr.store(value[0])
         return
 
-    return strided_store[type, simd_width](value, addr, stride, True)
+    strided_store[type, simd_width](value, addr, stride, True)
 
 
 # ===-------------------------------------------------------------------===#

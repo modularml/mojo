@@ -113,9 +113,8 @@ def test_indexing():
     var vector = InlinedFixedVector[Int](10)
     for i in range(5):
         vector.append(i)
-    assert_equal(1, vector[Int16(1)])
+    assert_equal(0, vector[int(0)])
     assert_equal(1, vector[True])
-    assert_equal(1, vector[Scalar[DType.bool](True)])
     assert_equal(2, vector[2])
 
 

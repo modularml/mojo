@@ -236,7 +236,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     alias ord_0 = ord("0")
     # FIXME:
-    #   Change this to `alias` after fixing support for __refitem__ of alias.
+    #   Change this to `alias` after fixing support for __getitem__ of alias.
     var ord_letter_min = (ord("a"), ord("A"))
     alias ord_underscore = ord("_")
 
@@ -620,12 +620,14 @@ struct String(
     Representable,
     IntableRaising,
     KeyElement,
+    Comparable,
     Boolable,
     Formattable,
     ToFormatter,
 ):
     """Represents a mutable string."""
 
+    # Fields
     alias _buffer_type = List[UInt8]
     var _buffer: Self._buffer_type
     """The underlying storage for the string."""
@@ -641,35 +643,8 @@ struct String(
     alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
     alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
 
-    @always_inline
-    fn __str__(self) -> String:
-        return self
-
-    @always_inline
-    fn __repr__(self) -> String:
-        """Return a Mojo-compatible representation of the `String` instance.
-
-        You don't need to call this method directly, use `repr(my_string)` instead.
-
-        Returns:
-            A new representation of the string.
-        """
-        alias ord_squote = ord("'")
-        var result = String()
-        var use_dquote = False
-
-        for idx in range(len(self._buffer) - 1):
-            var char = self._buffer[idx]
-            result += _repr_ascii(char)
-            use_dquote = use_dquote or (char == ord_squote)
-
-        if use_dquote:
-            return '"' + result + '"'
-        else:
-            return "'" + result + "'"
-
     # ===------------------------------------------------------------------===#
-    # Initializers
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
@@ -693,14 +668,7 @@ struct String(
             impl[-1] == 0,
             "expected last element of String buffer to be null terminator",
         )
-        # we store the length and capacity beforehand as `steal_data()` will invalidated `impl`
-        var length = len(impl)
-        var capacity = impl.capacity
-        self._buffer = List[UInt8](
-            unsafe_pointer=impl.steal_data().bitcast[UInt8](),
-            size=length,
-            capacity=capacity,
-        )
+        self._buffer = impl^
 
     @always_inline
     fn __init__(inout self):
@@ -716,17 +684,10 @@ struct String(
         """
         var length = len(str)
         var buffer = Self._buffer_type()
+        # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
-        memcpy(
-            # TODO(modularml/mojo#2317):
-            #   Remove this bitcast after transition to UInt8 for string data
-            #   is complete.
-            dest=buffer.data.bitcast[UInt8](),
-            src=str.data,
-            count=length,
-        )
-        buffer[length] = 0
-        self._buffer = buffer^
+        memcpy(dest=buffer.data, src=str.data, count=length)
+        self = Self(buffer^)
 
     @always_inline
     fn __init__(inout self, str_slice: StringSlice):
@@ -742,14 +703,14 @@ struct String(
         # Calculate length in bytes
         var length: Int = len(str_slice.as_bytes_slice())
         var buffer = Self._buffer_type()
+        # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
         memcpy(
             dest=buffer.data,
             src=str_slice.as_bytes_slice().unsafe_ptr(),
             count=length,
         )
-        buffer[length] = 0
-        self._buffer = buffer^
+        self = Self(buffer^)
 
     @always_inline
     fn __init__(inout self, literal: StringLiteral):
@@ -785,8 +746,10 @@ struct String(
         """
         # we don't know the capacity of ptr, but we'll assume it's the same or
         # larger than len
-        self._buffer = Self._buffer_type(
-            unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
+        self = Self(
+            Self._buffer_type(
+                unsafe_pointer=ptr.bitcast[UInt8](), size=len, capacity=len
+            )
         )
 
     @always_inline
@@ -800,9 +763,13 @@ struct String(
             ptr: The pointer to the buffer.
             len: The length of the buffer, including the null terminator.
         """
-        self._buffer = Self._buffer_type()
-        self._buffer.data = UnsafePointer(ptr.address)
-        self._buffer.size = len
+        self = Self(
+            Self._buffer_type(
+                unsafe_pointer=UnsafePointer(ptr.address),
+                size=len,
+                capacity=len,
+            )
+        )
 
     @always_inline
     fn __init__(inout self, ptr: DTypePointer[DType.uint8], len: Int):
@@ -834,6 +801,37 @@ struct String(
             existing: The string to move.
         """
         self._buffer = existing._buffer^
+
+    # ===------------------------------------------------------------------===#
+    # Factory dunders
+    # ===------------------------------------------------------------------===#
+
+    @staticmethod
+    fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
+        """
+        Construct a string by concatenating a sequence of formattable arguments.
+
+        Args:
+            args: A sequence of formattable arguments.
+
+        Parameters:
+            Ts: The types of the arguments to format. Each type must be satisfy
+              `Formattable`.
+
+        Returns:
+            A string formed by formatting the argument sequence.
+        """
+
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+
+        @parameter
+        fn write_arg[T: Formattable](arg: T):
+            arg.format_to(writer)
+
+        args.each[write_arg]()
+
+        return output^
 
     @staticmethod
     @always_inline
@@ -870,28 +868,15 @@ struct String(
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
-    @always_inline
-    fn __bool__(self) -> Bool:
-        """Checks if the string is not empty.
-
-        Returns:
-            True if the string length is greater than zero, and False otherwise.
-        """
-        return len(self) > 0
-
-    fn __getitem__[IndexerType: Indexer](self, i: IndexerType) -> String:
+    fn __getitem__(self, idx: Int) -> String:
         """Gets the character at the specified position.
 
-        Parameters:
-            IndexerType: The type of the indexer.
-
         Args:
-            i: The index value.
+            idx: The index value.
 
         Returns:
             A new string containing the character at the specified position.
         """
-        var idx = index(i)
         if idx < 0:
             return self.__getitem__(len(self) + idx)
 
@@ -900,26 +885,6 @@ struct String(
         buf.append(self._buffer[idx])
         buf.append(0)
         return String(buf^)
-
-    @always_inline
-    fn _adjust_span(self, span: Slice) -> Slice:
-        """Adjusts the span based on the string length."""
-        var adjusted_span = span
-
-        if adjusted_span.start < 0:
-            adjusted_span.start = len(self) + adjusted_span.start
-
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
-            adjusted_span.end = len(self) + adjusted_span.end
-
-        if span.step < 0:
-            var tmp = adjusted_span.end
-            adjusted_span.end = adjusted_span.start - 1
-            adjusted_span.start = tmp - 1
-
-        return adjusted_span
 
     @always_inline
     fn __getitem__(self, span: Slice) -> String:
@@ -947,20 +912,6 @@ struct String(
             buffer[i] = ptr[adjusted_span[i]]
         buffer[adjusted_span_len] = 0
         return Self(buffer^)
-
-    @always_inline
-    fn __len__(self) -> Int:
-        """Returns the string length.
-
-        Returns:
-            The string length.
-        """
-        # Avoid returning -1 if the buffer is not initialized
-        if not self.unsafe_ptr():
-            return 0
-
-        # The negative 1 is to account for the terminator.
-        return len(self._buffer) - 1
 
     @always_inline
     fn __eq__(self, other: String) -> Bool:
@@ -1101,35 +1052,82 @@ struct String(
         )
 
     # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        """Checks if the string is not empty.
+
+        Returns:
+            True if the string length is greater than zero, and False otherwise.
+        """
+        return len(self) > 0
+
+    @always_inline
+    fn __len__(self) -> Int:
+        """Returns the string length.
+
+        Returns:
+            The string length.
+        """
+        # Avoid returning -1 if the buffer is not initialized
+        if not self.unsafe_ptr():
+            return 0
+
+        # The negative 1 is to account for the terminator.
+        return len(self._buffer) - 1
+
+    @always_inline
+    fn __str__(self) -> String:
+        return self
+
+    @always_inline
+    fn __repr__(self) -> String:
+        """Return a Mojo-compatible representation of the `String` instance.
+
+        You don't need to call this method directly, use `repr(my_string)` instead.
+
+        Returns:
+            A new representation of the string.
+        """
+        alias ord_squote = ord("'")
+        var result = String()
+        var use_dquote = False
+
+        for idx in range(len(self._buffer) - 1):
+            var char = self._buffer[idx]
+            result += _repr_ascii(char)
+            use_dquote = use_dquote or (char == ord_squote)
+
+        if use_dquote:
+            return '"' + result + '"'
+        else:
+            return "'" + result + "'"
+
+    # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
 
-    @staticmethod
-    fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
-        """
-        Construct a string by concatenating a sequence of formattable arguments.
+    @always_inline
+    fn _adjust_span(self, span: Slice) -> Slice:
+        """Adjusts the span based on the string length."""
+        var adjusted_span = span
 
-        Args:
-            args: A sequence of formattable arguments.
+        if adjusted_span.start < 0:
+            adjusted_span.start = len(self) + adjusted_span.start
 
-        Parameters:
-            Ts: The types of the arguments to format. Each type must be satisfy
-              `Formattable`.
+        if not adjusted_span._has_end():
+            adjusted_span.end = len(self)
+        elif adjusted_span.end < 0:
+            adjusted_span.end = len(self) + adjusted_span.end
 
-        Returns:
-            A string formed by formatting the argument sequence.
-        """
+        if span.step < 0:
+            var tmp = adjusted_span.end
+            adjusted_span.end = adjusted_span.start - 1
+            adjusted_span.start = tmp - 1
 
-        var output = String()
-        var writer = output._unsafe_to_formatter()
-
-        @parameter
-        fn write_arg[T: Formattable](arg: T):
-            arg.format_to(writer)
-
-        args.each[write_arg]()
-
-        return output^
+        return adjusted_span
 
     fn format_to(self, inout writer: Formatter):
         """
@@ -1617,8 +1615,13 @@ struct String(
           True if the self[start:end] is prefixed by the input prefix.
         """
         if end == -1:
-            return self.find(prefix, start) == start
-        return self[start:end].startswith(prefix)
+            return StringRef(
+                self.unsafe_ptr() + start, len(self) - start
+            ).startswith(prefix._strref_dangerous())
+
+        return StringRef(self.unsafe_ptr() + start, end - start).startswith(
+            prefix._strref_dangerous()
+        )
 
     fn endswith(self, suffix: String, start: Int = 0, end: Int = -1) -> Bool:
         """Checks if the string end with the specified suffix between start
@@ -1633,8 +1636,13 @@ struct String(
           True if the self[start:end] is suffixed by the input suffix.
         """
         if end == -1:
-            return self._endswith_impl(suffix, start)
-        return self[start:end]._endswith_impl(suffix)
+            return StringRef(
+                self.unsafe_ptr() + start, len(self) - start
+            ).endswith(suffix._strref_dangerous())
+
+        return StringRef(self.unsafe_ptr() + start, end - start).endswith(
+            suffix._strref_dangerous()
+        )
 
     fn removeprefix(self, prefix: String, /) -> String:
         """If the string starts with the prefix string, return `string[len(prefix):]`.
@@ -1677,10 +1685,6 @@ struct String(
         if self.endswith(suffix):
             return self[: -len(suffix)]
         return self
-
-    @always_inline
-    fn _endswith_impl(self, suffix: String, start: Int = 0) -> Bool:
-        return self.rfind(suffix, start) + len(suffix) == len(self)
 
     fn __int__(self) raises -> Int:
         """Parses the given string as a base-10 integer and returns that value.

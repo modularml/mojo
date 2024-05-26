@@ -48,8 +48,8 @@ fn get_out_of_bounds_error_message[
 
 @always_inline
 fn normalize_index[
-    inferred IndexType: Indexer,
-    inferred ContainerType: Sized,
+    IndexType: Indexer,
+    ContainerType: Sized, //,
     container_name: StringLiteral,
 ](index_value: IndexType, container: ContainerType) -> Int:
     """Normalize the given index value to a valid index value for the given container length.

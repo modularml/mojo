@@ -43,17 +43,22 @@ struct StringRef(
     Stringable,
     Hashable,
     Boolable,
-    EqualityComparable,
+    Comparable,
 ):
     """
     Represent a constant reference to a string, i.e. a sequence of characters
     and a length, which need not be null terminated.
     """
 
+    # Fields
     var data: UnsafePointer[UInt8]
     """A pointer to the beginning of the string data being referenced."""
     var length: Int
     """The length of the string being referenced."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __init__(str: StringLiteral) -> StringRef:
@@ -66,14 +71,6 @@ struct StringRef(
             Constructed `StringRef` object.
         """
         return StringRef(str.unsafe_ptr(), len(str))
-
-    fn __str__(self) -> String:
-        """Convert the string reference to a string.
-
-        Returns:
-            A new string.
-        """
-        return self
 
     # TODO: #2317 Drop support for this constructor when we have fully
     # transitioned to UInt8 as the main byte type.
@@ -170,34 +167,21 @@ struct StringRef(
 
         return StringRef(ptr.bitcast[DType.int8](), len)
 
-    @always_inline
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
-        """Retrieves a pointer to the underlying memory.
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
-        Prefer to use `as_uint8_ptr()` instead.
+    @always_inline("nodebug")
+    fn __getitem__(self, idx: Int) -> StringRef:
+        """Get the string value at the specified position.
 
-        Returns:
-            The pointer to the underlying memory.
-        """
-        return self.data
-
-    @always_inline
-    fn __bool__(self) -> Bool:
-        """Checks if the string is empty or not.
+        Args:
+          idx: The index position.
 
         Returns:
-          Returns True if the string is not empty and False otherwise.
+          The character at the specified position.
         """
-        return len(self) != 0
-
-    @always_inline
-    fn __len__(self) -> Int:
-        """Returns the length of the string.
-
-        Returns:
-          The length of the string.
-        """
-        return self.length
+        return StringRef {data: self.data + idx, length: 1}
 
     @always_inline
     fn __eq__(self, rhs: StringRef) -> Bool:
@@ -211,16 +195,16 @@ struct StringRef(
         """
         return not (self != rhs)
 
-    # Use a local memcmp rather than memory.memcpy to avoid indirect recursions.
-    @always_inline("nodebug")
-    fn _memcmp(self, other: StringRef, count: Int) -> Int:
-        for i in range(count):
-            var s1i = self.data[i]
-            var s2i = other.data[i]
-            if s1i == s2i:
-                continue
-            return 1 if s1i > s2i else -1
-        return 0
+    fn __contains__(self, substr: StringRef) -> Bool:
+        """Returns True if the substring is contained within the current string.
+
+        Args:
+          substr: The substring to check.
+
+        Returns:
+          True if the string contains the substring.
+        """
+        return self.find(substr) != -1
 
     @always_inline
     fn __ne__(self, rhs: StringRef) -> Bool:
@@ -288,20 +272,18 @@ struct StringRef(
         """
         return not (self < rhs)
 
-    @always_inline("nodebug")
-    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> StringRef:
-        """Get the string value at the specified position.
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
 
-        Parameters:
-            IndexerType: The type of the indexer.
-
-        Args:
-          idx: The index position.
+    @always_inline
+    fn __bool__(self) -> Bool:
+        """Checks if the string is empty or not.
 
         Returns:
-          The character at the specified position.
+          Returns True if the string is not empty and False otherwise.
         """
-        return StringRef {data: self.data + index(idx), length: 1}
+        return len(self) != 0
 
     fn __hash__(self) -> Int:
         """Hash the underlying buffer using builtin hash.
@@ -312,6 +294,61 @@ struct StringRef(
             builtin documentation for more details.
         """
         return hash(self.data, self.length)
+
+    fn __int__(self) raises -> Int:
+        """Parses the given string as a base-10 integer and returns that value.
+
+        For example, `int("19")` returns `19`. If the given string cannot be parsed
+        as an integer value, an error is raised. For example, `int("hi")` raises an
+        error.
+
+        Returns:
+            An integer value that represents the string, or otherwise raises.
+        """
+        return _atol(self)
+
+    @always_inline
+    fn __len__(self) -> Int:
+        """Returns the length of the string.
+
+        Returns:
+          The length of the string.
+        """
+        return self.length
+
+    fn __str__(self) -> String:
+        """Convert the string reference to a string.
+
+        Returns:
+            A new string.
+        """
+        return self
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    # Use a local memcmp rather than memory.memcpy to avoid indirect recursions.
+    @always_inline("nodebug")
+    fn _memcmp(self, other: StringRef, count: Int) -> Int:
+        for i in range(count):
+            var s1i = self.data[i]
+            var s2i = other.data[i]
+            if s1i == s2i:
+                continue
+            return 1 if s1i > s2i else -1
+        return 0
+
+    @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
+        """Retrieves  a pointer to the underlying memory.
+
+        Prefer to use `as_uint8_ptr()` instead.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.data
 
     fn count(self, substr: StringRef) -> Int:
         """Return the number of non-overlapping occurrences of substring
@@ -341,17 +378,6 @@ struct StringRef(
             offset = pos + len(substr)
 
         return res
-
-    fn __contains__(self, substr: StringRef) -> Bool:
-        """Returns True if the substring is contained within the current string.
-
-        Args:
-          substr: The substring to check.
-
-        Returns:
-          True if the string contains the substring.
-        """
-        return self.find(substr) != -1
 
     fn find(self, substr: StringRef, start: Int = 0) -> Int:
         """Finds the offset of the first occurrence of `substr` starting at
@@ -477,17 +503,44 @@ struct StringRef(
             end -= 1
         return StringRef(ptr + start, end - start)
 
-    fn __int__(self) raises -> Int:
-        """Parses the given string as a base-10 integer and returns that value.
+    fn startswith(
+        self, prefix: StringRef, start: Int = 0, end: Int = -1
+    ) -> Bool:
+        """Checks if the StringRef starts with the specified prefix between start
+        and end positions. Returns True if found and False otherwise.
 
-        For example, `int("19")` returns `19`. If the given string cannot be parsed
-        as an integer value, an error is raised. For example, `int("hi")` raises an
-        error.
+        Args:
+          prefix: The prefix to check.
+          start: The start offset from which to check.
+          end: The end offset from which to check.
 
         Returns:
-            An integer value that represents the string, or otherwise raises.
+          True if the self[start:end] is prefixed by the input prefix.
         """
-        return _atol(self)
+        if end == -1:
+            return self.find(prefix, start) == start
+        return StringRef(self.unsafe_ptr() + start, end - start).startswith(
+            prefix
+        )
+
+    fn endswith(self, suffix: StringRef, start: Int = 0, end: Int = -1) -> Bool:
+        """Checks if the StringRef end with the specified suffix between start
+        and end positions. Returns True if found and False otherwise.
+
+        Args:
+          suffix: The suffix to check.
+          start: The start offset from which to check.
+          end: The end offset from which to check.
+
+        Returns:
+          True if the self[start:end] is suffixed by the input suffix.
+        """
+
+        if end == -1:
+            return self.rfind(suffix, start) + len(suffix) == len(self)
+        return StringRef(self.unsafe_ptr() + start, end - start).endswith(
+            suffix
+        )
 
 
 # ===----------------------------------------------------------------------===#

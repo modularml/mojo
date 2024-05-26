@@ -1061,17 +1061,10 @@ def test_min_max_clamp():
     assert_equal(i.clamp(-7, 4), I(-7, -5, 4, 4))
 
 
-def test_indexer():
-    assert_equal(5, Int8(5).__index__())
-    assert_equal(56, UInt32(56).__index__())
-    assert_equal(1, Scalar[DType.bool](True).__index__())
-    assert_equal(0, Scalar[DType.bool](False).__index__())
-
-
 def test_indexing():
     var s = SIMD[DType.int32, 4](1, 2, 3, 4)
     assert_equal(s[False], 1)
-    assert_equal(s[Int32(2)], 3)
+    assert_equal(s[int(2)], 3)
     assert_equal(s[3], 4)
 
 
@@ -1332,7 +1325,6 @@ def main():
     test_floor()
     test_floordiv()
     test_iadd()
-    test_indexer()
     test_indexing()
     test_insert()
     test_interleave()

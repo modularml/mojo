@@ -81,11 +81,12 @@ struct Span[
         lifetime: The lifetime of the Span.
     """
 
+    # Field
     var _data: UnsafePointer[T]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
-    # Initializers
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
@@ -125,63 +126,25 @@ struct Span[
         self._len = size
 
     # ===------------------------------------------------------------------===#
-    # Trait impls
-    # ===------------------------------------------------------------------===#
-
-    @always_inline
-    fn __len__(self) -> Int:
-        """Returns the length of the span. This is a known constant value.
-
-        Returns:
-            The size of the span.
-        """
-        return self._len
-
-    # ===------------------------------------------------------------------===#
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
     @always_inline
     fn _refitem__[
         intable: Intable
-    ](self, index: intable) -> Reference[T, is_mutable, lifetime]:
+    ](self, idx: intable) -> Reference[T, is_mutable, lifetime]:
         debug_assert(
-            -self._len <= int(index) < self._len, "index must be within bounds"
+            -self._len <= int(idx) < self._len, "index must be within bounds"
         )
 
-        var offset = int(index)
+        var offset = int(idx)
         if offset < 0:
             offset += len(self)
         return (self._data + offset)[]
 
     @always_inline
-    fn _adjust_span(self, span: Slice) -> Slice:
-        """Adjusts the span based on the list length."""
-        var adjusted_span = span
-
-        if adjusted_span.start < 0:
-            adjusted_span.start = len(self) + adjusted_span.start
-
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
-            adjusted_span.end = len(self) + adjusted_span.end
-
-        if span.step < 0:
-            var tmp = adjusted_span.end
-            adjusted_span.end = adjusted_span.start - 1
-            adjusted_span.start = tmp - 1
-
-        return adjusted_span
-
-    @always_inline
-    fn __getitem__[
-        IndexerType: Indexer
-    ](self, idx: IndexerType) -> Reference[T, is_mutable, lifetime]:
+    fn __getitem__(self, idx: Int) -> Reference[T, is_mutable, lifetime]:
         """Get a `Reference` to the element at the given index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The index of the item.
@@ -190,26 +153,21 @@ struct Span[
             A reference to the item at the given index.
         """
         # note that self._refitem__ is already bounds checking
-        return self._refitem__(index(idx))
+        return self._refitem__(idx)
 
     @always_inline
-    fn __setitem__[
-        IndexerType: Indexer
-    ](inout self, idx: IndexerType, value: T):
+    fn __setitem__(inout self, idx: Int, value: T):
         """Get a `Reference` to the element at the given index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The index of the item.
             value: The value to set at the given index.
         """
         # note that self._refitem__ is already bounds checking
-        var ref = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
-            UnsafePointer(self._refitem__(index(idx)))[]
+        var r = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
+            UnsafePointer(self._refitem__(idx))[]
         )
-        ref[] = value
+        r[] = value
 
     @always_inline
     fn __getitem__(self, slice: Slice) -> Self:
@@ -244,8 +202,41 @@ struct Span[
         return _SpanIter(0, self)
 
     # ===------------------------------------------------------------------===#
+    # Trait implementations
+    # ===------------------------------------------------------------------===#
+
+    @always_inline
+    fn __len__(self) -> Int:
+        """Returns the length of the span. This is a known constant value.
+
+        Returns:
+            The size of the span.
+        """
+        return self._len
+
+    # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
+
+    @always_inline
+    fn _adjust_span(self, span: Slice) -> Slice:
+        """Adjusts the span based on the list length."""
+        var adjusted_span = span
+
+        if adjusted_span.start < 0:
+            adjusted_span.start = len(self) + adjusted_span.start
+
+        if not adjusted_span._has_end():
+            adjusted_span.end = len(self)
+        elif adjusted_span.end < 0:
+            adjusted_span.end = len(self) + adjusted_span.end
+
+        if span.step < 0:
+            var tmp = adjusted_span.end
+            adjusted_span.end = adjusted_span.start - 1
+            adjusted_span.start = tmp - 1
+
+        return adjusted_span
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """
