@@ -634,19 +634,6 @@ struct String(
 
     """ Useful string aliases. """
     alias WHITESPACE = String(" \n\t\r\f\v")
-    alias UNIVERSAL_SEPARATORS = List[String](
-        String(" "),
-        String("\t"),
-        String("\n"),
-        String("\r"),
-        String("\v"),
-        String("\f"),
-        String("\x1c"),
-        String("\x1e"),
-        String("\x85"),
-        String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0)),
-        String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0)),
-    )
     alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
     alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
@@ -1434,7 +1421,19 @@ struct String(
         # Unicode Line Separator: \ u2028
         # Unicode Paragraph Separator: \ u2029
         # 0 is to build a String with null terminator
-        return self in String.UNIVERSAL_SEPARATORS
+        return self in List[String](
+            String(" "),
+            String("\t"),
+            String("\n"),
+            String("\r"),
+            String("\v"),
+            String("\f"),
+            String("\x1c"),
+            String("\x1e"),
+            String("\x85"),
+            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0)),
+            String(List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0)),
+        )
 
     fn split(self, delimiter: String) raises -> List[String]:
         """Split the string by a delimiter.
