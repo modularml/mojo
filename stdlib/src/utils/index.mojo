@@ -836,7 +836,6 @@ fn normalize_idx(
     - Notes:
         - positive index:
             - bigger than `end -1` defaults to `end -1`.
-            - less than `start` defaults to `start`.
         - negative index:
             - less than `-1 * end` defaults to `start`.
 
