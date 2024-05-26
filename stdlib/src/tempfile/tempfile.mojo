@@ -30,11 +30,12 @@ alias TMP_MAX = 10_000
 
 fn _get_random_name(size: Int = 8) -> String:
     alias characters = String("abcdefghijklmnopqrstuvwxyz0123456789_")
-    var name = String("")
+    var name_list = List[UInt8](capacity=size + 1)
     for _ in range(size):
         var rand_index = int(random.random_ui64(0, len(characters) - 1))
-        name += characters[rand_index]
-    return name
+        name_list.append(ord(characters[rand_index]))
+    name_list.append(0)
+    return String(name_list^)
 
 
 fn _candidate_tempdir_list() -> List[String]:
