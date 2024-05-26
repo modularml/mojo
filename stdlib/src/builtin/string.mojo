@@ -899,9 +899,8 @@ struct String(
 
         var adjusted_span = self._adjust_span(span)
         if adjusted_span.step == 1:
-            return StringRef(
-                self._buffer.data + span.start,
-                len(adjusted_span),
+            return self._strref_dangerous(
+                start=adjusted_span.start, length=len(adjusted_span)
             )
 
         var buffer = Self._buffer_type()
@@ -1627,13 +1626,13 @@ struct String(
           True if the self[start:end] is prefixed by the input prefix.
         """
         if end == -1:
-            return StringRef(
-                self.unsafe_ptr() + start, len(self) - start
-            ).startswith(prefix._strref_dangerous())
+            return self._strref_dangerous(start=start).startswith(
+                prefix._strref_dangerous()
+            )
 
-        return StringRef(self.unsafe_ptr() + start, end - start).startswith(
-            prefix._strref_dangerous()
-        )
+        return self._strref_dangerous(
+            start=start, length=end - start
+        ).startswith(prefix._strref_dangerous())
 
     fn endswith(self, suffix: String, start: Int = 0, end: Int = -1) -> Bool:
         """Checks if the string end with the specified suffix between start
@@ -1648,11 +1647,11 @@ struct String(
           True if the self[start:end] is suffixed by the input suffix.
         """
         if end == -1:
-            return StringRef(
-                self.unsafe_ptr() + start, len(self) - start
-            ).endswith(suffix._strref_dangerous())
+            return self._strref_dangerous(start=start).endswith(
+                suffix._strref_dangerous()
+            )
 
-        return StringRef(self.unsafe_ptr() + start, end - start).endswith(
+        return self._strref_dangerous(start=start, length=end - start).endswith(
             suffix._strref_dangerous()
         )
 
