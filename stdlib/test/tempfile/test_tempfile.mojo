@@ -46,42 +46,33 @@ fn test_mkdtemp() raises:
     assert_false(exists(dir_name), "Failed to delete temporary directory")
 
 
-struct _TempEnvForTest:
-    var tmpdir_value: String
-    var temp_value: String
-    var tmp_value: String
+struct TempEnvWithCleanup:
+    var vars_to_set: Dict[String, String]
+    var _vars_back: Dict[String, String]
     var clean_up_function: fn () raises -> None
-
-    var tmpdir_back: String
-    var temp_back: String
-    var tmp_back: String
+    """Function called after the context manager exits if an error occurs."""
 
     fn __init__(
         inout self,
-        tmpdir_value: String,
-        temp_value: String,
-        tmp_value: String,
+        vars_to_set: Dict[String, String],
         clean_up_function: fn () raises -> None,
     ):
-        self.tmpdir_value = tmpdir_value
-        self.temp_value = temp_value
-        self.tmp_value = tmp_value
-
+        self.vars_to_set = vars_to_set
+        self._vars_back = Dict[String, String]()
         self.clean_up_function = clean_up_function
 
-        self.tmpdir_back = os.getenv("TMPDIR")
-        self.temp_back = os.getenv("TEMP")
-        self.tmp_back = os.getenv("TMP")
-
     fn __enter__(inout self) raises:
-        _ = os.setenv("TMPDIR", self.tmpdir_value, overwrite=True)
-        _ = os.setenv("TEMP", self.temp_value, overwrite=True)
-        _ = os.setenv("TMP", self.tmp_value, overwrite=True)
+        for key_value in self.vars_to_set.items():
+            var key = key_value[].key
+            var value = key_value[].value
+            self._vars_back[key] = os.getenv(key)
+            _ = os.setenv(key, value, overwrite=True)
 
     fn __exit__(inout self):
-        _ = os.setenv("TMPDIR", self.tmpdir_back, overwrite=True)
-        _ = os.setenv("TEMP", self.temp_back, overwrite=True)
-        _ = os.setenv("TMP", self.tmp_back, overwrite=True)
+        for key_value in self.vars_to_set.items():
+            var key = key_value[].key
+            var value = key_value[].value
+            _ = os.setenv(key, value, overwrite=True)
 
     fn __exit__(inout self, error: Error) raises -> Bool:
         self.__exit__()
@@ -120,48 +111,50 @@ fn test_gettempdir() raises:
     _set_up_gettempdir_test(dir_with_writing_access, dir_without_writing_access)
 
     var tmpdir_result: Optional[String]
-    # test TEMPDIR is used first
-    with _TempEnvForTest(
-        dir_with_writing_access,
-        non_existing_dir,
-        non_existing_dir,
+    var vars_to_set = Dict[String, String]()
+
+    # test TMPDIR is used first
+    vars_to_set["TMPDIR"] = dir_with_writing_access
+    with TempEnvWithCleanup(
+        vars_to_set,
         _clean_up_gettempdir_test,
     ):
         tmpdir_result = gettempdir()
         assert_true(tmpdir_result, "Failed to get temporary directory")
         assert_equal(
             tmpdir_result.value()[],
-            String(dir_with_writing_access),
+            dir_with_writing_access,
             "expected to get:" + String(dir_with_writing_access),
         )
 
     # test gettempdir falls back to TEMP
-    with _TempEnvForTest(
-        non_existing_dir,
-        dir_with_writing_access,
-        non_existing_dir,
+    vars_to_set["TMPDIR"] = non_existing_dir
+    vars_to_set["TEMP"] = dir_with_writing_access
+    with TempEnvWithCleanup(
+        vars_to_set,
         _clean_up_gettempdir_test,
     ):
         tmpdir_result = gettempdir()
         assert_true(tmpdir_result, "Failed to get temporary directory")
         assert_equal(
             tmpdir_result.value()[],
-            String(dir_with_writing_access),
+            dir_with_writing_access,
             "expected to get:" + String(dir_with_writing_access),
         )
 
     # test gettempdir falls back to TMP
-    with _TempEnvForTest(
-        dir_without_writing_access,
-        non_existing_dir,
-        dir_with_writing_access,
+    vars_to_set["TMPDIR"] = dir_without_writing_access
+    vars_to_set["TEMP"] = non_existing_dir
+    vars_to_set["TMP"] = dir_with_writing_access
+    with TempEnvWithCleanup(
+        vars_to_set,
         _clean_up_gettempdir_test,
     ):
         tmpdir_result = gettempdir()
         assert_true(tmpdir_result, "Failed to get temporary directory")
         assert_equal(
             tmpdir_result.value()[],
-            String(dir_with_writing_access),
+            dir_with_writing_access,
             "expected to get:" + String(dir_with_writing_access),
         )
 
