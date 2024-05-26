@@ -109,6 +109,9 @@ struct Span[
     ):
         """Construct a Span from a List.
 
+        Parameters:
+            small_buffer_size: The size of the small buffer in the list.
+
         Args:
             list: The list to which the span refers.
         """
