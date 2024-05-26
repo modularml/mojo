@@ -40,11 +40,13 @@ def test_reversed_dict():
 
     assert_equal(keys, "dcba")
 
+    print("Running the second reverse")
     var check: Int = 4
     for val in reversed(dict.values()):
         assert_equal(val[], check)
         check -= 1
 
+    print("running the third reverse")
     keys = String("")
     check = 4
     for item in reversed(dict.items()):
