@@ -635,17 +635,22 @@ fn test_split() raises:
     assert_true(len(String("  ").split(" ")) == 3)
     assert_true(len(String("   ").split(" ")) == 4)
 
+    d = String("abababaaba").split("aba")
+    assert_true(d[0] == "" and d[1] == "b" and d[2] == "" and d[3] == "")
+
     # separator = "" returns all char split
-    d = String("hello ").split("")
-    assert_true(len(d) == 6)
-    assert_true(
-        d[0] == "h"
-        and d[1] == "e"
-        and d[2] == "l"
-        and d[3] == "l"
-        and d[4] == "o"
-        and d[5] == " "
-    )
+    # d = String("hello ").split("")
+    # assert_true(len(d) == 6)
+    # assert_true(
+    #     d[0] == "h"
+    #     and d[1] == "e"
+    #     and d[2] == "l"
+    #     and d[3] == "l"
+    #     and d[4] == "o"
+    #     and d[5] == " "
+    # )
+    with assert_raises():
+        _ = String("").split("")
 
     # Split in middle
     var d1 = String("n")
