@@ -546,7 +546,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return self._find_ref(key)[]
 
-    # TODO(MSTDL-452): rename to __refitem__
+    # TODO(MSTDL-452): rename to __getitem__ returning a reference
     fn __get_ref(
         self: Reference[Self, _, _], key: K
     ) raises -> Reference[V, self.is_mutable, self.lifetime]:
