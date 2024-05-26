@@ -864,6 +864,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         var self_copy = Self(capacity=self.capacity)
         for i in range(self.size):
             initialize_pointee_copy(self_copy.data + i, self[i])
+        self_copy.size = self.size
         return self_copy
 
     @always_inline
