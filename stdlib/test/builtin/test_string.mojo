@@ -716,6 +716,8 @@ fn test_isspace_unicode() raises:
     # TODO add line and paragraph separator as stringliteral once unicode
     # escape secuences are accepted
     var univ_sep_var = List[String](
+        String(" "),
+        String("\t"),
         String("\n"),
         String("\r"),
         String("\v"),
@@ -729,13 +731,13 @@ fn test_isspace_unicode() raises:
 
     for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0):
         var val = String(List[UInt8](b[], 0))
-        assert_false(val in univ_sep_var)
-        assert_false(val.isspace())
+        if not (val in univ_sep_var):
+            assert_false(val.isspace())
 
     for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0):
         var val = String(List[UInt8](b[], 0))
-        assert_false(val in univ_sep_var)
-        assert_false(val.isspace())
+        if not (val in univ_sep_var):
+            assert_false(val.isspace())
 
     for i in univ_sep_var:
         assert_true(i[].isspace())
