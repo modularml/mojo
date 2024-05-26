@@ -15,6 +15,7 @@
 from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
+    _isspace,
 )
 from testing import (
     assert_equal,

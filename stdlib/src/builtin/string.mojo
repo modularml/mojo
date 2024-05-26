@@ -585,11 +585,15 @@ fn _isspace(c: UInt8) -> Bool:
         True if the character is one of the whitespace characters listed above, otherwise False.
     """
 
-    alias ord_space = ord(" ")
-    alias ord_tab = ord("\t")
-    alias ord_carriage_return = ord("\r")
-
-    return c == ord_space or ord_tab <= int(c) <= ord_carriage_return
+    alias c_spaces = (
+        ord(" "),
+        ord("\t"),
+        ord("\n"),
+        ord("\r"),
+        ord("\f"),
+        ord("\v"),
+    )
+    return int(c) in c_spaces
 
 
 # ===----------------------------------------------------------------------===#
