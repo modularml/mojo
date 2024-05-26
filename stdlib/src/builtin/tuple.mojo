@@ -150,11 +150,19 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         return Self.__len__()
 
     @always_inline("nodebug")
-    fn __refitem__[
+    fn __getitem__[
         idx: Int
-    ](self: Reference[Self, _, _]) -> Reference[
-        element_types[idx.value], self.is_mutable, self.lifetime
+    ](self: Reference[Self, _, _]) -> ref [self.lifetime] element_types[
+        idx.value
     ]:
+        """Get a reference to an element in the tuple.
+
+        Parameters:
+            idx: The element to return.
+
+        Returns:
+            A referece to the specified element.
+        """
         # Return a reference to an element at the specified index, propagating
         # mutability of self.
         var storage_kgen_ptr = UnsafePointer.address_of(self[].storage).address
@@ -220,16 +228,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
             @parameter
             if _type_is_eq[T, element_types[i]]():
-                var tmp_ref = self.__refitem__[i]()
-                var tmp = rebind[
-                    Reference[
-                        T,
-                        tmp_ref.is_mutable,
-                        tmp_ref.lifetime,
-                        tmp_ref.address_space,
-                    ]
-                ](tmp_ref)
-                if tmp[].__eq__(value):
+                var elt_ptr = UnsafePointer.address_of(self[i]).bitcast[T]()
+                if elt_ptr[].__eq__(value):
                     return True
 
         return False
