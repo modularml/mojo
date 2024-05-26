@@ -49,20 +49,14 @@ fn _candidate_tempdir_list() -> List[String]:
 
     # First, try the environment.
     for env_var in possible_env_vars:
-        dirname = os.getenv(env_var[])
-        if dirname:
-            dirlist.append(dirname)
+        if dirname := os.getenv(env_var[]):
+            dirlist.append(dirname^)
 
     # Failing that, try OS-specific locations.
-    if sys.os_is_windows():
-        # TODO handle windows
-        pass
-    else:
-        dirlist.extend(
-            List(String("/tmp"), String("/var/tmp"), String("/usr/tmp"))
-        )
+    dirlist.extend(List(String("/tmp"), String("/var/tmp"), String("/usr/tmp")))
 
-    # As a last resort, the current directory.
+    # As a last resort, the current directory if possible,
+    # os.path.getcwd() could raise
     try:
         dirlist.append(Path())
     except:
@@ -91,16 +85,19 @@ fn _get_default_tempdir() raises -> String:
 
 
 fn _try_to_create_file(dir: String) -> Bool:
-    var name = _get_random_name()
-    # TODO use os.join when it exists
-    var filename = Path(dir) / name
-
     for _ in range(TMP_MAX):
+        var name = _get_random_name()
+        # TODO use os.join when it exists
+        var filename = Path(dir) / name
+
+        # prevent overwriting existing file
+        if os.path.exists(filename):
+            continue
+
+        # verify that we have writing access in the target directory
         try:
-            if os.path.exists(filename):
-                continue
-            var temp_file = FileHandle(filename, "w")
-            temp_file.close()
+            with FileHandle(filename, "w"):
+                pass
             os.remove(filename)
             return True
         except:
@@ -120,9 +117,9 @@ fn gettempdir() -> Optional[String]:
     Returns:
         The name of the default temporary directory.
     """
-    # TODO In python _get_default_tempdir is called exactly one such that the default
-    # tmp dir is the same along the program execution,
-    # since there is not a global scope in mojo yet this is not possible for now
+    # TODO In python _get_default_tempdir is called exactly once so that the default
+    # tmp dir is the same throughout the program execution/
+    # Since there is no global scope in mojo yet, this is not possible for now.
     try:
         return _get_default_tempdir()
     except:
@@ -133,7 +130,6 @@ fn mkdtemp(
     suffix: String = "", prefix: String = "tmp", dir: Optional[String] = None
 ) raises -> String:
     """Create a temporary directory.
-    If the directory can not be created an error is raised.
     Caller is responsible for deleting the directory when done with it.
 
     Args:
@@ -143,6 +139,9 @@ fn mkdtemp(
 
     Returns:
         The name of the created directory.
+
+    Raises:
+        If the directory can not be created.
     """
     var final_dir: Path
     if not dir:
