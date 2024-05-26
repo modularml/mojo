@@ -331,9 +331,9 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         @parameter
         for i in range(size):
-            var ref = self._get_reference_unsafe(i)
+            var eltref = self._get_reference_unsafe(i)
             initialize_pointee_move(
-                UnsafePointer[Self.ElementType](ref), elems[i]
+                UnsafePointer[Self.ElementType](eltref), elems[i]
             )
 
     # ===------------------------------------------------------------------===#
@@ -341,11 +341,11 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __refitem__[
+    fn __getitem__[
         IntableType: Intable,
-    ](self: Reference[Self, _, _], index: IntableType) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
+    ](self: Reference[Self, _, _], index: IntableType) -> ref [
+        self.lifetime
+    ] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -362,15 +362,13 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         if normalized_idx < 0:
             normalized_idx += size
 
-        return self[]._get_reference_unsafe(normalized_idx)
+        return self[]._get_reference_unsafe(normalized_idx)[]
 
     @always_inline("nodebug")
-    fn __refitem__[
+    fn __getitem__[
         IntableType: Intable,
         index: IntableType,
-    ](self: Reference[Self, _, _]) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
+    ](self: Reference[Self, _, _]) -> ref [self.lifetime] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -389,7 +387,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         if i < 0:
             normalized_idx += size
 
-        return self[]._get_reference_unsafe(normalized_idx)
+        return self[]._get_reference_unsafe(normalized_idx)[]
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
@@ -414,7 +412,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
         """Get a reference to an element of self without checking index bounds.
 
-        Users should opt for `__refitem__` instead of this method.
+        Users should opt for `__getitem__` instead of this method.
         """
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self[]._array).address,

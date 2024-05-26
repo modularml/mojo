@@ -210,11 +210,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __refitem__[
+    fn __getitem__[
         T: CollectionElement
-    ](self: Reference[Self, _, _]) -> Reference[
-        T, self.is_mutable, self.lifetime
-    ]:
+    ](self: Reference[Self, _, _]) -> ref [self.lifetime] T:
         """Get the value out of the variant as a type-checked type.
 
         This explicitly check that your value is of that type!
@@ -233,7 +231,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         if not self[].isa[T]():
             abort("get: wrong variant type")
 
-        return self[].unsafe_get[T]()
+        return self[].unsafe_get[T]()[]
 
     # ===-------------------------------------------------------------------===#
     # Methods
