@@ -16,6 +16,7 @@ from testing import assert_equal
 
 
 def test_reversed_list():
+    print("Running test_reversed_list")
     var list = List[Int](1, 2, 3, 4, 5, 6)
     var check: Int = 6
 
@@ -25,6 +26,7 @@ def test_reversed_list():
 
 
 def test_reversed_dict():
+    print("Running test_reversed_dict")
     var dict = Dict[String, Int]()
     dict["a"] = 1
     dict["b"] = 2
@@ -52,12 +54,13 @@ def test_reversed_dict():
 
     assert_equal(keys, "dcba")
 
-    # Order preserved
+    print("Verifying the order is preserved")
 
     _ = dict.pop("a")
     _ = dict.pop("c")
 
     # dict: {'b': 2, 'd': 4}
+    print("Assuming the dict is now {'b': 2, 'd': 4}")
 
     keys = String("")
     for key in dict:
@@ -86,7 +89,7 @@ def test_reversed_dict():
 
     assert_equal(keys, "db")
 
-    # Refill dict
+    print("Refilling the dict")
     dict["c"] = 2
     dict["a"] = 1
     dict["b"] = 4
@@ -103,7 +106,7 @@ def test_reversed_dict():
 
     assert_equal(keys, "acdb")
 
-    # Empty dict is iterable
+    print("Empty dict is iterable")
 
     var empty_dict = Dict[String, Int]()
 
