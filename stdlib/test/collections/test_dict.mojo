@@ -538,10 +538,10 @@ fn test_dict_setdefault() raises:
     var a = CopyCounter()
     var a_def = CopyCounter()
     var b_def = CopyCounter()
-    other_dict["a"] = a
+    other_dict["a"] = a^
     assert_equal(1, other_dict["a"].copy_count)
-    _ = other_dict.setdefault("a", a_def)
-    _ = other_dict.setdefault("b", b_def)
+    _ = other_dict.setdefault("a", a_def^)
+    _ = other_dict.setdefault("b", b_def^)
     assert_equal(1, other_dict["a"].copy_count)
     assert_equal(1, other_dict["b"].copy_count)
 
