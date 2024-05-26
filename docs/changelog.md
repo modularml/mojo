@@ -420,6 +420,9 @@ what we publish.
 
 - The Mojo Language Server now supports renaming local variables.
 
+- Added a new `tempfile` module. Similarly to Python, this will contain
+  utilities for creating and working with temporary files and directories.
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
