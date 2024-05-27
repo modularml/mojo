@@ -234,6 +234,20 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
             start = pos
         break
 
+    if str_ref[start] == "0" and start + 1 < str_len:
+        if base == 2 and (
+            str_ref[start + 1] == "b" or str_ref[start + 1] == "B"
+        ):
+            start += 2
+        elif base == 8 and (
+            str_ref[start + 1] == "o" or str_ref[start + 1] == "O"
+        ):
+            start += 2
+        elif base == 16 and (
+            str_ref[start + 1] == "x" or str_ref[start + 1] == "X"
+        ):
+            start += 2
+
     alias ord_0 = ord("0")
     # FIXME:
     #   Change this to `alias` after fixing support for __getitem__ of alias.
