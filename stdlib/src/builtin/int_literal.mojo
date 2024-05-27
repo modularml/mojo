@@ -284,7 +284,7 @@ struct IntLiteral(
         return quotient, remainder
 
     @always_inline("nodebug")
-    fn __round__(self, ndigits: IntLiteral) -> Self:
+    fn __round__(self, ndigits: Int) -> Self:
         """Return the rounded value of the IntLiteral value, which is itself.
 
         Args:

@@ -595,7 +595,7 @@ struct Int(
         return self
 
     @always_inline("nodebug")
-    fn __round__(self, ndigits: IntLiteral) -> Self:
+    fn __round__(self, ndigits: Int) -> Self:
         """Return the rounded value of the Int value, which is itself.
         Args:
             ndigits: The number of digits to round to.

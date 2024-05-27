@@ -261,7 +261,7 @@ struct FloatLiteral(
         return result
 
     @always_inline("nodebug")
-    fn __round__(self, ndigits: IntLiteral) -> Self:
+    fn __round__(self, ndigits: Int) -> Self:
         """Return the rounded value of the FloatLiteral.
 
         Args:
