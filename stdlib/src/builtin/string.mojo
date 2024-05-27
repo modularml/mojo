@@ -1461,6 +1461,8 @@ struct String(
 
         while current_offset < length:
             # Find the position of the next newline character
+            # FIXME: this should take all universal newlines into account
+            # see https://docs.python.org/3/library/stdtypes.html#str.splitlines
             var loc_n = self.find("\n", current_offset)
             var loc_r = self.find("\r", current_offset)
 
