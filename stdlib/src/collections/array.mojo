@@ -338,10 +338,10 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         if capacity != Self._vec_type.size:
             var mask = Self._vec_type(~Self._scalar_type(0))
             Self._mask_vec(mask)
-            var comp = ~(self.vec ^ value).cast[DType.bool]()
+            var comp = (self.vec != value).cast[DType.bool]()
             return (comp & mask.cast[DType.bool]()).reduce_or()
         else:
-            return (~(self.vec ^ value).cast[DType.bool]()).reduce_or()
+            return (self.vec == value).cast[DType.bool]().reduce_or()
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -644,18 +644,12 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
         @parameter
         if capacity != Self._vec_type.size:
-            var different = (self.vec ^ value).cast[DType.bool]().cast[
-                DType.uint8
-            ]()
+            var same = (self.vec == value).cast[DType.uint8]()
             var mask = Self._vec_type(~Self._scalar_type(0))
             Self._mask_vec(mask)
-            var masked = different & mask.cast[DType.uint8]()
-            return int(capacity - masked.reduce_add())
+            return int((same & mask.cast[DType.uint8]()).reduce_add())
         else:
-            var different = (self.vec ^ value).cast[DType.bool]().cast[
-                DType.uint8
-            ]()
-            return int(Self._vec_type.size - different.reduce_add())
+            return int((self.vec == value).cast[DType.uint8]().reduce_add())
 
     # FIXME: is this possible?
     # @always_inline
@@ -1120,6 +1114,72 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         """Zeroes the Array."""
         self.vec = self.vec.splat(0)
         self.capacity_left = capacity
+
+    fn __eq__(self, other: Self) -> Bool:
+        """Whether self is equal to other.
+
+        Args:
+            other: The other Array.
+
+        Returns:
+            The result.
+        """
+        return self.vec == other.vec
+
+    fn __ne__(self, other: Self) -> Bool:
+        """Whether self is unequal to other.
+
+        Args:
+            other: The other Array.
+
+        Returns:
+            The result.
+        """
+        return self.vec != other.vec
+
+    fn __gt__(self, other: Self) -> Bool:
+        """Whether self is greater than other.
+
+        Args:
+            other: The other Array.
+
+        Returns:
+            The result.
+        """
+        return self.vec > other.vec
+
+    fn __ge__(self, other: Self) -> Bool:
+        """Whether self is greater than or equal to other.
+
+        Args:
+            other: The other Array.
+
+        Returns:
+            The result.
+        """
+        return self.vec >= other.vec
+
+    fn __lt__(self, other: Self) -> Bool:
+        """Whether self is less than other.
+
+        Args:
+            other: The other Array.
+
+        Returns:
+            The result.
+        """
+        return self.vec < other.vec
+
+    fn __le__(self, other: Self) -> Bool:
+        """Whether self is less than or equal to other.
+
+        Args:
+            other: The other Array.
+
+        Returns:
+            The result.
+        """
+        return self.vec <= other.vec
 
     @always_inline("nodebug")
     fn cos(self, other: Self) -> Float64:
