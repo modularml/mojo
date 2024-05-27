@@ -53,10 +53,10 @@ struct _SpanIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src._refitem__(self.index - 1)
+            return self.src[self.index - 1]
         else:
             self.index -= 1
-            return self.src._refitem__(self.index)
+            return self.src[self.index]
 
     @always_inline
     fn __len__(self) -> Int:
@@ -130,44 +130,24 @@ struct Span[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn _refitem__[
-        intable: Intable
-    ](self, idx: intable) -> Reference[T, is_mutable, lifetime]:
+    fn __getitem__(self, idx: Int) -> ref [lifetime] T:
+        """Get a reference to an element in the span.
+
+        Args:
+            idx: The index of the value to return.
+
+        Returns:
+            An element reference.
+        """
+        # TODO: Simplify this with a UInt type.
         debug_assert(
             -self._len <= int(idx) < self._len, "index must be within bounds"
         )
 
-        var offset = int(idx)
+        var offset = idx
         if offset < 0:
             offset += len(self)
-        return (self._data + offset)[]
-
-    @always_inline
-    fn __getitem__(self, idx: Int) -> Reference[T, is_mutable, lifetime]:
-        """Get a `Reference` to the element at the given index.
-
-        Args:
-            idx: The index of the item.
-
-        Returns:
-            A reference to the item at the given index.
-        """
-        # note that self._refitem__ is already bounds checking
-        return self._refitem__(idx)
-
-    @always_inline
-    fn __setitem__(inout self, idx: Int, value: T):
-        """Get a `Reference` to the element at the given index.
-
-        Args:
-            idx: The index of the item.
-            value: The value to set at the given index.
-        """
-        # note that self._refitem__ is already bounds checking
-        var r = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
-            UnsafePointer(self._refitem__(idx))[]
-        )
-        r[] = value
+        return self._data[offset]
 
     @always_inline
     fn __getitem__(self, slc: Slice) -> Self:
