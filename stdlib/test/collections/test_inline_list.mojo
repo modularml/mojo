@@ -138,6 +138,16 @@ def test_list_variadic_constructor():
     assert_equal(8, l[3])
 
 
+def test_list_count():
+    var list = InlineList[Int](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
+    assert_equal(1, list.count(1))
+    assert_equal(2, list.count(2))
+    assert_equal(0, list.count(4))
+
+    var list2 = InlineList[Int]()
+    assert_equal(0, list2.count(1))
+
+
 def test_list_boolable():
     assert_true(InlineList[Int](1))
     assert_false(InlineList[Int]())
@@ -162,5 +172,6 @@ def main():
     test_list_iter_mutable()
     test_list_contains()
     test_list_variadic_constructor()
+    test_list_count()
     test_list_boolable()
     test_indexing()
