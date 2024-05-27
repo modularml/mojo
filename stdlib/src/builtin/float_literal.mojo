@@ -275,7 +275,7 @@ struct FloatLiteral(
             return self
 
         alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
-        alias minus_one = __mlir_attr.`#kgen.int_literal<-1> : !kgen.int_literal`
+        alias neg_one = __mlir_attr.`#kgen.int_literal<-1> : !kgen.int_literal`
         alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
         var multiplier = one
         # TODO: Use IntLiteral.__pow__() when it's implemented.
@@ -287,7 +287,7 @@ struct FloatLiteral(
         var truncated: IntLiteral = target.__int_literal__()
         var result: Self
         var abs_diff = abs(target - truncated)
-        var plus_one = one if self > 0 else minus_one
+        var plus_one = one if self > 0 else neg_one
         if abs_diff == 0.5:
             # Round to the nearest even number.
             if truncated % 2 == 0:
