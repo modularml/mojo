@@ -481,6 +481,7 @@ what we publish.
 
 - Added `String.isspace()` method conformant with Python's universal 
   separators.
+
 - Changed `isspace(..)` to take a `UInt8` and was made private 
   (`_isspace(..)`), use `String.isspace()` instead.
 

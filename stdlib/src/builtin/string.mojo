@@ -613,17 +613,6 @@ fn _isspace(c: UInt8) -> Bool:
         True if the character is one of the whitespace characters
             listed above, otherwise False.
     """
-    # alias spaces = SIMD[DType.uint8, 8](
-    #     ord(" "),
-    #     ord("\t"),
-    #     ord("\n"),
-    #     ord("\r"),
-    #     ord("\f"),
-    #     ord("\v"),
-    #     ord("\v"),
-    #     ord("\v"),
-    # )
-    # return (spaces ^ c).reduce_min() == 0
     return _SPACES_TABLE[c]
 
 
