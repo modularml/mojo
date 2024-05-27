@@ -164,10 +164,10 @@ struct Span[
             value: The value to set at the given index.
         """
         # note that self._refitem__ is already bounds checking
-        var ref = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
+        var r = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
             UnsafePointer(self._refitem__(idx))[]
         )
-        ref[] = value
+        r[] = value
 
     @always_inline
     fn __getitem__(self, slice: Slice) -> Self:

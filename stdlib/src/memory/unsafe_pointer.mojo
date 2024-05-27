@@ -31,7 +31,13 @@ from memory.memory import _free, _malloc
 @register_passable("trivial")
 struct UnsafePointer[
     T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC
-](Boolable, CollectionElement, Stringable, Intable, EqualityComparable):
+](
+    Boolable,
+    CollectionElement,
+    Stringable,
+    Intable,
+    Comparable,
+):
     """This is a pointer type that can point to any generic value that is movable.
 
     Parameters:

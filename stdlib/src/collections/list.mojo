@@ -772,7 +772,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         return (self.data + normalized_idx)[]
 
-    # TODO(30737): Replace __getitem__ with this as __refitem__, but lots of places use it
+    # TODO(30737): Replace __getitem__ with this, but lots of places use it
     fn __get_ref(
         self: Reference[Self, _, _], i: Int
     ) -> Reference[T, self.is_mutable, self.lifetime]:
@@ -788,7 +788,43 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if i < 0:
             normalized_idx += self[].size
 
-        return (self[].data + normalized_idx)[]
+        return self[].unsafe_get(normalized_idx)
+
+    @always_inline
+    fn unsafe_get[
+        IndexerType: Indexer,
+    ](self: Reference[Self, _, _], idx: IndexerType) -> Reference[
+        Self.T, self.is_mutable, self.lifetime
+    ]:
+        """Get a reference to an element of self without checking index bounds.
+
+        Users should consider using `__getitem__` instead of this method as it is unsafe.
+        If an index is out of bounds, this method will not abort, it will be considered
+        undefined behavior.
+
+        Note that there is no wraparound for negative indices, caution is advised.
+        Using negative indices is considered undefined behavior.
+        Never use `my_list.unsafe_get(-1)` to get the last element of the list. It will not work.
+        Instead, do `my_list.unsafe_get(len(my_list) - 1)`.
+
+        Parameters:
+            IndexerType: The type of the argument used as index.
+
+        Args:
+            idx: The index of the element to get.
+
+        Returns:
+            A reference to the element at the given index.
+        """
+        var idx_as_int = index(idx)
+        debug_assert(
+            0 <= idx_as_int < len(self[]),
+            (
+                "The index provided must be within the range [0, len(List) -1]"
+                " when using List.unsafe_get()"
+            ),
+        )
+        return (self[].data + idx_as_int)[]
 
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
