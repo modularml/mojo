@@ -19,14 +19,14 @@ from utils import Span
 
 fn test_string_literal_byte_slice() raises:
     alias string: StringLiteral = "Hello"
-    alias slice = string.as_bytes_slice()
+    alias slc = string.as_bytes_slice()
 
-    assert_equal(len(slice), 5)
-    assert_equal(slice[0][], ord("H"))
-    assert_equal(slice[1][], ord("e"))
-    assert_equal(slice[2][], ord("l"))
-    assert_equal(slice[3][], ord("l"))
-    assert_equal(slice[4][], ord("o"))
+    assert_equal(len(slc), 5)
+    assert_equal(slc[0][], ord("H"))
+    assert_equal(slc[1][], ord("e"))
+    assert_equal(slc[2][], ord("l"))
+    assert_equal(slc[3][], ord("l"))
+    assert_equal(slc[4][], ord("o"))
 
 
 fn test_string_byte_slice() raises:

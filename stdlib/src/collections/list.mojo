@@ -739,13 +739,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
 
         var adjusted_span = self._adjust_span(span)
-        var adjusted_span_len = len(adjusted_span)
+        var adjusted_span_len = adjusted_span.unsafe_indices()
 
         if not adjusted_span_len:
             return Self()
 
-        var res = Self(capacity=len(adjusted_span))
-        for i in range(len(adjusted_span)):
+        var res = Self(capacity=adjusted_span_len)
+        for i in range(adjusted_span_len):
             res.append(self[adjusted_span[i]])
 
         return res^

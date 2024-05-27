@@ -503,6 +503,13 @@ what we publish.
 - `InlinedString` has been renamed to `InlineString` to be consistent with other
   types.
 
+- The `Slice.__len__` function has been removed and `Slice` no longer conforms
+  to the `Sized` trait. This clarifies the ambiguity of the semantics: the
+  length of a slice always depends on the length of the object being sliced.
+  Users that need the existing functionality can use the `Slice.unsafe_indices`
+  method. This makes it explicit that this implementation does not check if the
+  slice bounds are concrete or within any given object's length.
+
 ### ❌ Removed
 
 - The `@unroll` decorator has been deprecated and removed. The decorator was

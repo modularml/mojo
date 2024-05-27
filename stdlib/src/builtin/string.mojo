@@ -912,14 +912,11 @@ struct String(
         """
 
         var adjusted_span = self._adjust_span(span)
+        var adjusted_span_len = adjusted_span.unsafe_indices()
         if adjusted_span.step == 1:
-            return StringRef(
-                self._buffer.data + span.start,
-                len(adjusted_span),
-            )
+            return StringRef(self._buffer.data + span.start, adjusted_span_len)
 
         var buffer = Self._buffer_type()
-        var adjusted_span_len = len(adjusted_span)
         buffer.resize(adjusted_span_len + 1, 0)
         var ptr = self.unsafe_uint8_ptr()
         for i in range(adjusted_span_len):
