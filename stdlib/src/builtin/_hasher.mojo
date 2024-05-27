@@ -10,18 +10,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the bit package."""
 
-from .bit import (
-    countl_zero,
-    countr_zero,
-    bit_reverse,
-    byte_reverse,
-    pop_count,
-    bit_not,
-    bit_width,
-    rotate_bits_left,
-    rotate_bits_right,
-    bit_ceil,
-    bit_floor,
-)
+
+trait _HashableWithHasher:
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        ...
+
+
+trait _Hasher:
+    fn __init__(inout self):
+        ...
+
+    fn _update_with_simd(inout self, value: SIMD[_, _]):
+        ...
+
+    fn update[T: _HashableWithHasher](inout self, value: T):
+        ...
+
+    fn finish(owned self) -> UInt64:
+        ...
+
+
+fn _hash_with_hasher[
+    HasherType: _Hasher, HashableType: _HashableWithHasher
+](hashable: HashableType) -> UInt64:
+    var hasher = HasherType()
+    hasher.update(hashable)
+    var value = hasher^.finish()
+    return value
