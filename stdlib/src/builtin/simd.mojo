@@ -784,33 +784,33 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return value % self
 
     @always_inline("nodebug")
-    fn __pow__(self, rhs: Int) -> Self:
+    fn __pow__(self, exp: Int) -> Self:
         """Computes the vector raised to the power of the input integer value.
 
         Args:
-            rhs: The exponential value.
+            exp: The exponent value.
 
         Returns:
             A SIMD vector where each element is raised to the power of the
-            specified exponential value.
+            specified exponent value.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return _pow(self, rhs)
+        return _pow[type, size, DType.index](self, exp)
 
     # TODO(#22771): remove this overload.
     @always_inline("nodebug")
-    fn __pow__(self, rhs: Self) -> Self:
+    fn __pow__(self, exp: Self) -> Self:
         """Computes the vector raised elementwise to the right hand side power.
 
         Args:
-            rhs: The exponential value.
+            exp: The exponent value.
 
         Returns:
             A SIMD vector where each element is raised to the power of the
-            specified exponential value.
+            specified exponent value.
         """
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
-        return _pow(self, rhs)
+        return _pow(self, exp)
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: Self) -> Self._Mask:
@@ -2547,61 +2547,40 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](zero_simd, self, Int32(-shift))
 
 
-# ===-------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # _pow
-# ===-------------------------------------------------------------------===#
-
-
-fn _pow[
-    type: DType, simd_width: Int
-](arg0: SIMD[type, simd_width], arg1: Int) -> SIMD[type, simd_width]:
-    """Computes the `pow` of the inputs.
-
-    Parameters:
-      type: The `dtype` of the input and output SIMD vector.
-      simd_width: The width of the input and output SIMD vector.
-
-    Args:
-      arg0: The first input argument.
-      arg1: The second input argument.
-
-    Returns:
-      The `pow` of the inputs.
-    """
-    return _pow[type, DType.index, simd_width](arg0, arg1)
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
 fn _pow[
-    lhs_type: DType, rhs_type: DType, simd_width: Int
-](lhs: SIMD[lhs_type, simd_width], rhs: SIMD[rhs_type, simd_width]) -> SIMD[
-    lhs_type, simd_width
-]:
-    """Computes elementwise power of a type raised to another type.
-
-    An element of the result SIMD vector will be the result of raising the
-    corresponding element of lhs to the corresponding element of rhs.
+    BaseTy: DType, simd_width: Int, ExpTy: DType
+](base: SIMD[BaseTy, simd_width], exp: SIMD[ExpTy, simd_width]) -> __type_of(
+    base
+):
+    """Computes the power of the elements of a SIMD vector raised to the
+    corresponding elements of another SIMD vector.
 
     Parameters:
-      lhs_type: The `dtype` of the lhs SIMD vector.
-      rhs_type: The `dtype` of the rhs SIMD vector.
-      simd_width: The width of the input and output SIMD vectors.
+        BaseTy: The `dtype` of the `base` SIMD vector.
+        simd_width: The width of the input and output SIMD vectors.
+        ExpTy: The `dtype` of the `exp` SIMD vector.
 
     Args:
-      lhs: Base of the power operation.
-      rhs: Exponent of the power operation.
+        base: Base of the power operation.
+        exp: Exponent of the power operation.
 
     Returns:
-      A SIMD vector containing elementwise lhs raised to the power of rhs.
+        A vector containing elementwise `base` raised to the power of `exp`.
     """
 
     @parameter
-    if rhs_type.is_floating_point() and lhs_type == rhs_type:
-        var rhs_quotient = rhs.__floor__()
-        if all((rhs >= 0) & (rhs_quotient == rhs)):
-            return _pow(lhs, rhs_quotient.cast[_integral_type_of[rhs_type]()]())
+    if ExpTy.is_floating_point() and BaseTy == ExpTy:
+        var rhs_quotient = exp.__floor__()
+        if all((exp >= 0) & (rhs_quotient == exp)):
+            return _pow(base, rhs_quotient.cast[_integral_type_of[ExpTy]()]())
 
-        var result = SIMD[lhs_type, simd_width]()
+        var result = __type_of(base)()
 
         @parameter
         if triple_is_nvidia_cuda():
@@ -2615,37 +2594,37 @@ fn _pow[
             @parameter
             for i in range(simd_width):
                 result[i] = llvm_intrinsic[
-                    "llvm.pow", Scalar[lhs_type], has_side_effect=False
-                ](lhs[i], rhs[i])
+                    "llvm.pow", Scalar[BaseTy], has_side_effect=False
+                ](base[i], exp[i])
 
         return result
-    elif rhs_type.is_integral():
+    elif ExpTy.is_integral():
         # Common cases
-        if all(rhs == 2):
-            return lhs * lhs
-        if all(rhs == 3):
-            return lhs * lhs * lhs
+        if all(exp == 2):
+            return base * base
+        if all(exp == 3):
+            return base * base * base
 
-        var result = SIMD[lhs_type, simd_width]()
+        var result = __type_of(base)()
 
         @parameter
         for i in range(simd_width):
-            result[i] = _powi(lhs[i], rhs[i].cast[DType.int32]())
+            result[i] = _powi(base[i], exp[i].cast[DType.int32]())
         return result
     else:
-        # Unsupported.
-        return SIMD[lhs_type, simd_width]()
+        constrained[False, "unsupported type combination"]()
+        return __type_of(base)()
 
 
 @always_inline
-fn _powi[type: DType](lhs: Scalar[type], rhs: Int32) -> __type_of(lhs):
-    if type.is_integral() and rhs < 0:
+fn _powi[type: DType](base: Scalar[type], exp: Int32) -> __type_of(base):
+    if type.is_integral() and exp < 0:
         # Not defined for Integers, this should raise an
         # exception.
         debug_assert(False, "exponent < 0 is undefined for integers")
         return 0
-    var a = lhs
-    var b = abs(rhs) if type.is_floating_point() else rhs
+    var a = base
+    var b = abs(exp) if type.is_floating_point() else exp
     var res: Scalar[type] = 1
     while b > 0:
         if b & 1:
@@ -2655,7 +2634,7 @@ fn _powi[type: DType](lhs: Scalar[type], rhs: Int32) -> __type_of(lhs):
 
     @parameter
     if type.is_floating_point():
-        if rhs < 0:
+        if exp < 0:
             return 1 / res
     return res
 
