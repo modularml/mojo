@@ -471,7 +471,8 @@ what we publish.
   - Removed `StringRef.unsafe_uint8_ptr()`. The `unsafe_ptr()` method now has
     the same behavior.
 
-- Added `String.isspace()` method conformant with Python's universal separators.
+- Added `String.isspace()` method conformant with Python's universal 
+  separators.
 - Changed `isspace(..)` to take a `UInt8` and was made private 
   (`_isspace(..)`), use `String.isspace()` instead.
 
