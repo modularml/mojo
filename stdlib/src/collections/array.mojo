@@ -82,8 +82,8 @@ fn _closest_upper_pow_2(val: Int) -> Int:
 struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     CollectionElement, Sized, Boolable
 ):
-    """An Array allocated on the stack with a capacity and
-    max_capacity known at compile time.
+    """An Array allocated on the stack with a capacity known at compile
+    time.
 
     It is backed by a `SIMD` vector. This struct has the same API
     as a regular `Array`.
@@ -93,13 +93,14 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
     Notes:
         Setting Array items directly doesn't update self.capacity_left,
-            methods like append(), extend(), concat() do.
+            methods like append(), extend(), concat(), etc. do.
 
     Parameters:
         T: The type of the elements in the Array.
         capacity: The number of elements that the Array can hold.
             Should be a power of two, otherwise space on the SIMD vector
-            is wasted.
+            is wasted and many functions become slower as they have
+            to mask the extra dimensions.
     """
 
     alias _vec_type = SIMD[T, _closest_upper_pow_2(capacity)]
@@ -134,7 +135,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Args:
             values: The values to populate the Array with.
         """
-        # FIXME: capacity should be statically determined from
+        # TODO: capacity should be statically determined from
         # this constructor
         self = Self()
         for value in values:
@@ -173,10 +174,9 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             existing: The existing Array.
         """
         self = Self()
-        for i in range(capacity):
+        for i in range(capacity):  # FIXME using memcpy?
             self[i] = existing[i]
         self.capacity_left = existing.capacity_left
-        # TODO enlargement if necessary to fit existing
 
     # FIXME
     # fn __init__(
@@ -333,7 +333,15 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             True if the value is contained in the Array, False otherwise.
         """
-        return ~(self.vec ^ value).cast[DType.bool]().reduce_or()
+
+        @parameter
+        if capacity != Self._vec_type.size:
+            var mask = Self._vec_type(~Self._scalar_type(0))
+            Self._mask_vec(mask)
+            var comp = ~(self.vec ^ value).cast[DType.bool]()
+            return (comp & mask.cast[DType.bool]()).reduce_or()
+        else:
+            return (~(self.vec ^ value).cast[DType.bool]()).reduce_or()
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -343,25 +351,6 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             `False` if the Array is empty, `True` if there is at least one element.
         """
         return len(self) > 0
-
-    # fn __moveinit__(inout self, owned existing: Self):
-    #     """Move data of an existing Array into a new one.
-
-    #     Args:
-    #         existing: The existing Array.
-    #     """
-    #     self.vec = existing.vec
-    #     self.capacity_left = existing.capacity_left
-
-    # fn __copyinit__(inout self, existing: Self):
-    #     """Creates a deepcopy of the given Array.
-
-    #     Args:
-    #         existing: The Array to copy.
-    #     """
-    #     self = Self()
-    #     for i in range(len(existing)):
-    #         self.unsafe_set(i, existing[i])
 
     @always_inline("nodebug")
     fn concat[
@@ -562,21 +551,22 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
         """Adjusts the span based on the Array length."""
-        var new_span = span
+        var adjusted_span = span
 
-        if new_span.start < 0:
-            new_span.start = max(0, len(self) + new_span.start)
+        if adjusted_span.start < 0:
+            adjusted_span.start = len(self) + adjusted_span.start
 
-        if not new_span._has_end():
-            new_span.end = len(self)
-        elif new_span.end < 0:
-            new_span.end = max(0, len(self) + new_span.end)
+        if not adjusted_span._has_end():
+            adjusted_span.end = len(self)
+        elif adjusted_span.end < 0:
+            adjusted_span.end = len(self) + adjusted_span.end
 
         if span.step < 0:
-            var tmp = new_span.end
-            new_span.end = new_span.start - 1
-            new_span.start = tmp - 1
-        return new_span
+            var tmp = adjusted_span.end
+            adjusted_span.end = adjusted_span.start - 1
+            adjusted_span.start = tmp - 1
+
+        return adjusted_span
 
     @always_inline
     fn __getitem__(self, span: Slice) -> Self:
@@ -588,16 +578,15 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             A new Array containing the Array at the specified span.
         """
-
         var adjusted_span = self._adjust_span(span)
         var adjusted_span_len = len(adjusted_span)
 
-        if not adjusted_span_len:
-            return Self()
-
         var res = Self()
-        for i in range(len(adjusted_span)):  # FIXME using memcpy?
-            res[i] = self[adjusted_span[i]]
+        if not adjusted_span_len:
+            return res
+
+        for i in range(adjusted_span_len):  # FIXME using memcpy?
+            res.append(self.unsafe_get(adjusted_span[i]))
         return res
 
     fn __setitem__(inout self, idx: Int, owned value: Self._scalar_type):
@@ -652,7 +641,21 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The number of occurrences of the value in the list.
         """
-        return int((value & self.vec).reduce_add())
+
+        @parameter
+        if capacity != Self._vec_type.size:
+            var different = (self.vec ^ value).cast[DType.bool]().cast[
+                DType.uint8
+            ]()
+            var mask = Self._vec_type(~Self._scalar_type(0))
+            Self._mask_vec(mask)
+            var masked = different & mask.cast[DType.uint8]()
+            return int(capacity - masked.reduce_add())
+        else:
+            var different = (self.vec ^ value).cast[DType.bool]().cast[
+                DType.uint8
+            ]()
+            return int(Self._vec_type.size - different.reduce_add())
 
     # FIXME: is this possible?
     # @always_inline
@@ -666,45 +669,40 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
     @always_inline
     fn unsafe_get(self, idx: Int) -> Self._scalar_type:
-        """Get a reference to an element of self without checking index bounds.
+        """Get a copy of an element of self without checking index bounds.
         Users should consider using `__getitem__` instead of this method as it is unsafe.
         If an index is out of bounds, this method will not abort, it will be considered
         undefined behavior.
 
         Note that there is no wraparound for negative indices, caution is advised.
         Using negative indices is considered undefined behavior.
-        Never use `my_list.unsafe_get(-1)` to get the last element of the list. It will
-        not work. Instead, do `my_list.unsafe_get(len(my_list) - 1)`.
+        Never use `my_array.unsafe_get(-1)` to get the last element of the list. It will
+        not work. Instead, do `my_array.unsafe_get(len(my_array) - 1)`.
 
         Args:
             idx: The index of the element to get.
 
         Returns:
-            A reference to the element at the given index.
+            A copy of the element at the given index.
         """
-        debug_assert(abs(idx) > len(self), "index must be within bounds")
         return self.vec[idx]
 
     @always_inline
     fn unsafe_set(inout self, idx: Int, value: Self._scalar_type):
-        """Set a reference to an element of self without checking index bounds.
+        """Set a copy to an element of self without checking index bounds.
         Users should consider using `__setitem__` instead of this method as it is unsafe.
         If an index is out of bounds, this method will not abort, it will be considered
-        undefined behavior.
+        undefined behavior. Does not update `self.capacity_left`.
 
         Note that there is no wraparound for negative indices, caution is advised.
         Using negative indices is considered undefined behavior.
-        Never use `my_list.unsafe_set(-1)` to set the last element of the list. It will
-        not work. Instead, do `my_list.unsafe_set(len(my_list) - 1)`.
+        Never use `my_array.unsafe_set(-1)` to set the last element of the list. It will
+        not work. Instead, do `my_array.unsafe_set(len(my_array) - 1)`.
 
         Args:
             idx: The index to set the element.
             value: The element.
         """
-        debug_assert(
-            abs(idx) > len(self) or idx == -1 * len(self),
-            "index must be within bounds",
-        )
         self.vec[idx] = value
 
     @always_inline("nodebug")
@@ -732,7 +730,14 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
-        return self.vec.reduce_min()
+
+        @parameter
+        if capacity == Self._vec_type.size:
+            return self.vec.reduce_min()
+        else:
+            var mask = Self._vec_type(~Self._scalar_type(0))
+            Self._mask_vec(mask)
+            return (self.vec + mask).reduce_min()
 
     @always_inline("nodebug")
     fn max(self) -> Self._scalar_type:
@@ -762,14 +767,30 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         alias delta = Self.capacity - other.capacity
 
         @parameter
-        if delta == 0:
+        if delta == 0 and capacity == Self._vec_type.size:
             return self.vec.min(rebind[Self._vec_type](other.vec))
-        elif delta > 0:
+        elif delta == 0 and capacity != Self._vec_type.size:
+            var mask = Self._vec_type(~Self._scalar_type(0))
+            Self._mask_vec(mask)
+            return (self.vec + mask).min(
+                rebind[Self._vec_type](other.vec) + mask
+            )
+        elif delta > 0 and capacity == Self._vec_type.size:
             var s = Self(other)
             return self.vec.min(s.vec)
-        else:
+        elif delta > 0 and capacity != Self._vec_type.size:
+            var mask = Self._vec_type(~Self._scalar_type(0))
+            Self._mask_vec(mask)
+            var s = Self(other)
+            return (self.vec + mask).min(s.vec + mask)
+        elif capacity == Self._vec_type.size:
             var s = Array[T, cap](self)
             return other.vec.min(s.vec)
+        else:
+            var mask = Array[T, cap]._vec_type(~Self._scalar_type(0))
+            Array[T, cap]._mask_vec(mask)
+            var s = Array[T, cap](self)
+            return (other.vec + mask).min(s.vec + mask)
 
     @always_inline("nodebug")
     fn max[
@@ -883,51 +904,55 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         """
         self.vec /= Self._build_vec(value)
 
-    @always_inline("nodebug")
-    fn __floordiv__(self, value: Self._scalar_type) -> Self:
-        """Calculates the elementwise floordiv
-        of the given value.
+    # FIXME issue #2855
+    # @always_inline("nodebug")
+    # fn __floordiv__(self, value: Self._scalar_type) -> Self:
+    #     """Calculates the elementwise floordiv
+    #     of the given value.
 
-        Args:
-            value: The value.
+    #     Args:
+    #         value: The value.
 
-        Returns:
-            A new Array with the values.
-        """
-        return self.vec // Self._build_vec(value)
+    #     Returns:
+    #         A new Array with the values.
+    #     """
+    #     return self.vec // Self._build_vec(value)
 
-    @always_inline("nodebug")
-    fn __ifloordiv__(inout self, owned value: Self._scalar_type):
-        """Calculates the elementwise floordiv
-        of the given value inplace.
+    # FIXME issue #2855
+    # @always_inline("nodebug")
+    # fn __ifloordiv__(inout self, owned value: Self._scalar_type):
+    #     """Calculates the elementwise floordiv
+    #     of the given value inplace.
 
-        Args:
-            value: The value.
-        """
-        self.vec //= Self._build_vec(value)
+    #     Args:
+    #         value: The value.
+    #     """
+    #     self.vec //= Self._build_vec(value)
 
-    @always_inline("nodebug")
-    fn __mod__(self, value: Self._scalar_type) -> Self:
-        """Calculates the elementwise mod
-        of the given value.
+    # FIXME issue #2855
+    # @always_inline("nodebug")
+    # fn __mod__(self, value: Self._scalar_type) -> Self:
+    #     """Calculates the elementwise mod
+    #     of the given value.
 
-        Args:
-            value: The value.
+    #     Args:
+    #         value: The value.
 
-        Returns:
-            A new Array with the values.
-        """
-        return self.vec % Self._build_vec(value)
+    #     Returns:
+    #         A new Array with the values.
+    #     """
+    #     return self.vec % Self._build_vec(value)
 
-    @always_inline("nodebug")
-    fn __imod__(inout self, owned value: Self._scalar_type):
-        """Calculates the elementwise mod
-        of the given value inplace.
+    # FIXME issue #2855
+    # @always_inline("nodebug")
+    # fn __imod__(inout self, owned value: Self._scalar_type):
+    #     """Calculates the elementwise mod
+    #     of the given value inplace.
 
-        Args:
-            value: The value.
-        """
-        self.vec %= Self._build_vec(value)
+    #     Args:
+    #         value: The value.
+    #     """
+    #     self.vec %= Self._build_vec(value)
 
     @always_inline("nodebug")
     fn __pow__(self, value: Self._scalar_type) -> Self:
@@ -1134,6 +1159,6 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     #     var magns = abs(self.vec) * abs(other.vec)
     #     return magns * sin((self * other) / magns)
 
-    # TODO
-    # fn sqrt(self):
+    # TODO: should do a vectorized apply
+    # fn apply(self):
     #     ...

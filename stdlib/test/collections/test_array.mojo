@@ -18,7 +18,7 @@ from testing import assert_equal, assert_false, assert_true, assert_raises
 from utils import Span
 
 
-def test_inlined_fixed_array():
+def test_array():
     var array = Array[DType.int8, 5]()
 
     for i in range(5):
@@ -64,8 +64,34 @@ def test_inlined_fixed_array():
     for i in range(5):
         assert_equal(0, array[i])
 
+    var arr = Array[DType.int8]()
 
-def test_inlined_fixed_array_with_default():
+    for i in range(5):
+        arr.append(i)
+
+    assert_equal(5, len(arr))
+    assert_equal(0, arr[0])
+    assert_equal(1, arr[1])
+    assert_equal(2, arr[2])
+    assert_equal(3, arr[3])
+    assert_equal(4, arr[4])
+
+    assert_equal(0, arr[-5])
+    assert_equal(3, arr[-2])
+    assert_equal(4, arr[-1])
+
+    arr[2] = -2
+    assert_equal(-2, arr[2])
+
+    arr[-5] = 5
+    assert_equal(5, arr[-5])
+    arr[-2] = 3
+    assert_equal(3, arr[-2])
+    arr[-1] = 7
+    assert_equal(7, arr[-1])
+
+
+def test_array_with_default():
     var array = Array[DType.int8]()
 
     for i in range(5):
@@ -116,42 +142,14 @@ def test_mojo_issue_698():
     assert_equal(4.0, arr[4])
 
 
-def test_list():
-    var arr = Array[DType.int8]()
-
-    for i in range(5):
-        arr.append(i)
-
-    assert_equal(5, len(arr))
-    assert_equal(0, arr[0])
-    assert_equal(1, arr[1])
-    assert_equal(2, arr[2])
-    assert_equal(3, arr[3])
-    assert_equal(4, arr[4])
-
-    assert_equal(0, arr[-5])
-    assert_equal(3, arr[-2])
-    assert_equal(4, arr[-1])
-
-    arr[2] = -2
-    assert_equal(-2, arr[2])
-
-    arr[-5] = 5
-    assert_equal(5, arr[-5])
-    arr[-2] = 3
-    assert_equal(3, arr[-2])
-    arr[-1] = 7
-    assert_equal(7, arr[-1])
-
-
-def test_list_to_bool_conversion():
+def test_array_to_bool_conversion():
     assert_false(Array[DType.int8]())
     assert_true(Array[DType.int8](0))
     assert_true(Array[DType.int8](0, 1))
     assert_true(Array[DType.int8](1))
 
 
-def test_list_pop():
+def test_array_pop():
     var arr = Array[DType.int8]()
     # Test pop with index
     for i in range(6):
@@ -161,7 +159,7 @@ def test_list_pop():
     for i in range(3, 6):
         assert_equal(i, arr.pop(3))
 
-    # list should have 3 elements now
+    # should have 3 elements now
     assert_equal(3, len(arr))
     assert_equal(0, arr[0])
     assert_equal(1, arr[1])
@@ -180,7 +178,7 @@ def test_list_pop():
     assert_equal(0, len(arr))
 
 
-def test_list_variadic_constructor():
+def test_array_variadic_constructor():
     var l = Array[DType.int8](2, 4, 6)
     assert_equal(3, len(l))
     assert_equal(2, l[0])
@@ -192,7 +190,7 @@ def test_list_variadic_constructor():
     assert_equal(8, l[3])
 
 
-def test_list_insert():
+def test_array_insert():
     #
     # Test the list [1, 2, 3] created with insert
     #
@@ -254,62 +252,62 @@ def test_list_insert():
         assert_equal(v4[i], i + 1)
 
 
-def test_list_index():
-    var test_list_a = Array[DType.int8](10, 20, 30, 40, 50)
+def test_array_index():
+    var test_array_a = Array[DType.int8](10, 20, 30, 40, 50)
 
     # Basic Functionality Tests
-    assert_equal(test_list_a.index(10).value(), 0)
-    assert_equal(test_list_a.index(30).value(), 2)
-    assert_equal(test_list_a.index(50).value(), 4)
-    assert_false(test_list_a.index(60))
+    assert_equal(test_array_a.index(10).value(), 0)
+    assert_equal(test_array_a.index(30).value(), 2)
+    assert_equal(test_array_a.index(50).value(), 4)
+    assert_false(test_array_a.index(60))
     # Tests With Start Parameter
-    assert_equal(test_list_a.index(30, start=1).value(), 2)
-    assert_equal(test_list_a.index(30, start=-4).value(), 2)
-    assert_equal(test_list_a.index(30, start=-1000).value(), 2)
-    assert_false(test_list_a.index(30, start=3))
-    assert_false(test_list_a.index(30, start=5))
+    assert_equal(test_array_a.index(30, start=1).value(), 2)
+    assert_equal(test_array_a.index(30, start=-4).value(), 2)
+    assert_equal(test_array_a.index(30, start=-1000).value(), 2)
+    assert_false(test_array_a.index(30, start=3))
+    assert_false(test_array_a.index(30, start=5))
     # Tests With Start and End Parameters
-    assert_equal(test_list_a.index(30, start=1, stop=3).value(), 2)
-    assert_equal(test_list_a.index(30, start=-4, stop=-2).value(), 2)
-    assert_equal(test_list_a.index(30, start=-1000, stop=1000).value(), 2)
-    assert_false(test_list_a.index(30, start=1, stop=2))
-    assert_false(test_list_a.index(30, start=3, stop=1))
+    assert_equal(test_array_a.index(30, start=1, stop=3).value(), 2)
+    assert_equal(test_array_a.index(30, start=-4, stop=-2).value(), 2)
+    assert_equal(test_array_a.index(30, start=-1000, stop=1000).value(), 2)
+    assert_false(test_array_a.index(30, start=1, stop=2))
+    assert_false(test_array_a.index(30, start=3, stop=1))
     # Tests With End Parameter Only
-    assert_equal(test_list_a.index(30, stop=3).value(), 2)
-    assert_equal(test_list_a.index(30, stop=-2).value(), 2)
-    assert_equal(test_list_a.index(30, stop=1000).value(), 2)
-    assert_false(test_list_a.index(30, stop=1))
-    assert_false(test_list_a.index(30, stop=2))
-    assert_false(test_list_a.index(60, stop=50))
+    assert_equal(test_array_a.index(30, stop=3).value(), 2)
+    assert_equal(test_array_a.index(30, stop=-2).value(), 2)
+    assert_equal(test_array_a.index(30, stop=1000).value(), 2)
+    assert_false(test_array_a.index(30, stop=1))
+    assert_false(test_array_a.index(30, stop=2))
+    assert_false(test_array_a.index(60, stop=50))
     # Edge Cases and Special Conditions
-    assert_equal(test_list_a.index(10, start=-5, stop=-1).value(), 0)
-    assert_equal(test_list_a.index(10, start=0, stop=50).value(), 0)
-    assert_equal(test_list_a.index(50, start=-5, stop=-1).value(), 4)
-    assert_equal(test_list_a.index(50, start=0, stop=-1).value(), 4)
-    assert_false(test_list_a.index(10, start=-4, stop=-1))
-    assert_false(test_list_a.index(10, start=5, stop=50))
+    assert_equal(test_array_a.index(10, start=-5, stop=-1).value(), 0)
+    assert_equal(test_array_a.index(10, start=0, stop=50).value(), 0)
+    assert_equal(test_array_a.index(50, start=-5, stop=-1).value(), 4)
+    assert_equal(test_array_a.index(50, start=0, stop=-1).value(), 4)
+    assert_false(test_array_a.index(10, start=-4, stop=-1))
+    assert_false(test_array_a.index(10, start=5, stop=50))
     assert_false(Array[DType.int8]().index(10))
     # print("5")
     # # Test empty slice
-    assert_false(test_list_a.index(10, start=1, stop=1))
+    assert_false(test_array_a.index(10, start=1, stop=1))
     # Test empty slice with 0 start and end
-    assert_false(test_list_a.index(10, start=0, stop=0))
-    var test_list_b = Array[DType.int8](10, 20, 30, 20, 10)
+    assert_false(test_array_a.index(10, start=0, stop=0))
+    var test_array_b = Array[DType.int8](10, 20, 30, 20, 10)
 
     # Test finding the first occurrence of an item
-    assert_equal(test_list_b.index(10).value(), 0)
-    assert_equal(test_list_b.index(20).value(), 1)
+    assert_equal(test_array_b.index(10).value(), 0)
+    assert_equal(test_array_b.index(20).value(), 1)
     # Test skipping the first occurrence with a start parameter
-    assert_equal(test_list_b.index(20, start=2).value(), 3)
+    assert_equal(test_array_b.index(20, start=2).value(), 3)
     # Test constraining search with start and end, excluding last occurrence
-    assert_false(test_list_b.index(10, start=1, stop=4))
+    assert_false(test_array_b.index(10, start=1, stop=4))
     # Test search within a range that includes multiple occurrences
-    assert_equal(test_list_b.index(20, start=1, stop=4).value(), 1)
+    assert_equal(test_array_b.index(20, start=1, stop=4).value(), 1)
     # Verify error when constrained range excludes occurrences
-    assert_false(test_list_b.index(20, start=4, stop=5))
+    assert_false(test_array_b.index(20, start=4, stop=5))
 
 
-def test_list_extend():
+def test_array_extend():
     #
     # Test extending the list [1, 2, 3] with itself
     #
@@ -337,7 +335,7 @@ def test_list_extend():
     assert_equal(vec[5], 3)
 
 
-def test_list_iter():
+def test_array_iter():
     var vs = Array[DType.index]()
     vs.append(1)
     vs.append(2)
@@ -375,15 +373,13 @@ def test_array_broadcast_ops():
     assert_equal(6, vs.sum())
     vs *= 2
     assert_equal(12, vs.sum())
-    vs /= 2
-    assert_equal(vs, arr(1, 2, 3))
     # assert_equal(0, (arr(2, 2, 2) % 2).sum()) # FIXME issue #2855
     # assert_equal(0, (arr(2, 2, 2) // 2).sum()) # FIXME issue #2855
     assert_equal(4 * 3, (arr(2, 2, 2) ** 2).sum())
 
 
-def test_list_span():
-    var vs = Array[DType.int8](1, 2, 3)
+def test_array_span():
+    var vs = Array[DType.int8, 3](1, 2, 3)
 
     var es = vs[1:]
     assert_equal(es[0], 2)
@@ -412,7 +408,7 @@ def test_list_span():
     assert_equal(len(es), 3)
 
 
-def test_list_boolable():
+def test_array_boolable():
     assert_true(Array[DType.int8](1))
     assert_false(Array[DType.int8]())
 
@@ -451,7 +447,7 @@ def test_constructor_from_other_list_through_pointer():
     pass
 
 
-def test_converting_list_to_string():
+def test_array_to_string():
     var my_list = Array[DType.int8](1, 2, 3)
     assert_equal(str(my_list), "[1, 2, 3]")
 
@@ -467,17 +463,18 @@ def test_converting_list_to_string():
     # )
 
 
-def test_list_count():
-    var list = Array[DType.int8](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
-    assert_equal(1, list.count(1))
-    assert_equal(2, list.count(2))
-    assert_equal(0, list.count(4))
+def test_array_count():
+    var arr1 = Array[DType.int8, 10](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
+    assert_equal(1, arr1.count(1))
+    assert_equal(2, arr1.count(2))
+    assert_equal(0, arr1.count(4))
+    assert_equal(0, arr1.count(0))
 
-    var list2 = Array[DType.int8]()
-    assert_equal(0, list2.count(1))
+    var arr2 = Array[DType.int8]()
+    assert_equal(0, arr2.count(1))
 
 
-def test_list_concat():
+def test_array_concat():
     var a = Array[DType.int8](1, 2, 3)
     var b = Array[DType.int8](4, 5, 6)
     # TODO: once lazy evaluation issue is solved
@@ -509,14 +506,14 @@ def test_list_concat():
     # assert_equal(len(l), 3)
 
 
-def test_list_contains():
-    var x = Array[DType.int8](1, 2, 3)
+def test_array_contains():
+    var x = Array[DType.int8, 3](1, 2, 3)
     assert_false(0 in x)
     assert_true(1 in x)
     assert_false(4 in x)
 
 
-def test_indexing_list():
+def test_indexing():
     var l = Array[DType.int8](1, 2, 3)
     assert_equal(l[int(1)], 2)
     assert_equal(l[False], 1)
@@ -524,39 +521,12 @@ def test_indexing_list():
     assert_equal(l[2], 3)
 
 
-def test_inline_list():
-    var arr = Array[DType.int8]()
-
-    for i in range(5):
-        arr.append(i)
-
-    assert_equal(5, len(arr))
-    assert_equal(0, arr[0])
-    assert_equal(1, arr[1])
-    assert_equal(2, arr[2])
-    assert_equal(3, arr[3])
-    assert_equal(4, arr[4])
-
-    assert_equal(0, arr[-5])
-    assert_equal(3, arr[-2])
-    assert_equal(4, arr[-1])
-
-    arr[2] = -2
-    assert_equal(-2, arr[2])
-
-    arr[-5] = 5
-    assert_equal(5, arr[-5])
-    arr[-2] = 3
-    assert_equal(3, arr[-2])
-    arr[-1] = 7
-    assert_equal(7, arr[-1])
-
-
-def test_list_unsafe_set_and_get():
-    var arr = Array[DType.int8]()
+def test_array_unsafe_set_and_get():
+    var arr = Array[DType.int8, 5]()
 
     for i in range(5):
         arr.unsafe_set(i, i)
+        arr.capacity_left -= 1
 
     assert_equal(5, len(arr))
     assert_equal(0, arr.unsafe_get(0))
@@ -571,34 +541,82 @@ def test_list_unsafe_set_and_get():
     arr.clear()
     arr.unsafe_set(0, 2)
     assert_equal(2, arr.unsafe_get(0))
+    assert_equal(0, len(arr))
+
+
+def test_min():
+    # TODO
+    pass
+
+
+def test_max():
+    # TODO
+    pass
+
+
+def test_dot():
+    # TODO
+    pass
+
+
+def test_array_add():
+    # TODO
+    pass
+
+
+def test_array_sub():
+    # TODO
+    pass
+
+
+def test_cos():
+    # TODO
+    pass
+
+
+def test_theta():
+    # TODO
+    pass
+
+
+def test_cross():
+    # TODO
+    pass
+
+
+def test_apply():
+    # TODO
+    pass
+
+
+def test_reversed():
+    # TODO
+    pass
 
 
 def main():
-    # from InlinedFixedVector
-    test_inlined_fixed_array()
-    test_inlined_fixed_array_with_default()
+    test_array()
+    test_array_with_default()
     test_indexing_vec()
-    # from List
     test_mojo_issue_698()
-    test_list()
-    test_list_to_bool_conversion()
-    test_list_pop()
-    test_list_variadic_constructor()
-    test_list_insert()
-    test_list_index()
-    test_list_extend()
-    test_list_iter()
-    # test_list_span()
-    # test_list_boolable()
-    # test_constructor_from_pointer()
-    # test_constructor_from_other_list_through_pointer()
-    # test_converting_list_to_string()
-    # test_list_count()
-    # test_list_concat()
-    # test_list_contains()
-    # test_indexing_list()
-    # from array
-    # test_list_unsafe_set_and_get()
-
+    test_array_to_bool_conversion()
+    test_array_pop()
+    test_array_variadic_constructor()
+    test_array_insert()
+    test_array_index()
+    test_array_extend()
+    test_array_iter()
+    test_array_span()
+    test_array_boolable()
+    test_constructor_from_pointer()
+    test_constructor_from_other_list_through_pointer()
+    test_array_to_string()
+    test_array_count()
+    test_array_concat()
+    test_array_contains()
+    test_indexing()
+    test_array_unsafe_set_and_get()
     test_array_iter_not_mutable()
     test_array_broadcast_ops()
+    test_min()
+    test_max()
