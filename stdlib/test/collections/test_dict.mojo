@@ -36,7 +36,7 @@ def test_dict_fromkeys():
 
     for k_v in expected_dict.items():
         var k = k_v[].key
-        var v = k_v[].value
+        var v = k_v[].value.value()[]
         assert_true(k in dict)
         assert_equal(dict[k], v)
 
@@ -53,7 +53,7 @@ def test_dict_fromkeys_optional():
 
     for k_v in expected_dict.items():
         var k = k_v[].key
-        var v = k_v[].value
+        var v = k_v[].value.value()[]
         assert_true(k in dict)
         assert_false(v)
 
@@ -219,7 +219,7 @@ def test_iter_items():
     var sum = 0
     for entry in dict.items():
         keys += entry[].key
-        sum += entry[].value
+        sum += entry[].value.value()[]
 
     assert_equal(keys, "ab")
     assert_equal(sum, 3)
@@ -491,7 +491,7 @@ def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
     sum = 0
     for entry in kwargs.items():
         keys += entry[].key
-        sum += entry[].value
+        sum += entry[].value.value()[]
     assert_equal(keys, "dessertsalad")
     assert_equal(sum, 19)
 
@@ -523,6 +523,18 @@ fn test_clear() raises:
     some_dict.clear()
     assert_equal(len(some_dict), 0)
 
+def issue_2756():
+    var context = Dict[String, String]()
+    context["a"] = "b"
+    print(context.pop("a"))
+
+    var context_assert = Dict[String, String]()
+    context_assert["a"] = "b"
+    assert_equal(context_assert.pop("a"),"b")
+
+    var context2 = Dict[String, StringLiteral]()
+    context2["a"] = "b"
+    assert_equal(context2.pop("a"),"b")
 
 def main():
     test_dict()
@@ -534,3 +546,4 @@ def main():
     test_bool_conversion()
     test_find_get()
     test_clear()
+    issue_2756()

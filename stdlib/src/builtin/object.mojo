@@ -575,7 +575,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
                 "'"
                 + str(entry[].key)
                 + "' = "
-                + str(object(entry[].value.copy()))
+                + str(object(entry[].value.value()[].copy()))
             )
             print_sep = True
         res += "}"

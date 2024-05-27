@@ -308,7 +308,7 @@ struct PythonObject(
         self.py_object = cpython.PyDict_New()
         for entry in value.items():
             var result = cpython.PyDict_SetItem(
-                self.py_object, entry[].key.py_object, entry[].value.py_object
+                self.py_object, entry[].key.py_object, entry[].value.value()[].py_object
             )
 
     fn __copyinit__(inout self, existing: Self):
@@ -1101,7 +1101,7 @@ struct PythonObject(
         for entry in kwargs.items():
             var key = cpython.toPython(entry[].key._strref_dangerous())
             var result = cpython.PyDict_SetItem(
-                dict_obj, key, entry[].value.py_object
+                dict_obj, key, entry[].value.value()[].py_object
             )
             if result != 0:
                 raise Error("internal error: PyDict_SetItem failed")

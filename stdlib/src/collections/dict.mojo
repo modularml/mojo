@@ -195,7 +195,7 @@ struct _DictValueIter[
         var entry_ref = self.iter.__next__()
         # Cast through a pointer to grant additional mutability because
         # _DictEntryIter.next erases it.
-        return UnsafePointer.address_of(entry_ref[].value)[]
+        return UnsafePointer.address_of(entry_ref[].value.value())[]
 
     fn __len__(self) -> Int:
         return self.iter.__len__()
@@ -214,7 +214,7 @@ struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
     """`key.__hash__()`, stored so hashing isn't re-computed during dict lookup."""
     var key: K
     """The unique key for the entry."""
-    var value: V
+    var value: Optional[V]
     """The value associated with the key."""
 
     fn __init__(inout self, owned key: K, owned value: V):
@@ -682,7 +682,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
         var i = 0
         for key_value in self.items():
-            result += repr(key_value[].key) + ": " + repr(key_value[].value)
+            result += repr(key_value[].key) + ": " + repr(key_value[].value.value()[])
             if i < len(self) - 1:
                 result += ", "
             i += 1
@@ -739,7 +739,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         if found:
             var entry = self[]._entries.__get_ref(index)
             debug_assert(entry[].__bool__(), "entry in index must be full")
-            return Reference(entry[].value()[].value)
+            return entry[].value()[].value.value()
         raise "KeyError"
 
     fn get(self, key: K) -> Optional[V]:
@@ -792,9 +792,11 @@ struct Dict[K: KeyElement, V: CollectionElement](
             var entry = self._entries.__get_ref(index)
             debug_assert(entry[].__bool__(), "entry in index must be full")
             var entry_value = entry[].unsafe_take()
+
             entry[] = None
             self.size -= 1
-            return entry_value.value^
+            var ret_val = entry_value.value.unsafe_take()
+            return ret_val^
         elif default:
             return default.value()[]
         raise "KeyError"
@@ -845,7 +847,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             other: The dictionary to update from.
         """
         for entry in other.items():
-            self[entry[].key] = entry[].value
+            self[entry[].key] = entry[].value.value()[]
 
     fn clear(inout self):
         """Remove all elements from the dictionary."""
