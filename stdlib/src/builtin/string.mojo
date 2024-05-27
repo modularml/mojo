@@ -24,11 +24,9 @@ from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 from utils import StringRef, StaticIntTuple, Span, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
-from .io import _snprintf
-
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # ord
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn ord(s: String) -> Int:
@@ -66,17 +64,17 @@ fn ord(s: String) -> Int:
     return result
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # chr
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn chr(c: Int) -> String:
     """Returns a string based on the given Unicode code point.
 
-    Returns the string representing a character whose code point is the integer `c`.
-    For example, `chr(97)` returns the string `"a"`. This is the inverse of the `ord()`
-    function.
+    Returns the string representing a character whose code point is the integer
+    `c`. For example, `chr(97)` returns the string `"a"`. This is the inverse of
+    the `ord()` function.
 
     Args:
         c: An integer that represents a code point.
@@ -118,9 +116,9 @@ fn chr(c: Int) -> String:
     return String(p.bitcast[DType.uint8](), num_bytes + 1)
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # ascii
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -183,28 +181,16 @@ fn ascii(value: String) -> String:
     return value.__repr__()
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # strtol
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
 fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
-    """Parses the given string as an integer in the given base and returns that value.
+    """Implementation of `atol` for StringRef inputs.
 
-    For example, `atol("19")` returns `19`. If the given string cannot be parsed
-    as an integer value, an error is raised. For example, `atol("hi")` raises an
-    error.
-
-    If base is 0 the the string is parsed as an Integer literal,
-    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
-
-    Args:
-        str_ref: A string to be parsed as an integer in the given base.
-        base: Base used for conversion, value must be between 2 and 36, or 0.
-
-    Returns:
-        An integer value that represents the string, or otherwise raises.
+    Please see its docstring for details.
     """
     if (base != 0) and (base < 2 or base > 36):
         raise Error("Base must be >= 2 and <= 36, or 0.")
@@ -369,14 +355,14 @@ fn _identify_base(str_ref: StringRef, start: Int) -> Tuple[Int, Int]:
 
 
 fn atol(str: String, base: Int = 10) raises -> Int:
-    """Parses the given string as an integer in the given base and returns that value.
+    """Parses and returns the given string as an integer in the given base.
 
-    For example, `atol("19")` returns `19`. If the given string cannot be parsed
-    as an integer value, an error is raised. For example, `atol("hi")` raises an
-    error.
+    For example, `atol("19")` returns `19`. If base is 0 the the string is
+    parsed as an Integer literal, see: https://docs.python.org/3/reference/lexical_analysis.html#integers.
 
-    If base is 0 the the string is parsed as an Integer literal,
-    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+    Raises:
+        If the given string cannot be parsed as an integer value. For example in
+        `atol("hi")`.
 
     Args:
         str: A string to be parsed as an integer in the given base.
@@ -394,17 +380,9 @@ fn _atof_error(str_ref: StringRef) -> Error:
 
 @always_inline
 fn _atof(str_ref: StringRef) raises -> Float64:
-    """Parses the given string as a floating point and returns that value.
+    """Implementation of `atof` for StringRef inputs.
 
-    For example, `atof("2.25")` returns `2.25`. If the given string cannot be parsed
-    as an float value, an error is raised. For example, `atof("hi")` raises an
-    error.
-
-    Args:
-        str_ref: A string to be parsed as a floating point.
-
-    Returns:
-        An float value that represents the string, or otherwise raises.
+    Please see its docstring for details.
     """
     if not str_ref:
         raise Error(_atof_error(str_ref))
@@ -499,9 +477,11 @@ fn _atof(str_ref: StringRef) raises -> Float64:
 fn atof(str: String) raises -> Float64:
     """Parses the given string as a floating point and returns that value.
 
-    For example, `atof("2.25")` returns `2.25`. If the given string cannot be parsed
-    as an floating point value, an error is raised. For example, `atof("hi")` raises an
-    error.
+    For example, `atof("2.25")` returns `2.25`.
+
+    Raises:
+        If the given string cannot be parsed as an floating point value, for
+        example in `atof("hi")`.
 
     Args:
         str: A string to be parsed as a floating point.
@@ -512,9 +492,9 @@ fn atof(str: String) raises -> Float64:
     return _atof(str._strref_dangerous())
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # isdigit
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn isdigit(c: UInt8) -> Bool:
@@ -531,15 +511,16 @@ fn isdigit(c: UInt8) -> Bool:
     return ord_0 <= int(c) <= ord_9
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # isupper
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn isupper(c: UInt8) -> Bool:
     """Determines whether the given character is an uppercase character.
-       This currently only respects the default "C" locale, i.e. returns
-       True only if the character specified is one of ABCDEFGHIJKLMNOPQRSTUVWXYZ.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
 
     Args:
         c: The character to check.
@@ -556,15 +537,16 @@ fn _is_ascii_uppercase(c: UInt8) -> Bool:
     return ord_a <= int(c) <= ord_z
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # islower
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn islower(c: UInt8) -> Bool:
     """Determines whether the given character is an lowercase character.
-       This currently only respects the default "C" locale, i.e. returns
-       True only if the character specified is one of abcdefghijklmnopqrstuvwxyz.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "abcdefghijklmnopqrstuvwxyz".
 
     Args:
         c: The character to check.
@@ -581,9 +563,9 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
     return ord_a <= int(c) <= ord_z
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # _isspace
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn _get_spaces_table() -> InlineArray[UInt8, 256]:
@@ -602,23 +584,23 @@ alias _SPACES_TABLE = _get_spaces_table()
 
 fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
-    This only respects the default "C" locale, i.e. returns True only
-    if the character specified is one of " \\t\\n\\r\\f\\v".
-    For full Python support use `String.isspace()`.
+
+    This only respects the default "C" locale, i.e. returns True only if the
+    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
+    to Python, use `String.isspace()`.
 
     Args:
         c: The character to check.
 
     Returns:
-        True if the character is one of the whitespace characters
-            listed above, otherwise False.
+        True iff the character is one of the whitespace characters listed above.
     """
     return _SPACES_TABLE[int(c)]
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # isprintable
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn isprintable(c: UInt8) -> Bool:
@@ -635,9 +617,11 @@ fn isprintable(c: UInt8) -> Bool:
     return ord_space <= int(c) <= ord_tilde
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # String
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
+
+
 struct String(
     Sized,
     Stringable,
@@ -665,11 +649,16 @@ struct String(
     alias HEX_DIGITS = String.DIGITS + String("abcdef") + String("ABCDEF")
     alias OCT_DIGITS = String("01234567")
     alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
-    alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
+    alias PRINTABLE = (
+        String.DIGITS
+        + String.ASCII_LETTERS
+        + String.PUNCTUATION
+        + String.WHITESPACE
+    )
 
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Life cycle methods
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     @always_inline
     fn __init__(inout self, owned impl: List[UInt8]):
@@ -826,9 +815,9 @@ struct String(
         """
         self._buffer = existing._buffer^
 
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Factory dunders
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     @staticmethod
     fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
@@ -840,7 +829,7 @@ struct String(
 
         Parameters:
             Ts: The types of the arguments to format. Each type must be satisfy
-              `Formattable`.
+                `Formattable`.
 
         Returns:
             A string formed by formatting the argument sequence.
@@ -888,9 +877,9 @@ struct String(
 
         return String(buff^)
 
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Operator dunders
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn __getitem__(self, idx: Int) -> String:
         """Gets the character at the specified position.
@@ -978,7 +967,7 @@ struct String(
             rhs: The other String to compare against.
 
         Returns:
-            True if this String is less than or equal to the RHS String and False otherwise.
+            True iff this String is less than or equal to the RHS String.
         """
         return not (rhs < self)
 
@@ -990,7 +979,7 @@ struct String(
             rhs: The other String to compare against.
 
         Returns:
-            True if this String is strictly greater than the RHS String and False otherwise.
+            True iff this String is strictly greater than the RHS String.
         """
         return rhs < self
 
@@ -1002,7 +991,7 @@ struct String(
             rhs: The other String to compare against.
 
         Returns:
-            True if this String is greater than or equal to the RHS String and False otherwise.
+            True iff this String is greater than or equal to the RHS String.
         """
         return not (self < rhs)
 
@@ -1106,8 +1095,6 @@ struct String(
     @always_inline
     fn __repr__(self) -> String:
         """Return a Mojo-compatible representation of the `String` instance.
-
-        You don't need to call this method directly, use `repr(my_string)` instead.
 
         Returns:
             A new representation of the string.
@@ -1495,15 +1482,16 @@ struct String(
         var current_offset = 0
         while True:
             var loc = self.find(delimiter, current_offset)
-            # delimiter not found, so add the search slice from where we're currently at
+            # The delimiter was not found, so add the search slice from where
+            # we're currently at.
             if loc == -1:
                 output.append(self[current_offset:])
                 break
 
-            # We found a delimiter, so add the preceding string slice
+            # We found a delimiter, so add the preceding string slice.
             output.append(self[current_offset:loc])
 
-            # Advance our search offset past the delimiter
+            # Advance our search offset past the delimiter.
             current_offset = loc + len(delimiter)
 
         return output
@@ -1513,11 +1501,11 @@ struct String(
         if replaced by `new`.
 
         Args:
-          old: The substring to replace.
-          new: The substring to replace with.
+            old: The substring to replace.
+            new: The substring to replace with.
 
         Returns:
-          The string where all occurrences of `old` are replaced with `new`.
+            The string where all occurrences of `old` are replaced with `new`.
         """
         if not old:
             return self._interleave(new)
@@ -1566,13 +1554,14 @@ struct String(
         return String(res^)
 
     fn strip(self, chars: String = String.WHITESPACE) -> String:
-        """Return a copy of the string with leading and trailing characters removed.
+        """Return a copy of the string with leading and trailing characters
+        removed.
 
         Args:
             chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no leading or trailing characters.
+            A copy of the string with no leading or trailing characters.
         """
 
         return self.lstrip(chars).rstrip(chars)
@@ -1584,7 +1573,7 @@ struct String(
             chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no trailing characters.
+            A copy of the string with no trailing characters.
         """
 
         var r_idx = len(self)
@@ -1600,7 +1589,7 @@ struct String(
             chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no leading characters.
+            A copy of the string with no leading characters.
         """
 
         var l_idx = 0
@@ -1714,8 +1703,9 @@ struct String(
         )
 
     fn removeprefix(self, prefix: String, /) -> String:
-        """If the string starts with the prefix string, return `string[len(prefix):]`.
-        Otherwise, return a copy of the original string.
+        """Returns a new string with the prefix removed if it was present.
+
+        For example:
 
         ```mojo
         print(String('TestHook').removeprefix('Test'))
@@ -1725,18 +1715,20 @@ struct String(
         ```
 
         Args:
-          prefix: The prefix to remove from the string.
+            prefix: The prefix to remove from the string.
 
         Returns:
-          A new string with the prefix removed if it was present.
+            `string[len(prefix):]` if the string starts with the prefix string,
+            or a copy of the original string otherwise.
         """
         if self.startswith(prefix):
             return self[len(prefix) :]
         return self
 
     fn removesuffix(self, suffix: String, /) -> String:
-        """If the string ends with the suffix string, return `string[:-len(suffix)]`.
-        Otherwise, return a copy of the original string.
+        """Returns a new string with the suffix removed if it was present.
+
+        For example:
 
         ```mojo
         print(String('TestHook').removesuffix('Hook'))
@@ -1746,10 +1738,11 @@ struct String(
         ```
 
         Args:
-          suffix: The suffix to remove from the string.
+            suffix: The suffix to remove from the string.
 
         Returns:
-          A new string with the suffix removed if it was present.
+            `string[:-len(suffix)]` if the string ends with the suffix string,
+            or a copy of the original string otherwise.
         """
         if self.endswith(suffix):
             return self[: -len(suffix)]
@@ -1791,13 +1784,14 @@ struct String(
         return String(buf^)
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn _toggle_ascii_case(char: UInt8) -> UInt8:
-    """Assuming char is a cased ASCII character, this function will return the opposite-cased letter
+    """Assuming char is a cased ASCII character, this function will return the
+    opposite-cased letter.
     """
 
     # ASCII defines A-Z and a-z as differing only in their 6th bit,
