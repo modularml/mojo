@@ -1042,6 +1042,29 @@ def test_abs():
     )
 
 
+def test_equatable():
+    var s1 = SIMD[DType.int32, 2](1, 2)
+    var s2 = SIMD[DType.int32, 2](1, 6)
+    var s3 = SIMD[DType.int32, 2](6, 2)
+    var s4 = SIMD[DType.int32, 2](6, 6)
+
+    assert_equal(s1 == s1, SIMD[DType.bool, 2](True, True))
+    assert_equal(s1 != s1, SIMD[DType.bool, 2](False, False))
+    assert_equal(s1, s1)
+
+    assert_equal(s1 == s2, SIMD[DType.bool, 2](True, False))
+    assert_equal(s1 != s2, SIMD[DType.bool, 2](False, True))
+    assert_not_equal(s1, s2)
+
+    assert_equal(s1 == s3, SIMD[DType.bool, 2](False, True))
+    assert_equal(s1 != s3, SIMD[DType.bool, 2](True, False))
+    assert_not_equal(s1, s3)
+
+    assert_equal(s1 == s4, SIMD[DType.bool, 2](False, False))
+    assert_equal(s1 != s4, SIMD[DType.bool, 2](True, True))
+    assert_not_equal(s1, s4)
+
+
 def test_min_max_clamp():
     alias F = SIMD[DType.float32, 4]
 
@@ -1351,3 +1374,4 @@ def main():
     test_trunc()
     test_truthy()
     test_reduce()
+    test_equatable()
