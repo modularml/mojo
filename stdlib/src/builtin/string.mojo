@@ -1506,23 +1506,7 @@ struct String(
           A copy of the string with no leading or trailing characters.
         """
 
-        return self.lstrip(chars).rstrip(chars)
-
-    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
-        """Return a copy of the string with trailing characters removed.
-
-        Args:
-            chars: A set of characters to be removed. Defaults to whitespace.
-
-        Returns:
-          A copy of the string with no trailing characters.
-        """
-
-        var r_idx = len(self)
-        while r_idx > 0 and self[r_idx - 1] in chars:
-            r_idx -= 1
-
-        return self[:r_idx]
+        return self._strref_dangerous().lstrip(chars).rstrip(chars)
 
     fn lstrip(self, chars: String = String.WHITESPACE) -> String:
         """Return a copy of the string with leading characters removed.
@@ -1534,11 +1518,19 @@ struct String(
           A copy of the string with no leading characters.
         """
 
-        var l_idx = 0
-        while l_idx < len(self) and self[l_idx] in chars:
-            l_idx += 1
+        return self._strref_dangerous().lstrip(chars)
 
-        return self[l_idx:]
+    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
+        """Return a copy of the string with trailing characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+          A copy of the string with no trailing characters.
+        """
+
+        return self._strref_dangerous().rstrip(chars)
 
     fn __hash__(self) -> Int:
         """Hash the underlying buffer using builtin hash.

@@ -486,22 +486,48 @@ struct StringRef(
 
         return StringRef(data, length)
 
-    fn strip(self) -> StringRef:
+    fn strip(self, chars: String = String.WHITESPACE) -> StringRef:
         """Gets a StringRef with leading and trailing whitespaces removed.
 
         For example, `"  mojo  "` returns `"mojo"`.
 
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
         Returns:
             A StringRef with leading and trailing whitespaces removed.
         """
-        var start: Int = 0
-        var end: Int = len(self)
-        var ptr = self.unsafe_ptr()
-        while start < end and isspace(int(ptr[start])):
+        return self.lstrip(chars).rstrip(chars)
+
+    fn lstrip(self, chars: String = String.WHITESPACE) -> StringRef:
+        """Return a StringRef with leading characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+          A StringRef with no leading characters.
+        """
+        var start = 0
+        while start < len(self) and self[start] in chars:
             start += 1
-        while end > start and isspace(int(ptr[end - 1])):
+
+        return StringRef(self.unsafe_ptr() + start, len(self) - start)
+
+    fn rstrip(self, chars: String = String.WHITESPACE) -> StringRef:
+        """Return a StringRef with trailing characters removed.
+
+        Args:
+            chars: A set of characters to be removed. Defaults to whitespace.
+
+        Returns:
+          A StringRef with no trailing characters.
+        """
+        var end = len(self)
+        while end > 0 and self[end - 1] in chars:
             end -= 1
-        return StringRef(ptr + start, end - start)
+
+        return StringRef(self.unsafe_ptr(), end)
 
     fn startswith(
         self, prefix: StringRef, start: Int = 0, end: Int = -1

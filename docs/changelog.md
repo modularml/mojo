@@ -420,6 +420,11 @@ what we publish.
 
 - The Mojo Language Server now supports renaming local variables.
 
+- `StringRef` now implements `rstrip()` and `lstrip()` which are used by `strip()`.
+  Custom characters can now be used. `String` delegated to `StringRef`.
+  ([PR #2700](https://github.com/modularml/mojo/pull/2700)
+  by [@fknfilewalker](https://github.com/fknfilewalker))
+
 ### 🦋 Changed
 
 - The `let` keyword has been completely removed from the language. We previously
