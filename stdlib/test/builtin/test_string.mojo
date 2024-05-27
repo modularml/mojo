@@ -744,7 +744,6 @@ fn test_isspace() raises:
             assert_false(val.isspace())
 
     for i in univ_sep_var:
-        print(len(i[]))
         assert_true(i[].isspace())
 
     for i in List[String]("not", "space", "", "s", "a", "c"):
