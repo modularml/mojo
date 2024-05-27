@@ -977,7 +977,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         var v = bitcast[integral_type, size](self)
         return v.cast[dest_type]()
 
-    @always_inline("nodebug")
+    @always_inline
     fn __abs__(self) -> Self:
         """Defines the absolute value operation.
 
@@ -988,14 +988,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if type.is_unsigned() or type.is_bool():
             return self
-
-        @parameter
-        if type.is_floating_point():
+        elif type.is_floating_point():
             alias integral_type = FPUtils[type].integral_type
             var m = self._float_to_bits[integral_type]()
             return (m & (FPUtils[type].sign_mask() - 1))._bits_to_float[type]()
-
-        return (self < 0).select(-self, self)
+        else:
+            return (self < 0).select(-self, self)
 
     fn _floor_ceil_trunc_impl[intrinsic: StringLiteral](self) -> Self:
         constrained[
