@@ -127,11 +127,11 @@ fn max(x: Int, y: Int) -> Int:
     """Gets the maximum of two integers.
 
     Args:
-      x: Integer input to max.
-      y: Integer input to max.
+        x: Integer input to max.
+        y: Integer input to max.
 
     Returns:
-      Maximum of x and y.
+        Maximum of x and y.
     """
     return __mlir_op.`index.maxs`(x.value, y.value)
 
@@ -148,15 +148,15 @@ fn max[
     corresponding elements in x and y.
 
     Parameters:
-      type: The `dtype` of the input and output SIMD vector.
-      simd_width: The width of the input and output SIMD vector.
+        type: The `dtype` of the input and output SIMD vector.
+        simd_width: The width of the input and output SIMD vector.
 
     Args:
-      x: First SIMD vector.
-      y: Second SIMD vector.
+        x: First SIMD vector.
+        y: Second SIMD vector.
 
     Returns:
-      A SIMD vector containing the elementwise maximum of x and y.
+        A SIMD vector containing the elementwise maximum of x and y.
     """
     return x.max(y)
 
@@ -171,11 +171,11 @@ fn min(x: Int, y: Int) -> Int:
     """Gets the minimum of two integers.
 
     Args:
-      x: Integer input to max.
-      y: Integer input to max.
+        x: Integer input to max.
+        y: Integer input to max.
 
     Returns:
-      Minimum of x and y.
+        Minimum of x and y.
     """
     return __mlir_op.`index.mins`(x.value, y.value)
 
@@ -192,15 +192,15 @@ fn min[
     corresponding elements in x and y.
 
     Parameters:
-      type: The `dtype` of the input and output SIMD vector.
-      simd_width: The width of the input and output SIMD vector.
+        type: The `dtype` of the input and output SIMD vector.
+        simd_width: The width of the input and output SIMD vector.
 
     Args:
-      x: First SIMD vector.
-      y: Second SIMD vector.
+        x: First SIMD vector.
+        y: Second SIMD vector.
 
     Returns:
-      A SIMD vector containing the elementwise minimum of x and y.
+        A SIMD vector containing the elementwise minimum of x and y.
     """
     return x.min(y)
 
@@ -212,8 +212,7 @@ fn min[
 
 trait Roundable:
     """
-    The `Roundable` trait describes a type that defines an rounded value
-    operation.
+    The `Roundable` trait describes a type that defines a rounding operation.
 
     Types that conform to `Roundable` will work with the builtin `round`
     function. The round operation always returns the same type as the input.

@@ -749,24 +749,24 @@ struct Int(
         return div, mod
 
     @always_inline("nodebug")
-    fn __pow__(self, rhs: Int) -> Int:
-        """Return pow(self, rhs).
+    fn __pow__(self, exp: Int) -> Int:
+        """Return the value raised to the power of the given exponent.
 
         Computes the power of an integer using the Russian Peasant Method.
 
         Args:
-            rhs: The RHS value.
+            exp: The RHS value.
 
         Returns:
-            The value of `pow(self, rhs)`.
+            The value of `self` raised to the power of `exp`.
         """
-        if rhs < 0:
+        if exp < 0:
             # Not defined for Integers, this should raise an
             # exception.
             return 0
         var res: Int = 1
         var x = self
-        var n = rhs
+        var n = exp
         while n > 0:
             if n & 1 != 0:
                 res *= x

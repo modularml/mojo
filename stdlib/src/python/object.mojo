@@ -928,16 +928,16 @@ struct PythonObject(
         """
         return self._call_single_arg_inplace_method("__lshift__", rhs)
 
-    fn __pow__(self, rhs: PythonObject) raises -> PythonObject:
+    fn __pow__(self, exp: PythonObject) raises -> PythonObject:
         """Raises this object to the power of the given value.
 
         Args:
-            rhs: The exponent.
+            exp: The exponent.
 
         Returns:
             The result of raising this by the given exponent.
         """
-        return self._call_single_arg_method("__pow__", rhs)
+        return self._call_single_arg_method("__pow__", exp)
 
     fn __rpow__(self, lhs: PythonObject) raises -> PythonObject:
         """Reverse power of.
