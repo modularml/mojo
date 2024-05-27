@@ -222,7 +222,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
-        if isspace(buff[pos]):
+        if _isspace(buff[pos]):
             continue
 
         if str_ref[pos] == "-":
@@ -283,13 +283,13 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         elif ord_letter_min[1] <= ord_current <= ord_letter_max[1]:
             result += ord_current - ord_letter_min[1] + 10
             found_valid_chars_after_start = True
-        elif isspace(ord_current):
+        elif _isspace(ord_current):
             has_space_after_number = True
             start = pos + 1
             break
         else:
             raise Error(_atol_error(base, str_ref))
-        if pos + 1 < str_len and not isspace(buff[pos + 1]):
+        if pos + 1 < str_len and not _isspace(buff[pos + 1]):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
@@ -303,7 +303,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     if has_space_after_number:
         for pos in range(start, str_len):
-            if not isspace(buff[pos]):
+            if not _isspace(buff[pos]):
                 raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
@@ -572,7 +572,7 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
-fn isspace(c: UInt8) -> Bool:
+fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
     This only respects the default "C" locale, i.e. returns True only
     if the character specified is one of " \\t\\n\\r\\f\\v".
@@ -1412,16 +1412,12 @@ struct String(
             substr._strref_dangerous(), start=start
         )
 
-    fn isspace[str_len: Int = -1](self) -> Bool:
+    fn isspace(self) -> Bool:
         """Determines whether the given String is a python
         whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
         `" \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
-
-        Parameters:
-            str_len: The length of the string to check. -1 means
-                it is determined at runtime.
 
         Returns:
             True if the String is one of the whitespace characters
@@ -1450,34 +1446,19 @@ struct String(
             var ptr2 = DTypePointer(item2.unsafe_ptr())
             return memcmp(ptr1, ptr2, amnt) == 0
 
-        # TODO: SBO
-        @parameter
-        if str_len == 1:
-            return isspace(self._buffer.unsafe_get(0)[])
-        elif str_len == 3:
+        if len(self) == 1:
+            return _isspace(self._buffer.unsafe_get(0)[])
+        elif len(self) == 3:
             return compare(self._buffer, next_line, 3)
-        elif str_len == 4:
+        elif len(self) == 4:
             return compare(self._buffer, information_sep_four, 4) or compare(
                 self._buffer, information_sep_two, 4
             )
-        elif str_len == 7:
+        elif len(self) == 7:
             return compare(self._buffer, unicode_line_sep, 7) or compare(
                 self._buffer, unicode_paragraph_sep, 7
             )
-        else:
-            if len(self) == 1:
-                return isspace(self._buffer.unsafe_get(0)[])
-            elif len(self) == 3:
-                return compare(self._buffer, next_line, 3)
-            elif len(self) == 4:
-                return compare(
-                    self._buffer, information_sep_four, 4
-                ) or compare(self._buffer, information_sep_two, 4)
-            elif len(self) == 7:
-                return compare(self._buffer, unicode_line_sep, 7) or compare(
-                    self._buffer, unicode_paragraph_sep, 7
-                )
-            return False
+        return False
 
     fn split(self, delimiter: String) raises -> List[String]:
         """Split the string by a delimiter.

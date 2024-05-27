@@ -15,6 +15,7 @@
 from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
+    _isspace,
 )
 from testing import (
     assert_equal,
@@ -684,22 +685,22 @@ fn test_upper() raises:
 
 fn test_isspace() raises:
     # checking true cases
-    assert_true(isspace(ord(" ")))
-    assert_true(isspace(ord("\n")))
-    assert_true(isspace(ord("\t")))
-    assert_true(isspace(ord("\r")))
-    assert_true(isspace(ord("\v")))
-    assert_true(isspace(ord("\f")))
+    assert_true(_isspace(ord(" ")))
+    assert_true(_isspace(ord("\n")))
+    assert_true(_isspace(ord("\t")))
+    assert_true(_isspace(ord("\r")))
+    assert_true(_isspace(ord("\v")))
+    assert_true(_isspace(ord("\f")))
 
     # Checking false cases
-    assert_false(isspace(ord("a")))
-    assert_false(isspace(ord("u")))
-    assert_false(isspace(ord("s")))
-    assert_false(isspace(ord("t")))
-    assert_false(isspace(ord("i")))
-    assert_false(isspace(ord("n")))
-    assert_false(isspace(ord("z")))
-    assert_false(isspace(ord(".")))
+    assert_false(_isspace(ord("a")))
+    assert_false(_isspace(ord("u")))
+    assert_false(_isspace(ord("s")))
+    assert_false(_isspace(ord("t")))
+    assert_false(_isspace(ord("i")))
+    assert_false(_isspace(ord("n")))
+    assert_false(_isspace(ord("z")))
+    assert_false(_isspace(ord(".")))
 
     # test all utf8 and unicode separators
     # 0 is to build a String with null terminator
