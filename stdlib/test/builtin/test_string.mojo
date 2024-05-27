@@ -726,9 +726,9 @@ fn test_isspace() raises:
         String("\r"),
         String("\v"),
         String("\f"),
+        String(next_line),
         String(information_sep_four),
         String(information_sep_two),
-        String(next_line),
         String(unicode_line_sep),
         String(unicode_paragraph_sep),
     )

@@ -585,19 +585,17 @@ fn isspace(c: UInt8) -> Bool:
         True if the character is one of the whitespace characters
             listed above, otherwise False.
     """
-    # alias spaces = SIMD[DType.uint8, 8](
-    #     ord(" "),
-    #     ord("\t"),
-    #     ord("\n"),
-    #     ord("\r"),
-    #     ord("\f"),
-    #     ord("\v"),
-    #     ord("\v"),
-    #     ord("\v"),
-    # )
-    # return (c & spaces).cast[DType.bool]().reduce_or()
-    # TODO: workaround until issue #2844 is solved
-    return String(List[UInt8](c, 0)) in String.WHITESPACE
+    alias spaces = SIMD[DType.uint8, 8](
+        ord(" "),
+        ord("\t"),
+        ord("\n"),
+        ord("\r"),
+        ord("\f"),
+        ord("\v"),
+        ord("\v"),
+        ord("\v"),
+    )
+    return (spaces ^ c).reduce_min() == 0
 
 
 # ===----------------------------------------------------------------------===#
@@ -1446,32 +1444,38 @@ struct String(
         )
         """TODO: \\u2029"""
 
+        @always_inline
+        fn compare(item1: List[UInt8], item2: List[UInt8], amnt: Int) -> Bool:
+            var ptr1 = DTypePointer(item1.unsafe_ptr())
+            var ptr2 = DTypePointer(item2.unsafe_ptr())
+            return memcmp(ptr1, ptr2, amnt) == 0
+
         # TODO: SBO
         @parameter
         if str_len == 1:
-            return self in String.WHITESPACE
+            return isspace(self._buffer.unsafe_get(0)[])
         elif str_len == 3:
-            return self == String(next_line)
+            return compare(self._buffer, next_line, 3)
         elif str_len == 4:
-            return self == String(information_sep_four) or self == String(
-                information_sep_two
+            return compare(self._buffer, information_sep_four, 4) or compare(
+                self._buffer, information_sep_two, 4
             )
         elif str_len == 7:
-            return self == String(unicode_line_sep) or self == String(
-                unicode_paragraph_sep
+            return compare(self._buffer, unicode_line_sep, 7) or compare(
+                self._buffer, unicode_paragraph_sep, 7
             )
         else:
             if len(self) == 1:
-                return self in String.WHITESPACE
+                return isspace(self._buffer.unsafe_get(0)[])
             elif len(self) == 3:
-                return self == String(next_line)
+                return compare(self._buffer, next_line, 3)
             elif len(self) == 4:
-                return self == String(information_sep_four) or self == String(
-                    information_sep_two
-                )
+                return compare(
+                    self._buffer, information_sep_four, 4
+                ) or compare(self._buffer, information_sep_two, 4)
             elif len(self) == 7:
-                return self == String(unicode_line_sep) or self == String(
-                    unicode_paragraph_sep
+                return compare(self._buffer, unicode_line_sep, 7) or compare(
+                    self._buffer, unicode_paragraph_sep, 7
                 )
             return False
 
