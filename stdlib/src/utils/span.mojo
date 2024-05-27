@@ -170,16 +170,16 @@ struct Span[
         r[] = value
 
     @always_inline
-    fn __getitem__(self, slice: Slice) -> Self:
+    fn __getitem__(self, slc: Slice) -> Self:
         """Get a new span from a slice of the current span.
 
         Args:
-            slice: The slice specifying the range of the new subslice.
+            slc: The slice specifying the range of the new subslice.
 
         Returns:
             A new span that points to the same data as the current span.
         """
-        var adjusted_span = self._adjust_span(slice)
+        var adjusted_span = self._adjust_span(slc)
         debug_assert(
             0 <= adjusted_span.start <= self._len
             and 0 <= adjusted_span.end <= self._len,
@@ -187,7 +187,7 @@ struct Span[
         )
         var res = Self(
             unsafe_ptr=(self._data + adjusted_span.start),
-            len=len(adjusted_span),
+            len=adjusted_span.unsafe_indices(),
         )
 
         return res
