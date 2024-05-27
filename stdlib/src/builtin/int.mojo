@@ -248,12 +248,13 @@ struct Int(
     Comparable,
     Floorable,
     Formattable,
+    Indexer,
     Intable,
     KeyElement,
+    Powable,
     Roundable,
     Stringable,
     Truncable,
-    Indexer,
 ):
     """This type represents an integer value."""
 
@@ -749,13 +750,13 @@ struct Int(
         return div, mod
 
     @always_inline("nodebug")
-    fn __pow__(self, exp: Int) -> Int:
+    fn __pow__(self, exp: Self) -> Self:
         """Return the value raised to the power of the given exponent.
 
         Computes the power of an integer using the Russian Peasant Method.
 
         Args:
-            exp: The RHS value.
+            exp: The exponent value.
 
         Returns:
             The value of `self` raised to the power of `exp`.

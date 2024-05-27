@@ -1311,6 +1311,28 @@ def test_reduce():
         test_dtype[DType.bfloat16]()
 
 
+def test_pow():
+    alias inf = FloatLiteral.infinity
+    alias F = SIMD[DType.float32, 4]
+
+    var simd_val = F(0, 1, 2, 3)
+
+    assert_equal(simd_val.__pow__(2.0), F(0.0, 1.0, 4.0, 9.0))
+    assert_equal(simd_val.__pow__(2), F(0.0, 1.0, 4.0, 9.0))
+    assert_equal(simd_val.__pow__(3), F(0.0, 1.0, 8.0, 27.0))
+    assert_equal(simd_val.__pow__(-1), F(inf, 1.0, 0.5, 0.3333333432674408))
+
+    # TODO: enable when math.isclose is open sourced
+    # assert_equal(simd_val.__pow__(0.5), F(0.0, 1.0, 1.41421, 1.73205))
+    # assert_equal(simd_val.__pow__(2, -0.5), F(0.70710, 0.57735, 0.5, 0.44721))
+
+    alias I = SIMD[DType.int32, 4]
+    var simd_val_int = I(0, 1, 2, 3)
+
+    # TODO: extend/improve these tests
+    assert_equal(simd_val_int.__pow__(2), I(0, 1, 4, 9))
+
+
 def main():
     test_abs()
     test_add()
@@ -1336,7 +1358,9 @@ def main():
     test_min_max_clamp()
     test_mod()
     test_mul_with_overflow()
+    test_pow()
     test_radd()
+    test_reduce()
     test_rfloordiv()
     test_rmod()
     test_rotate()
@@ -1350,4 +1374,3 @@ def main():
     test_sub_with_overflow()
     test_trunc()
     test_truthy()
-    test_reduce()

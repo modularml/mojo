@@ -162,9 +162,10 @@ what we publish.
           return Self(round(self.re), round(self.im))
   ```
 
-- The `abs`, `round`, `min`, `max`, and `divmod` functions have moved from
-  `math` to `builtin`, so you no longer need to do
-  `from math import abs, round, min, max, divmod`.
+- User defined types can now also opt in to use the `pow` function by
+  implementing the `__pow__` method (and thus conforming to the new `Powable`
+  trait). As before, these types will also benefit from being able to use the
+  `**` operator.
 
 - Mojo now allows types to opt in to use the `floor()`, `ceil()`, and `trunc()`
   functions in the `math` module by implementing the `__floor__()`,
@@ -434,8 +435,9 @@ what we publish.
   removed `let` declarations but still provided an error message to users. Now,
   it is completely gone from the grammar. Long live `var`!
 
-- The `abs` and `round` functions have moved from `math` to `builtin`, so you no
-  longer need to do `from math import abs, round`.
+- The `abs`, `round`, `min`, `max`, `pow`, and `divmod` functions have moved
+  from `math` to `builtin`, so you no longer need to do
+  `from math import abs, round, min, max, divmod, pow`.
 
 - Many functions returning a pointer type have been unified to have a public
   API function of `unsafe_ptr()`.

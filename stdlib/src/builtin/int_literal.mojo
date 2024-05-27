@@ -326,6 +326,8 @@ struct IntLiteral(
             ](self.value, rhs.value)
         )
 
+    # TODO: implement __pow__
+
     @always_inline("nodebug")
     fn __floordiv__(self, rhs: Self) -> Self:
         """Return `self // rhs`.
