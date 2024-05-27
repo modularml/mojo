@@ -554,6 +554,9 @@ what we publish.
 - The builtin `SIMD` struct no longer conforms to `Indexer`; users must
   explicitly cast `Scalar` values using `int`.
 
+- The overload of `math.pow` taking an integer parameter exponent has been
+  removed.
+
 ### 🛠️ Fixed
 
 - [#1837](https://github.com/modularml/mojo/issues/1837) Fix self-referential
