@@ -433,9 +433,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - The Mojo Language Server now supports renaming local variables.
 
-- Added a new `tempfile` module. Similarly to Python, this will contain
-  utilities for creating and working with temporary files and directories.
-  
+- Added a new `tempfile` module, with `gettempdir` and `mkdtemp` functions.
+  ([PR 2742](https://github.com/modularml/mojo/pull/2742) by [@artemiogr97](https://github.com/artemiogr97))
+
 - Added `SIMD.__repr__` to get the verbose string representation of `SIMD` types.
 ([PR #2728](https://github.com/modularml/mojo/pull/2728) by [@bgreni](https://github.com/bgreni))
 
