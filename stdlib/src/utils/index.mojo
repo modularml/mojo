@@ -838,8 +838,8 @@ fn normalize_idx[
 
     Args:
         idx: The index to normalize.
-        start: The start of the secuence.
-        end: The end of the secuence.
+        start: The start of the sequence.
+        end: The end of the sequence.
 
     Returns:
         The normalized Index.
