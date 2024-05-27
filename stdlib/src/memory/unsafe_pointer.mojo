@@ -185,18 +185,24 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __refitem__(self) -> Self._ref_type:
+    fn __getitem__(
+        self,
+    ) -> ref [MutableStaticLifetime, address_space._value.value] T:
         """Return a reference to the underlying data.
 
         Returns:
             A reference to the value.
         """
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Self._ref_type._mlir_type
-        ](self.address)
+        return __get_litref_as_mvalue(
+            __mlir_op.`lit.ref.from_pointer`[_type = Self._ref_type._mlir_type](
+                self.address
+            )
+        )
 
     @always_inline
-    fn __refitem__(self, offset: Int) -> Self._ref_type:
+    fn __getitem__(
+        self, offset: Int
+    ) -> ref [MutableStaticLifetime, address_space._value.value] T:
         """Return a reference to the underlying data, offset by the given index.
 
         Args:
@@ -205,7 +211,7 @@ struct UnsafePointer[
         Returns:
             An offset reference.
         """
-        return (self + offset).__refitem__()
+        return (self + offset)[]
 
     @always_inline
     fn __add__(self, offset: Int) -> Self:
