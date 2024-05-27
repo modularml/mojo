@@ -283,7 +283,7 @@ Every public function and public struct (including data fields) in the standard
 library must have docstrings (code comments that describe the API behavior).
 Mojo includes tooling to ensure that public functions include docstrings.
 
-You can run `./stdlib/scripts/check-doc-strings.sh` to validate
+You can run `./stdlib/scripts/check-docstrings.py` to validate
 docstrings. If the command exits with a `0` exit code, the docstrings are
 compliant; otherwise, an error will be shown. This is also enforced by the LSP
 with warnings for anything that doesn’t conform, you can generate docstrings

@@ -36,6 +36,11 @@ what we publish.
     get_first_ref(somePair) = 1
   ```
 
+  This approach provides a general way to return an "automatically dereferenced"
+  reference of a given type.  Notably, this eliminates the need for
+  `__refitem__` to exist.  `__refitem__` has thus been removed and replaced with
+  `__getitem__` that returns a reference.
+
 - Mojo has introduced `@parameter for`, a new feature for compile-time
   programming. `@parameter for` defines a for loop where the sequence and the
   induction values in the sequence must be parameter values. For example:
@@ -419,6 +424,9 @@ what we publish.
     ([PR #2710](https://github.com/modularml/mojo/pull/2710) by [@fknfilewalker](https://github.com/fknfilewalker))
 
 - The Mojo Language Server now supports renaming local variables.
+
+- Added a new `tempfile` module. Similarly to Python, this will contain
+  utilities for creating and working with temporary files and directories.
 
 ### 🦋 Changed
 

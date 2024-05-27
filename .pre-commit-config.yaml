@@ -9,7 +9,7 @@ repos:
         stages: [commit]
       - id: check-docstrings
         name: check-docstrings
-        entry: mojo doc --validate-doc-strings stdlib/src
+        entry: python3 ./stdlib/scripts/check-docstrings.py
         language: system
         pass_filenames: false
         stages: [commit]

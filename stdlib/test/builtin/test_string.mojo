@@ -307,7 +307,14 @@ fn test_atol() raises:
     assert_equal(10, atol("A", 16))
     assert_equal(15, atol("f ", 16))
     assert_equal(255, atol(" FF", 16))
+    assert_equal(255, atol(" 0xff ", 16))
+    assert_equal(255, atol(" 0Xff ", 16))
     assert_equal(18, atol("10010", 2))
+    assert_equal(18, atol("0b10010", 2))
+    assert_equal(18, atol("0B10010", 2))
+    assert_equal(10, atol("12", 8))
+    assert_equal(10, atol("0o12", 8))
+    assert_equal(10, atol("0O12", 8))
     assert_equal(35, atol("Z", 36))
 
     # Negative cases

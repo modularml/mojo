@@ -155,6 +155,15 @@ struct AddressSpace(EqualityComparable):
         return self._value
 
     @always_inline("nodebug")
+    fn __mlir_index__(self) -> __mlir_type.index:
+        """Convert to index.
+
+        Returns:
+            The corresponding __mlir_type.index value.
+        """
+        return self._value.value
+
+    @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
         """True if the two address spaces are equal and False otherwise.
 
@@ -185,7 +194,6 @@ struct AddressSpace(EqualityComparable):
 
 
 @value
-@automatically_dereference
 @register_passable("trivial")
 struct Reference[
     type: AnyType,
@@ -233,19 +241,10 @@ struct Reference[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __refitem__(self) -> Self:
+    fn __getitem__(self) -> ref [lifetime, address_space._value.value] type:
         """Enable subscript syntax `ref[]` to access the element.
 
         Returns:
             The MLIR reference for the Mojo compiler to use.
         """
-        return self
-
-    @always_inline("nodebug")
-    fn __mlir_ref__(self) -> Self._mlir_type:
-        """Enable the Mojo compiler to see into `Reference`.
-
-        Returns:
-            The MLIR reference for the Mojo compiler to use.
-        """
-        return self.value
+        return __get_litref_as_mvalue(self.value)
