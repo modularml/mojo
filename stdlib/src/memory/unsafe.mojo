@@ -278,27 +278,33 @@ struct LegacyPointer[
         )
 
     @always_inline("nodebug")
-    fn __refitem__(self) -> Self._ref_type:
-        """Enable subscript syntax `ref[]` to access the element.
+    fn __getitem__(
+        self,
+    ) -> ref [MutableStaticLifetime, address_space._value.value] type:
+        """Enable subscript syntax `ptr[]` to access the element.
 
         Returns:
-            The MLIR reference for the Mojo compiler to use.
+            The reference for the Mojo compiler to use.
         """
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Self._ref_type._mlir_type
-        ](self.address)
+        return __get_litref_as_mvalue(
+            __mlir_op.`lit.ref.from_pointer`[_type = Self._ref_type._mlir_type](
+                self.address
+            )
+        )
 
     @always_inline("nodebug")
-    fn __refitem__(self, offset: Int) -> Self._ref_type:
-        """Enable subscript syntax `ref[idx]` to access the element.
+    fn __getitem__(
+        self, offset: Int
+    ) -> ref [MutableStaticLifetime, address_space._value.value] type:
+        """Enable subscript syntax `ptr[idx]` to access the element.
 
         Args:
             offset: The offset to load from.
 
         Returns:
-            The MLIR reference for the Mojo compiler to use.
+            The reference for the Mojo compiler to use.
         """
-        return (self + offset).__refitem__()
+        return (self + offset)[]
 
     # ===------------------------------------------------------------------=== #
     # Load/Store

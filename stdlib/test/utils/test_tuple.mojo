@@ -131,7 +131,7 @@ def test_array_str():
     assert_equal(arr[1], "hello")
     assert_equal(arr[2], "hey")
 
-    # Test mutating an array through its __refitem__
+    # Test mutating an array through its __getitem__
     arr[0] = "howdy"
     arr[1] = "morning"
     arr[2] = "wazzup"
