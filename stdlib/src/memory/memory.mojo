@@ -64,7 +64,7 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         var s1i = s1.load[width=simd_width](i)
         var s2i = s2.load[width=simd_width](i)
         var diff = s1i != s2i
-        if diff.reduce_or():
+        if any(diff):
             var index = int(
                 diff.select(
                     iota, SIMD[DType.uint8, simd_width](255)
@@ -79,7 +79,7 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
     var s1i = s1.load[width=simd_width](last)
     var s2i = s2.load[width=simd_width](last)
     var diff = s1i != s2i
-    if diff.reduce_or():
+    if any(diff):
         var index = int(
             diff.select(iota, SIMD[DType.uint8, simd_width](255)).reduce_min()
         )
@@ -311,7 +311,7 @@ fn memcpy(dest: DTypePointer, src: __type_of(dest), count: Int):
 
 @always_inline
 fn memcpy[
-    inferred dtype: DType
+    dtype: DType, //
 ](*, dest: UnsafePointer[Scalar[dtype]], src: __type_of(dest), count: Int):
     """Copies a memory area.
 

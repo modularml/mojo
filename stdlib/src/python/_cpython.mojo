@@ -17,7 +17,7 @@ from sys.ffi import DLHandle
 
 from memory import DTypePointer, UnsafePointer
 
-from utils import StringRef, StaticIntTuple
+from utils import StringRef, InlineArray
 
 # https://github.com/python/cpython/blob/d45225bd66a8123e4a30314c627f2586293ba532/Include/compile.h#L7
 alias Py_single_input = 256
@@ -68,7 +68,7 @@ struct PythonVersion:
 
     fn __init__(version: StringRef) -> PythonVersion:
         var version_string = String(version)
-        var components = StaticIntTuple[3]()
+        var components = InlineArray[Int, 3](-1)
         var start = 0
         var next_idx = 0
         var i = 0

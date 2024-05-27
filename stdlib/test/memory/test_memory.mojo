@@ -508,6 +508,16 @@ def test_memcpy_unsafe_pointer():
     assert_equal(list_a[9], 5)
 
 
+def test_indexing():
+    var ptr = DTypePointer[DType.float32].alloc(4)
+    for i in range(4):
+        ptr[i] = i
+
+    assert_equal(ptr[True], 1)
+    assert_equal(ptr[int(2)], 2)
+    assert_equal(ptr[1], 1)
+
+
 def main():
     test_memcpy()
     test_memcpy_dtype()
@@ -526,3 +536,4 @@ def main():
 
     test_dtypepointer_gather()
     test_dtypepointer_scatter()
+    test_indexing()

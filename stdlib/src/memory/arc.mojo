@@ -23,6 +23,7 @@ print(3 == p.get())
 ```
 """
 
+from os.atomic import Atomic
 from memory import UnsafePointer, stack_allocation
 
 
@@ -100,9 +101,7 @@ struct Arc[T: Movable](CollectionElement):
 
     # FIXME: This isn't right - the element should be mutable regardless
     # of whether the 'self' type is mutable.
-    fn __refitem__(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+    fn __getitem__(self: Reference[Self, _, _]) -> ref [self.lifetime] T:
         """Returns a Reference to the managed value.
 
         Returns:
@@ -116,4 +115,4 @@ struct Arc[T: Movable](CollectionElement):
         Returns:
             The UnsafePointer to the underlying memory.
         """
-        return UnsafePointer.address_of(self._inner[].payload)
+        return UnsafePointer.address_of(self._inner[].payload)[]

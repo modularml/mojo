@@ -429,8 +429,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
     #     don't churn and compact on repeated insert/delete, and instead amortize
     #     compaction cost to O(1) amortized cost.
 
+    # Fields
     alias EMPTY = _EMPTY
     alias REMOVED = _REMOVED
+    alias _initial_reservation = 8
 
     var size: Int
     """The number of elements currently stored in the dict."""
@@ -442,12 +444,16 @@ struct Dict[K: KeyElement, V: CollectionElement](
     var _index: _DictIndex
     var _entries: List[Optional[DictEntry[K, V]]]
 
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
     fn __init__(inout self):
         """Initialize an empty dictiontary."""
         self.size = 0
         self._n_entries = 0
-        self._reserved = 8
+        self._reserved = Self._initial_reservation
         self._index = _DictIndex(self._reserved)
         self._entries = Self._new_entries(self._reserved)
 
@@ -463,6 +469,40 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._reserved = existing._reserved
         self._index = existing._index.copy(existing._reserved)
         self._entries = existing._entries
+
+    @staticmethod
+    fn fromkeys(keys: List[K], value: V) -> Self:
+        """Create a new dictionary with keys from list and values set to value.
+
+        Args:
+            keys: The keys to set.
+            value: The value to set.
+
+        Returns:
+            The new dictionary.
+        """
+        var dict = Dict[K, V]()
+        for key in keys:
+            dict[key[]] = value
+        return dict
+
+    @staticmethod
+    fn fromkeys(
+        keys: List[K], value: Optional[V] = None
+    ) -> Dict[K, Optional[V]]:
+        """Create a new dictionary with keys from list and values set to value.
+
+        Args:
+            keys: The keys to set.
+            value: The value to set.
+
+        Returns:
+            The new dictionary.
+        """
+        var dict = Dict[K, Optional[V]]()
+        for key in keys:
+            dict[key[]] = value
+        return dict
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing dictiontary.
@@ -488,6 +528,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._index = existing._index^
         self._entries = existing._entries^
 
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
     fn __getitem__(self, key: K) raises -> V:
         """Retrieve a value out of the dictionary.
 
@@ -502,7 +546,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return self._find_ref(key)[]
 
-    # TODO(MSTDL-452): rename to __refitem__
+    # TODO(MSTDL-452): rename to __getitem__ returning a reference
     fn __get_ref(
         self: Reference[Self, _, _], key: K
     ) raises -> Reference[V, self.is_mutable, self.lifetime]:
@@ -538,6 +582,53 @@ struct Dict[K: KeyElement, V: CollectionElement](
             True if there key exists in the dictionary, False otherwise.
         """
         return self.find(key).__bool__()
+
+    fn __iter__(
+        self: Reference[Self, _, _],
+    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
+        """Iterate over the dict's keys as immutable references.
+
+        Returns:
+            An iterator of immutable references to the dictionary keys.
+        """
+        return _DictKeyIter(_DictEntryIter(0, 0, self))
+
+    fn __reversed__(
+        self: Reference[Self, _, _]
+    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime, False]:
+        """Iterate backwards over the dict keys, returning immutable references.
+
+        Returns:
+            A reversed iterator of immutable references to the dict keys.
+        """
+        return _DictKeyIter(
+            _DictEntryIter[forward=False](self[]._reserved - 1, 0, self)
+        )
+
+    fn __or__(self, other: Self) -> Self:
+        """Merge self with other and return the result as a new dict.
+
+        Args:
+            other: The dictionary to merge with.
+
+        Returns:
+            The result of the merge.
+        """
+        var result = Dict(self)
+        result.update(other)
+        return result^
+
+    fn __ior__(inout self, other: Self):
+        """Merge self with other in place.
+
+        Args:
+            other: The dictionary to merge with.
+        """
+        self.update(other)
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
 
     fn __len__(self) -> Int:
         """The number of elements currently stored in the dictionary."""
@@ -584,7 +675,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
             A string representation of the Dict.
         """
         var minimum_capacity = self._minimum_size_of_string_representation()
-        var result = String(List[UInt8](capacity=minimum_capacity))
+        var string_buffer = List[UInt8](capacity=minimum_capacity)
+        string_buffer.append(0)  # Null terminator
+        var result = String(string_buffer^)
         result += "{"
 
         var i = 0
@@ -595,6 +688,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
             i += 1
         result += "}"
         return result
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     fn _minimum_size_of_string_representation(self) -> Int:
         # we do a rough estimation of the minimum number of chars that we'll see
@@ -702,16 +799,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
             return default.value()[]
         raise "KeyError"
 
-    fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
-        """Iterate over the dict's keys as immutable references.
-
-        Returns:
-            An iterator of immutable references to the dictionary keys.
-        """
-        return _DictKeyIter(_DictEntryIter(0, 0, self))
-
     fn keys(
         self: Reference[Self, _, _]
     ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
@@ -760,26 +847,13 @@ struct Dict[K: KeyElement, V: CollectionElement](
         for entry in other.items():
             self[entry[].key] = entry[].value
 
-    fn __or__(self, other: Self) -> Self:
-        """Merge self with other and return the result as a new dict.
-
-        Args:
-            other: The dictionary to merge with.
-
-        Returns:
-            The result of the merge.
-        """
-        var result = Dict(self)
-        result.update(other)
-        return result^
-
-    fn __ior__(inout self, other: Self):
-        """Merge self with other in place.
-
-        Args:
-            other: The dictionary to merge with.
-        """
-        self.update(other)
+    fn clear(inout self):
+        """Remove all elements from the dictionary."""
+        self.size = 0
+        self._n_entries = 0
+        self._reserved = Self._initial_reservation
+        self._index = _DictIndex(self._reserved)
+        self._entries = Self._new_entries(self._reserved)
 
     @staticmethod
     @always_inline
@@ -886,18 +960,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
         self._n_entries = self.size
 
-    fn __reversed__(
-        self: Reference[Self, _, _]
-    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime, False]:
-        """Iterate backwards over the dict keys, returning immutable references.
-
-        Returns:
-            A reversed iterator of immutable references to the dict keys.
-        """
-        return _DictKeyIter(
-            _DictEntryIter[forward=False](self[]._reserved - 1, 0, self)
-        )
-
 
 struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     """Container used to pass owned variadic keyword arguments to functions.
@@ -910,9 +972,14 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         V: The value type of the dictionary. Currently must be CollectionElement.
     """
 
+    # Fields
     alias key_type = String
 
     var _dict: Dict[Self.key_type, V]
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self):
         """Initialize an empty keyword dictionary."""
@@ -933,6 +1000,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
             existing: The existing keyword dictionary.
         """
         self._dict = existing._dict^
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __getitem__(self, key: Self.key_type) raises -> V:
@@ -959,6 +1030,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         self._dict[key] = value
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     @always_inline("nodebug")
     fn __contains__(self, key: Self.key_type) -> Bool:
         """Check if a given key is in the keyword dictionary or not.
@@ -976,6 +1051,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn __len__(self) -> Int:
         """The number of elements currently stored in the keyword dictionary."""
         return len(self._dict)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn find(self, key: Self.key_type) -> Optional[V]:

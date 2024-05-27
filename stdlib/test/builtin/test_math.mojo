@@ -15,6 +15,31 @@
 from testing import assert_equal
 
 
+def test_abs():
+    assert_equal(0, abs(0))
+    assert_equal(1, abs(1))
+    assert_equal(1, abs(-1))
+
+    var lhs = SIMD[DType.int32, 4](1, -2, 3, -4)
+    var expected = SIMD[DType.int32, 4](1, 2, 3, 4)
+    assert_equal(expected, abs(lhs))
+
+
+def test_divmod():
+    var t = divmod(0, 1)
+    assert_equal(0, t[0])
+    assert_equal(0, t[1])
+    t = divmod(1, 1)
+    assert_equal(1, t[0])
+    assert_equal(0, t[1])
+    t = divmod(1, 2)
+    assert_equal(0, t[0])
+    assert_equal(1, t[1])
+    t = divmod(4, 3)
+    assert_equal(1, t[0])
+    assert_equal(1, t[1])
+
+
 def test_min():
     assert_equal(0, min(0, 1))
     assert_equal(1, min(1, 42))
@@ -38,17 +63,25 @@ def test_max():
 
 
 def test_round():
+    assert_equal(0, round(0.0))
+    assert_equal(1, round(1.0))
+    assert_equal(1, round(1.1))
     assert_equal(1, round(1.4))
     assert_equal(2, round(1.5))
     assert_equal(2, round(2.5))
+    assert_equal(2, round(2.0))
     assert_equal(1, round(1.4, 0))
     assert_equal(1.5, round(1.5, 1))
     assert_equal(1.61, round(1.613, 2))
 
+    var lhs = SIMD[DType.float32, 4](1.1, 1.5, 1.9, 2.0)
+    var expected = SIMD[DType.float32, 4](1.0, 2.0, 2.0, 2.0)
+    assert_equal(expected, round(lhs))
+
 
 def main():
-    test_min()
+    test_abs()
+    test_divmod()
     test_max()
-    # TODO: add tests for abs, divmod, round. These tests should be simple; they
-    # test the free functions, so it's not needed to cover all corner cases of
-    # the underlying implementations.
+    test_min()
+    test_round()

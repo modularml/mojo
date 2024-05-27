@@ -289,11 +289,8 @@ struct LegacyPointer[
         ](self.address)
 
     @always_inline("nodebug")
-    fn __refitem__[T: Intable](self, offset: T) -> Self._ref_type:
+    fn __refitem__(self, offset: Int) -> Self._ref_type:
         """Enable subscript syntax `ref[idx]` to access the element.
-
-        Parameters:
-            T: The Intable type of the offset.
 
         Args:
             offset: The offset to load from.
@@ -714,12 +711,9 @@ struct DTypePointer[
         return LegacyPointer.address_of(arg[])
 
     @always_inline("nodebug")
-    fn __getitem__[T: Intable](self, offset: T) -> Scalar[type]:
+    fn __getitem__(self, offset: Int) -> Scalar[type]:
         """Loads a single element (SIMD of size 1) from the pointer at the
         specified index.
-
-        Parameters:
-            T: The Intable type of the offset.
 
         Args:
             offset: The offset to load from.
@@ -730,11 +724,8 @@ struct DTypePointer[
         return self.load(offset)
 
     @always_inline("nodebug")
-    fn __setitem__[T: Intable](self, offset: T, val: Scalar[type]):
+    fn __setitem__(self, offset: Int, val: Scalar[type]):
         """Stores a single element value at the given offset.
-
-        Parameters:
-            T: The Intable type of the offset.
 
         Args:
             offset: The offset to store to.

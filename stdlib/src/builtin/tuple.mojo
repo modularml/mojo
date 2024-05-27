@@ -23,6 +23,8 @@ from memory.unsafe_pointer import (
     move_pointee,
 )
 
+from sys.intrinsics import _type_is_eq
+
 # ===----------------------------------------------------------------------===#
 # Tuple
 # ===----------------------------------------------------------------------===#
@@ -148,11 +150,19 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         return Self.__len__()
 
     @always_inline("nodebug")
-    fn __refitem__[
+    fn __getitem__[
         idx: Int
-    ](self: Reference[Self, _, _]) -> Reference[
-        element_types[idx.value], self.is_mutable, self.lifetime
+    ](self: Reference[Self, _, _]) -> ref [self.lifetime] element_types[
+        idx.value
     ]:
+        """Get a reference to an element in the tuple.
+
+        Parameters:
+            idx: The element to return.
+
+        Returns:
+            A referece to the specified element.
+        """
         # Return a reference to an element at the specified index, propagating
         # mutability of self.
         var storage_kgen_ptr = UnsafePointer.address_of(self[].storage).address
@@ -178,3 +188,48 @@ struct Tuple[*element_types: Movable](Sized, Movable):
             The tuple element at the requested index.
         """
         return rebind[T](self[i])
+
+    @always_inline("nodebug")
+    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
+        """Verify if a given value is present in the tuple.
+
+        ```mojo
+        var x = Tuple(1,2,True)
+        if 1 in x: print("x contains 1")
+        ```
+
+        Args:
+            value: The value to find.
+
+        Parameters:
+            T: The type of the value argument. Must implement the
+              trait `ComparableCollectionElement`.
+
+        Returns:
+            True if the value is contained in the tuple, False otherwise.
+        """
+
+        @parameter
+        fn T_in_ts() -> Bool:
+            @parameter
+            for i in range(len(VariadicList(element_types))):
+
+                @parameter
+                if _type_is_eq[element_types[i], T]():
+                    return True
+            return False
+
+        @parameter
+        if not T_in_ts():
+            return False
+
+        @parameter
+        for i in range(len(VariadicList(element_types))):
+
+            @parameter
+            if _type_is_eq[T, element_types[i]]():
+                var elt_ptr = UnsafePointer.address_of(self[i]).bitcast[T]()
+                if elt_ptr[].__eq__(value):
+                    return True
+
+        return False

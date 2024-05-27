@@ -10,8 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# REQUIRES: disabled
-# https://github.com/modularml/mojo/issues/2369
 # RUN: %mojo %s
 
 from testing import assert_equal

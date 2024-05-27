@@ -22,6 +22,7 @@ from utils import StaticTuple
 from memory import Pointer
 
 from utils import unroll
+from sys.intrinsics import _type_is_eq
 
 # ===----------------------------------------------------------------------===#
 # Utilities
@@ -88,12 +89,10 @@ fn _create_array[
             _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
         ]()
 
-        @always_inline
         @parameter
-        fn fill[idx: Int]():
+        for idx in range(size):
             _set_array_elem[idx, size, type](lst[idx], array)
 
-        unroll[fill, size]()
         return array
 
 
@@ -256,6 +255,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         size: The size of the array.
     """
 
+    # Fields
     alias type = __mlir_type[
         `!pop.array<`, size.value, `, `, Self.ElementType, `>`
     ]
@@ -263,7 +263,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     """The underlying storage for the array."""
 
     # ===------------------------------------------------------------------===#
-    # Initializers
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
@@ -331,48 +331,21 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         @parameter
         for i in range(size):
-            var ref = self._get_reference_unsafe(i)
+            var eltref = self._get_reference_unsafe(i)
             initialize_pointee_move(
-                UnsafePointer[Self.ElementType](ref), elems[i]
+                UnsafePointer[Self.ElementType](eltref), elems[i]
             )
-
-    # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
-    # ===------------------------------------------------------------------=== #
-
-    @always_inline("nodebug")
-    fn __len__(self) -> Int:
-        """Returns the length of the array. This is a known constant value.
-
-        Returns:
-            The size of the array.
-        """
-        return size
-
-    @always_inline("nodebug")
-    fn _get_reference_unsafe(
-        self: Reference[Self, _, _], index: Int
-    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
-        """Get a reference to an element of self without checking index bounds.
-
-        Users should opt for `__refitem__` instead of this method.
-        """
-        var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(self[]._array).address,
-            index.value,
-        )
-        return UnsafePointer(ptr)[]
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __refitem__[
+    fn __getitem__[
         IntableType: Intable,
-    ](self: Reference[Self, _, _], index: IntableType) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
+    ](self: Reference[Self, _, _], index: IntableType) -> ref [
+        self.lifetime
+    ] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -389,15 +362,13 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         if normalized_idx < 0:
             normalized_idx += size
 
-        return self[]._get_reference_unsafe(normalized_idx)
+        return self[]._get_reference_unsafe(normalized_idx)[]
 
     @always_inline("nodebug")
-    fn __refitem__[
+    fn __getitem__[
         IntableType: Intable,
         index: IntableType,
-    ](self: Reference[Self, _, _]) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
+    ](self: Reference[Self, _, _]) -> ref [self.lifetime] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -416,7 +387,38 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         if i < 0:
             normalized_idx += size
 
-        return self[]._get_reference_unsafe(normalized_idx)
+        return self[]._get_reference_unsafe(normalized_idx)[]
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        """Returns the length of the array. This is a known constant value.
+
+        Returns:
+            The size of the array.
+        """
+        return size
+
+    # ===------------------------------------------------------------------===#
+    # Methods
+    # ===------------------------------------------------------------------===#
+
+    @always_inline("nodebug")
+    fn _get_reference_unsafe(
+        self: Reference[Self, _, _], index: Int
+    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
+        """Get a reference to an element of self without checking index bounds.
+
+        Users should opt for `__getitem__` instead of this method.
+        """
+        var ptr = __mlir_op.`pop.array.gep`(
+            UnsafePointer.address_of(self[]._array).address,
+            index.value,
+        )
+        return UnsafePointer(ptr)[]
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[Self.ElementType]:
@@ -432,3 +434,36 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             An `UnsafePointer` to the underlying array.
         """
         return UnsafePointer(self._array).bitcast[Self.ElementType]()
+
+    @always_inline
+    fn __contains__[
+        T: ComparableCollectionElement
+    ](self: Reference[InlineArray[T, size]], value: Self.ElementType) -> Bool:
+        """Verify if a given value is present in the array.
+
+        ```mojo
+        from utils import InlineArray
+        var x = InlineArray[Int, 3](1,2,3)
+        if 3 in x: print("x contains 3")
+        ```
+
+        Parameters:
+            T: The type of the elements in the array. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            value: The value to find.
+
+        Returns:
+            True if the value is contained in the array, False otherwise.
+        """
+        constrained[
+            _type_is_eq[T, Self.ElementType](),
+            "T must be equal to Self.ElementType",
+        ]()
+
+        # TODO: use @parameter for soon once it stabilizes a bit
+        for i in range(size):
+            if self[][i] == rebind[T](value):
+                return True
+        return False

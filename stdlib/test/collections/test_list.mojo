@@ -16,6 +16,7 @@ from collections import List
 
 from test_utils import CopyCounter, MoveCounter
 from testing import assert_equal, assert_false, assert_true, assert_raises
+from utils import Span
 
 
 def test_mojo_issue_698():
@@ -56,6 +57,27 @@ def test_list():
     assert_equal(3, list[-2])
     list[-1] = 7
     assert_equal(7, list[-1])
+
+
+def test_list_unsafe_get():
+    var list = List[Int]()
+
+    for i in range(5):
+        list.append(i)
+
+    assert_equal(5, len(list))
+    assert_equal(0, list.unsafe_get(0)[])
+    assert_equal(1, list.unsafe_get(1)[])
+    assert_equal(2, list.unsafe_get(2)[])
+    assert_equal(3, list.unsafe_get(3)[])
+    assert_equal(4, list.unsafe_get(4)[])
+
+    list[2] = -2
+    assert_equal(-2, list.unsafe_get(2)[])
+
+    list.clear()
+    list.append(2)
+    assert_equal(2, list.unsafe_get(0)[])
 
 
 def test_list_clear():
@@ -391,6 +413,7 @@ def test_list_index():
     # Tests With Start Parameter
     assert_equal(test_list_a.index(30, start=1), 2)
     assert_equal(test_list_a.index(30, start=-4), 2)
+    assert_equal(test_list_a.index(30, start=-1000), 2)
     with assert_raises(contains="ValueError: Given element is not in list"):
         _ = test_list_a.index(30, start=3)
     with assert_raises(contains="ValueError: Given element is not in list"):
@@ -399,6 +422,7 @@ def test_list_index():
     # Tests With Start and End Parameters
     assert_equal(test_list_a.index(30, start=1, stop=3), 2)
     assert_equal(test_list_a.index(30, start=-4, stop=-2), 2)
+    assert_equal(test_list_a.index(30, start=-1000, stop=1000), 2)
     with assert_raises(contains="ValueError: Given element is not in list"):
         _ = test_list_a.index(30, start=1, stop=2)
     with assert_raises(contains="ValueError: Given element is not in list"):
@@ -407,6 +431,7 @@ def test_list_index():
     # Tests With End Parameter Only
     assert_equal(test_list_a.index(30, stop=3), 2)
     assert_equal(test_list_a.index(30, stop=-2), 2)
+    assert_equal(test_list_a.index(30, stop=1000), 2)
     with assert_raises(contains="ValueError: Given element is not in list"):
         _ = test_list_a.index(30, stop=1)
     with assert_raises(contains="ValueError: Given element is not in list"):
@@ -427,6 +452,13 @@ def test_list_index():
         _ = test_list_a.index(10, start=5, stop=50)
     with assert_raises(contains="ValueError: Given element is not in list"):
         _ = List[Int]().index(10)
+
+    # Test empty slice
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        _ = test_list_a.index(10, start=1, stop=1)
+    # Test empty slice with 0 start and end
+    with assert_raises(contains="ValueError: Given element is not in list"):
+        _ = test_list_a.index(10, start=0, stop=0)
 
     var test_list_b = List[Int](10, 20, 30, 20, 10)
 
@@ -759,9 +791,26 @@ def test_list_contains():
     # assert_equal(List(0,1) in y,False)
 
 
+def test_list_init_span():
+    var l = List[String]("a", "bb", "cc", "def")
+    var sp = Span(l)
+    var l2 = List[String](sp)
+    for i in range(len(l)):
+        assert_equal(l[i], l2[i])
+
+
+def test_indexing():
+    var l = List[Int](1, 2, 3)
+    assert_equal(l[int(1)], 2)
+    assert_equal(l[False], 1)
+    assert_equal(l[True], 2)
+    assert_equal(l[2], 3)
+
+
 def main():
     test_mojo_issue_698()
     test_list()
+    test_list_unsafe_get()
     test_list_clear()
     test_list_to_bool_conversion()
     test_list_pop()
@@ -787,3 +836,4 @@ def main():
     test_list_add()
     test_list_mult()
     test_list_contains()
+    test_indexing()

@@ -75,7 +75,15 @@ def test_intable():
         _ = int(StringRef("hi"))
 
 
+def test_indexing():
+    a = StringRef("abc")
+    assert_equal(a[False], "a")
+    assert_equal(a[int(1)], "b")
+    assert_equal(a[0], "a")
+
+
 def main():
     test_strref_from_start()
     test_comparison_operators()
     test_intable()
+    test_indexing()

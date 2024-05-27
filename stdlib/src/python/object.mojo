@@ -101,7 +101,13 @@ struct _PyIter(Sized):
 
 @register_passable
 struct PythonObject(
-    Intable, Stringable, SizedRaising, Boolable, CollectionElement, KeyElement
+    Boolable,
+    CollectionElement,
+    Indexer,
+    Intable,
+    KeyElement,
+    SizedRaising,
+    Stringable,
 ):
     """A Python object."""
 

@@ -81,7 +81,7 @@ struct FileHandle:
 
         Args:
           path: The file path.
-          mode: The mode to open the file in (the mode can be "r" or "w").
+          mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
         """
         self.__init__(path._strref_dangerous(), mode._strref_dangerous())
 
@@ -93,7 +93,7 @@ struct FileHandle:
 
         Args:
           path: The file path.
-          mode: The mode to open the file in (the mode can be "r" or "w").
+          mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
         """
         var err_msg = _OwnedStringRef()
         var handle = external_call[
@@ -406,14 +406,6 @@ struct FileHandle:
 
         return pos
 
-    fn write(self, data: StringLiteral) raises:
-        """Write the data to the file.
-
-        Args:
-          data: The data to write to the file.
-        """
-        self.write(StringRef(data))
-
     fn write(self, data: String) raises:
         """Write the data to the file.
 
@@ -462,6 +454,13 @@ struct FileHandle:
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
         return self^
+
+    fn _get_raw_fd(self) -> Int:
+        var i64_res = external_call[
+            "KGEN_CompilerRT_IO_GetFD",
+            Int64,
+        ](self.handle)
+        return Int(i64_res.value)
 
 
 fn open(path: String, mode: String) raises -> FileHandle:

@@ -158,7 +158,7 @@ struct Slice(Sized, Stringable, EqualityComparable):
         Returns:
             The slice index.
         """
-        return self.start + idx * self.step
+        return self.start + index(idx) * self.step
 
     @always_inline("nodebug")
     fn _has_end(self) -> Bool:

@@ -58,10 +58,10 @@ struct _InlineListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__refitem__(self.index - 1)
+            return self.src[][self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__refitem__(self.index)
+            return self.src[][self.index]
 
     fn __len__(self) -> Int:
         @parameter
@@ -106,7 +106,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         Args:
             values: The values to populate the list with.
         """
-        debug_assert(len(values) < capacity, "List is full.")
+        debug_assert(len(values) <= capacity, "List is full.")
         self = Self()
         for value in values:
             self.append(value[])
@@ -128,28 +128,25 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         self._size += 1
 
     @always_inline
-    fn __refitem__[
-        IntableType: Intable,
-    ](self: Reference[Self, _, _], index: IntableType) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
+    fn __getitem__(
+        self: Reference[Self, _, _], owned idx: Int
+    ) -> ref [self.lifetime] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Args:
-            index: The index of the item.
+            idx: The index of the item.
 
         Returns:
             A reference to the item at the given index.
         """
-        var i = int(index)
         debug_assert(
-            -self[]._size <= i < self[]._size, "Index must be within bounds."
+            -self[]._size <= idx < self[]._size, "Index must be within bounds."
         )
 
-        if i < 0:
-            i += len(self[])
+        if idx < 0:
+            idx += len(self[])
 
-        return self[]._array[i]
+        return self[]._array[idx]
 
     @always_inline
     fn __del__(owned self):
@@ -195,3 +192,12 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
             if value == rebind[C](i[]):
                 return True
         return False
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        """Checks whether the list has any elements or not.
+
+        Returns:
+            `False` if the list is empty, `True` if there is at least one element.
+        """
+        return len(self) > 0

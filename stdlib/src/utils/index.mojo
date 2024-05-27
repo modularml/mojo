@@ -180,7 +180,7 @@ fn _bool_tuple_reduce[
 
 @value
 @register_passable("trivial")
-struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
+struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
     """A base struct that implements size agnostic index functions.
 
     Parameters:
@@ -335,19 +335,16 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         return size
 
     @always_inline("nodebug")
-    fn __getitem__[intable: Intable](self, index: intable) -> Int:
+    fn __getitem__(self, idx: Int) -> Int:
         """Gets an element from the tuple by index.
 
-        Parameters:
-            intable: The intable type.
-
         Args:
-            index: The element index.
+            idx: The element index.
 
         Returns:
             The tuple element value.
         """
-        return self.data[index]
+        return self.data[idx]
 
     @always_inline("nodebug")
     fn __setitem__[index: Int](inout self, val: Int):
@@ -362,17 +359,14 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         self.data.__setitem__[index](val)
 
     @always_inline("nodebug")
-    fn __setitem__[intable: Intable](inout self, index: intable, val: Int):
+    fn __setitem__(inout self, idx: Int, val: Int):
         """Sets an element in the tuple at the given index.
 
-        Parameters:
-            intable: The intable type.
-
         Args:
-            index: The element index.
+            idx: The element index.
             val: The value to store.
         """
-        self.data[index] = val
+        self.data[idx] = val
 
     @always_inline("nodebug")
     fn as_tuple(self) -> StaticTuple[Int, size]:

@@ -110,8 +110,17 @@ def test_span_array_str():
     assert_equal(l[-1], "i")
 
 
+def test_indexing():
+    var l = InlineArray[Int, 7](1, 2, 3, 4, 5, 6, 7)
+    var s = Span(l)
+    assert_equal(s[True][], 2)
+    assert_equal(s[int(0)][], 1)
+    assert_equal(s[3][], 4)
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
     test_span_array_int()
     test_span_array_str()
+    test_indexing()

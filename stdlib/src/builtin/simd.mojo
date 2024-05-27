@@ -42,7 +42,7 @@ from utils._visualizers import lldb_formatter_wrapping_type
 from utils import InlineArray
 
 from .dtype import _integral_type_of, _get_dtype_printf_format
-from .io import _snprintf_scalar, _snprintf, _printf, _print_fmt
+from .io import _snprintf_scalar, _printf, _print_fmt
 from .string import _calc_initial_buffer_size, _calc_format_buffer_size
 
 # ===------------------------------------------------------------------------===#
@@ -139,7 +139,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Sized,
     Stringable,
     Truncable,
-    Indexer,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -179,22 +178,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         _simd_construction_checks[type, size]()
         self = _unchecked_zero[type, size]()
-
-    @always_inline("nodebug")
-    fn __index__(self) -> Int:
-        """Returns the value as an int if it is an integral value.
-
-        Constraints:
-            Must be a scalar integral value.
-
-        Returns:
-            The value as an integer.
-        """
-        constrained[
-            type.is_integral() or type.is_bool(),
-            "expected integral or bool type",
-        ]()
-        return self.__int__()
 
     @always_inline("nodebug")
     fn __init__(inout self, value: SIMD[DType.float64, 1]):
@@ -326,8 +309,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 ]
             ](elems[0].value)
             return
-
-        debug_assert(size == num_elements, "mismatch in the number of elements")
+        # TODO: Make this a compile-time check when possible.
+        debug_assert(
+            size == num_elements,
+            (
+                "mismatch in the number of elements in the SIMD variadic"
+                " constructor"
+            ),
+        )
         self = Self()
 
         @parameter
@@ -454,7 +443,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             size == 1,
             (
                 "The truth value of a SIMD vector with more than one element is"
-                " ambiguous. Use `reduce_and()` or `reduce_or()`"
+                " ambiguous. Use the builtin `any()` or `all()` functions"
+                " instead."
             ),
         ]()
         return rebind[Scalar[DType.bool]](self.cast[DType.bool]()).value
@@ -608,23 +598,23 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
             @parameter
             if triple_is_nvidia_cuda():
-                # FIXME(MSTDL-406):
-                #   This prints "out of band" with the `Formatter` passed in,
-                #   meaning this will only work if `Formatter` is an unbuffered
-                #   wrapper around printf (which Formatter.stdout currently
-                #   is by default).
-                #
-                #   This is a workaround to permit debug formatting of
-                #   floating-point values on GPU, where printing to stdout is
-                #   the only way the Formatter framework is currently used.
-                var format = _get_dtype_printf_format[type]()
 
                 @parameter
                 if type.is_floating_point():
                     # get_dtype_printf_format hardcodes 17 digits of precision.
-                    format = "%g"
-
-                _printf(format, element)
+                    _printf["%g"](element)
+                else:
+                    # FIXME(MSTDL-406):
+                    #   This prints "out of band" with the `Formatter` passed
+                    #   in, meaning this will only work if `Formatter` is an
+                    #   unbuffered wrapper around printf (which Formatter.stdout
+                    #   currently is by default).
+                    #
+                    #   This is a workaround to permit debug formatting of
+                    #   floating-point values on GPU, where printing to stdout
+                    #   is the only way the Formatter framework is currently
+                    #   used.
+                    _printf[_get_dtype_printf_format[type]()](element)
             else:
                 _format_scalar(writer, element)
 
@@ -712,7 +702,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the type must be numeric"]()
 
-        if (rhs == 0).reduce_and():
+        if not any(rhs):
             # this should raise an exception.
             return 0
 
@@ -724,7 +714,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         elif type.is_unsigned():
             return div
         else:
-            if ((self > 0) & (rhs > 0)).reduce_and():
+            if all((self > 0) & (rhs > 0)):
                 return div
 
             var mod = self - div * rhs
@@ -760,7 +750,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         constrained[type.is_numeric(), "the type must be numeric"]()
 
-        if (rhs == 0).reduce_and():
+        if not any(rhs):
             # this should raise an exception.
             return 0
 
@@ -1585,7 +1575,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self << rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert((rhs >= 0).reduce_and(), "unhandled negative value")
+        debug_assert(all(rhs >= 0), "unhandled negative value")
         return __mlir_op.`pop.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -1602,7 +1592,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self >> rhs`.
         """
         constrained[type.is_integral(), "must be an integral type"]()
-        debug_assert((rhs >= 0).reduce_and(), "unhandled negative value")
+        debug_assert(all(rhs >= 0), "unhandled negative value")
         return __mlir_op.`pop.shr`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -1701,9 +1691,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 ]
             ]()
 
-            @always_inline
             @parameter
-            fn fill[idx: Int]():
+            for idx in range(output_size):
                 alias val = mask[idx]
                 constrained[
                     0 <= val < 2 * size,
@@ -1714,7 +1703,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 )
                 __mlir_op.`pop.store`(val, ptr)
 
-            unroll[fill, output_size]()
             return array
 
         alias length = variadic_len[mask]()
@@ -1750,13 +1738,11 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @parameter
-        fn _check[i: Int]():
+        for i in range(output_size):
             constrained[
                 0 <= mask[i] < 2 * size,
                 "invalid index in the shuffle operation",
             ]()
-
-        unroll[_check, output_size]()
 
         return __mlir_op.`pop.simd.shuffle`[
             mask = mask.data.array,
@@ -1847,7 +1833,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         return __mlir_op.`pop.simd.extractelement`[
             _type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-        ](self.value, idx.value)
+        ](self.value, index(idx).value)
 
     @always_inline("nodebug")
     fn __setitem__(inout self, idx: Int, val: Scalar[type]):
@@ -1858,7 +1844,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             val: The value to set.
         """
         self.value = __mlir_op.`pop.simd.insertelement`(
-            self.value, val.value, idx.value
+            self.value, val.value, index(idx).value
         )
 
     @always_inline("nodebug")
@@ -1872,7 +1858,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             val: The value to set.
         """
         self.value = __mlir_op.`pop.simd.insertelement`(
-            self.value, val, idx.value
+            self.value, val, index(idx).value
         )
 
     fn __hash__(self) -> Int:
@@ -1991,10 +1977,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             var indices = StaticIntTuple[2 * size]()
 
             @parameter
-            fn _fill[i: Int]():
+            for i in range(2 * size):
                 indices[i] = i
 
-            unroll[_fill, 2 * size]()
             return indices
 
         return self._shuffle_list[2 * size, build_indices()](other)
@@ -2287,39 +2272,93 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return self.reduce[mul_reduce_body, size_out]()
 
     @always_inline
-    fn reduce_and(self) -> Bool:
-        """Reduces the boolean vector using the `and` operator.
+    fn reduce_and[size_out: Int = 1](self) -> SIMD[type, size_out]:
+        """Reduces the vector using the bitwise `&` operator.
+
+        Parameters:
+            size_out: The width of the reduction.
 
         Constraints:
-            The element type of the vector must be boolean.
+            `size_out` must not exceed width of the vector.
+            The element type of the vector must be integer or boolean.
 
         Returns:
-            True if all element in the vector is True and False otherwise.
+            The reduced vector.
         """
+        constrained[
+            size_out <= size, "`size_out` must not exceed width of the vector."
+        ]()
+        constrained[
+            type.is_integral() or type.is_bool(),
+            "The element type of the vector must be integer or boolean.",
+        ]()
+
+        @parameter
+        if size_out > 1:
+
+            @always_inline
+            @parameter
+            fn and_reduce_body[
+                type: DType, width: Int
+            ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
+                type, width
+            ]:
+                return v1 & v2
+
+            return self.reduce[and_reduce_body, size_out]()
 
         @parameter
         if size == 1:
-            return self.cast[DType.bool]()[0].value
+            return rebind[SIMD[type, size_out]](self)
+
         return llvm_intrinsic[
-            "llvm.vector.reduce.and", Scalar[DType.bool], has_side_effect=False
+            "llvm.vector.reduce.and",
+            SIMD[type, size_out],
+            has_side_effect=False,
         ](self)
 
     @always_inline
-    fn reduce_or(self) -> Bool:
-        """Reduces the boolean vector using the `or` operator.
+    fn reduce_or[size_out: Int = 1](self) -> SIMD[type, size_out]:
+        """Reduces the vector using the bitwise `|` operator.
+
+        Parameters:
+            size_out: The width of the reduction.
 
         Constraints:
-            The element type of the vector must be boolean.
+            `size_out` must not exceed width of the vector.
+            The element type of the vector must be integer or boolean.
 
         Returns:
-            True if any element in the vector is True and False otherwise.
+            The reduced vector.
         """
+        constrained[
+            size_out <= size, "`size_out` must not exceed width of the vector."
+        ]()
+        constrained[
+            type.is_integral() or type.is_bool(),
+            "The element type of the vector must be integer or boolean.",
+        ]()
+
+        @parameter
+        if size_out > 1:
+
+            @always_inline
+            @parameter
+            fn or_reduce_body[
+                type: DType, width: Int
+            ](v1: SIMD[type, width], v2: SIMD[type, width]) -> SIMD[
+                type, width
+            ]:
+                return v1 | v2
+
+            return self.reduce[or_reduce_body, size_out]()
 
         @parameter
         if size == 1:
-            return self.cast[DType.bool]()[0].value
+            return rebind[SIMD[type, size_out]](self)
+
         return llvm_intrinsic[
-            "llvm.vector.reduce.or", Scalar[DType.bool], has_side_effect=False
+            "llvm.vector.reduce.or", SIMD[type, size_out], has_side_effect=False
         ](self)
 
     @always_inline
@@ -2329,10 +2368,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Returns:
             `True` if and only if **all** elements in this vector are non-zero.
         """
-
-        @parameter
-        if type == DType.bool:
-            return self.reduce_and()
         return self.cast[DType.bool]().reduce_and()
 
     @always_inline
@@ -2343,10 +2378,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `True` if this vector contains **any** non-zero elements, `False`
             otherwise.
         """
-
-        @parameter
-        if type == DType.bool:
-            return self.reduce_or()
         return self.cast[DType.bool]().reduce_or()
 
     # ===-------------------------------------------------------------------===#
@@ -2581,7 +2612,7 @@ fn _pow[
     @parameter
     if rhs_type.is_floating_point() and lhs_type == rhs_type:
         var rhs_quotient = rhs.__floor__()
-        if ((rhs >= 0) & (rhs_quotient == rhs)).reduce_and():
+        if all((rhs >= 0) & (rhs_quotient == rhs)):
             return _pow(lhs, rhs_quotient.cast[_integral_type_of[rhs_type]()]())
 
         var result = SIMD[lhs_type, simd_width]()
@@ -2604,9 +2635,9 @@ fn _pow[
         return result
     elif rhs_type.is_integral():
         # Common cases
-        if (rhs == 2).reduce_and():
+        if all(rhs == 2):
             return lhs * lhs
-        if (rhs == 3).reduce_and():
+        if all(rhs == 3):
             return lhs * lhs * lhs
 
         var result = SIMD[lhs_type, simd_width]()

@@ -144,7 +144,7 @@ def test_len():
     assert_equal(i1.__len__(), 1)
 
     alias I32 = SIMD[DType.int32, 4]
-    var i2 = I32(-1, 0, 1)
+    var i2 = I32(-1)
     assert_equal(4, i2.__len__())
     var i3 = I32(-1, 0, 1, 3)
     assert_equal(4, i3.__len__())
@@ -154,7 +154,7 @@ def test_len():
     assert_equal(1, i4.__len__())
 
     alias UI64 = SIMD[DType.uint64, 16]
-    var i5 = UI64(10, 20, 30, 40)
+    var i5 = UI64(10)
     assert_equal(16, i5.__len__())
     var i6 = UI64(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     assert_equal(16, i6.__len__())
@@ -232,6 +232,66 @@ def test_iadd():
     var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
     f1.__iadd__(f2)
     assert_equal(f1, F(0, 0, 0, 0, 0, 0, 0, 0))
+
+
+def test_sub():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    assert_equal(i.__sub__(0), I(-2, -4, 0, 1))
+    assert_equal(i.__sub__(Int32(0)), I(-2, -4, 0, 1))
+    assert_equal(i.__sub__(2), I(-4, -6, -2, -1))
+    assert_equal(i.__sub__(Int32(2)), I(-4, -6, -2, -1))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    assert_equal(i1.__sub__(i2), I(-1, -9, -6, 1))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    assert_equal(f1.__sub__(f2), F(2, -2, 2, -2, 2, -2, 2, -2))
+
+
+def test_rsub():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    assert_equal(i.__rsub__(0), I(2, 4, 0, -1))
+    assert_equal(i.__rsub__(Int32(0)), I(2, 4, 0, -1))
+    assert_equal(i.__rsub__(2), I(4, 6, 2, 1))
+    assert_equal(i.__rsub__(Int32(2)), I(4, 6, 2, 1))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    assert_equal(i1.__rsub__(i2), I(1, 9, 6, -1))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    assert_equal(f1.__rsub__(f2), F(-2, 2, -2, 2, -2, 2, -2, 2))
+
+
+def test_isub():
+    alias I = SIMD[DType.int32, 4]
+    var i = I(-2, -4, 0, 1)
+    i.__isub__(0)
+    assert_equal(i, I(-2, -4, 0, 1))
+    i.__isub__(Int32(0))
+    assert_equal(i, I(-2, -4, 0, 1))
+    i.__isub__(2)
+    assert_equal(i, I(-4, -6, -2, -1))
+    i.__isub__(I(0, -2, 2, 3))
+    assert_equal(i, I(-4, -4, -4, -4))
+
+    var i1 = I(1, -4, -3, 2)
+    var i2 = I(2, 5, 3, 1)
+    i1.__isub__(i2)
+    assert_equal(i1, I(-1, -9, -6, 1))
+
+    alias F = SIMD[DType.float32, 8]
+    var f1 = F(1, -1, 1, -1, 1, -1, 1, -1)
+    var f2 = F(-1, 1, -1, 1, -1, 1, -1, 1)
+    f1.__isub__(f2)
+    assert_equal(f1, F(2, -2, 2, -2, 2, -2, 2, -2))
 
 
 def test_ceil():
@@ -1001,11 +1061,254 @@ def test_min_max_clamp():
     assert_equal(i.clamp(-7, 4), I(-7, -5, 4, 4))
 
 
-def test_indexer():
-    assert_equal(5, Int8(5).__index__())
-    assert_equal(56, UInt32(56).__index__())
-    assert_equal(1, Scalar[DType.bool](True).__index__())
-    assert_equal(0, Scalar[DType.bool](False).__index__())
+def test_indexing():
+    var s = SIMD[DType.int32, 4](1, 2, 3, 4)
+    assert_equal(s[False], 1)
+    assert_equal(s[int(2)], 3)
+    assert_equal(s[3], 4)
+
+
+def test_reduce():
+    @parameter
+    def test_dtype[type: DType]():
+        alias X8 = SIMD[type, 8]
+        alias X4 = SIMD[type, 4]
+        alias X2 = SIMD[type, 2]
+        alias X1 = SIMD[type, 1]
+        var x8: X8
+        var x4: X4
+        var x2: X2
+        var x1: X1
+
+        @parameter
+        if type.is_numeric():
+            # reduce_add
+            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = X4(4, 6, 8, 10)
+            x2 = X2(12, 16)
+            x1 = X1(int(28))  # TODO: fix MOCO-697 and use X1(28) instead
+            assert_equal(x8.reduce_add(), x1)
+            assert_equal(x4.reduce_add(), x1)
+            assert_equal(x2.reduce_add(), x1)
+            assert_equal(x1.reduce_add(), x1)
+            assert_equal(x8.reduce_add[2](), x2)
+            assert_equal(x4.reduce_add[2](), x2)
+            assert_equal(x2.reduce_add[2](), x2)
+            assert_equal(x8.reduce_add[4](), x4)
+            assert_equal(x4.reduce_add[4](), x4)
+            assert_equal(x8.reduce_add[8](), x8)
+            assert_equal(X2(6, 3).reduce_add(), 9)
+
+            # reduce_mul
+            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = X4(0, 5, 12, 21)
+            x2 = X2(0, 105)
+            x1 = X1(int(0))  # TODO: fix MOCO-697 and use X1(0) instead
+            assert_equal(x8.reduce_mul(), x1)
+            assert_equal(x4.reduce_mul(), x1)
+            assert_equal(x2.reduce_mul(), x1)
+            assert_equal(x1.reduce_mul(), x1)
+            assert_equal(x8.reduce_mul[2](), x2)
+            assert_equal(x4.reduce_mul[2](), x2)
+            assert_equal(x2.reduce_mul[2](), x2)
+            assert_equal(x8.reduce_mul[4](), x4)
+            assert_equal(x4.reduce_mul[4](), x4)
+            assert_equal(x8.reduce_mul[8](), x8)
+            assert_equal(X2(6, 3).reduce_mul(), 18)
+
+            # reduce_min
+            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = X4(0, 1, 2, 3)
+            x2 = X2(0, 1)
+            x1 = X1(int(0))  # TODO: fix MOCO-697 and use X1(0) instead
+            assert_equal(x8.reduce_min(), x1)
+            assert_equal(x4.reduce_min(), x1)
+            assert_equal(x2.reduce_min(), x1)
+            assert_equal(x1.reduce_min(), x1)
+            assert_equal(x8.reduce_min[2](), x2)
+            assert_equal(x4.reduce_min[2](), x2)
+            assert_equal(x2.reduce_min[2](), x2)
+            assert_equal(x8.reduce_min[4](), x4)
+            assert_equal(x4.reduce_min[4](), x4)
+            assert_equal(x8.reduce_min[8](), x8)
+            assert_equal(X2(6, 3).reduce_min(), 3)
+
+            # reduce_max
+            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = X4(4, 5, 6, 7)
+            x2 = X2(6, 7)
+            x1 = X1(int(7))  # TODO: fix MOCO-697 and use X1(7) instead
+            assert_equal(x8.reduce_max(), x1)
+            assert_equal(x4.reduce_max(), x1)
+            assert_equal(x2.reduce_max(), x1)
+            assert_equal(x1.reduce_max(), x1)
+            assert_equal(x8.reduce_max[2](), x2)
+            assert_equal(x4.reduce_max[2](), x2)
+            assert_equal(x2.reduce_max[2](), x2)
+            assert_equal(x8.reduce_max[4](), x4)
+            assert_equal(x4.reduce_max[4](), x4)
+            assert_equal(x8.reduce_max[8](), x8)
+            assert_equal(X2(6, 3).reduce_max(), 6)
+
+        @parameter
+        if type.is_signed():
+            # reduce_add
+            x8 = X8(0, -1, 2, -3, 4, -5, 6, -7)
+            x4 = X4(4, -6, 8, -10)
+            x2 = X2(12, -16)
+            x1 = X1(int(-4))  # TODO: fix MOCO-697 and use X1(-4) instead
+            assert_equal(x8.reduce_add(), x1)
+            assert_equal(x4.reduce_add(), x1)
+            assert_equal(x2.reduce_add(), x1)
+            assert_equal(x1.reduce_add(), x1)
+            assert_equal(x8.reduce_add[2](), x2)
+            assert_equal(x4.reduce_add[2](), x2)
+            assert_equal(x2.reduce_add[2](), x2)
+            assert_equal(x8.reduce_add[4](), x4)
+            assert_equal(x4.reduce_add[4](), x4)
+            assert_equal(x8.reduce_add[8](), x8)
+            assert_equal(X2(6, -3).reduce_add(), 3)
+
+            # reduce_mul
+            x8 = X8(0, -1, 2, -3, 4, -5, 6, -7)
+            x4 = X4(0, 5, 12, 21)
+            x2 = X2(0, 105)
+            x1 = X1(int(0))  # TODO: fix MOCO-697 and use X1(0) instead
+            assert_equal(x8.reduce_mul(), x1)
+            assert_equal(x4.reduce_mul(), x1)
+            assert_equal(x2.reduce_mul(), x1)
+            assert_equal(x1.reduce_mul(), x1)
+            assert_equal(x8.reduce_mul[2](), x2)
+            assert_equal(x4.reduce_mul[2](), x2)
+            assert_equal(x2.reduce_mul[2](), x2)
+            assert_equal(x8.reduce_mul[4](), x4)
+            assert_equal(x4.reduce_mul[4](), x4)
+            assert_equal(x8.reduce_mul[8](), x8)
+            assert_equal(X2(6, -3).reduce_mul(), -18)
+
+            # reduce_min
+            x8 = X8(0, -1, 2, -3, 4, -5, 6, -7)
+            x4 = X4(0, -5, 2, -7)
+            x2 = X2(0, -7)
+            x1 = X1(int(-7))  # TODO: fix MOCO-697 and use X1(-7) instead
+            assert_equal(x8.reduce_min(), x1)
+            assert_equal(x4.reduce_min(), x1)
+            assert_equal(x2.reduce_min(), x1)
+            assert_equal(x1.reduce_min(), x1)
+            assert_equal(x8.reduce_min[2](), x2)
+            assert_equal(x4.reduce_min[2](), x2)
+            assert_equal(x2.reduce_min[2](), x2)
+            assert_equal(x8.reduce_min[4](), x4)
+            assert_equal(x4.reduce_min[4](), x4)
+            assert_equal(x8.reduce_min[8](), x8)
+            assert_equal(X2(6, -3).reduce_min(), -3)
+
+            # reduce_max
+            x8 = X8(0, -1, 2, -3, 4, -5, 6, -7)
+            x4 = X4(4, -1, 6, -3)
+            x2 = X2(6, -1)
+            x1 = X1(int(6))  # TODO: fix MOCO-697 and use X1(6) instead
+            assert_equal(x8.reduce_max(), x1)
+            assert_equal(x4.reduce_max(), x1)
+            assert_equal(x2.reduce_max(), x1)
+            assert_equal(x1.reduce_max(), x1)
+            assert_equal(x8.reduce_max[2](), x2)
+            assert_equal(x4.reduce_max[2](), x2)
+            assert_equal(x2.reduce_max[2](), x2)
+            assert_equal(x8.reduce_max[4](), x4)
+            assert_equal(x4.reduce_max[4](), x4)
+            assert_equal(x8.reduce_max[8](), x8)
+            assert_equal(X2(6, -3).reduce_max(), 6)
+
+        @parameter
+        if type.is_bool():
+            # reduce_and
+            x8 = X8(False, False, True, True, False, True, False, True)
+            x4 = X4(False, False, False, True)
+            x2 = X2(False, False)
+            x1 = X1(False)
+            assert_equal(x8.reduce_and(), x1)
+            assert_equal(x4.reduce_and(), x1)
+            assert_equal(x2.reduce_and(), x1)
+            assert_equal(x1.reduce_and(), x1)
+            assert_equal(x8.reduce_and[2](), x2)
+            assert_equal(x4.reduce_and[2](), x2)
+            assert_equal(x2.reduce_and[2](), x2)
+            assert_equal(x8.reduce_and[4](), x4)
+            assert_equal(x4.reduce_and[4](), x4)
+            assert_equal(x8.reduce_and[8](), x8)
+            assert_equal(X2(True, True).reduce_and(), True)
+
+            # reduce_or
+            x8 = X8(False, False, True, True, False, True, False, True)
+            x4 = X4(False, True, True, True)
+            x2 = X2(True, True)
+            x1 = X1(True)
+            assert_equal(x8.reduce_or(), x1)
+            assert_equal(x4.reduce_or(), x1)
+            assert_equal(x2.reduce_or(), x1)
+            assert_equal(x1.reduce_or(), x1)
+            assert_equal(x8.reduce_or[2](), x2)
+            assert_equal(x4.reduce_or[2](), x2)
+            assert_equal(x2.reduce_or[2](), x2)
+            assert_equal(x8.reduce_or[4](), x4)
+            assert_equal(x4.reduce_or[4](), x4)
+            assert_equal(x8.reduce_or[8](), x8)
+            assert_equal(X2(False, False).reduce_or(), False)
+
+        @parameter
+        if type.is_integral():
+            # reduce_and
+            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = X4(0, 1, 2, 3)
+            x2 = X2(0, 1)
+            x1 = X1(int(0))  # TODO: fix MOCO-697 and use X1(0) instead
+            assert_equal(x8.reduce_and(), x1)
+            assert_equal(x4.reduce_and(), x1)
+            assert_equal(x2.reduce_and(), x1)
+            assert_equal(x1.reduce_and(), x1)
+            assert_equal(x8.reduce_and[2](), x2)
+            assert_equal(x4.reduce_and[2](), x2)
+            assert_equal(x2.reduce_and[2](), x2)
+            assert_equal(x8.reduce_and[4](), x4)
+            assert_equal(x4.reduce_and[4](), x4)
+            assert_equal(x8.reduce_and[8](), x8)
+            assert_equal(X2(6, 3).reduce_and(), 2)
+
+            # reduce_or
+            x8 = X8(0, 1, 2, 3, 4, 5, 6, 7)
+            x4 = X4(4, 5, 6, 7)
+            x2 = X2(6, 7)
+            x1 = X1(int(7))  # TODO: fix MOCO-697 and use X1(7) instead
+            assert_equal(x8.reduce_or(), x1)
+            assert_equal(x4.reduce_or(), x1)
+            assert_equal(x2.reduce_or(), x1)
+            assert_equal(x1.reduce_or(), x1)
+            assert_equal(x8.reduce_or[2](), x2)
+            assert_equal(x4.reduce_or[2](), x2)
+            assert_equal(x2.reduce_or[2](), x2)
+            assert_equal(x8.reduce_or[4](), x4)
+            assert_equal(x4.reduce_or[4](), x4)
+            assert_equal(x8.reduce_or[8](), x8)
+            assert_equal(X2(6, 3).reduce_or(), 7)
+
+    test_dtype[DType.bool]()
+    test_dtype[DType.int8]()
+    test_dtype[DType.int16]()
+    test_dtype[DType.int32]()
+    test_dtype[DType.int64]()
+    test_dtype[DType.uint8]()
+    test_dtype[DType.uint16]()
+    test_dtype[DType.uint32]()
+    test_dtype[DType.uint64]()
+    test_dtype[DType.float16]()
+    test_dtype[DType.float32]()
+    test_dtype[DType.float64]()
+    test_dtype[DType.index]()
+
+    @parameter
+    if not has_neon():
+        test_dtype[DType.bfloat16]()
 
 
 def main():
@@ -1022,10 +1325,11 @@ def main():
     test_floor()
     test_floordiv()
     test_iadd()
-    test_indexer()
+    test_indexing()
     test_insert()
     test_interleave()
     test_issue_20421()
+    test_isub()
     test_join()
     test_len()
     test_limits()
@@ -1038,9 +1342,12 @@ def main():
     test_rotate()
     test_round()
     test_roundeven()
+    test_rsub()
     test_shift()
     test_shuffle()
     test_simd_variadic()
+    test_sub()
     test_sub_with_overflow()
     test_trunc()
     test_truthy()
+    test_reduce()
