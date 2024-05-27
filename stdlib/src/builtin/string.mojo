@@ -586,6 +586,20 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------===#
 
 
+fn _get_spaces_table() -> InlineArray[UInt8, 256]:
+    var table = InlineArray[UInt8, 256](0)
+    table[ord(" ")] = 1
+    table[ord("\t")] = 1
+    table[ord("\n")] = 1
+    table[ord("\r")] = 1
+    table[ord("\f")] = 1
+    table[ord("\v")] = 1
+    return table
+
+
+var _SPACES_TABLE = _get_spaces_table()
+
+
 fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
     This only respects the default "C" locale, i.e. returns True only
@@ -599,17 +613,18 @@ fn _isspace(c: UInt8) -> Bool:
         True if the character is one of the whitespace characters
             listed above, otherwise False.
     """
-    alias spaces = SIMD[DType.uint8, 8](
-        ord(" "),
-        ord("\t"),
-        ord("\n"),
-        ord("\r"),
-        ord("\f"),
-        ord("\v"),
-        ord("\v"),
-        ord("\v"),
-    )
-    return (spaces ^ c).reduce_min() == 0
+    # alias spaces = SIMD[DType.uint8, 8](
+    #     ord(" "),
+    #     ord("\t"),
+    #     ord("\n"),
+    #     ord("\r"),
+    #     ord("\f"),
+    #     ord("\v"),
+    #     ord("\v"),
+    #     ord("\v"),
+    # )
+    # return (spaces ^ c).reduce_min() == 0
+    return _SPACES_TABLE[c]
 
 
 # ===----------------------------------------------------------------------===#
