@@ -822,27 +822,30 @@ fn product[
 
 
 @always_inline
-fn normalize_idx(
-    idx: Int,
-    start: Int,
-    end: Int,
-    msg: StringLiteral = "index must be in range",
-) -> Int:
+fn normalize_idx[
+    use_assert: Bool = True, msg: StringLiteral = "index must be in range"
+](idx: Int, start: Int, end: Int) -> Int:
     """Normalize an Index to be between start and end e.g.
     `0, len(self)`. Positive idx up to `end -1`, defaults to
     that value. Negative idx can be up to `-1 * end`,
     defaults to that value. Has a builtin debug_assert that
     can be passed a custom message.
 
+    Parameters:
+        use_assert: Whether to do a debug_assert.
+        msg: The message for the debug_assert that the index is in
+            range.
+
     Args:
         idx: The index to normalize.
         start: The start of the secuence.
         end: The end of the secuence.
-        msg: The message for the debug_assert that the index is in
-            range.
 
     Returns:
         The normalized Index.
     """
-    debug_assert(abs(idx) < end or idx == -1 * end, msg)
+
+    @parameter
+    if use_assert:
+        debug_assert(abs(idx) < end or idx == -1 * end, msg)
     return min(idx, end - 1) if idx > -1 else max(start, end + idx)
