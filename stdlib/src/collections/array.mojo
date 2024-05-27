@@ -338,7 +338,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         if capacity != Self._vec_type.size:
             var mask = Self._vec_type(~Self._scalar_type(0))
             Self._mask_vec(mask)
-            var comp = (self.vec != value).cast[DType.bool]()
+            var comp = (self.vec == value).cast[DType.bool]()
             return (comp & mask.cast[DType.bool]()).reduce_or()
         else:
             return (self.vec == value).cast[DType.bool]().reduce_or()
