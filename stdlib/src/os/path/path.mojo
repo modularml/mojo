@@ -22,6 +22,7 @@ from os.path import isdir
 from stat import S_ISDIR, S_ISLNK, S_ISREG
 from sys import has_neon, os_is_linux, os_is_macos, os_is_windows
 
+from ..os import sep
 from .. import PathLike
 from .._linux_aarch64 import _lstat as _lstat_linux_arm
 from .._linux_aarch64 import _stat as _stat_linux_arm
@@ -283,3 +284,43 @@ fn getsize[pathlike: os.PathLike](path: pathlike) raises -> Int:
       The size of the path in bytes.
     """
     return getsize(path.__fspath__())
+
+
+# ===----------------------------------------------------------------------=== #
+# split
+# ===----------------------------------------------------------------------=== #
+
+
+fn split(path: String) -> Tuple[String, String]:
+    """Splits the path into two parts.
+
+    Args:
+      path: The path to split.
+
+    Returns:
+      Returns tuple "(head, tail)" where "tail" is everything after the final slash.
+      Either part may be empty.
+    """
+    var index = path.rfind(os.sep) + 1
+
+    var head: String = path[:index]
+    var tail: String = path[index:]
+    if head and head != String(sep) * len(head):
+        head = head.rstrip(sep)
+    return head, tail
+
+
+fn split[pathlike: os.PathLike](path: pathlike) -> Tuple[String, String]:
+    """Splits the path into two parts.
+
+    Parameters:
+      pathlike: The type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to split.
+
+    Returns:
+      Returns tuple "(head, tail)" where "tail" is everything after the final slash.
+      Either part may be empty.
+    """
+    return split(path.__fspath__())
