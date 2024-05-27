@@ -311,10 +311,10 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     fn __reversed__(
         self,
     ) -> _ArrayIter[T, capacity, False]:
-        """Iterate backwards over the list, returning immutable references.
+        """Iterate backwards over the Array, returning immutable references.
 
         Returns:
-            A reversed iterator of immutable references to the list elements.
+            A reversed iterator of immutable references to the Array elements.
         """
         return _ArrayIter[forward=False](len(self), self)
 
@@ -432,7 +432,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
     @always_inline
     fn insert(inout self, i: Int, owned value: Self._scalar_type):
-        """Inserts a value to the list at the given index.
+        """Inserts a value to the Array at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
 
         Args:
@@ -456,7 +456,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
     @always_inline
     fn extend[cap: Int = capacity](inout self, owned other: Array[T, cap]):
-        """Extends this list by consuming the elements of `other` up
+        """Extends this Array by consuming the elements of `other` up
         to Self.capacity.
 
         Parameters:
@@ -474,7 +474,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             self.capacity_left -= 1
 
     fn pop(inout self, i: Int = -1) -> Self._scalar_type:
-        """Pops a value from the list at the given index.
+        """Pops a value from the Array at the given index.
 
         Args:
             i: The index of the value to pop.
@@ -639,7 +639,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             value: The value to count.
 
         Returns:
-            The number of occurrences of the value in the list.
+            The number of occurrences of the value in the Array.
         """
 
         @parameter
@@ -676,7 +676,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
         Note that there is no wraparound for negative indices, caution is advised.
         Using negative indices is considered undefined behavior.
-        Never use `my_array.unsafe_get(-1)` to get the last element of the list. It will
+        Never use `my_array.unsafe_get(-1)` to get the last element of the Array. It will
         not work. Instead, do `my_array.unsafe_get(len(my_array) - 1)`.
 
         Args:
@@ -696,7 +696,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
         Note that there is no wraparound for negative indices, caution is advised.
         Using negative indices is considered undefined behavior.
-        Never use `my_array.unsafe_set(-1)` to set the last element of the list. It will
+        Never use `my_array.unsafe_set(-1)` to set the last element of the Array. It will
         not work. Instead, do `my_array.unsafe_set(len(my_array) - 1)`.
 
         Args:
@@ -1131,7 +1131,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
-        return (self * other) / (abs(self.vec) * abs(other.vec))
+        return (self * other) / (self.__abs__() * other.__abs__())
 
     # TODO: need math funcs
     # @always_inline("nodebug")
