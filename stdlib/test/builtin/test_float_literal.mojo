@@ -69,9 +69,9 @@ def test_trunc():
 
 
 def test_round():
-    assert_equal(FloatLiteral.__round__(1.5), 1.0)
+    assert_equal(FloatLiteral.__round__(1.5), 2.0)
     assert_equal(FloatLiteral.__round__(1.6), 2.0)
-    assert_equal(FloatLiteral.__round__(-1.5), -1.0)
+    assert_equal(FloatLiteral.__round__(-1.5), -2.0)
     assert_equal(FloatLiteral.__round__(-3.6), -4.0)
     assert_equal(FloatLiteral.__round__(3.0), 3.0)
     assert_equal(FloatLiteral.__round__(0.0), 0.0)
