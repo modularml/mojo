@@ -135,6 +135,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Floorable,
     Hashable,
     Intable,
+    Powable,
     Roundable,
     Sized,
     Stringable,
