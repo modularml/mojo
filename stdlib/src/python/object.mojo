@@ -308,7 +308,9 @@ struct PythonObject(
         self.py_object = cpython.PyDict_New()
         for entry in value.items():
             var result = cpython.PyDict_SetItem(
-                self.py_object, entry[].key.py_object, entry[].value.value()[].py_object
+                self.py_object,
+                entry[].key.py_object,
+                entry[].value.value()[].py_object,
             )
 
     fn __copyinit__(inout self, existing: Self):

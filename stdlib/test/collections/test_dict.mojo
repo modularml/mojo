@@ -523,6 +523,7 @@ fn test_clear() raises:
     some_dict.clear()
     assert_equal(len(some_dict), 0)
 
+
 def issue_2756():
     var context = Dict[String, String]()
     context["a"] = "b"
@@ -530,11 +531,12 @@ def issue_2756():
 
     var context_assert = Dict[String, String]()
     context_assert["a"] = "b"
-    assert_equal(context_assert.pop("a"),"b")
+    assert_equal(context_assert.pop("a"), "b")
 
     var context2 = Dict[String, StringLiteral]()
     context2["a"] = "b"
-    assert_equal(context2.pop("a"),"b")
+    assert_equal(context2.pop("a"), "b")
+
 
 def main():
     test_dict()
