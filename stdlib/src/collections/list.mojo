@@ -64,10 +64,10 @@ struct _ListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__get_ref(self.index - 1)[]
+            return self.src[][self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__get_ref(self.index)[]
+            return self.src[][self.index]
 
     fn __len__(self) -> Int:
         @parameter
@@ -722,10 +722,11 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return res^
 
     @always_inline
-    fn __getitem__(self, idx: Int) -> T:
+    fn __getitem__(
+        self: Reference[Self, _, _], idx: Int
+    ) -> ref [self.lifetime] T:
         """Gets a copy of the list element at the given index.
 
-        FIXME(lifetimes): This should return a reference, not a copy!
 
         Args:
             idx: The index of the element.
@@ -735,13 +736,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         var normalized_idx = idx
         debug_assert(
-            -self.size <= normalized_idx < self.size,
+            -self[].size <= normalized_idx < self[].size,
             "index must be within bounds",
         )
         if normalized_idx < 0:
-            normalized_idx += len(self)
+            normalized_idx += len(self[])
 
-        return (self.data + normalized_idx)[]
+        return (self[].data + normalized_idx)[]
 
     # TODO(30737): Replace __getitem__ with this, but lots of places use it
     fn __get_ref(
