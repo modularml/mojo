@@ -19,7 +19,6 @@ from collections import Array
 ```
 """
 
-from bit import countl_zero
 
 # ===----------------------------------------------------------------------===#
 # Array
@@ -105,6 +104,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
     alias _vec_type = SIMD[T, _closest_upper_pow_2(capacity)]
     var vec: Self._vec_type
+    """The underlying SIMD vector."""
     alias _scalar_type = Scalar[T]
     var capacity_left: UInt8
     """The current capacity left until expansion."""
@@ -134,6 +134,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Args:
             values: The values to populate the Array with.
         """
+        # FIXME: capacity should be statically determined from
+        # this constructor
         self = Self()
         for value in values:
             self.append(value)
@@ -141,14 +143,25 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     fn __init__[cap: Int](inout self, values: SIMD[T, cap]):
         """Constructs a Array from the given values.
 
+        Parameters:
+            cap: The capacity of the SIMD vector.
+
         Args:
             values: The values to populate the Array with.
         """
-        self = Self()
-        var delta = max(0, capacity - len(values))
-        for value in range(capacity - delta):  # FIXME
-            self.append(value)
-        self.capacity_left = capacity - delta
+
+        @parameter
+        if cap == capacity:
+            self.vec = values
+            self.capacity_left = 0
+        else:
+            alias size = min(cap, capacity)
+            self.capacity_left = capacity - size
+            self.vec = Self._vec_type()
+
+            @parameter
+            for i in range(size):
+                self.vec[i] = values[i]
 
     fn __init__[cap: Int](inout self, owned existing: Array[T, cap]):
         """Constructs a Array from an existing Array.
@@ -457,14 +470,18 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         """Extends this list by consuming the elements of `other` up
         to Self.capacity.
 
+        Parameters:
+            cap: The capacity of the other Array.
+
         Args:
             other: Array whose elements will be added in order at the end of this Array.
         """
-        alias cap_sum = capacity + other.capacity
-        if len(self) + len(other) > capacity:
+        var size_s = len(self)
+        var size_o = len(other)
+        if size_s + size_o > capacity:
             return
-        for i in range(capacity):
-            self.unsafe_set(len(self) + i, other.unsafe_get(i))
+        for i in range(size_o):
+            self.unsafe_set(size_s + i, other.unsafe_get(i))
             self.capacity_left -= 1
 
     fn pop(inout self, i: Int = -1) -> Self._scalar_type:
@@ -732,6 +749,9 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     ](self, other: Array[T, cap]) -> Self._scalar_type:
         """Computes the elementwise minimum between the two vectors.
 
+        Parameters:
+            cap: The capacity of the other Array.
+
         Args:
             other: The other SIMD vector.
 
@@ -757,6 +777,9 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     ](self, other: Array[T, cap]) -> Self._scalar_type:
         """Computes the elementwise maximum between the two Arrays.
 
+        Parameters:
+            cap: The capacity of the other Array.
+
         Args:
             other: The other SIMD vector.
 
@@ -780,19 +803,154 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     fn dot(self, other: Self) -> Self._scalar_type:
         """Calculates the dot product between two Arrays.
 
+        Args:
+            other: The other Array.
+
         Returns:
             The result.
         """
         return (self.vec * other.vec).reduce_add()
 
     @always_inline("nodebug")
+    @staticmethod
+    fn _mask_vec(inout vec: Self._vec_type):
+        @parameter
+        for i in range(Self._vec_type.size - capacity):
+            vec[capacity + i] = 0
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn _build_vec(value: Self._scalar_type) -> Self._vec_type:
+        var vec = Self._vec_type(value)
+        Self._mask_vec(vec)
+        return vec
+
+    @always_inline("nodebug")
     fn __mul__(self, other: Self) -> Self._scalar_type:
         """Calculates the dot product between two Arrays.
+
+        Args:
+            other: The other Array.
 
         Returns:
             The result.
         """
         return self.dot(other)
+
+    @always_inline("nodebug")
+    fn __mul__(self, value: Self._scalar_type) -> Self:
+        """Calculates the elementwise multiplication
+        of the given value.
+
+        Args:
+            value: The value.
+
+        Returns:
+            A new Array with the values.
+        """
+        return self.vec * Self._build_vec(value)
+
+    @always_inline("nodebug")
+    fn __imul__(inout self, owned value: Self._scalar_type):
+        """Calculates the elementwise multiplication
+        of the given value inplace.
+
+        Args:
+            value: The value.
+        """
+        self.vec *= Self._build_vec(value)
+
+    @always_inline("nodebug")
+    fn __truediv__(self, value: Self._scalar_type) -> Self:
+        """Calculates the elementwise division
+        of the given value.
+
+        Args:
+            value: The value.
+
+        Returns:
+            A new Array with the values.
+        """
+        return self.vec / Self._build_vec(value)
+
+    @always_inline("nodebug")
+    fn __itruediv__(inout self, owned value: Self._scalar_type):
+        """Calculates the elementwise division
+        of the given value inplace.
+
+        Args:
+            value: The value.
+        """
+        self.vec /= Self._build_vec(value)
+
+    @always_inline("nodebug")
+    fn __floordiv__(self, value: Self._scalar_type) -> Self:
+        """Calculates the elementwise floordiv
+        of the given value.
+
+        Args:
+            value: The value.
+
+        Returns:
+            A new Array with the values.
+        """
+        return self.vec // Self._build_vec(value)
+
+    @always_inline("nodebug")
+    fn __ifloordiv__(inout self, owned value: Self._scalar_type):
+        """Calculates the elementwise floordiv
+        of the given value inplace.
+
+        Args:
+            value: The value.
+        """
+        self.vec //= Self._build_vec(value)
+
+    @always_inline("nodebug")
+    fn __mod__(self, value: Self._scalar_type) -> Self:
+        """Calculates the elementwise mod
+        of the given value.
+
+        Args:
+            value: The value.
+
+        Returns:
+            A new Array with the values.
+        """
+        return self.vec % Self._build_vec(value)
+
+    @always_inline("nodebug")
+    fn __imod__(inout self, owned value: Self._scalar_type):
+        """Calculates the elementwise mod
+        of the given value inplace.
+
+        Args:
+            value: The value.
+        """
+        self.vec %= Self._build_vec(value)
+
+    @always_inline("nodebug")
+    fn __pow__(self, value: Self._scalar_type) -> Self:
+        """Calculates the elementwise pow
+        of the given value.
+
+        Args:
+            value: The value.
+
+        Returns:
+            A new Array with the values.
+        """
+        return Self(self.vec**value)
+
+    @always_inline("nodebug")
+    fn __ipow__(inout self, owned value: Self._scalar_type):
+        """Calculates the elementwise pow
+        of the given value inplace.
+
+        Args:
+            value: The value.
+        """
+        self.vec **= int(value)  # FIXME will we support float exp?
 
     @always_inline("nodebug")
     fn __abs__(self) -> Self._scalar_type:
@@ -801,7 +959,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
-        return abs(self.vec)
+        return (self.vec**2).reduce_add()
 
     @always_inline
     fn __add__[
@@ -810,6 +968,9 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         T, _closest_upper_pow_2(max(capacity, cap))
     ]:
         """Computes the elementwise addition between the two Arrays.
+
+        Parameters:
+            cap: The capacity of the other Array.
 
         Args:
             other: The other SIMD vector.
@@ -834,6 +995,18 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             var s = new_arr(self)
             return rebind[SIMD[T, size]](other.vec) + rebind[new_simd](s.vec)
 
+    @always_inline("nodebug")
+    fn __add__(self, owned value: Self._scalar_type) -> Self:
+        """Computes the elementwise addition of the value.
+
+        Args:
+            value: The value to broadcast.
+
+        Returns:
+            A new Array containing the result.
+        """
+        return Self(self.vec + value)
+
     @always_inline
     fn __sub__[
         cap: Int = capacity
@@ -841,6 +1014,9 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         T, _closest_upper_pow_2(max(capacity, cap))
     ]:
         """Computes the elementwise subtraction between the two Arrays.
+
+        Parameters:
+            cap: The capacity of the other Array.
 
         Args:
             other: The other SIMD vector.
@@ -866,24 +1042,54 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             return rebind[SIMD[T, size]](other.vec) - rebind[new_simd](s.vec)
 
     @always_inline("nodebug")
-    fn __iadd__[cap: Int = capacity](inout self, owned other: Array[T, cap]):
+    fn __sub__(self, owned value: Self._scalar_type) -> Self:
+        """Computes the elementwise subtraction of the value.
+
+        Args:
+            value: The value to broadcast.
+
+        Returns:
+            A new Array containing the result.
+        """
+        return Self(self.vec - value)
+
+    @always_inline("nodebug")
+    fn __iadd__(inout self, owned other: Self):
         """Computes the elementwise addition between the two Arrays
         inplace.
 
         Args:
             other: The other Array.
         """
-        self = self + other
+        self.vec += other.vec
 
     @always_inline("nodebug")
-    fn __isub__[cap: Int = capacity](inout self, owned other: Array[T, cap]):
+    fn __iadd__(inout self, owned value: Self._scalar_type):
+        """Computes the elementwise addition of the value.
+
+        Args:
+            value: The value to broadcast.
+        """
+        self.vec += Self._build_vec(value)
+
+    @always_inline("nodebug")
+    fn __isub__(inout self, owned other: Self):
         """Computes the elementwise subtraction between the two Arrays
         inplace.
 
         Args:
             other: The other Array.
         """
-        self = self - other
+        self.vec -= other.vec
+
+    @always_inline("nodebug")
+    fn __isub__(inout self, owned value: Self._scalar_type):
+        """Computes the elementwise subtraction of the value.
+
+        Args:
+            value: The value to broadcast.
+        """
+        self.vec -= Self._build_vec(value)
 
     fn clear(inout self):
         """Zeroes the Array."""
@@ -927,3 +1133,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     #     # TODO quaternions/fma for 3d vectors
     #     var magns = abs(self.vec) * abs(other.vec)
     #     return magns * sin((self * other) / magns)
+
+    # TODO
+    # fn sqrt(self):
+    #     ...

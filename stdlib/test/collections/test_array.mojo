@@ -353,16 +353,33 @@ def test_list_iter():
     assert_equal(6, sum(vs))
 
 
-def test_list_iter_mutable():
+def test_array_iter_not_mutable():
     var vs = Array(1, 2, 3)
 
+    # should not mutate
     for v in vs:
         v += 1
-
     var sum = 0
     for v in vs:
         sum += int(v)
-    assert_equal(9, sum)
+    assert_equal(6, sum)
+
+
+def test_array_broadcast_ops():
+    alias arr = Array[DType.uint8, 3]
+    var vs = arr(1, 2, 3)
+    # should apply to all
+    vs += 1
+    assert_equal(9, vs.sum())
+    vs -= 1
+    assert_equal(6, vs.sum())
+    vs *= 2
+    assert_equal(12, vs.sum())
+    vs /= 2
+    assert_equal(vs, arr(1, 2, 3))
+    # assert_equal(0, (arr(2, 2, 2) % 2).sum()) # FIXME issue #2855
+    # assert_equal(0, (arr(2, 2, 2) // 2).sum()) # FIXME issue #2855
+    assert_equal(4 * 3, (arr(2, 2, 2) ** 2).sum())
 
 
 def test_list_span():
@@ -569,9 +586,8 @@ def main():
     test_list_variadic_constructor()
     test_list_insert()
     test_list_index()
-    # test_list_extend()
-    # test_list_iter()
-    # test_list_iter_mutable()
+    test_list_extend()
+    test_list_iter()
     # test_list_span()
     # test_list_boolable()
     # test_constructor_from_pointer()
@@ -583,3 +599,6 @@ def main():
     # test_indexing_list()
     # from array
     # test_list_unsafe_set_and_get()
+
+    test_array_iter_not_mutable()
+    test_array_broadcast_ops()
