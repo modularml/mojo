@@ -80,7 +80,7 @@ fn _closest_upper_pow_2(val: Int) -> Int:
 
 
 @register_passable("trivial")
-struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
+struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     CollectionElement, Sized, Boolable
 ):
     """An Array allocated on the stack with a capacity and
@@ -135,11 +135,6 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
             values: The values to populate the Array with.
         """
         self = Self()
-        var delta = capacity - len(values)
-        if delta > -1:
-            self.capacity_left = delta
-        else:
-            self.capacity_left = 0
         for value in values:
             self.append(value)
 
@@ -275,25 +270,20 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
             self.unsafe_set(capacity - 1, value)
             return
         self.unsafe_set(len(self), value)
-        self.capacity_left = max(0, self.capacity_left - 1)
+        self.capacity_left -= 1
 
     @always_inline
-    fn append[cap: Int](inout self, other: Array[T, cap]) -> Self:
-        """Appends another Array to the Array up to
-        Self.capacity.
+    fn append[cap: Int](inout self, other: Array[T, cap]):
+        """Appends the values of another Array up to Self.capacity.
 
         Parameters:
             cap: The capacity of the other Array.
 
         Args:
             other: The Array to append.
-
-        Returns:
-            The new Array.
         """
-        var new_self = self
-        new_self.extend(other)
-        return new_self
+        for i in range(self.capacity_left):
+            self.append(other[i])
 
     fn __iter__(
         self,
@@ -330,7 +320,7 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
         Returns:
             True if the value is contained in the Array, False otherwise.
         """
-        return (value & self.vec).reduce_or()
+        return ~(self.vec ^ value).cast[DType.bool]().reduce_or()
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -359,18 +349,6 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
     #     self = Self()
     #     for i in range(len(existing)):
     #         self.unsafe_set(i, existing[i])
-
-    fn __setitem__(inout self, idx: Int, owned value: Self._scalar_type):
-        """Sets a Array element at the given index. This will
-        not update self.capacity_left.
-
-        Args:
-            idx: The index of the element.
-            value: The value to assign.
-        """
-        debug_assert(abs(idx) > len(self), "index must be within bounds")
-        var norm_idx = idx if idx > 0 else min(0, len(self) + idx)
-        self.vec[norm_idx] = value
 
     @always_inline("nodebug")
     fn concat[
@@ -459,16 +437,20 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
             i: The index for the value.
             value: The value to insert.
         """
-        debug_assert(abs(i) > len(self), "insert index out of range")
-
-        var norm_idx = i if i > 0 else min(0, len(self) + i)
+        debug_assert(
+            abs(i) < capacity or i == -1 * capacity, "insert index out of range"
+        )
+        var norm_idx = min(i, capacity - 1) if i > -1 else max(0, capacity + i)
 
         var previous = value
-        for i in range(norm_idx, len(self)):
+        for i in range(norm_idx, capacity):
             var tmp = self.vec[i]
             self.vec[i] = previous
             previous = tmp
-        self.append(previous)
+        if self.capacity_left > 0:
+            self.capacity_left = min(
+                self.capacity_left - 1, capacity - (norm_idx + 1)
+            )
 
     @always_inline
     fn extend[cap: Int = capacity](inout self, owned other: Array[T, cap]):
@@ -485,7 +467,6 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
             self.unsafe_set(len(self) + i, other.unsafe_get(i))
             self.capacity_left -= 1
 
-    @always_inline
     fn pop(inout self, i: Int = -1) -> Self._scalar_type:
         """Pops a value from the list at the given index.
 
@@ -495,16 +476,27 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The popped value.
         """
-        debug_assert(abs(i) > len(self), "pop index out of range")
-        var norm_idx = i if i > 0 else len(self) + i
+        debug_assert(
+            abs(i) < len(self) or i == -1 * len(self), "pop index out of range"
+        )
+        var norm_idx = min(i, len(self) - 1) if i > -1 else max(
+            0, len(self) + i
+        )
         self.capacity_left += 1
-        return self.unsafe_get(norm_idx)
+        var val = self.unsafe_get(norm_idx)
+        for i in range(len(self) - norm_idx):
+            var offset = norm_idx + i
+            if offset == len(self):
+                self.unsafe_set(norm_idx, 0)
+                break
+            self.unsafe_set(offset, self.unsafe_get(offset + 1))
+        return val
 
     fn index(
         self,
         value: Self._scalar_type,
         start: Int = 0,
-        stop: Optional[Int] = None,
+        stop: Int = -1,
     ) -> OptionalReg[Int]:
         """
         Returns the index of the first occurrence of a value in an Array
@@ -520,29 +512,34 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
             start: The starting index of the search, treated as a slice index
                 (defaults to 0).
             stop: The ending index of the search, treated as a slice index
-                (defaults to None, which means the end of the Array).
+                (defaults to the end of the Array).
 
         Returns:
             The Optional index of the first occurrence of the value in the Array.
         """
 
         var size = len(self)
-        debug_assert(abs(start) > size, "start index must be within bounds")
-        var start_norm = start if start > 0 else min(0, size + start)
+        debug_assert(
+            abs(start) < size or start == -1 * size,
+            "start index must be within bounds",
+        )
+        var start_norm = min(start, size - 1) if start > -1 else max(
+            0, size + start
+        )
 
-        var stop_norm: Int = stop.value()[] if stop else size
-        debug_assert(abs(stop_norm) > size, "stop index must be within bounds")
-        if stop_norm < 0:
-            stop_norm = min(0, size + stop_norm)
-
-        start_norm = max(start_norm, min(0, size))
-        stop_norm = max(stop_norm, min(0, size))
-        # FIXME ? maybe building a range 0..stop_norm and multiplying it
-        # to the bitwise & comparison's result and doing reduce_min()?
-        var s = (self[start_norm:stop_norm].vec & value).cast[DType.bool]()
-        for i in range(stop_norm - start_norm):
+        debug_assert(
+            abs(stop) < size or stop == -1 * size,
+            "stop index must be within bounds",
+        )
+        var stop_norm: Int = min(stop, size - 1) if stop > -1 else max(
+            0, size + stop + 1
+        )
+        if start == stop_norm:  # FIXME
+            return None
+        var s = ~(self.vec ^ Self._vec_type(value)).cast[DType.bool]()
+        for i in range(start_norm, stop_norm):
             if s[i]:
-                return i + start_norm
+                return i
         return None
 
     @always_inline
@@ -563,30 +560,6 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
             new_span.end = new_span.start - 1
             new_span.start = tmp - 1
         return new_span
-
-    # @always_inline("nodebug")
-    # fn __refitem__[
-    #     IntableType: Intable,
-    # ](self: Reference[Self, _, _], index: IntableType) -> Reference[
-    #     Self._scalar_type, self.is_mutable, self.lifetime
-    # ]:
-    #     """Get a `Reference` to the element at the given index.
-
-    #     Parameters:
-    #         IntableType: The inferred type of an intable argument.
-
-    #     Args:
-    #         index: The index of the item.
-
-    #     Returns:
-    #         A reference to the item at the given index.
-    #     """
-    #     debug_assert(
-    #         abs(int(index)) < capacity, "Index must be within bounds."
-    #     )
-    #     var idx = int(index)
-    #     var norm_idx = idx if idx > 0 else max(0, idx + capacity)
-    #     return UnsafePointer(self[][norm_idx])[]
 
     @always_inline
     fn __getitem__(self, span: Slice) -> Self:
@@ -610,6 +583,23 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
             res[i] = self[adjusted_span[i]]
         return res
 
+    fn __setitem__(inout self, idx: Int, owned value: Self._scalar_type):
+        """Sets a Array element at the given index. This will
+        not update self.capacity_left.
+
+        Args:
+            idx: The index of the element.
+            value: The value to assign.
+        """
+        debug_assert(
+            abs(idx) < len(self) or idx == -1 * len(self),
+            "index must be within bounds",
+        )
+        var norm_idx = min(idx, len(self) - 1) if idx > -1 else max(
+            0, len(self) + idx
+        )
+        self.vec[norm_idx] = value
+
     @always_inline
     fn __getitem__(self, idx: Int) -> Self._scalar_type:
         """Gets a copy of the element at the given index.
@@ -620,7 +610,14 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
         Returns:
             A copy of the element at the given index.
         """
-        return self.vec[idx]
+        debug_assert(
+            abs(idx) < len(self) or idx == -1 * len(self),
+            "index must be within bounds",
+        )
+        var norm_idx = min(idx, len(self) - 1) if idx > -1 else max(
+            0, len(self) + idx
+        )
+        return self.vec[norm_idx]
 
     fn count(self, value: Self._scalar_type) -> Int:
         """Counts the number of occurrences of a value in the Array.
@@ -687,7 +684,10 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
             idx: The index to set the element.
             value: The element.
         """
-        debug_assert(abs(idx) > len(self), "index must be within bounds")
+        debug_assert(
+            abs(idx) > len(self) or idx == -1 * len(self),
+            "index must be within bounds",
+        )
         self.vec[idx] = value
 
     @always_inline("nodebug")
@@ -890,22 +890,40 @@ struct Array[T: DType = DType.index, capacity: Int = 256 // T.bitwidth()](
         self.vec = self.vec.splat(0)
         self.capacity_left = capacity
 
-    # @always_inline
+    @always_inline("nodebug")
+    fn cos(self, other: Self) -> Float64:
+        """Calculates the cosine of the angle between two Arrays.
+
+        Args:
+            other: The other Array.
+
+        Returns:
+            The result.
+        """
+        return (self * other) / (abs(self.vec) * abs(other.vec))
+
+    # TODO: need math funcs
+    # @always_inline("nodebug")
     # fn theta(self, other: Self) -> Float64:
     #     """Calculates the angle between two Arrays.
 
+    #     Args:
+    #         other: The other Array.
+
     #     Returns:
     #         The result.
-    #     """ # TODO: need math funcs
-    #     return acos((self * other) / (abs(self.vec) * abs(other.vec)))
+    #     """
+    #     return acos(self.cos(other))
 
+    # TODO: need math funcs
+    # @always_inline("nodebug")
     # fn cross(self, other: Self) -> Self:
     #     """Calculates the cross product between two Arrays.
-
+    #
     #     Returns:
     #         The result.
     #     """
     #     # TODO using matmul for big vectors
     #     # TODO quaternions/fma for 3d vectors
     #     var magns = abs(self.vec) * abs(other.vec)
-    #     return magns * sin((self * other) / magns) # TODO: need math funcs
+    #     return magns * sin((self * other) / magns)

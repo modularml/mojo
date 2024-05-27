@@ -22,7 +22,6 @@ def test_inlined_fixed_array():
     var array = Array[DType.int8, 5]()
 
     for i in range(5):
-        print(i)
         array.append(i)
 
     # Verify it's iterable
@@ -53,19 +52,17 @@ def test_inlined_fixed_array():
     assert_equal(7, array[-1])
 
     # Can't assign past the static size
-    for j in range(5, 10):
-        array.append(j)
+    for i in range(5, 10):
+        array.append(i)
 
     assert_equal(5, len(array))
-
-    assert_equal(5, array[-1])
-    assert_equal(6, array[-1])
-    assert_equal(7, array[-1])
-    assert_equal(8, array[-1])
     assert_equal(9, array[-1])
 
+    # clearing zeroes the array
     array.clear()
     assert_equal(0, len(array))
+    for i in range(5):
+        assert_equal(0, array[i])
 
 
 def test_inlined_fixed_array_with_default():
@@ -108,17 +105,15 @@ def test_indexing_vec():
 
 
 def test_mojo_issue_698():
-    # FIXME
-    # var arr = Array[DType.float64]()
-    # for i in range(5):
-    #     arr.append(i)
+    var arr = Array[DType.float64, 5]()
+    for i in range(5):
+        arr.append(i)
 
-    # assert_equal(0.0, arr[0])
-    # assert_equal(1.0, arr[1])
-    # assert_equal(2.0, arr[2])
-    # assert_equal(3.0, arr[3])
-    # assert_equal(4.0, arr[4])
-    pass
+    assert_equal(0.0, arr[0])
+    assert_equal(1.0, arr[1])
+    assert_equal(2.0, arr[2])
+    assert_equal(3.0, arr[3])
+    assert_equal(4.0, arr[4])
 
 
 def test_list():
@@ -204,8 +199,8 @@ def test_list_insert():
 
     var v1 = Array[DType.int8]()
     v1.insert(len(v1), 1)
-    v1.insert(len(v1), 3)
     v1.insert(1, 2)
+    v1.insert(len(v1), 3)
 
     assert_equal(len(v1), 3)
     assert_equal(v1[0], 1)
@@ -216,12 +211,12 @@ def test_list_insert():
     # Test the list [1, 2, 3, 4, 5] created with negative and positive index
     #
 
-    var v2 = Array[DType.int8]()
+    var v2 = Array[DType.int8, 5]()
     v2.insert(-1729, 2)
     v2.insert(len(v2), 3)
     v2.insert(len(v2), 5)
-    v2.insert(-1, 4)
-    v2.insert(-len(v2), 1)
+    v2.insert(-5, 1)
+    v2.insert(-2, 4)
 
     assert_equal(len(v2), 5)
     assert_equal(v2[0], 1)
@@ -234,7 +229,7 @@ def test_list_insert():
     # Test the list [1, 2, 3, 4] created with negative index
     #
 
-    var v3 = Array[DType.int8]()
+    var v3 = Array[DType.int8, 4]()
     v3.insert(-11, 4)
     v3.insert(-13, 3)
     v3.insert(-17, 2)
@@ -267,21 +262,18 @@ def test_list_index():
     assert_equal(test_list_a.index(30).value(), 2)
     assert_equal(test_list_a.index(50).value(), 4)
     assert_false(test_list_a.index(60))
-
     # Tests With Start Parameter
     assert_equal(test_list_a.index(30, start=1).value(), 2)
     assert_equal(test_list_a.index(30, start=-4).value(), 2)
     assert_equal(test_list_a.index(30, start=-1000).value(), 2)
     assert_false(test_list_a.index(30, start=3))
     assert_false(test_list_a.index(30, start=5))
-
     # Tests With Start and End Parameters
     assert_equal(test_list_a.index(30, start=1, stop=3).value(), 2)
     assert_equal(test_list_a.index(30, start=-4, stop=-2).value(), 2)
     assert_equal(test_list_a.index(30, start=-1000, stop=1000).value(), 2)
     assert_false(test_list_a.index(30, start=1, stop=2))
     assert_false(test_list_a.index(30, start=3, stop=1))
-
     # Tests With End Parameter Only
     assert_equal(test_list_a.index(30, stop=3).value(), 2)
     assert_equal(test_list_a.index(30, stop=-2).value(), 2)
@@ -289,36 +281,30 @@ def test_list_index():
     assert_false(test_list_a.index(30, stop=1))
     assert_false(test_list_a.index(30, stop=2))
     assert_false(test_list_a.index(60, stop=50))
-
     # Edge Cases and Special Conditions
     assert_equal(test_list_a.index(10, start=-5, stop=-1).value(), 0)
     assert_equal(test_list_a.index(10, start=0, stop=50).value(), 0)
-    assert_false(test_list_a.index(50, start=-5, stop=-1))
-    assert_false(test_list_a.index(50, start=0, stop=-1))
+    assert_equal(test_list_a.index(50, start=-5, stop=-1).value(), 4)
+    assert_equal(test_list_a.index(50, start=0, stop=-1).value(), 4)
     assert_false(test_list_a.index(10, start=-4, stop=-1))
     assert_false(test_list_a.index(10, start=5, stop=50))
     assert_false(Array[DType.int8]().index(10))
-
-    # Test empty slice
+    # print("5")
+    # # Test empty slice
     assert_false(test_list_a.index(10, start=1, stop=1))
     # Test empty slice with 0 start and end
     assert_false(test_list_a.index(10, start=0, stop=0))
-
     var test_list_b = Array[DType.int8](10, 20, 30, 20, 10)
 
     # Test finding the first occurrence of an item
     assert_equal(test_list_b.index(10).value(), 0)
     assert_equal(test_list_b.index(20).value(), 1)
-
     # Test skipping the first occurrence with a start parameter
     assert_equal(test_list_b.index(20, start=2).value(), 3)
-
     # Test constraining search with start and end, excluding last occurrence
     assert_false(test_list_b.index(10, start=1, stop=4))
-
     # Test search within a range that includes multiple occurrences
     assert_equal(test_list_b.index(20, start=1, stop=4).value(), 1)
-
     # Verify error when constrained range excludes occurrences
     assert_false(test_list_b.index(20, start=4, stop=5))
 
@@ -577,12 +563,12 @@ def main():
     test_indexing_vec()
     # from List
     test_mojo_issue_698()
-    # test_list()
-    # test_list_to_bool_conversion()
-    # test_list_pop()
-    # test_list_variadic_constructor()
-    # test_list_insert()
-    # test_list_index()
+    test_list()
+    test_list_to_bool_conversion()
+    test_list_pop()
+    test_list_variadic_constructor()
+    test_list_insert()
+    test_list_index()
     # test_list_extend()
     # test_list_iter()
     # test_list_iter_mutable()
