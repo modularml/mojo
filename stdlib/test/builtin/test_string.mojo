@@ -672,7 +672,7 @@ fn test_splitlines() raises:
     assert_equal(res5[3], "language")
 
     # Test with keepends=True
-    var res6 = in5.splitlines[keepends=True]()
+    var res6 = in5.splitlines(keepends=True)
     assert_equal(len(res6), 4)
     assert_equal(res6[0], "hello\n")
     assert_equal(res6[1], "world\r\n")
