@@ -491,7 +491,10 @@ by [@jayzhan211](https://github.com/jayzhan211))
   - Removed `StringRef.unsafe_uint8_ptr()`. The `unsafe_ptr()` method now has
     the same behavior.
 
-- Changed `isspace(..)` to take an `Int`.
+- Added `String.isspace()` method conformant with Python's universal separators.
+
+- Changed `isspace(..)` to take a `UInt8` and was made private (`_isspace(..)`),
+  use `String.isspace()` instead.
 
 - Added `UnsafePointer.offset()` method.
 

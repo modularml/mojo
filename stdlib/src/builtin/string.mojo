@@ -222,7 +222,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
-        if isspace(int(buff[pos])):
+        if _isspace(buff[pos]):
             continue
 
         if str_ref[pos] == "-":
@@ -297,13 +297,13 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         elif ord_letter_min[1] <= ord_current <= ord_letter_max[1]:
             result += ord_current - ord_letter_min[1] + 10
             found_valid_chars_after_start = True
-        elif isspace(ord_current):
+        elif _isspace(ord_current):
             has_space_after_number = True
             start = pos + 1
             break
         else:
             raise Error(_atol_error(base, str_ref))
-        if pos + 1 < str_len and not isspace(int(buff[pos + 1])):
+        if pos + 1 < str_len and not _isspace(buff[pos + 1]):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
@@ -317,7 +317,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     if has_space_after_number:
         for pos in range(start, str_len):
-            if not isspace(int(buff[pos])):
+            if not _isspace(buff[pos]):
                 raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
@@ -582,28 +582,38 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 
 
 # ===----------------------------------------------------------------------===#
-# isspace
+# _isspace
 # ===----------------------------------------------------------------------===#
 
 
-fn isspace(c: UInt8) -> Bool:
+fn _get_spaces_table() -> InlineArray[UInt8, 256]:
+    var table = InlineArray[UInt8, 256](0)
+    table[ord(" ")] = 1
+    table[ord("\t")] = 1
+    table[ord("\n")] = 1
+    table[ord("\r")] = 1
+    table[ord("\f")] = 1
+    table[ord("\v")] = 1
+    return table
+
+
+alias _SPACES_TABLE = _get_spaces_table()
+
+
+fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
-       This currently only respects the default "C" locale, i.e. returns
-       True only if the character specified is one of
-       " \n\t\r\f\v".
+    This only respects the default "C" locale, i.e. returns True only
+    if the character specified is one of " \\t\\n\\r\\f\\v".
+    For full Python support use `String.isspace()`.
 
     Args:
         c: The character to check.
 
     Returns:
-        True if the character is one of the whitespace characters listed above, otherwise False.
+        True if the character is one of the whitespace characters
+            listed above, otherwise False.
     """
-
-    alias ord_space = ord(" ")
-    alias ord_tab = ord("\t")
-    alias ord_carriage_return = ord("\r")
-
-    return c == ord_space or ord_tab <= int(c) <= ord_carriage_return
+    return _SPACES_TABLE[int(c)]
 
 
 # ===----------------------------------------------------------------------===#
@@ -1416,6 +1426,54 @@ struct String(
         return self._strref_dangerous().rfind(
             substr._strref_dangerous(), start=start
         )
+
+    fn isspace(self) -> Bool:
+        """Determines whether the given String is a python
+        whitespace String. This corresponds to Python's
+        [universal separators](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `" \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
+
+        Returns:
+            True if the String is one of the whitespace characters
+                listed above, otherwise False."""
+        # TODO add line and paragraph separator as stringliteral
+        # once unicode escape secuences are accepted
+        # 0 is to build a String with null terminator
+        alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
+        """TODO: \\x1c"""
+        alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
+        """TODO: \\x1e"""
+        alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+        """TODO: \\x85"""
+        alias unicode_line_sep = List[UInt8](
+            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
+        )
+        """TODO: \\u2028"""
+        alias unicode_paragraph_sep = List[UInt8](
+            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
+        )
+        """TODO: \\u2029"""
+
+        @always_inline
+        fn compare(item1: List[UInt8], item2: List[UInt8], amnt: Int) -> Bool:
+            var ptr1 = DTypePointer(item1.unsafe_ptr())
+            var ptr2 = DTypePointer(item2.unsafe_ptr())
+            return memcmp(ptr1, ptr2, amnt) == 0
+
+        if len(self) == 1:
+            return _isspace(self._buffer.unsafe_get(0)[])
+        elif len(self) == 3:
+            return compare(self._buffer, next_line, 3)
+        elif len(self) == 4:
+            return compare(self._buffer, information_sep_four, 4) or compare(
+                self._buffer, information_sep_two, 4
+            )
+        elif len(self) == 7:
+            return compare(self._buffer, unicode_line_sep, 7) or compare(
+                self._buffer, unicode_paragraph_sep, 7
+            )
+        return False
 
     fn split(self, delimiter: String) raises -> List[String]:
         """Split the string by a delimiter.
