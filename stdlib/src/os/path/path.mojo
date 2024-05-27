@@ -22,6 +22,7 @@ from os.path import isdir
 from stat import S_ISDIR, S_ISLNK, S_ISREG
 from sys import has_neon, os_is_linux, os_is_macos, os_is_windows
 
+from ..os import sep
 from .. import PathLike
 from .._linux_aarch64 import _lstat as _lstat_linux_arm
 from .._linux_aarch64 import _stat as _stat_linux_arm
@@ -283,3 +284,59 @@ fn getsize[pathlike: os.PathLike](path: pathlike) raises -> Int:
       The size of the path in bytes.
     """
     return getsize(path.__fspath__())
+
+
+# ===----------------------------------------------------------------------=== #
+# join
+# ===----------------------------------------------------------------------=== #
+
+
+fn join(path: String, *paths: String) -> String:
+    """Join two or more pathname components, inserting '/' as needed.
+    If any component is an absolute path, all previous path components
+    will be discarded.  An empty last part will result in a path that
+    ends with a separator.
+
+    Args:
+      path: The path to join.
+      paths: The paths to join.
+
+    Returns:
+      The joined path.
+    """
+    var joined_path = path
+
+    for cur_path in paths:
+        if cur_path[].startswith(sep):
+            joined_path = cur_path[]
+        elif not joined_path or path.endswith(sep):
+            joined_path += cur_path[]
+        else:
+            joined_path += sep + cur_path[]
+
+    return joined_path
+
+
+# TODO uncomment this when unpacking is supported
+# fn join[pathlike: os.PathLike](path: pathlike, *paths: pathlike) -> String:
+#     """Join two or more pathname components, inserting '/' as needed.
+#     If any component is an absolute path, all previous path components
+#     will be discarded.  An empty last part will result in a path that
+#     ends with a separator.
+
+#     Parameters:
+#       pathlike: The type conforming to the os.PathLike trait.
+
+#     Args:
+#       path: The path to join.
+#       paths: The paths to join.
+
+#     Returns:
+#       The joined path.
+#     """
+#     var paths_str= List[String]()
+
+#     for cur_path in paths:
+#         paths_str.append(cur_path[].__fspath__())
+
+#     return join(path.__fspath__(), *paths_str)
