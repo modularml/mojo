@@ -40,9 +40,12 @@ from utils.numerics import (
 )
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils import InlineArray
-
-from .dtype import _integral_type_of, _get_dtype_printf_format
-from .io import _snprintf_scalar, _printf, _print_fmt
+from .dtype import (
+    _integral_type_of,
+    _get_dtype_printf_format,
+    _scientific_notation_digits,
+)
+from .io import _snprintf_scalar, _snprintf, _printf, _print_fmt
 from .string import _calc_initial_buffer_size, _calc_format_buffer_size
 
 # ===------------------------------------------------------------------------===#
@@ -140,6 +143,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Sized,
     Stringable,
     Truncable,
+    Representable,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -577,9 +581,47 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         return String.format_sequence(self)
 
+    @always_inline
+    fn __repr__(self) -> String:
+        """Get the representation of the SIMD value eg. "SIMD[DType.int8, 2](1, 2)".
+        Returns:
+            The representation of the SIMD value.
+
+        """
+
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to[use_scientific_notation=True](writer)
+
+        var values = output.as_string_slice()
+
+        @parameter
+        if size > 1:
+            # TODO: Fix when slice indexing is implemented on StringSlice
+            values = StringSlice(output.as_bytes_slice()[1:-1])
+        return (
+            "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
+        )
+
+    @always_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this SIMD value to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        self.format_to[use_scientific_notation=False](writer)
+
+    # This overload is required to keep SIMD compliant with the Formattable trait,
+    # and the call to `String.format_sequence(self)` in SIMD.__str__ will fail to compile
+    fn format_to[use_scientific_notation: Bool](self, inout writer: Formatter):
+        """
+        Formats this SIMD value to the provided formatter.
+
+        Parameters:
+            use_scientific_notation: Whether floats should use scientific notation.
+                This parameter does not apply to integer types.
 
         Args:
             writer: The formatter to write to.
@@ -617,7 +659,15 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                     #   used.
                     _printf[_get_dtype_printf_format[type]()](element)
             else:
-                _format_scalar(writer, element)
+
+                @parameter
+                if use_scientific_notation and type.is_floating_point():
+                    alias float_format = "%." + _scientific_notation_digits[
+                        type
+                    ]() + "e"
+                    _format_scalar[type, float_format](writer, element)
+                else:
+                    _format_scalar(writer, element)
 
         # Print a closing `]`.
         @parameter
@@ -2808,7 +2858,9 @@ fn _simd_apply[
 # ===----------------------------------------------------------------------=== #
 
 
-fn _format_scalar[dtype: DType](inout writer: Formatter, value: Scalar[dtype]):
+fn _format_scalar[
+    dtype: DType, float_format: StringLiteral = "%.17g"
+](inout writer: Formatter, value: Scalar[dtype]):
     # Stack allocate enough bytes to store any formatted Scalar value of any
     # type.
     alias size: Int = _calc_format_buffer_size[dtype]()
@@ -2817,11 +2869,7 @@ fn _format_scalar[dtype: DType](inout writer: Formatter, value: Scalar[dtype]):
 
     var buf_ptr = buf.unsafe_ptr()
 
-    var wrote = _snprintf_scalar[dtype](
-        buf_ptr,
-        size,
-        value,
-    )
+    var wrote = _snprintf_scalar[dtype, float_format](buf_ptr, size, value)
 
     var strref = StringRef(buf_ptr, wrote)
 
