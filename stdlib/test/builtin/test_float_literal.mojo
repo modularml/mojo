@@ -98,6 +98,11 @@ def test_round():
     assert_equal(FloatLiteral.__round__(-2.5, 0), -2.0)
     assert_equal(FloatLiteral.__round__(-1.5, 0), -2.0)
 
+    # Negative ndigits
+    assert_equal(FloatLiteral.__round__(123.456, -1), 120.0)
+    assert_equal(FloatLiteral.__round__(123.456, -2), 100.0)
+    assert_equal(FloatLiteral.__round__(123.456, -3), 0.0)
+
 
 fn round10(x: Float64) -> Float64:
     # TODO: implement __div__ on FloatLiteral?

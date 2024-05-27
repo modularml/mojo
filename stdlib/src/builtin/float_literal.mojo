@@ -286,12 +286,18 @@ struct FloatLiteral(
         alias neg_one = __mlir_attr.`#kgen.int_literal<-1> : !kgen.int_literal`
         alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
         var multiplier = one
+        var target: Self = self
         # TODO: Use IntLiteral.__pow__() when it's implemented.
-        for _ in range(ndigits):
+        for _ in range(abs(ndigits)):
             multiplier = __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
             ](multiplier, ten)
-        var target: Self = self * Self(multiplier)
+        if ndigits > 0:
+            target *= Self(multiplier)
+        elif ndigits < 0:
+            target /= Self(multiplier)
+        else:
+            return self.__round__()
         var truncated: IntLiteral = target.__int_literal__()
         var result: Self
         var abs_diff = abs(target - truncated)
@@ -306,8 +312,10 @@ struct FloatLiteral(
             result = Self(truncated)
         else:
             result = Self(truncated + plus_one)
-        if ndigits > 0:
+        if ndigits >= 0:
             result /= Self(multiplier)
+        elif ndigits < 0:
+            result *= Self(multiplier)
         return result
 
     # ===------------------------------------------------------------------===#
