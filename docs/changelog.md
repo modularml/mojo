@@ -546,7 +546,8 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - The `add`, `sub`, `mul`, `div`, and `mod` functions have been removed from the
   `math` module. Instead, users should rely on the `+`, `-`, `*`, `/`, and `%`
-  operators, respectively.
+  operators, respectively. The `math.identity` function is also removed; users
+  can implement it trivially.
 
 - The `math.roundeven` function has been removed from the `math` module. The new
   `SIMD.roundeven` method now provides the identical functionality.
