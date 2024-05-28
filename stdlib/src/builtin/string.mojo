@@ -1495,9 +1495,6 @@ struct String(
         var sep_len = len(sep)
         if sep_len == 0:
             raise Error("ValueError: empty separator")
-            # for i in range(str_iter_len + 1):
-            #     output.append(self[i])
-            # return output
 
         while lhs <= str_iter_len:
             rhs = self.find(sep, lhs)
@@ -1556,7 +1553,7 @@ struct String(
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
             while lhs <= str_iter_len:
-                if not self[lhs] in String.WHITESPACE:
+                if not _isspace(self._buffer.unsafe_get(lhs)[]):
                     break
                 lhs += 1
             # if it went until the end of the String, then
@@ -1570,7 +1567,7 @@ struct String(
                 break
             rhs = lhs + 1
             while rhs <= str_iter_len:
-                if self[rhs] in String.WHITESPACE:
+                if _isspace(self._buffer.unsafe_get(rhs)[]):
                     break
                 rhs += 1
 
