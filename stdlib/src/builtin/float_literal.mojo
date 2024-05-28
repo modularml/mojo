@@ -253,20 +253,18 @@ struct FloatLiteral(
         alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
         alias neg_one = __mlir_attr.`#kgen.int_literal<-1> : !kgen.int_literal`
         var truncated: IntLiteral = self.__int_literal__()
-        var result: Self
         var abs_diff = abs(self - truncated)
         var plus_one = one if self > 0 else neg_one
         if abs_diff == 0.5:
             # Round to the nearest even number.
             if truncated % 2 == 0:
-                result = Self(truncated)
+                return Self(truncated)
             else:
-                result = Self(truncated + plus_one)
+                return Self(truncated + plus_one)
         elif abs_diff > 0.5:
-            result = Self(truncated + plus_one)
+            return Self(truncated + plus_one)
         else:
-            result = Self(truncated)
-        return result
+            return Self(truncated)
 
     @always_inline("nodebug")
     fn __round__(self, ndigits: Int) -> Self:
