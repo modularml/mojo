@@ -1288,17 +1288,17 @@ struct object(IntableRaising, Boolable, Stringable):
         )
 
     @always_inline
-    fn __pow__(self, rhs: object) raises -> object:
+    fn __pow__(self, exp: object) raises -> object:
         """Exponentiation operator. Valid only for arithmetic types.
 
         Args:
-            rhs: Right hand value.
+            exp: Exponent value.
 
         Returns:
             The left hand value raised to the power of the right hand value.
         """
         return Self._arithmetic_binary_op[Float64.__pow__, Int64.__pow__](
-            self, rhs
+            self, exp
         )
 
     @always_inline

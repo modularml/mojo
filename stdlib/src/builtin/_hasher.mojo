@@ -11,4 +11,30 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from .path import exists, isdir, isfile, islink, lexists, getsize, join
+
+trait _HashableWithHasher:
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        ...
+
+
+trait _Hasher:
+    fn __init__(inout self):
+        ...
+
+    fn _update_with_simd(inout self, value: SIMD[_, _]):
+        ...
+
+    fn update[T: _HashableWithHasher](inout self, value: T):
+        ...
+
+    fn finish(owned self) -> UInt64:
+        ...
+
+
+fn _hash_with_hasher[
+    HasherType: _Hasher, HashableType: _HashableWithHasher
+](hashable: HashableType) -> UInt64:
+    var hasher = HasherType()
+    hasher.update(hashable)
+    var value = hasher^.finish()
+    return value

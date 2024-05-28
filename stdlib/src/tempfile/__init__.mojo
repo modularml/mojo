@@ -10,5 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Implements the tempfile package."""
 
-from .path import exists, isdir, isfile, islink, lexists, getsize, join
+from .tempfile import gettempdir, mkdtemp
