@@ -644,6 +644,7 @@ alias _UTF8_FIRST_BYTE_TABLE = _get_utf8_first_byte_table()
 
 
 # FIXME: this assumes utf8 encoding
+# TODO: this should extend the string's lifetime
 @value
 struct _StringIter[forward: Bool = True]:
     """Iterator for String.
@@ -680,11 +681,10 @@ struct _StringIter[forward: Bool = True]:
 
         @parameter
         if forward:
-            var start = self.index
-            self.index += 1 * byte_len
-            return StringRef(self.ptr.offset(start), byte_len)
+            self.index += byte_len
+            return StringRef(self.ptr.offset(self.index - byte_len), byte_len)
         else:
-            self.index -= 1 * byte_len
+            self.index -= byte_len
             return StringRef(self.ptr.offset(self.index), byte_len)
 
     fn __len__(self) -> Int:
@@ -1142,13 +1142,14 @@ struct String(
         """
         return _StringIter(self.unsafe_uint8_ptr(), len(self))
 
-    fn __reversed__(self) -> _StringIter[False]:
-        """Iterate backwards over the string, returning immutable references.
+    # FIXME
+    # fn __reversed__(self) -> _StringIter[False]:
+    #     """Iterate backwards over the string, returning immutable references.
 
-        Returns:
-            A reversed iterator of references to the string elements.
-        """
-        return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
+    #     Returns:
+    #         A reversed iterator of references to the string elements.
+    #     """
+    #     return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations

@@ -974,6 +974,13 @@ def test_string_iter():
 
     assert_equal(123, atol(conc(vs)))
 
+    # FIXME
+    # concat = String("")
+    # for v in vs.__reversed__():
+    #     print(v)
+    #     concat += v
+    # assert_equal(321, atol(concat))
+
     # TODO
     # for v in vs:
     #     v.unsafe_ptr().store(0, "1")
@@ -1001,12 +1008,15 @@ def test_string_iter():
         else:
             raise Error("shouldn't get here")
         amnt += 1
-    assert_equal(amnt, 4)
+    assert_equal(amnt, 5)
 
-    concat = String("")
-    for v in vs.__reversed__():
-        concat += v
-    assert_equal(concat, "🔥ojom")
+    # FIXME
+    # concat = String("")
+    # for v in vs.__reversed__():
+    #     concat += v
+    # assert_equal(concat, "🔥ojom")
+
+    _ = vs # TODO: this should not be necessary
 
 
 def main():
@@ -1052,3 +1062,4 @@ def main():
     test_intable()
     test_string_mul()
     test_indexing()
+    test_string_iter()
