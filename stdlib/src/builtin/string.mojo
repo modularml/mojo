@@ -576,6 +576,8 @@ fn _get_spaces_table() -> InlineArray[Bool, 256]:
     table[ord("\r")] = 1
     table[ord("\f")] = 1
     table[ord("\v")] = 1
+    table[ord("\x1c")] = 1
+    table[ord("\x1e")] = 1
     return table
 
 
@@ -627,13 +629,13 @@ fn _get_utf8_first_byte_table() -> InlineArray[UInt8, 256]:
 
     @parameter
     for i in range(256):
-        if i < 0b10000000:
+        if i < 0b1000_0000:
             table[i] = 0
-        elif i < 0b11000000:
+        elif i < 0b1100_0000:
             table[i] = 1  # is continuation byte
-        elif i < 0b11100000:
+        elif i < 0b1110_0000:
             table[i] = 2  # is 2 byte long
-        elif i < 0b11110000:
+        elif i < 0b1111_0000:
             table[i] = 3  # is 3 byte long
         else:
             table[i] = 4  # is 4 byte long
@@ -682,7 +684,10 @@ struct _StringIter[forward: Bool = True]:
                     byte_len = int(value)
                     self.continuation_bytes -= int(value) - 1
             self.index += byte_len
-            return StringRef(self.ptr.offset(self.index - byte_len), byte_len)
+            var val = StringRef(
+                self.ptr.offset(self.index - byte_len), byte_len
+            )
+            return val
         else:
             var byte_len = 1
             if self.continuation_bytes > 0:
@@ -699,9 +704,9 @@ struct _StringIter[forward: Bool = True]:
     fn __len__(self) -> Int:
         @parameter
         if forward:
-            return self.len - self.index
+            return self.len - self.index - self.continuation_bytes
         else:
-            return self.index
+            return self.index - self.continuation_bytes
 
 
 struct String(
@@ -1152,13 +1157,13 @@ struct String(
         return _StringIter(self.unsafe_uint8_ptr(), len(self))
 
     # FIXME
-    fn __reversed__(self) -> _StringIter[False]:
-        """Iterate backwards over the string, returning immutable references.
+    # fn __reversed__(self) -> _StringIter[False]:
+    #     """Iterate backwards over the string, returning immutable references.
 
-        Returns:
-            A reversed iterator of references to the string elements.
-        """
-        return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
+    #     Returns:
+    #         A reversed iterator of references to the string elements.
+    #     """
+    #     return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
@@ -1522,44 +1527,43 @@ struct String(
 
         Returns:
             True if the String is one of the whitespace characters
-                listed above, otherwise False."""
+                listed above, otherwise False.
+        """
         # TODO add line and paragraph separator as stringliteral
         # once unicode escape secuences are accepted
         # 0 is to build a String with null terminator
-        alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
-        """TODO: \\x1c"""
-        alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
-        """TODO: \\x1e"""
-        alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+        var next_line = List[UInt8](0xC2, 0x85)
         """TODO: \\x85"""
-        alias unicode_line_sep = List[UInt8](
-            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
-        )
+        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
         """TODO: \\u2028"""
-        alias unicode_paragraph_sep = List[UInt8](
-            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
-        )
+        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
         """TODO: \\u2029"""
 
         @always_inline
-        fn compare(item1: List[UInt8], item2: List[UInt8], amnt: Int) -> Bool:
-            var ptr1 = DTypePointer(item1.unsafe_ptr())
-            var ptr2 = DTypePointer(item2.unsafe_ptr())
+        fn compare(
+            item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
+        ) -> Bool:
+            var ptr1 = DTypePointer(item1)
+            var ptr2 = DTypePointer(item2)
             return memcmp(ptr1, ptr2, amnt) == 0
 
-        if len(self) == 1:
-            return _isspace(self._buffer.unsafe_get(0)[])
-        elif len(self) == 3:
-            return compare(self._buffer, next_line, 3)
-        elif len(self) == 4:
-            return compare(self._buffer, information_sep_four, 4) or compare(
-                self._buffer, information_sep_two, 4
-            )
-        elif len(self) == 7:
-            return compare(self._buffer, unicode_line_sep, 7) or compare(
-                self._buffer, unicode_paragraph_sep, 7
-            )
-        return False
+        if len(self) == 0:
+            return False
+
+        for s in self:
+            var no_null_len = len(s)
+            if no_null_len == 1 and not _isspace(s.data[0]):
+                return False
+            elif no_null_len == 2 and not compare(
+                s.data, next_line.unsafe_ptr(), 2
+            ):
+                return False
+            elif no_null_len == 3 and not (
+                compare(s.data, unicode_line_sep.unsafe_ptr(), 3)
+                or compare(s.data, unicode_paragraph_sep.unsafe_ptr(), 3)
+            ):
+                return False
+        return True
 
     fn split(self, delimiter: String) raises -> List[String]:
         """Split the string by a delimiter.

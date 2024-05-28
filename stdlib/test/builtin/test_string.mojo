@@ -711,19 +711,11 @@ fn test_isspace() raises:
 
     # test all utf8 and unicode separators
     # 0 is to build a String with null terminator
-    alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
-    """TODO: \\x1c"""
-    alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
-    """TODO: \\x1e"""
-    alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+    alias next_line = List[UInt8](0xC2, 0x85, 0)
     """TODO: \\x85"""
-    alias unicode_line_sep = List[UInt8](
-        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
-    )
+    alias unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
     """TODO: \\u2028"""
-    alias unicode_paragraph_sep = List[UInt8](
-        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
-    )
+    alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
     """TODO: \\u2029"""
     # TODO add line and paragraph separator as stringliteral once unicode
     # escape secuences are accepted
@@ -734,22 +726,12 @@ fn test_isspace() raises:
         String("\r"),
         String("\v"),
         String("\f"),
+        String("\x1c"),
+        String("\x1e"),
         String(next_line),
-        String(information_sep_four),
-        String(information_sep_two),
         String(unicode_line_sep),
         String(unicode_paragraph_sep),
     )
-
-    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0):
-        var val = String(List[UInt8](b[], 0))
-        if not (val in univ_sep_var):
-            assert_false(val.isspace())
-
-    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0):
-        var val = String(List[UInt8](b[], 0))
-        if not (val in univ_sep_var):
-            assert_false(val.isspace())
 
     for i in univ_sep_var:
         assert_true(i[].isspace())
@@ -757,18 +739,13 @@ fn test_isspace() raises:
     for i in List[String]("not", "space", "", "s", "a", "c"):
         assert_false(i[].isspace())
 
-    # FIXME
-    # for i in range(len(univ_sep_var)):
-    #     var sep = String("")
-    #     for j in range(len(univ_sep_var)):
-    #         sep += univ_sep_var[i]
-    #         sep += univ_sep_var[j]
-    #     for s in sep:
-    #         var val = String(s)
-    #         print(len(val))
-    #         assert_true(val.isspace())
-    #         _ = val
-    #     _ = sep
+    for i in range(len(univ_sep_var)):
+        var sep = String("")
+        for j in range(len(univ_sep_var)):
+            sep += univ_sep_var[i]
+            sep += univ_sep_var[j]
+        assert_true(sep.isspace())
+        _ = sep
 
 
 fn test_ascii_aliases() raises:
