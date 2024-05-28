@@ -641,8 +641,6 @@ struct String(
     """The underlying storage for the string."""
 
     """ Useful string aliases. """
-    alias WHITESPACE = " \t\n\r\v\f"
-    """C style Whitespaces ."""
     alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
     alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
@@ -654,7 +652,7 @@ struct String(
         String.DIGITS
         + String.ASCII_LETTERS
         + String.PUNCTUATION
-        + String.WHITESPACE
+        + " \t\n\r\v\f"  # single byte utf8 whitespaces
     )
 
     # ===------------------------------------------------------------------=== #
@@ -1639,7 +1637,7 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self, chars: String = String.WHITESPACE) -> String:
+    fn strip(self, chars: String) -> String:
         """Return a copy of the string with leading and trailing characters
         removed.
 
@@ -1652,7 +1650,16 @@ struct String(
 
         return self.lstrip(chars).rstrip(chars)
 
-    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
+    fn strip(self) -> String:
+        """Return a copy of the string with leading and trailing whitespaces
+        removed.
+
+        Returns:
+            A copy of the string with no leading or trailing whitespaces.
+        """
+        return self.lstrip().rstrip()
+
+    fn rstrip(self, chars: String) -> String:
         """Return a copy of the string with trailing characters removed.
 
         Args:
@@ -1668,7 +1675,19 @@ struct String(
 
         return self[:r_idx]
 
-    fn lstrip(self, chars: String = String.WHITESPACE) -> String:
+    fn rstrip(self) -> String:
+        """Return a copy of the string with trailing whitespaces removed.
+
+        Returns:
+            A copy of the string with no trailing whitespaces.
+        """
+        # TODO: should use self.__iter__ and self.isspace()
+        var r_idx = len(self)
+        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)[]):
+            r_idx -= 1
+        return self[:r_idx]
+
+    fn lstrip(self, chars: String) -> String:
         """Return a copy of the string with leading characters removed.
 
         Args:
@@ -1682,6 +1701,18 @@ struct String(
         while l_idx < len(self) and self[l_idx] in chars:
             l_idx += 1
 
+        return self[l_idx:]
+
+    fn lstrip(self) -> String:
+        """Return a copy of the string with leading whitespaces removed.
+
+        Returns:
+            A copy of the string with no leading whitespaces.
+        """
+        # TODO: should use self.__iter__ and self.isspace()
+        var l_idx = 0
+        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)[]):
+            l_idx += 1
         return self[l_idx:]
 
     fn __hash__(self) -> Int:
