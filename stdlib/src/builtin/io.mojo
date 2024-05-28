@@ -135,19 +135,17 @@ fn _printf[
 
 @no_inline
 fn _snprintf[
-    *types: AnyType
-](
-    str: UnsafePointer[UInt8],
-    size: Int,
-    fmt: StringLiteral,
-    *arguments: *types,
-) -> Int:
+    fmt: StringLiteral, *types: AnyType
+](str: UnsafePointer[UInt8], size: Int, *arguments: *types) -> Int:
     """Writes a format string into an output pointer.
+
+    Parameters:
+        fmt: A format string.
+        types: The types of arguments interpolated into the format string.
 
     Args:
         str: A pointer into which the format string is written.
         size: At most, `size - 1` bytes are written into the output string.
-        fmt: A format string.
         arguments: Arguments interpolated into the format string.
 
     Returns:
@@ -182,16 +180,14 @@ fn _snprintf_scalar[
     type: DType,
     float_format: StringLiteral = "%.17g",
 ](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type]) -> Int:
-    alias format = _get_dtype_printf_format[type]()
-
     @parameter
     if type == DType.bool:
         if x:
-            return _snprintf(buffer, size, "True")
+            return _snprintf["True"](buffer, size)
         else:
-            return _snprintf(buffer, size, "False")
+            return _snprintf["False"](buffer, size)
     elif type.is_integral() or type == DType.address:
-        return _snprintf(buffer, size, format, x)
+        return _snprintf[_get_dtype_printf_format[type]()](buffer, size, x)
     elif (
         type == DType.float16 or type == DType.bfloat16 or type == DType.float32
     ):
@@ -209,12 +205,12 @@ fn _snprintf_scalar[
 
 @no_inline
 fn _float_repr[
-    format: StringLiteral = "%.17g"
+    fmt: StringLiteral = "%.17g"
 ](buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
-    var n = _snprintf(buffer, size, format, x.value)
+    var n = _snprintf[fmt](buffer, size, x.value)
     # If the buffer isn't big enough to add anything, then just return.
     if n + 2 >= size:
         return n
