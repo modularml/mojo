@@ -544,13 +544,16 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - The `math.round_half_down` and `math.round_half_up` functions are removed.
   These can be trivially implemented using the `ceil` and `floor` functions.
 
-- The `add`, `sub`, `mul`, `div`, `mod`, `greater`, `greater_equal`, `less`,
-  `less_equal`, `equal`, `not_equal`, `logical_and`, `logical_xor`, and
-  `logical_not`, functions have been removed from the `math` module. Instead,
-  users should rely directly on the `+`, `-`, `*`, `/`, `%`, `>`, `>=`, `<`,
-  `<=`, `==`, `!=`, `&`, `^`, and `~` operators, respectively. The `identity`
-  `reciprocal` functions are also removed; users can implement these trivially.
-  The `select` function is removed in favor of using `SIMD.select` directly.
+- The following functions have been removed from the math module:
+  - `add`, `sub`, `mul`, `div`, `mod`, `greater`, `greater_equal`, `less`,
+    `less_equal`, `equal`, `not_equal`, `logical_and`, `logical_xor`, and
+    `logical_not`; Instead, users should rely directly on the `+`, `-`, `*`,
+    `/`, `%`, `>`, `>=`, `<`, `<=`, `==`, `!=`, `&`, `^`, and `~` operators,
+    respectively.
+  - `identity` and `reciprocal`; users can implement these trivially.
+  - `select`; in favor of using `SIMD.select` directly.
+  - `is_even` and `is_odd`; these can be trivially implemented using bitwise `&`
+    with `1`.
 
 - The `math.roundeven` function has been removed from the `math` module. The new
   `SIMD.roundeven` method now provides the identical functionality.
