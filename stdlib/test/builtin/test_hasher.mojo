@@ -86,7 +86,7 @@ def test_complexe_hash_with_hasher():
 
 
 @value
-struct ComplexeHashableStructWithList(_HashableWithHasher):
+struct ComplexHashableStructWithList(_HashableWithHasher):
     var _value1: SomeHashableStruct
     var _value2: SomeHashableStruct
     var _value3: List[UInt8]
@@ -105,7 +105,7 @@ struct ComplexeHashableStructWithList(_HashableWithHasher):
 
 def test_update_with_bytes():
     var hasher = DummyHasher()
-    var hashable = ComplexeHashableStructWithList(
+    var hashable = ComplexHashableStructWithList(
         SomeHashableStruct(42), SomeHashableStruct(10), List[UInt8](1, 2, 3)
     )
     hasher.update(hashable)
