@@ -1533,7 +1533,7 @@ fn _type_is_eq[t1: AnyType, t2: AnyType]() -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-@register_passable
+@register_passable("trivial")
 struct _RegisterPackType[*a: AnyRegType]:
     var storage: __mlir_type[`!kgen.pack<`, a, `>`]
 

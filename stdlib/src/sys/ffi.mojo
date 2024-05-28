@@ -40,11 +40,11 @@ alias DEFAULT_RTLD = RTLD.NOW | RTLD.GLOBAL
 
 
 @value
-@register_passable
+@register_passable("trivial")
 struct DLHandle(CollectionElement, Boolable):
     """Represents a dynamically linked library that can be loaded and unloaded.
 
-    The library is loaded on initialization and unloaded on deletion of the object.
+    The library is loaded on initialization and unloaded by `close`.
     """
 
     var handle: DTypePointer[DType.int8]
