@@ -672,18 +672,27 @@ struct _StringIter[forward: Bool = True]:
 
     fn __next__(inout self) -> StringRef:
         # TODO ? use SIMD like https://github.com/cyb70289/utf8
-        var byte_len = 1
-        if self.continuation_bytes > 0:
-            var value = _UTF8_FIRST_BYTE_TABLE[int(self.ptr[self.index])]
-            if value != 0:
-                byte_len = int(value)
-                self.continuation_bytes -= int(value) - 1
 
         @parameter
         if forward:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var value = _UTF8_FIRST_BYTE_TABLE[int(self.ptr[self.index])]
+                if value != 0:
+                    byte_len = int(value)
+                    self.continuation_bytes -= int(value) - 1
             self.index += byte_len
             return StringRef(self.ptr.offset(self.index - byte_len), byte_len)
         else:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var value = _UTF8_FIRST_BYTE_TABLE[int(self.ptr[self.index])]
+                if value != 0:
+                    while value == 1:
+                        var b = int(self.ptr[self.index - byte_len])
+                        value = _UTF8_FIRST_BYTE_TABLE[b]
+                        byte_len += 1
+                    self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
             return StringRef(self.ptr.offset(self.index), byte_len)
 
@@ -1143,13 +1152,13 @@ struct String(
         return _StringIter(self.unsafe_uint8_ptr(), len(self))
 
     # FIXME
-    # fn __reversed__(self) -> _StringIter[False]:
-    #     """Iterate backwards over the string, returning immutable references.
+    fn __reversed__(self) -> _StringIter[False]:
+        """Iterate backwards over the string, returning immutable references.
 
-    #     Returns:
-    #         A reversed iterator of references to the string elements.
-    #     """
-    #     return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
+        Returns:
+            A reversed iterator of references to the string elements.
+        """
+        return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
