@@ -83,6 +83,18 @@ def test_indexer():
     assert_equal(88, IntLiteral.__index__(88))
 
 
+def test_divmod():
+    t = divmod(2, 2)
+    assert_equal(t[0], 1)
+    assert_equal(t[1], 0)
+    t = divmod(2, 3)
+    assert_equal(t[0], 0)
+    assert_equal(t[1], 2)
+    t = divmod(99, -2)
+    assert_equal(t[0], -50)
+    assert_equal(t[1], -1)
+
+
 def main():
     test_int()
     test_ceil()
@@ -91,6 +103,7 @@ def main():
     test_trunc()
     test_floordiv()
     test_mod()
+    test_divmod()
     test_bit_width()
     test_abs()
     test_indexer()
