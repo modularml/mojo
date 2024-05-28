@@ -446,9 +446,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         return UnsafePointer(self._array).bitcast[Self.ElementType]()
 
     @always_inline
-    fn __contains__[
-        T: ComparableCollectionElement
-    ](self: Reference[InlineArray[T, size]], value: Self.ElementType) -> Bool:
+    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo
@@ -474,6 +472,11 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         # TODO: use @parameter for soon once it stabilizes a bit
         for i in range(size):
-            if self[][i] == rebind[T](value):
+            if (
+                rebind[Reference[T, False, __lifetime_of(self)]](
+                    Reference(self[i])
+                )[]
+                == value
+            ):
                 return True
         return False
