@@ -395,12 +395,7 @@ struct Int(
             var buf = InlineArray[UInt8, size](fill=0)
 
             # Format the integer to the local byte array
-            var len = _snprintf(
-                buf.unsafe_ptr(),
-                size,
-                "%li",
-                self.value,
-            )
+            var len = _snprintf["%li"](buf.unsafe_ptr(), size, self.value)
 
             # Create a StringRef that does NOT include the NUL terminator written
             # to the buffer.
