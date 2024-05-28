@@ -224,7 +224,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, False, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 2]()
 
@@ -249,7 +251,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, False, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 3]()
 
@@ -274,7 +278,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, False, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 4]()
 
