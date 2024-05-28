@@ -63,7 +63,7 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
         return len(self.storage)
 
     @always_inline("nodebug")
-    fn get[i: Int, T: Movable](self) -> T:
+    fn get[i: Int, T: Movable](self) -> ref [__lifetime_of(self)] T:
         """Get a list element at the given index.
 
         Parameters:
@@ -73,7 +73,9 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
         Returns:
             The element at the given index.
         """
-        return rebind[T](self.storage[i])
+        return rebind[Reference[T, False, __lifetime_of(self)]](
+            Reference(self.storage[i])
+        )[]
 
 
 # ===----------------------------------------------------------------------===#

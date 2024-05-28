@@ -39,7 +39,7 @@ print(to_string(who_knows))
 """
 
 from sys import alignof, sizeof
-from sys.intrinsics import _mlirtype_is_eq
+from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
 from memory.unsafe_pointer import (
@@ -90,7 +90,7 @@ struct _UnionTypeIndex[T: CollectionElement, *Ts: CollectionElement]:
             alias q = Ts[i]
 
             @parameter
-            if _mlirtype_is_eq[q, T]():
+            if _type_is_eq[q, T]():
                 result = i
 
         unroll[each, len(VariadicList(Ts))]()
