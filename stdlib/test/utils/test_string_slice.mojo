@@ -19,14 +19,14 @@ from utils import Span
 
 fn test_string_literal_byte_slice() raises:
     alias string: StringLiteral = "Hello"
-    alias slice = string.as_bytes_slice()
+    alias slc = string.as_bytes_slice()
 
-    assert_equal(len(slice), 5)
-    assert_equal(slice[0][], ord("H"))
-    assert_equal(slice[1][], ord("e"))
-    assert_equal(slice[2][], ord("l"))
-    assert_equal(slice[3][], ord("l"))
-    assert_equal(slice[4][], ord("o"))
+    assert_equal(len(slc), 5)
+    assert_equal(slc[0], ord("H"))
+    assert_equal(slc[1], ord("e"))
+    assert_equal(slc[2], ord("l"))
+    assert_equal(slc[3], ord("l"))
+    assert_equal(slc[4], ord("o"))
 
 
 fn test_string_byte_slice() raises:
@@ -34,11 +34,11 @@ fn test_string_byte_slice() raises:
     var str_slice = string.as_bytes_slice()
 
     assert_equal(len(str_slice), 5)
-    assert_equal(str_slice[0][], ord("H"))
-    assert_equal(str_slice[1][], ord("e"))
-    assert_equal(str_slice[2][], ord("l"))
-    assert_equal(str_slice[3][], ord("l"))
-    assert_equal(str_slice[4][], ord("o"))
+    assert_equal(str_slice[0], ord("H"))
+    assert_equal(str_slice[1], ord("e"))
+    assert_equal(str_slice[2], ord("l"))
+    assert_equal(str_slice[3], ord("l"))
+    assert_equal(str_slice[4], ord("o"))
 
     # ----------------------------------
     # Test subslicing
@@ -47,32 +47,32 @@ fn test_string_byte_slice() raises:
     # Slice the whole thing
     var sub1 = str_slice[:5]
     assert_equal(len(sub1), 5)
-    assert_equal(sub1[0][], ord("H"))
-    assert_equal(sub1[1][], ord("e"))
-    assert_equal(sub1[2][], ord("l"))
-    assert_equal(sub1[3][], ord("l"))
-    assert_equal(sub1[4][], ord("o"))
+    assert_equal(sub1[0], ord("H"))
+    assert_equal(sub1[1], ord("e"))
+    assert_equal(sub1[2], ord("l"))
+    assert_equal(sub1[3], ord("l"))
+    assert_equal(sub1[4], ord("o"))
 
     # Slice the end
     var sub2 = str_slice[2:5]
     assert_equal(len(sub2), 3)
-    assert_equal(sub2[0][], ord("l"))
-    assert_equal(sub2[1][], ord("l"))
-    assert_equal(sub2[2][], ord("o"))
+    assert_equal(sub2[0], ord("l"))
+    assert_equal(sub2[1], ord("l"))
+    assert_equal(sub2[2], ord("o"))
 
     # Slice the first element
     var sub3 = str_slice[0:1]
     assert_equal(len(sub3), 1)
-    assert_equal(sub3[0][], ord("H"))
+    assert_equal(sub3[0], ord("H"))
 
     #
     # Test mutation through slice
     #
 
-    sub1[0][] = ord("J")
+    sub1[0] = ord("J")
     assert_equal(string, "Jello")
 
-    sub2[2][] = ord("y")
+    sub2[2] = ord("y")
     assert_equal(string, "Jelly")
 
     # ----------------------------------

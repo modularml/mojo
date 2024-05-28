@@ -179,7 +179,8 @@ fn _snprintf[
 
 @no_inline
 fn _snprintf_scalar[
-    type: DType
+    type: DType,
+    float_format: StringLiteral = "%.17g",
 ](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type]) -> Int:
     alias format = _get_dtype_printf_format[type]()
 
@@ -195,9 +196,9 @@ fn _snprintf_scalar[
         type == DType.float16 or type == DType.bfloat16 or type == DType.float32
     ):
         # We need to cast the value to float64 to print it.
-        return _float_repr(buffer, size, x.cast[DType.float64]())
+        return _float_repr[float_format](buffer, size, x.cast[DType.float64]())
     elif type == DType.float64:
-        return _float_repr(buffer, size, rebind[Float64](x))
+        return _float_repr[float_format](buffer, size, rebind[Float64](x))
     return 0
 
 
@@ -207,11 +208,13 @@ fn _snprintf_scalar[
 
 
 @no_inline
-fn _float_repr(buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
+fn _float_repr[
+    format: StringLiteral = "%.17g"
+](buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
-    var n = _snprintf(buffer, size, "%.17g", x.value)
+    var n = _snprintf(buffer, size, format, x.value)
     # If the buffer isn't big enough to add anything, then just return.
     if n + 2 >= size:
         return n

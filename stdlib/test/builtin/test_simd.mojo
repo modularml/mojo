@@ -13,7 +13,7 @@
 # RUN: %mojo %s
 
 from sys import has_neon
-from utils.numerics import isfinite, isinf, isnan
+from utils.numerics import isfinite, isinf, isnan, nan
 
 from testing import assert_equal, assert_not_equal, assert_true, assert_false
 
@@ -87,6 +87,36 @@ def test_convert_simd_to_string():
             SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448)
         ),
         "[-943274556, -875902520, -808530484, -741158448]",
+    )
+
+
+def test_simd_repr():
+    assert_equal(
+        SIMD[DType.int32, 4](1, 2, 3, 4).__repr__(),
+        "SIMD[DType.int32, 4](1, 2, 3, 4)",
+    )
+    assert_equal(
+        SIMD[DType.int32, 4](-1, 2, -3, 4).__repr__(),
+        "SIMD[DType.int32, 4](-1, 2, -3, 4)",
+    )
+    assert_equal(
+        SIMD[DType.bool, 2](True, False).__repr__(),
+        "SIMD[DType.bool, 2](True, False)",
+    )
+    assert_equal(Int32(4).__repr__(), "SIMD[DType.int32, 1](4)")
+    assert_equal(
+        Float64(235234523.3452).__repr__(),
+        "SIMD[DType.float64, 1](2.3523452334520000e+08)",
+    )
+    assert_equal(
+        Float32(2897239).__repr__(), "SIMD[DType.float32, 1](2.89723900e+06)"
+    )
+    assert_equal(Float16(324).__repr__(), "SIMD[DType.float16, 1](3.2400e+02)")
+    assert_equal(
+        SIMD[DType.float32, 4](
+            Float32.MAX, Float32.MIN, -0.0, nan[DType.float32]()
+        ).__repr__(),
+        "SIMD[DType.float32, 4](inf, -inf, -0.00000000e+00, nan)",
     )
 
 
@@ -1311,6 +1341,28 @@ def test_reduce():
         test_dtype[DType.bfloat16]()
 
 
+def test_pow():
+    alias inf = FloatLiteral.infinity
+    alias F = SIMD[DType.float32, 4]
+
+    var simd_val = F(0, 1, 2, 3)
+
+    assert_equal(simd_val.__pow__(2.0), F(0.0, 1.0, 4.0, 9.0))
+    assert_equal(simd_val.__pow__(2), F(0.0, 1.0, 4.0, 9.0))
+    assert_equal(simd_val.__pow__(3), F(0.0, 1.0, 8.0, 27.0))
+    assert_equal(simd_val.__pow__(-1), F(inf, 1.0, 0.5, 0.3333333432674408))
+
+    # TODO: enable when math.isclose is open sourced
+    # assert_equal(simd_val.__pow__(0.5), F(0.0, 1.0, 1.41421, 1.73205))
+    # assert_equal(simd_val.__pow__(2, -0.5), F(0.70710, 0.57735, 0.5, 0.44721))
+
+    alias I = SIMD[DType.int32, 4]
+    var simd_val_int = I(0, 1, 2, 3)
+
+    # TODO: extend/improve these tests
+    assert_equal(simd_val_int.__pow__(2), I(0, 1, 4, 9))
+
+
 def main():
     test_abs()
     test_add()
@@ -1319,6 +1371,7 @@ def main():
     test_cast()
     test_ceil()
     test_convert_simd_to_string()
+    test_simd_repr()
     test_deinterleave()
     test_div()
     test_extract()
@@ -1336,7 +1389,9 @@ def main():
     test_min_max_clamp()
     test_mod()
     test_mul_with_overflow()
+    test_pow()
     test_radd()
+    test_reduce()
     test_rfloordiv()
     test_rmod()
     test_rotate()
@@ -1350,4 +1405,3 @@ def main():
     test_sub_with_overflow()
     test_trunc()
     test_truthy()
-    test_reduce()
