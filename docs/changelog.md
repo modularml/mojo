@@ -500,7 +500,7 @@ what we publish.
   - `cttz` -> `countr_zero`
   - `bit_length` -> `bit_width`
   - `ctpop` -> `pop_count`
-  - `bswap` -> `byte_reverse`
+  - `bswap` -> `byte_swap`
   - `bitreverse` -> `bit_reverse`
 
 - The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
