@@ -216,7 +216,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     @always_inline
     fn __contains__[
         T2: ComparableCollectionElement
-    ](self: List[T2], value: T) -> Bool:
+    ](self: List[T], value: T2) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -236,7 +236,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
         for i in self:
-            if i[] == rebind[T2](value):
+            if rebind[Reference[T2, False, __lifetime_of(self)]](i)[] == value:
                 return True
         return False
 

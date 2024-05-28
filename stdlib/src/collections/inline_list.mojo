@@ -189,7 +189,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
             _type_is_eq[ElementType, C](), "value type is not self.ElementType"
         ]()
         for i in self:
-            if value == rebind[C](i[]):
+            if value == rebind[Reference[C, False, __lifetime_of(self)]](i)[]:
                 return True
         return False
 
@@ -217,7 +217,10 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
 
         var count = 0
         for elem in self:
-            if value == rebind[C](elem[]):
+            if (
+                value
+                == rebind[Reference[C, False, __lifetime_of(self)]](elem)[]
+            ):
                 count += 1
         return count
 
