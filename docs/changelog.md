@@ -496,7 +496,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Changed `isspace(..)` to take a `UInt8` and was made private (`_isspace(..)`),
   use `String.isspace()` instead.
 
-- `String.split()` now defaults to whitespace and has pythonic behavior in that 
+- `String.split()` now defaults to whitespace and has pythonic behavior in that
   it removes all adjacent whitespaces by default.
 
 - Added `UnsafePointer.offset()` method.
