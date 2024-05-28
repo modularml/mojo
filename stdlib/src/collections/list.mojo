@@ -725,14 +725,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn __getitem__(
         self: Reference[Self, _, _], idx: Int
     ) -> ref [self.lifetime] T:
-        """Gets a copy of the list element at the given index.
+        """Gets the list element at the given index.
 
 
         Args:
             idx: The index of the element.
 
         Returns:
-            A copy of the element at the given index.
+            The element at the given index.
         """
         var normalized_idx = idx
         debug_assert(
