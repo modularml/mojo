@@ -592,3 +592,4 @@ by [@jayzhan211](https://github.com/jayzhan211))
   will also see large improvements.
 - [#2692](https://github.com/modularml/mojo/issues/2692) Fix `assert_raises`
   to include calling location.
+- [#2475](https://github.com/modularml/mojo/issues/2487) Fix `remove a footgun caused by implicit conversion by changing msg to keyword argument in assert_true/assert_false/ ..`
