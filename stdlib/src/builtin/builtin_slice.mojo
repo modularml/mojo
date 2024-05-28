@@ -40,7 +40,7 @@ fn _default_or[T: AnyRegType](value: T, default: Int) -> Int:
 
 
 @register_passable("trivial")
-struct Slice(Sized, Stringable, EqualityComparable):
+struct Slice(Stringable, EqualityComparable):
     """Represents a slice expression.
 
     Objects of this type are generated when slice syntax is used within square
@@ -138,9 +138,11 @@ struct Slice(Sized, Stringable, EqualityComparable):
         """
         return not (self == other)
 
-    @always_inline("nodebug")
-    fn __len__(self) -> Int:
+    @always_inline
+    fn unsafe_indices(self) -> Int:
         """Return the length of the slice.
+
+        Only use this function if start/end is guaranteed to be not None.
 
         Returns:
             The length of the slice.
