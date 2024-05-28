@@ -962,6 +962,41 @@ def test_indexing():
     assert_equal(a[2], "c")
 
 
+def test_string_iter():
+    var vs = String("123")
+
+    # Borrow immutably
+    fn conc(vs: String) -> String:
+        var c = String("")
+        for v in vs:
+            c += v
+        return c
+
+    assert_equal(123, atol(conc(vs)))
+
+    # TODO
+    # for v in vs:
+    #     v.unsafe_ptr().store(0, "1")
+
+    # # Borrow immutably
+    # var concat: String
+    # for v in vs:
+    #     concat += v
+
+    # assert_equal(111, atol(concat))
+
+    vs = String("mojo🔥")
+    var amnt = 0
+    for v in vs:
+        amnt += 1
+    assert_equal(amnt, 4)
+
+    concat = String("")
+    for v in vs.__reversed__():
+        concat += v
+    assert_equal(concat, "🔥ojom")
+
+
 def main():
     test_constructors()
     test_copy()

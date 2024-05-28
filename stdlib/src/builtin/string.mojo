@@ -1134,6 +1134,22 @@ struct String(
             count=other_len + 1,
         )
 
+    fn __iter__(self) -> _StringIter:
+        """Iterate over elements of the string, returning immutable references.
+
+        Returns:
+            An iterator of references to the string elements.
+        """
+        return _StringIter(self.unsafe_uint8_ptr(), len(self))
+
+    fn __reversed__(self) -> _StringIter[False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator of references to the string elements.
+        """
+        return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
+
     # ===------------------------------------------------------------------=== #
     # Trait implementations
     # ===------------------------------------------------------------------=== #
