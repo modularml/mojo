@@ -568,8 +568,8 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_spaces_table() -> InlineArray[UInt8, 256]:
-    var table = InlineArray[UInt8, 256](0)
+fn _get_spaces_table() -> InlineArray[Bool, 256]:
+    var table = InlineArray[Bool, 256](0)
     table[ord(" ")] = 1
     table[ord("\t")] = 1
     table[ord("\n")] = 1
@@ -620,6 +620,79 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # String
 # ===----------------------------------------------------------------------=== #
+
+
+fn _get_utf8_first_byte_table() -> InlineArray[UInt8, 256]:
+    var table = InlineArray[UInt8, 256](unsafe_uninitialized=True)
+
+    @parameter
+    for i in range(256):
+        if i < 0b10000000:
+            table[i] = 0
+        elif i < 0b11000000:
+            table[i] = 1  # is continuation byte
+        elif i < 0b11100000:
+            table[i] = 2  # is 2 byte long
+        elif i < 0b11110000:
+            table[i] = 3  # is 3 byte long
+        else:
+            table[i] = 4  # is 4 byte long
+    return table
+
+
+alias _UTF8_FIRST_BYTE_TABLE = _get_utf8_first_byte_table()
+
+
+# FIXME: this assumes utf8 encoding
+@value
+struct _StringIter[forward: Bool = True]:
+    """Iterator for String.
+
+    Parameters:
+        forward: The iteration direction. `False` is backwards.
+    """
+
+    var index: Int
+    var continuation_bytes: Int
+    var ptr: UnsafePointer[UInt8]
+    var len: Int
+
+    fn __init__(inout self, unsafe_pointer: UnsafePointer[UInt8], len: Int):
+        self.index = 0 if forward else len
+        self.ptr = unsafe_pointer
+        self.len = len
+        self.continuation_bytes = 0
+        for i in range(len):
+            if _UTF8_FIRST_BYTE_TABLE[int(unsafe_pointer[i])] == 1:
+                self.continuation_bytes += 1
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> StringRef:
+        # TODO ? use SIMD like https://github.com/cyb70289/utf8
+        var byte_len = 1
+        if self.continuation_bytes > 0:
+            var value = _UTF8_FIRST_BYTE_TABLE[int(self.ptr[self.index])]
+            if value != 0:
+                byte_len = int(value)
+                self.continuation_bytes -= int(value) - 1
+
+        @parameter
+        if forward:
+            var start = self.index
+            self.index += 1 * byte_len
+            return StringRef(self.ptr.offset(start), byte_len)
+        else:
+            self.index -= 1 * byte_len
+            return StringRef(self.ptr.offset(self.index), byte_len)
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return self.len - self.index
+        else:
+            return self.index
 
 
 struct String(

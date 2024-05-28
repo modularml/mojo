@@ -127,6 +127,18 @@ struct StringRef(
 
         return DTypePointer[DType.uint8](ptr)
 
+    @always_inline
+    fn __init__(inout self, owned ptr: UnsafePointer[UInt8], len: Int):
+        """Construct a StringRef value given a (potentially non-0 terminated
+        string).
+
+        Args:
+            ptr: UnsafePointer to the string.
+            len: The length of the string.
+        """
+        self.data = ptr
+        self.length = len
+
     # TODO: #2317 Drop support for this constructor when we have fully
     # transitioned to UInt8 as the main byte type.
     @always_inline
