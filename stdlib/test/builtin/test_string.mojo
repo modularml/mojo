@@ -1016,7 +1016,7 @@ def test_string_iter():
     #     concat += v
     # assert_equal(concat, "🔥ojom")
 
-    _ = vs # TODO: this should not be necessary
+    _ = vs  # TODO: this should not be necessary
 
 
 def main():
