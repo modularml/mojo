@@ -988,6 +988,18 @@ def test_string_iter():
     vs = String("mojo🔥")
     var amnt = 0
     for v in vs:
+        if amnt == 0:
+            assert_equal(v, "m")
+        elif amnt == 1:
+            assert_equal(v, "o")
+        elif amnt == 2:
+            assert_equal(v, "j")
+        elif amnt == 3:
+            assert_equal(v, "o")
+        elif amnt == 4:
+            assert_equal(v, "🔥")
+        else:
+            raise Error("shouldn't get here")
         amnt += 1
     assert_equal(amnt, 4)
 
