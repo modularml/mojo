@@ -537,13 +537,10 @@ what we publish.
 - The method `object.print()` has been removed. Since now, `object` has the
   `Stringable` trait, you can use `print(my_object)` instead.
 
-- The `math.clamp` function has been removed in favor of a new `SIMD.clamp`
-  method.
-
-- The `math.round_half_down` and `math.round_half_up` functions are removed.
-  These can be trivially implemented using the `ceil` and `floor` functions.
-
 - The following functions have been removed from the math module:
+  - `clamp`; use the new `SIMD.clamp` method instead.
+  - `round_half_down` and `round_half_up`; these can be trivially implemented
+    using the `ceil` and `floor` functions.
   - `add`, `sub`, `mul`, `div`, `mod`, `greater`, `greater_equal`, `less`,
     `less_equal`, `equal`, `not_equal`, `logical_and`, `logical_xor`, and
     `logical_not`; Instead, users should rely directly on the `+`, `-`, `*`,
@@ -553,21 +550,18 @@ what we publish.
   - `select`; in favor of using `SIMD.select` directly.
   - `is_even` and `is_odd`; these can be trivially implemented using bitwise `&`
     with `1`.
-
-- The `math.roundeven` function has been removed from the `math` module. The new
-  `SIMD.roundeven` method now provides the identical functionality.
-
-- The `math.div_ceil` function has been removed in favor of the `math.ceildiv`
-  function.
+  - `roundeven`; the new `SIMD.roundeven` method now provides the identical
+    functionality.
+  - `div_ceil`; use the new `ceildiv` function.
+  - `rotate_left` and `rotate_right`; the same functionality is available in the
+    builtin `SIMD.rotate_{left,right}` methods for `SIMD` types, and the
+    `bit.rotate_bits_{left,right}` methods for `Int`.
+  - an overload of `math.pow` taking an integer parameter exponent.
+  - `align_down_residual`; it can be trivially implemented using `align_down`.
 
 - The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
   same functionality is available in the builtin `SIMD.select` and
   `SIMD.__and__` methods, respectively.
-
-- The `math.rotate_left` and `math.rotate_right` functions have been removed.
-  The same functionality is available in the builtin `SIMD.rotate_{left,right}`
-  methods for `SIMD` types, and the `bit.rotate_bits_{left,right}` methods for
-  `Int`.
 
 - The `math.limit` module has been removed. The same functionality is available
   as follows:
@@ -581,9 +575,6 @@ what we publish.
 
 - The builtin `SIMD` struct no longer conforms to `Indexer`; users must
   explicitly cast `Scalar` values using `int`.
-
-- The overload of `math.pow` taking an integer parameter exponent has been
-  removed.
 
 ### 🛠️ Fixed
 
