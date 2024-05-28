@@ -142,12 +142,12 @@ fn bit_reverse[
 
 
 # ===----------------------------------------------------------------------===#
-# byte_reverse
+# byte_swap
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn byte_reverse[
+fn byte_swap[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Byte-swaps a value.
