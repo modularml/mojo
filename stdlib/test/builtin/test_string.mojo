@@ -602,11 +602,52 @@ fn test_rfind() raises:
 
 
 fn test_split() raises:
-    # Reject empty delimiters
-    with assert_raises(
-        contains="empty delimiter not allowed to be passed to split."
-    ):
-        _ = String("hello").split("")
+    # empty separators default to whitespace
+    var d = String("hello world").split()
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello", d[1] == "world")
+    d = String("hello \t\n\n\v\fworld").split("\n")
+    assert_true(len(d) == 3)
+    assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
+
+    # Should add all whitespace-like chars as one
+    alias utf8_spaces = String(" \t\n\r\v\f")
+    var s = utf8_spaces + "hello" + utf8_spaces + "world" + utf8_spaces
+    d = s.split()
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello" and d[1] == "world")
+
+    # should split into empty strings between separators
+    d = String("1,,,3").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "1" and d[1] == "" and d[2] == "" and d[3] == "3")
+    d = String(",,,").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "" and d[2] == "" and d[3] == "")
+    d = String(" a b ").split(" ")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "a" and d[2] == "b" and d[3] == "")
+    d = String("abababaaba").split("aba")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "b" and d[2] == "" and d[3] == "")
+
+    # should split into maxsplit + 1 items
+    d = String("1,2,3").split(",", 0)
+    assert_true(len(d) == 1)
+    assert_true(d[0] == "1,2,3")
+    d = String("1,2,3").split(",", 1)
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "1" and d[1] == "2,3")
+
+    assert_true(len(String("").split()) == 0)
+    assert_true(len(String(" ").split()) == 0)
+    assert_true(len(String("").split(" ")) == 1)
+    assert_true(len(String(" ").split(" ")) == 2)
+    assert_true(len(String("  ").split(" ")) == 3)
+    assert_true(len(String("   ").split(" ")) == 4)
+
+    with assert_raises():
+        _ = String("").split("")
 
     # Split in middle
     var d1 = String("n")
@@ -759,10 +800,6 @@ fn test_isspace() raises:
 
 
 fn test_ascii_aliases() raises:
-    var whitespaces = String(" \n\t\r\f\v")
-    for i in range(len(whitespaces)):
-        assert_true(whitespaces[i] in String.WHITESPACE)
-
     assert_true(String("a") in String.ASCII_LOWERCASE)
     assert_true(String("b") in String.ASCII_LOWERCASE)
     assert_true(String("y") in String.ASCII_LOWERCASE)
