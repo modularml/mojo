@@ -362,10 +362,73 @@ fn _put(x: DType, file: FileDescriptor = stdout):
 @no_inline
 fn print[
     *Ts: Stringable
+](*values: *Ts, flush: Bool = False, file: FileDescriptor = stdout):
+    """Prints elements to the text stream. Each element is separated by a
+    whitespace and followed by a newline character.
+
+    Parameters:
+        Ts: The elements types.
+
+    Args:
+        values: The elements to print.
+        flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
+    """
+    _print(values, sep=" ", end="\n", flush=flush, file=file)
+
+
+@no_inline
+fn print[
+    *Ts: Stringable, EndTy: Stringable
 ](
     *values: *Ts,
-    sep: StringLiteral = " ",
-    end: StringLiteral = "\n",
+    end: EndTy,
+    flush: Bool = False,
+    file: FileDescriptor = stdout,
+):
+    """Prints elements to the text stream. Each element is separated by a
+    whitespace and followed by `end`.
+
+    Parameters:
+        Ts: The elements types.
+        EndTy: The type of end argument.
+
+    Args:
+        values: The elements to print.
+        end: The String to write after printing the elements.
+        flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
+    """
+    _print(values, sep=" ", end=str(end), flush=flush, file=file)
+
+
+@no_inline
+fn print[
+    SepTy: Stringable, *Ts: Stringable
+](*values: *Ts, sep: SepTy, flush: Bool = False, file: FileDescriptor = stdout):
+    """Prints elements to the text stream. Each element is separated by `sep`
+    and followed by a newline character.
+
+    Parameters:
+        SepTy: The type of separator.
+        Ts: The elements types.
+
+    Args:
+        values: The elements to print.
+        sep: The separator used between elements.
+        flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
+    """
+    _print(values, sep=str(sep), end="\n", flush=flush, file=file)
+
+
+@no_inline
+fn print[
+    SepTy: Stringable, EndTy: Stringable, *Ts: Stringable
+](
+    *values: *Ts,
+    sep: SepTy,
+    end: EndTy,
     flush: Bool = False,
     file: FileDescriptor = stdout,
 ):
@@ -373,6 +436,8 @@ fn print[
     and followed by `end`.
 
     Parameters:
+        SepTy: The type of separator.
+        EndTy: The type of end argument.
         Ts: The elements types.
 
     Args:
@@ -382,8 +447,7 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
         file: The output stream.
     """
-
-    _print(values=values, sep=sep, end=end, flush=flush, file=file.value)
+    _print(values, sep=str(sep), end=str(end), flush=flush, file=file)
 
 
 @no_inline
@@ -391,10 +455,11 @@ fn _print[
     *Ts: Stringable
 ](
     values: VariadicPack[_, _, Stringable, Ts],
-    sep: StringLiteral = " ",
-    end: StringLiteral = "\n",
-    flush: Bool = False,
-    file: Int = 1,
+    *,
+    sep: String,
+    end: String,
+    flush: Bool,
+    file: FileDescriptor,
 ):
     @parameter
     fn print_with_separator[i: Int, T: Stringable](value: T):
@@ -402,11 +467,11 @@ fn _print[
 
         @parameter
         if i < values.__len__() - 1:
-            _put(StringRef(sep), file=file)
+            _put(sep, file=file)
 
     values.each_idx[print_with_separator]()
 
-    _put(StringRef(end), file=file)
+    _put(end, file=file)
     if flush:
         _flush(file=file)
 
