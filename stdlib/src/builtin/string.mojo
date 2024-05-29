@@ -1527,7 +1527,7 @@ struct String(
     fn splitlines(self, keepends: Bool = False) -> List[String]:
         """Split the string at line boundaries.
 
-        Arguments:
+        Args:
             keepends: If True, line breaks are kept in the resulting strings.
 
         Returns:
