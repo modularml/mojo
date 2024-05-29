@@ -674,7 +674,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             # Default end
             stop_normalized = len(self[])
         else:
-            stop_normalized = stop.value()[]
+            stop_normalized = stop.value()
 
         if start_normalized < 0:
             start_normalized += len(self[])

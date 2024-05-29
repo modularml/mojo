@@ -21,9 +21,9 @@ from collections import Optional
 var a = Optional(1)
 var b = Optional[Int](None)
 if a:
-    print(a.value()[])  # prints 1
+    print(a.value())  # prints 1
 if b:  # bool(b) is False, so no print
-    print(b.value()[])
+    print(b.value())
 var c = a.or_else(2)
 var d = b.or_else(2)
 print(c)  # prints 1
@@ -61,9 +61,9 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     var a = Optional(1)
     var b = Optional[Int](None)
     if a:
-        print(a.value()[])  # prints 1
+        print(a.value())  # prints 1
     if b:  # bool(b) is False, so no print
-        print(b.value()[])
+        print(b.value())
     var c = a.or_else(2)
     var d = b.or_else(2)
     print(c)  # prints 1
@@ -159,9 +159,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn value(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+    fn value(self: Reference[Self, _, _]) -> ref [self.lifetime] T:
         """Retrieve a reference to the value of the Optional.
 
         This check to see if the optional contains a value.
@@ -178,9 +176,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         return self[].unsafe_value()
 
     @always_inline
-    fn unsafe_value(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+    fn unsafe_value(self: Reference[Self, _, _]) -> ref [self.lifetime] T:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.

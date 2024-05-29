@@ -122,7 +122,7 @@ fn test_gettempdir() raises:
         tmpdir_result = gettempdir()
         assert_true(tmpdir_result, "Failed to get temporary directory")
         assert_equal(
-            tmpdir_result.value()[],
+            tmpdir_result.value(),
             dir_with_writing_access,
             "expected to get:" + String(dir_with_writing_access),
         )
@@ -137,7 +137,7 @@ fn test_gettempdir() raises:
         tmpdir_result = gettempdir()
         assert_true(tmpdir_result, "Failed to get temporary directory")
         assert_equal(
-            tmpdir_result.value()[],
+            tmpdir_result.value(),
             dir_with_writing_access,
             "expected to get:" + String(dir_with_writing_access),
         )
@@ -153,7 +153,7 @@ fn test_gettempdir() raises:
         tmpdir_result = gettempdir()
         assert_true(tmpdir_result, "Failed to get temporary directory")
         assert_equal(
-            tmpdir_result.value()[],
+            tmpdir_result.value(),
             dir_with_writing_access,
             "expected to get:" + String(dir_with_writing_access),
         )

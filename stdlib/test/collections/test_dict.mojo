@@ -506,8 +506,8 @@ def test_owned_kwargs_dict():
 def test_find_get():
     var some_dict = Dict[String, Int]()
     some_dict["key"] = 1
-    assert_equal(some_dict.find("key").value()[], 1)
-    assert_equal(some_dict.get("key").value()[], 1)
+    assert_equal(some_dict.find("key").value(), 1)
+    assert_equal(some_dict.get("key").value(), 1)
     assert_equal(some_dict.find("not_key").or_else(0), 0)
     assert_equal(some_dict.get("not_key", 0), 0)
 

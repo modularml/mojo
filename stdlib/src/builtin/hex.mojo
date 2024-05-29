@@ -82,7 +82,7 @@ fn _write_int(
 ) raises:
     var err = _try_write_int(fmt, value, radix, digit_chars, prefix)
     if err:
-        raise err.value()[]
+        raise err.value()
 
 
 @always_inline

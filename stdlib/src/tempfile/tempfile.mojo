@@ -148,7 +148,7 @@ fn mkdtemp(
     if not dir:
         final_dir = Path(_get_default_tempdir())
     else:
-        final_dir = Path(dir.value()[])
+        final_dir = Path(dir.value())
 
     for _ in range(TMP_MAX):
         var dir_name = final_dir / (prefix + _get_random_name() + suffix)

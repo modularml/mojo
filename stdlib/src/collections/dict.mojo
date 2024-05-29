@@ -104,7 +104,7 @@ struct _DictEntryIter[
                     self.index -= 1
 
                 self.seen += 1
-                return opt_entry_ref[].value()[]
+                return opt_entry_ref[].value()
 
             @parameter
             if forward:
@@ -739,7 +739,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         if found:
             var entry = self[]._entries.__get_ref(index)
             debug_assert(entry[].__bool__(), "entry in index must be full")
-            return Reference(entry[].value()[].value)
+            return Reference(entry[].value().value)
         raise "KeyError"
 
     fn get(self, key: K) -> Optional[V]:
@@ -796,7 +796,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self.size -= 1
             return entry_value.value^
         elif default:
-            return default.value()[]
+            return default.value()
         raise "KeyError"
 
     fn keys(
@@ -912,10 +912,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             else:
                 var entry = self._entries.__get_ref(index)
                 debug_assert(entry[].__bool__(), "entry in index must be full")
-                if (
-                    hash == entry[].value()[].hash
-                    and key == entry[].value()[].key
-                ):
+                if hash == entry[].value().hash and key == entry[].value().key:
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
 
@@ -951,7 +948,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 debug_assert(right < self._reserved, "Invalid dict state")
             var entry = self._entries.__get_ref(right)
             debug_assert(entry[].__bool__(), "Logic error")
-            var slot = self._find_empty_index(entry[].value()[].hash)
+            var slot = self._find_empty_index(entry[].value().hash)
             self._set_index(slot, left)
             if left != right:
                 self._entries[left] = entry[].unsafe_take()

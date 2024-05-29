@@ -132,7 +132,7 @@ struct _RefCountedAttrsDict:
     fn get(self, key: StringLiteral) raises -> _ObjectImpl:
         var iter = self.impl[].find(key)
         if iter:
-            return iter.value()[]
+            return iter.value()
         raise Error(
             "AttributeError: Object does not have an attribute of name '"
             + key
