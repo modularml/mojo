@@ -45,7 +45,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     var _data: Dict[T, NoneType]
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self, *ts: T):
@@ -87,7 +87,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         self._data = other._data^
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Operator dunders
     # ===-------------------------------------------------------------------===#
 
     fn __contains__(self, t: T) -> Bool:
@@ -262,7 +262,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         self.symmetric_difference_update(other)
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Trait implementations
     # ===-------------------------------------------------------------------===#
 
     fn __bool__(self) -> Bool:

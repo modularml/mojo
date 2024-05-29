@@ -337,7 +337,7 @@ struct _FixedString[CAP: Int](
         memcpy(self.buffer.unsafe_ptr(), literal.as_uint8_ptr(), len(literal))
 
     # ===------------------------------------------------------------------=== #
-    # Factor methods
+    # Factory methods
     # ===------------------------------------------------------------------=== #
 
     @staticmethod
