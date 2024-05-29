@@ -21,23 +21,23 @@ def test_random():
         var random_float = random_float64(0, 1)
         assert_true(
             random_float >= 0,
-            "Value " + str(random_float) + " is not above or equal to 0",
+            msg="Value " + str(random_float) + " is not above or equal to 0",
         )
         assert_true(
             random_float <= 1,
-            "Value " + str(random_float) + " is not below or equal to 1",
+            msg="Value " + str(random_float) + " is not below or equal to 1",
         )
 
         var random_signed = random_si64(-255, 255)
         assert_true(
             random_signed >= -255,
-            "Signed value "
+            msg="Signed value "
             + str(random_signed)
             + " is not above or equal to -255",
         )
         assert_true(
             random_signed <= 255,
-            "Signed value "
+            msg="Signed value "
             + str(random_signed)
             + " is not below or equal to 255",
         )
@@ -45,13 +45,13 @@ def test_random():
         var random_unsigned = random_ui64(0, 255)
         assert_true(
             random_unsigned >= 0,
-            "Unsigned value "
+            msg="Unsigned value "
             + str(random_unsigned)
             + " is not above or equal to 0",
         )
         assert_true(
             random_unsigned <= 255,
-            "Unsigned value "
+            msg="Unsigned value "
             + str(random_unsigned)
             + " is not below or equal to 255",
         )
