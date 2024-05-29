@@ -816,16 +816,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._n_entries -= 1
         return (entry_value[].key, entry_value[].value)
 
-    fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
-        """Iterate over the dict's keys as immutable references.
-
-        Returns:
-            An iterator of immutable references to the dictionary keys.
-        """
-        return _DictKeyIter(_DictEntryIter(0, 0, self))
-
     fn keys(
         self: Reference[Self, _, _]
     ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
