@@ -858,6 +858,73 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         return self.data
 
+    @always_inline
+    fn __delitem__(inout self, owned positions: List[Int]):
+        """
+        Remove one or multiples elements at specific positions in a list.
+        Order of removal is reverse of sorted positions.
+        Will only remove once, any position specified multiple times.
+
+        *Example:*
+        ```mojo
+        var x = List(0,10,20,30,40)
+        x.__delitem__(List(0,1,4))
+        for i in x: print(i[]) #20,30
+        ```
+
+        Args:
+            positions: The positions of the elements to delete from the list.
+
+        """
+        var tmp = Set[Int]()
+        sort(positions)
+        for e in reversed(positions):
+            if e[] not in tmp and e[] < len(self):
+                _ = self.pop(e[])
+                tmp.add(e[])
+
+    @always_inline
+    fn __delitem__(inout self, *positions: Int):
+        """
+        Remove one or multiples elements at specific positions in a list.
+        Positions are specified as arguments separated by ```,```.
+        Will only remove once, any position specified multiple times.
+        Order of removal is reverse of sorted arguments.
+
+        *Example:*
+        ```mojo
+        var x = List(0,10,20,30,40)
+        x.__delitem__(0,1,4)
+        for i in x: print(i[]) #20,30
+        ```
+
+        Args:
+            positions: The positions of the elements to delete from the list.
+
+        """
+        var indexes_as_list = List[Int]()
+        for i in positions:
+            indexes_as_list.append(i)
+        self.__delitem__(indexes_as_list^)
+
+    @always_inline
+    fn __delitem__(inout self, position: Int):
+        """
+        Remove one element at specific position in a list.
+
+        *Example:*
+        ```mojo
+        var x = List(0,10,20,30,40)
+        x.__delitem__(2)
+        for i in x: print(i[]) #0,10,30,40
+        ```
+
+        Args:
+            position: The position of the element to delete from the list.
+
+        """
+        _ = self.pop(position)
+
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))

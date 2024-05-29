@@ -470,6 +470,19 @@ what we publish.
 - Added `SIMD.__repr__` to get the verbose string representation of `SIMD` types.
 ([PR #2728](https://github.com/modularml/mojo/pull/2728) by [@bgreni](https://github.com/bgreni))
 
+- `List` now has a `__delitem__` method.
+  ([PR #2704](https://github.com/modularml/mojo/pull/2704) by [@rd4com](https://github.com/rd4com))
+
+  It provides a way to delete one or multiple(in a batch) elements by index:
+  - Even if provided twice, it won't delete two times the same index.
+  - The order of removal is reverse of sorted provided indexes.
+
+  ```mojo
+  x = List[Int](0,10,20,30,40)
+  x.__delitem__(0,4)
+  for i in x: print(i[]) #10,20,30
+  ```
+
 ### 🦋 Changed
 
 - `Coroutine` now requires a lifetime parameter. This parameter is set

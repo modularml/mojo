@@ -807,6 +807,45 @@ def test_indexing():
     assert_equal(l[2], 3)
 
 
+def test_list_delitem():
+    var x = List[Int](0, 10, 20, 30, 40)
+    x.__delitem__(0, 4)
+    assert_equal(len(x), 3)
+    assert_equal(x[0], 10)
+    assert_equal(x[1], 20)
+    assert_equal(x[2], 30)
+
+    x = List[Int](0, 10, 20, 30, 40)
+    x.__delitem__(List(0, 4))
+    assert_equal(len(x), 3)
+    assert_equal(x[0], 10)
+    assert_equal(x[1], 20)
+    assert_equal(x[2], 30)
+
+    x = List[Int](0, 10, 20, 30, 40)
+    var orig_len = len(x)
+    x.__delitem__(99, 100)
+    assert_equal(len(x), orig_len)
+    for i in range(orig_len):
+        assert_equal(x[i], i * 10)
+
+    x = List[Int](0, 10, 20, 30, 40)
+    orig_len = len(x)
+    x.__delitem__(List(99, 100))
+    assert_equal(len(x), orig_len)
+    for i in range(orig_len):
+        assert_equal(x[i], i * 10)
+
+    x = List[Int](0, 10, 20, 30, 40)
+    assert_equal(len(x), 5)
+    x.__delitem__(2)
+    assert_equal(len(x), 4)
+    assert_equal(x[0], 0)
+    assert_equal(x[1], 10)
+    assert_equal(x[2], 30)
+    assert_equal(x[3], 40)
+
+
 def main():
     test_mojo_issue_698()
     test_list()
@@ -837,3 +876,4 @@ def main():
     test_list_mult()
     test_list_contains()
     test_indexing()
+    test_list_delitem()
