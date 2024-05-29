@@ -566,6 +566,11 @@ what we publish.
   method. This makes it explicit that this implementation does not check if the
   slice bounds are concrete or within any given object's length.
 
+- `math.gcd` now works on negative inputs, and like Python's implementation,
+  accepts a variadic list of integers. New overloads for a `List` or `Span`of
+  integers are also added.
+  ([PR #2777](https://github.com/modularml/mojo/pull/2777) by [@bgreni](https://github.com/bgreni))
+
 ### ❌ Removed
 
 - The `@unroll` decorator has been deprecated and removed. The decorator was
