@@ -576,10 +576,10 @@ fn _get_spaces_table() -> InlineArray[UInt8, 256]:
     table[ord("\r")] = 1
     table[ord("\f")] = 1
     table[ord("\v")] = 1
+    table[ord("\x1c")] = 1
+    table[ord("\x1d")] = 1
+    table[ord("\x1e")] = 1
     return table
-
-
-alias _SPACES_TABLE = _get_spaces_table()
 
 
 fn _isspace(c: UInt8) -> Bool:
@@ -595,6 +595,7 @@ fn _isspace(c: UInt8) -> Bool:
     Returns:
         True iff the character is one of the whitespace characters listed above.
     """
+    alias _SPACES_TABLE = _get_spaces_table()
     return _SPACES_TABLE[int(c)]
 
 
