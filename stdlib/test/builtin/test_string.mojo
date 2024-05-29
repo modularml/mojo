@@ -692,6 +692,37 @@ fn test_splitlines() raises:
     var res7 = in7.splitlines()
     assert_equal(len(res7), 0)
 
+    # test \v \f \x1c \x1d
+    var in8 = String("hello\vworld\fmojo\x1clanguage\x1d")
+    var res8 = in8.splitlines()
+    assert_equal(len(res8), 4)
+    assert_equal(res8[0], "hello")
+    assert_equal(res8[1], "world")
+    assert_equal(res8[2], "mojo")
+    assert_equal(res8[3], "language")
+
+    # test \x1e \x85
+    var in9 = String("hello\x1eworld\x85mojo")
+    var res9 = in9.splitlines()
+    assert_equal(len(res9), 3)
+    assert_equal(res9[0], "hello")
+    assert_equal(res9[1], "world")
+    assert_equal(res9[2], "mojo")
+
+    # test with keepends=True
+    var res10 = in8.splitlines(keepends=True)
+    assert_equal(len(res10), 4)
+    assert_equal(res10[0], "hello\v")
+    assert_equal(res10[1], "world\f")
+    assert_equal(res10[2], "mojo\x1c")
+    assert_equal(res10[3], "language\x1d")
+
+    var res11 = in9.splitlines(keepends=True)
+    assert_equal(len(res11), 3)
+    assert_equal(res11[0], "hello\x1e")
+    assert_equal(res11[1], "world\x85")
+    assert_equal(res11[2], "mojo")
+
 
 fn test_isupper() raises:
     assert_true(isupper(ord("A")))

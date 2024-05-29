@@ -599,6 +599,34 @@ fn _isspace(c: UInt8) -> Bool:
 
 
 # ===----------------------------------------------------------------------=== #
+# _isnewline
+# ===----------------------------------------------------------------------=== #
+
+
+fn _get_newlines_table() -> InlineArray[UInt8, 128]:
+    var table = InlineArray[UInt8, 128](0)
+    table[ord("\n")] = 1
+    table[ord("\r")] = 1
+    table[ord("\f")] = 1
+    table[ord("\v")] = 1
+    table[ord("\x1c")] = 1
+    table[ord("\x1d")] = 1
+    table[ord("\x1e")] = 1
+    return table
+
+
+alias _NEWLINES_TABLE = _get_newlines_table()
+
+
+fn _isnewline(c: String) -> Bool:
+    # TODO: add \u2028 and \u2029 when they are properly parsed
+    # FIXME: \x85 is parsed but not encoded in utf-8
+    if len(c._buffer) == 2:
+        return c == "\x85" or _NEWLINES_TABLE[ord(c)]
+    return False
+
+
+# ===----------------------------------------------------------------------=== #
 # isprintable
 # ===----------------------------------------------------------------------=== #
 
@@ -1500,43 +1528,39 @@ struct String(
         """Split the string at line boundaries.
 
         Arguments:
-          keepends: If True, line breaks are kept in the resulting strings.
+        keepends: If True, line breaks are kept in the resulting strings.
 
         Returns:
-          A List of Strings containing the input split by line boundaries.
+        A List of Strings containing the input split by line boundaries.
         """
         var output = List[String]()
         var length = len(self)
         var current_offset = 0
 
         while current_offset < length:
-            # Find the position of the next newline character
-            # FIXME: this should take all universal newlines into account
-            # see https://docs.python.org/3/library/stdtypes.html#str.splitlines
-            var loc_n = self.find("\n", current_offset)
-            var loc_r = self.find("\r", current_offset)
+            var loc = -1
+            var eol_length = 1
 
-            if loc_n == -1 and loc_r == -1:
-                # No more newlines found, add the remaining part of the string
+            for i in range(current_offset, length):
+                var char = self[i]
+                var next_char = self[i + 1] if i + 1 < length else ""
+
+                if _isnewline(char):
+                    loc = i
+                    if char == "\r" and next_char == "\n":
+                        eol_length = 2
+                    break
+
+            if loc == -1:
                 output.append(self[current_offset:])
                 break
 
-            # Determine the earliest newline character
-            var loc = loc_n
-            if loc_r != -1 and (loc_r < loc_n or loc_n == -1):
-                loc = loc_r
-
-            # Determine the end of line (eol) position
-            var eol = loc
-            if self[loc] == "\r" and loc + 1 < length and self[loc + 1] == "\n":
-                loc += 1  # Handle \r\n as a single line break
-
             if keepends:
-                output.append(self[current_offset : loc + 1])
+                output.append(self[current_offset : loc + eol_length])
             else:
-                output.append(self[current_offset:eol])
+                output.append(self[current_offset:loc])
 
-            current_offset = loc + 1
+            current_offset = loc + eol_length
 
         return output
 
