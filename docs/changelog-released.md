@@ -547,10 +547,10 @@ modular update mojo
 #### ❌ Removed
 
 - Support for "register only" variadic packs has been removed. Instead of
-  `AnyRegType`, please upgrade your code to `AnyType` in examples like this:
+  `AnyTrivialRegType`, please upgrade your code to `AnyType` in examples like this:
 
   ```mojo
-  fn your_function[*Types: AnyRegType](*args: *Ts): ...
+  fn your_function[*Types: AnyTrivialRegType](*args: *Ts): ...
   ```
 
   This move gives you access to a nicer API and has the benefit of being memory
@@ -2361,7 +2361,7 @@ the previous "read to EOF" behavior when size is negative.
   `Bool` for whether the assertion succeeded or not.
 
 - Parameters of [`AnyType`](/mojo/stdlib/builtin/type_aliases.html) type are no
-  longer (implicitly) assumed to be register-passable. A new `AnyRegType` type
+  longer (implicitly) assumed to be register-passable. A new `AnyTrivialRegType` type
   is used to represent generic types that are register passable.
 
 - Changing the units in a [`benchmark`](/mojo/stdlib/benchmark/benchmark.html)

@@ -124,7 +124,7 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
 
 @always_inline
 fn memcmp[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](
     s1: LegacyPointer[type, address_space],
     s2: LegacyPointer[type, address_space],
@@ -391,7 +391,7 @@ fn memset[
 
 @always_inline
 fn memset[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], value: UInt8, count: Int):
     """Fills memory with the given value.
 
@@ -409,7 +409,7 @@ fn memset[
 
 @always_inline
 fn memset[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: LegacyPointer[type, address_space], value: UInt8, count: Int):
     """Fills memory with the given value.
 
@@ -449,7 +449,7 @@ fn memset_zero[
 
 @always_inline
 fn memset_zero[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
@@ -466,7 +466,7 @@ fn memset_zero[
 
 @always_inline
 fn memset_zero[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: LegacyPointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
@@ -515,7 +515,7 @@ fn stack_allocation[
 @always_inline
 fn stack_allocation[
     count: Int,
-    type: AnyRegType,
+    type: AnyTrivialRegType,
     /,
     alignment: Int = 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
@@ -557,7 +557,7 @@ fn stack_allocation[
 
 @always_inline
 fn _malloc[
-    type: AnyRegType,
+    type: AnyTrivialRegType,
     /,
     *,
     address_space: AddressSpace = AddressSpace.GENERIC,

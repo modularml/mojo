@@ -198,7 +198,7 @@ struct _Function:
     """The function pointer."""
 
     @always_inline
-    fn __init__[FnT: AnyRegType](inout self, value: FnT):
+    fn __init__[FnT: AnyTrivialRegType](inout self, value: FnT):
         # FIXME: No "pointer bitcast" for signature function pointers.
         var f = UnsafePointer[Int16]()
         UnsafePointer.address_of(f).bitcast[FnT]()[] = value
