@@ -568,20 +568,6 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_spaces_table() -> InlineArray[UInt8, 256]:
-    var table = InlineArray[UInt8, 256](0)
-    table[ord(" ")] = 1
-    table[ord("\t")] = 1
-    table[ord("\n")] = 1
-    table[ord("\r")] = 1
-    table[ord("\f")] = 1
-    table[ord("\v")] = 1
-    return table
-
-
-alias _SPACES_TABLE = _get_spaces_table()
-
-
 fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
 
@@ -595,7 +581,23 @@ fn _isspace(c: UInt8) -> Bool:
     Returns:
         True iff the character is one of the whitespace characters listed above.
     """
-    return _SPACES_TABLE[int(c)]
+
+    alias ` ` = UInt8(ord(" "))
+    alias `\t` = UInt8(ord("\t"))
+    alias `\n` = UInt8(ord("\n"))
+    alias `\r` = UInt8(ord("\r"))
+    alias `\f` = UInt8(ord("\f"))
+    alias `\v` = UInt8(ord("\v"))
+
+    # This compiles to something very clever that's even faster than a LUT.
+    return (
+        c == ` `
+        or c == `\t`
+        or c == `\n`
+        or c == `\r`
+        or c == `\f`
+        or c == `\v`
+    )
 
 
 # ===----------------------------------------------------------------------=== #
