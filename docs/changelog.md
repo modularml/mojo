@@ -610,6 +610,8 @@ what we publish.
     `bit.rotate_bits_{left,right}` methods for `Int`.
   - an overload of `math.pow` taking an integer parameter exponent.
   - `align_down_residual`; it can be trivially implemented using `align_down`.
+  - `all_true`, `any_true`, and `none_true`; use `SIMD.reduce_and` and
+    `SIMD.reduce_or` directly.
 
 - The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
   same functionality is available in the builtin `SIMD.select` and
