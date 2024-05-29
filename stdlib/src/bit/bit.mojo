@@ -120,7 +120,7 @@ fn countr_zero[
 fn bit_reverse[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Element-wise reverses the bitpattern of an integral value.
+    """Element-wise reverses the bitpattern of a SIMD vector of integer values.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -152,7 +152,7 @@ fn bit_reverse[
 fn byte_swap[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Byte-swaps a value.
+    """Byte-swaps a SIMD vector of integer values with an even number of bytes.
 
     Byte swap an integer value or vector of integer values with an even number
     of bytes (positive multiple of 16 bits). This is equivalent to `llvm.bswap`
@@ -197,7 +197,7 @@ fn byte_swap[
 fn pop_count[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Counts the number of bits set in a value.
+    """Counts the number of bits set in a SIMD vector of integer values.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -229,7 +229,7 @@ fn pop_count[
 fn bit_not[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Performs a bitwise NOT operation on an integral.
+    """Performs a bitwise NOT operation on an SIMD vector of integer values.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -274,7 +274,8 @@ fn bit_width(val: Int) -> Int:
 fn bit_width[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Computes the minimum number of bits required to represent the integer.
+    """Computes the minimum number of bits required to represent the SIMD vector
+    of integer values.
 
     Parameters:
         type: `dtype` used for the computation.
