@@ -630,6 +630,8 @@ fn _get_utf8_first_byte_table() -> InlineArray[UInt8, 256]:
 
     @parameter
     for i in range(256):
+
+        @parameter
         if i < 0b1000_0000:
             table[i] = 0
         elif i < 0b1100_0000:
