@@ -582,6 +582,9 @@ fn _get_spaces_table() -> InlineArray[UInt8, 256]:
     return table
 
 
+alias _SPACES_TABLE = _get_spaces_table()
+
+
 fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
 
@@ -595,7 +598,6 @@ fn _isspace(c: UInt8) -> Bool:
     Returns:
         True iff the character is one of the whitespace characters listed above.
     """
-    alias _SPACES_TABLE = _get_spaces_table()
     return _SPACES_TABLE[int(c)]
 
 
