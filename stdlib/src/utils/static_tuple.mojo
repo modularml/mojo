@@ -18,7 +18,7 @@ You can import these APIs from the `utils` package. For example:
 from utils import StaticTuple
 ```
 """
-
+from collections._index_normalization import normalize_index
 from memory import Pointer
 
 from utils import unroll
@@ -33,7 +33,7 @@ from sys.intrinsics import _type_is_eq
 fn _set_array_elem[
     index: Int,
     size: Int,
-    type: AnyRegType,
+    type: AnyTrivialRegType,
 ](
     val: type,
     array: Reference[
@@ -61,7 +61,7 @@ fn _set_array_elem[
 
 @always_inline
 fn _create_array[
-    size: Int, type: AnyRegType
+    size: Int, type: AnyTrivialRegType
 ](lst: VariadicList[type]) -> __mlir_type[
     `!pop.array<`, size.value, `, `, type, `>`
 ]:
@@ -114,7 +114,7 @@ fn _static_tuple_construction_checks[size: Int]():
 
 @value
 @register_passable("trivial")
-struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
+struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     """A statically sized tuple type which contains elements of homogeneous types.
 
     Parameters:
@@ -341,28 +341,20 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__[
-        IntableType: Intable,
-    ](self: Reference[Self, _, _], index: IntableType) -> ref [
-        self.lifetime
-    ] Self.ElementType:
+    fn __getitem__(
+        self: Reference[Self, _, _], idx: Int
+    ) -> ref [self.lifetime] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
-        Parameters:
-            IntableType: The inferred type of an intable argument.
-
         Args:
-            index: The index of the item.
+            idx: The index of the item.
 
         Returns:
             A reference to the item at the given index.
         """
-        debug_assert(-size <= int(index) < size, "Index must be within bounds.")
-        var normalized_idx = int(index)
-        if normalized_idx < 0:
-            normalized_idx += size
+        var normalized_index = normalize_index["InlineArray"](idx, self[])
 
-        return self[]._get_reference_unsafe(normalized_idx)[]
+        return self[]._get_reference_unsafe(normalized_index)[]
 
     @always_inline("nodebug")
     fn __getitem__[
@@ -408,15 +400,33 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
     @always_inline("nodebug")
     fn _get_reference_unsafe(
-        self: Reference[Self, _, _], index: Int
+        self: Reference[Self, _, _], idx: Int
     ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
         """Get a reference to an element of self without checking index bounds.
 
-        Users should opt for `__getitem__` instead of this method.
+        Users should opt for `__getitem__` instead of this method as it is
+        unsafe.
+
+        Note that there is no wraparound for negative indices. Using negative
+        indices is considered undefined behavior.
+
+        Args:
+            idx: The index of the element to get.
+
+        Returns:
+            A reference to the element at the given index.
         """
+        var idx_as_int = index(idx)
+        debug_assert(
+            0 <= idx_as_int < size,
+            (
+                "Index must be within bounds when using"
+                " `InlineArray.unsafe_get()`."
+            ),
+        )
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self[]._array).address,
-            index.value,
+            idx_as_int.value,
         )
         return UnsafePointer(ptr)[]
 
@@ -436,9 +446,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         return UnsafePointer(self._array).bitcast[Self.ElementType]()
 
     @always_inline
-    fn __contains__[
-        T: ComparableCollectionElement
-    ](self: Reference[InlineArray[T, size]], value: Self.ElementType) -> Bool:
+    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo
@@ -464,6 +472,11 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         # TODO: use @parameter for soon once it stabilizes a bit
         for i in range(size):
-            if self[][i] == rebind[T](value):
+            if (
+                rebind[Reference[T, False, __lifetime_of(self)]](
+                    Reference(self[i])
+                )[]
+                == value
+            ):
                 return True
         return False

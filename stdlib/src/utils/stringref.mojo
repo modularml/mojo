@@ -15,7 +15,7 @@
 
 from bit import countr_zero
 from builtin.dtype import _uint_type_of_width
-from builtin.string import _atol
+from builtin.string import _atol, _isspace
 from memory import DTypePointer, UnsafePointer, memcmp
 
 
@@ -61,7 +61,16 @@ struct StringRef(
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(str: StringLiteral) -> StringRef:
+    fn __init__() -> Self:
+        """Construct a StringRef value with length zero.
+
+        Returns:
+            Constructed `StringRef` object.
+        """
+        return StringRef(UnsafePointer[UInt8](), 0)
+
+    @always_inline
+    fn __init__(str: StringLiteral) -> Self:
         """Construct a StringRef value given a constant string.
 
         Args:
@@ -75,7 +84,7 @@ struct StringRef(
     # TODO: #2317 Drop support for this constructor when we have fully
     # transitioned to UInt8 as the main byte type.
     @always_inline
-    fn __init__(ptr: DTypePointer[DType.int8], len: Int) -> StringRef:
+    fn __init__(ptr: DTypePointer[DType.int8], len: Int) -> Self:
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -97,7 +106,7 @@ struct StringRef(
         return Self {data: unsafe_ptr.bitcast[UInt8](), length: len}
 
     @always_inline
-    fn __init__(ptr: DTypePointer[DType.uint8], len: Int) -> StringRef:
+    fn __init__(ptr: DTypePointer[DType.uint8], len: Int) -> Self:
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -115,7 +124,7 @@ struct StringRef(
         return Self {data: unsafe_ptr, length: len}
 
     @always_inline
-    fn __init__(ptr: UnsafePointer[UInt8]) -> StringRef:
+    fn __init__(ptr: UnsafePointer[UInt8]) -> Self:
         """Construct a StringRef value given a null-terminated string.
 
         Args:
@@ -130,7 +139,7 @@ struct StringRef(
     # TODO: #2317 Drop support for this constructor when we have fully
     # transitioned to UInt8 as the main byte type.
     @always_inline
-    fn __init__(ptr: DTypePointer[DType.int8]) -> StringRef:
+    fn __init__(ptr: DTypePointer[DType.int8]) -> Self:
         """Construct a StringRef value given a null-terminated string.
 
         Note that you should use the constructor from `DTypePointer[DType.uint8]` instead
@@ -151,7 +160,7 @@ struct StringRef(
         return StringRef(ptr, len)
 
     @always_inline
-    fn __init__(ptr: DTypePointer[DType.uint8]) -> StringRef:
+    fn __init__(ptr: DTypePointer[DType.uint8]) -> Self:
         """Construct a StringRef value given a null-terminated string.
 
         Args:
@@ -166,6 +175,75 @@ struct StringRef(
             len += 1
 
         return StringRef(ptr.bitcast[DType.int8](), len)
+
+    # ===-------------------------------------------------------------------===#
+    # Helper methods for slicing
+    # ===-------------------------------------------------------------------===#
+    # TODO: Move to slice syntax like str_ref[:42]
+
+    fn take_front(self, num_bytes: Int = 1) -> Self:
+        """Return a StringRef equal to 'self' but with only the first
+        `num_bytes` elements remaining.  If `num_bytes` is greater than the
+        length of the string, the entire string is returned.
+
+        Args:
+          num_bytes: The number of bytes to include.
+
+        Returns:
+          A new slice that starts with those bytes.
+        """
+        debug_assert(num_bytes >= 0, "num_bytes must be non-negative")
+        if num_bytes >= self.length:
+            return self
+        return Self(self.data, num_bytes)
+
+    fn take_back(self, num_bytes: Int = 1) -> Self:
+        """Return a StringRef equal to 'self' but with only the last
+        `num_bytes` elements remaining.  If `num_bytes` is greater than the
+        length of the string, the entire string is returned.
+
+        Args:
+          num_bytes: The number of bytes to include.
+
+        Returns:
+          A new slice that ends with those bytes.
+        """
+        debug_assert(num_bytes >= 0, "num_bytes must be non-negative")
+        if num_bytes >= self.length:
+            return self
+        return Self(self.data + (self.length - num_bytes), num_bytes)
+
+    fn drop_front(self, num_bytes: Int = 1) -> Self:
+        """Return a StringRef equal to 'self' but with the first
+        `num_bytes` elements skipped.  If `num_bytes` is greater than the
+        length of the string, an empty StringRef is returned.
+
+        Args:
+          num_bytes: The number of bytes to drop.
+
+        Returns:
+          A new slice with those bytes skipped.
+        """
+        debug_assert(num_bytes >= 0, "num_bytes must be non-negative")
+        if num_bytes >= self.length:
+            return StringRef()
+        return Self(self.data + num_bytes, self.length - num_bytes)
+
+    fn drop_back(self, num_bytes: Int = 1) -> Self:
+        """Return a StringRef equal to 'self' but with the last `num_bytes`
+        elements skipped.  If `num_bytes` is greater than the
+        length of the string, the entire string is returned.
+
+        Args:
+          num_bytes: The number of bytes to include.
+
+        Returns:
+          A new slice ends earlier than those bytes.
+        """
+        debug_assert(num_bytes >= 0, "num_bytes must be non-negative")
+        if num_bytes >= self.length:
+            return StringRef()
+        return Self(self.data, self.length - num_bytes)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -488,6 +566,7 @@ struct StringRef(
 
     fn strip(self) -> StringRef:
         """Gets a StringRef with leading and trailing whitespaces removed.
+        This only takes C spaces into account: " \\t\\n\\r\\f\\v".
 
         For example, `"  mojo  "` returns `"mojo"`.
 
@@ -497,9 +576,9 @@ struct StringRef(
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
-        while start < end and isspace(int(ptr[start])):
+        while start < end and _isspace(ptr[start]):
             start += 1
-        while end > start and isspace(int(ptr[end - 1])):
+        while end > start and _isspace(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
 

@@ -83,16 +83,16 @@ Benchmarks an input function with input args of type AnyType.
 <div class="mojo-function-sig">
 
 ```mojo
-bench_with_input[T: AnyRegType, bench_fn: fn(inout Bencher, $0) capturing -> None](inout self: Self, bench_id: BenchId, input: T, throughput_elems: Optional[Int] = #kgen.none)
+bench_with_input[T: AnyTrivialRegType, bench_fn: fn(inout Bencher, $0) capturing -> None](inout self: Self, bench_id: BenchId, input: T, throughput_elems: Optional[Int] = #kgen.none)
 ```
 
 </div>
 
-Benchmarks an input function with input args of type AnyRegType.
+Benchmarks an input function with input args of type AnyTrivialRegType.
 
 **Parameters:**
 
-- ​<b>T</b> (`AnyRegType`): Benchmark function input type.
+- ​<b>T</b> (`AnyTrivialRegType`): Benchmark function input type.
 - ​<b>bench_fn</b> (`fn(inout Bencher, $0) capturing -> None`): The function to
   be benchmarked.
 

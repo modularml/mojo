@@ -189,9 +189,40 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
             _type_is_eq[ElementType, C](), "value type is not self.ElementType"
         ]()
         for i in self:
-            if value == rebind[C](i[]):
+            if value == rebind[Reference[C, False, __lifetime_of(self)]](i)[]:
                 return True
         return False
+
+    @always_inline
+    fn count[C: ComparableCollectionElement](self: Self, value: C) -> Int:
+        """Counts the number of occurrences of a value in the list.
+
+        ```mojo
+        var my_list = InlineList[Int](1, 2, 3)
+        print(my_list.count(1))
+        ```
+        Parameters:
+            C: The type of the elements in the list. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            value: The value to count.
+
+        Returns:
+            The number of occurrences of the value in the list.
+        """
+        constrained[
+            _type_is_eq[ElementType, C](), "value type is not self.ElementType"
+        ]()
+
+        var count = 0
+        for elem in self:
+            if (
+                value
+                == rebind[Reference[C, False, __lifetime_of(self)]](elem)[]
+            ):
+                count += 1
+        return count
 
     @always_inline
     fn __bool__(self) -> Bool:

@@ -16,7 +16,7 @@ from pathlib import Path
 
 # We can't check much more than this at the moment, because the license year
 # changes and the language is not mature enough to do regex yet.
-alias LICENSE = String(
+var LICENSE = String(
     """
 # ===----------------------------------------------------------------------=== #
 # Copyright (c)

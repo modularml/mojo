@@ -162,9 +162,10 @@ what we publish.
           return Self(round(self.re), round(self.im))
   ```
 
-- The `abs`, `round`, `min`, `max`, and `divmod` functions have moved from
-  `math` to `builtin`, so you no longer need to do
-  `from math import abs, round, min, max, divmod`.
+- User defined types can now also opt in to use the `pow` function by
+  implementing the `__pow__` method (and thus conforming to the new `Powable`
+  trait). As before, these types will also benefit from being able to use the
+  `**` operator.
 
 - Mojo now allows types to opt in to use the `floor()`, `ceil()`, and `trunc()`
   functions in the `math` module by implementing the `__floor__()`,
@@ -210,7 +211,7 @@ what we publish.
 
 - Add an `InlinedArray` type that works on memory-only types.
   Compare with the existing `StaticTuple` type, which is conceptually an array
-  type, but only worked on `AnyRegType`.
+  type, but only worked on `AnyTrivialRegType`.
     ([PR #2294](https://github.com/modularml/mojo/pull/2294) by [@lsh](https://github.com/lsh))
 
 - Base64 decoding support has been added.
@@ -246,6 +247,26 @@ what we publish.
   processing.  Previously it required the use of an internal MLIR type to
   achieve this.
 
+- The `is_mutable` parameter of `Reference` and `AnyLifetime` is now a `Bool`,
+  not a low-level `__mlir_type.i1` value.
+
+  This improves the ergonomics of spelling out a
+  `Reference` type explicitly. For example, to define a struct holding a
+  `Reference`, you can now write:
+
+  ```mojo
+  struct Foo[is_mutable: Bool, lifetime: AnyLifetime[is_mutable].type]:
+      var data: Reference[Int32, is_mutable, lifetime]
+  ```
+
+  Or to specify a field that is always immutable, `False` can be specified
+  as the mutability:
+
+  ```mojo
+  struct Foo[lifetime: AnyLifetime[False].type]:
+      var data: Reference[Int32, False, lifetime]
+  ```
+
 - `object` now implements all the bitwise operators.
     ([PR #2324](https://github.com/modularml/mojo/pull/2324) by [@LJ-9801](https://github.com/LJ-9801))
 
@@ -275,10 +296,20 @@ what we publish.
 - Added a new `Span` type for taking slices of contiguous collections.
   ([PR #2595](https://github.com/modularml/mojo/pull/2595) by [lsh](https://github.com/lsh))
 
+- Added a new `StringSlice` type, to replace uses of the unsafe `StringRef` type
+  in standard library code.
+
+  `StringSlice` is a non-owning reference to encoded string data. Unlike
+  `StringRef`, a `StringSlice` is safely tied to the lifetime of the data it
+  points to.
+
+  - Add `StringSlice` intializer from an `UnsafePointer` and a length in bytes.
+  - Changed `Formatter.write_str()` to take a safe `StringSlice`.
+
 - Added a new `as_bytes_slice()` method to `String` and `StringLiteral`, which
   returns a `Span` of the bytes owned by the string.
 
-- Add new `ImmStaticLifetime` and `MutStaticLifetime` helpers
+- Add new `ImmutableStaticLifetime` and `MutableStaticLifetime` helpers
 
 - Add new `memcpy` overload for `UnsafePointer[Scalar[_]]` pointers.
 
@@ -420,22 +451,41 @@ what we publish.
 - Added `clear` method  to `Dict`.
   ([PR 2627](https://github.com/modularml/mojo/pull/2627) by [@artemiogr97](https://github.com/artemiogr97))
 
+- Added `os.path.join` function.
+  ([PR 2792](https://github.com/modularml/mojo/pull/2792)) by [@artemiogr97](https://github.com/artemiogr97))
+
 - `StringRef` now implements `startswith()` and `endswith()`.
     ([PR #2710](https://github.com/modularml/mojo/pull/2710) by [@fknfilewalker](https://github.com/fknfilewalker))
 
 - The Mojo Language Server now supports renaming local variables.
 
-- Added a new `tempfile` module. Similarly to Python, this will contain
-  utilities for creating and working with temporary files and directories.
+- Added a new `tempfile` module, with `gettempdir` and `mkdtemp` functions.
+  ([PR 2742](https://github.com/modularml/mojo/pull/2742) by [@artemiogr97](https://github.com/artemiogr97))
+
+- Added `SIMD.__repr__` to get the verbose string representation of `SIMD` types.
+([PR #2728](https://github.com/modularml/mojo/pull/2728) by [@bgreni](https://github.com/bgreni))
 
 ### 🦋 Changed
+
+- Async function calls are no longer allowed to borrow non-trivial
+  register-passable types. Because async functions capture their arguments but
+  register-passable types don't have lifetimes (yet), Mojo is not able to
+  correctly track the reference, making this unsafe. To cover this safety gap,
+  Mojo has temporarily disallowed binding non-trivial register-passable types
+  to borrowed arguments in async functions.
+
+- `AnyRegType` has been renamed to `AnyTrivialRegType` and Mojo now forbids
+  binding non-trivial register-passable types to `AnyTrivialRegType`. This
+  closes a major safety hole in the language. Please use `AnyType` for generic
+  code going forward.
 
 - The `let` keyword has been completely removed from the language. We previously
   removed `let` declarations but still provided an error message to users. Now,
   it is completely gone from the grammar. Long live `var`!
 
-- The `abs` and `round` functions have moved from `math` to `builtin`, so you no
-  longer need to do `from math import abs, round`.
+- The `abs`, `round`, `min`, `max`, `pow`, and `divmod` functions have moved
+  from `math` to `builtin`, so you no longer need to do
+  `from math import abs, round, min, max, divmod, pow`.
 
 - Many functions returning a pointer type have been unified to have a public
   API function of `unsafe_ptr()`.
@@ -479,7 +529,13 @@ what we publish.
   - Removed `StringRef.unsafe_uint8_ptr()`. The `unsafe_ptr()` method now has
     the same behavior.
 
-- Changed `isspace(..)` to take an `Int`.
+- Added `String.isspace()` method conformant with Python's universal separators.
+
+- Changed `isspace(..)` to take a `UInt8` and was made private (`_isspace(..)`),
+  use `String.isspace()` instead.
+
+- `String.split()` now defaults to whitespace and has pythonic behavior in that
+  it removes all adjacent whitespaces by default.
 
 - Added `UnsafePointer.offset()` method.
 
@@ -489,7 +545,7 @@ what we publish.
   - `cttz` -> `countr_zero`
   - `bit_length` -> `bit_width`
   - `ctpop` -> `pop_count`
-  - `bswap` -> `byte_reverse`
+  - `bswap` -> `byte_swap`
   - `bitreverse` -> `bit_reverse`
 
 - The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
@@ -502,6 +558,18 @@ what we publish.
 
 - `InlinedString` has been renamed to `InlineString` to be consistent with other
   types.
+
+- The `Slice.__len__` function has been removed and `Slice` no longer conforms
+  to the `Sized` trait. This clarifies the ambiguity of the semantics: the
+  length of a slice always depends on the length of the object being sliced.
+  Users that need the existing functionality can use the `Slice.unsafe_indices`
+  method. This makes it explicit that this implementation does not check if the
+  slice bounds are concrete or within any given object's length.
+
+- `math.gcd` now works on negative inputs, and like Python's implementation,
+  accepts a variadic list of integers. New overloads for a `List` or `Span`of
+  integers are also added.
+  ([PR #2777](https://github.com/modularml/mojo/pull/2777) by [@bgreni](https://github.com/bgreni))
 
 ### ❌ Removed
 
@@ -516,30 +584,31 @@ what we publish.
 - The method `object.print()` has been removed. Since now, `object` has the
   `Stringable` trait, you can use `print(my_object)` instead.
 
-- The `math.clamp` function has been removed in favor of a new `SIMD.clamp`
-  method.
-
-- The `math.round_half_down` and `math.round_half_up` functions are removed.
-  These can be trivially implemented using the `ceil` and `floor` functions.
-
-- The `add`, `sub`, `mul`, `div`, and `mod` functions have been removed from the
-  `math` module. Instead, users should rely on the `+`, `-`, `*`, `/`, and `%`
-  operators, respectively.
-
-- The `math.roundeven` function has been removed from the `math` module. The new
-  `SIMD.roundeven` method now provides the identical functionality.
-
-- The `math.div_ceil` function has been removed in favor of the `math.ceildiv`
-  function.
+- The following functions have been removed from the math module:
+  - `clamp`; use the new `SIMD.clamp` method instead.
+  - `round_half_down` and `round_half_up`; these can be trivially implemented
+    using the `ceil` and `floor` functions.
+  - `add`, `sub`, `mul`, `div`, `mod`, `greater`, `greater_equal`, `less`,
+    `less_equal`, `equal`, `not_equal`, `logical_and`, `logical_xor`, and
+    `logical_not`; Instead, users should rely directly on the `+`, `-`, `*`,
+    `/`, `%`, `>`, `>=`, `<`, `<=`, `==`, `!=`, `&`, `^`, and `~` operators,
+    respectively.
+  - `identity` and `reciprocal`; users can implement these trivially.
+  - `select`; in favor of using `SIMD.select` directly.
+  - `is_even` and `is_odd`; these can be trivially implemented using bitwise `&`
+    with `1`.
+  - `roundeven`; the new `SIMD.roundeven` method now provides the identical
+    functionality.
+  - `div_ceil`; use the new `ceildiv` function.
+  - `rotate_left` and `rotate_right`; the same functionality is available in the
+    builtin `SIMD.rotate_{left,right}` methods for `SIMD` types, and the
+    `bit.rotate_bits_{left,right}` methods for `Int`.
+  - an overload of `math.pow` taking an integer parameter exponent.
+  - `align_down_residual`; it can be trivially implemented using `align_down`.
 
 - The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
   same functionality is available in the builtin `SIMD.select` and
   `SIMD.__and__` methods, respectively.
-
-- The `math.rotate_left` and `math.rotate_right` functions have been removed.
-  The same functionality is available in the builtin `SIMD.rotate_{left,right}`
-  methods for `SIMD` types, and the `bit.rotate_bits_{left,right}` methods for
-  `Int`.
 
 - The `math.limit` module has been removed. The same functionality is available
   as follows:

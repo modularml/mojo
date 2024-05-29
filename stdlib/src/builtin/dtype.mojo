@@ -641,6 +641,22 @@ fn _integral_type_of[type: DType]() -> DType:
     return type.invalid
 
 
+fn _scientific_notation_digits[type: DType]() -> StringLiteral:
+    """Get the number of digits as a StringLiteral for the scientific notation
+    representation of a float.
+    """
+    constrained[type.is_floating_point(), "expected floating point type"]()
+
+    @parameter
+    if type == DType.bfloat16 or type == DType.float16:
+        return "4"
+    elif type == DType.float32 or type == DType.tensor_float32:
+        return "8"
+    else:
+        constrained[type == DType.float64, "unknown floating point type"]()
+        return "16"
+
+
 # ===-------------------------------------------------------------------===#
 # _uint_type_of_width
 # ===-------------------------------------------------------------------===#
