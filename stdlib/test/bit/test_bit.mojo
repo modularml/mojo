@@ -33,12 +33,17 @@ from testing import assert_equal
 
 
 def test_countl_zero():
+    assert_equal(countl_zero(-(2**59)), 0)
+    assert_equal(countl_zero(-(2**20)), 0)
+    assert_equal(countl_zero(-1), 0)
     assert_equal(countl_zero(-1), 0)
     assert_equal(countl_zero(0), 64)
     assert_equal(countl_zero(1), 63)
     assert_equal(countl_zero(2), 62)
     assert_equal(countl_zero(3), 62)
     assert_equal(countl_zero(4), 61)
+    assert_equal(countl_zero(2**20), 43)
+    assert_equal(countl_zero(2**59), 4)
 
 
 def test_countl_zero_simd():
@@ -48,38 +53,35 @@ def test_countl_zero_simd():
     alias int32_t = DType.int32
     alias int64_t = DType.int64
 
-    alias var1 = SIMD[int8_t, simd_width](-1, 0, 1, 2)
-    assert_equal(countl_zero(var1), SIMD[int8_t, simd_width](0, 8, 7, 6))
+    alias var1 = SIMD[int8_t, simd_width](-(2**6), 0, -1, 2**6)
+    assert_equal(countl_zero(var1), SIMD[int8_t, simd_width](0, 8, 0, 1))
 
-    alias var2 = SIMD[int8_t, simd_width](3, 4, 5, 8)
-    assert_equal(countl_zero(var2), SIMD[int8_t, simd_width](6, 5, 5, 4))
+    alias var3 = SIMD[int16_t, simd_width](-(2**14), 0, -1, 2**14)
+    assert_equal(countl_zero(var3), SIMD[int16_t, simd_width](0, 16, 0, 1))
 
-    alias var3 = SIMD[int16_t, simd_width](-1, 0, 1, 2)
-    assert_equal(countl_zero(var3), SIMD[int16_t, simd_width](0, 16, 15, 14))
+    alias var5 = SIMD[int32_t, simd_width](-(2**30), 0, -1, 2**30)
+    assert_equal(countl_zero(var5), SIMD[int32_t, simd_width](0, 32, 0, 1))
 
-    alias var4 = SIMD[int16_t, simd_width](3, 4, 5, 8)
-    assert_equal(countl_zero(var4), SIMD[int16_t, simd_width](14, 13, 13, 12))
-
-    alias var5 = SIMD[int32_t, simd_width](-1, 0, 1, 2)
-    assert_equal(countl_zero(var5), SIMD[int32_t, simd_width](0, 32, 31, 30))
-
-    alias var6 = SIMD[int32_t, simd_width](3, 4, 5, 8)
-    assert_equal(countl_zero(var6), SIMD[int32_t, simd_width](30, 29, 29, 28))
-
-    alias var7 = SIMD[int64_t, simd_width](-1, 0, 1, 2)
-    assert_equal(countl_zero(var7), SIMD[int64_t, simd_width](0, 64, 63, 62))
-
-    alias var8 = SIMD[int64_t, simd_width](3, 4, 5, 8)
-    assert_equal(countl_zero(var8), SIMD[int64_t, simd_width](62, 61, 61, 60))
+    # BUG: compiler crash after 2**30 for alias, for 2**31
+    #      failed to fold operation pop.cast(#pop<simd 2147483648> : !pop.scalar<index>)
+    # alias var7 = SIMD[int64_t, simd_width](-(2**62), 0, -1, 2**62)
+    alias var7 = SIMD[int64_t, simd_width](
+        -4611686018427387904, 0, -1, 4611686018427387904
+    )
+    assert_equal(countl_zero(var7), SIMD[int64_t, simd_width](0, 64, 0, 1))
 
 
 def test_countr_zero():
+    assert_equal(countr_zero(-(2**59)), 59)
+    assert_equal(countr_zero(-(2**20)), 20)
     assert_equal(countr_zero(-1), 0)
     assert_equal(countr_zero(0), 64)
     assert_equal(countr_zero(1), 0)
     assert_equal(countr_zero(2), 1)
     assert_equal(countr_zero(3), 0)
     assert_equal(countr_zero(4), 2)
+    assert_equal(countr_zero(2**20), 20)
+    assert_equal(countr_zero(2**59), 59)
 
 
 def test_countr_zero_simd():
@@ -89,29 +91,21 @@ def test_countr_zero_simd():
     alias int32_t = DType.int32
     alias int64_t = DType.int64
 
-    alias var1 = SIMD[int8_t, simd_width](-1, 0, 1, 2)
-    assert_equal(countr_zero(var1), SIMD[int8_t, simd_width](0, 8, 0, 1))
+    alias var1 = SIMD[int8_t, simd_width](-(2**6), 0, -1, 2**6)
+    assert_equal(countr_zero(var1), SIMD[int8_t, simd_width](6, 8, 0, 6))
 
-    alias var2 = SIMD[int8_t, simd_width](3, 4, 5, 8)
-    assert_equal(countr_zero(var2), SIMD[int8_t, simd_width](0, 2, 0, 3))
+    alias var3 = SIMD[int16_t, simd_width](-(2**14), 0, -1, 2**14)
+    assert_equal(countr_zero(var3), SIMD[int16_t, simd_width](14, 16, 0, 14))
 
-    alias var3 = SIMD[int16_t, simd_width](-1, 0, 1, 2)
-    assert_equal(countr_zero(var3), SIMD[int16_t, simd_width](0, 16, 0, 1))
+    alias var5 = SIMD[int32_t, simd_width](-(2**30), 0, -1, 2**30)
+    assert_equal(countr_zero(var5), SIMD[int32_t, simd_width](30, 32, 0, 30))
 
-    alias var4 = SIMD[int16_t, simd_width](3, 4, 5, 8)
-    assert_equal(countr_zero(var4), SIMD[int16_t, simd_width](0, 2, 0, 3))
-
-    alias var5 = SIMD[int32_t, simd_width](-1, 0, 1, 2)
-    assert_equal(countr_zero(var5), SIMD[int32_t, simd_width](0, 32, 0, 1))
-
-    alias var6 = SIMD[int32_t, simd_width](3, 4, 5, 8)
-    assert_equal(countr_zero(var6), SIMD[int32_t, simd_width](0, 2, 0, 3))
-
-    alias var7 = SIMD[int64_t, simd_width](-1, 0, 1, 2)
-    assert_equal(countr_zero(var7), SIMD[int64_t, simd_width](0, 64, 0, 1))
-
-    alias var8 = SIMD[int64_t, simd_width](3, 4, 5, 8)
-    assert_equal(countr_zero(var8), SIMD[int64_t, simd_width](0, 2, 0, 3))
+    # BUG: compiler crash after 2**30 for alias
+    # alias var7 = SIMD[int64_t, simd_width](-(2**62), 0, -1, 2**62)
+    alias var7 = SIMD[int64_t, simd_width](
+        -4611686018427387904, 0, -1, 4611686018427387904
+    )
+    assert_equal(countr_zero(var7), SIMD[int64_t, simd_width](62, 64, 0, 62))
 
 
 def test_bit_reverse_simd():
@@ -144,24 +138,42 @@ def test_bit_reverse_simd():
     )
 
 
-def test_byte_reverse_simd():
+def test_byte_swap_simd():
     alias simd_width = 4
     alias int16_t = DType.int16
     alias int32_t = DType.int32
     alias int64_t = DType.int64
 
-    alias var2 = SIMD[int16_t, simd_width](-1, 0, 1, 2)
-    assert_equal(byte_swap(var2), SIMD[int16_t, simd_width](-1, 0, 256, 512))
-
-    alias var3 = SIMD[int32_t, simd_width](-1, 0, 1, 2)
+    alias var2 = SIMD[int16_t, simd_width](-0x0123, 0x0000, 0x0102, 0x0201)
     assert_equal(
-        byte_swap(var3), SIMD[int32_t, simd_width](-1, 0, 16777216, 33554432)
+        byte_swap(var2),
+        SIMD[int16_t, simd_width](0xDDFE, 0x0000, 0x0201, 0x0102),
     )
 
-    alias var4 = SIMD[int64_t, simd_width](-1, 0, 1, 2)
+    alias var3 = SIMD[int32_t, simd_width](
+        -0x01234567, 0x01234567, 0x56789ABC, 0x89ABCDEF
+    )
+    assert_equal(
+        byte_swap(var3),
+        SIMD[int32_t, simd_width](
+            0x99BADCFE, 0x67452301, 0xBC9A7856, 0xEFCDAB89
+        ),
+    )
+
+    alias var4 = SIMD[int64_t, simd_width](
+        -0x0123456789ABCDEF,
+        0x0123456789ABCDEF,
+        0x56789ABCDEF01234,
+        0x23456789ABCDEF01,
+    )
     assert_equal(
         byte_swap(var4),
-        SIMD[int64_t, simd_width](-1, 0, 72057594037927936, 144115188075855872),
+        SIMD[int64_t, simd_width](
+            0x1132547698BADCFE,
+            0xEFCDAB8967452301,
+            0x3412F0DEBC9A7856,
+            0x01EFCDAB89674523,
+        ),
     )
 
 
@@ -172,17 +184,20 @@ def test_pop_count_simd():
     alias int32_t = DType.int32
     alias int64_t = DType.int64
 
-    alias var1 = SIMD[int8_t, simd_width](-1, 0, 27, 8)
-    assert_equal(pop_count(var1), SIMD[int8_t, simd_width](8, 0, 4, 1))
+    alias var1 = SIMD[int8_t, simd_width](-114, 0, 100, 2**6)
+    assert_equal(pop_count(var1), SIMD[int8_t, simd_width](4, 0, 3, 1))
 
-    alias var2 = SIMD[int16_t, simd_width](-1, 0, 27, 8)
-    assert_equal(pop_count(var2), SIMD[int16_t, simd_width](16, 0, 4, 1))
+    alias var2 = SIMD[int16_t, simd_width](-11444, 0, 3000, 2**13)
+    assert_equal(pop_count(var2), SIMD[int16_t, simd_width](8, 0, 7, 1))
 
-    alias var3 = SIMD[int32_t, simd_width](-1, 0, 27, 8)
-    assert_equal(pop_count(var3), SIMD[int32_t, simd_width](32, 0, 4, 1))
-
-    alias var4 = SIMD[int64_t, simd_width](-1, 0, 27, 8)
-    assert_equal(pop_count(var4), SIMD[int64_t, simd_width](64, 0, 4, 1))
+    alias var3 = SIMD[int32_t, simd_width](-111444, 0, 30000, 2**29)
+    assert_equal(pop_count(var3), SIMD[int32_t, simd_width](22, 0, 7, 1))
+    
+    #alias var4 = SIMD[int64_t, simd_width](-111444444, 0, 3000000, 2**59)
+    alias var4 = SIMD[int64_t, simd_width](
+        -111444444, 0, 3000000, 576460752303423488
+    )
+    assert_equal(pop_count(var4), SIMD[int64_t, simd_width](51, 0, 10, 1))
 
 
 def test_bit_not_simd():
@@ -192,20 +207,31 @@ def test_bit_not_simd():
     alias int32_t = DType.int32
     alias int64_t = DType.int64
 
-    alias var1 = SIMD[int8_t, simd_width](-1, 0, 27, 8)
-    assert_equal(bit_not(var1), SIMD[int8_t, simd_width](0, -1, -28, -9))
+    alias var1 = SIMD[int8_t, simd_width](-114, 0, 100, 2**6)
+    assert_equal(bit_not(var1), SIMD[int8_t, simd_width](113, -1, -101, -65))
 
-    alias var2 = SIMD[int16_t, simd_width](-1, 0, 27, 8)
-    assert_equal(bit_not(var2), SIMD[int16_t, simd_width](0, -1, -28, -9))
+    alias var2 = SIMD[int16_t, simd_width](-11444, 0, 3000, 2**13)
+    assert_equal(
+        bit_not(var2), SIMD[int16_t, simd_width](11443, -1, -3001, -8193)
+    )
 
-    alias var3 = SIMD[int32_t, simd_width](-1, 0, 27, 8)
-    assert_equal(bit_not(var3), SIMD[int32_t, simd_width](0, -1, -28, -9))
+    alias var3 = SIMD[int32_t, simd_width](-111444, 0, 30000, 2**29)
+    assert_equal(
+        bit_not(var3), SIMD[int32_t, simd_width](111443, -1, -30001, -536870913)
+    )
 
-    alias var4 = SIMD[int64_t, simd_width](-1, 0, 27, 8)
-    assert_equal(bit_not(var4), SIMD[int64_t, simd_width](0, -1, -28, -9))
+    # alias var4 = SIMD[int64_t, simd_width](-111444444, 0, 3000000, 2**59)
+    alias var4 = SIMD[int64_t, simd_width](
+        -111444444, 0, 3000000, 576460752303423488
+    )
+    assert_equal(
+        bit_not(var4),
+        SIMD[int64_t, simd_width](111444443, -1, -3000001, -(2**59)-1),
+    )
 
 
 def test_is_power_of_two():
+    assert_equal(is_power_of_two(-(2**59)), False)
     assert_equal(is_power_of_two(-1), False)
     assert_equal(is_power_of_two(0), False)
     assert_equal(is_power_of_two(1), True)
@@ -213,82 +239,151 @@ def test_is_power_of_two():
     assert_equal(is_power_of_two(3), False)
     assert_equal(is_power_of_two(4), True)
     assert_equal(is_power_of_two(5), False)
+    assert_equal(is_power_of_two(2**59), True)
 
 
 def test_is_power_of_two_simd():
     alias simd_width = 4
-    alias type = DType.int8
-    alias return_type = DType.bool
+    alias int8_t = DType.int8
+    alias int16_t = DType.int16
+    alias int32_t = DType.int32
+    alias int64_t = DType.int64
 
-    alias var1 = SIMD[type, simd_width](-1, 0, 1, 2)
+    alias var1 = SIMD[int8_t, simd_width](-114, 0, 100, 2**6)
     assert_equal(
         is_power_of_two(var1),
         SIMD[DType.bool, simd_width](False, False, True, True),
     )
 
-    alias var2 = SIMD[type, simd_width](3, 4, 5, 8)
+    alias var2 = SIMD[int16_t, simd_width](-11444, 0, 3000, 2**13)
     assert_equal(
         is_power_of_two(var2),
-        SIMD[DType.bool, simd_width](False, True, False, True),
+        SIMD[DType.bool, simd_width](False, False, False, True),
+    )
+
+    alias var3 = SIMD[int32_t, simd_width](-111444, 0, 30000, 2**29)
+    assert_equal(
+        is_power_of_two(var3),
+        SIMD[DType.bool, simd_width](False, False, False, True),
+    )
+
+    # alias var4 = SIMD[int64_t, simd_width](-111444444, 0, 3000000, 2**59)
+    alias var4 = SIMD[int64_t, simd_width](
+        -111444444, 0, 3000000, 576460752303423488
+    )
+    assert_equal(
+        is_power_of_two(var4),
+        SIMD[DType.bool, simd_width](False, False, False, True),
     )
 
 
 def test_bit_width():
+    assert_equal(bit_width(-(2**59)), 59)
     assert_equal(bit_width(-2), 1)
     assert_equal(bit_width(-1), 0)
+    assert_equal(bit_width(0), 0)
     assert_equal(bit_width(1), 1)
     assert_equal(bit_width(2), 2)
     assert_equal(bit_width(4), 3)
     assert_equal(bit_width(5), 3)
+    assert_equal(bit_width(2**59), 60)
 
 
 def test_bit_width_simd():
     alias simd_width = 4
-    alias type = DType.int8
+    alias int8_t = DType.int8
+    alias int16_t = DType.int16
+    alias int32_t = DType.int32
+    alias int64_t = DType.int64
 
-    alias var1 = SIMD[type, simd_width](-2, -1, 3, 4)
-    assert_equal(bit_width(var1), SIMD[type, simd_width](1, 0, 2, 3))
+    alias var1 = SIMD[int8_t, simd_width](-114, 0, 100, 2**6)
+    assert_equal(bit_width(var1), SIMD[int8_t, simd_width](7, 0, 7, 7))
 
-    alias var2 = SIMD[type, simd_width](1, 2, 3, 4)
-    assert_equal(bit_width(var2), SIMD[type, simd_width](1, 2, 2, 3))
+    alias var2 = SIMD[int16_t, simd_width](-11444, 0, 3000, 2**13)
+    assert_equal(bit_width(var2), SIMD[int16_t, simd_width](14, 0, 12, 14))
+
+    alias var3 = SIMD[int32_t, simd_width](-111444, 0, 30000, 2**29)
+    assert_equal(bit_width(var3), SIMD[int32_t, simd_width](17, 0, 15, 30))
+
+    # alias var4 = SIMD[int64_t, simd_width](-111444444, 0, 3000000, 2**59)
+    alias var4 = SIMD[int64_t, simd_width](
+        -111444444, 0, 3000000, 576460752303423488
+    )
+    assert_equal(bit_width(var4), SIMD[int64_t, simd_width](27, 0, 22, 60))
 
 
 def test_bit_ceil():
+    assert_equal(bit_ceil(-2**59), 1)
     assert_equal(bit_ceil(-2), 1)
     assert_equal(bit_ceil(1), 1)
     assert_equal(bit_ceil(2), 2)
     assert_equal(bit_ceil(4), 4)
     assert_equal(bit_ceil(5), 8)
+    assert_equal(bit_ceil(2**59-3), 2**59)
 
 
 def test_bit_ceil_simd():
     alias simd_width = 4
-    alias type = DType.int8
+    alias int8_t = DType.int8
+    alias int16_t = DType.int16
+    alias int32_t = DType.int32
+    alias int64_t = DType.int64
 
-    alias var1 = SIMD[type, simd_width](-2, -1, 3, 4)
-    assert_equal(bit_ceil(var1), SIMD[type, simd_width](1, 1, 4, 4))
+    alias var1 = SIMD[int8_t, simd_width](-114, 0, 2**7-3, 2**6)
+    assert_equal(bit_ceil(var1), SIMD[int8_t, simd_width](1, 1, 2**7, 2**6))
 
-    alias var2 = SIMD[type, simd_width](1, 2, 3, 4)
-    assert_equal(bit_ceil(var2), SIMD[type, simd_width](1, 2, 4, 4))
+    alias var2 = SIMD[int16_t, simd_width](-11444, 0, 2**12-3, 2**13) 
+    assert_equal(bit_ceil(var2), SIMD[int16_t, simd_width](1, 1, 2**12, 2**13))
+
+    alias var3 = SIMD[int32_t, simd_width](-111444, 0, 2**14-3, 2**29) 
+    assert_equal(
+        bit_ceil(var3), SIMD[int32_t, simd_width](1, 1, 2**14, 2**29)
+    )
+
+    # alias var4 = SIMD[int64_t, simd_width](-111444444, 1, 2**22-3, 2**59)
+    alias var4 = SIMD[int64_t, simd_width](
+        -111444444, 1, 2**22-3, 576460752303423488
+    )
+    assert_equal(
+        bit_ceil(var4),
+        SIMD[int64_t, simd_width](1, 1, 2**22, 2**59),
+    )
 
 
 def test_bit_floor():
+    assert_equal(bit_floor(-(2**59)), 0)
     assert_equal(bit_floor(-2), 0)
     assert_equal(bit_floor(1), 1)
     assert_equal(bit_floor(2), 2)
     assert_equal(bit_floor(4), 4)
     assert_equal(bit_floor(5), 4)
+    assert_equal(bit_floor(2**59), 2**59)
 
 
 def test_bit_floor_simd():
     alias simd_width = 4
-    alias type = DType.int8
+    alias int8_t = DType.int8
+    alias int16_t = DType.int16
+    alias int32_t = DType.int32
+    alias int64_t = DType.int64
 
-    alias var1 = SIMD[type, simd_width](-1, -2, 3, 4)
-    assert_equal(bit_floor(var1), SIMD[type, simd_width](0, 0, 2, 4))
+    alias var1 = SIMD[int8_t, simd_width](-114, 0, 2**5+3, 2**6)
+    assert_equal(bit_floor(var1), SIMD[int8_t, simd_width](0, 0, 2**5, 2**6))
 
-    alias var2 = SIMD[type, simd_width](4, 5, 6, 7)
-    assert_equal(bit_floor(var2), SIMD[type, simd_width](4, 4, 4, 4))
+    alias var2 = SIMD[int16_t, simd_width](-11444, 0, 2**12+3, 2**13)
+    assert_equal(bit_floor(var2), SIMD[int16_t, simd_width](0, 0, 2**12, 2**13))
+
+    alias var3 = SIMD[int32_t, simd_width](-111444, 0, 2**14+3, 2**29)
+    assert_equal(bit_floor(var3), SIMD[int32_t, simd_width](0, 0, 2**14, 2**29))
+
+    # alias var4 = SIMD[int64_t, simd_width](-111444444, 1, 2**22+3, 2**59)
+    alias var4 = SIMD[int64_t, simd_width](
+        -111444444, 1, 2**22+3, 576460752303423488
+    )
+    assert_equal(
+        bit_floor(var4),
+        SIMD[int64_t, simd_width](0, 1, 2**22, 2**59), 
+    )
 
 
 def test_rotate_bits_int():
@@ -353,6 +448,6 @@ def main():
     test_countr_zero()
     test_countr_zero_simd()
     test_bit_reverse_simd()
-    test_byte_reverse_simd()
+    test_byte_swap_simd()
     test_pop_count_simd()
     test_bit_not_simd()

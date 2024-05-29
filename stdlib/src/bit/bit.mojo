@@ -302,7 +302,7 @@ fn bit_width[
     else:
         var leading_zero_pos = countl_zero(val)
         var leading_zero_neg = countl_zero(bit_not(val))
-        var leading_zero = (val > 0).select(leading_zero_pos, leading_zero_neg)
+        var leading_zero = (val < 0).select(leading_zero_neg, leading_zero_pos)
         return bitwidth - leading_zero
 
 
