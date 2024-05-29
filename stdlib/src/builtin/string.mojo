@@ -1550,8 +1550,7 @@ struct String(
                     if char == "\r" and next_char == "\n":
                         eol_length = 2
                     break
-
-            if loc == -1:
+            else:
                 output.append(self[current_offset:])
                 break
 
