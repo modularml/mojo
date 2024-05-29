@@ -162,7 +162,7 @@ alias Pointer = LegacyPointer
 @value
 @register_passable("trivial")
 struct LegacyPointer[
-    type: AnyRegType, address_space: AddressSpace = AddressSpace.GENERIC
+    type: AnyTrivialRegType, address_space: AddressSpace = AddressSpace.GENERIC
 ](Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
     """Defines a LegacyPointer struct that contains the address of a register passable
     type.
@@ -272,7 +272,7 @@ struct LegacyPointer[
         Returns:
             A LegacyPointer struct which contains the address of the argument.
         """
-        # Work around AnyRegType vs AnyType.
+        # Work around AnyTrivialRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
             UnsafePointer(arg).address
         )
@@ -453,7 +453,7 @@ struct LegacyPointer[
 
     @always_inline("nodebug")
     fn bitcast[
-        new_type: AnyRegType = type,
+        new_type: AnyTrivialRegType = type,
         /,
         address_space: AddressSpace = Self.address_space,
     ](self) -> LegacyPointer[new_type, address_space]:

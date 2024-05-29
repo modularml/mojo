@@ -124,7 +124,7 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
 
 @always_inline
 fn memcmp[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](
     s1: LegacyPointer[type, address_space],
     s2: LegacyPointer[type, address_space],
@@ -234,19 +234,16 @@ fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
 
 
 @always_inline
-fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
+fn memcpy(
+    dest_data: LegacyPointer[Int8, *_], src_data: __type_of(dest_data), n: Int
+):
     """Copies a memory area.
 
     Args:
-        dest: The destination pointer.
-        src: The source pointer.
-        count: The number of elements to copy.
+        dest_data: The destination pointer.
+        src_data: The source pointer.
+        n: The number of bytes to copy.
     """
-    var n = count * sizeof[dest.type]()
-
-    var dest_data = dest.bitcast[Int8]()
-    var src_data = src.bitcast[Int8]()
-
     if n < 5:
         if n == 0:
             return
@@ -285,8 +282,12 @@ fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
     #    )
     #    return
 
-    var dest_dtype_ptr = DTypePointer[DType.int8, dest.address_space](dest_data)
-    var src_dtype_ptr = DTypePointer[DType.int8, src.address_space](src_data)
+    var dest_dtype_ptr = DTypePointer[DType.int8, dest_data.address_space](
+        dest_data
+    )
+    var src_dtype_ptr = DTypePointer[DType.int8, src_data.address_space](
+        src_data
+    )
 
     # Copy in 32-byte chunks.
     alias chunk_size = 32
@@ -295,6 +296,32 @@ fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
         dest_dtype_ptr.store(i, src_dtype_ptr.load[width=chunk_size](i))
     for i in range(vector_end, n):
         dest_dtype_ptr.store(i, src_dtype_ptr.load[width=1](i))
+
+
+@always_inline
+fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
+    """Copies a memory area.
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+        count: The number of elements to copy.
+    """
+    var n = count * sizeof[dest.type]()
+    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
+
+
+@always_inline
+fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
+    """Copies a memory area.
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+        count: The number of elements to copy.
+    """
+    var n = count * sizeof[dest.type]()
+    memcpy(dest.bitcast[Int8]().address, src.bitcast[Int8]().address, n)
 
 
 @always_inline
@@ -364,7 +391,7 @@ fn memset[
 
 @always_inline
 fn memset[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], value: UInt8, count: Int):
     """Fills memory with the given value.
 
@@ -382,7 +409,7 @@ fn memset[
 
 @always_inline
 fn memset[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: LegacyPointer[type, address_space], value: UInt8, count: Int):
     """Fills memory with the given value.
 
@@ -422,7 +449,7 @@ fn memset_zero[
 
 @always_inline
 fn memset_zero[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
@@ -439,7 +466,7 @@ fn memset_zero[
 
 @always_inline
 fn memset_zero[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: LegacyPointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
@@ -488,7 +515,7 @@ fn stack_allocation[
 @always_inline
 fn stack_allocation[
     count: Int,
-    type: AnyRegType,
+    type: AnyTrivialRegType,
     /,
     alignment: Int = 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
@@ -530,7 +557,7 @@ fn stack_allocation[
 
 @always_inline
 fn _malloc[
-    type: AnyRegType,
+    type: AnyTrivialRegType,
     /,
     *,
     address_space: AddressSpace = AddressSpace.GENERIC,

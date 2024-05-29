@@ -63,7 +63,7 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
         return len(self.storage)
 
     @always_inline("nodebug")
-    fn get[i: Int, T: Movable](self) -> T:
+    fn get[i: Int, T: Movable](self) -> ref [__lifetime_of(self)] T:
         """Get a list element at the given index.
 
         Parameters:
@@ -73,7 +73,9 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
         Returns:
             The element at the given index.
         """
-        return rebind[T](self.storage[i])
+        return rebind[Reference[T, False, __lifetime_of(self)]](
+            Reference(self.storage[i])
+        )[]
 
 
 # ===----------------------------------------------------------------------===#
@@ -82,7 +84,7 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
 
 
 @value
-struct _VariadicListIter[type: AnyRegType]:
+struct _VariadicListIter[type: AnyTrivialRegType]:
     """Const Iterator for VariadicList.
 
     Parameters:
@@ -101,7 +103,7 @@ struct _VariadicListIter[type: AnyRegType]:
 
 
 @register_passable("trivial")
-struct VariadicList[type: AnyRegType](Sized):
+struct VariadicList[type: AnyTrivialRegType](Sized):
     """A utility class to access variadic function arguments. Provides a "list"
     view of the function argument so that the size of the argument list and each
     individual argument can be accessed.

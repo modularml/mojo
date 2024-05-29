@@ -261,7 +261,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
 
 
 @register_passable("trivial")
-struct OptionalReg[T: AnyRegType](Boolable):
+struct OptionalReg[T: AnyTrivialRegType](Boolable):
     """A register-passable optional type.
 
     This struct optionally contains a value. It only works with trivial register

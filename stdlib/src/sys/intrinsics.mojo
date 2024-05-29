@@ -32,7 +32,7 @@ from memory import AddressSpace, DTypePointer
 
 @always_inline("nodebug")
 fn llvm_intrinsic[
-    intrin: StringLiteral, type: AnyRegType, has_side_effect: Bool = True
+    intrin: StringLiteral, type: AnyTrivialRegType, has_side_effect: Bool = True
 ]() -> type:
     """Calls an LLVM intrinsic with no arguments.
 
@@ -82,8 +82,8 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0) -> type:
     """Calls an LLVM intrinsic with one argument.
@@ -137,9 +137,9 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1) -> type:
     """Calls an LLVM intrinsic with two arguments.
@@ -195,10 +195,10 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2) -> type:
     """Calls an LLVM intrinsic with three arguments.
@@ -259,11 +259,11 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3) -> type:
     """Calls an LLVM intrinsic with four arguments.
@@ -327,12 +327,12 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4) -> type:
     """Calls an LLVM intrinsic with five arguments.
@@ -394,13 +394,13 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5) -> type:
     """Calls an LLVM intrinsic with six arguments.
@@ -465,14 +465,14 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5, arg6: T6) -> type:
     """Calls an LLVM intrinsic with seven arguments.
@@ -538,15 +538,15 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](
     arg0: T0,
@@ -622,16 +622,16 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](
     arg0: T0,
@@ -711,17 +711,17 @@ fn llvm_intrinsic[
 @always_inline("nodebug")
 fn llvm_intrinsic[
     intrin: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
+    T9: AnyTrivialRegType,
     has_side_effect: Bool = True,
 ](
     arg0: T0,
@@ -1482,7 +1482,7 @@ fn strided_store[
 # ===-------------------------------------------------------------------===#
 
 
-fn _mlirtype_is_eq[t1: AnyRegType, t2: AnyRegType]() -> Bool:
+fn _mlirtype_is_eq[t1: AnyTrivialRegType, t2: AnyTrivialRegType]() -> Bool:
     """Compares the two type for equality.
 
     Parameters:
@@ -1533,8 +1533,8 @@ fn _type_is_eq[t1: AnyType, t2: AnyType]() -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-@register_passable
-struct _RegisterPackType[*a: AnyRegType]:
+@register_passable("trivial")
+struct _RegisterPackType[*a: AnyTrivialRegType]:
     var storage: __mlir_type[`!kgen.pack<`, a, `>`]
 
     @always_inline("nodebug")

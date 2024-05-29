@@ -177,7 +177,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
     # TODO(#38268): Remove this method when references and parameter expressions
     # cooperate better.  We can't handle the use in test_simd without this.
     @always_inline("nodebug")
-    fn get[i: Int, T: Movable](self) -> T:
+    fn get[i: Int, T: Movable](self) -> ref [__lifetime_of(self)] T:
         """Get a tuple element and rebind to the specified type.
 
         Parameters:
@@ -187,7 +187,9 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         Returns:
             The tuple element at the requested index.
         """
-        return rebind[T](self[i])
+        return rebind[Reference[T, False, __lifetime_of(self)]](
+            Reference(self[i])
+        )[]
 
     @always_inline("nodebug")
     fn __contains__[T: EqualityComparable](self, value: T) -> Bool:
