@@ -250,16 +250,14 @@ struct StringLiteral(
         return self.__str__().__repr__()
 
     @always_inline
-    fn as_string_slice(
-        self: Reference[Self, _, _]
-    ) -> StringSlice[False, ImmutableStaticLifetime]:
+    fn as_string_slice(self) -> StringSlice[False, ImmutableStaticLifetime]:
         """Returns a string slice of this static string literal.
 
         Returns:
             A string slice pointing to this static string literal.
         """
 
-        var bytes = self[].as_bytes_slice()
+        var bytes = self.as_bytes_slice()
 
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
@@ -269,9 +267,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes_slice(
-        self: Reference[Self, _, _]
-    ) -> Span[UInt8, False, ImmutableStaticLifetime]:
+    fn as_bytes_slice(self) -> Span[UInt8, False, ImmutableStaticLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -279,11 +275,11 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        var ptr = self[].unsafe_uint8_ptr()
+        var ptr = self.unsafe_uint8_ptr()
 
         return Span[UInt8, False, ImmutableStaticLifetime](
             unsafe_ptr=ptr,
-            len=self[]._byte_length(),
+            len=self._byte_length(),
         )
 
     fn format_to(self, inout writer: Formatter):
