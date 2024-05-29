@@ -208,7 +208,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
-        if _isspace(buff[pos]):
+        if _isspace_(buff[pos]):
             continue
 
         if str_ref[pos] == "-":
@@ -283,13 +283,13 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         elif ord_letter_min[1] <= ord_current <= ord_letter_max[1]:
             result += ord_current - ord_letter_min[1] + 10
             found_valid_chars_after_start = True
-        elif _isspace(ord_current):
+        elif _isspace_(ord_current):
             has_space_after_number = True
             start = pos + 1
             break
         else:
             raise Error(_atol_error(base, str_ref))
-        if pos + 1 < str_len and not _isspace(buff[pos + 1]):
+        if pos + 1 < str_len and not _isspace_(buff[pos + 1]):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
@@ -303,7 +303,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     if has_space_after_number:
         for pos in range(start, str_len):
-            if not _isspace(buff[pos]):
+            if not _isspace_(buff[pos]):
                 raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
@@ -564,7 +564,7 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 
 
 # ===----------------------------------------------------------------------=== #
-# _isspace
+# _isspace_
 # ===----------------------------------------------------------------------=== #
 
 
@@ -579,7 +579,7 @@ fn _get_spaces_table() -> InlineArray[UInt8, 256]:
     return table
 
 
-fn _isspace(c: UInt8) -> Bool:
+fn _isspace_(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
 
     This only respects the default "C" locale, i.e. returns True only if the
@@ -1443,7 +1443,7 @@ struct String(
             return memcmp(ptr1, ptr2, amnt) == 0
 
         if len(self) == 1:
-            return _isspace(self._buffer.unsafe_get(0)[])
+            return _isspace_(self._buffer.unsafe_get(0)[])
         elif len(self) == 3:
             return compare(self._buffer, next_line, 3)
         elif len(self) == 4:
@@ -1549,7 +1549,7 @@ struct String(
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
             while lhs <= str_iter_len:
-                if not _isspace(self._buffer.unsafe_get(lhs)[]):
+                if not _isspace_(self._buffer.unsafe_get(lhs)[]):
                     break
                 lhs += 1
             # if it went until the end of the String, then
@@ -1563,7 +1563,7 @@ struct String(
                 break
             rhs = lhs + 1
             while rhs <= str_iter_len:
-                if _isspace(self._buffer.unsafe_get(rhs)[]):
+                if _isspace_(self._buffer.unsafe_get(rhs)[]):
                     break
                 rhs += 1
 
@@ -1681,7 +1681,7 @@ struct String(
         """
         # TODO: should use self.__iter__ and self.isspace()
         var r_idx = len(self)
-        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)[]):
+        while r_idx > 0 and _isspace_(self._buffer.unsafe_get(r_idx - 1)[]):
             r_idx -= 1
         return self[:r_idx]
 
@@ -1709,7 +1709,7 @@ struct String(
         """
         # TODO: should use self.__iter__ and self.isspace()
         var l_idx = 0
-        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)[]):
+        while l_idx < len(self) and _isspace_(self._buffer.unsafe_get(l_idx)[]):
             l_idx += 1
         return self[l_idx:]
 
