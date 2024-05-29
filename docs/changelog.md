@@ -16,6 +16,10 @@ what we publish.
 
 ### 🔥 Legendary
 
+- `List` now implements `copy`, to generate a shallow copy of a list
+  ([PR #2806](https://github.com/modularml/mojo/pull/2806)
+  by [@msaelices](https://github.com/msaelices))
+
 ### ⭐️ New
 
 - `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
