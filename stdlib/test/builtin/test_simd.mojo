@@ -1341,6 +1341,23 @@ def test_reduce():
         test_dtype[DType.bfloat16]()
 
 
+def test_reduce_bit_count():
+    var int_0xFFFF = Int32(0xFFFF)
+    assert_equal(int_0xFFFF.reduce_bit_count(), 16)
+
+    var int_iota8 = SIMD[DType.int32, 8](0, 1, 2, 3, 4, 5, 6, 7)
+    assert_equal(int_iota8.reduce_bit_count(), 12)
+
+    var bool_true = Scalar[DType.bool].splat(True)
+    assert_equal(bool_true.reduce_bit_count(), 1)
+
+    var bool_false = Scalar[DType.bool].splat(False)
+    assert_equal(bool_false.reduce_bit_count(), 0)
+
+    var bool_true16 = SIMD[DType.bool, 16].splat(True)
+    assert_equal(bool_true16.reduce_bit_count(), 16)
+
+
 def test_pow():
     alias inf = FloatLiteral.infinity
     alias F = SIMD[DType.float32, 4]
@@ -1392,6 +1409,7 @@ def main():
     test_pow()
     test_radd()
     test_reduce()
+    test_reduce_bit_count()
     test_rfloordiv()
     test_rmod()
     test_rotate()
