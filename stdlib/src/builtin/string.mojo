@@ -568,17 +568,33 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_spaces_table() -> InlineArray[UInt8, 256]:
-    var table = InlineArray[UInt8, 256](0)
-    table[ord(" ")] = 1
-    table[ord("\t")] = 1
-    table[ord("\n")] = 1
-    table[ord("\r")] = 1
-    table[ord("\f")] = 1
-    table[ord("\v")] = 1
-    table[0x1C] = 1
-    table[0x1D] = 1
-    table[0x1E] = 1
+fn _get_spaces_table() -> InlineArray[Bool, 256]:
+    var table = InlineArray[Bool, 256](unsafe_uninitialized=True)
+
+    @parameter
+    for i in range(256):
+
+        @parameter
+        if i == ord(" "):
+            table[i] = 1
+        elif i == ord("\t"):
+            table[i] = 1
+        elif i == ord("\n"):
+            table[i] = 1
+        elif i == ord("\r"):
+            table[i] = 1
+        elif i == ord("\f"):
+            table[i] = 1
+        elif i == ord("\v"):
+            table[i] = 1
+        elif i == ord("\x1c"):
+            table[i] = 1
+        elif i == ord("\x1d"):
+            table[i] = 1
+        elif i == ord("\x1e"):
+            table[i] = 1
+        else:
+            table[i] = 0
     return table
 
 
