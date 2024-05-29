@@ -84,12 +84,17 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         T: The type of the elements.
     """
 
+    # Fields
     var data: UnsafePointer[T]
     """The underlying storage for the list."""
     var size: Int
     """The number of elements in the list."""
     var capacity: Int
     """The amount of elements that can fit in the list without resizing it."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self):
         """Constructs an empty list."""
@@ -185,6 +190,129 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if self.data:
             self.data.free()
 
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
+    fn __setitem__(inout self, idx: Int, owned value: T):
+        """Sets a list element at the given index.
+
+        Args:
+            idx: The index of the element.
+            value: The value to assign.
+        """
+        var normalized_idx = idx
+        debug_assert(
+            -self.size <= normalized_idx < self.size,
+            "index must be within bounds",
+        )
+
+        if normalized_idx < 0:
+            normalized_idx += len(self)
+
+        destroy_pointee(self.data + normalized_idx)
+        initialize_pointee_move(self.data + normalized_idx, value^)
+
+    @always_inline
+    fn __contains__[
+        T2: ComparableCollectionElement
+    ](self: List[T], value: T2) -> Bool:
+        """Verify if a given value is present in the list.
+
+        ```mojo
+        var x = List[Int](1,2,3)
+        if 3 in x: print("x contains 3")
+        ```
+        Parameters:
+            T2: The type of the elements in the list. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            value: The value to find.
+
+        Returns:
+            True if the value is contained in the list, False otherwise.
+        """
+
+        constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
+        for i in self:
+            if rebind[Reference[T2, False, __lifetime_of(self)]](i)[] == value:
+                return True
+        return False
+
+    @always_inline("nodebug")
+    fn __mul__(self, x: Int) -> Self:
+        """Multiplies the list by x and returns a new list.
+
+        Args:
+            x: The multiplier number.
+
+        Returns:
+            The new list.
+        """
+        # avoid the copy since it would be cleared immediately anyways
+        if x == 0:
+            return Self()
+        var result = List(self)
+        result.__mul(x)
+        return result^
+
+    @always_inline("nodebug")
+    fn __imul__(inout self, x: Int):
+        """Multiplies the list by x in place.
+
+        Args:
+            x: The multiplier number.
+        """
+        self.__mul(x)
+
+    @always_inline("nodebug")
+    fn __add__(self, owned other: Self) -> Self:
+        """Concatenates self with other and returns the result as a new list.
+
+        Args:
+            other: List whose elements will be combined with the elements of self.
+
+        Returns:
+            The newly created list.
+        """
+        var result = List(self)
+        result.extend(other^)
+        return result^
+
+    @always_inline("nodebug")
+    fn __iadd__(inout self, owned other: Self):
+        """Appends the elements of other into self.
+
+        Args:
+            other: List whose elements will be appended to self.
+        """
+        self.extend(other^)
+
+    fn __iter__(
+        self: Reference[Self, _, _],
+    ) -> _ListIter[T, self.is_mutable, self.lifetime]:
+        """Iterate over elements of the list, returning immutable references.
+
+        Returns:
+            An iterator of immutable references to the list elements.
+        """
+        return _ListIter(0, self)
+
+    fn __reversed__(
+        self: Reference[Self, _, _]
+    ) -> _ListIter[T, self.is_mutable, self.lifetime, False]:
+        """Iterate backwards over the list, returning immutable references.
+
+        Returns:
+            A reversed iterator of immutable references to the list elements.
+        """
+        return _ListIter[forward=False](len(self[]), self)
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     fn __len__(self) -> Int:
         """Gets the number of elements in the list.
 
@@ -200,6 +328,75 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             `False` if the list is empty, `True` if there is at least one element.
         """
         return len(self) > 0
+
+    fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
+        """Returns a string representation of a `List`.
+
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(my_list.__str__())
+        ```
+
+        When the compiler supports conditional methods, then a simple `str(my_list)` will
+        be enough.
+
+        The elements' type must implement the `__repr__()` for this to work.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the list.
+        """
+        # we do a rough estimation of the number of chars that we'll see
+        # in the final string, we assume that str(x) will be at least one char.
+        var minimum_capacity = (
+            2  # '[' and ']'
+            + len(self) * 3  # str(x) and ", "
+            - 2  # remove the last ", "
+        )
+        var string_buffer = List[UInt8](capacity=minimum_capacity)
+        string_buffer.append(0)  # Null terminator
+        var result = String(string_buffer^)
+        result += "["
+        for i in range(len(self)):
+            result += repr(self[i])
+            if i < len(self) - 1:
+                result += ", "
+        result += "]"
+        return result
+
+    fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
+        """Returns a string representation of a `List`.
+        Note that since we can't condition methods on a trait yet,
+        the way to call this method is a bit special. Here is an example below:
+
+        ```mojo
+        var my_list = List[Int](1, 2, 3)
+        print(my_list.__repr__(my_list))
+        ```
+
+        When the compiler supports conditional methods, then a simple `repr(my_list)` will
+        be enough.
+
+        The elements' type must implement the `__repr__()` for this to work.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Returns:
+            A string representation of the list.
+        """
+        return self.__str__()
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn _realloc(inout self, new_capacity: Int):
@@ -274,55 +471,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.reserve(len(self) * x)
         for i in range(x - 1):
             self.extend(orig)
-
-    @always_inline("nodebug")
-    fn __mul__(self, x: Int) -> Self:
-        """Multiplies the list by x and returns a new list.
-
-        Args:
-            x: The multiplier number.
-
-        Returns:
-            The new list.
-        """
-        # avoid the copy since it would be cleared immediately anyways
-        if x == 0:
-            return Self()
-        var result = List(self)
-        result.__mul(x)
-        return result^
-
-    @always_inline("nodebug")
-    fn __imul__(inout self, x: Int):
-        """Multiplies the list by x in place.
-
-        Args:
-            x: The multiplier number.
-        """
-        self.__mul(x)
-
-    @always_inline("nodebug")
-    fn __add__(self, owned other: Self) -> Self:
-        """Concatenates self with other and returns the result as a new list.
-
-        Args:
-            other: List whose elements will be combined with the elements of self.
-
-        Returns:
-            The newly created list.
-        """
-        var result = List(self)
-        result.extend(other^)
-        return result^
-
-    @always_inline("nodebug")
-    fn __iadd__(inout self, owned other: Self):
-        """Appends the elements of other into self.
-
-        Args:
-            other: List whose elements will be appended to self.
-        """
-        self.extend(other^)
 
     @always_inline
     fn extend(inout self, owned other: List[T]):
@@ -559,30 +707,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.capacity = 0
         return ptr
 
-    fn __setitem__[
-        IndexerType: Indexer
-    ](inout self, i: IndexerType, owned value: T):
-        """Sets a list element at the given index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
-
-        Args:
-            i: The index of the element.
-            value: The value to assign.
-        """
-        var normalized_idx = index(i)
-        debug_assert(
-            -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
-        )
-
-        if normalized_idx < 0:
-            normalized_idx += len(self)
-
-        destroy_pointee(self.data + normalized_idx)
-        initialize_pointee_move(self.data + normalized_idx, value^)
-
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
         """Adjusts the span based on the list length."""
@@ -615,33 +739,30 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
 
         var adjusted_span = self._adjust_span(span)
-        var adjusted_span_len = len(adjusted_span)
+        var adjusted_span_len = adjusted_span.unsafe_indices()
 
         if not adjusted_span_len:
             return Self()
 
-        var res = Self(capacity=len(adjusted_span))
-        for i in range(len(adjusted_span)):
+        var res = Self(capacity=adjusted_span_len)
+        for i in range(adjusted_span_len):
             res.append(self[adjusted_span[i]])
 
         return res^
 
     @always_inline
-    fn __getitem__[IndexerType: Indexer](self, i: IndexerType) -> T:
+    fn __getitem__(self, idx: Int) -> T:
         """Gets a copy of the list element at the given index.
 
         FIXME(lifetimes): This should return a reference, not a copy!
 
-        Parameters:
-            IndexerType: The type of the indexer.
-
         Args:
-            i: The index of the element.
+            idx: The index of the element.
 
         Returns:
             A copy of the element at the given index.
         """
-        var normalized_idx = index(i)
+        var normalized_idx = idx
         debug_assert(
             -self.size <= normalized_idx < self.size,
             "index must be within bounds",
@@ -651,7 +772,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         return (self.data + normalized_idx)[]
 
-    # TODO(30737): Replace __getitem__ with this as __refitem__, but lots of places use it
+    # TODO(30737): Replace __getitem__ with this, but lots of places use it
     fn __get_ref(
         self: Reference[Self, _, _], i: Int
     ) -> Reference[T, self.is_mutable, self.lifetime]:
@@ -667,90 +788,37 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if i < 0:
             normalized_idx += self[].size
 
-        return (self[].data + normalized_idx)[]
+        return self[].unsafe_get(normalized_idx)
 
-    fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _ListIter[T, self.is_mutable, self.lifetime]:
-        """Iterate over elements of the list, returning immutable references.
+    @always_inline
+    fn unsafe_get(
+        self: Reference[Self, _, _], idx: Int
+    ) -> Reference[Self.T, self.is_mutable, self.lifetime]:
+        """Get a reference to an element of self without checking index bounds.
 
-        Returns:
-            An iterator of immutable references to the list elements.
-        """
-        return _ListIter(0, self)
+        Users should consider using `__getitem__` instead of this method as it
+        is unsafe. If an index is out of bounds, this method will not abort, it
+        will be considered undefined behavior.
 
-    fn __reversed__(
-        self: Reference[Self, _, _]
-    ) -> _ListIter[T, self.is_mutable, self.lifetime, False]:
-        """Iterate backwards over the list, returning immutable references.
+        Note that there is no wraparound for negative indices, caution is
+        advised. Using negative indices is considered undefined behavior. Never
+        use `my_list.unsafe_get(-1)` to get the last element of the list.
+        Instead, do `my_list.unsafe_get(len(my_list) - 1)`.
 
-        Returns:
-            A reversed iterator of immutable references to the list elements.
-        """
-        return _ListIter[forward=False](len(self[]), self)
-
-    fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
-        """Returns a string representation of a `List`.
-
-        Note that since we can't condition methods on a trait yet,
-        the way to call this method is a bit special. Here is an example below:
-
-        ```mojo
-        var my_list = List[Int](1, 2, 3)
-        print(my_list.__str__())
-        ```
-
-        When the compiler supports conditional methods, then a simple `str(my_list)` will
-        be enough.
-
-        The elements' type must implement the `__repr__()` for this to work.
-
-        Parameters:
-            U: The type of the elements in the list. Must implement the
-              traits `Representable` and `CollectionElement`.
+        Args:
+            idx: The index of the element to get.
 
         Returns:
-            A string representation of the list.
+            A reference to the element at the given index.
         """
-        # we do a rough estimation of the number of chars that we'll see
-        # in the final string, we assume that str(x) will be at least one char.
-        var minimum_capacity = (
-            2  # '[' and ']'
-            + len(self) * 3  # str(x) and ", "
-            - 2  # remove the last ", "
+        debug_assert(
+            0 <= idx < len(self[]),
+            (
+                "The index provided must be within the range [0, len(List) -1]"
+                " when using List.unsafe_get()"
+            ),
         )
-        var result = String(List[UInt8](capacity=minimum_capacity))
-        result += "["
-        for i in range(len(self)):
-            result += repr(self[i])
-            if i < len(self) - 1:
-                result += ", "
-        result += "]"
-        return result
-
-    fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
-        """Returns a string representation of a `List`.
-        Note that since we can't condition methods on a trait yet,
-        the way to call this method is a bit special. Here is an example below:
-
-        ```mojo
-        var my_list = List[Int](1, 2, 3)
-        print(my_list.__repr__(my_list))
-        ```
-
-        When the compiler supports conditional methods, then a simple `repr(my_list)` will
-        be enough.
-
-        The elements' type must implement the `__repr__()` for this to work.
-
-        Parameters:
-            U: The type of the elements in the list. Must implement the
-              traits `Representable` and `CollectionElement`.
-
-        Returns:
-            A string representation of the list.
-        """
-        return self.__str__()
+        return (self[].data + idx)[]
 
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
@@ -789,33 +857,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             The UnsafePointer to the underlying memory.
         """
         return self.data
-
-    @always_inline
-    fn __contains__[
-        T2: ComparableCollectionElement
-    ](self: List[T2], value: T) -> Bool:
-        """Verify if a given value is present in the list.
-
-        ```mojo
-        var x = List[Int](1,2,3)
-        if 3 in x: print("x contains 3")
-        ```
-        Parameters:
-            T2: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
-
-        Args:
-            value: The value to find.
-
-        Returns:
-            True if the value is contained in the list, False otherwise.
-        """
-
-        constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
-        for i in self:
-            if i[] == rebind[T2](value):
-                return True
-        return False
 
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:

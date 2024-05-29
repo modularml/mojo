@@ -125,7 +125,7 @@ compatibility with Python. It allows, for example, omitting type annotations,
 implicit variable declarations, implicit raises, etc. But the Mojo `def` is not
 the same as a Python `def`. A commonly reported issue is that Mojo scoping rules
 differ from Python's. In Python, local variables are scoped at the function
-level, but Python also supports behaviour like:
+level, but Python also supports behavior like:
 
 ```python
 def foo(k):
@@ -229,7 +229,7 @@ from Mojo itself, it comes from Mojo's first class interoperability with
 CPython.  This in effect will be Mojo's escape hatch for compatibility purposes
 and is what gives Mojo access to all of Python's vast ecosystem.  Below that,
 Mojo will provide an emulation of Python's hash-table dynamism that is a
-faithful but not quite identical replication of Python behaviour (no GIL, for
+faithful but not quite identical replication of Python behavior (no GIL, for
 example!).  Building this out will be a huge undertaking, and is something Mojo
 should do over time.
 

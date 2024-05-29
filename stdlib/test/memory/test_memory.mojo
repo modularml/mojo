@@ -30,6 +30,7 @@ alias int8_pop = __mlir_type.`!pop.scalar<si8>`
 
 
 @value
+@register_passable("trivial")
 struct Pair:
     var lo: Int
     var hi: Int
@@ -333,7 +334,7 @@ def test_pointer_refitem():
 
 def test_pointer_refitem_string():
     alias payload = "$Modular!Mojo!HelloWorld^"
-    var ptr = Pointer[String].alloc(1)
+    var ptr = UnsafePointer[String].alloc(1)
     __get_address_as_uninit_lvalue(ptr.address) = String()
     ptr[] = payload
     assert_equal(ptr[], payload)
@@ -514,7 +515,7 @@ def test_indexing():
         ptr[i] = i
 
     assert_equal(ptr[True], 1)
-    assert_equal(ptr[Int32(2)], 2)
+    assert_equal(ptr[int(2)], 2)
     assert_equal(ptr[1], 1)
 
 

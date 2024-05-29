@@ -88,15 +88,35 @@ struct Formatter:
     # Methods
     # ===------------------------------------------------------------------=== #
 
+    # TODO(cleanup):
+    #   Remove this overload by defining a working
+    #   `StringSlice.__init__(StringLiteral)` implicit conversion.
     @always_inline
-    fn write_str(inout self, strref: StringRef):
+    fn write_str(inout self, literal: StringLiteral):
         """
-        Write a string to this formatter.
+        Write a string literal to this formatter.
 
         Args:
-            strref: The string to write to this formatter. Must NOT be null
-              terminated.
+            literal: The string literal to write.
         """
+
+        self.write_str(literal.as_string_slice())
+
+    @always_inline
+    fn write_str(inout self, str_slice: StringSlice[False, _]):
+        """
+        Write a string slice to this formatter.
+
+        Args:
+            str_slice: The string slice to write to this formatter. Must NOT be
+              null terminated.
+        """
+
+        # SAFETY:
+        #   Safe because `str_slice` is a `borrowed` arg, and so alive at least
+        #   as long as this call.
+        var strref: StringRef = str_slice._strref_dangerous()
+
         self._write_func(self._write_func_arg, strref)
 
     # ===------------------------------------------------------------------=== #

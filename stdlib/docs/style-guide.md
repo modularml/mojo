@@ -119,28 +119,52 @@ defined on structs.
 struct MyStruct(Sized, Stringable):
     """Description goes here."""
 
+    # Fields
     var field: Int
 
-    # ===------------------------------------------------------------------===#
-    # Constructors
-    # ===------------------------------------------------------------------===#
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
-    fn __init__(self):
-        ...
+    fn __init__(...)
+    fn __moveinit__(...)
+    fn __copyinit__(...)
 
-    # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
-    # ===------------------------------------------------------------------=== #
+    fn __del__(...)
 
-    fn __len__(self) -> Int:
-        ...
+    # ===-------------------------------------------------------------------===#
+    # Factory methods
+    # ===-------------------------------------------------------------------===#
 
-    fn __str__(self) -> String:
-        ...
+    @staticmethod
+    fn foo(...) -> Self[...]
 
-    # ===------------------------------------------------------------------=== #
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
+    # Basically anything that "backs" special syntax: [..], *, +, /, //, etc...
+
+    fn __getitem__
+    fn __getitem__
+    fn __refitem__
+
+    fn __add__
+    fn __iadd__
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    fn __bool__
+    fn __len__
+    fn __str__
+
+    # ===-------------------------------------------------------------------===#
     # Methods
-    # ===------------------------------------------------------------------=== #
+    # ===-------------------------------------------------------------------===#
+
+    fn unsafe_ptr(..)   # e.g.
 ```
 
 ## Code conventions
@@ -259,7 +283,7 @@ Every public function and public struct (including data fields) in the standard
 library must have docstrings (code comments that describe the API behavior).
 Mojo includes tooling to ensure that public functions include docstrings.
 
-You can run `./stdlib/scripts/check-doc-strings.sh` to validate
+You can run `./stdlib/scripts/check-docstrings.py` to validate
 docstrings. If the command exits with a `0` exit code, the docstrings are
 compliant; otherwise, an error will be shown. This is also enforced by the LSP
 with warnings for anything that doesn’t conform, you can generate docstrings

@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-alias AnyRegType = __mlir_type.`!kgen.type`
+alias AnyTrivialRegType = __mlir_type.`!kgen.type`
 """Represents any register passable Mojo data type."""
 
 alias NoneType = __mlir_type.`!kgen.none`

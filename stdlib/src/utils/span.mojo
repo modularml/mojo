@@ -53,10 +53,10 @@ struct _SpanIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src._refitem__(self.index - 1)
+            return self.src[self.index - 1]
         else:
             self.index -= 1
-            return self.src._refitem__(self.index)
+            return self.src[self.index]
 
     @always_inline
     fn __len__(self) -> Int:
@@ -81,11 +81,12 @@ struct Span[
         lifetime: The lifetime of the Span.
     """
 
+    # Field
     var _data: UnsafePointer[T]
     var _len: Int
 
     # ===------------------------------------------------------------------===#
-    # Initializers
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
@@ -125,7 +126,63 @@ struct Span[
         self._len = size
 
     # ===------------------------------------------------------------------===#
-    # Trait impls
+    # Operator dunders
+    # ===------------------------------------------------------------------===#
+
+    @always_inline
+    fn __getitem__(self, idx: Int) -> ref [lifetime] T:
+        """Get a reference to an element in the span.
+
+        Args:
+            idx: The index of the value to return.
+
+        Returns:
+            An element reference.
+        """
+        # TODO: Simplify this with a UInt type.
+        debug_assert(
+            -self._len <= int(idx) < self._len, "index must be within bounds"
+        )
+
+        var offset = idx
+        if offset < 0:
+            offset += len(self)
+        return self._data[offset]
+
+    @always_inline
+    fn __getitem__(self, slc: Slice) -> Self:
+        """Get a new span from a slice of the current span.
+
+        Args:
+            slc: The slice specifying the range of the new subslice.
+
+        Returns:
+            A new span that points to the same data as the current span.
+        """
+        var adjusted_span = self._adjust_span(slc)
+        debug_assert(
+            0 <= adjusted_span.start <= self._len
+            and 0 <= adjusted_span.end <= self._len,
+            "Slice must be within bounds.",
+        )
+        var res = Self(
+            unsafe_ptr=(self._data + adjusted_span.start),
+            len=adjusted_span.unsafe_indices(),
+        )
+
+        return res
+
+    @always_inline
+    fn __iter__(self) -> _SpanIter[T, is_mutable, lifetime]:
+        """Get an iterator over the elements of the span.
+
+        Returns:
+            An iterator over the elements of the span.
+        """
+        return _SpanIter(0, self)
+
+    # ===------------------------------------------------------------------===#
+    # Trait implementations
     # ===------------------------------------------------------------------===#
 
     @always_inline
@@ -138,21 +195,8 @@ struct Span[
         return self._len
 
     # ===------------------------------------------------------------------===#
-    # Operator dunders
+    # Methods
     # ===------------------------------------------------------------------===#
-
-    @always_inline
-    fn _refitem__[
-        intable: Intable
-    ](self, index: intable) -> Reference[T, is_mutable, lifetime]:
-        debug_assert(
-            -self._len <= int(index) < self._len, "index must be within bounds"
-        )
-
-        var offset = int(index)
-        if offset < 0:
-            offset += len(self)
-        return (self._data + offset)[]
 
     @always_inline
     fn _adjust_span(self, span: Slice) -> Slice:
@@ -173,79 +217,6 @@ struct Span[
             adjusted_span.start = tmp - 1
 
         return adjusted_span
-
-    @always_inline
-    fn __getitem__[
-        IndexerType: Indexer
-    ](self, idx: IndexerType) -> Reference[T, is_mutable, lifetime]:
-        """Get a `Reference` to the element at the given index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
-
-        Args:
-            idx: The index of the item.
-
-        Returns:
-            A reference to the item at the given index.
-        """
-        # note that self._refitem__ is already bounds checking
-        return self._refitem__(index(idx))
-
-    @always_inline
-    fn __setitem__[
-        IndexerType: Indexer
-    ](inout self, idx: IndexerType, value: T):
-        """Get a `Reference` to the element at the given index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
-
-        Args:
-            idx: The index of the item.
-            value: The value to set at the given index.
-        """
-        # note that self._refitem__ is already bounds checking
-        var ref = Reference[T, __mlir_attr.`1: i1`, __lifetime_of(self)](
-            UnsafePointer(self._refitem__(index(idx)))[]
-        )
-        ref[] = value
-
-    @always_inline
-    fn __getitem__(self, slice: Slice) -> Self:
-        """Get a new span from a slice of the current span.
-
-        Args:
-            slice: The slice specifying the range of the new subslice.
-
-        Returns:
-            A new span that points to the same data as the current span.
-        """
-        var adjusted_span = self._adjust_span(slice)
-        debug_assert(
-            0 <= adjusted_span.start <= self._len
-            and 0 <= adjusted_span.end <= self._len,
-            "Slice must be within bounds.",
-        )
-        var res = Self(
-            unsafe_ptr=(self._data + adjusted_span.start),
-            len=len(adjusted_span),
-        )
-
-        return res
-
-    @always_inline
-    fn __iter__(self) -> _SpanIter[T, is_mutable, lifetime]:
-        """Get an iterator over the elements of the span.
-
-        Returns:
-            An iterator over the elements of the span.
-        """
-        return _SpanIter(0, self)
-
-    # ===------------------------------------------------------------------===#
-    # Methods
-    # ===------------------------------------------------------------------===#
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """

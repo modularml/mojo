@@ -25,6 +25,7 @@ from sys import (
 
 from builtin.dtype import _get_dtype_printf_format
 from builtin.builtin_list import _LITRefPackHelper
+from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
 from utils import StringRef, unroll
@@ -51,11 +52,11 @@ struct _fdopen:
     alias STDERR = 2
     var handle: UnsafePointer[NoneType]
 
-    fn __init__(inout self, stream_id: Int):
+    fn __init__(inout self, stream_id: FileDescriptor):
         """Creates a file handle to the stdout/stderr stream.
 
         Args:
-            stream_id: The stream id (either `STDOUT` or `STDERR`)
+            stream_id: The stream id
         """
         alias mode = "a"
         var handle: UnsafePointer[NoneType]
@@ -63,11 +64,11 @@ struct _fdopen:
         @parameter
         if os_is_windows():
             handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_ptr()
             )
         else:
             handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_ptr()
             )
         self.handle = handle
 
@@ -85,7 +86,7 @@ struct _fdopen:
 
 
 @no_inline
-fn _flush(file: Int = stdout):
+fn _flush(file: FileDescriptor = stdout):
     with _fdopen(file) as fd:
         _ = external_call["fflush", Int32](fd)
 
@@ -98,7 +99,7 @@ fn _flush(file: Int = stdout):
 @no_inline
 fn _printf[
     fmt: StringLiteral, *types: AnyType
-](*arguments: *types, file: Int = stdout):
+](*arguments: *types, file: FileDescriptor = stdout):
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C snprintf call. Load
     # all the members of the pack.
@@ -134,19 +135,17 @@ fn _printf[
 
 @no_inline
 fn _snprintf[
-    *types: AnyType
-](
-    str: UnsafePointer[UInt8],
-    size: Int,
-    fmt: StringLiteral,
-    *arguments: *types,
-) -> Int:
+    fmt: StringLiteral, *types: AnyType
+](str: UnsafePointer[UInt8], size: Int, *arguments: *types) -> Int:
     """Writes a format string into an output pointer.
+
+    Parameters:
+        fmt: A format string.
+        types: The types of arguments interpolated into the format string.
 
     Args:
         str: A pointer into which the format string is written.
         size: At most, `size - 1` bytes are written into the output string.
-        fmt: A format string.
         arguments: Arguments interpolated into the format string.
 
     Returns:
@@ -178,25 +177,24 @@ fn _snprintf[
 
 @no_inline
 fn _snprintf_scalar[
-    type: DType
-](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type],) -> Int:
-    alias format = _get_dtype_printf_format[type]()
-
+    type: DType,
+    float_format: StringLiteral = "%.17g",
+](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type]) -> Int:
     @parameter
     if type == DType.bool:
         if x:
-            return _snprintf(buffer, size, "True")
+            return _snprintf["True"](buffer, size)
         else:
-            return _snprintf(buffer, size, "False")
+            return _snprintf["False"](buffer, size)
     elif type.is_integral() or type == DType.address:
-        return _snprintf(buffer, size, format, x)
+        return _snprintf[_get_dtype_printf_format[type]()](buffer, size, x)
     elif (
         type == DType.float16 or type == DType.bfloat16 or type == DType.float32
     ):
         # We need to cast the value to float64 to print it.
-        return _float_repr(buffer, size, x.cast[DType.float64]())
+        return _float_repr[float_format](buffer, size, x.cast[DType.float64]())
     elif type == DType.float64:
-        return _float_repr(buffer, size, rebind[Float64](x))
+        return _float_repr[float_format](buffer, size, rebind[Float64](x))
     return 0
 
 
@@ -206,11 +204,13 @@ fn _snprintf_scalar[
 
 
 @no_inline
-fn _float_repr(buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
+fn _float_repr[
+    fmt: StringLiteral = "%.17g"
+](buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
-    var n = _snprintf(buffer, size, "%.17g", x.value)
+    var n = _snprintf[fmt](buffer, size, x.value)
     # If the buffer isn't big enough to add anything, then just return.
     if n + 2 >= size:
         return n
@@ -239,7 +239,7 @@ fn _float_repr(buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
 
 
 @no_inline
-fn _put(x: Int, file: Int = stdout):
+fn _put(x: Int, file: FileDescriptor = stdout):
     """Prints a scalar value.
 
     Args:
@@ -263,7 +263,7 @@ fn _put_simd_scalar[type: DType](x: Scalar[type]):
 
     @parameter
     if type == DType.bool:
-        _put("True") if x else _put("False")
+        _put["True"]() if x else _put["False"]()
     elif type.is_integral() or type == DType.address:
         _printf[format](x)
     elif type.is_floating_point():
@@ -294,26 +294,26 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
     if simd_width == 1:
         _put_simd_scalar(x[0])
     elif type.is_integral():
-        _put("[")
+        _put["["]()
 
         @parameter
         for i in range(simd_width):
             _put_simd_scalar(x[i])
             if i != simd_width - 1:
-                _put(", ")
-        _put("]")
+                _put[", "]()
+        _put["]"]()
     else:
         _put(str(x))
 
 
 @no_inline
-fn _put(x: String, file: Int = stdout):
+fn _put(x: String, file: FileDescriptor = stdout):
     # 'x' is borrowed, so we know it will outlive the call to print.
     _put(x._strref_dangerous(), file=file)
 
 
 @no_inline
-fn _put(x: StringRef, file: Int = stdout):
+fn _put(x: StringRef, file: FileDescriptor = stdout):
     # Avoid printing "(null)" for an empty/default constructed `String`
     var str_len = len(x)
 
@@ -345,12 +345,12 @@ fn _put(x: StringRef, file: Int = stdout):
 
 
 @no_inline
-fn _put(x: StringLiteral, file: Int = stdout):
+fn _put[x: StringLiteral](file: FileDescriptor = stdout):
     _put(StringRef(x), file=file)
 
 
 @no_inline
-fn _put(x: DType, file: Int = stdout):
+fn _put(x: DType, file: FileDescriptor = stdout):
     _put(str(x), file=file)
 
 
@@ -362,17 +362,82 @@ fn _put(x: DType, file: Int = stdout):
 @no_inline
 fn print[
     *Ts: Stringable
+](*values: *Ts, flush: Bool = False, file: FileDescriptor = stdout):
+    """Prints elements to the text stream. Each element is separated by a
+    whitespace and followed by a newline character.
+
+    Parameters:
+        Ts: The elements types.
+
+    Args:
+        values: The elements to print.
+        flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
+    """
+    _print(values, sep=" ", end="\n", flush=flush, file=file)
+
+
+@no_inline
+fn print[
+    *Ts: Stringable, EndTy: Stringable
 ](
     *values: *Ts,
-    sep: StringLiteral = " ",
-    end: StringLiteral = "\n",
+    end: EndTy,
     flush: Bool = False,
-    file: Int = stdout,
+    file: FileDescriptor = stdout,
+):
+    """Prints elements to the text stream. Each element is separated by a
+    whitespace and followed by `end`.
+
+    Parameters:
+        Ts: The elements types.
+        EndTy: The type of end argument.
+
+    Args:
+        values: The elements to print.
+        end: The String to write after printing the elements.
+        flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
+    """
+    _print(values, sep=" ", end=str(end), flush=flush, file=file)
+
+
+@no_inline
+fn print[
+    SepTy: Stringable, *Ts: Stringable
+](*values: *Ts, sep: SepTy, flush: Bool = False, file: FileDescriptor = stdout):
+    """Prints elements to the text stream. Each element is separated by `sep`
+    and followed by a newline character.
+
+    Parameters:
+        SepTy: The type of separator.
+        Ts: The elements types.
+
+    Args:
+        values: The elements to print.
+        sep: The separator used between elements.
+        flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
+    """
+    _print(values, sep=str(sep), end="\n", flush=flush, file=file)
+
+
+@no_inline
+fn print[
+    SepTy: Stringable, EndTy: Stringable, *Ts: Stringable
+](
+    *values: *Ts,
+    sep: SepTy,
+    end: EndTy,
+    flush: Bool = False,
+    file: FileDescriptor = stdout,
 ):
     """Prints elements to the text stream. Each element is separated by `sep`
     and followed by `end`.
 
     Parameters:
+        SepTy: The type of separator.
+        EndTy: The type of end argument.
         Ts: The elements types.
 
     Args:
@@ -382,7 +447,20 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
         file: The output stream.
     """
+    _print(values, sep=str(sep), end=str(end), flush=flush, file=file)
 
+
+@no_inline
+fn _print[
+    *Ts: Stringable
+](
+    values: VariadicPack[_, _, Stringable, Ts],
+    *,
+    sep: String,
+    end: String,
+    flush: Bool,
+    file: FileDescriptor,
+):
     @parameter
     fn print_with_separator[i: Int, T: Stringable](value: T):
         _put(str(value), file=file)

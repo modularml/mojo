@@ -34,15 +34,6 @@ from memory import memcpy, memset_zero, stack_allocation
 # TODO remove this import onece InlineArray is moved to collections
 from utils import InlineArray
 
-# ===----------------------------------------------------------------------=== #
-# Utilities
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
-    return (numerator + denominator - 1)._positive_div(denominator)
-
 
 # ===----------------------------------------------------------------------=== #
 # Implementation

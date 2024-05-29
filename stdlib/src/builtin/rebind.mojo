@@ -18,8 +18,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 @always_inline("nodebug")
 fn rebind[
-    dest_type: AnyRegType,
-    src_type: AnyRegType,
+    dest_type: AnyTrivialRegType,
+    src_type: AnyTrivialRegType,
 ](val: src_type) -> dest_type:
     """Statically assert that a parameter input type `src_type` resolves to the
     same type as a parameter result type `dest_type` after function

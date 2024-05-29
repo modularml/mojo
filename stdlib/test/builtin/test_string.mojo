@@ -15,6 +15,7 @@
 from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
+    _isspace,
 )
 from testing import (
     assert_equal,
@@ -306,7 +307,14 @@ fn test_atol() raises:
     assert_equal(10, atol("A", 16))
     assert_equal(15, atol("f ", 16))
     assert_equal(255, atol(" FF", 16))
+    assert_equal(255, atol(" 0xff ", 16))
+    assert_equal(255, atol(" 0Xff ", 16))
     assert_equal(18, atol("10010", 2))
+    assert_equal(18, atol("0b10010", 2))
+    assert_equal(18, atol("0B10010", 2))
+    assert_equal(10, atol("12", 8))
+    assert_equal(10, atol("0o12", 8))
+    assert_equal(10, atol("0O12", 8))
     assert_equal(35, atol("Z", 36))
 
     # Negative cases
@@ -594,11 +602,52 @@ fn test_rfind() raises:
 
 
 fn test_split() raises:
-    # Reject empty delimiters
-    with assert_raises(
-        contains="empty delimiter not allowed to be passed to split."
-    ):
-        _ = String("hello").split("")
+    # empty separators default to whitespace
+    var d = String("hello world").split()
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello", d[1] == "world")
+    d = String("hello \t\n\n\v\fworld").split("\n")
+    assert_true(len(d) == 3)
+    assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
+
+    # Should add all whitespace-like chars as one
+    alias utf8_spaces = String(" \t\n\r\v\f")
+    var s = utf8_spaces + "hello" + utf8_spaces + "world" + utf8_spaces
+    d = s.split()
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello" and d[1] == "world")
+
+    # should split into empty strings between separators
+    d = String("1,,,3").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "1" and d[1] == "" and d[2] == "" and d[3] == "3")
+    d = String(",,,").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "" and d[2] == "" and d[3] == "")
+    d = String(" a b ").split(" ")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "a" and d[2] == "b" and d[3] == "")
+    d = String("abababaaba").split("aba")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "b" and d[2] == "" and d[3] == "")
+
+    # should split into maxsplit + 1 items
+    d = String("1,2,3").split(",", 0)
+    assert_true(len(d) == 1)
+    assert_true(d[0] == "1,2,3")
+    d = String("1,2,3").split(",", 1)
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "1" and d[1] == "2,3")
+
+    assert_true(len(String("").split()) == 0)
+    assert_true(len(String(" ").split()) == 0)
+    assert_true(len(String("").split(" ")) == 1)
+    assert_true(len(String(" ").split(" ")) == 2)
+    assert_true(len(String("  ").split(" ")) == 3)
+    assert_true(len(String("   ").split(" ")) == 4)
+
+    with assert_raises():
+        _ = String("").split("")
 
     # Split in middle
     var d1 = String("n")
@@ -684,29 +733,73 @@ fn test_upper() raises:
 
 fn test_isspace() raises:
     # checking true cases
-    assert_true(isspace(ord(" ")))
-    assert_true(isspace(ord("\n")))
-    assert_true(isspace(ord("\t")))
-    assert_true(isspace(ord("\r")))
-    assert_true(isspace(ord("\v")))
-    assert_true(isspace(ord("\f")))
+    assert_true(_isspace(ord(" ")))
+    assert_true(_isspace(ord("\n")))
+    assert_true(_isspace(ord("\t")))
+    assert_true(_isspace(ord("\r")))
+    assert_true(_isspace(ord("\v")))
+    assert_true(_isspace(ord("\f")))
 
     # Checking false cases
-    assert_false(isspace(ord("a")))
-    assert_false(isspace(ord("u")))
-    assert_false(isspace(ord("s")))
-    assert_false(isspace(ord("t")))
-    assert_false(isspace(ord("i")))
-    assert_false(isspace(ord("n")))
-    assert_false(isspace(ord("z")))
-    assert_false(isspace(ord(".")))
+    assert_false(_isspace(ord("a")))
+    assert_false(_isspace(ord("u")))
+    assert_false(_isspace(ord("s")))
+    assert_false(_isspace(ord("t")))
+    assert_false(_isspace(ord("i")))
+    assert_false(_isspace(ord("n")))
+    assert_false(_isspace(ord("z")))
+    assert_false(_isspace(ord(".")))
+
+    # test all utf8 and unicode separators
+    # 0 is to build a String with null terminator
+    alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
+    """TODO: \\x1c"""
+    alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
+    """TODO: \\x1e"""
+    alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+    """TODO: \\x85"""
+    alias unicode_line_sep = List[UInt8](
+        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
+    )
+    """TODO: \\u2028"""
+    alias unicode_paragraph_sep = List[UInt8](
+        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
+    )
+    """TODO: \\u2029"""
+    # TODO add line and paragraph separator as stringliteral once unicode
+    # escape secuences are accepted
+    var univ_sep_var = List[String](
+        String(" "),
+        String("\t"),
+        String("\n"),
+        String("\r"),
+        String("\v"),
+        String("\f"),
+        String(next_line),
+        String(information_sep_four),
+        String(information_sep_two),
+        String(unicode_line_sep),
+        String(unicode_paragraph_sep),
+    )
+
+    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0):
+        var val = String(List[UInt8](b[], 0))
+        if not (val in univ_sep_var):
+            assert_false(val.isspace())
+
+    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0):
+        var val = String(List[UInt8](b[], 0))
+        if not (val in univ_sep_var):
+            assert_false(val.isspace())
+
+    for i in univ_sep_var:
+        assert_true(i[].isspace())
+
+    for i in List[String]("not", "space", "", "s", "a", "c"):
+        assert_false(i[].isspace())
 
 
 fn test_ascii_aliases() raises:
-    var whitespaces = String(" \n\t\r\f\v")
-    for i in range(len(whitespaces)):
-        assert_true(whitespaces[i] in String.WHITESPACE)
-
     assert_true(String("a") in String.ASCII_LOWERCASE)
     assert_true(String("b") in String.ASCII_LOWERCASE)
     assert_true(String("y") in String.ASCII_LOWERCASE)
@@ -902,7 +995,7 @@ def test_string_mul():
 def test_indexing():
     a = String("abc")
     assert_equal(a[False], "a")
-    assert_equal(a[Int16(1)], "b")
+    assert_equal(a[int(1)], "b")
     assert_equal(a[2], "c")
 
 

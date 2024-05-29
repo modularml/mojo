@@ -24,11 +24,11 @@ from sys import bitwidthof
 # sort
 # ===----------------------------------------------------------------------===#
 
-alias _cmp_fn_type = fn[type: AnyRegType] (type, type) capturing -> Bool
+alias _cmp_fn_type = fn[type: AnyTrivialRegType] (type, type) capturing -> Bool
 
 
 fn _insertion_sort[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], start: Int, end: Int):
     """Sort the array[start:end] slice"""
 
@@ -67,7 +67,7 @@ fn _insertion_sort[
 
 @always_inline
 fn _partition[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], start: Int, end: Int) -> Int:
     if start == end:
         return end
@@ -132,7 +132,7 @@ fn _estimate_initial_height(size: Int) -> Int:
 
 
 fn _quicksort[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], size: Int):
     if size == 0:
         return
@@ -211,7 +211,7 @@ fn _quicksort[
 # partition
 # ===----------------------------------------------------------------------===#
 fn partition[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](buff: Pointer[type], k: Int, size: Int):
     """Partition the input vector inplace such that first k elements are the
     largest (or smallest if cmp_fn is <= operator) elements.
@@ -258,7 +258,7 @@ fn sort(inout buff: Pointer[Int], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) <= rebind[Int](rhs)
 
     _quicksort[Int, _less_than_equal](buff, len)
@@ -277,7 +277,7 @@ fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[ty: AnyRegType](lhs: ty, rhs: ty) -> Bool:
+    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
         return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
 
     _quicksort[Scalar[type], _less_than_equal](buff, len)
@@ -335,7 +335,7 @@ fn sort[
 
 @always_inline
 fn _sort2[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], offset0: Int, offset1: Int):
     var a = array[offset0]
     var b = array[offset1]
@@ -346,7 +346,7 @@ fn _sort2[
 
 @always_inline
 fn _sort_partial_3[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], offset0: Int, offset1: Int, offset2: Int):
     var a = array[offset0]
     var b = array[offset1]
@@ -364,7 +364,7 @@ fn _sort_partial_3[
 
 @always_inline
 fn _small_sort[
-    n: Int, type: AnyRegType, cmp_fn: _cmp_fn_type
+    n: Int, type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type]):
     @parameter
     if n == 2:
@@ -395,3 +395,91 @@ fn _small_sort[
         _sort_partial_3[type, cmp_fn](array, 0, 2, 3)
         _sort_partial_3[type, cmp_fn](array, 1, 2, 3)
         return
+
+
+# ===----------------------------------------------------------------------=== #
+#  Comparable elements list sorting
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn insertion_sort[type: ComparableCollectionElement](inout list: List[type]):
+    """Sort list of the order comparable elements in-place with insertion sort algorithm.
+
+    Parameters:
+        type: The order comparable collection element type.
+
+    Args:
+        list: The list of the order comparable elements which will be sorted in-place.
+    """
+    for i in range(1, len(list)):
+        var key = list[i]
+        var j = i - 1
+        while j >= 0 and key < list[j]:
+            list[j + 1] = list[j]
+            j -= 1
+        list[j + 1] = key
+
+
+fn _quick_sort[
+    type: ComparableCollectionElement
+](inout list: List[type], low: Int, high: Int):
+    """Sort section of the list, between low and high, with quick sort algorithm in-place.
+
+    Parameters:
+        type: The order comparable collection element type.
+
+    Args:
+        list: The list of the order comparable elements which will be sorted in-place.
+        low: Int value identifying the lowest index of the list section to be sorted.
+        high: Int value identifying the highest index of the list section to be sorted.
+    """
+
+    @always_inline
+    @parameter
+    fn _partition(low: Int, high: Int) -> Int:
+        var pivot = list[high]
+        var i = low - 1
+        for j in range(low, high):
+            if list[j] <= pivot:
+                i += 1
+                list[j], list[i] = list[i], list[j]
+        list[i + 1], list[high] = list[high], list[i + 1]
+        return i + 1
+
+    if low < high:
+        var pi = _partition(low, high)
+        _quick_sort(list, low, pi - 1)
+        _quick_sort(list, pi + 1, high)
+
+
+@always_inline
+fn quick_sort[type: ComparableCollectionElement](inout list: List[type]):
+    """Sort list of the order comparable elements in-place with quick sort algorithm.
+
+    Parameters:
+        type: The order comparable collection element type.
+
+    Args:
+        list: The list of the order comparable elements which will be sorted in-place.
+    """
+    _quick_sort(list, 0, len(list) - 1)
+
+
+fn sort[
+    type: ComparableCollectionElement, slist_ub: Int = 64
+](inout list: List[type]):
+    """Sort list of the order comparable elements in-place. This function picks the best algorithm based on the list length.
+
+    Parameters:
+        type: The order comparable collection element type.
+        slist_ub: The upper bound for a list size which is considered small.
+
+    Args:
+        list: The list of the scalars which will be sorted in-place.
+    """
+    var count = len(list)
+    if count <= slist_ub:
+        insertion_sort(list)  # small lists are best sorted with insertion sort
+    else:
+        quick_sort(list)  # others are best sorted with quick sort

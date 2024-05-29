@@ -41,7 +41,12 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         T: The element type of the set. Must implement KeyElement.
     """
 
+    # Fields
     var _data: Dict[T, NoneType]
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self, *ts: T):
         """Construct a set from initial elements.
@@ -81,6 +86,10 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         self._data = other._data^
 
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
     fn __contains__(self, t: T) -> Bool:
         """Whether or not the set contains an element.
 
@@ -91,22 +100,6 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             Whether or not the set contains the element.
         """
         return t in self._data
-
-    fn __bool__(self) -> Bool:
-        """Whether the set is non-empty or not.
-
-        Returns:
-            True if the set is non-empty, False if it is empty.
-        """
-        return len(self).__bool__()
-
-    fn __len__(self) -> Int:
-        """The size of the set.
-
-        Returns:
-            The number of elements in the set.
-        """
-        return len(self._data)
 
     fn __eq__(self, other: Self) -> Bool:
         """Set equality.
@@ -134,21 +127,6 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             True if the sets are different and False otherwise.
         """
         return not (self == other)
-
-    fn __hash__(self) -> Int:
-        """A hash value of the elements in the set.
-
-        The hash value is order independent, so s1 == s2 -> hash(s1) == hash(s2).
-
-        Returns:
-            A hash value of the set suitable for non-cryptographic purposes.
-        """
-        var hash_value = 0
-        # Hash combination needs to be commutative so iteration order
-        # doesn't impact the hash value.
-        for e in self:
-            hash_value ^= hash(e[])
-        return hash_value
 
     fn __and__(self, other: Self) -> Self:
         """The set intersection operator.
@@ -282,6 +260,45 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             other: The set to find the symmetric difference with.
         """
         self.symmetric_difference_update(other)
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    fn __bool__(self) -> Bool:
+        """Whether the set is non-empty or not.
+
+        Returns:
+            True if the set is non-empty, False if it is empty.
+        """
+        return len(self).__bool__()
+
+    fn __len__(self) -> Int:
+        """The size of the set.
+
+        Returns:
+            The number of elements in the set.
+        """
+        return len(self._data)
+
+    fn __hash__(self) -> Int:
+        """A hash value of the elements in the set.
+
+        The hash value is order independent, so s1 == s2 -> hash(s1) == hash(s2).
+
+        Returns:
+            A hash value of the set suitable for non-cryptographic purposes.
+        """
+        var hash_value = 0
+        # Hash combination needs to be commutative so iteration order
+        # doesn't impact the hash value.
+        for e in self:
+            hash_value ^= hash(e[])
+        return hash_value
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     fn __iter__(
         self: Reference[Self, _, _],

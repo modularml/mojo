@@ -180,7 +180,7 @@ fn _bool_tuple_reduce[
 
 @value
 @register_passable("trivial")
-struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
+struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
     """A base struct that implements size agnostic index functions.
 
     Parameters:
@@ -224,7 +224,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, False, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 2]()
 
@@ -249,7 +251,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, False, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 3]()
 
@@ -274,7 +278,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, False, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 4]()
 
@@ -335,11 +341,8 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         return size
 
     @always_inline("nodebug")
-    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> Int:
+    fn __getitem__(self, idx: Int) -> Int:
         """Gets an element from the tuple by index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The element index.
@@ -347,7 +350,7 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         Returns:
             The tuple element value.
         """
-        return self.data[index(idx)]
+        return self.data[idx]
 
     @always_inline("nodebug")
     fn __setitem__[index: Int](inout self, val: Int):
@@ -362,19 +365,14 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         self.data.__setitem__[index](val)
 
     @always_inline("nodebug")
-    fn __setitem__[
-        IndexerType: Indexer
-    ](inout self, idx: IndexerType, val: Int):
+    fn __setitem__(inout self, idx: Int, val: Int):
         """Sets an element in the tuple at the given index.
-
-        Parameters:
-            IndexerType: The type of the indexer.
 
         Args:
             idx: The element index.
             val: The value to store.
         """
-        self.data[index(idx)] = val
+        self.data[idx] = val
 
     @always_inline("nodebug")
     fn as_tuple(self) -> StaticTuple[Int, size]:
@@ -654,22 +652,19 @@ struct StaticIntTuple[size: Int](Sized, Stringable, EqualityComparable):
         buf.reserve(initial_buffer_size)
 
         # Print an opening `(`.
-        buf.size += _snprintf(buf.data, 2, "(")
+        buf.size += _snprintf["("](buf.data, 2)
         for i in range(size):
             # Print separators between each element.
             if i != 0:
-                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
-            buf.size += _snprintf(
-                buf.data + buf.size,
-                _calc_initial_buffer_size(self[i]),
-                _get_dtype_printf_format[DType.index](),
-                self[i],
+                buf.size += _snprintf[", "](buf.data + buf.size, 3)
+            buf.size += _snprintf[_get_dtype_printf_format[DType.index]()](
+                buf.data + buf.size, _calc_initial_buffer_size(self[i]), self[i]
             )
         # Single element tuples should be printed with a trailing comma.
         if size == 1:
-            buf.size += _snprintf(buf.data + buf.size, 2, ",")
+            buf.size += _snprintf[","](buf.data + buf.size, 2)
         # Print a closing `)`.
-        buf.size += _snprintf(buf.data + buf.size, 2, ")")
+        buf.size += _snprintf[")"](buf.data + buf.size, 2)
 
         buf.size += 1  # for the null terminator.
         return buf^

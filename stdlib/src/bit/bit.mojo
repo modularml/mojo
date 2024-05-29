@@ -142,12 +142,12 @@ fn bit_reverse[
 
 
 # ===----------------------------------------------------------------------===#
-# byte_reverse
+# byte_swap
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn byte_reverse[
+fn byte_swap[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Byte-swaps a value.
@@ -246,18 +246,31 @@ fn bit_not[
     return __mlir_op.`pop.xor`(val.value, neg_one.value)
 
 
-# TODO: implement bit_ceil, bit_floor, has_single_bit, et al
-
 # ===----------------------------------------------------------------------===#
 # bit_width
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline
+fn bit_width(val: Int) -> Int:
+    """Computes the minimum number of bits required to represent the integer.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The number of bits required to represent the integer.
+    """
+    alias bitwidth = bitwidthof[Int]()
+
+    return bitwidth - countl_zero(~val if val < 0 else val)
+
+
+@always_inline
 fn bit_width[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Computes the minimum number of digits required to represent the integer.
+    """Computes the minimum number of bits required to represent the integer.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -271,7 +284,7 @@ fn bit_width[
 
     Returns:
         A SIMD value where the element at position `i` equals to the number of
-        digits required to represent the integer at position `i` of the input
+        bits required to represent the integer at position `i` of the input
         value.
     """
 
@@ -287,6 +300,159 @@ fn bit_width[
         var leading_zero_neg = countl_zero(bit_not(val))
         var leading_zero = (val > 0).select(leading_zero_pos, leading_zero_neg)
         return bitwidth - leading_zero
+
+
+# ===----------------------------------------------------------------------===#
+# has_single_bit
+# ===----------------------------------------------------------------------===#
+# reference: https://en.cppreference.com/w/cpp/numeric/has_single_bit
+
+
+@always_inline
+fn has_single_bit(val: Int) -> Bool:
+    """Checks if the input value is a power of 2.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        True if the input value is a power of 2, False otherwise.
+    """
+    return val > 0 and not (val & (val - 1))
+
+
+@always_inline
+fn has_single_bit[
+    type: DType, simd_width: Int
+](val: SIMD[type, simd_width]) -> SIMD[DType.bool, simd_width]:
+    """Checks if the input value is a power of 2 for each element of a SIMD vector.
+
+    Parameters:
+        type: `dtype` used for the computation.
+        simd_width: SIMD width used for the computation.
+
+    Constraints:
+        The element type of the input vector must be integral.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        A SIMD value where the element at position `i` is True if the integer at
+        position `i` of the input value is a power of 2, False otherwise.
+    """
+    constrained[type.is_integral(), "must be integral"]()
+
+    return (val > 0) & ((val & (val - 1)) == 0)
+
+
+# ===----------------------------------------------------------------------===#
+# bit_ceil
+# ===----------------------------------------------------------------------===#
+# reference: https://en.cppreference.com/w/cpp/numeric/bit_ceil
+
+
+@always_inline("nodebug")
+fn bit_ceil(val: Int) -> Int:
+    """Computes the smallest power of 2 that is greater than or equal to the
+    input value. Any integral value less than or equal to 1 will be ceiled to 1.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The smallest power of 2 that is greater than or equal to the input value.
+    """
+    if val <= 1:
+        return 1
+
+    if has_single_bit(val):
+        return val
+
+    return 1 << bit_width(val - 1)
+
+
+@always_inline("nodebug")
+fn bit_ceil[
+    type: DType, simd_width: Int
+](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    """Computes the smallest power of 2 that is greater than or equal to the
+    input value for each element of a SIMD vector. Any integral value less than
+    or equal to 1 will be ceiled to 1.
+
+    Parameters:
+        type: `dtype` used for the computation.
+        simd_width: SIMD width used for the computation.
+
+    Constraints:
+        The element type of the input vector must be integral.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        A SIMD value where the element at position `i` is the smallest power of 2
+        that is greater than or equal to the integer at position `i` of the input
+        value.
+    """
+    constrained[type.is_integral(), "must be integral"]()
+
+    alias ones = SIMD[type, simd_width].splat(1)
+
+    return (val > 1).select(1 << bit_width(val - ones), ones)
+
+
+# ===----------------------------------------------------------------------===#
+# bit_floor
+# ===----------------------------------------------------------------------===#
+# reference: https://en.cppreference.com/w/cpp/numeric/bit_floor
+
+
+@always_inline("nodebug")
+fn bit_floor(val: Int) -> Int:
+    """Computes the largest power of 2 that is less than or equal to the input
+    value. Any integral value less than or equal to 0 will be floored to 0.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The largest power of 2 that is less than or equal to the input value.
+    """
+    if val <= 0:
+        return 0
+
+    return 1 << (bit_width(val) - 1)
+
+
+@always_inline("nodebug")
+fn bit_floor[
+    type: DType, simd_width: Int
+](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    """Computes the largest power of 2 that is less than or equal to the input
+    value for each element of a SIMD vector. Any integral value less than or
+    equal to 0 will be floored to 0.
+
+    Parameters:
+        type: `dtype` used for the computation.
+        simd_width: SIMD width used for the computation.
+
+    Constraints:
+        The element type of the input vector must be integral.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        A SIMD value where the element at position `i` is the largest power of 2
+        that is less than or equal to the integer at position `i` of the input
+        value.
+    """
+    constrained[type.is_integral(), "must be integral and unsigned"]()
+
+    alias zeros = SIMD[type, simd_width].splat(0)
+
+    return (val > 0).select(1 << (bit_width(val) - 1), zeros)
 
 
 # ===----------------------------------------------------------------------===#
