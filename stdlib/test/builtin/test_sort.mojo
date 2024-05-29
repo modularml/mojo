@@ -79,7 +79,7 @@ fn test_sort_small_3() raises:
     list.append(2)
 
     @parameter
-    fn _less_than_equal[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) <= rebind[Int](rhs)
 
     var ptr = rebind[Pointer[Int]](list.data)
@@ -102,7 +102,7 @@ fn test_sort_small_5() raises:
     list.append(4)
 
     @parameter
-    fn _less_than_equal[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) <= rebind[Int](rhs)
 
     var ptr = rebind[Pointer[Int]](list.data)
@@ -171,7 +171,7 @@ fn test_sort3_dupe_elements() raises:
     alias length = 3
 
     fn test[
-        cmp_fn: fn[type: AnyRegType] (type, type) capturing -> Bool,
+        cmp_fn: fn[type: AnyTrivialRegType] (type, type) capturing -> Bool,
     ]() raises:
         var list = List[Int](capacity=3)
         list.append(5)
@@ -186,11 +186,11 @@ fn test_sort3_dupe_elements() raises:
             assert_equal(expected[i], list[i])
 
     @parameter
-    fn _lt[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _lt[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) < rebind[Int](rhs)
 
     @parameter
-    fn _leq[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _leq[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) <= rebind[Int](rhs)
 
     test[_lt]()
@@ -332,7 +332,7 @@ fn test_quick_sort_repeated_val() raises:
         list.append(i + 1)
 
     @parameter
-    fn _greater_than[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _greater_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Float32](lhs) > rebind[Float32](rhs)
 
     var ptr = rebind[Pointer[Float32]](list.data)
@@ -380,7 +380,7 @@ fn test_quick_sort_repeated_val() raises:
         assert_equal(expected[i], list[i])
 
     @parameter
-    fn _less_than[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _less_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Float32](lhs) < rebind[Float32](rhs)
 
     expected = List[Float32](
@@ -434,7 +434,7 @@ fn test_partition_top_k(length: Int, k: Int) raises:
         list.append(i)
 
     @parameter
-    fn _great_than_equal[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _great_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Float32](lhs) >= rebind[Float32](rhs)
 
     var ptr = rebind[Pointer[Float32]](list.data)
@@ -453,8 +453,8 @@ fn test_sort_stress() raises:
     @__copy_capture(random_seed)
     @parameter
     fn test[
-        cmp_fn: fn[type: AnyRegType] (type, type) capturing -> Bool,
-        check_fn: fn[type: AnyRegType] (type, type) capturing -> Bool,
+        cmp_fn: fn[type: AnyTrivialRegType] (type, type) capturing -> Bool,
+        check_fn: fn[type: AnyTrivialRegType] (type, type) capturing -> Bool,
     ](length: Int) raises:
         var list = List[Int](capacity=length)
         for _ in range(length):
@@ -468,22 +468,22 @@ fn test_sort_stress() raises:
 
     @parameter
     @always_inline
-    fn _gt[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _gt[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) > rebind[Int](rhs)
 
     @parameter
     @always_inline
-    fn _geq[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _geq[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) >= rebind[Int](rhs)
 
     @parameter
     @always_inline
-    fn _lt[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _lt[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) < rebind[Int](rhs)
 
     @parameter
     @always_inline
-    fn _leq[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _leq[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) <= rebind[Int](rhs)
 
     for i in range(len(lens)):

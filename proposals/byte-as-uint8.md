@@ -1,4 +1,4 @@
-# Standardise the representation of byte sequence as a sequence of unsigned 8 bit integers
+# Standardize the representation of byte sequence as a sequence of unsigned 8 bit integers
 
 At this point in time, a sequence of bytes is often represented as a sequence of
 signed 8 bit integers in Mojo standard library.  Most noticeable example is the

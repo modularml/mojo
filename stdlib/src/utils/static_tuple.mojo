@@ -33,7 +33,7 @@ from sys.intrinsics import _type_is_eq
 fn _set_array_elem[
     index: Int,
     size: Int,
-    type: AnyRegType,
+    type: AnyTrivialRegType,
 ](
     val: type,
     array: Reference[
@@ -61,7 +61,7 @@ fn _set_array_elem[
 
 @always_inline
 fn _create_array[
-    size: Int, type: AnyRegType
+    size: Int, type: AnyTrivialRegType
 ](lst: VariadicList[type]) -> __mlir_type[
     `!pop.array<`, size.value, `, `, type, `>`
 ]:
@@ -114,7 +114,7 @@ fn _static_tuple_construction_checks[size: Int]():
 
 @value
 @register_passable("trivial")
-struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
+struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     """A statically sized tuple type which contains elements of homogeneous types.
 
     Parameters:
@@ -446,9 +446,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         return UnsafePointer(self._array).bitcast[Self.ElementType]()
 
     @always_inline
-    fn __contains__[
-        T: ComparableCollectionElement
-    ](self: Reference[InlineArray[T, size]], value: Self.ElementType) -> Bool:
+    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo
@@ -474,6 +472,11 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         # TODO: use @parameter for soon once it stabilizes a bit
         for i in range(size):
-            if self[][i] == rebind[T](value):
+            if (
+                rebind[Reference[T, False, __lifetime_of(self)]](
+                    Reference(self[i])
+                )[]
+                == value
+            ):
                 return True
         return False

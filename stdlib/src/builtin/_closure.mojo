@@ -13,7 +13,9 @@
 
 
 @register_passable
-struct __ParameterClosureCaptureList[fn_type: AnyRegType, fn_ref: fn_type]:
+struct __ParameterClosureCaptureList[
+    fn_type: AnyTrivialRegType, fn_ref: fn_type
+]:
     var value: __mlir_type.`!kgen.pointer<none>`
 
     # Parameter closure invariant requires this function be marked 'capturing'.

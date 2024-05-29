@@ -641,7 +641,6 @@ struct String(
     """The underlying storage for the string."""
 
     """ Useful string aliases. """
-    alias WHITESPACE = String(" \n\t\r\f\v")
     alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
     alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
@@ -653,7 +652,7 @@ struct String(
         String.DIGITS
         + String.ASCII_LETTERS
         + String.PUNCTUATION
-        + String.WHITESPACE
+        + " \t\n\r\v\f"  # single byte utf8 whitespaces
     )
 
     # ===------------------------------------------------------------------=== #
@@ -1145,10 +1144,7 @@ struct String(
             writer: The formatter to write to.
         """
 
-        # SAFETY:
-        #   Safe because `self` is borrowed, so its lifetime
-        #   extends beyond this function.
-        writer.write_str(self._strref_dangerous())
+        writer.write_str(self.as_string_slice())
 
     fn _unsafe_to_formatter(inout self) -> Formatter:
         """
@@ -1462,37 +1458,125 @@ struct String(
             )
         return False
 
-    fn split(self, delimiter: String) raises -> List[String]:
-        """Split the string by a delimiter.
+    fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
+        """Split the string by a separator.
 
         Args:
-          delimiter: The string to split on.
+            sep: The string to split on.
+            maxsplit: The maximum amount of items to split from String.
+                Defaults to unlimited.
 
         Returns:
-          A List of Strings containing the input split by the delimiter.
+            A List of Strings containing the input split by the separator.
 
-        Raises:
-          Error if an empty delimiter is specified.
+        Examples:
+
+        ```mojo
+        # Splitting a space
+        _ = String("hello world").split(" ") # ["hello", "world"]
+        # Splitting adjacent separators
+        _ = String("hello,,world").split(",") # ["hello", "", "world"]
+        # Splitting with maxsplit
+        _ = String("1,2,3").split(",", 1) # ['1', '2,3']
+        ```
+        .
         """
-        if not delimiter:
-            raise Error("empty delimiter not allowed to be passed to split.")
+        var output = List[String]()
+
+        var str_iter_len = len(self) - 1
+        var lhs = 0
+        var rhs = 0
+        var items = 0
+        var sep_len = len(sep)
+        if sep_len == 0:
+            raise Error("ValueError: empty separator")
+
+        while lhs <= str_iter_len:
+            rhs = self.find(sep, lhs)
+            if rhs == -1:
+                output.append(self[lhs:])
+                break
+
+            if maxsplit > -1:
+                if items == maxsplit:
+                    output.append(self[lhs:])
+                    break
+                items += 1
+
+            output.append(self[lhs:rhs])
+            lhs = rhs + sep_len
+
+        if self.endswith(sep):
+            output.append("")
+        return output
+
+    fn split(self, *, maxsplit: Int = -1) -> List[String]:
+        """Split the string by every Whitespace separator.
+
+        Currently only uses C style separators.
+
+        Args:
+            maxsplit: The maximum amount of items to split from String. Defaults
+                to unlimited.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting an empty string or filled with whitespaces
+        _ = String("      ").split() # []
+        _ = String("").split() # []
+
+        # Splitting a string with leading, trailing, and middle whitespaces
+        _ = String("      hello    world     ").split() # ["hello", "world"]
+        ```
+        .
+        """
+        # TODO: implement and document splitting adjacent universal newlines:
+        # _ = String(
+        #     "hello \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029world"
+        # ).split()  # ["hello", "world"]
 
         var output = List[String]()
 
-        var current_offset = 0
-        while True:
-            var loc = self.find(delimiter, current_offset)
-            # The delimiter was not found, so add the search slice from where
-            # we're currently at.
-            if loc == -1:
-                output.append(self[current_offset:])
+        var str_iter_len = len(self) - 1
+        var lhs = 0
+        var rhs = 0
+        var items = 0
+        # FIXME: this should iterate and build unicode strings
+        # and use self.isspace()
+        while lhs <= str_iter_len:
+            # Python adds all "whitespace chars" as one separator
+            # if no separator was specified
+            while lhs <= str_iter_len:
+                if not _isspace(self._buffer.unsafe_get(lhs)[]):
+                    break
+                lhs += 1
+            # if it went until the end of the String, then
+            # it should be sliced up until the original
+            # start of the whitespace which was already appended
+            if lhs - 1 == str_iter_len:
                 break
+            elif lhs == str_iter_len:
+                # if the last char is not whitespace
+                output.append(self[str_iter_len])
+                break
+            rhs = lhs + 1
+            while rhs <= str_iter_len:
+                if _isspace(self._buffer.unsafe_get(rhs)[]):
+                    break
+                rhs += 1
 
-            # We found a delimiter, so add the preceding string slice.
-            output.append(self[current_offset:loc])
+            if maxsplit > -1:
+                if items == maxsplit:
+                    output.append(self[lhs:])
+                    break
+                items += 1
 
-            # Advance our search offset past the delimiter.
-            current_offset = loc + len(delimiter)
+            output.append(self[lhs:rhs])
+            lhs = rhs
 
         return output
 
@@ -1553,7 +1637,7 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self, chars: String = String.WHITESPACE) -> String:
+    fn strip(self, chars: String) -> String:
         """Return a copy of the string with leading and trailing characters
         removed.
 
@@ -1566,7 +1650,16 @@ struct String(
 
         return self.lstrip(chars).rstrip(chars)
 
-    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
+    fn strip(self) -> String:
+        """Return a copy of the string with leading and trailing whitespaces
+        removed.
+
+        Returns:
+            A copy of the string with no leading or trailing whitespaces.
+        """
+        return self.lstrip().rstrip()
+
+    fn rstrip(self, chars: String) -> String:
         """Return a copy of the string with trailing characters removed.
 
         Args:
@@ -1582,7 +1675,19 @@ struct String(
 
         return self[:r_idx]
 
-    fn lstrip(self, chars: String = String.WHITESPACE) -> String:
+    fn rstrip(self) -> String:
+        """Return a copy of the string with trailing whitespaces removed.
+
+        Returns:
+            A copy of the string with no trailing whitespaces.
+        """
+        # TODO: should use self.__iter__ and self.isspace()
+        var r_idx = len(self)
+        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)[]):
+            r_idx -= 1
+        return self[:r_idx]
+
+    fn lstrip(self, chars: String) -> String:
         """Return a copy of the string with leading characters removed.
 
         Args:
@@ -1596,6 +1701,18 @@ struct String(
         while l_idx < len(self) and self[l_idx] in chars:
             l_idx += 1
 
+        return self[l_idx:]
+
+    fn lstrip(self) -> String:
+        """Return a copy of the string with leading whitespaces removed.
+
+        Returns:
+            A copy of the string with no leading whitespaces.
+        """
+        # TODO: should use self.__iter__ and self.isspace()
+        var l_idx = 0
+        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)[]):
+            l_idx += 1
         return self[l_idx:]
 
     fn __hash__(self) -> Int:

@@ -26,7 +26,7 @@ fn _int_max_value() -> Int:
 
 
 @always_inline("nodebug")
-fn _default_or[T: AnyRegType](value: T, default: Int) -> Int:
+fn _default_or[T: AnyTrivialRegType](value: T, default: Int) -> Int:
     # TODO: Handle `__index__` for other types when we have traits!
     @parameter
     if _mlirtype_is_eq[T, Int]():
@@ -76,7 +76,7 @@ struct Slice(Stringable, EqualityComparable):
 
     @always_inline("nodebug")
     fn __init__[
-        T0: AnyRegType, T1: AnyRegType, T2: AnyRegType
+        T0: AnyTrivialRegType, T1: AnyTrivialRegType, T2: AnyTrivialRegType
     ](inout self, start: T0, end: T1, step: T2):
         """Construct slice given the start, end and step values.
 
@@ -197,7 +197,7 @@ fn slice(start: Int, end: Int) -> Slice:
 # TODO(30496): Modernize the slice type
 @always_inline("nodebug")
 fn slice[
-    T0: AnyRegType, T1: AnyRegType, T2: AnyRegType
+    T0: AnyTrivialRegType, T1: AnyTrivialRegType, T2: AnyTrivialRegType
 ](start: T0, end: T1, step: T2) -> Slice:
     """Construct a Slice given the start, end and step values.
 

@@ -134,7 +134,15 @@ fn _try_write_int(
     fmt.write_str(prefix)
 
     if value == 0:
-        var zero = StringRef(digit_chars_array, 1)
+        # TODO: Replace with safe digit_chars[:1] syntax.
+        # SAFETY:
+        #   This static lifetime is valid as long as we're using a
+        #   `StringLiteral` for `digit_chars`.
+        var zero = StringSlice[False, ImmutableStaticLifetime](
+            # TODO: Remove cast after transition to UInt8 strings is complete.
+            unsafe_from_utf8_ptr=digit_chars_array.bitcast[UInt8](),
+            len=1,
+        )
         fmt.write_str(zero)
         return
 
@@ -197,8 +205,14 @@ fn _try_write_int(
     # bytes from our final `buf_ptr` to the end of the buffer.
     var len = CAPACITY - offset
 
-    var strref = StringRef(buf_ptr, len)
+    # SAFETY:
+    #   Create a slice to only those bytes in `buf` that have been initialized.
+    var str_slice = StringSlice[False, __lifetime_of(buf)](
+        # TODO: Remove cast after transition to UInt8 strings is complete.
+        unsafe_from_utf8_ptr=buf_ptr.bitcast[UInt8](),
+        len=len,
+    )
 
-    fmt.write_str(strref)
+    fmt.write_str(str_slice)
 
     return None
