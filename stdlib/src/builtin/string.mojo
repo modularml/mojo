@@ -1144,10 +1144,7 @@ struct String(
             writer: The formatter to write to.
         """
 
-        # SAFETY:
-        #   Safe because `self` is borrowed, so its lifetime
-        #   extends beyond this function.
-        writer.write_str(self._strref_dangerous())
+        writer.write_str(self.as_string_slice())
 
     fn _unsafe_to_formatter(inout self) -> Formatter:
         """

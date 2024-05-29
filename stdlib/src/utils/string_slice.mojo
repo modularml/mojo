@@ -46,7 +46,7 @@ struct StringSlice[
 
     @always_inline
     fn __init__(
-        inout self, owned unsafe_from_utf8: Span[UInt8, is_mutable, lifetime]
+        inout self, *, owned unsafe_from_utf8: Span[UInt8, is_mutable, lifetime]
     ):
         """
         Construct a new StringSlice from a sequence of UTF-8 encoded bytes.
@@ -81,6 +81,35 @@ struct StringSlice[
         )
 
         self = Self(unsafe_from_utf8=byte_slice)
+
+    @always_inline
+    fn __init__(
+        inout self,
+        *,
+        unsafe_from_utf8_ptr: UnsafePointer[UInt8],
+        len: Int,
+    ):
+        """
+        Construct a StringSlice from a pointer to a sequence of UTF-8 encoded
+        bytes and a length.
+
+        Safety:
+            - `unsafe_from_utf8_ptr` MUST point to at least `len` bytes of valid
+              UTF-8 encoded data.
+            - `unsafe_from_utf8_ptr` must point to data that is live for the
+              duration of `lifetime`.
+
+        Args:
+            unsafe_from_utf8_ptr: A pointer to a sequence of bytes encoded in
+              UTF-8.
+            len: The number of bytes of encoded data.
+        """
+        var byte_slice = Span[UInt8, is_mutable, lifetime](
+            unsafe_ptr=unsafe_from_utf8_ptr,
+            len=len,
+        )
+
+        self._slice = byte_slice
 
     # ===------------------------------------------------------------------===#
     # Trait implementations
