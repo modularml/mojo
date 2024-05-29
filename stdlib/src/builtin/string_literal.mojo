@@ -290,10 +290,7 @@ struct StringLiteral(
             writer: The formatter to write to.
         """
 
-        # SAFETY:
-        #   Safe because `self` is borrowed, so the lifetime of this
-        #   StringRef extends beyond this function.
-        writer.write_str(StringRef(self))
+        writer.write_str(self.as_string_slice())
 
     fn __contains__(self, substr: StringLiteral) -> Bool:
         """Returns True if the substring is contained within the current string.

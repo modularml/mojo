@@ -296,10 +296,20 @@ what we publish.
 - Added a new `Span` type for taking slices of contiguous collections.
   ([PR #2595](https://github.com/modularml/mojo/pull/2595) by [lsh](https://github.com/lsh))
 
+- Added a new `StringSlice` type, to replace uses of the unsafe `StringRef` type
+  in standard library code.
+
+  `StringSlice` is a non-owning reference to encoded string data. Unlike
+  `StringRef`, a `StringSlice` is safely tied to the lifetime of the data it
+  points to.
+
+  - Add `StringSlice` intializer from an `UnsafePointer` and a length in bytes.
+  - Changed `Formatter.write_str()` to take a safe `StringSlice`.
+
 - Added a new `as_bytes_slice()` method to `String` and `StringLiteral`, which
   returns a `Span` of the bytes owned by the string.
 
-- Add new `ImmStaticLifetime` and `MutStaticLifetime` helpers
+- Add new `ImmutableStaticLifetime` and `MutableStaticLifetime` helpers
 
 - Add new `memcpy` overload for `UnsafePointer[Scalar[_]]` pointers.
 

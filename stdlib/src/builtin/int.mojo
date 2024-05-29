@@ -22,6 +22,7 @@ from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
 from builtin.hex import _try_write_int
+from builtin.simd import _format_scalar
 
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._format import Formattable, Formatter
@@ -389,25 +390,7 @@ struct Int(
                     + str(err.value()[])
                 )
         else:
-            # Stack allocate enough bytes to store any formatted 64-bit integer
-            alias size: Int = 32
-
-            var buf = InlineArray[UInt8, size](fill=0)
-
-            # Format the integer to the local byte array
-            var len = _snprintf["%li"](buf.unsafe_ptr(), size, self.value)
-
-            # Create a StringRef that does NOT include the NUL terminator written
-            # to the buffer.
-            #
-            # Write the formatted integer to the formatter.
-            #
-            # SAFETY:
-            #   `buf` is kept alive long enough for the use of this StringRef.
-            writer.write_str(StringRef(buf.unsafe_ptr(), len))
-
-            # Keep buf alive until we've finished with the StringRef
-            _ = buf^
+            _format_scalar(writer, Int64(self))
 
     fn __repr__(self) -> String:
         """Get the integer as a string. Returns the same `String` as `__str__`.
