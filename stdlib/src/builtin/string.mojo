@@ -1528,10 +1528,10 @@ struct String(
         """Split the string at line boundaries.
 
         Arguments:
-        keepends: If True, line breaks are kept in the resulting strings.
+            keepends: If True, line breaks are kept in the resulting strings.
 
         Returns:
-        A List of Strings containing the input split by line boundaries.
+            A List of Strings containing the input split by line boundaries.
         """
         var output = List[String]()
         var length = len(self)
