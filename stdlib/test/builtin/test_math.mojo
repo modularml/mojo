@@ -90,6 +90,26 @@ def test_pow():
     assert_equal(pow(I(0, 1, 2, 3), int(2)), I(0, 1, 4, 9))
 
 
+def test_gcd():
+    var l = List(2, 4, 6, 8, 16)
+    var il = InlineArray[Int, 5](4, 16, 2, 8, 6)
+    assert_equal(gcd(Span(il)), 2)
+    assert_equal(gcd(2, 4, 6, 8, 16), 2)
+    assert_equal(gcd(l), 2)
+    assert_equal(gcd(88, 24), 8)
+    assert_equal(gcd(0, 0), 0)
+    assert_equal(gcd(1, 0), 1)
+    assert_equal(gcd(-2, 4), 2)
+    assert_equal(gcd(-2, -4), 2)
+    assert_equal(gcd(24826148, 45296490), 526)
+    assert_equal(gcd(0, 9), 9)
+    assert_equal(gcd(4, 4), 4)
+    assert_equal(gcd(8), 8)
+    assert_equal(gcd(), 0)
+    assert_equal(gcd(List[Int]()), 0)
+    assert_equal(gcd(List(16)), 16)
+
+
 def main():
     test_abs()
     test_divmod()
@@ -97,3 +117,4 @@ def main():
     test_min()
     test_round()
     test_pow()
+    test_gcd()

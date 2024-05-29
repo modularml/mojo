@@ -224,7 +224,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, False, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 2]()
 
@@ -249,7 +251,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, False, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 3]()
 
@@ -274,7 +278,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, False, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 4]()
 
@@ -646,22 +652,19 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
         buf.reserve(initial_buffer_size)
 
         # Print an opening `(`.
-        buf.size += _snprintf(buf.data, 2, "(")
+        buf.size += _snprintf["("](buf.data, 2)
         for i in range(size):
             # Print separators between each element.
             if i != 0:
-                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
-            buf.size += _snprintf(
-                buf.data + buf.size,
-                _calc_initial_buffer_size(self[i]),
-                _get_dtype_printf_format[DType.index](),
-                self[i],
+                buf.size += _snprintf[", "](buf.data + buf.size, 3)
+            buf.size += _snprintf[_get_dtype_printf_format[DType.index]()](
+                buf.data + buf.size, _calc_initial_buffer_size(self[i]), self[i]
             )
         # Single element tuples should be printed with a trailing comma.
         if size == 1:
-            buf.size += _snprintf(buf.data + buf.size, 2, ",")
+            buf.size += _snprintf[","](buf.data + buf.size, 2)
         # Print a closing `)`.
-        buf.size += _snprintf(buf.data + buf.size, 2, ")")
+        buf.size += _snprintf[")"](buf.data + buf.size, 2)
 
         buf.size += 1  # for the null terminator.
         return buf^

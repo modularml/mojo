@@ -16,7 +16,7 @@ from .bit import (
     countl_zero,
     countr_zero,
     bit_reverse,
-    byte_reverse,
+    byte_swap,
     pop_count,
     bit_not,
     bit_width,

@@ -81,7 +81,7 @@ fn _coro_resume_noop_callback(handle: AnyCoroutine, null: AnyCoroutine):
 
 
 @register_passable
-struct Coroutine[type: AnyRegType]:
+struct Coroutine[type: AnyTrivialRegType]:
     """Represents a coroutine.
 
     Coroutines can pause execution saving the state of the program (including
@@ -96,7 +96,7 @@ struct Coroutine[type: AnyRegType]:
     var _handle: AnyCoroutine
 
     @always_inline
-    fn _get_ctx[ctx_type: AnyRegType](self) -> UnsafePointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyTrivialRegType](self) -> UnsafePointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:
@@ -178,7 +178,7 @@ struct Coroutine[type: AnyRegType]:
 
 
 @register_passable
-struct RaisingCoroutine[type: AnyRegType]:
+struct RaisingCoroutine[type: AnyTrivialRegType]:
     """Represents a coroutine that can raise.
 
     Coroutines can pause execution saving the state of the program (including
@@ -208,7 +208,7 @@ struct RaisingCoroutine[type: AnyRegType]:
         return __mlir_op.`kgen.variant.take`[index = Int(1).value](variant)
 
     @always_inline
-    fn _get_ctx[ctx_type: AnyRegType](self) -> UnsafePointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyTrivialRegType](self) -> UnsafePointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:

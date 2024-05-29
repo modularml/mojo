@@ -39,7 +39,8 @@ from utils.numerics import (
     min_or_neg_inf as _min_or_neg_inf,
 )
 from utils._visualizers import lldb_formatter_wrapping_type
-from utils import InlineArray
+from utils import InlineArray, StringSlice
+
 from .dtype import (
     _integral_type_of,
     _get_dtype_printf_format,
@@ -599,7 +600,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if size > 1:
             # TODO: Fix when slice indexing is implemented on StringSlice
-            values = StringSlice(output.as_bytes_slice()[1:-1])
+            values = StringSlice(unsafe_from_utf8=output.as_bytes_slice()[1:-1])
         return (
             "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
         )
@@ -2879,7 +2880,8 @@ fn _simd_apply[
 
 
 fn _format_scalar[
-    dtype: DType, float_format: StringLiteral = "%.17g"
+    dtype: DType,
+    float_format: StringLiteral = "%.17g",
 ](inout writer: Formatter, value: Scalar[dtype]):
     # Stack allocate enough bytes to store any formatted Scalar value of any
     # type.
@@ -2887,12 +2889,16 @@ fn _format_scalar[
 
     var buf = InlineArray[UInt8, size](fill=0)
 
-    var buf_ptr = buf.unsafe_ptr()
+    var wrote = _snprintf_scalar[dtype, float_format](
+        buf.unsafe_ptr(),
+        size,
+        value,
+    )
 
-    var wrote = _snprintf_scalar[dtype, float_format](buf_ptr, size, value)
+    # SAFETY:
+    #   Create a slice to only those bytes in `buf` that have been initialized.
+    var str_slice = StringSlice[False, __lifetime_of(buf)](
+        unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
+    )
 
-    var strref = StringRef(buf_ptr, wrote)
-
-    writer.write_str(strref)
-
-    _ = buf^  # Keep alive
+    writer.write_str(str_slice)
