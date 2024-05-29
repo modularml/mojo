@@ -568,8 +568,8 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_spaces_table() -> InlineArray[Bool, 256]:
-    var table = InlineArray[Bool, 256](0)
+fn _get_spaces_table() -> InlineArray[UInt8, 256]:
+    var table = InlineArray[UInt8, 256](0)
     table[ord(" ")] = 1
     table[ord("\t")] = 1
     table[ord("\n")] = 1
@@ -582,7 +582,7 @@ fn _get_spaces_table() -> InlineArray[Bool, 256]:
     return table
 
 
-var _SPACES_TABLE = _get_spaces_table()
+alias _SPACES_TABLE = _get_spaces_table()
 
 
 fn _isspace(c: UInt8) -> Bool:
@@ -645,7 +645,7 @@ fn _get_utf8_first_byte_table() -> InlineArray[UInt8, 256]:
     return table
 
 
-var _UTF8_FIRST_BYTE_TABLE = _get_utf8_first_byte_table()
+alias _UTF8_FIRST_BYTE_TABLE = _get_utf8_first_byte_table()
 
 
 # FIXME: this assumes utf8 encoding
