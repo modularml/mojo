@@ -304,11 +304,10 @@ struct IntLiteral(
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
             ](multiplier, ten)
         alias Pair = Tuple[Self, Self]
-        var t: Pair = self.__divmod__(Self(multiplier))
-        if t[1] * 2 >= multiplier:
-            t[0] += 1
-            t[1] -= multiplier
-        return self - t[1]
+        var mod: IntLiteral = self % Self(multiplier)
+        if mod * 2 >= multiplier:
+            mod -= multiplier
+        return self - mod
 
     @always_inline("nodebug")
     fn __invert__(self) -> Self:
