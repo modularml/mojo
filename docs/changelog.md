@@ -330,6 +330,11 @@ what we publish.
   whitespace, ASCII lower/uppercase, and so on.
     ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
 
+- `String` now has a `splitlines()` method, which allows splitting strings at line
+  boundaries. This method supports [universal newlines](https://docs.python.org/3/glossary.html#term-universal-newlines)
+  and provides an option to retain or remove the line break characters.
+    ([PR #2810](https://github.com/modularml/mojo/pull/2810)) by [@YichengDWu](https://github.com/YichengDWu)
+
 - `List` has a simplified syntax to call the `count` method: `my_list.count(x)`.
     ([PR #2675](https://github.com/modularml/mojo/pull/2675) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
