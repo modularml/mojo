@@ -467,6 +467,13 @@ what we publish.
 
 ### 🦋 Changed
 
+- Async function calls are no longer allowed to borrow non-trivial
+  register-passable types. Because async functions capture their arguments but
+  register-passable types don't have lifetimes (yet), Mojo is not able to
+  correctly track the reference, making this unsafe. To cover this safety gap,
+  Mojo has temporarily disallowed binding non-trivial register-passable types
+  to borrowed arguments in async functions.
+
 - `AnyRegType` has been renamed to `AnyTrivialRegType` and Mojo now forbids
   binding non-trivial register-passable types to `AnyTrivialRegType`. This
   closes a major safety hole in the language. Please use `AnyType` for generic
