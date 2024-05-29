@@ -19,6 +19,8 @@ from collections import Array
 ```
 """
 
+from math import sqrt
+from algorithm import vectorize
 
 # ===----------------------------------------------------------------------===#
 # Array
@@ -26,11 +28,7 @@ from collections import Array
 
 
 @value
-struct _ArrayIter[
-    T: DType,
-    capacity: Int,
-    forward: Bool = True,
-](Sized):
+struct _ArrayIter[T: DType, capacity: Int, forward: Bool = True](Sized):
     """Iterator for Array.
 
     Parameters:
@@ -39,10 +37,8 @@ struct _ArrayIter[
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias type = Array[T, capacity]
-
     var index: Int
-    var src: Self.type
+    var src: Array[T, capacity]
 
     fn __iter__(self) -> Self:
         return self
@@ -108,7 +104,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     """The underlying SIMD vector."""
     alias _scalar_type = Scalar[T]
     var capacity_left: UInt8
-    """The current capacity left until expansion."""
+    """The current capacity left."""
 
     @always_inline
     fn __init__(inout self):
@@ -978,7 +974,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
-        return (self.vec**2).reduce_add()
+        return sqrt((self.vec**2).reduce_add())
 
     @always_inline
     fn __add__[
@@ -1024,7 +1020,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             A new Array containing the result.
         """
-        return Self(self.vec + value)
+        return Self(self.vec + Self._build_vec(value))
 
     @always_inline
     fn __sub__[
@@ -1070,7 +1066,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             A new Array containing the result.
         """
-        return Self(self.vec - value)
+        return Self(self.vec - Self._build_vec(value))
 
     @always_inline("nodebug")
     fn __iadd__(inout self, owned other: Self):
@@ -1215,10 +1211,45 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     #         The result.
     #     """
     #     # TODO using matmul for big vectors
-    #     # TODO quaternions/fma for 3d vectors
+    #     # TODO fma for 3d vectors
     #     var magns = abs(self.vec) * abs(other.vec)
     #     return magns * sin((self * other) / magns)
 
-    # TODO: should do a vectorized apply
-    # fn apply(self):
-    #     ...
+    fn apply(inout self, func: fn (Self._scalar_type) -> Self._scalar_type):
+        """Apply a function to the Array inplace.
+
+        Args:
+            func: The function to apply.
+        """
+
+        @parameter
+        fn closure[simd_width: Int](i: Int):
+            self.vec[i] = func(self.vec[i])
+
+        vectorize[closure, simdwidthof[T]()](Self._vec_type.size)
+
+    fn map(
+        owned self, func: fn (Self._scalar_type) -> Self._scalar_type
+    ) -> Self:
+        """Apply a function to the Array and return it.
+
+        Args:
+            func: The function to apply.
+        """
+
+        self.apply(func)
+        return self
+
+    fn filter(owned self, func: fn (Self._scalar_type) -> Bool) -> Self:
+        """Filter the Array and return it.
+
+        Args:
+            func: The function to filter by.
+        """
+
+        var res = Self()
+        for i in range(len(self)):
+            var value = self.vec[i]
+            if func(value):
+                res.append(value)
+        return res
