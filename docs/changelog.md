@@ -247,6 +247,26 @@ what we publish.
   processing.  Previously it required the use of an internal MLIR type to
   achieve this.
 
+- The `is_mutable` parameter of `Reference` and `AnyLifetime` is now a `Bool`,
+  not a low-level `__mlir_type.i1` value.
+
+  This improves the ergonomics of spelling out a
+  `Reference` type explicitly. For example, to define a struct holding a
+  `Reference`, you can now write:
+
+  ```mojo
+  struct Foo[is_mutable: Bool, lifetime: AnyLifetime[is_mutable].type]:
+      var data: Reference[Int32, is_mutable, lifetime]
+  ```
+
+  Or to specify a field that is always immutable, `False` can be specified
+  as the mutability:
+
+  ```mojo
+  struct Foo[lifetime: AnyLifetime[False].type]:
+      var data: Reference[Int32, False, lifetime]
+  ```
+
 - `object` now implements all the bitwise operators.
     ([PR #2324](https://github.com/modularml/mojo/pull/2324) by [@LJ-9801](https://github.com/LJ-9801))
 
