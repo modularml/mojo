@@ -575,7 +575,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             A new Array containing the Array at the specified span.
         """
         var adjusted_span = self._adjust_span(span)
-        var adjusted_span_len = len(adjusted_span)
+        var adjusted_span_len = adjusted_span.unsafe_indices()
 
         var res = Self()
         if not adjusted_span_len:
@@ -1235,6 +1235,9 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
         Args:
             func: The function to apply.
+
+        Returns:
+            The altered Array.
         """
 
         self.apply(func)
@@ -1245,6 +1248,9 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
         Args:
             func: The function to filter by.
+
+        Returns:
+            The filtered Array.
         """
 
         var res = Self()
