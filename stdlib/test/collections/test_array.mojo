@@ -594,6 +594,11 @@ def test_reversed():
     pass
 
 
+def test_filter():
+    # TODO
+    pass
+
+
 def main():
     test_array()
     test_array_with_default()
@@ -620,3 +625,12 @@ def main():
     test_array_broadcast_ops()
     test_min()
     test_max()
+    test_dot()
+    test_array_add()
+    test_array_sub()
+    test_cos()
+    test_theta()
+    test_cross()
+    test_apply()
+    test_reversed()
+    test_filter()
