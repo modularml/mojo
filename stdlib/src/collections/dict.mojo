@@ -809,7 +809,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             "KeyError" if the dictionary is empty.
         """
         if self.size == 0:
-            raise "KeyError"
+            raise "KeyError: popitem(): dictionary is empty"
         var entry = self._entries.pop(0)
         var entry_value = entry.value()
         self.size -= 1
