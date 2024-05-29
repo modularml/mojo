@@ -14,20 +14,20 @@
 import sys
 from pathlib import Path
 
-# We can't check much more than this at the moment, because the license year
-# changes and the language is not mature enough to do regex yet.
-alias LICENSE = String(
-    """
-# ===----------------------------------------------------------------------=== #
-# Copyright (c)
-"""
-).strip()
-
 
 def main():
     target_paths = sys.argv()
     if len(target_paths) < 2:
         raise Error("A file path must be given as a command line argument.")
+
+    # We can't check much more than this at the moment, because the license year
+    # changes and the language is not mature enough to do regex yet.
+    var license_start = String(
+        """
+# ===----------------------------------------------------------------------=== #
+# Copyright (c)
+"""
+    ).strip()
 
     files_without_license = List[Path]()
     for i in range(len(target_paths)):
@@ -35,7 +35,7 @@ def main():
             # this is the current file
             continue
         file_path = Path(target_paths[i])
-        if not file_path.read_text().startswith(LICENSE):
+        if not file_path.read_text().startswith(license_start):
             files_without_license.append(file_path)
 
     if len(files_without_license) > 0:
