@@ -571,6 +571,9 @@ what we publish.
   method. This makes it explicit that this implementation does not check if the
   slice bounds are concrete or within any given object's length.
 
+- Implicit conversion to `String` is now removed for builtin classes/types.
+  One should use `str(...)` explicitly to convert to `String`.
+
 - `math.gcd` now works on negative inputs, and like Python's implementation,
   accepts a variadic list of integers. New overloads for a `List` or `Span`of
   integers are also added.
