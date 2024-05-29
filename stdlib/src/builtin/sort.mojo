@@ -24,11 +24,11 @@ from sys import bitwidthof
 # sort
 # ===----------------------------------------------------------------------===#
 
-alias _cmp_fn_type = fn[type: AnyRegType] (type, type) capturing -> Bool
+alias _cmp_fn_type = fn[type: AnyTrivialRegType] (type, type) capturing -> Bool
 
 
 fn _insertion_sort[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], start: Int, end: Int):
     """Sort the array[start:end] slice"""
 
@@ -67,7 +67,7 @@ fn _insertion_sort[
 
 @always_inline
 fn _partition[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], start: Int, end: Int) -> Int:
     if start == end:
         return end
@@ -132,7 +132,7 @@ fn _estimate_initial_height(size: Int) -> Int:
 
 
 fn _quicksort[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], size: Int):
     if size == 0:
         return
@@ -211,7 +211,7 @@ fn _quicksort[
 # partition
 # ===----------------------------------------------------------------------===#
 fn partition[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](buff: Pointer[type], k: Int, size: Int):
     """Partition the input vector inplace such that first k elements are the
     largest (or smallest if cmp_fn is <= operator) elements.
@@ -258,7 +258,7 @@ fn sort(inout buff: Pointer[Int], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) <= rebind[Int](rhs)
 
     _quicksort[Int, _less_than_equal](buff, len)
@@ -277,7 +277,7 @@ fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[ty: AnyRegType](lhs: ty, rhs: ty) -> Bool:
+    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
         return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
 
     _quicksort[Scalar[type], _less_than_equal](buff, len)
@@ -335,7 +335,7 @@ fn sort[
 
 @always_inline
 fn _sort2[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], offset0: Int, offset1: Int):
     var a = array[offset0]
     var b = array[offset1]
@@ -346,7 +346,7 @@ fn _sort2[
 
 @always_inline
 fn _sort_partial_3[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], offset0: Int, offset1: Int, offset2: Int):
     var a = array[offset0]
     var b = array[offset1]
@@ -364,7 +364,7 @@ fn _sort_partial_3[
 
 @always_inline
 fn _small_sort[
-    n: Int, type: AnyRegType, cmp_fn: _cmp_fn_type
+    n: Int, type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type]):
     @parameter
     if n == 2:

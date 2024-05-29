@@ -33,7 +33,7 @@ from sys.intrinsics import _type_is_eq
 fn _set_array_elem[
     index: Int,
     size: Int,
-    type: AnyRegType,
+    type: AnyTrivialRegType,
 ](
     val: type,
     array: Reference[
@@ -61,7 +61,7 @@ fn _set_array_elem[
 
 @always_inline
 fn _create_array[
-    size: Int, type: AnyRegType
+    size: Int, type: AnyTrivialRegType
 ](lst: VariadicList[type]) -> __mlir_type[
     `!pop.array<`, size.value, `, `, type, `>`
 ]:
@@ -114,7 +114,7 @@ fn _static_tuple_construction_checks[size: Int]():
 
 @value
 @register_passable("trivial")
-struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
+struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     """A statically sized tuple type which contains elements of homogeneous types.
 
     Parameters:

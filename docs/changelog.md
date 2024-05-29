@@ -211,7 +211,7 @@ what we publish.
 
 - Add an `InlinedArray` type that works on memory-only types.
   Compare with the existing `StaticTuple` type, which is conceptually an array
-  type, but only worked on `AnyRegType`.
+  type, but only worked on `AnyTrivialRegType`.
     ([PR #2294](https://github.com/modularml/mojo/pull/2294) by [@lsh](https://github.com/lsh))
 
 - Base64 decoding support has been added.
@@ -436,6 +436,11 @@ what we publish.
 ([PR #2728](https://github.com/modularml/mojo/pull/2728) by [@bgreni](https://github.com/bgreni))
 
 ### 🦋 Changed
+
+- `AnyRegType` has been renamed to `AnyTrivialRegType` and Mojo now forbids
+  binding non-trivial register-passable types to `AnyTrivialRegType`. This
+  closes a major safety hole in the language. Please use `AnyType` for generic
+  code going forward.
 
 - The `let` keyword has been completely removed from the language. We previously
   removed `let` declarations but still provided an error message to users. Now,
