@@ -82,8 +82,35 @@ def test_indexing():
     assert_equal(a[0], "a")
 
 
+def test_find():
+    haystack = StringRef("abcdefg")
+    haystack_with_special_chars = StringRef("abcdefg@#$")
+    haystack_repeated_chars = StringRef("aaaaaaaaaaaaaaaaaaaaaaaa")
+
+    assert_equal(haystack.find("a"), 0)
+    assert_equal(haystack.find("ab"), 0)
+    assert_equal(haystack.find("abc"), 0)
+    assert_equal(haystack.find("bcd"), 1)
+    assert_equal(haystack.find("de"), 3)
+    assert_equal(haystack.find("fg"), 5)
+    assert_equal(haystack.find("g"), 6)
+    assert_equal(haystack.find("z"), -1)
+    assert_equal(haystack.find("zzz"), -1)
+
+    assert_equal(haystack.find("@#$"), -1)
+    assert_equal(haystack_with_special_chars.find("@#$"), 7)
+
+    assert_equal(haystack_repeated_chars.find("aaa"), 0)
+    assert_equal(haystack_repeated_chars.find("AAa"), -1)
+
+    assert_equal(haystack.find("hijklmnopqrstuvwxyz"), -1)
+
+    assert_equal(StringRef("").find("abc"), -1)
+
+
 def main():
     test_strref_from_start()
     test_comparison_operators()
     test_intable()
     test_indexing()
+    test_find()
