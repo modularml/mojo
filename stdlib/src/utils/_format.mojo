@@ -99,6 +99,20 @@ struct Formatter:
         """
         self._write_func(self._write_func_arg, strref)
 
+    @always_inline
+    fn write_str(inout self, str_slice: StringSlice[False, _]):
+        """
+        Write a string slice to this formatter.
+
+        Args:
+            str_slice: The string slice to write to this formatter. Must NOT be
+              null terminated.
+        """
+
+        var strref: StringRef = str_slice._strref_dangerous()
+
+        self.write_str(strref)
+
     # ===------------------------------------------------------------------=== #
     # Factory methods
     # ===------------------------------------------------------------------=== #
