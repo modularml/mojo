@@ -23,6 +23,12 @@ struct DummyHasher(_Hasher):
     fn __init__(inout self):
         self._dummy_value = 0
 
+    fn _update_with_bytes(
+        inout self, data: DTypePointer[DType.uint8], length: Int
+    ):
+        for i in range(length):
+            self._dummy_value += data[i].cast[DType.uint64]()
+
     fn _update_with_simd(inout self, value: SIMD[_, _]):
         self._dummy_value += value.cast[DType.uint64]().reduce_add()
 
@@ -79,8 +85,36 @@ def test_complexe_hash_with_hasher():
     assert_equal(_hash_with_hasher[DummyHasher](hashable), 52)
 
 
+@value
+struct ComplexHashableStructWithList(_HashableWithHasher):
+    var _value1: SomeHashableStruct
+    var _value2: SomeHashableStruct
+    var _value3: List[UInt8]
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        hasher.update(self._value1)
+        hasher.update(self._value2)
+        # This is okay because self is passed as borrowed so the pointer will
+        # be valid until at least the end of the function
+        hasher._update_with_bytes(
+            data=DTypePointer(self._value3.unsafe_ptr()),
+            length=len(self._value3),
+        )
+        _ = self._value3
+
+
+def test_update_with_bytes():
+    var hasher = DummyHasher()
+    var hashable = ComplexHashableStructWithList(
+        SomeHashableStruct(42), SomeHashableStruct(10), List[UInt8](1, 2, 3)
+    )
+    hasher.update(hashable)
+    assert_equal(hasher^.finish(), 58)
+
+
 def main():
     test_hasher()
     test_hash_with_hasher()
     test_complex_hasher()
     test_complexe_hash_with_hasher()
+    test_update_with_bytes()
