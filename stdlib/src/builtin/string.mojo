@@ -582,6 +582,9 @@ fn _get_spaces_table() -> InlineArray[UInt8, 256]:
     return table
 
 
+var _SPACES_TABLE = _get_spaces_table()
+
+
 fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
 
@@ -595,7 +598,6 @@ fn _isspace(c: UInt8) -> Bool:
     Returns:
         True iff the character is one of the whitespace characters listed above.
     """
-    var _SPACES_TABLE = _get_spaces_table()
     return _SPACES_TABLE[int(c)]
 
 
@@ -643,6 +645,9 @@ fn _get_utf8_first_byte_table() -> InlineArray[UInt8, 256]:
     return table
 
 
+var _UTF8_FIRST_BYTE_TABLE = _get_utf8_first_byte_table()
+
+
 # FIXME: this assumes utf8 encoding
 # TODO: this should extend the string's lifetime
 @value
@@ -657,16 +662,14 @@ struct _StringIter[forward: Bool = True]:
     var continuation_bytes: Int
     var ptr: UnsafePointer[UInt8]
     var len: Int
-    var _UTF8_FIRST_BYTE_TABLE: InlineArray[UInt8, 256]
 
     fn __init__(inout self, unsafe_pointer: UnsafePointer[UInt8], len: Int):
         self.index = 0 if forward else len
         self.ptr = unsafe_pointer
         self.len = len
         self.continuation_bytes = 0
-        self._UTF8_FIRST_BYTE_TABLE = _get_utf8_first_byte_table()
         for i in range(len):
-            if self._UTF8_FIRST_BYTE_TABLE[int(unsafe_pointer[i])] == 1:
+            if _UTF8_FIRST_BYTE_TABLE[int(unsafe_pointer[i])] == 1:
                 self.continuation_bytes += 1
 
     fn __iter__(self) -> Self:
@@ -679,9 +682,7 @@ struct _StringIter[forward: Bool = True]:
         if forward:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var value = self._UTF8_FIRST_BYTE_TABLE[
-                    int(self.ptr[self.index])
-                ]
+                var value = _UTF8_FIRST_BYTE_TABLE[int(self.ptr[self.index])]
                 if value != 0:
                     byte_len = int(value)
                     self.continuation_bytes -= int(value) - 1
@@ -693,13 +694,11 @@ struct _StringIter[forward: Bool = True]:
         else:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var value = self._UTF8_FIRST_BYTE_TABLE[
-                    int(self.ptr[self.index])
-                ]
+                var value = _UTF8_FIRST_BYTE_TABLE[int(self.ptr[self.index])]
                 if value != 0:
                     while value == 1:
                         var b = int(self.ptr[self.index - byte_len])
-                        value = self._UTF8_FIRST_BYTE_TABLE[b]
+                        value = _UTF8_FIRST_BYTE_TABLE[b]
                         byte_len += 1
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
