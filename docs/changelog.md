@@ -18,6 +18,10 @@ what we publish.
 
 ### ⭐️ New
 
+- `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
+([PR #2701](https://github.com/modularml/mojo/pull/2701)
+by [@jayzhan211](https://github.com/jayzhan211))
+
 - Add a `sort` function for list of `ComparableCollectionElement`s.
   [PR #2609](https://github.com/modularml/mojo/pull/2609) by
   [@mzaks](https://github.com/mzaks)
@@ -162,9 +166,10 @@ what we publish.
           return Self(round(self.re), round(self.im))
   ```
 
-- The `abs`, `round`, `min`, `max`, and `divmod` functions have moved from
-  `math` to `builtin`, so you no longer need to do
-  `from math import abs, round, min, max, divmod`.
+- User defined types can now also opt in to use the `pow` function by
+  implementing the `__pow__` method (and thus conforming to the new `Powable`
+  trait). As before, these types will also benefit from being able to use the
+  `**` operator.
 
 - Mojo now allows types to opt in to use the `floor()`, `ceil()`, and `trunc()`
   functions in the `math` module by implementing the `__floor__()`,
@@ -425,13 +430,19 @@ what we publish.
 - Added `clear` method  to `Dict`.
   ([PR 2627](https://github.com/modularml/mojo/pull/2627) by [@artemiogr97](https://github.com/artemiogr97))
 
+- Added `os.path.join` function.
+  ([PR 2792](https://github.com/modularml/mojo/pull/2792)) by [@artemiogr97](https://github.com/artemiogr97))
+
 - `StringRef` now implements `startswith()` and `endswith()`.
     ([PR #2710](https://github.com/modularml/mojo/pull/2710) by [@fknfilewalker](https://github.com/fknfilewalker))
 
 - The Mojo Language Server now supports renaming local variables.
 
-- Added a new `tempfile` module. Similarly to Python, this will contain
-  utilities for creating and working with temporary files and directories.
+- Added a new `tempfile` module, with `gettempdir` and `mkdtemp` functions.
+  ([PR 2742](https://github.com/modularml/mojo/pull/2742) by [@artemiogr97](https://github.com/artemiogr97))
+
+- Added `SIMD.__repr__` to get the verbose string representation of `SIMD` types.
+([PR #2728](https://github.com/modularml/mojo/pull/2728) by [@bgreni](https://github.com/bgreni))
 
 ### 🦋 Changed
 
@@ -439,8 +450,9 @@ what we publish.
   removed `let` declarations but still provided an error message to users. Now,
   it is completely gone from the grammar. Long live `var`!
 
-- The `abs` and `round` functions have moved from `math` to `builtin`, so you no
-  longer need to do `from math import abs, round`.
+- The `abs`, `round`, `min`, `max`, `pow`, and `divmod` functions have moved
+  from `math` to `builtin`, so you no longer need to do
+  `from math import abs, round, min, max, divmod, pow`.
 
 - Many functions returning a pointer type have been unified to have a public
   API function of `unsafe_ptr()`.
@@ -484,7 +496,10 @@ what we publish.
   - Removed `StringRef.unsafe_uint8_ptr()`. The `unsafe_ptr()` method now has
     the same behavior.
 
-- Changed `isspace(..)` to take an `Int`.
+- Added `String.isspace()` method conformant with Python's universal separators.
+
+- Changed `isspace(..)` to take a `UInt8` and was made private (`_isspace(..)`),
+  use `String.isspace()` instead.
 
 - Added `UnsafePointer.offset()` method.
 
@@ -507,6 +522,13 @@ what we publish.
 
 - `InlinedString` has been renamed to `InlineString` to be consistent with other
   types.
+
+- The `Slice.__len__` function has been removed and `Slice` no longer conforms
+  to the `Sized` trait. This clarifies the ambiguity of the semantics: the
+  length of a slice always depends on the length of the object being sliced.
+  Users that need the existing functionality can use the `Slice.unsafe_indices`
+  method. This makes it explicit that this implementation does not check if the
+  slice bounds are concrete or within any given object's length.
 
 ### ❌ Removed
 
@@ -558,6 +580,9 @@ what we publish.
 
 - The builtin `SIMD` struct no longer conforms to `Indexer`; users must
   explicitly cast `Scalar` values using `int`.
+
+- The overload of `math.pow` taking an integer parameter exponent has been
+  removed.
 
 ### 🛠️ Fixed
 

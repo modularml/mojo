@@ -50,11 +50,11 @@ fn stdlib_reduce_sum[size: Int](array: Buffer[type, size]) -> scalar:
     return my_sum
 
 
-def pretty_print(name: StringLiteral, elements: Int, time: Float64):
+def pretty_print(name: String, elements: Int, time: Float64):
     py = Python.import_module("builtins")
     py.print(
         py.str("{:<16} {:>11,} {:>8.2f}ms").format(
-            String(name) + " elements:", elements, time
+            name + " elements:", elements, time
         )
     )
 
@@ -62,7 +62,7 @@ def pretty_print(name: StringLiteral, elements: Int, time: Float64):
 fn bench[
     func: fn[size: Int] (buffer: Buffer[type, size]) -> scalar,
     size: Int,
-    name: StringLiteral,
+    name: String,
 ](buffer: Buffer[type, size]) raises:
     @parameter
     fn runner():

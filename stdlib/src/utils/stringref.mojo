@@ -15,7 +15,7 @@
 
 from bit import countr_zero
 from builtin.dtype import _uint_type_of_width
-from builtin.string import _atol
+from builtin.string import _atol, _isspace
 from memory import DTypePointer, UnsafePointer, memcmp
 
 
@@ -488,6 +488,7 @@ struct StringRef(
 
     fn strip(self) -> StringRef:
         """Gets a StringRef with leading and trailing whitespaces removed.
+        This only takes C spaces into account: " \\t\\n\\r\\f\\v".
 
         For example, `"  mojo  "` returns `"mojo"`.
 
@@ -497,9 +498,9 @@ struct StringRef(
         var start: Int = 0
         var end: Int = len(self)
         var ptr = self.unsafe_ptr()
-        while start < end and isspace(int(ptr[start])):
+        while start < end and _isspace(ptr[start]):
             start += 1
-        while end > start and isspace(int(ptr[end - 1])):
+        while end > start and _isspace(ptr[end - 1]):
             end -= 1
         return StringRef(ptr + start, end - start)
 
