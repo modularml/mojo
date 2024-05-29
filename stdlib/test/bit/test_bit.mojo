@@ -42,13 +42,13 @@ def test_has_single_bit_simd():
     alias var1 = SIMD[type, simd_width](-1, 0, 1, 2)
     assert_equal(
         has_single_bit(var1),
-        SIMD[return_type, simd_width](False, False, True, True),
+        SIMD[DType.bool, simd_width](False, False, True, True),
     )
 
     alias var2 = SIMD[type, simd_width](3, 4, 5, 8)
     assert_equal(
         has_single_bit(var2),
-        SIMD[return_type, simd_width](False, True, False, True),
+        SIMD[DType.bool, simd_width](False, True, False, True),
     )
 
 

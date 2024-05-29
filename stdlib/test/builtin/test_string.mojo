@@ -605,7 +605,8 @@ fn test_split() raises:
     # empty separators default to whitespace
     var d = String("hello world").split()
     assert_true(len(d) == 2)
-    assert_true(d[0] == "hello", d[1] == "world")
+    assert_true(d[0] == "hello")
+    assert_true(d[1] == "world")
     d = String("hello \t\n\n\v\fworld").split("\n")
     assert_true(len(d) == 3)
     assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")

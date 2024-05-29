@@ -385,7 +385,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     Please see its docstring for details.
     """
     if not str_ref:
-        raise Error(_atof_error(str_ref))
+        raise _atof_error(str_ref)
 
     var result: Float64 = 0.0
     var exponent: Int = 0
@@ -760,18 +760,6 @@ struct String(
             literal: The input constant string.
         """
         self = literal.__str__()
-
-    fn __init__[stringable: Stringable](inout self, value: stringable):
-        """Creates a string from a value that conforms to Stringable trait.
-
-        Parameters:
-            stringable: The Stringable type.
-
-        Args:
-            value: The value that conforms to Stringable.
-        """
-
-        self = str(value)
 
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
