@@ -576,9 +576,9 @@ fn _get_spaces_table() -> InlineArray[UInt8, 256]:
     table[ord("\r")] = 1
     table[ord("\f")] = 1
     table[ord("\v")] = 1
-    table[ord("\x1c")] = 1
-    table[ord("\x1d")] = 1
-    table[ord("\x1e")] = 1
+    table[0x1C] = 1
+    table[0x1D] = 1
+    table[0x1E] = 1
     return table
 
 
