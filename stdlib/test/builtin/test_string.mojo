@@ -851,6 +851,7 @@ fn test_isspace() raises:
         String("\v"),
         String("\f"),
         String("\x1c"),
+        String("\x1d"),
         String("\x1e"),
         String(next_line),
         String(unicode_line_sep),
@@ -1101,24 +1102,32 @@ def test_string_iter():
     #     concat += v
 
     # assert_equal(111, atol(concat))
-
-    vs = String("mojo🔥")
-    var amnt = 0
-    for v in vs:
-        if amnt == 0:
-            assert_equal(v, "m")
-        elif amnt == 1:
-            assert_equal(v, "o")
-        elif amnt == 2:
-            assert_equal(v, "j")
-        elif amnt == 3:
-            assert_equal(v, "o")
-        elif amnt == 4:
-            assert_equal(v, "🔥")
-        else:
-            raise Error("shouldn't get here")
-        amnt += 1
-    assert_equal(amnt, 5)
+    var items = List[String](
+        "mojo🔥",
+        "السلام عليكم",
+        "Dobrý den",
+        "Hello",
+        "שָׁלוֹם",
+        "नमस्ते",
+        "こんにちは",
+        "안녕하세요",
+        "你好",
+        "Olá",
+        "Здравствуйте",
+    )
+    var utf8_length = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
+    var len_idx = 0
+    for item in items:
+        var size = len(item[])
+        var amnt = 0
+        var item_idx = 0
+        for v in item[]:
+            var byte_len = len(v)
+            assert_equal(item[][item_idx : item_idx + byte_len], v)
+            item_idx += byte_len
+            amnt += 1
+        assert_equal(amnt, utf8_length[len_idx])
+        len_idx += 1
 
     # FIXME
     # concat = String("")
@@ -1126,7 +1135,9 @@ def test_string_iter():
     #     concat += v
     # assert_equal(concat, "🔥ojom")
 
-    _ = vs  # TODO: this should not be necessary
+    # TODO: this should not be necessary
+    _ = vs
+    _ = items
 
 
 def main():

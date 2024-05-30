@@ -588,6 +588,9 @@ fn _isspace(c: UInt8) -> Bool:
     alias `\r` = UInt8(ord("\r"))
     alias `\f` = UInt8(ord("\f"))
     alias `\v` = UInt8(ord("\v"))
+    alias `\x1c` = UInt8(ord("\x1c"))
+    alias `\x1d` = UInt8(ord("\x1d"))
+    alias `\x1e` = UInt8(ord("\x1e"))
 
     # This compiles to something very clever that's even faster than a LUT.
     return (
@@ -597,6 +600,9 @@ fn _isspace(c: UInt8) -> Bool:
         or c == `\r`
         or c == `\f`
         or c == `\v`
+        or c == `\x1c`
+        or c == `\x1d`
+        or c == `\x1e`
     )
 
 
@@ -652,27 +658,17 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_utf8_first_byte_table() -> InlineArray[UInt8, 256]:
-    var table = InlineArray[UInt8, 256](unsafe_uninitialized=True)
-
-    @parameter
-    for i in range(256):
-
-        @parameter
-        if i < 0b1000_0000:
-            table[i] = 0
-        elif i < 0b1100_0000:
-            table[i] = 1  # is continuation byte
-        elif i < 0b1110_0000:
-            table[i] = 2  # is 2 byte long
-        elif i < 0b1111_0000:
-            table[i] = 3  # is 3 byte long
-        else:
-            table[i] = 4  # is 4 byte long
-    return table
-
-
-var _UTF8_FIRST_BYTE_TABLE = _get_utf8_first_byte_table()
+fn _utf8_byte_type(b: UInt8) -> UInt8:
+    if b < 0b1000_0000:
+        return 0
+    elif b < 0b1100_0000:
+        return 1  # is continuation byte
+    elif b < 0b1110_0000:
+        return 2  # is 2 byte long
+    elif b < 0b1111_0000:
+        return 3  # is 3 byte long
+    else:
+        return 4  # is 4 byte long
 
 
 # FIXME: this assumes utf8 encoding
@@ -696,7 +692,7 @@ struct _StringIter[forward: Bool = True]:
         self.len = len
         self.continuation_bytes = 0
         for i in range(len):
-            if _UTF8_FIRST_BYTE_TABLE[int(unsafe_pointer[i])] == 1:
+            if _utf8_byte_type(int(unsafe_pointer[i])) == 1:
                 self.continuation_bytes += 1
 
     fn __iter__(self) -> Self:
@@ -709,7 +705,7 @@ struct _StringIter[forward: Bool = True]:
         if forward:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var value = _UTF8_FIRST_BYTE_TABLE[int(self.ptr[self.index])]
+                var value = _utf8_byte_type(int(self.ptr[self.index]))
                 if value != 0:
                     byte_len = int(value)
                     self.continuation_bytes -= int(value) - 1
@@ -721,11 +717,11 @@ struct _StringIter[forward: Bool = True]:
         else:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var value = _UTF8_FIRST_BYTE_TABLE[int(self.ptr[self.index])]
+                var value = _utf8_byte_type(int(self.ptr[self.index]))
                 if value != 0:
                     while value == 1:
                         var b = int(self.ptr[self.index - byte_len])
-                        value = _UTF8_FIRST_BYTE_TABLE[b]
+                        value = _utf8_byte_type(b)
                         byte_len += 1
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
@@ -1545,7 +1541,6 @@ struct String(
         """
         # TODO add line and paragraph separator as stringliteral
         # once unicode escape secuences are accepted
-        # 0 is to build a String with null terminator
         var next_line = List[UInt8](0xC2, 0x85)
         """TODO: \\x85"""
         var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
