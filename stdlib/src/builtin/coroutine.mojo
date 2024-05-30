@@ -81,7 +81,11 @@ fn _coro_resume_noop_callback(handle: AnyCoroutine, null: AnyCoroutine):
 
 
 @register_passable
-struct Coroutine[type: AnyRegType]:
+struct Coroutine[
+    is_mut: Bool, //,
+    type: AnyTrivialRegType,
+    lifetime: AnyLifetime[is_mut].type,
+]:
     """Represents a coroutine.
 
     Coroutines can pause execution saving the state of the program (including
@@ -90,13 +94,15 @@ struct Coroutine[type: AnyRegType]:
     left off, with the saved state restored.
 
     Parameters:
+        is_mut: Whether the lifetime is mutable.
         type: Type of value returned upon completion of the coroutine.
+        lifetime: The lifetime of the coroutine's captures.
     """
 
     var _handle: AnyCoroutine
 
     @always_inline
-    fn _get_ctx[ctx_type: AnyRegType](self) -> UnsafePointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyTrivialRegType](self) -> UnsafePointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:
@@ -123,7 +129,7 @@ struct Coroutine[type: AnyRegType]:
         return __mlir_op.`co.get_results`[_type=type](self._handle)
 
     @always_inline
-    fn __init__(handle: AnyCoroutine) -> Coroutine[type]:
+    fn __init__(handle: AnyCoroutine) -> Self:
         """Construct a coroutine object from a handle.
 
         Args:
@@ -178,7 +184,11 @@ struct Coroutine[type: AnyRegType]:
 
 
 @register_passable
-struct RaisingCoroutine[type: AnyRegType]:
+struct RaisingCoroutine[
+    is_mut: Bool, //,
+    type: AnyTrivialRegType,
+    lifetime: AnyLifetime[is_mut].type,
+]:
     """Represents a coroutine that can raise.
 
     Coroutines can pause execution saving the state of the program (including
@@ -187,7 +197,9 @@ struct RaisingCoroutine[type: AnyRegType]:
     left off, with the saved state restored.
 
     Parameters:
+        is_mut: Whether the lifetime is mutable.
         type: Type of value returned upon completion of the coroutine.
+        lifetime: The lifetime of the coroutine's captures.
     """
 
     alias _var_type = __mlir_type[`!kgen.variant<`, Error, `, `, type, `>`]
@@ -208,7 +220,7 @@ struct RaisingCoroutine[type: AnyRegType]:
         return __mlir_op.`kgen.variant.take`[index = Int(1).value](variant)
 
     @always_inline
-    fn _get_ctx[ctx_type: AnyRegType](self) -> UnsafePointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyTrivialRegType](self) -> UnsafePointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:

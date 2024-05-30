@@ -142,12 +142,12 @@ fn bit_reverse[
 
 
 # ===----------------------------------------------------------------------===#
-# byte_reverse
+# byte_swap
 # ===----------------------------------------------------------------------===#
 
 
 @always_inline("nodebug")
-fn byte_reverse[
+fn byte_swap[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
     """Byte-swaps a value.
@@ -246,8 +246,6 @@ fn bit_not[
     return __mlir_op.`pop.xor`(val.value, neg_one.value)
 
 
-# TODO: implement bit_ceil, bit_floor, has_single_bit, et al
-
 # ===----------------------------------------------------------------------===#
 # bit_width
 # ===----------------------------------------------------------------------===#
@@ -305,6 +303,50 @@ fn bit_width[
 
 
 # ===----------------------------------------------------------------------===#
+# is_power_of_two
+# ===----------------------------------------------------------------------===#
+# reference: https://en.cppreference.com/w/cpp/numeric/has_single_bit
+
+
+@always_inline
+fn is_power_of_two(val: Int) -> Bool:
+    """Checks if the input value is a power of 2.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        True if the input value is a power of 2, False otherwise.
+    """
+    return (val != 0) & (val & (val - 1) == 0)
+
+
+@always_inline
+fn is_power_of_two[
+    type: DType, simd_width: Int
+](val: SIMD[type, simd_width]) -> SIMD[DType.bool, simd_width]:
+    """Checks if the input value is a power of 2 for each element of a SIMD vector.
+
+    Parameters:
+        type: `dtype` used for the computation.
+        simd_width: SIMD width used for the computation.
+
+    Constraints:
+        The element type of the input vector must be integral.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        A SIMD value where the element at position `i` is True if the integer at
+        position `i` of the input value is a power of 2, False otherwise.
+    """
+    constrained[type.is_integral(), "must be integral"]()
+
+    return (val != 0) & (val & (val - 1) == 0)
+
+
+# ===----------------------------------------------------------------------===#
 # bit_ceil
 # ===----------------------------------------------------------------------===#
 # reference: https://en.cppreference.com/w/cpp/numeric/bit_ceil
@@ -313,7 +355,7 @@ fn bit_width[
 @always_inline("nodebug")
 fn bit_ceil(val: Int) -> Int:
     """Computes the smallest power of 2 that is greater than or equal to the
-    input value. Any integral value less than or equal to 1 be ceiled to 1.
+    input value. Any integral value less than or equal to 1 will be ceiled to 1.
 
     Args:
         val: The input value.
@@ -324,7 +366,7 @@ fn bit_ceil(val: Int) -> Int:
     if val <= 1:
         return 1
 
-    if val & (val - 1) == 0:
+    if is_power_of_two(val):
         return val
 
     return 1 << bit_width(val - 1)

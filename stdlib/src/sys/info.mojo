@@ -510,7 +510,7 @@ fn simdbytewidth[
 
 @always_inline("nodebug")
 fn sizeof[
-    type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
+    type: AnyType, target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
     """Returns the size of (in bytes) of the type.
 
@@ -521,9 +521,16 @@ fn sizeof[
     Returns:
         The size of the type in bytes.
     """
+    alias mlir_type = __mlir_attr[
+        `#kgen.param.expr<rebind, #kgen.parameterizedtype.constant<!kgen.paramref<`,
+        type,
+        `>> : `,
+        AnyType,
+        `> : !kgen.type`,
+    ]
     return __mlir_attr[
         `#kgen.param.expr<get_sizeof, #kgen.parameterizedtype.constant<`,
-        type,
+        mlir_type,
         `> : !kgen.type,`,
         target,
         `> : !kgen.int_literal`,
@@ -556,7 +563,7 @@ fn sizeof[
 
 @always_inline("nodebug")
 fn alignof[
-    type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
+    type: AnyType, target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
     """Returns the align of (in bytes) of the type.
 
@@ -567,9 +574,16 @@ fn alignof[
     Returns:
         The alignment of the type in bytes.
     """
+    alias mlir_type = __mlir_attr[
+        `#kgen.param.expr<rebind, #kgen.parameterizedtype.constant<!kgen.paramref<`,
+        type,
+        `>> : `,
+        AnyType,
+        `> : !kgen.type`,
+    ]
     return __mlir_attr[
         `#kgen.param.expr<get_alignof, #kgen.parameterizedtype.constant<`,
-        type,
+        mlir_type,
         `> : !kgen.type,`,
         target,
         `> : !kgen.int_literal`,
@@ -602,7 +616,8 @@ fn alignof[
 
 @always_inline("nodebug")
 fn bitwidthof[
-    type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
+    type: AnyTrivialRegType,
+    target: __mlir_type.`!kgen.target` = _current_target(),
 ]() -> IntLiteral:
     """Returns the size of (in bits) of the type.
 
@@ -637,7 +652,8 @@ fn bitwidthof[
 
 @always_inline("nodebug")
 fn simdwidthof[
-    type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
+    type: AnyTrivialRegType,
+    target: __mlir_type.`!kgen.target` = _current_target(),
 ]() -> IntLiteral:
     """Returns the vector size of the type on the host system.
 

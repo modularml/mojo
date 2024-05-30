@@ -17,6 +17,7 @@
 from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
+    _isspace,
 )
 from testing import (
     assert_equal,
@@ -603,11 +604,53 @@ fn test_rfind() raises:
 
 
 fn test_split() raises:
-    # Reject empty delimiters
-    with assert_raises(
-        contains="empty delimiter not allowed to be passed to split."
-    ):
-        _ = String("hello").split("")
+    # empty separators default to whitespace
+    var d = String("hello world").split()
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello")
+    assert_true(d[1] == "world")
+    d = String("hello \t\n\n\v\fworld").split("\n")
+    assert_true(len(d) == 3)
+    assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
+
+    # Should add all whitespace-like chars as one
+    alias utf8_spaces = String(" \t\n\r\v\f")
+    var s = utf8_spaces + "hello" + utf8_spaces + "world" + utf8_spaces
+    d = s.split()
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello" and d[1] == "world")
+
+    # should split into empty strings between separators
+    d = String("1,,,3").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "1" and d[1] == "" and d[2] == "" and d[3] == "3")
+    d = String(",,,").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "" and d[2] == "" and d[3] == "")
+    d = String(" a b ").split(" ")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "a" and d[2] == "b" and d[3] == "")
+    d = String("abababaaba").split("aba")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "b" and d[2] == "" and d[3] == "")
+
+    # should split into maxsplit + 1 items
+    d = String("1,2,3").split(",", 0)
+    assert_true(len(d) == 1)
+    assert_true(d[0] == "1,2,3")
+    d = String("1,2,3").split(",", 1)
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "1" and d[1] == "2,3")
+
+    assert_true(len(String("").split()) == 0)
+    assert_true(len(String(" ").split()) == 0)
+    assert_true(len(String("").split(" ")) == 1)
+    assert_true(len(String(" ").split(" ")) == 2)
+    assert_true(len(String("  ").split(" ")) == 3)
+    assert_true(len(String("   ").split(" ")) == 4)
+
+    with assert_raises():
+        _ = String("").split("")
 
     # Split in middle
     var d1 = String("n")
@@ -641,6 +684,88 @@ fn test_split() raises:
     assert_equal(len(res4), 2)
     assert_equal(res4[0], "he")
     assert_equal(res4[1], "o")
+
+
+fn test_splitlines() raises:
+    # Test with no line breaks
+    var in1 = String("hello world")
+    var res1 = in1.splitlines()
+    assert_equal(len(res1), 1)
+    assert_equal(res1[0], "hello world")
+
+    # Test with \n line break
+    var in2 = String("hello\nworld")
+    var res2 = in2.splitlines()
+    assert_equal(len(res2), 2)
+    assert_equal(res2[0], "hello")
+    assert_equal(res2[1], "world")
+
+    # Test with \r\n line break
+    var in3 = String("hello\r\nworld")
+    var res3 = in3.splitlines()
+    assert_equal(len(res3), 2)
+    assert_equal(res3[0], "hello")
+    assert_equal(res3[1], "world")
+
+    # Test with \r line break
+    var in4 = String("hello\rworld")
+    var res4 = in4.splitlines()
+    assert_equal(len(res4), 2)
+    assert_equal(res4[0], "hello")
+    assert_equal(res4[1], "world")
+
+    # Test with multiple different line breaks
+    var in5 = String("hello\nworld\r\nmojo\rlanguage")
+    var res5 = in5.splitlines()
+    assert_equal(len(res5), 4)
+    assert_equal(res5[0], "hello")
+    assert_equal(res5[1], "world")
+    assert_equal(res5[2], "mojo")
+    assert_equal(res5[3], "language")
+
+    # Test with keepends=True
+    var res6 = in5.splitlines(keepends=True)
+    assert_equal(len(res6), 4)
+    assert_equal(res6[0], "hello\n")
+    assert_equal(res6[1], "world\r\n")
+    assert_equal(res6[2], "mojo\r")
+    assert_equal(res6[3], "language")
+
+    # Test with an empty string
+    var in7 = String("")
+    var res7 = in7.splitlines()
+    assert_equal(len(res7), 0)
+
+    # test \v \f \x1c \x1d
+    var in8 = String("hello\vworld\fmojo\x1clanguage\x1d")
+    var res8 = in8.splitlines()
+    assert_equal(len(res8), 4)
+    assert_equal(res8[0], "hello")
+    assert_equal(res8[1], "world")
+    assert_equal(res8[2], "mojo")
+    assert_equal(res8[3], "language")
+
+    # test \x1e \x85
+    var in9 = String("hello\x1eworld\x85mojo")
+    var res9 = in9.splitlines()
+    assert_equal(len(res9), 3)
+    assert_equal(res9[0], "hello")
+    assert_equal(res9[1], "world")
+    assert_equal(res9[2], "mojo")
+
+    # test with keepends=True
+    var res10 = in8.splitlines(keepends=True)
+    assert_equal(len(res10), 4)
+    assert_equal(res10[0], "hello\v")
+    assert_equal(res10[1], "world\f")
+    assert_equal(res10[2], "mojo\x1c")
+    assert_equal(res10[3], "language\x1d")
+
+    var res11 = in9.splitlines(keepends=True)
+    assert_equal(len(res11), 3)
+    assert_equal(res11[0], "hello\x1e")
+    assert_equal(res11[1], "world\x85")
+    assert_equal(res11[2], "mojo")
 
 
 fn test_isupper() raises:
@@ -693,29 +818,73 @@ fn test_upper() raises:
 
 fn test_isspace() raises:
     # checking true cases
-    assert_true(isspace(ord(" ")))
-    assert_true(isspace(ord("\n")))
-    assert_true(isspace(ord("\t")))
-    assert_true(isspace(ord("\r")))
-    assert_true(isspace(ord("\v")))
-    assert_true(isspace(ord("\f")))
+    assert_true(_isspace(ord(" ")))
+    assert_true(_isspace(ord("\n")))
+    assert_true(_isspace(ord("\t")))
+    assert_true(_isspace(ord("\r")))
+    assert_true(_isspace(ord("\v")))
+    assert_true(_isspace(ord("\f")))
 
     # Checking false cases
-    assert_false(isspace(ord("a")))
-    assert_false(isspace(ord("u")))
-    assert_false(isspace(ord("s")))
-    assert_false(isspace(ord("t")))
-    assert_false(isspace(ord("i")))
-    assert_false(isspace(ord("n")))
-    assert_false(isspace(ord("z")))
-    assert_false(isspace(ord(".")))
+    assert_false(_isspace(ord("a")))
+    assert_false(_isspace(ord("u")))
+    assert_false(_isspace(ord("s")))
+    assert_false(_isspace(ord("t")))
+    assert_false(_isspace(ord("i")))
+    assert_false(_isspace(ord("n")))
+    assert_false(_isspace(ord("z")))
+    assert_false(_isspace(ord(".")))
+
+    # test all utf8 and unicode separators
+    # 0 is to build a String with null terminator
+    alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
+    """TODO: \\x1c"""
+    alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
+    """TODO: \\x1e"""
+    alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+    """TODO: \\x85"""
+    alias unicode_line_sep = List[UInt8](
+        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
+    )
+    """TODO: \\u2028"""
+    alias unicode_paragraph_sep = List[UInt8](
+        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
+    )
+    """TODO: \\u2029"""
+    # TODO add line and paragraph separator as stringliteral once unicode
+    # escape secuences are accepted
+    var univ_sep_var = List[String](
+        String(" "),
+        String("\t"),
+        String("\n"),
+        String("\r"),
+        String("\v"),
+        String("\f"),
+        String(next_line),
+        String(information_sep_four),
+        String(information_sep_two),
+        String(unicode_line_sep),
+        String(unicode_paragraph_sep),
+    )
+
+    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0):
+        var val = String(List[UInt8](b[], 0))
+        if not (val in univ_sep_var):
+            assert_false(val.isspace())
+
+    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0):
+        var val = String(List[UInt8](b[], 0))
+        if not (val in univ_sep_var):
+            assert_false(val.isspace())
+
+    for i in univ_sep_var:
+        assert_true(i[].isspace())
+
+    for i in List[String]("not", "space", "", "s", "a", "c"):
+        assert_false(i[].isspace())
 
 
 fn test_ascii_aliases() raises:
-    var whitespaces = String(" \n\t\r\f\v")
-    for i in range(len(whitespaces)):
-        assert_true(whitespaces[i] in String.WHITESPACE)
-
     assert_true(String("a") in String.ASCII_LOWERCASE)
     assert_true(String("b") in String.ASCII_LOWERCASE)
     assert_true(String("y") in String.ASCII_LOWERCASE)
@@ -941,6 +1110,7 @@ def main():
     test_replace()
     test_rfind()
     test_split()
+    test_splitlines()
     test_isupper()
     test_islower()
     test_lower()

@@ -216,7 +216,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     @always_inline
     fn __contains__[
         T2: ComparableCollectionElement
-    ](self: List[T2], value: T) -> Bool:
+    ](self: List[T], value: T2) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -236,7 +236,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
         for i in self:
-            if i[] == rebind[T2](value):
+            if rebind[Reference[T2, False, __lifetime_of(self)]](i)[] == value:
                 return True
         return False
 
@@ -739,13 +739,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
 
         var adjusted_span = self._adjust_span(span)
-        var adjusted_span_len = len(adjusted_span)
+        var adjusted_span_len = adjusted_span.unsafe_indices()
 
         if not adjusted_span_len:
             return Self()
 
-        var res = Self(capacity=len(adjusted_span))
-        for i in range(len(adjusted_span)):
+        var res = Self(capacity=adjusted_span_len)
+        for i in range(adjusted_span_len):
             res.append(self[adjusted_span[i]])
 
         return res^
@@ -791,24 +791,19 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return self[].unsafe_get(normalized_idx)
 
     @always_inline
-    fn unsafe_get[
-        IndexerType: Indexer,
-    ](self: Reference[Self, _, _], idx: IndexerType) -> Reference[
-        Self.T, self.is_mutable, self.lifetime
-    ]:
+    fn unsafe_get(
+        self: Reference[Self, _, _], idx: Int
+    ) -> Reference[Self.T, self.is_mutable, self.lifetime]:
         """Get a reference to an element of self without checking index bounds.
 
-        Users should consider using `__getitem__` instead of this method as it is unsafe.
-        If an index is out of bounds, this method will not abort, it will be considered
-        undefined behavior.
+        Users should consider using `__getitem__` instead of this method as it
+        is unsafe. If an index is out of bounds, this method will not abort, it
+        will be considered undefined behavior.
 
-        Note that there is no wraparound for negative indices, caution is advised.
-        Using negative indices is considered undefined behavior.
-        Never use `my_list.unsafe_get(-1)` to get the last element of the list. It will not work.
+        Note that there is no wraparound for negative indices, caution is
+        advised. Using negative indices is considered undefined behavior. Never
+        use `my_list.unsafe_get(-1)` to get the last element of the list.
         Instead, do `my_list.unsafe_get(len(my_list) - 1)`.
-
-        Parameters:
-            IndexerType: The type of the argument used as index.
 
         Args:
             idx: The index of the element to get.
@@ -816,15 +811,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A reference to the element at the given index.
         """
-        var idx_as_int = index(idx)
         debug_assert(
-            0 <= idx_as_int < len(self[]),
+            0 <= idx < len(self[]),
             (
                 "The index provided must be within the range [0, len(List) -1]"
                 " when using List.unsafe_get()"
             ),
         )
-        return (self[].data + idx_as_int)[]
+        return (self[].data + idx)[]
 
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.

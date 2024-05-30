@@ -29,7 +29,7 @@ from utils import InlineArray
 
 @value
 struct _VecIter[
-    type: AnyRegType,
+    type: AnyTrivialRegType,
     vec_type: AnyType,
     deref: fn (UnsafePointer[vec_type], Int) -> type,
 ](Sized):
@@ -53,7 +53,7 @@ struct _VecIter[
 
 
 @always_inline
-fn _calculate_fixed_vector_default_size[type: AnyRegType]() -> Int:
+fn _calculate_fixed_vector_default_size[type: AnyTrivialRegType]() -> Int:
     alias prefered_bytecount = 64
     alias sizeof_type = sizeof[type]()
 
@@ -69,7 +69,8 @@ fn _calculate_fixed_vector_default_size[type: AnyRegType]() -> Int:
 
 
 struct InlinedFixedVector[
-    type: AnyRegType, size: Int = _calculate_fixed_vector_default_size[type]()
+    type: AnyTrivialRegType,
+    size: Int = _calculate_fixed_vector_default_size[type](),
 ](Sized):
     """A dynamically-allocated vector with small-vector optimization and a fixed
     maximum capacity.

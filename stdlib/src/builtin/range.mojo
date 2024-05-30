@@ -26,6 +26,7 @@ from builtin._stubs import _IntIterable, _StridedIterable
 # ===----------------------------------------------------------------------=== #
 
 
+# TODO: use math.ceildiv when open sourced.
 @always_inline
 fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
     """Divides an integer by another integer, and round up to the nearest

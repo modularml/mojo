@@ -66,9 +66,9 @@ struct _ImmutableString:
 
 
 struct _RefCountedList:
-    """Python objects have the behaviour that bool, int, float, and str are
+    """Python objects have the behavior that bool, int, float, and str are
     passed by value but lists and dictionaries are passed by reference. In order
-    to model this behaviour, lists and dictionaries are implemented as
+    to model this behavior, lists and dictionaries are implemented as
     ref-counted data types.
     """
 
@@ -198,7 +198,7 @@ struct _Function:
     """The function pointer."""
 
     @always_inline
-    fn __init__[FnT: AnyRegType](inout self, value: FnT):
+    fn __init__[FnT: AnyTrivialRegType](inout self, value: FnT):
         # FIXME: No "pointer bitcast" for signature function pointers.
         var f = UnsafePointer[Int16]()
         UnsafePointer.address_of(f).bitcast[FnT]()[] = value
@@ -509,7 +509,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
     fn coerce_arithmetic_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
         """Coerces two values of arithmetic type to the appropriate
         lowest-common denominator type for performing arithmetic operations.
-        Bools are always converted to integers, to match Python's behaviour.
+        Bools are always converted to integers, to match Python's behavior.
         """
         if lhs.is_bool():
             lhs = lhs.convert_bool_to_int()
@@ -1288,17 +1288,17 @@ struct object(IntableRaising, Boolable, Stringable):
         )
 
     @always_inline
-    fn __pow__(self, rhs: object) raises -> object:
+    fn __pow__(self, exp: object) raises -> object:
         """Exponentiation operator. Valid only for arithmetic types.
 
         Args:
-            rhs: Right hand value.
+            exp: Exponent value.
 
         Returns:
             The left hand value raised to the power of the right hand value.
         """
         return Self._arithmetic_binary_op[Float64.__pow__, Int64.__pow__](
-            self, rhs
+            self, exp
         )
 
     @always_inline
