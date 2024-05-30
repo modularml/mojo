@@ -176,7 +176,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         self.capacity_left = existing.capacity_left
 
     fn __init__(
-        inout self: Self,
+        inout self,
         *,
         unsafe_pointer: UnsafePointer[Self._scalar_type],
         length: Int,
@@ -197,10 +197,10 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     # FIXME
     fn __init__[
         size: Int
-    ](inout self: Self, *, unsafe_pointer: UnsafePointer[Self._scalar_type]):
+    ](inout self, *, unsafe_pointer: UnsafePointer[Self._scalar_type]):
         """Constructs an Array from a pointer and its size.
 
-        Parameter:
+        Parameters:
             size: The number of elements pointed to.
 
         Args:
