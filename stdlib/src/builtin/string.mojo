@@ -582,6 +582,7 @@ fn _isspace(c: UInt8) -> Bool:
         True iff the character is one of the whitespace characters listed above.
     """
 
+    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
     alias ` ` = UInt8(ord(" "))
     alias `\t` = UInt8(ord("\t"))
     alias `\n` = UInt8(ord("\n"))
@@ -605,27 +606,34 @@ fn _isspace(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_newlines_table() -> InlineArray[UInt8, 128]:
-    var table = InlineArray[UInt8, 128](0)
-    table[ord("\n")] = 1
-    table[ord("\r")] = 1
-    table[ord("\f")] = 1
-    table[ord("\v")] = 1
-    table[ord("\x1c")] = 1
-    table[ord("\x1d")] = 1
-    table[ord("\x1e")] = 1
-    return table
+fn _isnewline(s: String) -> Bool:
+    if len(s._buffer) != 2:
+        return False
 
-
-alias _NEWLINES_TABLE = _get_newlines_table()
-
-
-fn _isnewline(c: String) -> Bool:
     # TODO: add \u2028 and \u2029 when they are properly parsed
     # FIXME: \x85 is parsed but not encoded in utf-8
-    if len(c._buffer) == 2:
-        return c == "\x85" or _NEWLINES_TABLE[ord(c)]
-    return False
+    if s == "\x85":
+        return True
+
+    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
+    alias `\n` = UInt8(ord("\n"))
+    alias `\r` = UInt8(ord("\r"))
+    alias `\f` = UInt8(ord("\f"))
+    alias `\v` = UInt8(ord("\v"))
+    alias `\x1c` = UInt8(ord("\x1c"))
+    alias `\x1d` = UInt8(ord("\x1d"))
+    alias `\x1e` = UInt8(ord("\x1e"))
+
+    var c = UInt8(ord(s))
+    return (
+        c == `\n`
+        or c == `\r`
+        or c == `\f`
+        or c == `\v`
+        or c == `\x1c`
+        or c == `\x1d`
+        or c == `\x1e`
+    )
 
 
 # ===----------------------------------------------------------------------=== #
