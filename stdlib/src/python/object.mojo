@@ -58,16 +58,16 @@ struct _PyIter(Sized):
         var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
         if maybeNextItem.is_null():
             self.isDone = True
-            self.preparedNextItem = PyObjectPtr.null_ptr()
+            self.preparedNextItem = PyObjectPtr()
         else:
             self.preparedNextItem = maybeNextItem
             self.isDone = False
 
     fn __init__(inout self):
         """Initialize an empty iterator."""
-        self.iterator = PyObjectPtr.null_ptr()
+        self.iterator = PyObjectPtr()
         self.isDone = True
-        self.preparedNextItem = PyObjectPtr.null_ptr()
+        self.preparedNextItem = PyObjectPtr()
 
     fn __next__(inout self: _PyIter) -> PythonObject:
         """Return the next item and update to point to subsequent item.
@@ -345,7 +345,7 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         if not self.py_object.is_null():
             cpython.Py_DecRef(self.py_object)
-        self.py_object = PyObjectPtr.null_ptr()
+        self.py_object = PyObjectPtr()
 
     fn __getattr__(self, name: StringLiteral) raises -> PythonObject:
         """Return the value of the object attribute with the given name.
