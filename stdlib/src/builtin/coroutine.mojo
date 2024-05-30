@@ -81,7 +81,11 @@ fn _coro_resume_noop_callback(handle: AnyCoroutine, null: AnyCoroutine):
 
 
 @register_passable
-struct Coroutine[type: AnyTrivialRegType]:
+struct Coroutine[
+    is_mut: Bool, //,
+    type: AnyTrivialRegType,
+    lifetime: AnyLifetime[is_mut].type,
+]:
     """Represents a coroutine.
 
     Coroutines can pause execution saving the state of the program (including
@@ -90,7 +94,9 @@ struct Coroutine[type: AnyTrivialRegType]:
     left off, with the saved state restored.
 
     Parameters:
+        is_mut: Whether the lifetime is mutable.
         type: Type of value returned upon completion of the coroutine.
+        lifetime: The lifetime of the coroutine's captures.
     """
 
     var _handle: AnyCoroutine
@@ -123,7 +129,7 @@ struct Coroutine[type: AnyTrivialRegType]:
         return __mlir_op.`co.get_results`[_type=type](self._handle)
 
     @always_inline
-    fn __init__(handle: AnyCoroutine) -> Coroutine[type]:
+    fn __init__(handle: AnyCoroutine) -> Self:
         """Construct a coroutine object from a handle.
 
         Args:
@@ -178,7 +184,11 @@ struct Coroutine[type: AnyTrivialRegType]:
 
 
 @register_passable
-struct RaisingCoroutine[type: AnyTrivialRegType]:
+struct RaisingCoroutine[
+    is_mut: Bool, //,
+    type: AnyTrivialRegType,
+    lifetime: AnyLifetime[is_mut].type,
+]:
     """Represents a coroutine that can raise.
 
     Coroutines can pause execution saving the state of the program (including
@@ -187,7 +197,9 @@ struct RaisingCoroutine[type: AnyTrivialRegType]:
     left off, with the saved state restored.
 
     Parameters:
+        is_mut: Whether the lifetime is mutable.
         type: Type of value returned upon completion of the coroutine.
+        lifetime: The lifetime of the coroutine's captures.
     """
 
     alias _var_type = __mlir_type[`!kgen.variant<`, Error, `, `, type, `>`]

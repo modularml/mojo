@@ -472,6 +472,12 @@ what we publish.
 
 ### 🦋 Changed
 
+- `Coroutine` now requires a lifetime parameter. This parameter is set
+  automatically by the parser when calling an async function. It contains the
+  lifetimes of all the arguments and any lifetime accesses by the arguments.
+  This ensures that argument captures by async functions keep the arguments
+  alive as long as the coroutine is alive.
+
 - Async function calls are no longer allowed to borrow non-trivial
   register-passable types. Because async functions capture their arguments but
   register-passable types don't have lifetimes (yet), Mojo is not able to
