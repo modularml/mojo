@@ -33,7 +33,15 @@ from memory import UnsafePointer, bitcast
 # ===----------------------------------------------------------------------=== #
 
 
-struct FPUtils[type: DType]:
+fn _constrain_fp_type[type: DType]():
+    constrained[
+        type.is_floating_point(), "dtype must be a floating point type"
+    ]()
+
+
+struct FPUtils[
+    type: DType, *, _constraint: NoneType = _constrain_fp_type[type]()
+]:
     """Collection of utility functions for working with FP values.
 
     Constraints:
@@ -41,6 +49,7 @@ struct FPUtils[type: DType]:
 
     Parameters:
         type: The concrete FP dtype (FP32/FP64/etc).
+        _constraint: Implements the constraint. Do not pass explicitly.
     """
 
     alias integral_type = _integral_type_of[type]()
@@ -54,10 +63,6 @@ struct FPUtils[type: DType]:
         Returns:
             The mantissa width.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
 
         @parameter
         if type == DType.float16:
@@ -67,7 +72,7 @@ struct FPUtils[type: DType]:
         elif type == DType.float32:
             return 23
         else:
-            constrained[type == DType.float64, "unsupported DType"]()
+            constrained[type == DType.float64, "unsupported float type"]()
             return 52
 
     @staticmethod
@@ -78,10 +83,6 @@ struct FPUtils[type: DType]:
         Returns:
             The max exponent.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
 
         @parameter
         if type == DType.float16:
@@ -89,7 +90,7 @@ struct FPUtils[type: DType]:
         elif type == DType.float32 or type == DType.bfloat16:
             return 128
         else:
-            constrained[type == DType.float64, "unsupported DType"]()
+            constrained[type == DType.float64, "unsupported float type"]()
             return 1024
 
     @staticmethod
@@ -100,10 +101,6 @@ struct FPUtils[type: DType]:
         Returns:
             The exponent width.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
 
         @parameter
         if type == DType.float16:
@@ -111,7 +108,7 @@ struct FPUtils[type: DType]:
         elif type == DType.float32 or type == DType.bfloat16:
             return 8
         else:
-            constrained[type == DType.float64, "unsupported DType"]()
+            constrained[type == DType.float64, "unsupported float type"]()
             return 11
 
     @staticmethod
@@ -200,10 +197,6 @@ struct FPUtils[type: DType]:
         Returns:
             An integer representation of the floating-point value.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
         return int(bitcast[Self.integral_type, 1](value))
 
     @staticmethod
@@ -217,10 +210,6 @@ struct FPUtils[type: DType]:
         Returns:
             An floating-point representation of the Int.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
         return bitcast[type, 1](SIMD[Self.integral_type, 1](value))
 
     @staticmethod
