@@ -548,6 +548,9 @@ what we publish.
 - `String.split()` now defaults to whitespace and has pythonic behavior in that
   it removes all adjacent whitespaces by default.
 
+- `String` now has a `String.__iter__()` method which returns a `StringRef`
+  on every iteration with the corresponding utf8 character length.
+
 - Added `UnsafePointer.offset()` method.
 
 - The `math.bit` module has been moved to a new top-level `bit` module. The
