@@ -97,8 +97,10 @@ struct _UnionTypeIndex[T: CollectionElement, *Ts: CollectionElement]:
         return result
 
 
-@value
-struct Variant[*Ts: CollectionElement](CollectionElement):
+struct Variant[*Ts: CollectionElement](
+    CollectionElement,
+    ExplicitlyCopyable,
+):
     """A runtime-variant type.
 
     Data for this type is stored internally. Currently, its size is the
@@ -150,6 +152,14 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
+    fn __init__(inout self, *, unsafe_uninitialized: ()):
+        """Unsafely create an uninitialized Variant.
+
+        Args:
+            unsafe_uninitialized: Marker argument indicating this initializer is unsafe.
+        """
+        self._impl = __mlir_attr[`#kgen.unknown : `, Self._mlir_type]
+
     fn __init__[T: CollectionElement](inout self, owned value: T):
         """Create a variant with one of the types.
 
@@ -164,13 +174,13 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         self._get_state()[] = Self._check[T]()
         initialize_pointee_move(self._get_ptr[T](), value^)
 
-    fn __copyinit__(inout self, other: Self):
-        """Creates a deep copy of an existing variant.
+    fn __init__(inout self, other: Self):
+        """Explicitly creates a deep copy of an existing variant.
 
         Args:
-            other: The variant to copy from.
+            other: The value to copy from.
         """
-        self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
+        self = Self(unsafe_uninitialized=())
         self._get_state()[] = other._get_state()[]
 
         @parameter
@@ -183,6 +193,16 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
                 )
 
         unroll[each, len(VariadicList(Ts))]()
+
+    fn __copyinit__(inout self, other: Self):
+        """Creates a deep copy of an existing variant.
+
+        Args:
+            other: The variant to copy from.
+        """
+
+        # Delegate to explicit copy initializer.
+        self = Self(other=other)
 
     fn __moveinit__(inout self, owned other: Self):
         """Move initializer for the variant.

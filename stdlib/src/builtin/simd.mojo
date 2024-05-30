@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-
+from bit import pop_count
 from sys import (
     llvm_intrinsic,
     has_neon,
@@ -2408,23 +2408,24 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](self)
 
     @always_inline
-    fn _reduce_all(self) -> Bool:
-        """Returns whether **all** elements in this vector are non-zero.
+    fn reduce_bit_count(self) -> Int:
+        """Returns the total number of bits set in the SIMD vector.
+
+        Constraints:
+            Must be either an integral or a boolean type.
 
         Returns:
-            `True` if and only if **all** elements in this vector are non-zero.
+            Count of set bits across all elements of the vector.
         """
-        return self.cast[DType.bool]().reduce_and()
 
-    @always_inline
-    fn _reduce_any(self) -> Bool:
-        """Returns whether this vector contains **any** non-zero elements.
-
-        Returns:
-            `True` if this vector contains **any** non-zero elements, `False`
-            otherwise.
-        """
-        return self.cast[DType.bool]().reduce_or()
+        @parameter
+        if type.is_bool():
+            return int(self.cast[DType.uint8]().reduce_add())
+        else:
+            constrained[
+                type.is_integral(), "Expected either integral or bool type"
+            ]()
+            return int(pop_count(self).reduce_add())
 
     # ===------------------------------------------------------------------=== #
     # select

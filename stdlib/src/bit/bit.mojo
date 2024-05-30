@@ -303,13 +303,13 @@ fn bit_width[
 
 
 # ===----------------------------------------------------------------------===#
-# has_single_bit
+# is_power_of_two
 # ===----------------------------------------------------------------------===#
 # reference: https://en.cppreference.com/w/cpp/numeric/has_single_bit
 
 
 @always_inline
-fn has_single_bit(val: Int) -> Bool:
+fn is_power_of_two(val: Int) -> Bool:
     """Checks if the input value is a power of 2.
 
     Args:
@@ -318,11 +318,11 @@ fn has_single_bit(val: Int) -> Bool:
     Returns:
         True if the input value is a power of 2, False otherwise.
     """
-    return val > 0 and not (val & (val - 1))
+    return (val != 0) & (val & (val - 1) == 0)
 
 
 @always_inline
-fn has_single_bit[
+fn is_power_of_two[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[DType.bool, simd_width]:
     """Checks if the input value is a power of 2 for each element of a SIMD vector.
@@ -343,7 +343,7 @@ fn has_single_bit[
     """
     constrained[type.is_integral(), "must be integral"]()
 
-    return (val > 0) & ((val & (val - 1)) == 0)
+    return (val != 0) & (val & (val - 1) == 0)
 
 
 # ===----------------------------------------------------------------------===#
@@ -366,7 +366,7 @@ fn bit_ceil(val: Int) -> Int:
     if val <= 1:
         return 1
 
-    if has_single_bit(val):
+    if is_power_of_two(val):
         return val
 
     return 1 << bit_width(val - 1)
