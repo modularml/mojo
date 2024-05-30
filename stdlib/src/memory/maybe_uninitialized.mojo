@@ -25,7 +25,7 @@ struct _MaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
 
     @always_inline
     fn __init__(inout self):
-        """The mpemory is now considered uninitialized."""
+        """The memory is now considered uninitialized."""
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
