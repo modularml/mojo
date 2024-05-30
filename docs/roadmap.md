@@ -210,7 +210,7 @@ to use right now.
 ## Traits support
 
 As of v0.6.0 Mojo has basic support for
-[traits](/docs/manual/traits.html#built-in-traits). Traits allow you
+[traits](/mojo/manual/traits.html#built-in-traits). Traits allow you
 to specify a set of requirements for types to implement. Types can implement
 those requirements to *conform to* the trait. Traits allow you to write
 generic functions and generic containers, which can work with any type that
@@ -221,7 +221,7 @@ Currently, the only kind of requirements supported by traits are required method
 signatures. The trait can't provide a default implementation for its required
 methods, so each conforming type must implement all of the required methods.
 
-A number of [built-in traits](/docs/manual/traits.html#built-in-traits) are
+A number of [built-in traits](/mojo/manual/traits.html#built-in-traits) are
 already implemented in the standard library.
 
 We plan to expand traits support in future releases. Planned features include:
