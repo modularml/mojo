@@ -313,6 +313,9 @@ what we publish.
 
 - Add new `memcpy` overload for `UnsafePointer[Scalar[_]]` pointers.
 
+- Removed the `UnsafePointer[T].get_null()` method (and from other pointers),
+  please use the default constructor instead: `UnsafePointer[T]()`.
+
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
 
