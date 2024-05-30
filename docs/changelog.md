@@ -352,6 +352,11 @@ what we publish.
 - `List()` now supports `__contains__`.
     ([PR #2667](https://github.com/modularml/mojo/pull/2667) by [@rd4com](https://github.com/rd4com/))
 
+- Added a new [`InlineList`](/mojo/stdlib/collections/inline_list/InlineList)
+  type, a stack-allocated list with a static maximum size.
+  ([PR 2587#](https://github.com/modularml/mojo/pull/2587) by
+  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
 - `InlineList()` now supports `__contains__`, `__iter__`.
     ([PR #2703](https://github.com/modularml/mojo/pull/2703) by [@ChristopherLR](https://github.com/ChristopherLR))
 
