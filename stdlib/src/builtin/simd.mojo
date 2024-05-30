@@ -48,6 +48,7 @@ from .dtype import (
 )
 from .io import _snprintf_scalar, _printf, _print_fmt
 from .string import _calc_initial_buffer_size, _calc_format_buffer_size
+from builtin._hasher import _Hasher, _HashableWithHasher
 
 # ===----------------------------------------------------------------------=== #
 # Type Aliases
@@ -145,6 +146,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Stringable,
     Truncable,
     Representable,
+    _HashableWithHasher,
 ):
     """Represents a small vector that is backed by a hardware vector element.
 
@@ -1916,6 +1918,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             builtin documentation for more details.
         """
         return _hash_simd(self)
+
+    fn __hash__[H: _Hasher](self, inout hasher: H):
+        hasher._update_with_simd(self)
 
     @always_inline("nodebug")
     fn slice[
