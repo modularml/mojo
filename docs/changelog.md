@@ -633,6 +633,13 @@ what we publish.
   - `reduce_bit_count`; use the new `SIMD.reduce_bit_count` directly.
   - `rint` and `nearbyint`; use `round` or `SIMD.roundeven` as appropriate.
 
+- The `EvaluationMethod` has been removed from `math.polynomial` and Estrin's
+  method is no longer available. This method was limited to degree 10 or less,
+  underutilized, and its performance unclear. In the future, this might be
+  reintroduced with an improved implementation if needed, when better
+  performance benchmarking infrastructure is available. The default behavior of
+  `math.polynomial.polynomial_evaluate` is unchanged (Horner's method).
+
 - The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
   same functionality is available in the builtin `SIMD.select` and
   `SIMD.__and__` methods, respectively.
