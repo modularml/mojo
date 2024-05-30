@@ -330,6 +330,11 @@ what we publish.
   whitespace, ASCII lower/uppercase, and so on.
     ([PR #2555](https://github.com/modularml/mojo/pull/2555) by [@toiletsandpaper](https://github.com/toiletsandpaper))
 
+- `String` now has a `splitlines()` method, which allows splitting strings at line
+  boundaries. This method supports [universal newlines](https://docs.python.org/3/glossary.html#term-universal-newlines)
+  and provides an option to retain or remove the line break characters.
+    ([PR #2810](https://github.com/modularml/mojo/pull/2810)) by [@YichengDWu](https://github.com/YichengDWu)
+
 - `List` has a simplified syntax to call the `count` method: `my_list.count(x)`.
     ([PR #2675](https://github.com/modularml/mojo/pull/2675) by [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
@@ -467,6 +472,12 @@ what we publish.
 
 ### 🦋 Changed
 
+- `Coroutine` now requires a lifetime parameter. This parameter is set
+  automatically by the parser when calling an async function. It contains the
+  lifetimes of all the arguments and any lifetime accesses by the arguments.
+  This ensures that argument captures by async functions keep the arguments
+  alive as long as the coroutine is alive.
+
 - Async function calls are no longer allowed to borrow non-trivial
   register-passable types. Because async functions capture their arguments but
   register-passable types don't have lifetimes (yet), Mojo is not able to
@@ -566,6 +577,9 @@ what we publish.
   method. This makes it explicit that this implementation does not check if the
   slice bounds are concrete or within any given object's length.
 
+- Implicit conversion to `String` is now removed for builtin classes/types.
+  One should use `str(...)` explicitly to convert to `String`.
+
 - `math.gcd` now works on negative inputs, and like Python's implementation,
   accepts a variadic list of integers. New overloads for a `List` or `Span`of
   integers are also added.
@@ -605,6 +619,9 @@ what we publish.
     `bit.rotate_bits_{left,right}` methods for `Int`.
   - an overload of `math.pow` taking an integer parameter exponent.
   - `align_down_residual`; it can be trivially implemented using `align_down`.
+  - `all_true`, `any_true`, and `none_true`; use `SIMD.reduce_and` and
+    `SIMD.reduce_or` directly.
+  - `reduce_bit_count`; use the new `SIMD.reduce_bit_count` directly.
 
 - The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
   same functionality is available in the builtin `SIMD.select` and

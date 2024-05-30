@@ -5,6 +5,9 @@
 
 # Documentation
 /docs/         @modularml/mojo-docs
+
+/docs/changelog.md @modularml/mojo-standard-library
+
 /stdlib/docs/  @modularml/mojo-docs @modularml/mojo-standard-library
 
 # Examples

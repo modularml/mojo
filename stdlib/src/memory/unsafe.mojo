@@ -30,27 +30,10 @@ from sys import (
 from sys.intrinsics import PrefetchOptions, _mlirtype_is_eq
 from sys.intrinsics import prefetch as _prefetch
 from sys.intrinsics import gather, scatter, strided_load, strided_store
+from bit import is_power_of_two
 
 from .memory import _free, _malloc
 from .reference import AddressSpace
-
-# ===----------------------------------------------------------------------===#
-# Utilities
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _is_power_of_2(val: Int) -> Bool:
-    """Checks whether an integer is a power of two.
-
-    Args:
-      val: The integer to check.
-
-    Returns:
-      True if val is a power of two, otherwise False.
-    """
-    return (val & (val - 1) == 0) & (val != 0)
-
 
 # ===----------------------------------------------------------------------===#
 # bitcast
@@ -1110,7 +1093,7 @@ struct DTypePointer[
             "offset type must be an integral type",
         ]()
         constrained[
-            _is_power_of_2(alignment),
+            is_power_of_two(alignment),
             "alignment must be a power of two integer value",
         ]()
 
@@ -1188,7 +1171,7 @@ struct DTypePointer[
             "offset type must be an integral type",
         ]()
         constrained[
-            _is_power_of_2(alignment),
+            is_power_of_two(alignment),
             "alignment must be a power of two integer value",
         ]()
 
@@ -1216,7 +1199,7 @@ struct DTypePointer[
             otherwise.
         """
         constrained[
-            _is_power_of_2(alignment), "alignment must be a power of 2."
+            is_power_of_two(alignment), "alignment must be a power of 2."
         ]()
         return int(self) % alignment == 0
 
