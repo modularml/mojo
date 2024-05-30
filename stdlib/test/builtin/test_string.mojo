@@ -699,6 +699,29 @@ fn test_split() raises:
     assert_equal(res4[0], "he")
     assert_equal(res4[1], "o")
 
+    # related to #2879
+    # TODO: replace string comparison when __eq__ is implemented for List
+    assert_equal(
+        String("abbaaaabbba").split("a").__str__(),
+        "['', 'bb', '', '', '', 'bbb', '']",
+    )
+    assert_equal(
+        String("abbaaaabbba").split("a", 8).__str__(),
+        "['', 'bb', '', '', '', 'bbb', '']",
+    )
+    assert_equal(
+        String("abbaaaabbba").split("a", 5).__str__(),
+        "['', 'bb', '', '', '', 'bbba']",
+    )
+    assert_equal(String("aaa").split("a", 0).__str__(), "['aaa']")
+    assert_equal(String("a").split("a").__str__(), "['', '']")
+    assert_equal(String("1,2,3").split("3", 0).__str__(), "['1,2,3']")
+    assert_equal(String("1,2,3").split("3", 1).__str__(), "['1,2,', '']")
+    assert_equal(String("1,2,3,3").split("3", 2).__str__(), "['1,2,', ',', '']")
+    assert_equal(
+        String("1,2,3,3,3").split("3", 2).__str__(), "['1,2,', ',', ',3']"
+    )
+
 
 fn test_splitlines() raises:
     # Test with no line breaks

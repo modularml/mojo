@@ -1631,7 +1631,7 @@ struct String(
             output.append(self[lhs:rhs])
             lhs = rhs + sep_len
 
-        if self.endswith(sep):
+        if self.endswith(sep) and (len(output) <= maxsplit or maxsplit == -1):
             output.append("")
         return output
 
