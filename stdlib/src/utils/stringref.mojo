@@ -680,25 +680,40 @@ fn _memmem[
         return _memchr[type](haystack, needle[0], haystack_len)
 
     alias bool_mask_width = simdwidthof[DType.bool]()
-    var first_needle = SIMD[type, bool_mask_width](needle[0])
     var vectorized_end = _align_down(
         haystack_len - needle_len + 1, bool_mask_width
     )
+
+    var first_needle = SIMD[type, bool_mask_width](needle[0])
+    var last_needle = SIMD[type, bool_mask_width](needle[needle_len - 1])
+
     for i in range(0, vectorized_end, bool_mask_width):
-        var bool_mask = haystack.load[width=bool_mask_width](i) == first_needle
+        var first_block = haystack.load[width=bool_mask_width](i)
+        var last_block = haystack.load[width=bool_mask_width](
+            i + needle_len - 1
+        )
+
+        var eq_first = first_needle == first_block
+        var eq_last = last_needle == last_block
+
+        var bool_mask = eq_first & eq_last
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
+
         while mask:
             var offset = i + countr_zero(mask)
             if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
                 return haystack + offset
             mask = mask & (mask - 1)
 
+    # remaining partial block compare using byte-by-byte
+    #
     for i in range(vectorized_end, haystack_len - needle_len + 1):
         if haystack[i] != needle[0]:
             continue
 
         if memcmp(haystack + i + 1, needle + 1, needle_len - 1) == 0:
             return haystack + i
+
     return DTypePointer[type]()
 
 

@@ -103,10 +103,23 @@ def test_basic():
 def test_copy():
     var v1 = TestVariant(TestCounter())
     var v2 = v1
-    assert_true(
-        v2[TestCounter].copied > v1[TestCounter].copied,
-        "didn't call copyinit",
-    )
+    # didn't call copyinit
+    assert_equal(v1[TestCounter].copied, 0)
+    assert_equal(v2[TestCounter].copied, 1)
+    # test that we didn't call the other copyinit too!
+    assert_no_poison()
+
+
+def test_explicit_copy():
+    var v1 = TestVariant(TestCounter())
+
+    # Perform explicit copy
+    var v2 = TestVariant(other=v1)
+
+    # Test copy counts
+    assert_equal(v1[TestCounter].copied, 0)
+    assert_equal(v2[TestCounter].copied, 1)
+
     # test that we didn't call the other copyinit too!
     assert_no_poison()
 
@@ -114,10 +127,9 @@ def test_copy():
 def test_move():
     var v1 = TestVariant(TestCounter())
     var v2 = v1
-    assert_true(
-        v2[TestCounter].moved > v1[TestCounter].moved,
-        "didn't call moveinit",
-    )
+    # didn't call moveinit
+    assert_equal(v1[TestCounter].moved, 1)
+    assert_equal(v2[TestCounter].moved, 2)
     # test that we didn't call the other moveinit too!
     assert_no_poison()
 
@@ -198,6 +210,7 @@ def main():
     test_basic()
     test_get_returns_mutable_reference()
     test_copy()
+    test_explicit_copy()
     test_move()
     test_del()
     test_take_doesnt_call_deleter()
