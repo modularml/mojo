@@ -118,6 +118,9 @@ struct StringSlice[
     fn __str__(self) -> String:
         return String(str_slice=self)
 
+    fn __len__(self) -> Int:
+        return self._byte_length()
+
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#

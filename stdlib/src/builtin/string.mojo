@@ -671,13 +671,17 @@ fn _utf8_byte_type(b: UInt8) -> UInt8:
         return 4  # is 4 byte long
 
 
-# FIXME: this assumes utf8 encoding
-# TODO: this should extend the string's lifetime
 @value
-struct _StringIter[forward: Bool = True]:
+struct _StringIter[
+    is_mutable: Bool,
+    lifetime: AnyLifetime[is_mutable].type,
+    forward: Bool = True,
+]:
     """Iterator for String.
 
     Parameters:
+        is_mutable: Whether the slice is mutable.
+        lifetime: The lifetime of the underlying string data.
         forward: The iteration direction. `False` is backwards.
     """
 
@@ -698,7 +702,7 @@ struct _StringIter[forward: Bool = True]:
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> StringRef:
+    fn __next__(inout self) -> StringSlice[is_mutable, lifetime]:
         @parameter
         if forward:
             var byte_len = 1
@@ -708,7 +712,10 @@ struct _StringIter[forward: Bool = True]:
                     byte_len = int(value)
                     self.continuation_bytes -= int(value) - 1
             self.index += byte_len
-            return StringRef(self.ptr.offset(self.index - byte_len), byte_len)
+            return StringSlice[is_mutable, lifetime](
+                unsafe_from_utf8_ptr=self.ptr.offset(self.index - byte_len),
+                len=byte_len,
+            )
         else:
             var byte_len = 1
             if self.continuation_bytes > 0:
@@ -720,7 +727,9 @@ struct _StringIter[forward: Bool = True]:
                         value = _utf8_byte_type(b)
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
-            return StringRef(self.ptr.offset(self.index), byte_len)
+            return StringSlice[is_mutable, lifetime](
+                unsafe_from_utf8_ptr=self.ptr.offset(self.index), len=byte_len
+            )
 
     fn __len__(self) -> Int:
         @parameter
@@ -1156,21 +1165,29 @@ struct String(
             count=other_len + 1,
         )
 
-    fn __iter__(self) -> _StringIter:
+    fn __iter__(
+        self: Reference[Self, _, _]
+    ) -> _StringIter[self.is_mutable, self.lifetime]:
         """Iterate over elements of the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringIter(self.unsafe_uint8_ptr(), len(self))
+        return _StringIter[self.is_mutable, self.lifetime](
+            self[].unsafe_uint8_ptr(), len(self[])
+        )
 
-    fn __reversed__(self) -> _StringIter[False]:
+    fn __reversed__(
+        self: Reference[Self, _, _]
+    ) -> _StringIter[self.is_mutable, self.lifetime, False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
+        return _StringIter[self.is_mutable, self.lifetime, forward=False](
+            self[].unsafe_uint8_ptr(), len(self[])
+        )
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
@@ -1555,15 +1572,16 @@ struct String(
 
         for s in self:
             var no_null_len = len(s)
-            if no_null_len == 1 and not _isspace(s.data[0]):
+            var ptr = s.unsafe_ptr()
+            if no_null_len == 1 and not _isspace(ptr[0]):
                 return False
             elif no_null_len == 2 and not compare(
-                s.data, next_line.unsafe_ptr(), 2
+                ptr, next_line.unsafe_ptr(), 2
             ):
                 return False
             elif no_null_len == 3 and not (
-                compare(s.data, unicode_line_sep.unsafe_ptr(), 3)
-                or compare(s.data, unicode_paragraph_sep.unsafe_ptr(), 3)
+                compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
+                or compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
             ):
                 return False
         return True

@@ -1101,9 +1101,6 @@ def test_string_iter():
 
     # assert_equal(111, atol(concat))
 
-    # TODO: this should not be necessary
-    _ = vs
-
     var items = List[String](
         "mojo🔥",
         "السلام عليكم",

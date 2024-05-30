@@ -548,7 +548,7 @@ what we publish.
 - `String.split()` now defaults to whitespace and has pythonic behavior in that
   it removes all adjacent whitespaces by default.
 
-- `String` now has a `String.__iter__()` method which returns a `StringRef`
+- `String` now has a `String.__iter__()` method which returns a `StringSlice`
   on every iteration with the corresponding utf8 character length.
 
 - Added `UnsafePointer.offset()` method.
