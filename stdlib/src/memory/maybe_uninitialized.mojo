@@ -13,7 +13,8 @@
 
 
 # TODO: Make this public when we are certain of the design.
-# TODO: Move _size into an alias when the bug.
+# TODO: Move _size into an alias when the bug https://github.com/modularml/mojo/issues/2889
+# is fixed.
 struct _MaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
     CollectionElement
 ):
