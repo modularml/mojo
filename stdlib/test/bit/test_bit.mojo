@@ -18,36 +18,36 @@ from bit import (
     bit_width,
     bit_ceil,
     bit_floor,
-    has_single_bit,
+    is_power_of_two,
 )
 
 from testing import assert_equal
 
 
-def test_has_single_bit():
-    assert_equal(has_single_bit(-1), False)
-    assert_equal(has_single_bit(0), False)
-    assert_equal(has_single_bit(1), True)
-    assert_equal(has_single_bit(2), True)
-    assert_equal(has_single_bit(3), False)
-    assert_equal(has_single_bit(4), True)
-    assert_equal(has_single_bit(5), False)
+def test_is_power_of_two():
+    assert_equal(is_power_of_two(-1), False)
+    assert_equal(is_power_of_two(0), False)
+    assert_equal(is_power_of_two(1), True)
+    assert_equal(is_power_of_two(2), True)
+    assert_equal(is_power_of_two(3), False)
+    assert_equal(is_power_of_two(4), True)
+    assert_equal(is_power_of_two(5), False)
 
 
-def test_has_single_bit_simd():
+def test_is_power_of_two_simd():
     alias simd_width = 4
     alias type = DType.int8
     alias return_type = DType.bool
 
     alias var1 = SIMD[type, simd_width](-1, 0, 1, 2)
     assert_equal(
-        has_single_bit(var1),
+        is_power_of_two(var1),
         SIMD[DType.bool, simd_width](False, False, True, True),
     )
 
     alias var2 = SIMD[type, simd_width](3, 4, 5, 8)
     assert_equal(
-        has_single_bit(var2),
+        is_power_of_two(var2),
         SIMD[DType.bool, simd_width](False, True, False, True),
     )
 
@@ -165,5 +165,5 @@ def main():
     test_bit_floor_simd()
     test_bit_width()
     test_bit_width_simd()
-    test_has_single_bit()
-    test_has_single_bit_simd()
+    test_is_power_of_two()
+    test_is_power_of_two_simd()
