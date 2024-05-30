@@ -699,8 +699,6 @@ struct _StringIter[forward: Bool = True]:
         return self
 
     fn __next__(inout self) -> StringRef:
-        # TODO ? use SIMD like https://github.com/cyb70289/utf8
-
         @parameter
         if forward:
             var byte_len = 1
@@ -1166,7 +1164,6 @@ struct String(
         """
         return _StringIter(self.unsafe_uint8_ptr(), len(self))
 
-    # FIXME
     fn __reversed__(self) -> _StringIter[False]:
         """Iterate backwards over the string, returning immutable references.
 
