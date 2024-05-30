@@ -85,7 +85,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     as a regular `Array`.
 
     This is typically faster than Python's `Array` as it is stack-allocated
-    and does not require any dynamic memory allocation.
+    and does not require any dynamic memory allocation and uses vectorized
+    operations wherever possible.
 
     Notes:
         Setting Array items directly doesn't update self.capacity_left,
@@ -114,7 +115,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
     @always_inline
     fn __init__(inout self, *, fill: Self._scalar_type):
-        """Constructs a Array by filling it with the
+        """Constructs an Array by filling it with the
         given value. Sets the capacity_left var to 0.
 
         Args:
@@ -126,7 +127,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     # TODO: Avoid copying elements in once owned varargs
     # allow transfers.
     fn __init__(inout self, *values: Self._scalar_type):
-        """Constructs a Array from the given values.
+        """Constructs an Array from the given values.
 
         Args:
             values: The values to populate the Array with.
@@ -138,7 +139,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             self.append(value)
 
     fn __init__[cap: Int](inout self, values: SIMD[T, cap]):
-        """Constructs a Array from the given values.
+        """Constructs an Array from the given values.
 
         Parameters:
             cap: The capacity of the SIMD vector.
@@ -161,7 +162,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
                 self.vec[i] = values[i]
 
     fn __init__[cap: Int](inout self, owned existing: Array[T, cap]):
-        """Constructs a Array from an existing Array.
+        """Constructs an Array from an existing Array.
 
         Parameters:
             cap: The number of elements that the Array can hold.
@@ -214,7 +215,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         self.capacity_left = capacity - s
 
     fn __init__[size: Int](inout self, owned existing: List[Self._scalar_type]):
-        """Constructs a Array from an existing List.
+        """Constructs an Array from an existing List.
 
         Parameters:
             size: The size of the List.
@@ -554,7 +555,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         return res
 
     fn __setitem__(inout self, idx: Int, owned value: Self._scalar_type):
-        """Sets a Array element at the given index. This will
+        """Sets an Array element at the given index. This will
         not update self.capacity_left.
 
         Args:
