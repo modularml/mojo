@@ -208,6 +208,18 @@ trait StringableCollectionElement(CollectionElement, Stringable):
     pass
 
 
+trait EqualityCollectionElement(CollectionElement, EqualityComparable):
+    """
+    This trait is a temporary solution to enable comparison of
+    collection elements as utilized in the `__eq__` and `__ne__` methods of
+    a list.
+    This approach will be revised with the introduction of conditional trait
+    conformances.
+    """
+
+    pass
+
+
 trait ComparableCollectionElement(CollectionElement, Comparable):
     """
     This trait is a temporary solution to enable comparison of

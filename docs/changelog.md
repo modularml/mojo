@@ -470,6 +470,17 @@ what we publish.
 - Added `SIMD.__repr__` to get the verbose string representation of `SIMD` types.
 ([PR #2728](https://github.com/modularml/mojo/pull/2728) by [@bgreni](https://github.com/bgreni))
 
+- `List` support `__eq__` and `__ne__` for `Rhs_t:EqualityCollectionElement`
+  ([PR #2702](https://github.com/modularml/mojo/pull/2702) by [@rd4com](https://github.com/rd4com))
+
+  For example:
+
+  ```mojo
+  var x = List(1,2,3)
+  var y = List(4,5,6)
+  print(x!=y) #True
+  ```
+
 ### 🦋 Changed
 
 - `Coroutine` now requires a lifetime parameter. This parameter is set
