@@ -1085,12 +1085,10 @@ def test_string_iter():
 
     assert_equal(123, atol(conc(vs)))
 
-    # FIXME
-    # concat = String("")
-    # for v in vs.__reversed__():
-    #     print(v)
-    #     concat += v
-    # assert_equal(321, atol(concat))
+    concat = String("")
+    for v in vs.__reversed__():
+        concat += v
+    assert_equal(321, atol(concat))
 
     # TODO
     # for v in vs:
@@ -1102,6 +1100,7 @@ def test_string_iter():
     #     concat += v
 
     # assert_equal(111, atol(concat))
+
     var items = List[String](
         "mojo🔥",
         "السلام عليكم",
@@ -1115,25 +1114,36 @@ def test_string_iter():
         "Olá",
         "Здравствуйте",
     )
-    var utf8_length = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
-    var len_idx = 0
+    var rev = List[String](
+        "🔥ojom",
+        "مكيلع مالسلا",
+        "ned ýrboD",
+        "olleH",
+        "םֹולָׁש",
+        "ेत्समन",
+        "はちにんこ",
+        "요세하녕안",
+        "好你",
+        "álO",
+        "етйувтсвардЗ",
+    )
+    var utf8_lengths = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
+    var item_idx = 0
     for item in items:
         var size = len(item[])
         var amnt = 0
-        var item_idx = 0
+        var byte_idx = 0
         for v in item[]:
             var byte_len = len(v)
-            assert_equal(item[][item_idx : item_idx + byte_len], v)
-            item_idx += byte_len
+            assert_equal(item[][byte_idx : byte_idx + byte_len], v)
+            byte_idx += byte_len
             amnt += 1
-        assert_equal(amnt, utf8_length[len_idx])
-        len_idx += 1
-
-    # FIXME
-    # concat = String("")
-    # for v in vs.__reversed__():
-    #     concat += v
-    # assert_equal(concat, "🔥ojom")
+        assert_equal(amnt, utf8_lengths[item_idx])
+        var concat = String("")
+        for v in item[].__reversed__():
+            concat += v
+        assert_equal(rev[item_idx], concat)
+        item_idx += 1
 
     # TODO: this should not be necessary
     _ = vs

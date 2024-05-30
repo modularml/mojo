@@ -710,19 +710,16 @@ struct _StringIter[forward: Bool = True]:
                     byte_len = int(value)
                     self.continuation_bytes -= int(value) - 1
             self.index += byte_len
-            var val = StringRef(
-                self.ptr.offset(self.index - byte_len), byte_len
-            )
-            return val
+            return StringRef(self.ptr.offset(self.index - byte_len), byte_len)
         else:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var value = _utf8_byte_type(int(self.ptr[self.index]))
+                var value = _utf8_byte_type(int(self.ptr[self.index - 1]))
                 if value != 0:
                     while value == 1:
+                        byte_len += 1
                         var b = int(self.ptr[self.index - byte_len])
                         value = _utf8_byte_type(b)
-                        byte_len += 1
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
             return StringRef(self.ptr.offset(self.index), byte_len)
@@ -1170,13 +1167,13 @@ struct String(
         return _StringIter(self.unsafe_uint8_ptr(), len(self))
 
     # FIXME
-    # fn __reversed__(self) -> _StringIter[False]:
-    #     """Iterate backwards over the string, returning immutable references.
+    fn __reversed__(self) -> _StringIter[False]:
+        """Iterate backwards over the string, returning immutable references.
 
-    #     Returns:
-    #         A reversed iterator of references to the string elements.
-    #     """
-    #     return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
+        Returns:
+            A reversed iterator of references to the string elements.
+        """
+        return _StringIter[forward=False](self.unsafe_uint8_ptr(), len(self))
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
