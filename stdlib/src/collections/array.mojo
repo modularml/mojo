@@ -174,76 +174,44 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             self[i] = existing[i]
         self.capacity_left = existing.capacity_left
 
-    # FIXME
-    # fn __init__(
-    #     inout self: Self,
-    #     *,
-    #     unsafe_pointer: UnsafePointer[Self._scalar_type],
-    #     size: Int,
-    # ):
-    #     """Constructs an Array from a pointer and its size.
+    fn __init__(
+        inout self: Self,
+        *,
+        unsafe_pointer: UnsafePointer[Self._scalar_type],
+        length: Int,
+    ):
+        """Constructs an Array from a pointer and its length.
 
-    #     Args:
-    #         unsafe_pointer: The pointer to the data.
-    #         size: The number of elements pointed to.
-    #     """
-    #     var s = min(capacity, size)
-    #     self.vec = Self._vec_type()
-    #     # FIXME: will this even work? is there no faster way?
-    #     for i in range(s):
-    #         self.vec[i] = unsafe_pointer[i]
-    #     self.capacity_left = capacity - s
-
-    # FIXME
-    # fn __init__[
-    #     size: Int
-    # ](inout self: Self, *, unsafe_pointer: UnsafePointer[Self._scalar_type]):
-    #     """Constructs an Array from a pointer and its size.
-
-    #     Parameter:
-    #         size: The number of elements pointed to.
-
-    #     Args:
-    #         unsafe_pointer: The pointer to the data.
-    #     """
-    #     alias s = min(capacity, size)
-    #     self.vec = Self._vec_type()
-
-    #     @parameter
-    #     for i in range(s):
-    #         self.vec[i] = unsafe_pointer[i]
-    #     self.capacity_left = capacity - s
+        Args:
+            unsafe_pointer: The pointer to the data.
+            length: The number of elements pointed to.
+        """
+        var s = min(capacity, length)
+        self.vec = Self._vec_type()
+        # FIXME: will this even work? is there no faster way?
+        for i in range(s):
+            self.vec[i] = unsafe_pointer[i]
+        self.capacity_left = capacity - s
 
     # FIXME
-    # fn __init__[
-    #     size: Int
-    # ](inout self: Self, *, unsafe_pointer: UnsafePointer[T.type]):
-    #     """Constructs an Array from a pointer and its size.
+    fn __init__[
+        size: Int
+    ](inout self: Self, *, unsafe_pointer: UnsafePointer[Self._scalar_type]):
+        """Constructs an Array from a pointer and its size.
 
-    #     Parameter:
-    #         size: The number of elements pointed to.
+        Parameter:
+            size: The number of elements pointed to.
 
-    #     Args:
-    #         unsafe_pointer: The pointer to the data.
-    #     """
-    #     alias s = min(capacity, size)
-    #     self.vec = Self._vec_type()
+        Args:
+            unsafe_pointer: The pointer to the data.
+        """
+        alias s = min(capacity, size)
+        self.vec = Self._vec_type()
 
-    #     @parameter
-    #     for i in range(s):
-    #         self.vec[i] = rebind[SIMD[T, 0]](unsafe_pointer[i])
-    #     self.capacity_left = capacity - s
-
-    # FIXME
-    # fn __init__[
-    #     capacity: Int
-    # ](inout self, owned existing: InlineArray[Self._scalar_type, capacity]):
-    #     """Constructs a Array from an existing InlineArray.
-
-    #     Args:
-    #         existing: The existing InlineArray.
-    #     """
-    #     Self.__init__[capacity](self, unsafe_pointer=existing.unsafe_ptr())
+        @parameter
+        for i in range(s):
+            self.vec[i] = unsafe_pointer[i]
+        self.capacity_left = capacity - s
 
     fn __init__[size: Int](inout self, owned existing: List[Self._scalar_type]):
         """Constructs a Array from an existing List.
@@ -1264,6 +1232,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         fn closure[simd_width: Int](i: Int):
             self.vec[i] = func(self.vec[i])
 
+        # FIXME will this work?
         vectorize[closure, simdwidthof[T]()](Self._vec_type.size)
 
     fn map(
