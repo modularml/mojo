@@ -15,7 +15,6 @@
 from collections.array import Array
 
 from testing import assert_equal, assert_false, assert_true, assert_raises
-from utils import Span
 
 
 def test_array():
@@ -373,8 +372,8 @@ def test_array_broadcast_ops():
     assert_equal(6, vs.sum())
     vs *= 2
     assert_equal(12, vs.sum())
-    # assert_equal(0, (arr(2, 2, 2) % 2).sum()) # FIXME issue #2855
-    # assert_equal(0, (arr(2, 2, 2) // 2).sum()) # FIXME issue #2855
+    assert_equal(0, (arr(2, 2, 2) % 2).sum())
+    assert_equal(0, (arr(2, 2, 2) // 2).sum())
     assert_equal(4 * 3, (arr(2, 2, 2) ** 2).sum())
 
 

@@ -824,10 +824,10 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
     @always_inline("nodebug")
     @staticmethod
-    fn _mask_vec(inout vec: Self._vec_type):
+    fn _mask_vec(inout vec: Self._vec_type, value: Int = 0):
         @parameter
         for i in range(Self._vec_type.size - capacity):
-            vec[capacity + i] = 0
+            vec[capacity + i] = value
 
     @always_inline("nodebug")
     @staticmethod
@@ -882,7 +882,14 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             A new Array with the values.
         """
-        return self.vec / Self._build_vec(value)
+
+        @parameter
+        if Self._vec_type.size == capacity:
+            return self.vec / Self._vec_type(value)
+        else:
+            var vec = Self._vec_type(value)
+            Self._mask_vec(vec, 1)
+            return self.vec / vec
 
     @always_inline("nodebug")
     fn __itruediv__(inout self, owned value: Self._scalar_type):
@@ -892,57 +899,88 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Args:
             value: The value.
         """
-        self.vec /= Self._build_vec(value)
 
-    # FIXME issue #2855
-    # @always_inline("nodebug")
-    # fn __floordiv__(self, value: Self._scalar_type) -> Self:
-    #     """Calculates the elementwise floordiv
-    #     of the given value.
+        @parameter
+        if Self._vec_type.size == capacity:
+            self.vec /= Self._vec_type(value)
+        else:
+            var vec = Self._vec_type(value)
+            Self._mask_vec(vec, 1)
+            self.vec /= vec
 
-    #     Args:
-    #         value: The value.
+    @always_inline("nodebug")
+    fn __floordiv__(self, value: Self._scalar_type) -> Self:
+        """Calculates the elementwise floordiv
+        of the given value.
 
-    #     Returns:
-    #         A new Array with the values.
-    #     """
-    #     return self.vec // Self._build_vec(value)
+        Args:
+            value: The value.
 
-    # FIXME issue #2855
-    # @always_inline("nodebug")
-    # fn __ifloordiv__(inout self, owned value: Self._scalar_type):
-    #     """Calculates the elementwise floordiv
-    #     of the given value inplace.
+        Returns:
+            A new Array with the values.
+        """
 
-    #     Args:
-    #         value: The value.
-    #     """
-    #     self.vec //= Self._build_vec(value)
+        @parameter
+        if Self._vec_type.size == capacity:
+            return self.vec // Self._vec_type(value)
+        else:
+            var vec = Self._vec_type(value)
+            Self._mask_vec(vec, 1)
+            return self.vec // vec
 
-    # FIXME issue #2855
-    # @always_inline("nodebug")
-    # fn __mod__(self, value: Self._scalar_type) -> Self:
-    #     """Calculates the elementwise mod
-    #     of the given value.
+    @always_inline("nodebug")
+    fn __ifloordiv__(inout self, owned value: Self._scalar_type):
+        """Calculates the elementwise floordiv
+        of the given value inplace.
 
-    #     Args:
-    #         value: The value.
+        Args:
+            value: The value.
+        """
 
-    #     Returns:
-    #         A new Array with the values.
-    #     """
-    #     return self.vec % Self._build_vec(value)
+        @parameter
+        if Self._vec_type.size == capacity:
+            self.vec //= Self._vec_type(value)
+        else:
+            var vec = Self._vec_type(value)
+            Self._mask_vec(vec, 1)
+            self.vec //= vec
 
-    # FIXME issue #2855
-    # @always_inline("nodebug")
-    # fn __imod__(inout self, owned value: Self._scalar_type):
-    #     """Calculates the elementwise mod
-    #     of the given value inplace.
+    @always_inline("nodebug")
+    fn __mod__(self, value: Self._scalar_type) -> Self:
+        """Calculates the elementwise mod
+        of the given value.
 
-    #     Args:
-    #         value: The value.
-    #     """
-    #     self.vec %= Self._build_vec(value)
+        Args:
+            value: The value.
+
+        Returns:
+            A new Array with the values.
+        """
+
+        @parameter
+        if Self._vec_type.size == capacity:
+            return self.vec % Self._vec_type(value)
+        else:
+            var vec = Self._vec_type(value)
+            Self._mask_vec(vec, 1)
+            return self.vec % vec
+
+    @always_inline("nodebug")
+    fn __imod__(inout self, owned value: Self._scalar_type):
+        """Calculates the elementwise mod
+        of the given value inplace.
+
+        Args:
+            value: The value.
+        """
+
+        @parameter
+        if Self._vec_type.size == capacity:
+            self.vec %= Self._vec_type(value)
+        else:
+            var vec = Self._vec_type(value)
+            Self._mask_vec(vec, 1)
+            self.vec %= vec
 
     @always_inline("nodebug")
     fn __pow__(self, value: Self._scalar_type) -> Self:
