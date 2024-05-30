@@ -1143,6 +1143,18 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
         return llvm_intrinsic["llvm.round", Self, has_side_effect=False](self)
 
+    @always_inline("nodebug")
+    fn __round__(self, ndigits: Int) -> Self:
+        """Performs elementwise rounding on the elements of a SIMD vector.
+        This rounding goes to the nearest integer with ties away from zero.
+        Args:
+            ndigits: The number of digits to round to.
+        Returns:
+            The elementwise rounded value of this SIMD vector.
+        """
+        # TODO: see how can we implement this.
+        return llvm_intrinsic["llvm.round", Self, has_side_effect=False](self)
+
     # ===------------------------------------------------------------------=== #
     # In place operations.
     # ===------------------------------------------------------------------=== #

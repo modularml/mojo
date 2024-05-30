@@ -574,6 +574,18 @@ struct Int(
         return self
 
     @always_inline("nodebug")
+    fn __round__(self, ndigits: Int) -> Self:
+        """Return the rounded value of the Int value, which is itself.
+        Args:
+            ndigits: The number of digits to round to.
+        Returns:
+            The Int value itself if ndigits >= 0 else the rounded value.
+        """
+        if ndigits >= 0:
+            return self
+        return self - (self % 10 ** -(ndigits))
+
+    @always_inline("nodebug")
     fn __trunc__(self) -> Self:
         """Return the truncated Int value, which is itself.
 
