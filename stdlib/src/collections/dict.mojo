@@ -810,7 +810,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         if self.size == 0:
             raise "KeyError: popitem(): dictionary is empty"
-        var entry = self._entries.pop(0)
+        var entry = self._entries.pop(self.size - 1)
         var entry_value = entry.value()
         self.size -= 1
         self._n_entries -= 1
