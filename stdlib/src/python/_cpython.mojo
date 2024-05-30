@@ -40,10 +40,9 @@ struct PyKeyValuePair:
 struct PyObjectPtr:
     var value: DTypePointer[DType.int8]
 
-    @staticmethod
-    fn null_ptr() -> PyObjectPtr:
-        var null_pointer = DTypePointer[DType.int8].get_null()
-        return PyObjectPtr {value: null_pointer}
+    @always_inline("nodebug")
+    fn __init__(inout self):
+        self.value = DTypePointer[DType.int8]()
 
     fn is_null(self) -> Bool:
         return int(self.value) == 0
@@ -169,12 +168,10 @@ struct CPython:
                 " suitable libpython, please set `MOJO_PYTHON_LIBRARY`"
             )
 
-        var null_pointer = DTypePointer[DType.int8].get_null()
-
         self.lib = DLHandle(python_lib)
         self.total_ref_count = UnsafePointer[Int].alloc(1)
-        self.none_value = PyObjectPtr(null_pointer)
-        self.dict_type = PyObjectPtr(null_pointer)
+        self.none_value = PyObjectPtr()
+        self.dict_type = PyObjectPtr()
         self.logging_enabled = logging_enabled
         self.version = PythonVersion(_py_get_version(self.lib))
 
@@ -780,8 +777,8 @@ struct CPython:
     fn PyDict_Next(
         inout self, dictionary: PyObjectPtr, p: Int
     ) -> PyKeyValuePair:
-        var key = DTypePointer[DType.int8].get_null()
-        var value = DTypePointer[DType.int8].get_null()
+        var key = DTypePointer[DType.int8]()
+        var value = DTypePointer[DType.int8]()
         var v = p
         var position = UnsafePointer[Int].address_of(v)
         var value_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
