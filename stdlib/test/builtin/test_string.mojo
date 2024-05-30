@@ -1101,6 +1101,9 @@ def test_string_iter():
 
     # assert_equal(111, atol(concat))
 
+    # TODO: this should not be necessary
+    _ = vs
+
     var items = List[String](
         "mojo🔥",
         "السلام عليكم",
@@ -1130,7 +1133,6 @@ def test_string_iter():
     var utf8_lengths = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
     var item_idx = 0
     for item in items:
-        var size = len(item[])
         var amnt = 0
         var byte_idx = 0
         for v in item[]:
@@ -1144,10 +1146,6 @@ def test_string_iter():
             concat += v
         assert_equal(rev[item_idx], concat)
         item_idx += 1
-
-    # TODO: this should not be necessary
-    _ = vs
-    _ = items
 
 
 def main():
