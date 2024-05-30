@@ -534,7 +534,7 @@ what we publish.
   operations, and support integer types.
     ([PR #2671](https://github.com/modularml/mojo/pull/2671) by [@helehex](https://github.com/helehex))
 
-- `ListLiteral` and `Tuple` now only require that element types be `Copyable`.
+- `ListLiteral` and `Tuple` now only require that element types be `Movable`.
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
