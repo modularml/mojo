@@ -162,9 +162,16 @@ def test_popitem():
     assert_equal(t1[1], 2)
     assert_equal(1, len(dict))
 
+    dict["c"] = 3
+
     var t2: (String, Int) = dict.popitem()
-    assert_equal(t2[0], "a")
-    assert_equal(t2[1], 1)
+    assert_equal(t2[0], "c")
+    assert_equal(t2[1], 3)
+    assert_equal(1, len(dict))
+
+    var t3: (String, Int) = dict.popitem()
+    assert_equal(t3[0], "a")
+    assert_equal(t3[1], 1)
     assert_equal(0, len(dict))
 
     with assert_raises(contains="KeyError"):

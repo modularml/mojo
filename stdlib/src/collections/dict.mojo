@@ -810,11 +810,16 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         if self.size == 0:
             raise "KeyError: popitem(): dictionary is empty"
-        var entry = self._entries.pop(self.size - 1)
-        var entry_value = entry.value()
-        self.size -= 1
-        self._n_entries -= 1
-        return (entry_value[].key, entry_value[].value)
+            # var entry = self._entries.pop(self.size - 1)
+        var reversed_items = reversed(self.items())
+        var entry_ref = reversed_items.__next__()  # TODO: Use next() when supported in Mojo
+        var entry = entry_ref[]
+        _ = self.pop(entry.key)
+        return (entry.key, entry.value)
+        # var entry_value = entry.value()
+        # self.size -= 1
+        # self._n_entries -= 1
+        # return (entry_value[].key, entry_value[].value)
 
     fn keys(
         self: Reference[Self, _, _]
