@@ -2718,7 +2718,7 @@ fn _bfloat16_to_f32_scalar(
         # BF16 support on neon systems is not supported.
         return _unchecked_zero[DType.float32, 1]()
 
-    var bfloat_bits = FPUtils.bitcast_to_integer(val)
+    var bfloat_bits = FPUtils[DType.bfloat16].bitcast_to_integer(val)
     return FPUtils[DType.float32].bitcast_from_integer(
         bfloat_bits << _fp32_bf16_mantissa_diff
     )
@@ -2755,11 +2755,11 @@ fn _f32_to_bfloat16_scalar(
         return _unchecked_zero[DType.bfloat16, 1]()
 
     if _isnan(val):
-        return -_nan[DType.bfloat16]() if FPUtils.get_sign(val) else _nan[
-            DType.bfloat16
-        ]()
+        return -_nan[DType.bfloat16]() if FPUtils[DType.float32].get_sign(
+            val
+        ) else _nan[DType.bfloat16]()
 
-    var float_bits = FPUtils.bitcast_to_integer(val)
+    var float_bits = FPUtils[DType.float32].bitcast_to_integer(val)
 
     var lsb = (float_bits >> _fp32_bf16_mantissa_diff) & 1
     var rounding_bias = 0x7FFF + lsb
