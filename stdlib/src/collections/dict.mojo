@@ -85,15 +85,6 @@ struct _DictEntryIter[
     @always_inline
     fn __next__(inout self) -> Self.ref_type:
         while True:
-
-            @parameter
-            if forward:
-                debug_assert(
-                    self.index < self.src[]._reserved, "dict iter bounds"
-                )
-            else:
-                debug_assert(self.index >= 0, "dict iter bounds")
-
             var opt_entry_ref = self.src[]._entries.__get_ref(self.index)
             if opt_entry_ref[]:
 
@@ -187,7 +178,7 @@ struct _DictValueIter[
         var src = self.iter.src
         return _DictValueIter(
             _DictEntryIter[K, V, dict_mutability, dict_lifetime, False](
-                src[]._reserved, 0, src
+                src[]._reserved - 1, 0, src
             )
         )
 
