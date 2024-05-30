@@ -470,6 +470,10 @@ what we publish.
 - Added `SIMD.__repr__` to get the verbose string representation of `SIMD` types.
 ([PR #2728](https://github.com/modularml/mojo/pull/2728) by [@bgreni](https://github.com/bgreni))
 
+- Added temporary `SliceNew` type with corrected behaviour from `Slice` to facilitate
+  an incremental internal migration due to reliance on the old, incorrect behaviour.
+  ([PR #2894](https://github.com/modularml/mojo/pull/2894) by [@bgreni](https://github.com/bgreni))
+
 ### 🦋 Changed
 
 - `Coroutine` now requires a lifetime parameter. This parameter is set
