@@ -385,7 +385,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     Please see its docstring for details.
     """
     if not str_ref:
-        raise Error(_atof_error(str_ref))
+        raise _atof_error(str_ref)
 
     var result: Float64 = 0.0
     var exponent: Int = 0
@@ -568,20 +568,6 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_spaces_table() -> InlineArray[UInt8, 256]:
-    var table = InlineArray[UInt8, 256](0)
-    table[ord(" ")] = 1
-    table[ord("\t")] = 1
-    table[ord("\n")] = 1
-    table[ord("\r")] = 1
-    table[ord("\f")] = 1
-    table[ord("\v")] = 1
-    return table
-
-
-alias _SPACES_TABLE = _get_spaces_table()
-
-
 fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
 
@@ -595,7 +581,51 @@ fn _isspace(c: UInt8) -> Bool:
     Returns:
         True iff the character is one of the whitespace characters listed above.
     """
-    return _SPACES_TABLE[int(c)]
+
+    alias ` ` = UInt8(ord(" "))
+    alias `\t` = UInt8(ord("\t"))
+    alias `\n` = UInt8(ord("\n"))
+    alias `\r` = UInt8(ord("\r"))
+    alias `\f` = UInt8(ord("\f"))
+    alias `\v` = UInt8(ord("\v"))
+
+    # This compiles to something very clever that's even faster than a LUT.
+    return (
+        c == ` `
+        or c == `\t`
+        or c == `\n`
+        or c == `\r`
+        or c == `\f`
+        or c == `\v`
+    )
+
+
+# ===----------------------------------------------------------------------=== #
+# _isnewline
+# ===----------------------------------------------------------------------=== #
+
+
+fn _get_newlines_table() -> InlineArray[UInt8, 128]:
+    var table = InlineArray[UInt8, 128](0)
+    table[ord("\n")] = 1
+    table[ord("\r")] = 1
+    table[ord("\f")] = 1
+    table[ord("\v")] = 1
+    table[ord("\x1c")] = 1
+    table[ord("\x1d")] = 1
+    table[ord("\x1e")] = 1
+    return table
+
+
+alias _NEWLINES_TABLE = _get_newlines_table()
+
+
+fn _isnewline(c: String) -> Bool:
+    # TODO: add \u2028 and \u2029 when they are properly parsed
+    # FIXME: \x85 is parsed but not encoded in utf-8
+    if len(c._buffer) == 2:
+        return c == "\x85" or _NEWLINES_TABLE[ord(c)]
+    return False
 
 
 # ===----------------------------------------------------------------------=== #
@@ -732,18 +762,6 @@ struct String(
             literal: The input constant string.
         """
         self = literal.__str__()
-
-    fn __init__[stringable: Stringable](inout self, value: stringable):
-        """Creates a string from a value that conforms to Stringable trait.
-
-        Parameters:
-            stringable: The Stringable type.
-
-        Args:
-            value: The value that conforms to Stringable.
-        """
-
-        self = str(value)
 
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
@@ -1577,6 +1595,45 @@ struct String(
 
             output.append(self[lhs:rhs])
             lhs = rhs
+
+        return output
+
+    fn splitlines(self, keepends: Bool = False) -> List[String]:
+        """Split the string at line boundaries.
+
+        Args:
+            keepends: If True, line breaks are kept in the resulting strings.
+
+        Returns:
+            A List of Strings containing the input split by line boundaries.
+        """
+        var output = List[String]()
+        var length = len(self)
+        var current_offset = 0
+
+        while current_offset < length:
+            var loc = -1
+            var eol_length = 1
+
+            for i in range(current_offset, length):
+                var char = self[i]
+                var next_char = self[i + 1] if i + 1 < length else ""
+
+                if _isnewline(char):
+                    loc = i
+                    if char == "\r" and next_char == "\n":
+                        eol_length = 2
+                    break
+            else:
+                output.append(self[current_offset:])
+                break
+
+            if keepends:
+                output.append(self[current_offset : loc + eol_length])
+            else:
+                output.append(self[current_offset:loc])
+
+            current_offset = loc + eol_length
 
         return output
 

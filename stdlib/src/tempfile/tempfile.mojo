@@ -59,7 +59,7 @@ fn _candidate_tempdir_list() -> List[String]:
     # As a last resort, the current directory if possible,
     # os.path.getcwd() could raise
     try:
-        dirlist.append(Path())
+        dirlist.append(str(Path()))
     except:
         pass
 
@@ -97,7 +97,7 @@ fn _try_to_create_file(dir: String) -> Bool:
 
         # verify that we have writing access in the target directory
         try:
-            with FileHandle(filename, "w"):
+            with FileHandle(str(filename), "w"):
                 pass
             os.remove(filename)
             return True
@@ -160,7 +160,7 @@ fn mkdtemp(
             # python implementation expands the path,
             # but several functions are not yet implemented in mojo
             # i.e. abspath, normpath
-            return dir_name
+            return str(dir_name)
         except:
             continue
     raise Error("Failed to create temporary file")
