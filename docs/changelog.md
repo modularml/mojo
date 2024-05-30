@@ -18,7 +18,8 @@ what we publish.
 
 ### ⭐️ New
 
-- `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.  The item is returned as a (key, value) pair.
+- `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
+  The item is returned as a (key, value) pair.
   ([PR #2794](https://github.com/modularml/mojo/pull/2794)
   by [@msaelices](https://github.com/msaelices))
 
