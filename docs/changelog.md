@@ -631,6 +631,7 @@ what we publish.
   - `all_true`, `any_true`, and `none_true`; use `SIMD.reduce_and` and
     `SIMD.reduce_or` directly.
   - `reduce_bit_count`; use the new `SIMD.reduce_bit_count` directly.
+  - `rint` and `nearbyint`; use `round` or `SIMD.roundeven` as appropriate.
 
 - The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
   same functionality is available in the builtin `SIMD.select` and
