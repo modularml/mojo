@@ -498,6 +498,9 @@ what we publish.
   from `math` to `builtin`, so you no longer need to do
   `from math import abs, round, min, max, divmod, pow`.
 
+  - The `is_power_of_2` function in the `math` module is now called
+  `is_power_of_two` and located in the `bit` module.
+
 - Many functions returning a pointer type have been unified to have a public
   API function of `unsafe_ptr()`.
 
