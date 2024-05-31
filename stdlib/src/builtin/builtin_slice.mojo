@@ -90,9 +90,12 @@ struct Slice(Stringable, EqualityComparable):
             end: The end value.
             step: The step value.
         """
-        self.start = _default_or(start, 0)
-        self.end = _default_or(end, _int_max_value())
         self.step = _default_or(step, 1)
+        if self.step < 0:
+            self.start = _default_or(start, _int_max_value())
+        else:
+            self.start = _default_or(start, 0)
+        self.end = _default_or(end, _int_max_value())
 
     fn __str__(self) -> String:
         """Gets the string representation of the span.
@@ -161,6 +164,10 @@ struct Slice(Stringable, EqualityComparable):
             The slice index.
         """
         return self.start + index(idx) * self.step
+
+    @always_inline("nodebug")
+    fn _has_start(self) -> Bool:
+        return self.start != _int_max_value()
 
     @always_inline("nodebug")
     fn _has_end(self) -> Bool:

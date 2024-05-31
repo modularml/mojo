@@ -1138,20 +1138,32 @@ struct String(
     fn _adjust_span(self, span: Slice) -> Slice:
         """Adjusts the span based on the string length."""
         var adjusted_span = span
+         
+        print("Slice Check Before: ", adjusted_span.start, adjusted_span.end, adjusted_span.step) 
 
         if adjusted_span.start < 0:
             adjusted_span.start = len(self) + adjusted_span.start
-
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
+        if adjusted_span.end < 0:
             adjusted_span.end = len(self) + adjusted_span.end
 
+        if adjusted_span.step < 0:
+            if not adjusted_span._has_start():
+                adjusted_span.start = len(self) - 1
+            if not adjusted_span._has_end():
+                adjusted_span.end = -1
+        else:
+            if not adjusted_span._has_start():
+                adjusted_span.start = 0
+            if not adjusted_span._has_end():
+                adjusted_span.end = len(self)
+
+        '''
         if span.step < 0:
             var tmp = adjusted_span.end
             adjusted_span.end = adjusted_span.start - 1
             adjusted_span.start = tmp - 1
-
+        '''
+        print("Slice Check After: ", adjusted_span.start, adjusted_span.end, adjusted_span.step) 
         return adjusted_span
 
     fn format_to(self, inout writer: Formatter):
