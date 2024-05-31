@@ -10,15 +10,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the collections package."""
+# RUN: %mojo %s
 
-from .counter import Counter
-from .dict import Dict, KeyElement
-from .inline_list import InlineList
-from .list import List
-from .optional import Optional, OptionalReg
-from .set import Set
-from .vector import (
-    CollectionElement,
-    InlinedFixedVector,
-)
+from collections.counter import Counter
+
+from testing import assert_equal, assert_false, assert_raises, assert_true
+
+
+def test_counter_construction():
+    _ = Counter[Int]()
+    _ = Counter[Int](List[Int]())
+    _ = Counter[String](List[String]())
+
+
+def main():
+    test_counter_construction()
