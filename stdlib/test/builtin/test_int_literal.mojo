@@ -38,6 +38,10 @@ def test_round():
     assert_equal(IntLiteral.__round__(5), 5)
     assert_equal(IntLiteral.__round__(0), 0)
     assert_equal(IntLiteral.__round__(-5), -5)
+    assert_equal(IntLiteral.__round__(5, 1), 5)
+    assert_equal(IntLiteral.__round__(0, 1), 0)
+    assert_equal(IntLiteral.__round__(-5, 1), -5)
+    assert_equal(IntLiteral.__round__(100, -2), 100)
 
 
 def test_trunc():
@@ -83,6 +87,18 @@ def test_indexer():
     assert_equal(88, IntLiteral.__index__(88))
 
 
+def test_divmod():
+    t = IntLiteral.__divmod__(2, 2)
+    assert_equal(t[0], 1)
+    assert_equal(t[1], 0)
+    t = IntLiteral.__divmod__(2, 3)
+    assert_equal(t[0], 0)
+    assert_equal(t[1], 2)
+    t = IntLiteral.__divmod__(99, -2)
+    assert_equal(t[0], -50)
+    assert_equal(t[1], -1)
+
+
 def main():
     test_int()
     test_ceil()
@@ -91,6 +107,7 @@ def main():
     test_trunc()
     test_floordiv()
     test_mod()
+    test_divmod()
     test_bit_width()
     test_abs()
     test_indexer()

@@ -22,7 +22,7 @@ struct MoveOnly[T: Movable](Movable):
     var data: T
     """Test data payload."""
 
-    fn __init__(inout self, i: T):
+    fn __init__(inout self, owned i: T):
         """Construct a MoveOnly providing the payload data.
 
         Args:
