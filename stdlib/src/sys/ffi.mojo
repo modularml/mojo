@@ -78,7 +78,7 @@ struct DLHandle(CollectionElement, Boolable):
         @parameter
         if not os_is_windows():
             _ = external_call["dlclose", Int](self.handle)
-            self.handle = DTypePointer[DType.int8].get_null()
+            self.handle = DTypePointer[DType.int8]()
 
     fn __bool__(self) -> Bool:
         """Checks if the handle is valid.

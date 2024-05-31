@@ -72,7 +72,9 @@ struct UnsafePointer[
         Returns:
             A null pointer.
         """
-        return Self.get_null()
+        return Self {
+            address: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
+        }
 
     @always_inline
     fn __init__(value: Self._mlir_type) -> Self:
@@ -126,18 +128,6 @@ struct UnsafePointer[
         #   Is there a better way to create an UnsafePointer from a
         #   DTypePointer?
         return UnsafePointer[Scalar[dtype]](address=int(ptr))
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn get_null() -> Self:
-        """Constructs a UnsafePointer representing nullptr.
-
-        Returns:
-            Constructed nullptr UnsafePointer object.
-        """
-        return Self {
-            address: __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
-        }
 
     @staticmethod
     @always_inline

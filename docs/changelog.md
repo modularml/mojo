@@ -313,6 +313,9 @@ what we publish.
 
 - Add new `memcpy` overload for `UnsafePointer[Scalar[_]]` pointers.
 
+- Removed the `UnsafePointer[T].get_null()` method (and from other pointers),
+  please use the default constructor instead: `UnsafePointer[T]()`.
+
 - `Dict` now implements `get(key)` and `get(key, default)` functions.
     ([PR #2519](https://github.com/modularml/mojo/pull/2519) by [@martinvuyk](https://github.com/martinvuyk))
 
@@ -348,6 +351,11 @@ what we publish.
 
 - `List()` now supports `__contains__`.
     ([PR #2667](https://github.com/modularml/mojo/pull/2667) by [@rd4com](https://github.com/rd4com/))
+
+- Added a new [`InlineList`](/mojo/stdlib/collections/inline_list/InlineList)
+  type, a stack-allocated list with a static maximum size.
+  ([PR 2587#](https://github.com/modularml/mojo/pull/2587) by
+  [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
 
 - `InlineList()` now supports `__contains__`, `__iter__`.
     ([PR #2703](https://github.com/modularml/mojo/pull/2703) by [@ChristopherLR](https://github.com/ChristopherLR))
@@ -498,6 +506,9 @@ what we publish.
   from `math` to `builtin`, so you no longer need to do
   `from math import abs, round, min, max, divmod, pow`.
 
+  - The `is_power_of_2` function in the `math` module is now called
+  `is_power_of_two` and located in the `bit` module.
+
 - Many functions returning a pointer type have been unified to have a public
   API function of `unsafe_ptr()`.
 
@@ -523,7 +534,7 @@ what we publish.
   operations, and support integer types.
     ([PR #2671](https://github.com/modularml/mojo/pull/2671) by [@helehex](https://github.com/helehex))
 
-- `ListLiteral` and `Tuple` now only require that element types be `Copyable`.
+- `ListLiteral` and `Tuple` now only require that element types be `Movable`.
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
@@ -564,6 +575,9 @@ what we publish.
 
 - The `math.rotate_bits_left` and `math.rotate_bits_right` functions have been
   moved to the `bit` module.
+
+- The `math.tgamma` function has been renamed to `math.gamma` to conform with
+  Python's naming.
 
 - The implementation of the following functions have been moved from the `math`
   module to the new `utils.numerics` module: `isfinite`, `isinf`, `isnan`,
@@ -625,6 +639,14 @@ what we publish.
   - `all_true`, `any_true`, and `none_true`; use `SIMD.reduce_and` and
     `SIMD.reduce_or` directly.
   - `reduce_bit_count`; use the new `SIMD.reduce_bit_count` directly.
+  - `rint` and `nearbyint`; use `round` or `SIMD.roundeven` as appropriate.
+
+- The `EvaluationMethod` has been removed from `math.polynomial` and Estrin's
+  method is no longer available. This method was limited to degree 10 or less,
+  underutilized, and its performance unclear. In the future, this might be
+  reintroduced with an improved implementation if needed, when better
+  performance benchmarking infrastructure is available. The default behavior of
+  `math.polynomial.polynomial_evaluate` is unchanged (Horner's method).
 
 - The `math.bit.select` and `math.bit.bit_and` functions have been removed. The
   same functionality is available in the builtin `SIMD.select` and

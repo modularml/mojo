@@ -69,9 +69,9 @@ def test_trunc():
 
 
 def test_round():
-    assert_equal(FloatLiteral.__round__(1.5), 1.0)
+    assert_equal(FloatLiteral.__round__(1.5), 2.0)
     assert_equal(FloatLiteral.__round__(1.6), 2.0)
-    assert_equal(FloatLiteral.__round__(-1.5), -1.0)
+    assert_equal(FloatLiteral.__round__(-1.5), -2.0)
     assert_equal(FloatLiteral.__round__(-3.6), -4.0)
     assert_equal(FloatLiteral.__round__(3.0), 3.0)
     assert_equal(FloatLiteral.__round__(0.0), 0.0)
@@ -81,10 +81,7 @@ def test_round():
     assert_equal(FloatLiteral.__round__(inf), inf)
     assert_equal(FloatLiteral.__round__(neg_inf), neg_inf)
 
-    assert_equal(FloatLiteral.__round__(1.5, 0), 1.0)
-    assert_equal(FloatLiteral.__round__(2.5, 0), 2.0)
     assert_equal(FloatLiteral.__round__(1.6, 0), 2.0)
-    assert_equal(FloatLiteral.__round__(-2.5, 0), -2.0)
 
     assert_equal(FloatLiteral.__round__(1.5, 1), 1.5)
     assert_equal(FloatLiteral.__round__(1.123, 1), 1.1)
@@ -94,6 +91,17 @@ def test_round():
     assert_equal(FloatLiteral.__round__(-1.123, 1), -1.1)
     assert_equal(FloatLiteral.__round__(-1.198, 2), -1.2)
     assert_equal(FloatLiteral.__round__(-1.123, 2), -1.12)
+
+    # Test rounding to nearest even number
+    assert_equal(FloatLiteral.__round__(1.5, 0), 2.0)
+    assert_equal(FloatLiteral.__round__(2.5, 0), 2.0)
+    assert_equal(FloatLiteral.__round__(-2.5, 0), -2.0)
+    assert_equal(FloatLiteral.__round__(-1.5, 0), -2.0)
+
+    # Negative ndigits
+    assert_equal(FloatLiteral.__round__(123.456, -1), 120.0)
+    assert_equal(FloatLiteral.__round__(123.456, -2), 100.0)
+    assert_equal(FloatLiteral.__round__(123.456, -3), 0.0)
 
 
 fn round10(x: Float64) -> Float64:
