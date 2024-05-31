@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from bit import countl_zero
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
+from sys.ffi import C_char
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
@@ -951,7 +952,7 @@ struct String(
 
         var buffer = Self._buffer_type()
         buffer.resize(adjusted_span_len + 1, 0)
-        var ptr = self.unsafe_uint8_ptr()
+        var ptr = self.unsafe_ptr()
         for i in range(adjusted_span_len):
             buffer[i] = ptr[adjusted_span[i]]
         buffer[adjusted_span_len] = 0
@@ -1050,12 +1051,12 @@ struct String(
         buffer.resize(total_len + 1, 0)
         memcpy(
             DTypePointer(buffer.data),
-            self.unsafe_uint8_ptr(),
+            self.unsafe_ptr(),
             self_len,
         )
         memcpy(
             DTypePointer(buffer.data + self_len),
-            other.unsafe_uint8_ptr(),
+            other.unsafe_ptr(),
             other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
@@ -1265,27 +1266,23 @@ struct String(
         """
         pass
 
-    # TODO: Remove this method when #2317 is done
-    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
-        """Retrieves a pointer to the underlying memory.
-
-        Note that you should use `unsafe_uint8_ptr()` if you need to access the
-        pointer as we are now storing the bytes as UInt8.
-
-        See https://github.com/modularml/mojo/issues/2317 for more information.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
-        return self._buffer.data.bitcast[Int8]()
-
-    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return self._buffer.data.bitcast[UInt8]()
+        return self._buffer.data
+
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+        """Retrieves a C-string-compatible pointer to the underlying memory.
+
+        The returned pointer is guaranteed to be null, or NUL terminated.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.unsafe_ptr().bitcast[C_char]()
 
     fn as_bytes(self) -> List[UInt8]:
         """Retrieves the underlying byte sequence encoding the characters in
@@ -1360,7 +1357,7 @@ struct String(
         else:
             return buffer_len
 
-    fn _steal_ptr(inout self) -> DTypePointer[DType.int8]:
+    fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
 
@@ -1672,9 +1669,9 @@ struct String(
         if occurrences == -1:
             return self
 
-        var self_start = self.unsafe_uint8_ptr()
-        var self_ptr = self.unsafe_uint8_ptr()
-        var new_ptr = new.unsafe_uint8_ptr()
+        var self_start = self.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
+        var new_ptr = new.unsafe_ptr()
 
         var self_len = len(self)
         var old_len = len(old)
@@ -1801,8 +1798,8 @@ struct String(
 
     fn _interleave(self, val: String) -> String:
         var res = List[UInt8]()
-        var val_ptr = val.unsafe_uint8_ptr()
-        var self_ptr = self.unsafe_uint8_ptr()
+        var val_ptr = val.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
@@ -1841,7 +1838,7 @@ struct String(
     fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
         var copy: String = self
 
-        var char_ptr = copy.unsafe_uint8_ptr()
+        var char_ptr = copy.unsafe_ptr()
 
         for i in range(len(self)):
             var char: UInt8 = char_ptr[i]
@@ -1969,7 +1966,7 @@ struct String(
         for i in range(n):
             memcpy(
                 dest=buf.data + len_self * i,
-                src=self.unsafe_uint8_ptr(),
+                src=self.unsafe_ptr(),
                 count=len_self,
             )
         return String(buf^)

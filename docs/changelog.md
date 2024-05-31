@@ -542,9 +542,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
-  - `String.unsafe_ptr()` now returns an `UnsafePointer` (was `DTypePointer`)
-  - `String.unsafe_uint8_ptr()` now returns `UnsafePointer` (was
-    `DTypePointer`)
+  - Rename `String._as_ptr()` to `String.unsafe_ptr()`
+  - `String.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
+    (was `DTypePointer[DType.int8]`)
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer` (was
     `DTypePointer`).
   - `InlinedString.as_ptr()` has been renamed to `unsafe_ptr()` and now
@@ -554,6 +554,11 @@ by [@jayzhan211](https://github.com/jayzhan211))
     `DTypePointer[DType.int8]`).
   - Removed `StringRef.unsafe_uint8_ptr()`. The `unsafe_ptr()` method now has
     the same behavior.
+
+- Added `String.unsafe_cstr_ptr(self)` that returns an `UnsafePointer[C_char]`
+  for convenient interoperability with C APIs.
+
+- Added `C_char` type alias in `sys.ffi`.
 
 - Added `String.isspace()` method conformant with Python's universal separators.
 
