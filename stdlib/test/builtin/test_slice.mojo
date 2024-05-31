@@ -66,6 +66,9 @@ def test_has_end():
     alias is_end = Slice(None, None, None)._has_end()
     assert_false(is_end)
 
+def test_has_start():
+    alias has_start = Slice(None, None, -1)._has_start()
+    assert_false(has_start)
 
 struct SliceStringable:
     fn __init__(inout self):
@@ -80,6 +83,9 @@ def test_slice_stringable():
     assert_equal(s[2::-1], "2::-1")
     assert_equal(s[1:-1:2], "1:-1:2")
     assert_equal(s[:-1], "0:-1:1")
+    assert_equal(s[::1], "0::1") 
+    assert_equal(s[::], "0::1") 
+    assert_equal(s[::-1], "::-1")
 
 
 def test_indexing():
@@ -93,5 +99,6 @@ def main():
     test_none_end_folds()
     test_slicable()
     test_has_end()
+    test_has_start()
     test_slice_stringable()
     test_indexing()

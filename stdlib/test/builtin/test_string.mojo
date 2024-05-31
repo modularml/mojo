@@ -1081,8 +1081,6 @@ def test_indexing():
 
 
 def main():
-    """Testing my changes."""
-    '''
     test_constructors()
     test_copy()
     test_equality_operators()
@@ -1096,9 +1094,7 @@ def main():
     test_stringref_strip()
     test_ord()
     test_chr()
-    '''
     test_string_indexing()
-    '''
     test_atol()
     test_atol_base_0()
     test_atof()
@@ -1128,4 +1124,3 @@ def main():
     test_intable()
     test_string_mul()
     test_indexing()
-    '''
