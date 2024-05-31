@@ -122,12 +122,14 @@ struct UnsafePointer[
 
     @staticmethod
     fn _from_dtype_ptr[
-        dtype: DType
-    ](ptr: DTypePointer[dtype]) -> UnsafePointer[Scalar[dtype]]:
+        dtype: DType,
+    ](ptr: DTypePointer[dtype, address_space]) -> UnsafePointer[
+        Scalar[dtype], address_space
+    ]:
         # TODO:
         #   Is there a better way to create an UnsafePointer from a
         #   DTypePointer?
-        return UnsafePointer[Scalar[dtype]](address=int(ptr))
+        return UnsafePointer[Scalar[dtype], address_space](address=int(ptr))
 
     @staticmethod
     @always_inline
