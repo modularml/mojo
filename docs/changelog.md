@@ -484,7 +484,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 ### 🦋 Changed
 
-- `Coroutine` now requires a lifetime parameter. This parameter is set
+- `Coroutine` now requires a lifetime set parameter. This parameter is set
   automatically by the parser when calling an async function. It contains the
   lifetimes of all the arguments and any lifetime accesses by the arguments.
   This ensures that argument captures by async functions keep the arguments
