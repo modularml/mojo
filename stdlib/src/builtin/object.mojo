@@ -555,7 +555,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
                 + "'"
             )
         if self.is_func():
-            return "Function at address " + hex(self.get_as_func().value)
+            return "Function at address " + hex(int(self.get_as_func().value))
         if self.is_list():
             var res = String("[")
             for j in range(self.get_list_length()):

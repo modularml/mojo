@@ -11,19 +11,92 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-"""Provides the `hex` function.
+"""Provides the `hex` and `bin` functions.
 
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import List, Optional
+from collections import Optional
 from utils import InlineArray
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
+# ===----------------------------------------------------------------------===#
+# bin
+# ===----------------------------------------------------------------------===#
+
+
 @always_inline
-fn hex[T: Intable](value: T, prefix: StringLiteral = "0x") -> String:
+fn bin[
+    type: DType
+](num: Scalar[type], prefix: StringLiteral = "0b", /) -> String:
+    """Return the binary string representation an integral value.
+
+    ```mojo
+    print(bin(123))
+    print(bin(-123))
+    ```
+    ```plaintext
+    '0b1111011'
+    '-0b1111011'
+    ```
+
+    Parameters:
+        type: The data type of the integral scalar.
+
+    Args:
+        num: An integral scalar value.
+        prefix: The prefix of the formatted int.
+
+    Returns:
+        The binary string representation of num.
+    """
+    return _try_format_int(num, 2, prefix=prefix)
+
+
+# Need this until we have constraints to stop the compiler from matching this
+# directly to bin[type: DType](num: Scalar[type]).
+@always_inline("nodebug")
+fn bin(b: Scalar[DType.bool], prefix: StringLiteral = "0b", /) -> String:
+    """Returns the binary representation of a scalar bool.
+
+    Args:
+        b: A scalar bool value.
+        prefix: The prefix of the formatted int.
+
+    Returns:
+        The binary string representation of b.
+    """
+    return bin(b.cast[DType.int8]())
+
+
+@always_inline("nodebug")
+fn bin[T: Indexer](num: T, prefix: StringLiteral = "0b", /) -> String:
+    """Returns the binary representation of an indexer type.
+
+    Parameters:
+        T: The Indexer type.
+
+    Args:
+        num: An indexer value.
+        prefix: The prefix of the formatted int.
+
+    Returns:
+        The binary string representation of num.
+    """
+    return bin(Scalar[DType.index](index(num)))
+
+
+# ===----------------------------------------------------------------------===#
+# hex
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn hex[
+    type: DType
+](value: Scalar[type], prefix: StringLiteral = "0x", /) -> String:
     """Returns the hex string representation of the given integer.
 
     The hexadecimal representation is a base-16 encoding of the integer value.
@@ -32,7 +105,7 @@ fn hex[T: Intable](value: T, prefix: StringLiteral = "0x") -> String:
     subsequent digits are hex.
 
     Parameters:
-        T: The intable type to represent in hexadecimal.
+        type: The type of the Scalar to represent in hexadecimal.
 
     Args:
         value: The integer value to format.
@@ -41,9 +114,60 @@ fn hex[T: Intable](value: T, prefix: StringLiteral = "0x") -> String:
     Returns:
         A string containing the hex representation of the given integer.
     """
+    return _try_format_int(value, 16, prefix=prefix)
 
+
+@always_inline
+fn hex[T: Indexer](value: T, prefix: StringLiteral = "0x", /) -> String:
+    """Returns the hex string representation of the given integer.
+
+    The hexadecimal representation is a base-16 encoding of the integer value.
+
+    The returned string will be prefixed with "0x" to indicate that the
+    subsequent digits are hex.
+
+    Parameters:
+        T: The indexer type to represent in hexadecimal.
+
+    Args:
+        value: The integer value to format.
+        prefix: The prefix of the formatted int.
+
+    Returns:
+        A string containing the hex representation of the given integer.
+    """
+    return hex[DType.index](index(value), prefix)
+
+
+@always_inline
+fn hex(value: Scalar[DType.bool], prefix: StringLiteral = "0x", /) -> String:
+    """Returns the hex string representation of the given scalar bool.
+
+    The hexadecimal representation is a base-16 encoding of the bool.
+
+    The returned string will be prefixed with "0x" to indicate that the
+    subsequent digits are hex.
+
+    Args:
+        value: The bool value to format.
+        prefix: The prefix of the formatted int.
+
+    Returns:
+        A string containing the hex representation of the given bool.
+    """
+    return hex(value.cast[DType.int8]())
+
+
+# ===----------------------------------------------------------------------===#
+# Integer formatting utilities
+# ===----------------------------------------------------------------------===#
+
+
+fn _try_format_int[
+    type: DType
+](value: Scalar[type], radix: Int = 10, prefix: StringLiteral = "",) -> String:
     try:
-        return _format_int(int(value), 16, prefix=prefix)
+        return _format_int(value, radix, prefix=prefix)
     except e:
         # This should not be reachable as _format_int only throws if we pass
         # incompatible radix and custom digit chars, which we aren't doing
@@ -53,13 +177,10 @@ fn hex[T: Intable](value: T, prefix: StringLiteral = "0x") -> String:
         )
 
 
-# ===----------------------------------------------------------------------===#
-# Integer formatting utilities
-# ===----------------------------------------------------------------------===#
-
-
-fn _format_int(
-    value: Int64,
+fn _format_int[
+    type: DType
+](
+    value: Scalar[type],
     radix: Int = 10,
     digit_chars: StringLiteral = _DEFAULT_DIGIT_CHARS,
     prefix: StringLiteral = "",
@@ -73,9 +194,11 @@ fn _format_int(
 
 
 @always_inline
-fn _write_int(
+fn _write_int[
+    type: DType
+](
     inout fmt: Formatter,
-    value: Int64,
+    value: Scalar[type],
     radix: Int = 10,
     digit_chars: StringLiteral = _DEFAULT_DIGIT_CHARS,
     prefix: StringLiteral = "",
@@ -86,9 +209,11 @@ fn _write_int(
 
 
 @always_inline
-fn _try_write_int(
+fn _try_write_int[
+    type: DType
+](
     inout fmt: Formatter,
-    value: Int64,
+    value: Scalar[type],
     radix: Int = 10,
     digit_chars: StringLiteral = _DEFAULT_DIGIT_CHARS,
     prefix: StringLiteral = "",
@@ -102,6 +227,8 @@ fn _try_write_int(
     #
     # Check that the radix and available digit characters are valid
     #
+
+    constrained[type.is_integral(), "Expected integral"]()
 
     if radix < 2:
         return Error("Unable to format integer to string with radix < 2")
@@ -151,6 +278,7 @@ fn _try_write_int(
     #
 
     # Stack allocate enough bytes to store any formatted 64-bit integer
+    # TODO: use a dynamic size when #2194 is resolved
     alias CAPACITY: Int = 64
 
     var buf = InlineArray[Int8, CAPACITY](unsafe_uninitialized=True)
@@ -167,7 +295,7 @@ fn _try_write_int(
     var remaining_int = value
 
     @parameter
-    fn process_digits[get_digit_value: fn () capturing -> Int64]():
+    fn process_digits[get_digit_value: fn () capturing -> Scalar[type]]():
         while remaining_int:
             var digit_value = get_digit_value()
 
@@ -184,14 +312,14 @@ fn _try_write_int(
     if remaining_int >= 0:
 
         @parameter
-        fn pos_digit_value() -> Int64:
+        fn pos_digit_value() -> Scalar[type]:
             return remaining_int % radix
 
         process_digits[pos_digit_value]()
     else:
 
         @parameter
-        fn neg_digit_value() -> Int64:
+        fn neg_digit_value() -> Scalar[type]:
             return abs(remaining_int % -radix)
 
         process_digits[neg_digit_value]()
