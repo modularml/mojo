@@ -30,7 +30,7 @@ See [Mojo Dev Container &gt; Usage](https://github.com/benz0li/mojo-dev-containe
 on how to use with [Github Codespaces](https://docs.github.com/en/codespaces/developing-in-codespaces/creating-a-codespace-for-a-repository#creating-a-codespace-for-a-repository)
 or [VS Code](https://code.visualstudio.com/docs/devcontainers/containers).
 
-If there is a problem with the Dev Container, please open an issue at
+If there is a problem with the Dev Container, please open an issue
 [here](https://github.com/benz0li/mojo-dev-container/issues).
 
 ## Building the standard library
