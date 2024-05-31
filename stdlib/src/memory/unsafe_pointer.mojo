@@ -344,7 +344,7 @@ struct UnsafePointer[
         ](self.address)
 
     fn __str__(self) -> String:
-        return hex(self)
+        return hex(int(self))
 
     # ===-------------------------------------------------------------------===#
     # Methods
