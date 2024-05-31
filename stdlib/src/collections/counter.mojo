@@ -69,3 +69,14 @@ struct Counter[V: KeyElement](
         for item_ref in items:
             var item = item_ref[]
             self._data[item] = self._data.get(item, 0) + 1
+
+    def __getitem__(self, key: V) -> Int:
+        """Get the count of a key.
+
+        Args:
+            key: The key to get the count of.
+
+        Returns:
+            The count of the key.
+        """
+        return self._data.get(key, 0)

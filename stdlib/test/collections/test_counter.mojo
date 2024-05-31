@@ -23,5 +23,15 @@ def test_counter_construction():
     _ = Counter[String](List[String]())
 
 
+def test_counter_getitem():
+    c = Counter[Int](List[Int](1, 2, 2, 3, 3, 3, 4))
+    assert_equal(c[1], 1)
+    assert_equal(c[2], 2)
+    assert_equal(c[3], 3)
+    assert_equal(c[4], 1)
+    assert_equal(c[5], 0)
+
+
 def main():
     test_counter_construction()
+    test_counter_getitem()
