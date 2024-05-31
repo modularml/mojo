@@ -193,5 +193,5 @@ fn reversed[
     """
     var src = Reference(value)[].src
     return _DictEntryIter[K, V, dict_mutability, dict_lifetime, False](
-        src[]._reserved, 0, src
+        src[]._reserved - 1, 0, src
     )
