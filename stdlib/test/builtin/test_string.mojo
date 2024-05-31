@@ -26,6 +26,7 @@ from testing import (
 )
 
 from utils import StringRef
+from python import Python
 
 
 @value
@@ -89,6 +90,11 @@ fn test_constructors() raises:
     ptr[3] = 0
     var s3 = String(ptr, 4)
     assert_equal(s3, "abc")
+
+    # Construction from PythonObject
+    var py = Python.evaluate("1 + 1")
+    var s4 = String(py)
+    assert_equal(s4, "2")
 
 
 fn test_copy() raises:
