@@ -452,6 +452,7 @@ def test_dict():
     test["test_dict_update_empty_new", test_dict_update_empty_new]()
     test["test_mojo_issue_1729", test_mojo_issue_1729]()
     test["test dict or", test_dict_or]()
+    test["test dict popitem", test_dict_popitem]()
 
 
 def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
@@ -510,6 +511,21 @@ def test_find_get():
     assert_equal(some_dict.get("key").value()[], 1)
     assert_equal(some_dict.find("not_key").or_else(0), 0)
     assert_equal(some_dict.get("not_key", 0), 0)
+
+
+def test_dict_popitem():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    var item = dict.popitem()
+    assert_equal(item.key, "b")
+    assert_equal(item.value, 2)
+    item = dict.popitem()
+    assert_equal(item.key, "a")
+    assert_equal(item.value, 1)
+    with assert_raises(contains="KeyError"):
+        _ = dict.popitem()
 
 
 fn test_clear() raises:

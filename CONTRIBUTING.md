@@ -259,29 +259,29 @@ git rebase upstream/nightly
 #### Getting the nightly Mojo compiler
 
 Now that you're on the nightly branch, you need to install the latest nightly
-build.
-
-If you're using [`magic`](https://docs.modular.com/magic), create a new
-project environment with the `max-nightly` channel like this:
+Mojo compiler:
 
 ```bash
-magic init mojo-nightly --format mojoproject \
-  -c conda-forge -c https://conda.modular.com/max-nightly
+curl https://get.modular.com | sh -
+
+modular auth
+
+modular install nightly/mojo
 ```
 
-If you're [using conda](https://docs.modular.com/magic/conda), add the
-`https://conda.modular.com/max-nightly` channel to your `environment.yaml`
-file. For example:
+If you already have an older `nightly/mojo` compiler, replace
+`modular install nightly/mojo` with `modular update nightly/mojo`.
 
-```yaml
-[project]
-name = "Mojo nightly example"
-channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
-platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
+Then, follow the instructions from the `modular` tool in adding the `mojo`
+compiler to your `PATH` such as:
 
-[dependencies]
-max = "*"
+```bash
+echo export MODULAR_HOME="$HOME/.modular" >> ~/.zshrc
+echo 'export PATH="$HOME/.modular/pkg/packages.modular.com_nightly_mojo/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
 ```
+
+If you're using bash, replace the three `~/.zshrc` above with `~/.bashrc`.
 
 #### Mojo nightly vscode extension
 

@@ -13,7 +13,7 @@ listing:
       - RayTracing.ipynb
     type: grid
     grid-columns: 2
-    sort: 'false'
+    sort: "false"
 ---
 
 The following pages are rendered from the Jupyter notebooks that are [available
@@ -21,5 +21,5 @@ on GitHub](https://github.com/modularml/mojo/tree/main/examples/notebooks).
 
 <p><br/></p>
 
-:::🔥#docs
+:::{#docs}
 :::

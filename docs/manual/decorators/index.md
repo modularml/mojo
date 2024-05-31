@@ -13,6 +13,7 @@ listing:
       - parameter.ipynb
       - register-passable.ipynb
       - staticmethod.ipynb
+      - unroll.ipynb
       - value.ipynb
     type: grid
     page-size: 99
@@ -34,5 +35,5 @@ built directly into the compiler.
 
 The following pages describe each built-in decorator with examples.
 
-:::🔥#docs
+:::{#docs}
 :::
