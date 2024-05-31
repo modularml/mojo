@@ -19,7 +19,7 @@ from collections import Array
 ```
 """
 
-from math import sqrt
+from math import sqrt, acos, sin
 from algorithm import vectorize
 
 # ===----------------------------------------------------------------------===#
@@ -1196,31 +1196,32 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         """
         return (self * other) / (self.__abs__() * other.__abs__())
 
-    # TODO: need math funcs
-    # @always_inline("nodebug")
-    # fn theta(self, other: Self) -> Float64:
-    #     """Calculates the angle between two Arrays.
+    @always_inline("nodebug")
+    fn theta(self, other: Self) -> Float64:
+        """Calculates the angle between two Arrays.
 
-    #     Args:
-    #         other: The other Array.
+        Args:
+            other: The other Array.
 
-    #     Returns:
-    #         The result.
-    #     """
-    #     return acos(self.cos(other))
+        Returns:
+            The result.
+        """
+        return acos(self.cos(other))
 
-    # TODO: need math funcs
-    # @always_inline("nodebug")
-    # fn cross(self, other: Self) -> Self:
-    #     """Calculates the cross product between two Arrays.
-    #
-    #     Returns:
-    #         The result.
-    #     """
-    #     # TODO using matmul for big vectors
-    #     # TODO fma for 3d vectors
-    #     var magns = abs(self.vec) * abs(other.vec)
-    #     return magns * sin((self * other) / magns)
+    @always_inline("nodebug")
+    fn cross(self, other: Self) -> Self:
+        """Calculates the cross product between two Arrays.
+
+        Args:
+            other: The other Array.
+
+        Returns:
+            The result.
+        """
+        # TODO using matmul for big vectors
+        # TODO fma for 3d vectors
+        var magns = abs(self.vec) * abs(other.vec)
+        return magns * sin((self * other) / magns)
 
     fn apply(inout self, func: fn (Self._scalar_type) -> Self._scalar_type):
         """Apply a function to the Array inplace.
