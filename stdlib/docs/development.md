@@ -31,7 +31,7 @@ on how to use with [Github Codespaces](https://docs.github.com/en/codespaces/dev
 or [VS Code](https://code.visualstudio.com/docs/devcontainers/containers).
 
 If there is a problem with the Dev Container, please open an issue at
-<https://github.com/benz0li/mojo-dev-container/issues>.
+[here](https://github.com/benz0li/mojo-dev-container/issues).
 
 ## Building the standard library
 
