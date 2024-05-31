@@ -285,12 +285,10 @@ fn test_string_indexing() raises:
 
     assert_equal("!!ojoM olleH", str[::-1])
 
-    assert_equal("!!ojoM oll", str[2::-1])
-
+    assert_equal("leH", str[2::-1])
     assert_equal("!oo le", str[::-2])
-
-    assert_equal("!jMolH", str[:-1:-2])
-
+    assert_equal("", str[:-1:-2])
+    assert_equal("M o", str[6:3:-1])
 
 fn test_atol() raises:
     # base 10

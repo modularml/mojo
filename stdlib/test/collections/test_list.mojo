@@ -48,6 +48,16 @@ def test_list():
     assert_equal(3, list[-2])
     assert_equal(4, list[-1])
 
+    var slice = list[::-1]
+    for i in range(len(slice)):
+        assert_equal(slice[i], list[len(list)-(i+1)])
+
+    slice = list[:2:-1]
+    test = List(4, 3)
+
+    for i in range(len(slice)):
+        assert_equal(slice[i], test[i])
+
     list[2] = -2
     assert_equal(-2, list[2])
 

@@ -927,7 +927,7 @@ struct String(
             A new string containing the string at the specified positions.
         """
 
-        var adjusted_span = self._adjust_span(span)
+        var adjusted_span = Slice._adjust_span(self, span)
         var adjusted_span_len = adjusted_span.unsafe_indices()
         if adjusted_span.step == 1:
             return StringRef(self._buffer.data + span.start, adjusted_span_len)
@@ -1133,26 +1133,6 @@ struct String(
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
-
-    @always_inline
-    fn _adjust_span(self, span: Slice) -> Slice:
-        """Adjusts the span based on the string length."""
-        var adjusted_span = span
-
-        if adjusted_span.start < 0:
-            adjusted_span.start = len(self) + adjusted_span.start
-
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
-            adjusted_span.end = len(self) + adjusted_span.end
-
-        if span.step < 0:
-            var tmp = adjusted_span.end
-            adjusted_span.end = adjusted_span.start - 1
-            adjusted_span.start = tmp - 1
-
-        return adjusted_span
 
     fn format_to(self, inout writer: Formatter):
         """

@@ -90,9 +90,12 @@ struct Slice(Stringable, EqualityComparable):
             end: The end value.
             step: The step value.
         """
-        self.start = _default_or(start, 0)
-        self.end = _default_or(end, _int_max_value())
         self.step = _default_or(step, 1)
+        if self.step < 0:
+            self.start = _default_or(start, _int_max_value())
+        else:
+            self.start = _default_or(start, 0)
+        self.end = _default_or(end, _int_max_value())
 
     fn __str__(self) -> String:
         """Gets the string representation of the span.
@@ -100,7 +103,10 @@ struct Slice(Stringable, EqualityComparable):
         Returns:
             The string representation of the span.
         """
-        var res = str(self.start)
+
+        var res = String()
+        if self._has_start():
+            res += str(self.start)
         res += ":"
         if self._has_end():
             res += str(self.end)
@@ -163,8 +169,37 @@ struct Slice(Stringable, EqualityComparable):
         return self.start + index(idx) * self.step
 
     @always_inline("nodebug")
+    fn _has_start(self) -> Bool:
+        return self.start != _int_max_value()
+
+    @always_inline("nodebug")
     fn _has_end(self) -> Bool:
         return self.end != _int_max_value()
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn _adjust_span[T: Sized](object: T, span: Self) -> Self:
+        """Adjusts the provided slice based on the length of the object"""
+
+        var adjusted_span = span
+         
+        if adjusted_span.start < 0:
+            adjusted_span.start = len(object) + adjusted_span.start
+        if adjusted_span.end < 0:
+            adjusted_span.end = len(object) + adjusted_span.end
+
+        if adjusted_span.step < 0:
+            if not adjusted_span._has_start():
+                adjusted_span.start = len(object) - 1
+            if not adjusted_span._has_end():
+                adjusted_span.end = -1
+        else:
+            if not adjusted_span._has_start():
+                adjusted_span.start = 0
+            if not adjusted_span._has_end():
+                adjusted_span.end = len(object)
+        
+        return adjusted_span
 
 
 @always_inline("nodebug")
