@@ -43,6 +43,25 @@ fn test_local_import(inout python: Python) -> String:
         return str(e)
 
 
+fn test_dynamic_import(inout python: Python, times: Int = 1) -> String:
+    alias INLINE_MODULE = """
+called_already = False
+def hello(name):
+    global called_already
+    if not called_already:
+        called_already = True
+        return f"Hello {name}!"
+    return "Again?"
+"""
+    try:
+        var mod = Python.evaluate(INLINE_MODULE, file=True)
+        for _ in range(times - 1):
+            mod.hello("world")
+        return str(mod.hello("world"))
+    except e:
+        return str(e)
+
+
 fn test_call(inout python: Python) -> String:
     try:
         Python.add_to_path(TEST_DIR)
@@ -64,6 +83,13 @@ fn test_call(inout python: Python) -> String:
 def main():
     var python = Python()
     assert_equal(test_local_import(python), "orange")
+
+    # Test twice to ensure that the module state is fresh.
+    assert_equal(test_dynamic_import(python), "Hello world!")
+    assert_equal(test_dynamic_import(python), "Hello world!")
+
+    # Test with two calls to ensure that the state is persistent.
+    assert_equal(test_dynamic_import(python, times=2), "Again?")
 
     assert_equal(
         test_call(python),

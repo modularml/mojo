@@ -251,7 +251,7 @@ fn sleep(sec: Float64):
         int((sec - total_secs) * NANOSECONDS_IN_SECOND),
     )
     var req = UnsafePointer[_CTimeSpec].address_of(tv_spec)
-    var rem = UnsafePointer[_CTimeSpec].get_null()
+    var rem = UnsafePointer[_CTimeSpec]()
     _ = external_call["nanosleep", Int32](req, rem)
 
 

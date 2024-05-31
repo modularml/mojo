@@ -44,9 +44,7 @@ def test_last_error():
     # GetProcessId takes the handle to a process and returns its id. If the
     # handle is null this will fail and returns an invalid handle error (error
     # code 6).
-    var succeeded = external_call["GetProcessId", Int](
-        UnsafePointer[Int].get_null()
-    )
+    var succeeded = external_call["GetProcessId", Int](UnsafePointer[Int]())
 
     assert_equal(succeeded, 0)
 

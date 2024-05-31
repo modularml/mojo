@@ -280,9 +280,9 @@ struct VariadicListMem[
 
     # Provide support for variadics of *inout* arguments.  The reference will
     # automatically be inferred to be mutable, and the !kgen.variadic will have
-    # convention=byref.
+    # convention=inout.
     alias _inout_variadic_type = __mlir_type[
-        `!kgen.variadic<`, Self._mlir_ref_type, `, byref>`
+        `!kgen.variadic<`, Self._mlir_ref_type, `, inout>`
     ]
 
     @always_inline

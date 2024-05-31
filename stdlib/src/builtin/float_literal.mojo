@@ -250,18 +250,24 @@ struct FloatLiteral(
         if not self._is_normal():
             return self
 
+        alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
+        alias neg_one = __mlir_attr.`#kgen.int_literal<-1> : !kgen.int_literal`
         var truncated: IntLiteral = self.__int_literal__()
-        var result: Self
-        if abs(self) - abs(truncated) <= 0.5:
-            result = Self(truncated)
-        elif self > 0:
-            result = Self(truncated + 1)
+        var abs_diff = abs(self - truncated)
+        var plus_one = one if self > 0 else neg_one
+        if abs_diff == 0.5:
+            # Round to the nearest even number.
+            if truncated % 2 == 0:
+                return Self(truncated)
+            else:
+                return Self(truncated + plus_one)
+        elif abs_diff > 0.5:
+            return Self(truncated + plus_one)
         else:
-            result = Self(truncated - 1)
-        return result
+            return Self(truncated)
 
     @always_inline("nodebug")
-    fn __round__(self, ndigits: IntLiteral) -> Self:
+    fn __round__(self, ndigits: Int) -> Self:
         """Return the rounded value of the FloatLiteral.
 
         Args:
@@ -275,24 +281,39 @@ struct FloatLiteral(
             return self
 
         alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
+        alias neg_one = __mlir_attr.`#kgen.int_literal<-1> : !kgen.int_literal`
         alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
         var multiplier = one
+        var target: Self = self
         # TODO: Use IntLiteral.__pow__() when it's implemented.
-        for _ in range(ndigits):
+        for _ in range(abs(ndigits)):
             multiplier = __mlir_op.`kgen.int_literal.binop`[
                 oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
             ](multiplier, ten)
-        var target: Self = self * Self(multiplier)
-        var truncated: Self = target.__int_literal__()
-        var result: Self
-        if abs(target) - abs(truncated) <= 0.5:
-            result = truncated
-        elif self > 0:
-            result = truncated + 1
-        else:
-            result = truncated - 1
         if ndigits > 0:
+            target *= Self(multiplier)
+        elif ndigits < 0:
+            target /= Self(multiplier)
+        else:
+            return self.__round__()
+        var truncated: IntLiteral = target.__int_literal__()
+        var result: Self
+        var abs_diff = abs(target - truncated)
+        var plus_one = one if self > 0 else neg_one
+        if abs_diff == 0.5:
+            # Round to the nearest even number.
+            if truncated % 2 == 0:
+                result = Self(truncated)
+            else:
+                result = Self(truncated + plus_one)
+        elif abs_diff <= 0.5:
+            result = Self(truncated)
+        else:
+            result = Self(truncated + plus_one)
+        if ndigits >= 0:
             result /= Self(multiplier)
+        elif ndigits < 0:
+            result *= Self(multiplier)
         return result
 
     # ===------------------------------------------------------------------===#

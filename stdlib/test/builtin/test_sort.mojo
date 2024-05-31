@@ -446,7 +446,7 @@ fn test_partition_top_k(length: Int, k: Int) raises:
 
 
 fn test_sort_stress() raises:
-    var lens = VariadicList[Int](3, 100, 117, 223, 500, 1000, 1500, 2000, 3000)
+    var lens = List[Int](3, 100, 117, 223, 500, 1000, 1500, 2000, 3000)
     var random_seed = 0
     seed(random_seed)
 
