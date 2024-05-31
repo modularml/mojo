@@ -26,7 +26,7 @@ from memory import UnsafePointer
 
 from utils import StringRef
 
-from ._cpython import CPython, Py_eval_input
+from ._cpython import CPython, Py_eval_input, Py_file_input
 from .object import PythonObject
 
 
@@ -93,28 +93,62 @@ struct Python:
         return cpython.PyRun_SimpleString(code)
 
     @staticmethod
-    fn evaluate(expr: StringRef) raises -> PythonObject:
+    fn evaluate(
+        expr: StringRef, file: Bool = False, name: StringRef = "__main__"
+    ) raises -> PythonObject:
         """Executes the given Python code.
 
         Args:
             expr: The Python expression to evaluate.
+            file: Evaluate as a file and return the module.
+            name: The name of the module (most relevant if `file` is True).
 
         Returns:
             `PythonObject` containing the result of the evaluation.
         """
         var cpython = _get_global_python_itf().cpython()
-        var module = PythonObject(cpython.PyImport_AddModule("__main__"))
+        var module = PythonObject(cpython.PyImport_AddModule(name))
         # PyImport_AddModule returns a borrowed reference - IncRef it to keep it alive.
         cpython.Py_IncRef(module.py_object)
         var dict_obj = PythonObject(cpython.PyModule_GetDict(module.py_object))
         # PyModule_GetDict returns a borrowed reference - IncRef it to keep it alive.
         cpython.Py_IncRef(dict_obj.py_object)
-        var result = cpython.PyRun_String(
-            expr, dict_obj.py_object, dict_obj.py_object, Py_eval_input
-        )
-        # We no longer need module and dictionary, release them.
-        Python.throw_python_exception_if_error_state(cpython)
-        return PythonObject(result)
+        if file:
+            # We compile the code as provided and execute in the module
+            # context. Note that this may be an existing module if the provided
+            # module name is not unique. The name here is used only for this
+            # code object, not the module itself.
+            #
+            # The Py_file_input is the code passed to the parsed to indicate
+            # the initial state: this is essentially whether it is expecting
+            # to compile an expression, a file or statements (e.g. repl).
+            var code = PythonObject(
+                cpython.Py_CompileString(expr, "<evaluate>", Py_file_input)
+            )
+            # For this evaluation, we pass the dictionary both as the globals
+            # and the locals. This is because the globals is defined as the
+            # dictionary for the module scope, and locals is defined as the
+            # dictionary for the *current* scope. Since we are executing at
+            # the module scope for this eval, they should be the same object.
+            var result = PythonObject(
+                cpython.PyEval_EvalCode(
+                    code.py_object, dict_obj.py_object, dict_obj.py_object
+                )
+            )
+            Python.throw_python_exception_if_error_state(cpython)
+            _ = code^
+            _ = result^
+            return module
+        else:
+            # We use the result of evaluating the expression directly, and allow
+            # all the globals/locals to be discarded. See above re: why the same
+            # dictionary is being used here for both globals and locals.
+            var result = cpython.PyRun_String(
+                expr, dict_obj.py_object, dict_obj.py_object, Py_eval_input
+            )
+            # We no longer need module and dictionary, release them.
+            Python.throw_python_exception_if_error_state(cpython)
+            return PythonObject(result)
 
     @staticmethod
     fn add_to_path(dir_path: String) raises:

@@ -361,6 +361,36 @@ struct CPython:
         self._inc_total_rc()
         return result
 
+    fn PyEval_EvalCode(
+        inout self,
+        co: PyObjectPtr,
+        globals: PyObjectPtr,
+        locals: PyObjectPtr,
+    ) -> PyObjectPtr:
+        var result = PyObjectPtr(
+            self.lib.get_function[
+                fn (
+                    PyObjectPtr, PyObjectPtr, PyObjectPtr
+                ) -> DTypePointer[DType.int8]
+            ]("PyEval_EvalCode")(co, globals, locals)
+        )
+        self._inc_total_rc()
+        return result
+
+    fn Py_CompileString(
+        inout self,
+        strref: StringRef,
+        filename: StringRef,
+        compile_mode: Int,
+    ) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (
+                DTypePointer[DType.uint8], DTypePointer[DType.uint8], Int32
+            ) -> PyObjectPtr
+        ]("Py_CompileString")(strref.data, filename.data, Int32(compile_mode))
+        self._inc_total_rc()
+        return r
+
     fn PyObject_GetAttrString(
         inout self,
         obj: PyObjectPtr,
