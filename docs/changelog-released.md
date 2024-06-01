@@ -316,6 +316,7 @@ modular update mojo
   `StringRef`, a `StringSlice` is safely tied to the lifetime of the data it
   points to.
 
+  - Add new `as_string_slice()` method to `String` and `StringLiteral`.
   - Add `StringSlice` intializer from an `UnsafePointer` and a length in bytes.
   - Changed `Formatter.write_str()` to take a safe `StringSlice`.
 
