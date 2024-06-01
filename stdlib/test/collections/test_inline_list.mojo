@@ -164,6 +164,22 @@ def test_indexing():
     assert_equal(list[0], 0)
 
 
+def test_list_copy_constructor():
+    var vec = InlineList[Int](1, 2, 3)
+    var vec_copy = vec
+    assert_equal(vec_copy[0], 1)
+    assert_equal(vec_copy[1], 2)
+    assert_equal(vec_copy[2], 3)
+
+
+def test_list_move_constructor():
+    var vec = InlineList[Int](1, 2, 3)
+    var vec_move = vec^
+    assert_equal(vec_move[0], 1)
+    assert_equal(vec_move[1], 2)
+    assert_equal(vec_move[2], 3)
+
+
 def main():
     test_list()
     test_append_triggers_a_move()
@@ -175,3 +191,5 @@ def main():
     test_list_count()
     test_list_boolable()
     test_indexing()
+    test_list_copy_constructor()
+    test_list_move_constructor()

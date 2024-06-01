@@ -72,7 +72,9 @@ struct _InlineListIter[
 
 
 # TODO: Provide a smarter default for the capacity.
-struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
+struct InlineList[ElementType: CollectionElement, capacity: Int = 16](
+    Sized, CollectionElement
+):
     """A list allocated on the stack with a maximum size known at compile time.
 
     It is backed by an `InlineArray` and an `Int` to represent the size.
@@ -110,6 +112,26 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         self = Self()
         for value in values:
             self.append(value[])
+
+    fn __copyinit__(inout self, existing: Self):
+        """Creates a copy of the given list.
+
+        Args:
+            existing: The list to copy.
+        """
+
+        self = Self()
+        for i in range(len(existing)):
+            self.append(existing[i])
+
+    fn __moveinit__(inout self, owned existing: Self):
+        """Move data of an existing list into a new one.
+
+        Args:
+            existing: The existing list.
+        """
+        self._array = existing._array
+        self._size = existing._size
 
     @always_inline
     fn __len__(self) -> Int:
