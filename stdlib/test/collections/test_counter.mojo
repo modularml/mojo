@@ -96,6 +96,20 @@ def test_iter_items():
     assert_equal(sum, 3)
 
 
+def test_total():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    assert_equal(c.total(), 3)
+
+
 def main():
     test_counter_construction()
     test_counter_getitem()
+    test_iter()
+    test_iter_keys()
+    test_iter_items()
+    test_iter_values()
+    test_iter_values_mut()
+    test_total()

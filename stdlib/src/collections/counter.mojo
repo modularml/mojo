@@ -190,3 +190,16 @@ struct Counter[V: KeyElement](
     fn clear(inout self):
         """Remove all elements from the Counter."""
         self._data.clear()
+
+    # Special methods for counter
+
+    fn total(self) -> Int:
+        """Return the total of all counts in the Counter.
+
+        Returns:
+            The total of all counts in the Counter.
+        """
+        var total = 0
+        for count_ref in self._data.values():
+            total += count_ref[]
+        return total
