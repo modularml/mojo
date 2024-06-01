@@ -157,6 +157,75 @@ fn hex[prefix: StringLiteral = "0x"](value: Scalar[DType.bool], /) -> String:
 
 
 # ===----------------------------------------------------------------------===#
+# oct
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn oct[prefix: StringLiteral = "0o"](value: Scalar, /) -> String:
+    """Returns the octal string representation of the given integer.
+
+    The octal representation is a base-8 encoding of the integer value.
+
+    The returned string will be prefixed with "0o" to indicate that the
+    subsequent digits are octal.
+
+    Parameters:
+        prefix: The prefix of the formatted int.
+
+    Args:
+        value: The integer value to format.
+
+    Returns:
+        A string containing the octal representation of the given integer.
+    """
+    return _try_format_int[prefix](value, 8)
+
+
+@always_inline
+fn oct[T: Indexer, //, prefix: StringLiteral = "0o"](value: T, /) -> String:
+    """Returns the octal string representation of the given integer.
+
+    The octal representation is a base-8 encoding of the integer value.
+
+    The returned string will be prefixed with "0o" to indicate that the
+    subsequent digits are octal.
+
+    Parameters:
+        T: The indexer type to represent in octal.
+        prefix: The prefix of the formatted int.
+
+    Args:
+        value: The integer value to format.
+
+    Returns:
+        A string containing the octal representation of the given integer.
+    """
+    return oct[prefix](Scalar[DType.index](index(value)))
+
+
+@always_inline
+fn oct[prefix: StringLiteral = "0o"](value: Scalar[DType.bool], /) -> String:
+    """Returns the octal string representation of the given scalar bool.
+
+    The octal representation is a base-8 encoding of the bool.
+
+    The returned string will be prefixed with "0o" to indicate that the
+    subsequent digits are octal.
+
+    Parameters:
+        prefix: The prefix of the formatted int.
+
+    Args:
+        value: The bool value to format.
+
+    Returns:
+        A string containing the octal representation of the given bool.
+    """
+    return oct[prefix](value.cast[DType.int8]())
+
+
+# ===----------------------------------------------------------------------===#
 # Integer formatting utilities
 # ===----------------------------------------------------------------------===#
 

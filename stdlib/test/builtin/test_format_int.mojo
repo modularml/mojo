@@ -106,9 +106,50 @@ def test_bin_bool():
     assert_equal(bin(False), "0b0")
 
 
+def test_oct_scalar():
+    assert_equal(oct(Int32(234)), "0o352")
+    assert_equal(oct(Int32(-23)), "-0o27")
+    assert_equal(oct(Int32(0)), "0o0")
+    assert_equal(oct(Scalar[DType.bool](True)), "0o1")
+    assert_equal(oct(Scalar[DType.bool](False)), "0o0")
+
+
+def test_oct_int():
+    assert_equal(oct(768), "0o1400")
+    assert_equal(oct(-12), "-0o14")
+    assert_equal(oct(23623564), "0o132073614")
+    assert_equal(oct(0), "0o0")
+    assert_equal(oct(1), "0o1")
+    assert_equal(oct(Int(7658)), "0o16752")
+
+
+def test_oct_bool():
+    assert_equal(oct(True), "0o1")
+    assert_equal(oct(False), "0o0")
+
+
 def test_indexer():
     assert_equal(bin(Ind()), "0b1")
     assert_equal(hex(Ind()), "0x1")
+    assert_equal(oct(Ind()), "0o1")
+
+
+def test_different_prefix():
+    assert_equal(bin["binary"](Int8(1)), "binary1")
+    assert_equal(hex["hexidecimal"](Int8(1)), "hexidecimal1")
+    assert_equal(oct["octal"](Int8(1)), "octal1")
+
+    assert_equal(bin["binary"](0), "binary0")
+    assert_equal(hex["hexidecimal"](0), "hexidecimal0")
+    assert_equal(oct["octal"](0), "octal0")
+
+    assert_equal(bin["I'mAnIndexer!"](Ind()), "I'mAnIndexer!1")
+    assert_equal(hex["I'mAnIndexer!"](Ind()), "I'mAnIndexer!1")
+    assert_equal(oct["I'mAnIndexer!"](Ind()), "I'mAnIndexer!1")
+
+    assert_equal(bin["test"](Scalar[DType.bool](True)), "test1")
+    assert_equal(hex["test"](Scalar[DType.bool](True)), "test1")
+    assert_equal(oct["test"](Scalar[DType.bool](True)), "test1")
 
 
 def main():
@@ -118,3 +159,6 @@ def main():
     test_bin_int()
     test_bin_bool()
     test_indexer()
+    test_oct_scalar()
+    test_oct_bool()
+    test_oct_int()
