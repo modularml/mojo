@@ -14,7 +14,7 @@
 
 from memory import UnsafePointer
 from memory.unsafe_pointer import move_from_pointee, move_pointee
-from test_utils import MoveCounter
+from test_utils import MoveCounter, ExplicitCopyOnly
 from testing import assert_equal, assert_not_equal, assert_true
 
 
@@ -79,6 +79,19 @@ def test_unsafepointer_move_pointee_move_count():
     move_pointee(src=ptr, dst=ptr_2)
 
     assert_equal(2, ptr_2[].move_count)
+
+
+def test_unsafepointer_initialize_pointee_explicit_copy():
+    var ptr = UnsafePointer[ExplicitCopyOnly].alloc(1)
+
+    var orig = ExplicitCopyOnly(5)
+    assert_equal(orig.copy_count, 0)
+
+    # Test initialize pointee from `ExplicitlyCopyable` type
+    ptr.initialize_pointee_explicit_copy(orig)
+
+    assert_equal(ptr[].value, 5)
+    assert_equal(ptr[].copy_count, 1)
 
 
 def test_refitem():
@@ -189,6 +202,7 @@ def main():
 
     test_unsafepointer_of_move_only_type()
     test_unsafepointer_move_pointee_move_count()
+    test_unsafepointer_initialize_pointee_explicit_copy()
 
     test_bitcast()
     test_unsafepointer_string()

@@ -22,6 +22,8 @@ from utils import Span
 
 from . import InlineArray
 
+from sys.intrinsics import _type_is_eq
+
 
 @value
 struct _SpanIter[
@@ -112,16 +114,23 @@ struct Span[
 
     @always_inline
     fn __init__[
-        size: Int
-    ](inout self, array: Reference[InlineArray[T, size], is_mutable, lifetime]):
+        T2: CollectionElementNew, size: Int
+    ](
+        inout self,
+        array: Reference[InlineArray[T2, size], is_mutable, lifetime],
+    ):
         """Construct a Span from an InlineArray.
 
         Parameters:
+            T2: The type of the elements in the span.
             size: The size of the InlineArray.
 
         Args:
             array: The array to which the span refers.
         """
+
+        constrained[_type_is_eq[T, T2](), "array element is not Span.T"]()
+
         self._data = UnsafePointer(array).bitcast[T]()
         self._len = size
 

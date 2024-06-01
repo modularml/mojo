@@ -16,6 +16,12 @@ what we publish.
 
 ### ⭐️ New
 
+- Added new `ExplicitlyCopyable` trait, to mark types that can be copied
+  explicitly, but which might not be implicitly copyable.
+
+  This supports work to transition the standard library collection types away
+  from implicit copyability, which can lead to unintended expensive copies.
+
 - `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
 ([PR #2701](https://github.com/modularml/mojo/pull/2701)
 by [@jayzhan211](https://github.com/jayzhan211))

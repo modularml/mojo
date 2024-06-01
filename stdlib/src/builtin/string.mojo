@@ -726,6 +726,14 @@ struct String(
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
 
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.__copyinit__(other)
+
     @always_inline
     fn __init__(inout self, str: StringRef):
         """Construct a string from a StringRef object.
