@@ -160,6 +160,18 @@ def test_file_write():
     read_file.close()
 
 
+def test_file_write_span():
+    var content: String = "The quick brown fox jumps over the lazy dog"
+    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write_span"
+    var f = open(TEMP_FILE, "w")
+    f.write(content.as_bytes_slice())
+    f.close()
+
+    var read_file = open(TEMP_FILE, "r")
+    assert_equal(read_file.read(), content)
+    read_file.close()
+
+
 def test_file_write_again():
     var unexpected_content: String = "foo bar baz"
     var expected_content: String = "foo bar"
