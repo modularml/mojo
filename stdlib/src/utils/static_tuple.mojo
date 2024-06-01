@@ -247,7 +247,10 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
 
 
 @value
-struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
+struct InlineArray[
+    ElementType: CollectionElementNew,
+    size: Int,
+](Sized, Movable, Copyable, ExplicitlyCopyable):
     """A fixed-size sequence of size homogeneous elements where size is a constant expression.
 
     Parameters:
@@ -301,6 +304,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             unsafe_uninitialized: A boolean to indicate if the array should be initialized.
                 Always set to `True` (it's not actually used inside the constructor).
         """
+        _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
@@ -315,26 +319,60 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         @parameter
         for i in range(size):
-            var ptr = self._get_reference_unsafe(i)
-            initialize_pointee_copy(UnsafePointer[Self.ElementType](ptr), fill)
+            var ptr = UnsafePointer(self._get_reference_unsafe(i))
+            ptr.initialize_pointee_explicit_copy(fill)
 
     @always_inline
-    fn __init__(inout self, *elems: Self.ElementType):
+    fn __init__(inout self, owned *elems: Self.ElementType):
         """Constructs an array given a set of arguments.
 
         Args:
             elems: The element types.
         """
-        debug_assert(len(elems) == size, "Elements must be of length size")
+
+        self = Self(storage=elems^)
+
+    @always_inline("nodebug")
+    fn __init__(
+        inout self,
+        *,
+        owned storage: VariadicListMem[Self.ElementType, _, _],
+    ):
+        """Construct an array from a low-level internal representation.
+
+        Args:
+            storage: The variadic list storage to construct from.
+        """
+
+        debug_assert(len(storage) == size, "Elements must be of length size")
         _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
+        # Move each element into the array storage.
         @parameter
         for i in range(size):
             var eltref = self._get_reference_unsafe(i)
-            initialize_pointee_move(
-                UnsafePointer[Self.ElementType](eltref), elems[i]
+            move_pointee(
+                dst=UnsafePointer[Self.ElementType](eltref),
+                src=UnsafePointer(storage[i]),
             )
+
+        # Mark the elements as already destroyed.
+        storage._is_owned = False
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+
+        self = Self(unsafe_uninitialized=True)
+
+        for idx in range(size):
+            var ptr = self.unsafe_ptr() + idx
+
+            ptr.initialize_pointee_explicit_copy(other[idx])
 
     # ===------------------------------------------------------------------===#
     # Operator dunders

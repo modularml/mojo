@@ -136,6 +136,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Ceilable,
     CeilDivable,
     CollectionElement,
+    CollectionElementNew,
     Floorable,
     Hashable,
     Intable,
@@ -205,6 +206,15 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
         ](casted)
         self.value = vec
+
+    @always_inline("nodebug")
+    fn __init__(inout self, *, other: SIMD[type, size]):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.__copyinit__(other)
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Int):

@@ -28,7 +28,7 @@ from sys.intrinsics import _type_is_eq
 # ===----------------------------------------------------------------------===#
 @value
 struct _InlineListIter[
-    T: CollectionElement,
+    T: CollectionElementNew,
     capacity: Int,
     list_mutability: Bool,
     list_lifetime: AnyLifetime[list_mutability].type,
@@ -72,7 +72,7 @@ struct _InlineListIter[
 
 
 # TODO: Provide a smarter default for the capacity.
-struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
+struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     """A list allocated on the stack with a maximum size known at compile time.
 
     It is backed by an `InlineArray` and an `Int` to represent the size.
@@ -109,7 +109,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         debug_assert(len(values) <= capacity, "List is full.")
         self = Self()
         for value in values:
-            self.append(value[])
+            self.append(ElementType(other=value[]))
 
     @always_inline
     fn __len__(self) -> Int:
@@ -176,7 +176,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
+              traits `EqualityComparable` and `CollectionElementNew`.
 
         Args:
             value: The value to find.
@@ -203,7 +203,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
+              traits `EqualityComparable` and `CollectionElementNew`.
 
         Args:
             value: The value to count.

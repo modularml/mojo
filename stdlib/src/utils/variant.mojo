@@ -174,7 +174,7 @@ struct Variant[*Ts: CollectionElement](
         self._get_state()[] = Self._check[T]()
         initialize_pointee_move(self._get_ptr[T](), value^)
 
-    fn __init__(inout self, other: Self):
+    fn __init__(inout self, *, other: Self):
         """Explicitly creates a deep copy of an existing variant.
 
         Args:

@@ -93,7 +93,7 @@ def test_pow():
 def test_gcd():
     var l = List(2, 4, 6, 8, 16)
     var il = InlineArray[Int, 5](4, 16, 2, 8, 6)
-    assert_equal(gcd(Span(il)), 2)
+    assert_equal(gcd(Span[Int](il)), 2)
     assert_equal(gcd(2, 4, 6, 8, 16), 2)
     assert_equal(gcd(l), 2)
     assert_equal(gcd(88, 24), 8)

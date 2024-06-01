@@ -20,7 +20,7 @@ from memory import UnsafePointer
 """
 
 from sys import alignof, sizeof
-from sys.intrinsics import _mlirtype_is_eq
+from sys.intrinsics import _mlirtype_is_eq, _type_is_eq
 
 from memory.memory import _free, _malloc
 
@@ -351,6 +351,39 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn initialize_pointee_explicit_copy[
+        T2: ExplicitlyCopyable
+    ](inout self: UnsafePointer[T, address_space], value: T2):
+        """Emplace a copy of `value` into this pointer location.
+
+        The pointer memory location is assumed to contain uninitialized data,
+        and consequently the current contents of this pointer are not destructed
+        before writing `value`. Similarly, ownership of `value` is logically
+        transferred into the pointer location.
+
+        When compared to `initialize_pointee_move`, this avoids an extra move on
+        the callee side when the value must be copied.
+
+        Parameters:
+            T2: The type the pointer points to, which must be
+               `ExplicitlyCopyable`.
+
+        Args:
+            value: The value to emplace.
+        """
+
+        constrained[
+            address_space == AddressSpace.GENERIC,
+            "can not initialize pointer in non-GENERIC address space",
+        ]()
+
+        constrained[_type_is_eq[T, T2](), "pointee type is not self.T"]()
+
+        var ptr = self.bitcast[T2, address_space = AddressSpace.GENERIC]()
+
+        __get_address_as_uninit_lvalue(ptr.address) = T2(other=value)
 
     @always_inline
     fn free(self):
