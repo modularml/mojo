@@ -458,7 +458,6 @@ struct FileHandle:
         if err_msg:
             raise (err_msg^).consume_as_error()
 
-
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
         return self^
