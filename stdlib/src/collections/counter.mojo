@@ -226,6 +226,19 @@ struct Counter[V: KeyElement](
         sort[type = CountTuple[V], cmp_fn=comparator](items)
         return items[:n]
 
+    fn elements(self) -> List[V]:
+        """Return an iterator over elements repeating each as many times as its count.
+
+        Returns:
+            An iterator over the elements in the Counter.
+        """
+        var elements: List[V] = List[V]()
+        for item_ref in self._data.items():
+            var item = item_ref[]
+            for _ in range(item.value):
+                elements.append(item.key)
+        return elements
+
 
 struct CountTuple[V: KeyElement](
     CollectionElement,

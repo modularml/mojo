@@ -118,9 +118,27 @@ def test_most_common():
     assert_equal(most_common[1][1][Int], 2)
 
 
+def test_elements():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+    c["c"] = 3
+
+    var elements = c.elements()
+
+    assert_equal(len(elements), 6)
+    assert_equal(elements[0], "a")
+    assert_equal(elements[1], "b")
+    assert_equal(elements[2], "b")
+    assert_equal(elements[3], "c")
+    assert_equal(elements[4], "c")
+    assert_equal(elements[5], "c")
+
+
 def main():
     test_counter_construction()
     test_counter_getitem()
+    test_elements()
     test_iter()
     test_iter_keys()
     test_iter_items()
