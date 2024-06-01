@@ -213,7 +213,7 @@ struct Counter[V: KeyElement](
         Returns:
             A list of the n most common elements and their counts.
         """
-        var items = List[CountTuple[V]]()
+        var items: List[CountTuple[V]] = List[CountTuple[V]]()
         for item_ref in self._data.items():
             var item = item_ref[]
             var t = CountTuple[V](item.key, item.value)
@@ -223,7 +223,7 @@ struct Counter[V: KeyElement](
         fn comparator(a: CountTuple[V], b: CountTuple[V]) -> Bool:
             return a < b
 
-        var sorted_items = sort[cmp_fn=comparator](items)
+        sort[type = CountTuple[V], cmp_fn=comparator](items)
         return items[:n]
 
 
@@ -236,9 +236,9 @@ struct CountTuple[V: KeyElement](
         V: The value in the Counter.
     """
 
-    var value: V
+    var _value: V
     """ The value in the Counter."""
-    var count: Int
+    var _count: Int
     """ The count of the value in the Counter."""
 
     fn __init__(inout self, value: V, count: Int):
@@ -248,8 +248,8 @@ struct CountTuple[V: KeyElement](
             value: The value in the Counter.
             count: The count of the value in the Counter.
         """
-        self.value = value
-        self.count = count
+        self._value = value
+        self._count = count
 
     fn __copyinit__(inout self, other: Self):
         """Create a new CountTuple by copying another CountTuple.
@@ -257,8 +257,8 @@ struct CountTuple[V: KeyElement](
         Args:
             other: The CountTuple to copy.
         """
-        self.value = other.value
-        self.count = other.count
+        self._value = other._value
+        self._count = other._count
 
     fn __moveinit__(inout self, owned other: Self):
         """Create a new CountTuple by moving another CountTuple.
@@ -266,8 +266,27 @@ struct CountTuple[V: KeyElement](
         Args:
             other: The CountTuple to move.
         """
-        self.value = other.value^
-        self.count = other.count
+        self._value = other._value^
+        self._count = other._count
+
+    @always_inline("nodebug")
+    fn __getitem__(self, idx: Int) -> Variant[V, Int]:
+        """Get an element in the tuple.
+
+        Args:
+            idx: The element to return.
+
+        Returns:
+            The value if idx is 0 and the count if idx is 1.
+        """
+        debug_assert(
+            0 <= idx <= 1,
+            "index must be within bounds",
+        )
+        if idx == 0:
+            return self._value
+        else:
+            return self._count
 
     fn __lt__(self, other: Self) -> Bool:
         """Compare two CountTuples by count, then by value.
@@ -278,7 +297,7 @@ struct CountTuple[V: KeyElement](
         Returns:
             True if this CountTuple is less than the other, False otherwise.
         """
-        return self.count > other.count
+        return self._count > other._count
 
     fn __eq__(self, other: Self) -> Bool:
         """Compare two CountTuples for equality.
@@ -289,4 +308,4 @@ struct CountTuple[V: KeyElement](
         Returns:
             True if the two CountTuples are equal, False otherwise.
         """
-        return self.count == other.count
+        return self._count == other._count

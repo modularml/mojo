@@ -111,10 +111,11 @@ def test_most_common():
     c["c"] = 3
 
     var most_common = c.most_common(2)
-    assert_equal(most_common[0].value, "c")
-    assert_equal(most_common[0].count, 3)
-    assert_equal(most_common[1].value, "b")
-    assert_equal(most_common[1].count, 2)
+    assert_equal(len(most_common), 2)
+    assert_equal(most_common[0][0][String], "c")
+    assert_equal(most_common[0][1][Int], 3)
+    assert_equal(most_common[1][0][String], "b")
+    assert_equal(most_common[1][1][Int], 2)
 
 
 def main():
