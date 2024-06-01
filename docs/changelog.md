@@ -42,4 +42,6 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Removed `String.unsafe_uint8_ptr()`. `String.unsafe_ptr()` now returns the
   same thing.
 
+- Removed `UnsafePointer.offset(offset:Int)`.
+
 ### 🛠️ Fixed
