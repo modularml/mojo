@@ -144,11 +144,7 @@ fn mkdtemp(
     Raises:
         If the directory can not be created.
     """
-    var final_dir: Path
-    if not dir:
-        final_dir = Path(_get_default_tempdir())
-    else:
-        final_dir = Path(dir.value()[])
+    var final_dir = Path(dir.value()[]) if dir else Path(_get_default_tempdir())
 
     for _ in range(TMP_MAX):
         var dir_name = final_dir / (prefix + _get_random_name() + suffix)
@@ -172,33 +168,35 @@ fn _rmtree(path: String, ignore_errors: Bool = False) raises:
     If the path is a symbolic link, an error is raised.
     If ignore_errors is True, errors resulting from failed removals will be ignored.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
+
     Args:
       path: The path to the directory.
       ignore_errors: Whether to ignore errors.
     """
     if os.path.islink(path):
-        raise Error("`path`can not be a symbolic link")
+        raise Error("`path`can not be a symbolic link: " + path)
 
     for file_or_dir in os.listdir(path):
-        if os.path.isfile(path + "/" + file_or_dir[]):
+        var curr_path = os.path.join(path, file_or_dir[])
+        if os.path.isfile(curr_path):
             try:
-                os.remove(path + "/" + file_or_dir[])
+                os.remove(curr_path)
             except e:
                 if not ignore_errors:
-                    raise Error(e)
+                    raise e
             continue
-        if os.path.isdir(path + "/" + file_or_dir[]):
+        if os.path.isdir(curr_path):
             try:
-                _rmtree(path + "/" + file_or_dir[], ignore_errors)
+                _rmtree(curr_path, ignore_errors)
             except e:
                 if ignore_errors:
                     continue
-                raise Error(e)
+                raise e
     try:
         os.rmdir(path)
     except e:
         if not ignore_errors:
-            raise Error(e)
+            raise e
 
 
 struct TemporaryDirectory:
@@ -225,13 +223,8 @@ struct TemporaryDirectory:
             ignore_cleanup_errors: Whether to ignore cleanup errors.
         """
         self._ignore_cleanup_errors = ignore_cleanup_errors
-        var final_dir: Path
-        if not dir:
-            final_dir = Path(_get_default_tempdir())
-        else:
-            final_dir = Path(dir.value()[])
 
-        self.name = mkdtemp(suffix, prefix, final_dir.__fspath__())
+        self.name = mkdtemp(suffix, prefix, dir)
 
     fn __enter__(self) -> String:
         return self.name
