@@ -31,10 +31,6 @@ modular update mojo
 
 ### ⭐️ New
 
-- `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
-([PR #2701](https://github.com/modularml/mojo/pull/2701)
-by [@jayzhan211](https://github.com/jayzhan211))
-
 - Add a `sort` function for list of `ComparableCollectionElement`s.
   [PR #2609](https://github.com/modularml/mojo/pull/2609) by
   [@mzaks](https://github.com/mzaks)
@@ -497,7 +493,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 ### 🦋 Changed
 
-- `Coroutine` now requires a lifetime set parameter. This parameter is set
+- `Coroutine` now requires a lifetime parameter. This parameter is set
   automatically by the parser when calling an async function. It contains the
   lifetimes of all the arguments and any lifetime accesses by the arguments.
   This ensures that argument captures by async functions keep the arguments
@@ -555,9 +551,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
-  - Rename `String._as_ptr()` to `String.unsafe_ptr()`
-  - `String.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
-    (was `DTypePointer[DType.int8]`)
+  - `String.unsafe_ptr()` now returns an `UnsafePointer` (was `DTypePointer`)
+  - `String.unsafe_uint8_ptr()` now returns `UnsafePointer` (was
+    `DTypePointer`)
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer` (was
     `DTypePointer`).
   - `InlinedString.as_ptr()` has been renamed to `unsafe_ptr()` and now
@@ -567,11 +563,6 @@ by [@jayzhan211](https://github.com/jayzhan211))
     `DTypePointer[DType.int8]`).
   - Removed `StringRef.unsafe_uint8_ptr()`. The `unsafe_ptr()` method now has
     the same behavior.
-
-- Added `String.unsafe_cstr_ptr(self)` that returns an `UnsafePointer[C_char]`
-  for convenient interoperability with C APIs.
-
-- Added `C_char` type alias in `sys.ffi`.
 
 - Added `String.isspace()` method conformant with Python's universal separators.
 
