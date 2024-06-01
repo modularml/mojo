@@ -551,11 +551,11 @@ modular update mojo
   Consequently, `ListLiteral` and `Tuple` are themselves no longer `Copyable`.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
-  - `String.unsafe_ptr()` now returns an `UnsafePointer` (was `DTypePointer`)
-  - `String.unsafe_uint8_ptr()` now returns `UnsafePointer` (was
-    `DTypePointer`)
-  - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer` (was
-    `DTypePointer`).
+  - Rename `String._as_ptr()` to `String.unsafe_ptr()`, and change return type
+    to `UnsafePointer` (was `DTypePointer`).
+  - Rename `StringLiteral.data()` to `StringLiteral.unsafe_ptr()`, and change
+    return type to `UnsafePointer` (was `DTypePointer`).
+  - Added `unsafe_uint8_ptr()` methods to `String` and `StringLiteral`.
   - `InlinedString.as_ptr()` has been renamed to `unsafe_ptr()` and now
     returns an `UnsafePointer[UInt8]` (was `DTypePointer[DType.int8]`).
   - `StringRef.data` is now an `UnsafePointer` (was `DTypePointer`)

@@ -28,10 +28,12 @@ by [@jayzhan211](https://github.com/jayzhan211))
 ### 🦋 Changed
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
-  - Rename `String._as_ptr()` to `String.unsafe_ptr()`
   - `String.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
-    (was `DTypePointer[DType.int8]`)
+    (was `UnsafePointer[Int8]`)
 
 ### ❌ Removed
+
+- Removed `String.unsafe_uint8_ptr()`. `String.unsafe_ptr()` now returns the
+  same thing.
 
 ### 🛠️ Fixed
