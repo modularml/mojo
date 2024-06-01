@@ -215,7 +215,7 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return self.offset(offset)
+        return Self(address=int(self) + offset * sizeof[T]())
 
     @always_inline
     fn __sub__(self, offset: Int) -> Self:
@@ -409,18 +409,6 @@ struct UnsafePointer[
         return __mlir_op.`pop.pointer.bitcast`[
             _type = UnsafePointer[new_type, address_space]._mlir_type,
         ](self.address)
-
-    @always_inline
-    fn offset(self, offset: Int) -> Self:
-        """Return a pointer at an offset from the current one.
-
-        Args:
-            offset: The offset index.
-
-        Returns:
-            An offset pointer.
-        """
-        return Self(address=int(self) + offset * sizeof[T]())
 
 
 # ===----------------------------------------------------------------------=== #
