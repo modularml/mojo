@@ -203,3 +203,90 @@ struct Counter[V: KeyElement](
         for count_ref in self._data.values():
             total += count_ref[]
         return total
+
+    fn most_common(self, n: Int) -> List[CountTuple[V]]:
+        """Return a list of the n most common elements and their counts from the most common to the least.
+
+        Args:
+            n: The number of most common elements to return.
+
+        Returns:
+            A list of the n most common elements and their counts.
+        """
+        var items = List[CountTuple[V]]()
+        for item_ref in self._data.items():
+            var item = item_ref[]
+            var t = CountTuple[V](item.key, item.value)
+            items.append(t)
+
+        @parameter
+        fn comparator(a: CountTuple[V], b: CountTuple[V]) -> Bool:
+            return a < b
+
+        var sorted_items = sort[cmp_fn=comparator](items)
+        return items[:n]
+
+
+struct CountTuple[V: KeyElement](
+    CollectionElement,
+):
+    """A tuple representing a value and its count in a Counter.
+
+    Parameters:
+        V: The value in the Counter.
+    """
+
+    var value: V
+    """ The value in the Counter."""
+    var count: Int
+    """ The count of the value in the Counter."""
+
+    fn __init__(inout self, value: V, count: Int):
+        """Create a new CountTuple.
+
+        Args:
+            value: The value in the Counter.
+            count: The count of the value in the Counter.
+        """
+        self.value = value
+        self.count = count
+
+    fn __copyinit__(inout self, other: Self):
+        """Create a new CountTuple by copying another CountTuple.
+
+        Args:
+            other: The CountTuple to copy.
+        """
+        self.value = other.value
+        self.count = other.count
+
+    fn __moveinit__(inout self, owned other: Self):
+        """Create a new CountTuple by moving another CountTuple.
+
+        Args:
+            other: The CountTuple to move.
+        """
+        self.value = other.value^
+        self.count = other.count
+
+    fn __lt__(self, other: Self) -> Bool:
+        """Compare two CountTuples by count, then by value.
+
+        Args:
+            other: The other CountTuple to compare to.
+
+        Returns:
+            True if this CountTuple is less than the other, False otherwise.
+        """
+        return self.count > other.count
+
+    fn __eq__(self, other: Self) -> Bool:
+        """Compare two CountTuples for equality.
+
+        Args:
+            other: The other CountTuple to compare to.
+
+        Returns:
+            True if the two CountTuples are equal, False otherwise.
+        """
+        return self.count == other.count
