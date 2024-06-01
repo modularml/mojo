@@ -19,6 +19,9 @@ from utils import StringRef
 from .info import os_is_linux, os_is_windows
 from .intrinsics import _mlirtype_is_eq
 
+alias C_char = Int8
+"""C `char` type."""
+
 
 struct RTLD:
     """Enumeration of the RTLD flags used during dynamic library loading."""
@@ -106,12 +109,12 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](name.unsafe_ptr())
+        return self._get_function[result_type](name.unsafe_cstr_ptr())
 
     @always_inline
     fn _get_function[
         result_type: AnyTrivialRegType
-    ](self, name: DTypePointer[DType.int8]) -> result_type:
+    ](self, name: UnsafePointer[C_char]) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -149,7 +152,9 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](func_name.unsafe_ptr())
+        return self._get_function[result_type](
+            func_name.unsafe_ptr().bitcast[C_char]()
+        )
 
 
 # ===----------------------------------------------------------------------===#
