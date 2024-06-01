@@ -135,6 +135,22 @@ def test_elements():
     assert_equal(elements[5], "c")
 
 
+def test_update():
+    var c1 = Counter[String]()
+    c1["a"] = 1
+    c1["b"] = 2
+
+    var c2 = Counter[String]()
+    c2["b"] = 3
+    c2["c"] = 4
+
+    c1.update(c2)
+
+    assert_equal(c1["a"], 1)
+    assert_equal(c1["b"], 5)
+    assert_equal(c1["c"], 4)
+
+
 def test_substract():
     var c1 = Counter[String]()
     c1["a"] = 4
@@ -165,3 +181,4 @@ def main():
     test_most_common()
     test_substract()
     test_total()
+    test_update()

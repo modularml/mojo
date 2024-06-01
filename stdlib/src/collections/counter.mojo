@@ -178,15 +178,6 @@ struct Counter[V: KeyElement](
         """
         return self[]._data.items()
 
-    fn update(inout self, other: Self, /):
-        """Update the Counter with the value/count pairs from other, overwriting existing keys.
-        The argument must be positional only.
-
-        Args:
-            other: The Counter to update from.
-        """
-        self._data.update(other._data)
-
     fn clear(inout self):
         """Remove all elements from the Counter."""
         self._data.clear()
@@ -238,6 +229,16 @@ struct Counter[V: KeyElement](
             for _ in range(item.value):
                 elements.append(item.key)
         return elements
+
+    fn update(inout self, other: Self):
+        """Update the Counter, like dict.update() but add counts instead of replacing them.
+
+        Args:
+            other: The Counter to update this Counter with.
+        """
+        for item_ref in other.items():
+            var item = item_ref[]
+            self._data[item.key] = self._data.get(item.key, 0) + item.value
 
     fn subtract(inout self, other: Self):
         """Subtract count. Both inputs and outputs may be zero or negative.
