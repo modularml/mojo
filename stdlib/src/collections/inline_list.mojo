@@ -112,7 +112,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
             self.append(value[])
 
     fn __copyinit__(inout self, existing: Self):
-        """Creates a deepcopy of the given list.
+        """Creates a copy of the given list.
 
         Args:
             existing: The list to copy.
