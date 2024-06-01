@@ -32,6 +32,70 @@ def test_counter_getitem():
     assert_equal(c[5], 0)
 
 
+def test_iter():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    var keys = String("")
+    for key in c:
+        keys += key[]
+
+    assert_equal(keys, "ab")
+
+
+def test_iter_keys():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    var keys = String("")
+    for key in c.keys():
+        keys += key[]
+
+    assert_equal(keys, "ab")
+
+
+def test_iter_values():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    var sum = 0
+    for value in c.values():
+        sum += value[]
+
+    assert_equal(sum, 3)
+
+
+def test_iter_values_mut():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    for value in c.values():
+        value[] += 1
+
+    assert_equal(2, c["a"])
+    assert_equal(3, c["b"])
+    assert_equal(2, len(c))
+
+
+def test_iter_items():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    var keys = String("")
+    var sum = 0
+    for entry in c.items():
+        keys += entry[].key
+        sum += entry[].value
+
+    assert_equal(keys, "ab")
+    assert_equal(sum, 3)
+
+
 def main():
     test_counter_construction()
     test_counter_getitem()

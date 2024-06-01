@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from collections.dict import Dict
+from collections.dict import Dict, _DictKeyIter, _DictValueIter, _DictEntryIter
 
 
 struct Counter[V: KeyElement](
@@ -80,3 +80,113 @@ struct Counter[V: KeyElement](
             The count of the key.
         """
         return self._data.get(key, 0)
+
+    fn __setitem__(inout self, value: V, count: Int):
+        """Set a value in the keyword Counter by key.
+
+        Args:
+            value: The value to associate with the specified count.
+            count: The count to store in the Counter.
+        """
+        self._data[value] = count
+
+    fn __iter__(
+        self: Reference[Self, _, _]
+    ) -> _DictKeyIter[V, Int, self.is_mutable, self.lifetime]:
+        """Iterate over the keyword dict's keys as immutable references.
+
+        Returns:
+            An iterator of immutable references to the Counter values.
+        """
+        return self[]._data.__iter__()
+
+    fn __len__(self) -> Int:
+        """The number of elements currently stored in the Counter."""
+        return self._data.size
+
+    fn get(self, value: V) -> Optional[V]:
+        """Get a value from the counter.
+
+        Args:
+            value: The value to search for in the Counter.
+
+        Returns:
+            An optional value containing a copy of the value if it was present,
+            otherwise an empty Optional.
+        """
+        return self._data.get(value)
+
+    fn get(self, value: V, default: Int) -> Int:
+        """Get a value from the Counter.
+
+        Args:
+            value: The value to search for in the counter.
+            default: Default count to return.
+
+        Returns:
+            A copy of the value if it was present, otherwise default.
+        """
+        return self._data.find(value).or_else(default)
+
+    fn pop(
+        inout self, value: V, owned default: Optional[Int] = None
+    ) raises -> Int:
+        """Remove a value from the Counter by value.
+
+        Args:
+            value: The value to remove from the Counter.
+            default: Optionally provide a default value to return if the value
+                was not found instead of raising.
+
+        Returns:
+            The value associated with the key, if it was in the Counter.
+            If it wasn't, return the provided default value instead.
+
+        Raises:
+            "KeyError" if the key was not present in the Counter and no
+            default value was provided.
+        """
+        return self._data.pop(value, default)
+
+    fn keys(
+        self: Reference[Self, _, _]
+    ) -> _DictKeyIter[V, Int, self.is_mutable, self.lifetime]:
+        """Iterate over the Counter's keys as immutable references.
+
+        Returns:
+            An iterator of immutable references to the Counter keys.
+        """
+        return self[]._data.keys()
+
+    fn values(
+        self: Reference[Self, _, _]
+    ) -> _DictValueIter[V, Int, self.is_mutable, self.lifetime]:
+        """Iterate over the Counter's values as references.
+
+        Returns:
+            An iterator of references to the Counter values.
+        """
+        return self[]._data.values()
+
+    fn items(
+        self: Reference[Self, _, _]
+    ) -> _DictEntryIter[V, Int, self.is_mutable, self.lifetime]:
+        """Iterate over the dict's entries as immutable references.
+
+        Returns:
+            An iterator of immutable references to the Counter entries.
+        """
+        return self[]._data.items()
+
+    fn update(inout self, other: Self, /):
+        """Update the Counter with the value/count pairs from other, overwriting existing keys.
+        The argument must be positional only.
+
+        Args:
+            other: The Counter to update from.
+        """
+        self._data.update(other._data)
+
+    fn clear(inout self):
+        """Remove all elements from the Counter."""
+        self._data.clear()
