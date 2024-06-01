@@ -412,7 +412,7 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        self._write(data.unsafe_uint8_ptr(), len(data))
+        self._write(data.unsafe_ptr(), len(data))
 
     fn write(self, data: Span[UInt8, _, _]) raises:
         """Write a borrowed sequence of data to the file.
@@ -431,11 +431,10 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
-
     @always_inline
     fn _write[
         address_space: AddressSpace
-    ](self, ptr: DTypePointer[DType.uint8, address_space], len: Int) raises:
+    ](self, ptr: UnsafePointer[UInt8, address_space], len: Int) raises:
         """Write the data to the file.
 
         Params:

@@ -246,7 +246,7 @@ struct InlineString(Sized, Stringable, CollectionElement):
         if self._is_small():
             return self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr()
         else:
-            return self._storage[String].unsafe_uint8_ptr()
+            return self._storage[String].unsafe_ptr()
 
     @always_inline
     fn as_string_slice(
