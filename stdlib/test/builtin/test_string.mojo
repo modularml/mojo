@@ -10,8 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %bare-mojo %s
 
+# TODO: Replace %bare-mojo with %mojo
+# when  https://github.com/modularml/mojo/issues/2751 is fixed.
 from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
@@ -26,6 +28,7 @@ from testing import (
 )
 
 from utils import StringRef
+from python import Python
 
 
 @value
@@ -89,6 +92,11 @@ fn test_constructors() raises:
     ptr[3] = 0
     var s3 = String(ptr, 4)
     assert_equal(s3, "abc")
+
+    # Construction from PythonObject
+    var py = Python.evaluate("1 + 1")
+    var s4 = String(py)
+    assert_equal(s4, "2")
 
 
 fn test_copy() raises:
