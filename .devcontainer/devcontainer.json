@@ -1,0 +1,67 @@
+{
+  "name": "Mojo (nightly)",
+  "build": {
+    "dockerfile": "Mojo.Dockerfile",
+    "args": {
+      "MOJO_VERSION": "nightly",
+      "LLVM_VERSION": "17", // optional
+      "MODULAR_TELEMETRY_ENABLE": "unset-to-keep-disabled",
+      "MODULAR_TELEMETRY_LEVEL": "2", // Set to 0 to disable
+      "MODULAR_CRASHREPORTING_ENABLE": "unset-to-keep-disabled",
+      "USE_ZSH_FOR_ROOT": "unset-to-use-bash",
+      "LANG": "en_US.UTF-8",
+      "TZ": "Etc/UTC"
+    }
+  },
+
+  "onCreateCommand": "onCreateCommand.sh",
+  "postStartCommand": "pre-commit install",
+
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true,
+      "upgradePackages": false,
+      "username": "vscode",
+      "userUid": "automatic",
+      "userGid": "automatic"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "moby": false
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "DavidAnson.vscode-markdownlint",
+        "eamodio.gitlens@11.7.0",
+        "editorconfig.editorconfig",
+        "exiasr.hadolint",
+        "GitHub.vscode-pull-request-github",
+        "mhutchie.git-graph",
+        "modular-mojotools.vscode-mojo-nightly",
+        "ms-azuretools.vscode-docker",
+        "ms-python.black-formatter",
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "mutantdino.resourcemonitor",
+        "redhat.vscode-yaml",
+        "timonwong.shellcheck"
+      ],
+      "settings": {
+        "gitlens.showWelcomeOnInstall": false,
+        "gitlens.showWhatsNewAfterUpgrades": false,
+        "resmon.show.battery": false,
+        "resmon.show.cpufreq": false
+      }
+    }
+  },
+
+  // Set 'remoteUser' to 'root' to connect as root instead.
+  "remoteUser": "vscode",
+
+  "remoteEnv": {
+    // Pip: Install packages to the user site
+    "PIP_USER": "1"
+  }
+}
