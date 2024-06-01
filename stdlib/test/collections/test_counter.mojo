@@ -135,6 +135,24 @@ def test_elements():
     assert_equal(elements[5], "c")
 
 
+def test_substract():
+    var c1 = Counter[String]()
+    c1["a"] = 4
+    c1["b"] = 2
+    c1["c"] = 0
+
+    var c2 = Counter[String]()
+    c2["a"] = 1
+    c2["b"] = -2
+    c2["c"] = 3
+
+    c1.subtract(c2)
+
+    assert_equal(c1["a"], 3)
+    assert_equal(c1["b"], 4)
+    assert_equal(c1["c"], -3)
+
+
 def main():
     test_counter_construction()
     test_counter_getitem()
@@ -145,4 +163,5 @@ def main():
     test_iter_values()
     test_iter_values_mut()
     test_most_common()
+    test_substract()
     test_total()

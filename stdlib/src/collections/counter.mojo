@@ -239,6 +239,16 @@ struct Counter[V: KeyElement](
                 elements.append(item.key)
         return elements
 
+    fn subtract(inout self, other: Self):
+        """Subtract count. Both inputs and outputs may be zero or negative.
+
+        Args:
+            other: The Counter to subtract from this Counter.
+        """
+        for item_ref in other.items():
+            var item = item_ref[]
+            self._data[item.key] = self._data.get(item.key, 0) - item.value
+
 
 struct CountTuple[V: KeyElement](
     CollectionElement,
