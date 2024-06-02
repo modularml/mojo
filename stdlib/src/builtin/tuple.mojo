@@ -193,45 +193,33 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
     @always_inline("nodebug")
     fn __contains__[T: EqualityComparable](self, value: T) -> Bool:
-        """Verify if a given value is present in the tuple.
+        """Return whether the tuple contains the specified value.
+
+        For example:
 
         ```mojo
-        var x = Tuple(1,2,True)
-        if 1 in x: print("x contains 1")
+        var t = Tuple(True, 1, 2.5)
+        if 1 in t:
+            print("t contains 1")
         ```
 
         Args:
-            value: The value to find.
+            value: The value to search for.
 
         Parameters:
-            T: The type of the value argument. Must implement the
-              trait `EqualityComparable`.
+            T: The type of the value.
 
         Returns:
-            True if the value is contained in the tuple, False otherwise.
+            True if the value is in the tuple, False otherwise.
         """
-
-        @parameter
-        fn T_in_ts() -> Bool:
-            @parameter
-            for i in range(len(VariadicList(element_types))):
-
-                @parameter
-                if _type_is_eq[element_types[i], T]():
-                    return True
-            return False
-
-        @parameter
-        if not T_in_ts():
-            return False
 
         @parameter
         for i in range(len(VariadicList(element_types))):
 
             @parameter
-            if _type_is_eq[T, element_types[i]]():
+            if _type_is_eq[element_types[i], T]():
                 var elt_ptr = UnsafePointer.address_of(self[i]).bitcast[T]()
-                if elt_ptr[].__eq__(value):
+                if elt_ptr[] == value:
                     return True
 
         return False
