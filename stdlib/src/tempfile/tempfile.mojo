@@ -144,11 +144,7 @@ fn mkdtemp(
     Raises:
         If the directory can not be created.
     """
-    var final_dir: Path
-    if not dir:
-        final_dir = Path(_get_default_tempdir())
-    else:
-        final_dir = Path(dir.value()[])
+    var final_dir = Path(dir.value()[]) if dir else Path(_get_default_tempdir())
 
     for _ in range(TMP_MAX):
         var dir_name = final_dir / (prefix + _get_random_name() + suffix)
@@ -164,3 +160,82 @@ fn mkdtemp(
         except:
             continue
     raise Error("Failed to create temporary file")
+
+
+# TODO use shutil.rmtree (or equivalent) when it exists
+fn _rmtree(path: String, ignore_errors: Bool = False) raises:
+    """Removes the specified directory and all its contents.
+
+    If the path is a symbolic link, an error is raised. If ignore_errors is
+    True, errors resulting from failed removals will be ignored. Absolute and
+    relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+        path: The path to the directory.
+        ignore_errors: Whether to ignore errors.
+    """
+    if os.path.islink(path):
+        raise Error("`path`can not be a symbolic link: " + path)
+
+    for file_or_dir in os.listdir(path):
+        var curr_path = os.path.join(path, file_or_dir[])
+        if os.path.isfile(curr_path):
+            try:
+                os.remove(curr_path)
+            except e:
+                if not ignore_errors:
+                    raise e
+            continue
+        if os.path.isdir(curr_path):
+            try:
+                _rmtree(curr_path, ignore_errors)
+            except e:
+                if ignore_errors:
+                    continue
+                raise e
+    try:
+        os.rmdir(path)
+    except e:
+        if not ignore_errors:
+            raise e
+
+
+struct TemporaryDirectory:
+    """A temporary directory."""
+
+    var name: String
+    """The name of the temporary directory."""
+    var _ignore_cleanup_errors: Bool
+    """Whether to ignore cleanup errors."""
+
+    fn __init__(
+        inout self,
+        suffix: String = "",
+        prefix: String = "tmp",
+        dir: Optional[String] = None,
+        ignore_cleanup_errors: Bool = False,
+    ) raises:
+        """Create a temporary directory. Can be used as a context manager.
+
+        Args:
+            suffix: Suffix to use for the directory name.
+            prefix: Prefix to use for the directory name.
+            dir: Directory in which the directory will be created.
+            ignore_cleanup_errors: Whether to ignore cleanup errors.
+        """
+        self._ignore_cleanup_errors = ignore_cleanup_errors
+
+        self.name = mkdtemp(suffix, prefix, dir)
+
+    fn __enter__(self) -> String:
+        return self.name
+
+    fn __exit__(self) raises:
+        _rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+
+    fn __exit__(self, err: Error) -> Bool:
+        try:
+            self.__exit__()
+            return True
+        except:
+            return False
