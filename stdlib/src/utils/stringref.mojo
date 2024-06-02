@@ -409,12 +409,48 @@ struct StringRef(
     # Use a local memcmp rather than memory.memcpy to avoid indirect recursions.
     @always_inline("nodebug")
     fn _memcmp(self, other: StringRef, count: Int) -> Int:
-        for i in range(count):
-            var s1i = self.data[i]
-            var s2i = other.data[i]
-            if s1i == s2i:
-                continue
-            return 1 if s1i > s2i else -1
+        alias simd_width = simdwidthof[UInt8]()
+        var s1 = DTypePointer(self.data)
+        var s2 = DTypePointer(other.data)
+
+        if count < simd_width:
+            for i in range(count):
+                var s1i = s1[i]
+                var s2i = s2[i]
+                if s1i != s2i:
+                    return 1 if s1i > s2i else -1
+            return 0
+
+        var iota = llvm_intrinsic[
+            "llvm.experimental.stepvector",
+            SIMD[DType.uint8, simd_width],
+            has_side_effect=False,
+        ]()
+
+        for i in range(0, count - simd_width, simd_width):
+            var s1i = s1.load[width=simd_width](i)
+            var s2i = s2.load[width=simd_width](i)
+            var diff = s1i != s2i
+            if any(diff):
+                var index = int(
+                    diff.select(
+                        iota, SIMD[DType.uint8, simd_width](255)
+                    ).reduce_min()
+                )
+                return -1 if s1i[index] < s2i[index] else 1
+
+        var last = count - simd_width
+
+        var s1i = s1.load[width=simd_width](last)
+        var s2i = s2.load[width=simd_width](last)
+        var diff = s1i != s2i
+        if any(diff):
+            var index = int(
+                diff.select(
+                    iota, SIMD[DType.uint8, simd_width](255)
+                ).reduce_min()
+            )
+            return -1 if s1i[index] < s2i[index] else 1
         return 0
 
     @always_inline
