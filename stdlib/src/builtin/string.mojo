@@ -2011,31 +2011,26 @@ struct String(
         var entries = _FormatCurlyEntry.create_entries(self)
         var manual_indexing_count = 0
         var automatic_indexing_count = 0
-        for e in Entries:
+        for e in entries:
             if e[].value.isa[Int]():
                 manual_indexing_count += 1
+                if e[].value[Int] >= len(args):
+                    raise ("Index " + str(e[].value[Int]) + " not in *args")
             elif e[].value.isa[NoneType]():
                 automatic_indexing_count += 1
             elif e[].value.isa[String]():
-                kwargs_indexing_count += 1
-
-        if manual_indexing_count and automatic_indexing_count:
-            raise "Cannot both use manual and automatic indexing for *args"
-
-        for e in Entries:
-            if e[].value.isa[String]():
                 raise "Index " + e[].value[String] + " not in kwargs"
-            if manual_indexing_count:
-                if e[].value.isa[Int]() and e[].value[Int] >= len(args):
-                    raise ("Index " + str(e[].value[Int]) + " not in *args")
-            if automatic_indexing_count > len(args):
-                    raise ("Automatic indexing require more args in *args")
+            if manual_indexing_count and automatic_indexing_count:
+                raise "Cannot both use manual and automatic indexing"
+
+        if automatic_indexing_count > len(args):
+            raise ("Automatic indexing require more args in *args")
 
         var res: String = ""
         var start = 0
 
         if manual_indexing_count:
-            for e in Entries:
+            for e in entries:
                 debug_assert(start < len(self), "start >= len(self)")
                 res += self[start : e[].first_curly]
                 if e[].value.isa[Int]():
@@ -2048,7 +2043,7 @@ struct String(
 
         if automatic_indexing_count:
             var current_arg_index = 0
-            for e in Entries:
+            for e in entries:
                 debug_assert(start < len(self), "start >= len(self)")
                 res += self[start : e[].first_curly]
                 if e[].value.isa[NoneType]():

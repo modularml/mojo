@@ -1123,7 +1123,7 @@ def test_format_args():
         _ = String("A {} B {}").format("First")
 
     with assert_raises(
-        contains="Cannot both use manual and automatic indexing for *args"
+        contains="Cannot both use manual and automatic indexing"
     ):
         _ = String("A {} B {1}").format("First", "Second")
 
@@ -1138,6 +1138,13 @@ def test_format_args():
         ),
         " Hello , Beautiful World !",
     )
+
+    assert_equal(String("{{0}}").format("foo"), "{foo}")
+    assert_equal(String("{{}}").format("foo"), "{foo}")
+    assert_equal(String("{{0}").format("foo"), "{foo")
+    assert_equal(String("{{}").format("foo"), "{foo")
+    assert_equal(String("{0}}").format("foo"), "foo}")
+    assert_equal(String("{}}").format("foo"), "foo}")
 
     var vinput = "{} {}"
     var output = String(vinput).format("123", 456)
