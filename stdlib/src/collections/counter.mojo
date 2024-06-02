@@ -58,7 +58,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         Usage:
         ```mojo
-        c = Counter(['g', 'a', 't', 't', 'a', 'c', 'a'])
+        c = Counter(List('g', 'a', 't', 't', 'a', 'c', 'a'))
         ```
         """
         self._data = Dict[V, Int]()
