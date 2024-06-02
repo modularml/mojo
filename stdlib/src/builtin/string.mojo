@@ -2008,7 +2008,7 @@ struct String(
         Variadic arguments are required to implement `Stringable`.
 
         """
-        var Entries = _FormatCurlyEntry.create_entries(self)
+        var entries = _FormatCurlyEntry.create_entries(self)
         var manual_indexing_count = 0
         var automatic_indexing_count = 0
         for e in Entries:
