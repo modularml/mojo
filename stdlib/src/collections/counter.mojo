@@ -75,7 +75,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         Returns:
             The count of the key.
         """
-        return self._data.get(key, 0)
+        return self.get(key, 0)
 
     fn __setitem__(inout self, value: V, count: Int):
         """Set a value in the keyword Counter by key.
