@@ -23,7 +23,7 @@ from sys.ffi import C_char
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import StringRef, StaticIntTuple, Span, StringSlice
-from utils._format import Formattable, Formatter, ToFormatter, FormatCurlyEntry
+from utils._format import Formattable, Formatter, ToFormatter
 from collections.dict import OwnedKwargsDict
 
 # ===----------------------------------------------------------------------=== #
@@ -1972,21 +1972,43 @@ struct String(
         return String(buf^)
 
     @always_inline
-    fn _format[
-        *Ts: Stringable
-    ](
-        inout self,
-        args: VariadicPack[_, _, Stringable, Ts],
-        kwargs: OwnedKwargsDict[String],
-    ) raises:
-        """
-        Internally used by the `format()` methods for:
+    fn format[*Ts: Stringable](self, *args: *Ts) raises -> String:
+        """Format a template with *args.
 
-        - variadic arguments without unpack.
+        Example of manual indexing:
 
-        - variadic keyword arguments without unpack.
+        ```mojo
+        print(
+            String("{0} {1} {0}").format(
+                "Mojo", 1.125
+            )
+        ) #Mojo 1.125 Mojo
+        ```
+
+        Example of automatic indexing:
+
+        ```mojo
+        var x = String("{} {}").format(
+            True, "hello world"
+        )
+        print(x) #True hello world
+        ```
+
+        ⚠️ Raising functions does not work in the parameter domain.
+
+        Args:
+            args: Values passed as variadic arguments.
+
+        Parameters:
+            Ts: The types of the variadic arguments.
+
+        Returns:
+            The formated template.
+
+        Variadic arguments are required to implement `Stringable`.
+
         """
-        var Entries = FormatCurlyEntry.create_entries(self)
+        var Entries = _FormatCurlyEntry.create_entries(self)
         var manual_indexing_count = 0
         var automatic_indexing_count = 0
         var kwargs_indexing_count = 0
@@ -1997,18 +2019,20 @@ struct String(
                 automatic_indexing_count += 1
             elif e[].value.isa[String]():
                 kwargs_indexing_count += 1
+
         if manual_indexing_count and automatic_indexing_count:
             raise "Cannot both use manual and automatic indexing for *args"
+
         for e in Entries:
             if e[].value.isa[String]():
-                if e[].value[String] not in kwargs:
-                    raise "Index " + e[].value[String] + " not in kwargs"
+                raise "Index " + e[].value[String] + " not in kwargs"
             if manual_indexing_count:
                 if e[].value.isa[Int]() and e[].value[Int] >= len(args):
                     raise ("Index " + str(e[].value[Int]) + " not in *args")
             if automatic_indexing_count:
                 if automatic_indexing_count > len(args):
                     raise ("Automatic indexing require more args in *args")
+
         var res: String = ""
         var start = 0
 
@@ -2016,8 +2040,6 @@ struct String(
             for e in Entries:
                 debug_assert(start < len(self), "start >= len(self)")
                 res += self[start : e[].first_curly]
-                if e[].value.isa[String]():
-                    res += kwargs[e[].value[String]]
                 if e[].value.isa[Int]():
 
                     @parameter
@@ -2031,8 +2053,6 @@ struct String(
             for e in Entries:
                 debug_assert(start < len(self), "start >= len(self)")
                 res += self[start : e[].first_curly]
-                if e[].value.isa[String]():
-                    res += kwargs[e[].value[String]]
                 if e[].value.isa[NoneType]():
 
                     @parameter
@@ -2043,41 +2063,7 @@ struct String(
                 start = e[].last_curly + 1
         if start < len(self):
             res += self[start : len(self)]
-        self = res
 
-    @always_inline
-    fn format[
-        *Ts: Stringable
-    ](self, *args: *Ts, **kwargs: String) raises -> String:
-        """Format a template with *args and **kwargs.
-
-        Example:
-
-        ```mojo
-        var x = "{0} %2 == {1} {mojo} {number}".format(
-            1024, True, mojo="❤️‍🔥", number=str(1.125)
-        )
-        print(x) #1024 %2 == True ❤️‍🔥 1.225
-        ```
-
-        ⚠️ Does not work in the parameter domain (`alias`) yet
-
-        Args:
-            args: Values passed as variadic arguments.
-            kwargs: Values passed a keyword variadic arguments.
-
-        Parameters:
-            Ts: The types of the variadic arguments.
-
-        Returns:
-            The formated template.
-
-        Variadic arguments are required to implement `Stringable`.
-
-        """
-        var res: String
-        String.__copyinit__(res, self)
-        res._format(args, kwargs)
         return res^
 
 
@@ -2210,3 +2196,83 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
         return 64 + 1
     else:
         return 128 + 1  # Add 1 for the terminator
+
+
+# ===----------------------------------------------------------------------===#
+# Format method structures
+# ===----------------------------------------------------------------------===#
+
+
+@value
+struct _FormatCurlyEntry:
+    """
+    Internally used by the `format()` method.
+
+    Purpose of the variant types:
+
+    - `String` for **kwargs
+
+        ```mojo
+        "{message}".format(message="hello")
+        ```
+
+        value field contains `message`
+
+    - `Int` for manual indexing of *args
+
+        ```mojo
+        "{0}".format("hello")
+        ```
+
+        value field contains `0`
+
+    - `NoneType` for automatic indexing of *args
+
+        ```mojo
+        "{}".format("hello")
+        ```
+
+        value field contains `None`
+
+    `*_curly` are the indexes of the enclosing curlies
+
+    This struct only supports theses:
+
+    `{number|name|nothing}`
+
+    """
+
+    var first_curly: Int
+    var last_curly: Int
+    var value: Variant[String, Int, NoneType]
+
+    @staticmethod
+    fn create_entries(arg: String) -> List[Self]:
+        """Used internally by the `format()` method.
+
+        Args:
+            arg: The "format" part provided by the user.
+
+        Returns:
+            A `List` of structured format entries.
+        """
+        var Entries = List[Self]()
+        var start = Optional[Int](None)
+        for i in range(len(arg)):
+            if arg[i] == "{":
+                start = i
+                continue
+            if arg[i] == "}":
+                if start:
+                    var start_value = start.value()[]
+                    var tmp = Self(start_value, i, None)
+                    if i - start_value != 1:
+                        var tmp2 = arg[start_value + 1 : i]
+                        try:
+                            var tmp3 = int(tmp2)
+                            tmp.value = tmp3
+                        except:
+                            tmp.value = tmp2
+                    Entries.append(tmp)
+                start = None
+        return Entries
