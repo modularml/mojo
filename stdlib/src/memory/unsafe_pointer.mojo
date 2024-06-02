@@ -161,7 +161,7 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: Reference[T, _, address_space]) -> Self:
+    fn address_of(ref [_, address_space._value.value]arg: T) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -170,7 +170,7 @@ struct UnsafePointer[
         Returns:
             An UnsafePointer which contains the address of the argument.
         """
-        return Self(arg)
+        return Self(__get_mvalue_as_litref(arg))
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
