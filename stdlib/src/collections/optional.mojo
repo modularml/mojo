@@ -176,7 +176,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         return self[].unsafe_value()
 
     @always_inline
-    fn unsafe_value(self: Reference[Self, _]) -> Reference[T, self.lifetime]:
+    fn unsafe_value(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
@@ -187,8 +187,8 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """
-        debug_assert(self[].__bool__(), ".value() on empty Optional")
-        return self[]._value[T]
+        debug_assert(self.__bool__(), ".value() on empty Optional")
+        return self._value[T]
 
     @always_inline
     fn _value_copy(self) -> T:
