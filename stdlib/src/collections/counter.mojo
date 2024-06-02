@@ -211,7 +211,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             The total of all counts in the Counter.
         """
         var total = 0
-        for count_ref in self._data.values():
+        for count_ref in self.values():
             total += count_ref[]
         return total
 
