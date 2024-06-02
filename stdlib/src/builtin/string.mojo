@@ -2208,13 +2208,6 @@ struct _FormatCurlyEntry:
 
     Purpose of the variant types:
 
-    - `String` for **kwargs
-
-        ```mojo
-        "{message}".format(message="hello")
-        ```
-
-        value field contains `message`
 
     - `Int` for manual indexing of *args
 
