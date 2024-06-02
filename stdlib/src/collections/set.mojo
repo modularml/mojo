@@ -302,7 +302,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
 
     fn __iter__(
         self: Reference[Self, _, _],
-    ) -> _DictKeyIter[T, NoneType, self.is_mutable, self.lifetime]:
+    ) -> _DictKeyIter[T, NoneType, self.lifetime]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:

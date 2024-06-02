@@ -80,7 +80,7 @@ fn reversed[
     T: CollectionElement, //,
     mutability: Bool,
     self_life: AnyLifetime[mutability].type,
-](ref [self_life]value: List[T]) -> _ListIter[T, mutability, self_life, False]:
+](ref [self_life]value: List[T]) -> _ListIter[T, self_life, False]:
     """Get a reversed iterator of the input list.
 
     **Note**: iterators are currently non-raising.
@@ -104,11 +104,7 @@ fn reversed[
     V: CollectionElement,
     mutability: Bool,
     self_life: AnyLifetime[mutability].type,
-](
-    ref [self_life]value: Dict[K, V],
-) -> _DictKeyIter[
-    K, V, mutability, self_life, False
-]:
+](ref [self_life]value: Dict[K, V],) -> _DictKeyIter[K, V, self_life, False]:
     """Get a reversed iterator of the input dict.
 
     **Note**: iterators are currently non-raising.
@@ -135,9 +131,9 @@ fn reversed[
     V: CollectionElement,
     dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-](
-    ref [self_life]value: _DictValueIter[K, V, dict_mutability, dict_lifetime]
-) -> _DictValueIter[K, V, dict_mutability, dict_lifetime, False]:
+](ref [self_life]value: _DictValueIter[K, V, dict_lifetime]) -> _DictValueIter[
+    K, V, dict_lifetime, False
+]:
     """Get a reversed iterator of the input dict values.
 
     **Note**: iterators are currently non-raising.
@@ -166,9 +162,9 @@ fn reversed[
     V: CollectionElement,
     dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-](
-    ref [self_life]value: _DictEntryIter[K, V, dict_mutability, dict_lifetime]
-) -> _DictEntryIter[K, V, dict_mutability, dict_lifetime, False]:
+](ref [self_life]value: _DictEntryIter[K, V, dict_lifetime]) -> _DictEntryIter[
+    K, V, dict_lifetime, False
+]:
     """Get a reversed iterator of the input dict items.
 
     **Note**: iterators are currently non-raising.
@@ -188,6 +184,6 @@ fn reversed[
         The reversed iterator of the dict items.
     """
     var src = value.src
-    return _DictEntryIter[K, V, dict_mutability, dict_lifetime, False](
+    return _DictEntryIter[K, V, dict_lifetime, False](
         src[]._reserved - 1, 0, src
     )

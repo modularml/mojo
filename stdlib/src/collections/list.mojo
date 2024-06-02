@@ -33,16 +33,16 @@ from utils import Span
 
 @value
 struct _ListIter[
+    list_mutability: Bool, //,
     T: CollectionElement,
-    list_mutability: Bool,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.
 
     Parameters:
-        T: The type of the elements in the list.
         list_mutability: Whether the reference to the list is mutable.
+        T: The type of the elements in the list.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
@@ -291,7 +291,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     fn __iter__(
         self: Reference[Self, _, _],
-    ) -> _ListIter[T, self.is_mutable, self.lifetime]:
+    ) -> _ListIter[T, self.lifetime]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -301,7 +301,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     fn __reversed__(
         self: Reference[Self, _, _]
-    ) -> _ListIter[T, self.is_mutable, self.lifetime, False]:
+    ) -> _ListIter[T, self.lifetime, False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
