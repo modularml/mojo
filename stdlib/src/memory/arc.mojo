@@ -101,7 +101,7 @@ struct Arc[T: Movable](CollectionElement):
 
     # FIXME: This isn't right - the element should be mutable regardless
     # of whether the 'self' type is mutable.
-    fn __getitem__(self: Reference[Self, _, _]) -> ref [self.lifetime] T:
+    fn __getitem__(self: Reference[Self, _]) -> ref [self.lifetime] T:
         """Returns a Reference to the managed value.
 
         Returns:

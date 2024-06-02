@@ -159,9 +159,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn value(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+    fn value(self: Reference[Self, _]) -> Reference[T, self.lifetime]:
         """Retrieve a reference to the value of the Optional.
 
         This check to see if the optional contains a value.
@@ -178,9 +176,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         return self[].unsafe_value()
 
     @always_inline
-    fn unsafe_value(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+    fn unsafe_value(self: Reference[Self, _]) -> Reference[T, self.lifetime]:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.

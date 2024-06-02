@@ -232,7 +232,7 @@ struct Variant[*Ts: CollectionElement](
 
     fn __getitem__[
         T: CollectionElement
-    ](self: Reference[Self, _, _]) -> ref [self.lifetime] T:
+    ](self: Reference[Self, _]) -> ref [self.lifetime] T:
         """Get the value out of the variant as a type-checked type.
 
         This explicitly check that your value is of that type!
@@ -263,9 +263,7 @@ struct Variant[*Ts: CollectionElement](
         ]()
         return UnsafePointer.address_of(self._impl).bitcast[T]()
 
-    fn _get_state(
-        self: Reference[Self, _, _]
-    ) -> Reference[Int8, self.is_mutable, self.lifetime]:
+    fn _get_state(self: Reference[Self, _]) -> Reference[Int8, self.lifetime]:
         var int8_self = UnsafePointer(self).bitcast[Int8]()
         return (int8_self + _UnionSize[Ts].compute())[]
 
@@ -406,9 +404,7 @@ struct Variant[*Ts: CollectionElement](
 
     fn unsafe_get[
         T: CollectionElement
-    ](self: Reference[Self, _, _]) -> Reference[
-        T, self.is_mutable, self.lifetime
-    ]:
+    ](self: Reference[Self, _]) -> Reference[T, self.lifetime]:
         """Get the value out of the variant as a type-checked type.
 
         This doesn't explicitly check that your value is of that type!

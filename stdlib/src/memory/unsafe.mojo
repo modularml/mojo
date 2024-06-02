@@ -162,9 +162,7 @@ struct LegacyPointer[
     var address: Self._mlir_type
     """The pointed-to address."""
 
-    alias _ref_type = Reference[
-        type, True, MutableStaticLifetime, address_space
-    ]
+    alias _ref_type = Reference[type, MutableStaticLifetime, address_space]
 
     @always_inline("nodebug")
     fn __init__() -> Self:
@@ -236,7 +234,7 @@ struct LegacyPointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: Reference[type, _, _, address_space]) -> Self:
+    fn address_of(arg: Reference[type, _, address_space]) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -668,7 +666,7 @@ struct DTypePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: Reference[Scalar[type], _, _, address_space]) -> Self:
+    fn address_of(arg: Reference[Scalar[type], _, address_space]) -> Self:
         """Gets the address of the argument.
 
         Args:

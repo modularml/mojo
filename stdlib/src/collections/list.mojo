@@ -50,14 +50,14 @@ struct _ListIter[
     alias list_type = List[T]
 
     var index: Int
-    var src: Reference[Self.list_type, list_mutability, list_lifetime]
+    var src: Reference[Self.list_type, list_lifetime]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_mutability, list_lifetime]:
+    ) -> Reference[T, list_lifetime]:
         @parameter
         if forward:
             self.index += 1
@@ -236,7 +236,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
         for i in self:
-            if rebind[Reference[T2, False, __lifetime_of(self)]](i)[] == value:
+            if rebind[Reference[T2, __lifetime_of(self)]](i)[] == value:
                 return True
         return False
 
@@ -290,7 +290,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.extend(other^)
 
     fn __iter__(
-        self: Reference[Self, _, _],
+        self: Reference[Self, _],
     ) -> _ListIter[T, self.lifetime]:
         """Iterate over elements of the list, returning immutable references.
 
@@ -300,7 +300,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return _ListIter(0, self)
 
     fn __reversed__(
-        self: Reference[Self, _, _]
+        self: Reference[Self, _]
     ) -> _ListIter[T, self.lifetime, False]:
         """Iterate backwards over the list, returning immutable references.
 
@@ -636,7 +636,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn index[
         C: ComparableCollectionElement
     ](
-        self: Reference[List[C]],
+        self: Reference[List[C], _],
         value: C,
         start: Int = 0,
         stop: Optional[Int] = None,
@@ -774,8 +774,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     # TODO(30737): Replace __getitem__ with this, but lots of places use it
     fn __get_ref(
-        self: Reference[Self, _, _], i: Int
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+        self: Reference[Self, _], i: Int
+    ) -> Reference[T, self.lifetime]:
         """Gets a reference to the list element at the given index.
 
         Args:
@@ -792,8 +792,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @always_inline
     fn unsafe_get(
-        self: Reference[Self, _, _], idx: Int
-    ) -> Reference[Self.T, self.is_mutable, self.lifetime]:
+        self: Reference[Self, _], idx: Int
+    ) -> Reference[Self.T, self.lifetime]:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it

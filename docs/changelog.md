@@ -16,6 +16,9 @@ what we publish.
 
 ### ⭐️ New
 
+- The `Reference` type (and many iterators) now use "inferred" parameters to
+  represent the mutability of their lifetime, simplifying the interface.
+
 - Added new `ExplicitlyCopyable` trait, to mark types that can be copied
   explicitly, but which might not be implicitly copyable.
 

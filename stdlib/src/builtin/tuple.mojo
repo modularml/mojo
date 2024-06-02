@@ -152,9 +152,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
     @always_inline("nodebug")
     fn __getitem__[
         idx: Int
-    ](self: Reference[Self, _, _]) -> ref [self.lifetime] element_types[
-        idx.value
-    ]:
+    ](self: Reference[Self, _]) -> ref [self.lifetime] element_types[idx.value]:
         """Get a reference to an element in the tuple.
 
         Parameters:
@@ -187,9 +185,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         Returns:
             The tuple element at the requested index.
         """
-        return rebind[Reference[T, False, __lifetime_of(self)]](
-            Reference(self[i])
-        )[]
+        return rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
 
     @always_inline("nodebug")
     fn __contains__[T: EqualityComparable](self, value: T) -> Bool:

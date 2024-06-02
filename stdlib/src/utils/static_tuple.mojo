@@ -38,7 +38,6 @@ fn _set_array_elem[
     val: type,
     array: Reference[
         __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
-        __mlir_attr.`1 : i1`,
         _,
     ],
 ):
@@ -380,7 +379,7 @@ struct InlineArray[
 
     @always_inline("nodebug")
     fn __getitem__(
-        self: Reference[Self, _, _], idx: Int
+        self: Reference[Self, _], idx: Int
     ) -> ref [self.lifetime] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
@@ -398,7 +397,7 @@ struct InlineArray[
     fn __getitem__[
         IntableType: Intable,
         index: IntableType,
-    ](self: Reference[Self, _, _]) -> ref [self.lifetime] Self.ElementType:
+    ](self: Reference[Self, _]) -> ref [self.lifetime] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -438,8 +437,8 @@ struct InlineArray[
 
     @always_inline("nodebug")
     fn _get_reference_unsafe(
-        self: Reference[Self, _, _], idx: Int
-    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
+        self: Reference[Self, _], idx: Int
+    ) -> Reference[Self.ElementType, self.lifetime]:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__getitem__` instead of this method as it is
@@ -511,9 +510,7 @@ struct InlineArray[
         # TODO: use @parameter for soon once it stabilizes a bit
         for i in range(size):
             if (
-                rebind[Reference[T, False, __lifetime_of(self)]](
-                    Reference(self[i])
-                )[]
+                rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
                 == value
             ):
                 return True
