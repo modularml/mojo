@@ -146,7 +146,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         Returns:
             A copy of the value if it was present, otherwise default.
         """
-        return self._data.find(value).or_else(default)
+        return self._data.get(value, default)
 
     fn pop(
         inout self, value: V, owned default: Optional[Int] = None
