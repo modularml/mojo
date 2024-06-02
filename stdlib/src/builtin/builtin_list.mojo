@@ -382,7 +382,9 @@ struct VariadicListMem[
             A low-level pointer to the element on the list corresponding to the
             given index.
         """
-        return Reference(__mlir_op.`pop.variadic.get`(self.value, idx.value))[]
+        return __get_litref_as_mvalue(
+            __mlir_op.`pop.variadic.get`(self.value, idx.value)
+        )
 
     fn __iter__(
         self,
