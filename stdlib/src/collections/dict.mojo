@@ -54,18 +54,18 @@ trait RepresentableKeyElement(KeyElement, Representable):
 
 @value
 struct _DictEntryIter[
+    dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over immutable DictEntry references.
 
     Parameters:
+        dict_mutability: Whether the reference to the dictionary is mutable.
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
-        dict_mutability: Whether the reference to the dictionary is mutable.
         dict_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
@@ -109,18 +109,18 @@ struct _DictEntryIter[
 
 @value
 struct _DictKeyIter[
+    dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator over immutable Dict key references.
 
     Parameters:
+        dict_mutability: Whether the reference to the vector is mutable.
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
-        dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
@@ -130,9 +130,7 @@ struct _DictKeyIter[
     ]
     alias ref_type = Reference[K, False, Self.imm_dict_lifetime]
 
-    alias dict_entry_iter = _DictEntryIter[
-        K, V, dict_mutability, dict_lifetime, forward
-    ]
+    alias dict_entry_iter = _DictEntryIter[K, V, dict_lifetime, forward]
 
     var iter: Self.dict_entry_iter
 
@@ -148,9 +146,9 @@ struct _DictKeyIter[
 
 @value
 struct _DictValueIter[
+    dict_mutability: Bool, //,
     K: KeyElement,
     V: CollectionElement,
-    dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
     forward: Bool = True,
 ]:
@@ -158,26 +156,26 @@ struct _DictValueIter[
     is mutable.
 
     Parameters:
+        dict_mutability: Whether the reference to the vector is mutable.
         K: The key type of the elements in the dictionary.
         V: The value type of the elements in the dictionary.
-        dict_mutability: Whether the reference to the vector is mutable.
         dict_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
 
     alias ref_type = Reference[V, dict_mutability, dict_lifetime]
 
-    var iter: _DictEntryIter[K, V, dict_mutability, dict_lifetime, forward]
+    var iter: _DictEntryIter[K, V, dict_lifetime, forward]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __reversed__[
         mutability: Bool, self_life: AnyLifetime[mutability].type
-    ](self) -> _DictValueIter[K, V, dict_mutability, dict_lifetime, False]:
+    ](self) -> _DictValueIter[K, V, dict_lifetime, False]:
         var src = self.iter.src
         return _DictValueIter(
-            _DictEntryIter[K, V, dict_mutability, dict_lifetime, False](
+            _DictEntryIter[K, V, dict_lifetime, False](
                 src[]._reserved - 1, 0, src
             )
         )
@@ -576,7 +574,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn __iter__(
         self: Reference[Self, _, _],
-    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
+    ) -> _DictKeyIter[K, V, self.lifetime]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -586,7 +584,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn __reversed__(
         self: Reference[Self, _, _]
-    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime, False]:
+    ) -> _DictKeyIter[K, V, self.lifetime, False]:
         """Iterate backwards over the dict keys, returning immutable references.
 
         Returns:
@@ -818,9 +816,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
         raise "KeyError: popitem(): dictionary is empty"
 
-    fn keys(
-        self: Reference[Self, _, _]
-    ) -> _DictKeyIter[K, V, self.is_mutable, self.lifetime]:
+    fn keys(self: Reference[Self, _, _]) -> _DictKeyIter[K, V, self.lifetime]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -830,7 +826,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn values(
         self: Reference[Self, _, _]
-    ) -> _DictValueIter[K, V, self.is_mutable, self.lifetime]:
+    ) -> _DictValueIter[K, V, self.lifetime]:
         """Iterate over the dict's values as references.
 
         Returns:
@@ -840,7 +836,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn items(
         self: Reference[Self, _, _]
-    ) -> _DictEntryIter[K, V, self.is_mutable, self.lifetime]:
+    ) -> _DictEntryIter[K, V, self.lifetime]:
         """Iterate over the dict's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
@@ -1111,7 +1107,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     fn __iter__(
         self: Reference[Self, _, _]
-    ) -> _DictKeyIter[Self.key_type, V, self.is_mutable, self.lifetime]:
+    ) -> _DictKeyIter[Self.key_type, V, self.lifetime]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -1123,7 +1119,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     fn keys(
         self: Reference[Self, _, _],
-    ) -> _DictKeyIter[Self.key_type, V, self.is_mutable, self.lifetime]:
+    ) -> _DictKeyIter[Self.key_type, V, self.lifetime]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -1135,7 +1131,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     fn values(
         self: Reference[Self, _, _],
-    ) -> _DictValueIter[Self.key_type, V, self.is_mutable, self.lifetime]:
+    ) -> _DictValueIter[Self.key_type, V, self.lifetime]:
         """Iterate over the keyword dict's values as references.
 
         Returns:
@@ -1147,7 +1143,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     fn items(
         self: Reference[Self, _, _]
-    ) -> _DictEntryIter[Self.key_type, V, self.is_mutable, self.lifetime]:
+    ) -> _DictEntryIter[Self.key_type, V, self.lifetime]:
         """Iterate over the keyword dictionary's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
