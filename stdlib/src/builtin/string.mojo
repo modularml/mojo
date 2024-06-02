@@ -2029,8 +2029,7 @@ struct String(
             if manual_indexing_count:
                 if e[].value.isa[Int]() and e[].value[Int] >= len(args):
                     raise ("Index " + str(e[].value[Int]) + " not in *args")
-            if automatic_indexing_count:
-                if automatic_indexing_count > len(args):
+            if automatic_indexing_count > len(args):
                     raise ("Automatic indexing require more args in *args")
 
         var res: String = ""
