@@ -110,6 +110,25 @@ def test_gcd():
     assert_equal(gcd(List(16)), 16)
 
 
+def test_lcm():
+    assert_equal(lcm(-2, 4), 4)
+    assert_equal(lcm(2345, 23452), 54994940)
+    var l = List(4, 6, 7, 3)
+    assert_equal(lcm(Span(l)), 84)
+    assert_equal(lcm(l), 84)
+    assert_equal(lcm(4, 6, 7, 3), 84)
+    assert_equal(lcm(), 1)
+    assert_equal(lcm(List(3)), 3)
+    assert_equal(lcm(List[Int]()), 1)
+    assert_equal(lcm(0, 4), 0)
+    assert_equal(lcm(5, 33), 165)
+    assert_equal(lcm(-34, -56, -32), 3808)
+    var il = InlineArray[Int, 5](4, 16, 2, 8, 6)
+    assert_equal(lcm(Span[Int](il)), 48)
+    assert_equal(lcm(345, 623, 364, 84, 93), 346475220)
+    assert_equal(lcm(0, 0), 0)
+
+
 def main():
     test_abs()
     test_divmod()
@@ -118,3 +137,4 @@ def main():
     test_round()
     test_pow()
     test_gcd()
+    test_lcm()
