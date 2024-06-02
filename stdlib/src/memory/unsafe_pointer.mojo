@@ -170,7 +170,7 @@ struct UnsafePointer[
         Returns:
             An UnsafePointer which contains the address of the argument.
         """
-        return Self(__get_mvalue_as_litref(arg))
+        return Self(__mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg)))
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
