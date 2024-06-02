@@ -51,7 +51,7 @@ struct _SpanIter[
     @always_inline
     fn __next__(
         inout self,
-    ) -> Reference[T, is_mutable, lifetime]:
+    ) -> Reference[T, lifetime]:
         @parameter
         if forward:
             self.index += 1
@@ -103,7 +103,7 @@ struct Span[
         self._len = len
 
     @always_inline
-    fn __init__(inout self, list: Reference[List[T], is_mutable, lifetime]):
+    fn __init__(inout self, list: Reference[List[T], lifetime]):
         """Construct a Span from a List.
 
         Args:
@@ -115,10 +115,7 @@ struct Span[
     @always_inline
     fn __init__[
         T2: CollectionElementNew, size: Int
-    ](
-        inout self,
-        array: Reference[InlineArray[T2, size], is_mutable, lifetime],
-    ):
+    ](inout self, array: Reference[InlineArray[T2, size], lifetime],):
         """Construct a Span from an InlineArray.
 
         Parameters:

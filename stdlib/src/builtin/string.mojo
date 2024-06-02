@@ -1314,7 +1314,7 @@ struct String(
 
     @always_inline
     fn as_bytes_slice(
-        self: Reference[Self, _, _]
+        self: Reference[Self, _]
     ) -> Span[UInt8, self.is_mutable, self.lifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
@@ -1333,7 +1333,7 @@ struct String(
 
     @always_inline
     fn as_string_slice(
-        self: Reference[Self, _, _]
+        self: Reference[Self, _]
     ) -> StringSlice[self.is_mutable, self.lifetime]:
         """Returns a string slice of the data owned by this string.
 

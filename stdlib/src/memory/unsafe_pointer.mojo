@@ -55,7 +55,7 @@ struct UnsafePointer[
     # We're unsafe, so we can have unsafe things. References we make have
     # an immortal mutable lifetime, since we can't come up with a meaningful
     # lifetime for them anyway.
-    alias _ref_type = Reference[T, True, MutableStaticLifetime, address_space]
+    alias _ref_type = Reference[T, MutableStaticLifetime, address_space]
 
     """The underlying pointer type."""
     var address: Self._mlir_type
@@ -89,7 +89,7 @@ struct UnsafePointer[
         return Self {address: value}
 
     @always_inline
-    fn __init__(value: Reference[T, _, _, address_space]) -> Self:
+    fn __init__(value: Reference[T, _, address_space]) -> Self:
         """Create an unsafe UnsafePointer from a safe Reference.
 
         Args:
@@ -161,7 +161,7 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: Reference[T, _, _, address_space]) -> Self:
+    fn address_of(arg: Reference[T, _, address_space]) -> Self:
         """Gets the address of the argument.
 
         Args:

@@ -28,18 +28,18 @@ from sys.intrinsics import _type_is_eq
 # ===----------------------------------------------------------------------===#
 @value
 struct _InlineListIter[
+    list_mutability: Bool, //,
     T: CollectionElementNew,
     capacity: Int,
-    list_mutability: Bool,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for InlineList.
 
     Parameters:
+        list_mutability: Whether the reference to the list is mutable.
         T: The type of the elements in the list.
         capacity: The maximum number of elements that the list can hold.
-        list_mutability: Whether the reference to the list is mutable.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
@@ -47,14 +47,14 @@ struct _InlineListIter[
     alias list_type = InlineList[T, capacity]
 
     var index: Int
-    var src: Reference[Self.list_type, list_mutability, list_lifetime]
+    var src: Reference[Self.list_type, list_lifetime]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_mutability, list_lifetime]:
+    ) -> Reference[T, list_lifetime]:
         @parameter
         if forward:
             self.index += 1
@@ -129,7 +129,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     @always_inline
     fn __getitem__(
-        self: Reference[Self, _, _], owned idx: Int
+        self: Reference[Self, _], owned idx: Int
     ) -> ref [self.lifetime] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
@@ -155,8 +155,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             destroy_pointee(UnsafePointer(self._array[i]))
 
     fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _InlineListIter[ElementType, capacity, self.is_mutable, self.lifetime]:
+        self: Reference[Self, _],
+    ) -> _InlineListIter[ElementType, capacity, self.lifetime]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -189,7 +189,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             _type_is_eq[ElementType, C](), "value type is not self.ElementType"
         ]()
         for i in self:
-            if value == rebind[Reference[C, False, __lifetime_of(self)]](i)[]:
+            if value == rebind[Reference[C, __lifetime_of(self)]](i)[]:
                 return True
         return False
 
@@ -217,10 +217,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
         var count = 0
         for elem in self:
-            if (
-                value
-                == rebind[Reference[C, False, __lifetime_of(self)]](elem)[]
-            ):
+            if value == rebind[Reference[C, __lifetime_of(self)]](elem)[]:
                 count += 1
         return count
 

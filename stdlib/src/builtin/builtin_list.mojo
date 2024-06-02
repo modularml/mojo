@@ -73,7 +73,7 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
         Returns:
             The element at the given index.
         """
-        return rebind[Reference[T, False, __lifetime_of(self)]](
+        return rebind[Reference[T, __lifetime_of(self)]](
             Reference(self.storage[i])
         )[]
 
@@ -190,7 +190,7 @@ struct _VariadicListMemIter[
     ]
 
     var index: Int
-    var src: Reference[Self.variadic_list_type, False, list_lifetime]
+    var src: Reference[Self.variadic_list_type, list_lifetime]
 
     fn __next__(inout self) -> Self.variadic_list_type.reference_type:
         self.index += 1
@@ -251,9 +251,7 @@ struct VariadicListMem[
         lifetime: The reference lifetime of the underlying elements.
     """
 
-    alias reference_type = Reference[
-        element_type, Bool {value: elt_is_mutable}, lifetime
-    ]
+    alias reference_type = Reference[element_type, lifetime]
     alias _mlir_ref_type = Self.reference_type._mlir_type
     alias _mlir_type = __mlir_type[
         `!kgen.variadic<`, Self._mlir_ref_type, `, borrow_in_mem>`
@@ -597,7 +595,6 @@ struct VariadicPack[
         # element_types[index] expression is erased to AnyType for Reference.
         alias result_ref = Reference[
             element_types[index.value],
-            Bool {value: Self.elt_is_mutable},
             Self.lifetime,
         ]
         return Reference(rebind[result_ref._mlir_type](ref_elt))[]

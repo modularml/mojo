@@ -196,16 +196,16 @@ struct AddressSpace(EqualityComparable):
 @value
 @register_passable("trivial")
 struct Reference[
+    is_mutable: Bool, //,
     type: AnyType,
-    is_mutable: Bool,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Defines a non-nullable safe reference.
 
     Parameters:
-        type: Type of the underlying data.
         is_mutable: Whether the referenced data may be mutated through this.
+        type: Type of the underlying data.
         lifetime: The lifetime of the reference.
         address_space: The address space of the referenced data.
     """
