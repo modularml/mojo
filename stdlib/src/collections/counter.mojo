@@ -28,7 +28,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
     ```mojo
     from collections import Counter
-    var c = Counter[String](["a", "a", "a", "b", "b", "c", "d", "c", "c"])
+    var c = Counter[String](List("a", "a", "a", "b", "b", "c", "d", "c", "c"))
     print(c["a"]) # prints 3
     print(c["b"]) # prints 2
     ```
