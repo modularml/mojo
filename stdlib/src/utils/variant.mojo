@@ -232,7 +232,7 @@ struct Variant[*Ts: CollectionElement](
 
     fn __getitem__[
         T: CollectionElement
-    ](self: Reference[Self, _]) -> ref [self.lifetime] T:
+    ](ref [_]self: Self) -> ref [__lifetime_of(self)] T:
         """Get the value out of the variant as a type-checked type.
 
         This explicitly check that your value is of that type!
@@ -248,10 +248,10 @@ struct Variant[*Ts: CollectionElement](
         Returns:
             The internal data represented as a `Reference[T]`.
         """
-        if not self[].isa[T]():
+        if not self.isa[T]():
             abort("get: wrong variant type")
 
-        return self[].unsafe_get[T]()[]
+        return self.unsafe_get[T]()[]
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -404,7 +404,7 @@ struct Variant[*Ts: CollectionElement](
 
     fn unsafe_get[
         T: CollectionElement
-    ](self: Reference[Self, _]) -> Reference[T, self.lifetime]:
+    ](ref [_]self: Self) -> Reference[T, __lifetime_of(self)]:
         """Get the value out of the variant as a type-checked type.
 
         This doesn't explicitly check that your value is of that type!
@@ -421,8 +421,8 @@ struct Variant[*Ts: CollectionElement](
         Returns:
             The internal data represented as a `Reference[T]`.
         """
-        debug_assert(self[].isa[T](), "get: wrong variant type")
-        return self[]._get_ptr[T]()[]
+        debug_assert(self.isa[T](), "get: wrong variant type")
+        return self._get_ptr[T]()[]
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:
