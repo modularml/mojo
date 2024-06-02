@@ -98,7 +98,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
     fn __len__(self) -> Int:
         """The number of elements currently stored in the Counter."""
-        return self._data.size
+        return len(self._data)
 
     fn __bool__(self) -> Bool:
         """Check if the Counter is empty or not.
