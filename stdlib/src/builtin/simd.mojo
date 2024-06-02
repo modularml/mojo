@@ -643,14 +643,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Print an opening `[`.
         @parameter
         if size > 1:
-            writer.write_str("[")
+            writer.write_str["["]()
 
         # Print each element.
         for i in range(size):
             var element = self[i]
             # Print separators between each element.
             if i != 0:
-                writer.write_str(", ")
+                writer.write_str[", "]()
 
             @parameter
             if triple_is_nvidia_cuda():
@@ -685,7 +685,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # Print a closing `]`.
         @parameter
         if size > 1:
-            writer.write_str("]")
+            writer.write_str["]"]()
 
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
