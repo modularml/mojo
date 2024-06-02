@@ -23,72 +23,64 @@ alias TEMP_FILE_DIR = env_get_string["TEMP_FILE_DIR"]()
 
 
 def test_file_read():
-    var f = open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
-        "r",
-    )
-    assert_true(
-        f.read().startswith(
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+    var path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
+    with open(path, "r") as f:
+        assert_true(
+            f.read().startswith(
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+            )
         )
-    )
-    f.close()
 
 
 def test_file_read_multi():
-    var f = open(
+    with open(
         (Path(CURRENT_DIR) / "test_file_dummy_input.txt"),
         "r",
-    )
-
-    assert_equal(f.read(12), "Lorem ipsum ")
-    assert_equal(f.read(6), "dolor ")
-    assert_true(f.read().startswith("sit amet, consectetur adipiscing elit."))
-
-    f.close()
+    ) as f:
+        assert_equal(f.read(12), "Lorem ipsum ")
+        assert_equal(f.read(6), "dolor ")
+        assert_true(
+            f.read().startswith("sit amet, consectetur adipiscing elit.")
+        )
 
 
 def test_file_read_bytes_multi():
-    var f = open(
+    with open(
         Path(CURRENT_DIR) / "test_file_dummy_input.txt",
         "r",
-    )
+    ) as f:
+        var bytes1 = f.read_bytes(12)
+        assert_equal(len(bytes1), 12, "12 bytes")
+        # we add the null terminator
+        bytes1.append(0)
+        var string1 = String(bytes1)
+        assert_equal(len(string1), 12, "12 chars")
+        assert_equal(string1, String("Lorem ipsum "))
 
-    var bytes1 = f.read_bytes(12)
-    assert_equal(len(bytes1), 12, "12 bytes")
-    # we add the null terminator
-    bytes1.append(0)
-    var string1 = String(bytes1)
-    assert_equal(len(string1), 12, "12 chars")
-    assert_equal(string1, String("Lorem ipsum "))
+        var bytes2 = f.read_bytes(6)
+        assert_equal(len(bytes2), 6, "6 bytes")
+        # we add the null terminator
+        bytes2.append(0)
+        var string2 = String(bytes2)
+        assert_equal(len(string2), 6, "6 chars")
+        assert_equal(string2, "dolor ")
 
-    var bytes2 = f.read_bytes(6)
-    assert_equal(len(bytes2), 6, "6 bytes")
-    # we add the null terminator
-    bytes2.append(0)
-    var string2 = String(bytes2)
-    assert_equal(len(string2), 6, "6 chars")
-    assert_equal(string2, "dolor ")
+        # Read where N is greater than the number of bytes in the file.
+        var s: String = f.read(1e9)
 
-    # Read where N is greater than the number of bytes in the file.
-    var s: String = f.read(1e9)
-
-    assert_equal(len(s), 936)
-    assert_true(s.startswith("sit amet, consectetur adipiscing elit."))
-
-    f.close()
+        assert_equal(len(s), 936)
+        assert_true(s.startswith("sit amet, consectetur adipiscing elit."))
 
 
 def test_file_read_path():
     var file_path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
 
-    var f = open(file_path, "r")
-    assert_true(
-        f.read().startswith(
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+    with open(file_path, "r") as f:
+        assert_true(
+            f.read().startswith(
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+            )
         )
-    )
-    f.close()
 
 
 def test_file_path_direct_read():
@@ -151,25 +143,21 @@ def test_file_open_nodir():
 def test_file_write():
     var content: String = "The quick brown fox jumps over the lazy dog"
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write"
-    var f = open(TEMP_FILE, "w")
-    f.write(content)
-    f.close()
+    with open(TEMP_FILE, "w") as f:
+        f.write(content)
 
-    var read_file = open(TEMP_FILE, "r")
-    assert_equal(read_file.read(), content)
-    read_file.close()
+    with open(TEMP_FILE, "r") as read_file:
+        assert_equal(read_file.read(), content)
 
 
 def test_file_write_span():
     var content: String = "The quick brown fox jumps over the lazy dog"
     var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write_span"
-    var f = open(TEMP_FILE, "w")
-    f.write(content.as_bytes_slice())
-    f.close()
+    with open(TEMP_FILE, "w") as f:
+        f.write(content.as_bytes_slice())
 
-    var read_file = open(TEMP_FILE, "r")
-    assert_equal(read_file.read(), content)
-    read_file.close()
+    with open(TEMP_FILE, "r") as read_file:
+        assert_equal(read_file.read(), content)
 
 
 def test_file_write_again():
@@ -182,9 +170,8 @@ def test_file_write_again():
     with open(TEMP_FILE, "w") as f:
         f.write(expected_content)
 
-    var read_file = open(TEMP_FILE, "r")
-    assert_equal(read_file.read(), expected_content)
-    read_file.close()
+    with open(TEMP_FILE, "r") as read_file:
+        assert_equal(read_file.read(), expected_content)
 
 
 @value
@@ -208,19 +195,19 @@ struct Word:
 
 
 def test_file_read_to_dtype_pointer():
-    var f = open(Path(CURRENT_DIR) / "test_file_dummy_input.txt", "r")
+    with open(Path(CURRENT_DIR) / "test_file_dummy_input.txt", "r") as f:
+        var ptr = DTypePointer[DType.int8].alloc(8)
+        var data = f.read(ptr, 8)
+        assert_equal(
+            str(ptr.load[width=8](0)), "[76, 111, 114, 101, 109, 32, 105, 112]"
+        )
 
-    var ptr = DTypePointer[DType.int8].alloc(8)
-    var data = f.read(ptr, 8)
-    assert_equal(
-        str(ptr.load[width=8](0)), "[76, 111, 114, 101, 109, 32, 105, 112]"
-    )
-
-    var ptr2 = DTypePointer[DType.int8].alloc(8)
-    var data2 = f.read(ptr2, 8)
-    assert_equal(
-        str(ptr2.load[width=8](0)), "[115, 117, 109, 32, 100, 111, 108, 111]"
-    )
+        var ptr2 = DTypePointer[DType.int8].alloc(8)
+        var data2 = f.read(ptr2, 8)
+        assert_equal(
+            str(ptr2.load[width=8](0)),
+            "[115, 117, 109, 32, 100, 111, 108, 111]",
+        )
 
 
 def test_file_get_raw_fd():
@@ -266,6 +253,7 @@ def main():
     test_file_seek()
     test_file_open_nodir()
     test_file_write()
+    test_file_write_span()
     test_file_write_again()
     test_file_read_to_dtype_pointer()
     test_file_get_raw_fd()
