@@ -145,6 +145,71 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         return is_eq(self.keys()) and is_eq(other.keys())
 
+    fn __ne__(self, other: Self) -> Bool:
+        """Check if all counts disagree. Missing counts are treated as zero.
+
+        Args:
+            other: The other Counter to compare to.
+
+        Returns:
+            True if the two Counters are not equal, False otherwise.
+        """
+        return not self == other
+
+    fn __le__(self, other: Self) -> Bool:
+        """Check if all counts are less than or equal to the other Counter.
+
+        Args:
+            other: The other Counter to compare to.
+
+        Returns:
+            True if all counts are less than or equal to the other Counter, False otherwise.
+        """
+
+        @parameter
+        @always_inline
+        fn is_le(keys: _DictKeyIter[V, Int, False, _]) -> Bool:
+            for e_ref in keys:
+                var e = e_ref[]
+                if self.get(e, 0) > other.get(e, 0):
+                    return False
+            return True
+
+        return is_le(self.keys())
+
+    fn __lt__(self, other: Self) -> Bool:
+        """Check if all counts are less than in the other Counter.
+
+        Args:
+            other: The other Counter to compare to.
+
+        Returns:
+            True if all counts are less than in the other Counter, False otherwise.
+        """
+        return self <= other and self != other
+
+    fn __gt__(self, other: Self) -> Bool:
+        """Check if all counts are greater than in the other Counter.
+
+        Args:
+            other: The other Counter to compare to.
+
+        Returns:
+            True if all counts are greater than in the other Counter, False otherwise.
+        """
+        return other < self
+
+    fn __ge__(self, other: Self) -> Bool:
+        """Check if all counts are greater than or equal to the other Counter.
+
+        Args:
+            other: The other Counter to compare to.
+
+        Returns:
+            True if all counts are greater than or equal to the other Counter, False otherwise.
+        """
+        return other <= self
+
     fn get(self, value: V) -> Optional[V]:
         """Get a value from the counter.
 

@@ -118,7 +118,7 @@ def test_most_common():
     assert_equal(most_common[1][1][Int], 2)
 
 
-def test_eq():
+def test_eq_and_ne():
     var c1 = Counter[String]()
     c1["a"] = 1
     c1["b"] = 2
@@ -130,9 +130,33 @@ def test_eq():
     c2["c"] = 0
 
     assert_true(c1 == c2)
+    assert_false(c1 != c2)
 
     c2["b"] = 3
     assert_false(c1 == c2)
+    assert_true(c1 != c2)
+
+
+def test_lt_le_gt_and_ge():
+    var c1 = Counter[String]()
+    c1["a"] = 1
+    c1["b"] = 2
+    c1["d"] = 0
+
+    var c2 = Counter[String]()
+    c2["a"] = 1
+    c2["b"] = 2
+    c2["c"] = 0
+
+    assert_false(c1 < c2)
+    assert_true(c1 <= c2)
+    assert_false(c1 > c2)
+
+    c2["b"] = 3
+    assert_true(c1 < c2)
+    assert_true(c1 <= c2)
+    assert_false(c1 > c2)
+    assert_true(c2 > c1)
 
 
 def test_elements():
@@ -190,12 +214,13 @@ def main():
     test_counter_construction()
     test_counter_getitem()
     test_elements()
-    test_eq()
+    test_eq_and_ne()
     test_iter()
     test_iter_keys()
     test_iter_items()
     test_iter_values()
     test_iter_values_mut()
+    test_lt_le_gt_and_ge()
     test_most_common()
     test_substract()
     test_total()
