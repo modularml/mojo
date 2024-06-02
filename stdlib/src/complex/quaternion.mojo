@@ -246,7 +246,9 @@ struct Quaternion[T: DType = DType.float64]:
 
     fn n(self) -> Self._vec_type:
         """Calculate the unit vector n for the vector
-        part of the Quaternion. Used for polar decomposition.
+        part of the Quaternion. Used for polar decomposition:
+        `q = |q| * e**(phi*n) = |q| * (cos(phi) + n * sin(phi))`
+        where phi is the angle of the Quaternion.
 
         Returns:
             The unit vector.
@@ -256,8 +258,10 @@ struct Quaternion[T: DType = DType.float64]:
         return v / v_magn
 
     fn phi(self) -> Self._scalar_type:
-        """Calculate the vector angle phi for the vector
-        part of the Quaternion. Used for polar decomposition.
+        """Calculate the Quaternion angle phi.
+        Used for polar decomposition:
+        `q = |q| * e**(phi*n) = |q| * (cos(phi) + n * sin(phi))`
+        where n is the unit vector of the vector part of the Quaternion.
 
         Returns:
             The angle.
@@ -443,27 +447,31 @@ struct DualQuaternion[T: DType = DType.float64]:
         self.vec = rotatational.vec.join(rotatational.vec)
         self.vec *= SIMD[T, 4](1, 1, 1, 1).join(displacement.vec)
 
-    fn __init__(inout self, screw: SIMD[T, 8], dual_angle: SIMD[T, 2]):
-        """Construct a DualQuaternion from a Screw axis and a dual angle.
+    fn __init__(inout self, screw_vec: SIMD[T, 8], dual_angle: SIMD[T, 2]):
+        """Construct a DualQuaternion from a Screw and a dual angle.
 
         Args:
-            screw: The Screw axis. It is assumed that the first 6 of the
-                8 dimensions represent the vectors.
-            dual_angle: The dual angle of the axis: (phi, d).
+            screw_vec: The Screw vectors. It is assumed that 6 of the 8
+                dimensions represent the vectors such that:
+                `screw_vec = (lx, ly, lz, _, mx, my, mz, _)`, `|l| = 1`.
+            dual_angle: The dual angle: `(theta, d)`.
         """
 
         alias msg = "DualQuaternions can only be expressed with floating point types"
         constrained[T.is_floating_point(), msg=msg]()
 
-        var d_cos = cos(dual_angle * 0.5)
-        var w = d_cos[0]
-        var ew = d_cos[1]
-        var d_sin = sin(dual_angle * 0.5)
-        var d_sin_vec = SIMD[T, 8](
-            d_sin[0], d_sin[0], d_sin[0], d_sin[1], d_sin[1], d_sin[1], 0, 0
+        var cos_theta_2 = cos(dual_angle[0] * 0.5)
+        var w = cos_theta_2
+        var sin_theta_2 = sin(dual_angle[0] * 0.5)
+        var d_2 = dual_angle[1] * 0.5
+        var ew = -d_2 * sin_theta_2
+        var sin_theta_2_vec = SIMD[T, 8](sin_theta_2)
+        var l_d_cos_vec = screw_vec.slice[4]() * (d_2 * cos_theta_2)
+        var l_vec = SIMD[T, 8](
+            0, 0, 0, ew, l_d_cos_vec[0], l_d_cos_vec[1], l_d_cos_vec[2], w
         )
-        var vec = screw * d_sin_vec
-        self = Self(w, vec[0], vec[1], vec[2], ew, vec[3], vec[4], vec[5])
+        var sin_vec = screw_vec * sin_theta_2_vec
+        self = Self((sin_vec + l_vec).rotate_right[1]())
 
     fn __getattr__[name: StringLiteral](self) -> Self._scalar_type:
         """Get the attribute.
@@ -596,32 +604,14 @@ struct DualQuaternion[T: DType = DType.float64]:
         """
         return self.vec / self.__abs__()
 
-    fn theta(self) -> SIMD[T, 2]:
-        """Calculate the dual angle of the DualQuaternion.
-
-        Returns:
-            The dual angle: (phi, d).
-        """
-        return acos((self.vec**2).reduce_add[2]() / self.__abs__())
-
-    fn displace(inout self, dual_quaternion: Self):
-        """Displace the DualQuaternion by a given screw.
-
-        Args:
-            dual_quaternion: The dual_quaternion to displace by.
-        """
-        self *= dual_quaternion
-
     fn displace(inout self, *dual_quaternions: Self):
         """Displace the DualQuaternion by a set of DualQuaternions.
 
         Args:
             dual_quaternions: The DualQuaternions to displace by.
         """
-        var axis = dual_quaternions[0]
-        for i in range(1, len(dual_quaternions)):
-            axis *= dual_quaternions[i]
-        self.displace(axis)
+        for i in range(len(dual_quaternions)):
+            self *= dual_quaternions[i]
 
     fn transform(inout self, rotate: Quaternion[T], displace: Quaternion[T]):
         """Transform the DualQuaternion by a set of Quaternions.
@@ -634,10 +624,60 @@ struct DualQuaternion[T: DType = DType.float64]:
         self *= Self(rotate, displace)
 
     fn to_quaternions(self) -> (Quaternion[T], Quaternion[T]):
+        """Get the Quaternion representation such that
+        `q = r + n * t * r`, where r is the rotation quaternion
+        and t is the translation quaternion and n is the unit
+        vector for the DualQuaternion's dual part.
+
+        Returns:
+            Tuple[Quaternion[T], Quaternion[T])]: (r, t).
+        """
+
         var r = Quaternion[T](self.w, self.i, self.j, self.k)
         var rest = self.vec / (r.vec.join(r.vec))
         var d = Quaternion[T](rest.slice[4, offset=4]())
         return r, d
+
+    fn to_screw(self) -> (SIMD[T, 8], SIMD[T, 2]):
+        """Get the screw representation:
+        `screw_vec = (lx, ly, lz, _, mx, my, mz, _)` ,
+        `dual_angle: (theta, d)`.
+
+        Notes:
+            This assumes it's a normalized dual quaternion.
+
+        Returns:
+            Tuple[SIMD[T, 8], SIMD[T, 2])]: (screw vector, dual_angle).
+        """
+
+        var theta = acos(self.w) * 2
+        var sin_theta_2 = sin(theta * 0.5)
+        var cos_theta_2 = cos(theta * 0.5)
+        var d = 2 * self.ew / (-sin_theta_2)
+        var q1 = SIMD[T, 4](self.i, self.j, self.k, 0)
+        var q2 = SIMD[T, 4](self.ei, self.ej, self.ek, 0)
+        var l = q1 / sin_theta_2
+        var l_dual = l * (d * 0.5 * cos_theta_2)
+        var m = (q2 - l_dual) / sin_theta_2
+        return l.join(m), SIMD[T, 2](theta, d)
+
+    fn __pow__(self, value: Int) -> Self:
+        """Raise the DualQuaternion to the given power.
+
+        Notes:
+            This assumes it's a normalized dual quaternion.
+
+        Args:
+            value: The exponent.
+
+        Returns:
+            The result.
+        """
+
+        var screw = self.to_screw()
+        var screw_vec = screw[0]
+        var dual_angle = screw[1]
+        return Self(screw_vec, dual_angle * value)
 
     # TODO: need Matrix[T, 4, 4]
     # fn to_matrix(self) -> Matrix[T, 4, 4]:
@@ -668,3 +708,71 @@ struct DualQuaternion[T: DType = DType.float64]:
     #     m[2] = (d.j, ij + wk, i2, jk - wi)
     #     m[3] = (d.k, ik - wj, jk + wi, i3)
     #     return m
+
+    fn differential(self, w: Quaternion[T], v: Quaternion[T]) -> Self:
+        """Calculate the value of the derivative of the DualQuaternion
+        with given parameters.
+
+        Args:
+            w: Omega, the angular velocity.
+            v: Translational velocity.
+
+        Returns:
+            The DualQuaternion value.
+        """
+
+        var qs = self.to_quaternions()
+        var r = qs[0]
+        var t = qs[1]
+        var half = SIMD[T, 4](0.5)
+        var q1 = w * r * half
+        var q2 = (v * r + (t * w * r) * half) * half
+        return Self(q1.w, q1.i, q1.j, q1.k, q2.w, q2.i, q2.j, q2.k)
+
+    # TODO: capturing closures cannot be materialized as runtime values
+    # fn sclerp(self, other: Self) -> fn (Int) capturing -> Self:
+    #     """Get the tick function for performing Screw Linear
+    #     Interpolation (ScLERP) from self to other using the function
+    #     `fn(tau: Int) -> DualQuaternion[T]` , `tau: [0, 1]`.
+
+    #     Notes:
+    #         This assumes both are normalized dual quaternions.
+
+    #     Args:
+    #         other: The other DualQuaternion.
+
+    #     Returns:
+    #         The tick function.
+    #     """
+
+    #     @parameter
+    #     fn closure(tau: Int) -> Self:
+    #         return self * ((~self * other) ** tau)
+
+    #     return closure
+
+    # TODO: capturing closures cannot be materialized as runtime values
+    # fn dlb(self, other: Self) -> fn (Int) capturing -> Self:
+    #     """Get the tick function for performing Dual Linear Blending
+    #     (DLB) from self to other using the function
+    #     `fn(tau: Int) -> DualQuaternion[T]` , `tau: [0, 1]`.
+
+    #     Notes:
+    #         This assumes both are normalized dual quaternions.
+
+    #     Args:
+    #         other: The other DualQuaternion.
+
+    #     Returns:
+    #         The tick function.
+    #     """
+
+    #     @parameter
+    #     fn closure(tau: Int) -> Self:
+    #         var w = 1 - tau
+    #         var vec_t = SIMD[T, 8](0, tau, tau, tau, tau, tau, tau, tau)
+    #         var vec = (~self * other).vec * vec_t
+    #         vec[0] = w
+    #         return vec / sqrt((vec**2).reduce_add())
+
+    #     return closure
