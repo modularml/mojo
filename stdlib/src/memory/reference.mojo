@@ -228,13 +228,15 @@ struct Reference[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Self._mlir_type):
-        """Constructs a Reference from the MLIR reference.
+    fn __init__(
+        inout self, ref [lifetime, address_space._value.value]value: type
+    ):
+        """Constructs a Reference from a value reference.
 
         Args:
-            value: The MLIR reference.
+            value: The value reference.
         """
-        self.value = value
+        self.value = __get_mvalue_as_litref(value)
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
