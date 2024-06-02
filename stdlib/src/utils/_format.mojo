@@ -103,7 +103,7 @@ struct Formatter:
         self.write_str(literal.as_string_slice())
 
     @always_inline
-    fn write_str(inout self, str_slice: StringSlice[False, _]):
+    fn write_str(inout self, str_slice: StringSlice[_]):
         """
         Write a string slice to this formatter.
 

@@ -2908,7 +2908,7 @@ fn _format_scalar[
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
-    var str_slice = StringSlice[False, __lifetime_of(buf)](
+    var str_slice = StringSlice[__lifetime_of(buf)](
         unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
     )
 

@@ -289,9 +289,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self.extend(other^)
 
-    fn __iter__(
-        self: Reference[Self, _],
-    ) -> _ListIter[T, self.lifetime]:
+    fn __iter__(ref [_]self: Self) -> _ListIter[T, __lifetime_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -300,14 +298,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return _ListIter(0, self)
 
     fn __reversed__(
-        self: Reference[Self, _]
-    ) -> _ListIter[T, self.lifetime, False]:
+        ref [_]self: Self,
+    ) -> _ListIter[T, __lifetime_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the list elements.
         """
-        return _ListIter[forward=False](len(self[]), self)
+        return _ListIter[forward=False](len(self), self)
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -636,7 +634,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn index[
         C: ComparableCollectionElement
     ](
-        self: Reference[List[C], _],
+        ref [_]self: List[C],
         value: C,
         start: Int = 0,
         stop: Optional[Int] = None,
@@ -672,20 +670,20 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         var stop_normalized: Int
         if stop is None:
             # Default end
-            stop_normalized = len(self[])
+            stop_normalized = len(self)
         else:
             stop_normalized = stop.value()[]
 
         if start_normalized < 0:
-            start_normalized += len(self[])
+            start_normalized += len(self)
         if stop_normalized < 0:
-            stop_normalized += len(self[])
+            stop_normalized += len(self)
 
-        start_normalized = _clip(start_normalized, 0, len(self[]))
-        stop_normalized = _clip(stop_normalized, 0, len(self[]))
+        start_normalized = _clip(start_normalized, 0, len(self))
+        stop_normalized = _clip(stop_normalized, 0, len(self))
 
         for i in range(start_normalized, stop_normalized):
-            if self[][i] == value:
+            if self[i] == value:
                 return i
         raise "ValueError: Given element is not in list"
 
