@@ -124,6 +124,27 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         self._data.__moveinit__(existing._data)
 
+    fn __eq__(self, other: Self) -> Bool:
+        """Check if all counts agree. Missing counts are treated as zero.
+
+        Args:
+            other: The other Counter to compare to.
+
+        Returns:
+            True if the two Counters are equal, False otherwise.
+        """
+
+        @parameter
+        @always_inline
+        fn is_eq(keys: _DictKeyIter[V, Int, False, _]) -> Bool:
+            for e_ref in keys:
+                var e = e_ref[]
+                if self.get(e, 0) != other.get(e, 0):
+                    return False
+            return True
+
+        return is_eq(self.keys()) and is_eq(other.keys())
+
     fn get(self, value: V) -> Optional[V]:
         """Get a value from the counter.
 
@@ -268,7 +289,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         for item_ref in other.items():
             var item = item_ref[]
-            self._data[item.key] = self._data.get(item.key, 0) - item.value
+            self[item.key] = self.get(item.key, 0) - item.value
 
 
 struct CountTuple[V: KeyElement](
