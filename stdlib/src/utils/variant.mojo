@@ -263,8 +263,8 @@ struct Variant[*Ts: CollectionElement](
         ]()
         return UnsafePointer.address_of(self._impl).bitcast[T]()
 
-    fn _get_state(self: Reference[Self, _]) -> Reference[Int8, self.lifetime]:
-        var int8_self = UnsafePointer(self).bitcast[Int8]()
+    fn _get_state(ref [_]self: Self) -> Reference[Int8, __lifetime_of(self)]:
+        var int8_self = UnsafePointer.address_of(self).bitcast[Int8]()
         return (int8_self + _UnionSize[Ts].compute())[]
 
     @always_inline

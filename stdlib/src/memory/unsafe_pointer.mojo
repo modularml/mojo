@@ -52,11 +52,6 @@ struct UnsafePointer[
 
     alias type = T
 
-    # We're unsafe, so we can have unsafe things. References we make have
-    # an immortal mutable lifetime, since we can't come up with a meaningful
-    # lifetime for them anyway.
-    alias _ref_type = Reference[T, MutableStaticLifetime, address_space]
-
     """The underlying pointer type."""
     var address: Self._mlir_type
     """The underlying pointer."""
@@ -88,6 +83,8 @@ struct UnsafePointer[
         """
         return Self {address: value}
 
+    # TODO: remove this in favor of address_of which is less of a footgun. We
+    # shouldn't allow safe references to implicitly convert to unsafe pointers.
     @always_inline
     fn __init__(value: Reference[T, _, address_space]) -> Self:
         """Create an unsafe UnsafePointer from a safe Reference.
@@ -185,8 +182,13 @@ struct UnsafePointer[
         Returns:
             A reference to the value.
         """
+
+        # We're unsafe, so we can have unsafe things. References we make have
+        # an immortal mutable lifetime, since we can't come up with a meaningful
+        # lifetime for them anyway.
+        alias _ref_type = Reference[T, MutableStaticLifetime, address_space]
         return __get_litref_as_mvalue(
-            __mlir_op.`lit.ref.from_pointer`[_type = Self._ref_type._mlir_type](
+            __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
                 self.address
             )
         )

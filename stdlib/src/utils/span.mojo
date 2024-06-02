@@ -103,19 +103,19 @@ struct Span[
         self._len = len
 
     @always_inline
-    fn __init__(inout self, list: Reference[List[T], lifetime]):
+    fn __init__(inout self, ref [lifetime]list: List[T]):
         """Construct a Span from a List.
 
         Args:
             list: The list to which the span refers.
         """
-        self._data = list[].data
-        self._len = len(list[])
+        self._data = list.data
+        self._len = len(list)
 
     @always_inline
     fn __init__[
         T2: CollectionElementNew, size: Int
-    ](inout self, array: Reference[InlineArray[T2, size], lifetime],):
+    ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 
         Parameters:
@@ -128,7 +128,7 @@ struct Span[
 
         constrained[_type_is_eq[T, T2](), "array element is not Span.T"]()
 
-        self._data = UnsafePointer(array).bitcast[T]()
+        self._data = UnsafePointer.address_of(array).bitcast[T]()
         self._len = size
 
     # ===------------------------------------------------------------------===#

@@ -101,13 +101,13 @@ struct Arc[T: Movable](CollectionElement):
 
     # FIXME: This isn't right - the element should be mutable regardless
     # of whether the 'self' type is mutable.
-    fn __getitem__(self: Reference[Self, _]) -> ref [self.lifetime] T:
+    fn __getitem__(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
         """Returns a Reference to the managed value.
 
         Returns:
             A Reference to the managed value.
         """
-        return self[]._inner[].payload
+        return self._inner[].payload
 
     fn as_ptr(self) -> UnsafePointer[T]:
         """Retrieves a pointer to the underlying memory.

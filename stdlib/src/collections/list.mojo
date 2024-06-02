@@ -61,10 +61,10 @@ struct _ListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__get_ref(self.index - 1)
+            return self.src[].__get_ref(self.index - 1)[]
         else:
             self.index -= 1
-            return self.src[].__get_ref(self.index)
+            return self.src[].__get_ref(self.index)[]
 
     fn __len__(self) -> Int:
         @parameter
@@ -772,8 +772,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     # TODO(30737): Replace __getitem__ with this, but lots of places use it
     fn __get_ref(
-        self: Reference[Self, _], i: Int
-    ) -> Reference[T, self.lifetime]:
+        ref [_]self: Self, i: Int
+    ) -> Reference[T, __lifetime_of(self)]:
         """Gets a reference to the list element at the given index.
 
         Args:
@@ -784,14 +784,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         var normalized_idx = i
         if i < 0:
-            normalized_idx += self[].size
+            normalized_idx += self.size
 
-        return self[].unsafe_get(normalized_idx)
+        return self.unsafe_get(normalized_idx)
 
     @always_inline
     fn unsafe_get(
-        self: Reference[Self, _], idx: Int
-    ) -> Reference[Self.T, self.lifetime]:
+        ref [_]self: Self, idx: Int
+    ) -> Reference[Self.T, __lifetime_of(self)]:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it
@@ -810,13 +810,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             A reference to the element at the given index.
         """
         debug_assert(
-            0 <= idx < len(self[]),
+            0 <= idx < len(self),
             (
                 "The index provided must be within the range [0, len(List) -1]"
                 " when using List.unsafe_get()"
             ),
         )
-        return (self[].data + idx)[]
+        return (self.data + idx)[]
 
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
