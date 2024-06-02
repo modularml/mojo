@@ -73,9 +73,8 @@ struct ListLiteral[*Ts: Movable](Sized, Movable):
         Returns:
             The element at the given index.
         """
-        return rebind[Reference[T, __lifetime_of(self)]](
-            Reference(self.storage[i])
-        )[]
+        # FIXME: Rebinding to a different lifetime.
+        return UnsafePointer.address_of(self.storage[i]).bitcast[T]()[]
 
 
 # ===----------------------------------------------------------------------===#
@@ -171,16 +170,16 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
 
 @value
 struct _VariadicListMemIter[
+    elt_is_mutable: Bool, //,
     elt_type: AnyType,
-    elt_is_mutable: Bool,
     elt_lifetime: AnyLifetime[elt_is_mutable].type,
     list_lifetime: ImmutableLifetime,
 ]:
     """Iterator for VariadicListMem.
 
     Parameters:
-        elt_type: The type of the elements in the list.
         elt_is_mutable: Whether the elements in the list are mutable.
+        elt_type: The type of the elements in the list.
         elt_lifetime: The lifetime of the elements.
         list_lifetime: The lifetime of the VariadicListMem.
     """
@@ -222,7 +221,7 @@ struct _lit_lifetime_union[
 
 
 struct _lit_mut_cast[
-    is_mutable: Bool,
+    is_mutable: Bool, //,
     operand: AnyLifetime[is_mutable].type,
     result_mutable: Bool,
 ]:
@@ -367,7 +366,7 @@ struct VariadicListMem[
             # since that is what we want to use in the ultimate reference and
             # the union overall doesn't matter.
             _lit_mut_cast[
-                False, __lifetime_of(self), Bool {value: elt_is_mutable}
+                __lifetime_of(self), Bool {value: elt_is_mutable}
             ].result,
         ].result
     ] element_type:
@@ -386,12 +385,7 @@ struct VariadicListMem[
 
     fn __iter__(
         self,
-    ) -> _VariadicListMemIter[
-        element_type,
-        Bool {value: elt_is_mutable},
-        lifetime,
-        __lifetime_of(self),
-    ]:
+    ) -> _VariadicListMemIter[element_type, lifetime, __lifetime_of(self),]:
         """Iterate over the list.
 
         Returns:
@@ -399,7 +393,6 @@ struct VariadicListMem[
         """
         return _VariadicListMemIter[
             element_type,
-            Bool {value: elt_is_mutable},
             lifetime,
             __lifetime_of(self),
         ](0, self)
@@ -586,18 +579,17 @@ struct VariadicPack[
             A reference to the element.  The Reference's mutability follows the
             mutability of the pack argument convention.
         """
-        var ref_elt = __mlir_op.`lit.ref.pack.extract`[index = index.value](
+        var litref_elt = __mlir_op.`lit.ref.pack.extract`[index = index.value](
             self._value
         )
 
         # Rebind the !lit.ref to agree on the element type.  This is needed
         # because we're getting a low level rebind to AnyType when the
         # element_types[index] expression is erased to AnyType for Reference.
-        alias result_ref = Reference[
-            element_types[index.value],
-            Self.lifetime,
-        ]
-        return Reference(rebind[result_ref._mlir_type](ref_elt))[]
+        var ref_elt = UnsafePointer.address_of(
+            __get_litref_as_mvalue(litref_elt)
+        )
+        return ref_elt.bitcast[element_types[index.value]]()[]
 
     @always_inline
     fn each[func: fn[T: element_trait] (T) capturing -> None](self):

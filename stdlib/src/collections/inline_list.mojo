@@ -129,8 +129,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     @always_inline
     fn __getitem__(
-        self: Reference[Self, _], owned idx: Int
-    ) -> ref [self.lifetime] Self.ElementType:
+        ref [_]self: Self, owned idx: Int
+    ) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Args:
@@ -140,13 +140,13 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             A reference to the item at the given index.
         """
         debug_assert(
-            -self[]._size <= idx < self[]._size, "Index must be within bounds."
+            -self._size <= idx < self._size, "Index must be within bounds."
         )
 
         if idx < 0:
-            idx += len(self[])
+            idx += len(self)
 
-        return self[]._array[idx]
+        return self._array[idx]
 
     @always_inline
     fn __del__(owned self):
@@ -155,8 +155,8 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             destroy_pointee(UnsafePointer(self._array[i]))
 
     fn __iter__(
-        self: Reference[Self, _],
-    ) -> _InlineListIter[ElementType, capacity, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _InlineListIter[ElementType, capacity, __lifetime_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:

@@ -73,7 +73,6 @@ struct _DictEntryIter[
     alias imm_dict_lifetime = __mlir_attr[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
-    alias ref_type = Reference[DictEntry[K, V], Self.imm_dict_lifetime]
 
     var index: Int
     var seen: Int
@@ -83,7 +82,7 @@ struct _DictEntryIter[
         return self
 
     @always_inline
-    fn __next__(inout self) -> Self.ref_type:
+    fn __next__(inout self) -> Reference[DictEntry[K, V], Self.dict_lifetime]:
         while True:
             var opt_entry_ref = self.src[]._entries.__get_ref(self.index)
             if opt_entry_ref[]:
@@ -95,9 +94,7 @@ struct _DictEntryIter[
                     self.index -= 1
 
                 self.seen += 1
-                # Use UnsafePointer to cast from dict_mutability to mutable.
-                # TODO: This seems wrong.
-                return UnsafePointer(opt_entry_ref[].value())[]
+                return opt_entry_ref[].value()
 
             @parameter
             if forward:
@@ -127,11 +124,6 @@ struct _DictKeyIter[
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias imm_dict_lifetime = __mlir_attr[
-        `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
-    ]
-    alias ref_type = Reference[K, Self.imm_dict_lifetime]
-
     alias dict_entry_iter = _DictEntryIter[K, V, dict_lifetime, forward]
 
     var iter: Self.dict_entry_iter
@@ -139,7 +131,7 @@ struct _DictKeyIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> Self.ref_type:
+    fn __next__(inout self) -> Reference[K, dict_lifetime]:
         return self.iter.__next__()[].key
 
     fn __len__(self) -> Int:
@@ -172,9 +164,7 @@ struct _DictValueIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __reversed__[
-        mutability: Bool, self_life: AnyLifetime[mutability].type
-    ](self) -> _DictValueIter[K, V, dict_lifetime, False]:
+    fn __reversed__(self) -> _DictValueIter[K, V, dict_lifetime, False]:
         var src = self.iter.src
         return _DictValueIter(
             _DictEntryIter[K, V, dict_lifetime, False](

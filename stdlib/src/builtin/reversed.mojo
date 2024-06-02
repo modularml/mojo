@@ -77,18 +77,14 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
 
 
 fn reversed[
-    T: CollectionElement, //,
-    mutability: Bool,
-    self_life: AnyLifetime[mutability].type,
-](ref [self_life]value: List[T]) -> _ListIter[T, self_life, False]:
+    T: CollectionElement
+](ref [_]value: List[T]) -> _ListIter[T, __lifetime_of(value), False]:
     """Get a reversed iterator of the input list.
 
     **Note**: iterators are currently non-raising.
 
     Parameters:
         T: The type of the elements in the list.
-        mutability: Mutability of the collection.
-        self_life: Lifetime of the collection.
 
     Args:
         value: The list to get the reversed iterator of.
@@ -102,9 +98,7 @@ fn reversed[
 fn reversed[
     K: KeyElement,
     V: CollectionElement,
-    mutability: Bool,
-    self_life: AnyLifetime[mutability].type,
-](ref [self_life]value: Dict[K, V],) -> _DictKeyIter[K, V, self_life, False]:
+](ref [_]value: Dict[K, V],) -> _DictKeyIter[K, V, __lifetime_of(value), False]:
     """Get a reversed iterator of the input dict.
 
     **Note**: iterators are currently non-raising.
@@ -112,8 +106,6 @@ fn reversed[
     Parameters:
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
-        mutability: Mutability of the collection.
-        self_life: Lifetime of the collection.
 
     Args:
         value: The dict to get the reversed iterator of.
@@ -125,13 +117,11 @@ fn reversed[
 
 
 fn reversed[
-    mutability: Bool,
-    self_life: AnyLifetime[mutability].type,
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-](ref [self_life]value: _DictValueIter[K, V, dict_lifetime]) -> _DictValueIter[
+](ref [_]value: _DictValueIter[K, V, dict_lifetime]) -> _DictValueIter[
     K, V, dict_lifetime, False
 ]:
     """Get a reversed iterator of the input dict values.
@@ -139,8 +129,6 @@ fn reversed[
     **Note**: iterators are currently non-raising.
 
     Parameters:
-        mutability: Whether the reference to the dict is mutable.
-        self_life: The lifetime of the dict.
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
         dict_mutability: Whether the reference to the dict values is mutable.
@@ -152,17 +140,15 @@ fn reversed[
     Returns:
         The reversed iterator of the dict values.
     """
-    return value.__reversed__[mutability, self_life]()
+    return value.__reversed__()
 
 
 fn reversed[
-    mutability: Bool,
-    self_life: AnyLifetime[mutability].type,
     K: KeyElement,
     V: CollectionElement,
     dict_mutability: Bool,
     dict_lifetime: AnyLifetime[dict_mutability].type,
-](ref [self_life]value: _DictEntryIter[K, V, dict_lifetime]) -> _DictEntryIter[
+](ref [_]value: _DictEntryIter[K, V, dict_lifetime]) -> _DictEntryIter[
     K, V, dict_lifetime, False
 ]:
     """Get a reversed iterator of the input dict items.
@@ -170,8 +156,6 @@ fn reversed[
     **Note**: iterators are currently non-raising.
 
     Parameters:
-        mutability: Whether the reference to the dict is mutable.
-        self_life: The lifetime of the dict.
         K: The type of the keys in the dict.
         V: The type of the values in the dict.
         dict_mutability: Whether the reference to the dict items is mutable.

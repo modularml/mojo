@@ -152,7 +152,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
     @always_inline("nodebug")
     fn __getitem__[
         idx: Int
-    ](self: Reference[Self, _]) -> ref [self.lifetime] element_types[idx.value]:
+    ](ref [_]self: Self) -> ref [__lifetime_of(self)] element_types[idx.value]:
         """Get a reference to an element in the tuple.
 
         Parameters:
@@ -163,7 +163,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         """
         # Return a reference to an element at the specified index, propagating
         # mutability of self.
-        var storage_kgen_ptr = UnsafePointer.address_of(self[].storage).address
+        var storage_kgen_ptr = UnsafePointer.address_of(self.storage).address
 
         # KGenPointer to the element.
         var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](

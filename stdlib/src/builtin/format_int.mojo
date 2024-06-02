@@ -265,7 +265,7 @@ fn _try_write_int[
         # SAFETY:
         #   This static lifetime is valid as long as we're using a
         #   `StringLiteral` for `digit_chars`.
-        var zero = StringSlice[False, ImmutableStaticLifetime](
+        var zero = StringSlice[ImmutableStaticLifetime](
             # TODO: Remove cast after transition to UInt8 strings is complete.
             unsafe_from_utf8_ptr=digit_chars_array.bitcast[UInt8](),
             len=1,
@@ -335,7 +335,7 @@ fn _try_write_int[
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
-    var str_slice = StringSlice[False, __lifetime_of(buf)](
+    var str_slice = StringSlice[__lifetime_of(buf)](
         # TODO: Remove cast after transition to UInt8 strings is complete.
         unsafe_from_utf8_ptr=buf_ptr.bitcast[UInt8](),
         len=len,

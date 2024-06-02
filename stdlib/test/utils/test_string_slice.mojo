@@ -117,7 +117,7 @@ fn test_heap_string_from_string_slice() raises:
     alias string_lit: StringLiteral = "Hello"
 
     alias static_str: StringSlice[
-        False, ImmutableStaticLifetime
+        ImmutableStaticLifetime
     ] = string_lit.as_string_slice()
 
     alias heap_string = String(static_str)

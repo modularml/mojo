@@ -1313,9 +1313,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(
-        self: Reference[Self, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1325,28 +1323,24 @@ struct String(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
-            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+        return Span[UInt8, __lifetime_of(self)](
+            unsafe_ptr=self._buffer.unsafe_ptr(),
             # Does NOT include the NUL terminator.
-            len=self[]._byte_length(),
+            len=self._byte_length(),
         )
 
     @always_inline
-    fn as_string_slice(
-        self: Reference[Self, _]
-    ) -> StringSlice[self.is_mutable, self.lifetime]:
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        var bytes = self[].as_bytes_slice()
-
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice[self.is_mutable, self.lifetime](
-            unsafe_from_utf8=bytes
+        return StringSlice[__lifetime_of(self)](
+            unsafe_from_utf8=self.as_bytes_slice()
         )
 
     fn _byte_length(self) -> Int:
