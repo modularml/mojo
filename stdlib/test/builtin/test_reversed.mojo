@@ -47,7 +47,7 @@ def test_reversed_dict():
     check = 4
     for item in reversed(dict.items()):
         keys += item[].key
-        assert_equal(item[].value, check)
+        assert_equal(item[].value.value()[], check)
         check -= 1
 
     assert_equal(keys, "dcba")
@@ -81,7 +81,7 @@ def test_reversed_dict():
     check = 4
     for item in reversed(dict.items()):
         keys += item[].key
-        assert_equal(item[].value, check)
+        assert_equal(item[].value.value()[], check)
         check -= 2
 
     assert_equal(keys, "db")
@@ -98,7 +98,7 @@ def test_reversed_dict():
     check = 1
     for item in reversed(dict.items()):
         keys += item[].key
-        assert_equal(item[].value, check)
+        assert_equal(item[].value.value()[], check)
         check += 1
 
     assert_equal(keys, "acdb")
@@ -124,7 +124,7 @@ def test_reversed_dict():
     check = 0
     for item in reversed(empty_dict.items()):
         keys += item[].key
-        check += item[].value
+        check += item[].value.value()[]
 
     assert_equal(keys, "")
     assert_equal(check, 0)
