@@ -210,6 +210,36 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return other <= self
 
+    fn __add__(self, other: Self) raises -> Self:
+        """Add counts from two Counters.
+
+        Args:
+            other: The other Counter to add to this Counter.
+
+        Returns:
+            A new Counter with the counts from both Counters added together.
+        """
+        var result = Counter[V]()
+        result.update(self)
+        result.update(other)
+        return result
+
+    fn __iadd__(inout self, other: Self) raises:
+        """Add counts from another Counter to this Counter.
+
+        Args:
+            other: The other Counter to add to this Counter.
+        """
+        self.update(other)
+        self._keep_positive()
+
+    fn _keep_positive(inout self) raises:
+        """Remove zero and negative counts from the Counter."""
+        for key_ref in self.keys():
+            var key = key_ref[]
+            if self[key] <= 0:
+                _ = self.pop(key)
+
     fn get(self, value: V) -> Optional[V]:
         """Get a value from the counter.
 

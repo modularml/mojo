@@ -192,6 +192,28 @@ def test_update():
     assert_equal(c1["c"], 4)
 
 
+def test_add():
+    var c1 = Counter[String]()
+    c1["a"] = 1
+    c1["b"] = 2
+
+    var c2 = Counter[String]()
+    c2["b"] = 3
+    c2["c"] = 4
+
+    var c3 = c1 + c2
+
+    assert_equal(c3["a"], 1)
+    assert_equal(c3["b"], 5)
+    assert_equal(c3["c"], 4)
+
+    c2 += c1
+
+    assert_equal(c2["a"], 1)
+    assert_equal(c2["b"], 5)
+    assert_equal(c2["c"], 4)
+
+
 def test_substract():
     var c1 = Counter[String]()
     c1["a"] = 4
@@ -211,6 +233,7 @@ def test_substract():
 
 
 def main():
+    test_add()
     test_counter_construction()
     test_counter_getitem()
     test_elements()
