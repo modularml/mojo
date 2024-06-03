@@ -80,3 +80,12 @@ struct Counter[V: KeyElement](
             The count of the key.
         """
         return self._data.get(key, 0)
+
+    fn __setitem__(inout self, value: V, count: Int):
+        """Set a value in the keyword Counter by key.
+
+        Args:
+            value: The value to associate with the specified count.
+            count: The count to store in the Counter.
+        """
+        self._data[value] = count

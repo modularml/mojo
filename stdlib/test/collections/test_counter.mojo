@@ -32,6 +32,16 @@ def test_counter_getitem():
     assert_equal(c[5], 0)
 
 
+def test_counter_setitem():
+    c = Counter[Int]()
+    c[1] = 1
+    c[2] = 2
+    assert_equal(c[1], 1)
+    assert_equal(c[2], 2)
+    assert_equal(c[3], 0)
+
+
 def main():
     test_counter_construction()
     test_counter_getitem()
+    test_counter_setitem()
