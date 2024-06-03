@@ -54,14 +54,6 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         """Initializes a path with the current directory."""
         self = cwd()
 
-    fn __init__(inout self, path: StringLiteral):
-        """Initializes a path with the provided path.
-
-        Args:
-          path: The file system path.
-        """
-        self.path = path
-
     fn __init__(inout self, path: String):
         """Initializes a path with the provided path.
 
@@ -97,17 +89,6 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
           A new path with the suffix appended to the current path.
         """
         return self.__truediv__(suffix.path)
-
-    fn __truediv__(self, suffix: StringLiteral) -> Self:
-        """Joins two paths using the system-defined path separator.
-
-        Args:
-          suffix: The suffix to append to the path.
-
-        Returns:
-          A new path with the suffix appended to the current path.
-        """
-        return self.__truediv__(String(suffix))
 
     fn __truediv__(self, suffix: String) -> Self:
         """Joins two paths using the system-defined path separator.
