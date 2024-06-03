@@ -117,6 +117,12 @@ struct StringSlice[
         return String(str_slice=self)
 
     fn __len__(self) -> Int:
+        """Returns the StringSlice byte length.
+
+        Returns:
+            The StringSlice byte length.
+        """
+
         return self._byte_length()
 
     # ===------------------------------------------------------------------===#

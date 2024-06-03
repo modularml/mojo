@@ -1226,10 +1226,10 @@ struct String(
 
     @always_inline
     fn __len__(self) -> Int:
-        """Returns the string length.
+        """Returns the string byte length.
 
         Returns:
-            The string length.
+            The string byte length.
         """
         # Avoid returning -1 if the buffer is not initialized
         if not self.unsafe_ptr():
@@ -1572,7 +1572,7 @@ struct String(
         """TODO: \\u2029"""
 
         @always_inline
-        fn compare(
+        fn _compare(
             item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
         ) -> Bool:
             var ptr1 = DTypePointer(item1)
@@ -1587,13 +1587,13 @@ struct String(
             var ptr = s.unsafe_ptr()
             if no_null_len == 1 and not _isspace(ptr[0]):
                 return False
-            elif no_null_len == 2 and not compare(
+            elif no_null_len == 2 and not _compare(
                 ptr, next_line.unsafe_ptr(), 2
             ):
                 return False
             elif no_null_len == 3 and not (
-                compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
-                or compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
+                _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
+                or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
             ):
                 return False
         return True

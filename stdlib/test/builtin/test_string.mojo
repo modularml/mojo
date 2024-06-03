@@ -1115,7 +1115,7 @@ def test_string_iter():
         concat += v
     assert_equal(321, atol(concat))
 
-    # TODO
+    # TODO: UnsafePointer does not have a store or __setitem__ method
     # for v in vs:
     #     v.unsafe_ptr().store(0, "1")
 
