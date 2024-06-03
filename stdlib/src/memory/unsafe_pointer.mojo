@@ -83,20 +83,6 @@ struct UnsafePointer[
         """
         return Self {address: value}
 
-    # TODO: remove this in favor of address_of which is less of a footgun. We
-    # shouldn't allow safe references to implicitly convert to unsafe pointers.
-    @always_inline
-    fn __init__(value: Reference[T, _, address_space]) -> Self:
-        """Create an unsafe UnsafePointer from a safe Reference.
-
-        Args:
-            value: The input reference to construct with.
-
-        Returns:
-            The pointer.
-        """
-        return Self {address: __mlir_op.`lit.ref.to_pointer`(value.value)}
-
     @always_inline
     fn __init__(*, address: Int) -> Self:
         """Create an unsafe UnsafePointer from an address in an integer.
@@ -116,6 +102,19 @@ struct UnsafePointer[
     # ===-------------------------------------------------------------------===#
     # Factory methods
     # ===-------------------------------------------------------------------===#
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn address_of(ref [_, address_space._value.value]arg: T) -> Self:
+        """Gets the address of the argument.
+
+        Args:
+            arg: The value to get the address of.
+
+        Returns:
+            An UnsafePointer which contains the address of the argument.
+        """
+        return Self(__mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg)))
 
     @staticmethod
     fn _from_dtype_ptr[
@@ -155,19 +154,6 @@ struct UnsafePointer[
                 )
             )
         )
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn address_of(ref [_, address_space._value.value]arg: T) -> Self:
-        """Gets the address of the argument.
-
-        Args:
-            arg: The value to get the address of.
-
-        Returns:
-            An UnsafePointer which contains the address of the argument.
-        """
-        return Self(__mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(arg)))
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
