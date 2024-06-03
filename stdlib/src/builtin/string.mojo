@@ -2230,7 +2230,7 @@ struct _FormatCurlyEntry:
 
     var first_curly: Int
     var last_curly: Int
-    var value: Variant[String, Int, NoneType]
+    var field: Variant[String, Int, NoneType]
 
     @staticmethod
     fn create_entries(arg: String) -> List[Self]:
