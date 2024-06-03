@@ -16,6 +16,31 @@ what we publish.
 
 ### ⭐️ New
 
+- Now supports "conditional conformances" where some methods on a struct have
+  additional trait requirements that the struct itself doesn't.  This is
+  expressed through an explicitly declared `self` type:
+
+  ```mojo
+  struct GenericThing[Type: AnyType]:  # Works with anything
+    # Sugar for 'fn normal_method[Type: AnyType](self: GenericThing[Type]):'
+    fn normal_method(self): ...
+
+    # Just redeclare the requirements with more specific types:
+    fn needs_move[Type: Movable](self: GenericThing[Type], owned val: Type):
+      var tmp = val^  # Ok to move 'val' since it is Movable
+      ...
+  fn usage_example():
+    var a = GenericThing[Int]()
+    a.normal_method() # Ok, Int conforms to AnyType
+    a.needs_move(42)  # Ok, Int is movable
+
+    var b = GenericThing[NonMovable]()
+    b.normal_method() # Ok, NonMovable conforms to AnyType
+
+      # error: argument type 'NonMovable' does not conform to trait 'Movable'
+    b.needs_move(NonMovable())
+  ```
+
 - `async` functions now support memory-only results (like `String`, `List`,
   etc.) and `raises`. Accordingly, both `Coroutine` and `RaisingCoroutine` have
   been changed to accept `AnyType` instead of `AnyTrivialRegType`. This means
