@@ -80,8 +80,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         @parameter
         fn initialize_elt[idx: Int]():
             move_pointee(
-                dst=UnsafePointer(self[idx]),
-                src=UnsafePointer(storage[idx]),
+                dst=UnsafePointer.address_of(self[idx]),
+                src=UnsafePointer.address_of(storage[idx]),
             )
 
         # Move each element into the tuple storage.
@@ -97,7 +97,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         # trivial and won't do anything.
         @parameter
         fn destroy_elt[idx: Int]():
-            destroy_pointee(UnsafePointer(self[idx]))
+            destroy_pointee(UnsafePointer.address_of(self[idx]))
 
         unroll[destroy_elt, Self.__len__()]()
 
@@ -115,9 +115,9 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            var existing_elt_ptr = UnsafePointer(existing[idx]).address
             move_pointee(
-                src=UnsafePointer(existing[idx]), dst=UnsafePointer(self[idx])
+                src=UnsafePointer.address_of(existing[idx]),
+                dst=UnsafePointer.address_of(self[idx]),
             )
 
         unroll[initialize_elt, Self.__len__()]()
