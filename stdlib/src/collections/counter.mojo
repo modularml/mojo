@@ -58,11 +58,6 @@ struct Counter[V: KeyElement](
 
         Args:
             items: A list of items to count.
-
-        Usage:
-        ```mojo
-        c = Counter(List('g', 'a', 't', 't', 'a', 'c', 'a'))
-        ```
         """
         self._data = Dict[V, Int]()
         for item_ref in items:
