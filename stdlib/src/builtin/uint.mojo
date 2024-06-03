@@ -64,32 +64,6 @@ struct UInt:
         self.value = int(UInt64(value)).value
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<ui64>`):
-        """Construct Int from the given Int64 value.
-
-        Args:
-            value: The init value.
-        """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
-            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-                value
-            )
-        )
-
-    @always_inline("nodebug")
-    fn __init__(inout self, value: __mlir_type.`!pop.scalar<index>`):
-        """Construct Int from the given Index value.
-
-        Args:
-            value: The init value.
-        """
-        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.index](
-            __mlir_op.`pop.cast`[_type = __mlir_type.`!pop.scalar<index>`](
-                value
-            )
-        )
-
-    @always_inline("nodebug")
     fn __str__(self) -> String:
         """Convert this Int to a string.
 
