@@ -134,19 +134,69 @@ def test_isnan():
     assert_true(isnan(nan[DType.float64]()))
 
 
+fn overflow_int[type: DType]() -> Bool:
+    constrained[type.is_integral(), "comparison only valid on integral types"]()
+    return max_finite[type]() + 1 < max_finite[type]()
+
+
+fn overflow_fp[type: DType]() -> Bool:
+    constrained[
+        type.is_floating_point(),
+        "comparison only valid on floating point types",
+    ]()
+    return max_finite[type]() + 1 == max_finite[type]()
+
+
 def test_max_finite():
     assert_almost_equal(max_finite[DType.float32](), 3.4028235e38)
     assert_almost_equal(max_finite[DType.float64](), 1.7976931348623157e308)
 
+    assert_true(overflow_int[DType.int8]())
+    assert_true(overflow_int[DType.uint8]())
+    assert_true(overflow_int[DType.int16]())
+    assert_true(overflow_int[DType.uint16]())
+    assert_true(overflow_int[DType.int32]())
+    assert_true(overflow_int[DType.uint32]())
+    assert_true(overflow_int[DType.int64]())
+    assert_true(overflow_int[DType.uint64]())
 
-def test_max_or_inf():
-    assert_almost_equal(max_or_inf[DType.float32](), inf[DType.float32]())
-    assert_almost_equal(max_or_inf[DType.float64](), inf[DType.float64]())
+    assert_true(overflow_fp[DType.float32]())
+    assert_true(overflow_fp[DType.float64]())
+
+
+fn underflow_int[type: DType]() -> Bool:
+    constrained[type.is_integral(), "comparison only valid on integral types"]()
+    return min_finite[type]() - 1 > min_finite[type]()
+
+
+fn underflow_fp[type: DType]() -> Bool:
+    constrained[
+        type.is_floating_point(),
+        "comparison only valid on floating point types",
+    ]()
+    return min_finite[type]() - 1 == min_finite[type]()
 
 
 def test_min_finite():
     assert_almost_equal(min_finite[DType.float32](), -3.4028235e38)
     assert_almost_equal(min_finite[DType.float64](), -1.7976931348623157e308)
+
+    assert_true(underflow_int[DType.int8]())
+    assert_true(underflow_int[DType.uint8]())
+    assert_true(underflow_int[DType.int16]())
+    assert_true(underflow_int[DType.uint16]())
+    assert_true(underflow_int[DType.int32]())
+    assert_true(underflow_int[DType.uint32]())
+    assert_true(underflow_int[DType.int64]())
+    assert_true(underflow_int[DType.uint64]())
+
+    assert_true(underflow_fp[DType.float32]())
+    assert_true(underflow_fp[DType.float64]())
+
+
+def test_max_or_inf():
+    assert_almost_equal(max_or_inf[DType.float32](), inf[DType.float32]())
+    assert_almost_equal(max_or_inf[DType.float64](), inf[DType.float64]())
 
 
 def test_min_or_neg_inf():
