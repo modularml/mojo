@@ -10,11 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo %s
+
 from testing import assert_equal
 
+
 def test_simple_uint():
-    var a = UInt(32)
-    assert_equal(str(a), "32")
+    assert_equal(str(UInt(32)), "32")
+
+    assert_equal(str(UInt(0)), "0")
+    assert_equal(str(UInt()), "0")
+
+    # (2 ** 64) - 1, we'll probably want to raise a error in the future
+    assert_equal(str(UInt(-1)), "18446744073709551615")
+
+    assert_equal(str(UInt(18446744073709551615)), "18446744073709551615")
+
 
 def main():
     test_simple_uint()

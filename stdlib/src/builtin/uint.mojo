@@ -20,14 +20,29 @@ These are Mojo built-ins, so you don't need to import them.
 @value
 @register_passable("trivial")
 struct UInt:
-    var value: __mlir_type.index
+    """This type represents an unsigned integer.
 
+    The size of this unsigned integer is platform-dependent.
+
+    If you wish to use a fixed size unsigned integer, consider using
+    `UInt8`, `UInt16`, `UInt32`, or `UInt64`.
+    """
+
+    var value: __mlir_type.index
+    """The underlying storage for the integer value.
+
+    Note that it is the same type as the `Int.value` field.
+    MLIR doesn't differentiate between signed and unsigned integers
+    when it comes to storing them with the index dialect. 
+    The difference is in the operations that are performed on them,
+    which have signed and unsigned variants.
+    """
 
     @always_inline("nodebug")
     fn __init__(inout self):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
-    
+
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
         """Construct Int from the given index value.
@@ -45,6 +60,7 @@ struct UInt:
             value: The init value.
         """
         # TODO: Find a way to convert directly without using UInt64.
+        # This will require  kgen.int_literal.convert
         self.value = int(UInt64(value)).value
 
     @always_inline("nodebug")
@@ -74,106 +90,10 @@ struct UInt:
         )
 
     @always_inline("nodebug")
-    fn __mlir_index__(self) -> __mlir_type.index:
-        """Convert to index.
-
-        Returns:
-            The corresponding __mlir_type.index value.
-        """
-        return self.value
-    
-    
-    @always_inline("nodebug")
-    fn __lt__(self, rhs: Self) -> Bool:
-        """Compare this Int to the RHS using LT comparison.
-
-        Args:
-            rhs: The other Int to compare against.
-
-        Returns:
-            True if this Int is less-than the RHS Int and False otherwise.
-        """
-        return __mlir_op.`index.cmp`[
-            pred = __mlir_attr.`#index<cmp_predicate ult>`
-        ](self.value, rhs.value)
-
-    @always_inline("nodebug")
-    fn __le__(self, rhs: Self) -> Bool:
-        """Compare this Int to the RHS using LE comparison.
-
-        Args:
-            rhs: The other Int to compare against.
-
-        Returns:
-            True if this Int is less-or-equal than the RHS Int and False
-            otherwise.
-        """
-        return __mlir_op.`index.cmp`[
-            pred = __mlir_attr.`#index<cmp_predicate ule>`
-        ](self.value, rhs.value)
-
-    @always_inline("nodebug")
-    fn __eq__(self, rhs: Self) -> Bool:
-        """Compare this Int to the RHS using EQ comparison.
-
-        Args:
-            rhs: The other Int to compare against.
-
-        Returns:
-            True if this Int is equal to the RHS Int and False otherwise.
-        """
-        return __mlir_op.`index.cmp`[
-            pred = __mlir_attr.`#index<cmp_predicate eq>`
-        ](self.value, rhs.value)
-
-    @always_inline("nodebug")
-    fn __ne__(self, rhs: Self) -> Bool:
-        """Compare this Int to the RHS using NE comparison.
-
-        Args:
-            rhs: The other Int to compare against.
-
-        Returns:
-            True if this Int is non-equal to the RHS Int and False otherwise.
-        """
-        return __mlir_op.`index.cmp`[
-            pred = __mlir_attr.`#index<cmp_predicate ne>`
-        ](self.value, rhs.value)
-
-    @always_inline("nodebug")
-    fn __gt__(self, rhs: Self) -> Bool:
-        """Compare this Int to the RHS using GT comparison.
-
-        Args:
-            rhs: The other Int to compare against.
-
-        Returns:
-            True if this Int is greater-than the RHS Int and False otherwise.
-        """
-        return __mlir_op.`index.cmp`[
-            pred = __mlir_attr.`#index<cmp_predicate ugt>`
-        ](self.value, rhs.value)
-
-    @always_inline("nodebug")
-    fn __ge__(self, rhs: Self) -> Bool:
-        """Compare this Int to the RHS using GE comparison.
-
-        Args:
-            rhs: The other Int to compare against.
-
-        Returns:
-            True if this Int is greater-or-equal than the RHS Int and False
-            otherwise.
-        """
-        return __mlir_op.`index.cmp`[
-            pred = __mlir_attr.`#index<cmp_predicate uge>`
-        ](self.value, rhs.value)
-
-    @always_inline("nodebug")
     fn __str__(self) -> String:
         """Convert this Int to a string.
 
         Returns:
             The string representation of this Int.
         """
-        return str(UInt64(self.value))
+        return str(UInt64(self))
