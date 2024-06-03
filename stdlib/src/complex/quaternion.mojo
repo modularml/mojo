@@ -56,7 +56,7 @@ struct Quaternion[T: DType = DType.float64]:
         self.vec = Self._vec_type(w, i, j, k)
 
     fn __init__(inout self, vec: Self._vec_type):
-        """Construct a Quaternion from a real and an imaginary vector part.
+        """Construct a Quaternion from a SIMD vector.
 
         Args:
             vec: A SIMD vector representing the Quaternion.
@@ -649,9 +649,9 @@ struct DualQuaternion[T: DType = DType.float64]:
             Tuple[Quaternion[T], Quaternion[T])]: (r, t).
         """
 
-        var r = Quaternion[T](self.w, self.i, self.j, self.k)
-        var rest = self.vec / (r.vec.join(r.vec))
-        var d = Quaternion[T](rest.slice[4, offset=4]())
+        var r = Quaternion[T](self.vec.slice[4]())
+        var rest = self.vec / r.vec.join(SIMD[T, 4](0))
+        var d = Quaternion[T](rest.slice[4, offset=4]()) * SIMD[T, 4](2)
         return r, d
 
     fn to_screw(self) -> (SIMD[T, 8], SIMD[T, 2]):
