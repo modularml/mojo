@@ -574,10 +574,15 @@ struct DTypePointer[
         address_space: The address space the pointer is in.
     """
 
+    # Fields
     alias element_type = Scalar[type]
     alias _pointer_type = Pointer[Scalar[type], address_space]
     var address: Self._pointer_type
     """The pointed-to address."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __init__(inout self):
@@ -644,23 +649,9 @@ struct DTypePointer[
         """
         self.address = Self._pointer_type(address=address)
 
-    fn __str__(self) -> String:
-        """Format this pointer as a hexadecimal string.
-
-        Returns:
-            A String containing the hexadecimal representation of the memory location
-            destination of this pointer.
-        """
-        return str(self.address)
-
-    @always_inline("nodebug")
-    fn __bool__(self) -> Bool:
-        """Checks if the DTypePointer is *null*.
-
-        Returns:
-            Returns False if the DTypePointer is *null* and True otherwise.
-        """
-        return self.address.__bool__()
+    # ===------------------------------------------------------------------=== #
+    # Factory methods
+    # ===------------------------------------------------------------------=== #
 
     @staticmethod
     @always_inline("nodebug")
@@ -674,6 +665,28 @@ struct DTypePointer[
             A DTypePointer struct which contains the address of the argument.
         """
         return LegacyPointer.address_of(arg)
+
+    @staticmethod
+    @always_inline
+    fn alloc(count: Int, /, *, alignment: Int = alignof[type]()) -> Self:
+        """Heap-allocates a number of element of the specified type using
+        the specified alignment.
+
+        Args:
+            count: The number of elements to allocate (note that this is not
+              the bytecount).
+            alignment: The alignment used for the allocation.
+
+        Returns:
+            A new `DTypePointer` object which has been allocated on the heap.
+        """
+        return _malloc[Self.element_type, address_space=address_space](
+            count * sizeof[type](), alignment=alignment
+        )
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __getitem__(self, offset: Int) -> Scalar[type]:
@@ -697,10 +710,6 @@ struct DTypePointer[
             val: The value to store.
         """
         return Scalar.store(self, offset, val)
-
-    # ===------------------------------------------------------------------=== #
-    # Comparisons
-    # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
@@ -739,26 +748,97 @@ struct DTypePointer[
         return self.address < rhs.address
 
     # ===------------------------------------------------------------------=== #
-    # Allocate/Free
+    # Pointer arithmetic
     # ===------------------------------------------------------------------=== #
 
-    @staticmethod
-    @always_inline
-    fn alloc(count: Int, /, *, alignment: Int = alignof[type]()) -> Self:
-        """Heap-allocates a number of element of the specified type using
-        the specified alignment.
+    @always_inline("nodebug")
+    fn __add__[T: Intable](self, rhs: T) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
 
         Args:
-            count: The number of elements to allocate (note that this is not
-              the bytecount).
-            alignment: The alignment used for the allocation.
+            rhs: The offset.
 
         Returns:
-            A new `DTypePointer` object which has been allocated on the heap.
+            The new DTypePointer shifted by the offset.
         """
-        return _malloc[Self.element_type, address_space=address_space](
-            count * sizeof[type](), alignment=alignment
-        )
+        return self.offset(rhs)
+
+    @always_inline("nodebug")
+    fn __sub__[T: Intable](self, rhs: T) -> Self:
+        """Returns a new pointer shifted back by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
+
+        Args:
+            rhs: The offset.
+
+        Returns:
+            The new DTypePointer shifted by the offset.
+        """
+        return self.offset(-int(rhs))
+
+    @always_inline("nodebug")
+    fn __iadd__[T: Intable](inout self, rhs: T):
+        """Shifts the current pointer by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
+
+        Args:
+            rhs: The offset.
+        """
+        self = self + rhs
+
+    @always_inline("nodebug")
+    fn __isub__[T: Intable](inout self, rhs: T):
+        """Shifts back the current pointer by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
+
+        Args:
+            rhs: The offset.
+        """
+        self = self - rhs
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Returns the pointer address as an integer.
+
+        Returns:
+          The address of the pointer as an Int.
+        """
+        return int(self.address)
+
+    fn __str__(self) -> String:
+        """Format this pointer as a hexadecimal string.
+
+        Returns:
+            A String containing the hexadecimal representation of the memory location
+            destination of this pointer.
+        """
+        return str(self.address)
+
+    @always_inline("nodebug")
+    fn __bool__(self) -> Bool:
+        """Checks if the DTypePointer is *null*.
+
+        Returns:
+            Returns False if the DTypePointer is *null* and True otherwise.
+        """
+        return self.address.__bool__()
+
+    # ===------------------------------------------------------------------=== #
+    # Methods
+    # ===------------------------------------------------------------------=== #
 
     @always_inline
     fn free(self):
@@ -795,10 +875,6 @@ struct DTypePointer[
             A `Pointer` to a scalar of the same dtype.
         """
         return self.address
-
-    # ===------------------------------------------------------------------=== #
-    # Load/Store
-    # ===------------------------------------------------------------------=== #
 
     alias _default_alignment = alignof[
         Scalar[type]
@@ -874,7 +950,7 @@ struct DTypePointer[
         self.address.bitcast[SIMD[type, width]]().nt_store(val)
 
     # ===------------------------------------------------------------------=== #
-    # Gather/Scatter
+    # Gather / Scatter
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
@@ -1035,15 +1111,6 @@ struct DTypePointer[
         var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
         scatter(val, base.cast[DType.address](), mask, alignment)
 
-    @always_inline("nodebug")
-    fn __int__(self) -> Int:
-        """Returns the pointer address as an integer.
-
-        Returns:
-          The address of the pointer as an Int.
-        """
-        return int(self.address)
-
     @always_inline
     fn is_aligned[alignment: Int](self) -> Bool:
         """Checks if the pointer is aligned.
@@ -1060,10 +1127,6 @@ struct DTypePointer[
         ]()
         return int(self) % alignment == 0
 
-    # ===------------------------------------------------------------------=== #
-    # Pointer Arithmetic
-    # ===------------------------------------------------------------------=== #
-
     @always_inline("nodebug")
     fn offset[T: Intable](self, idx: T) -> Self:
         """Returns a new pointer shifted by the specified offset.
@@ -1078,57 +1141,3 @@ struct DTypePointer[
             The new constructed DTypePointer.
         """
         return self.address.offset(idx)
-
-    @always_inline("nodebug")
-    fn __add__[T: Intable](self, rhs: T) -> Self:
-        """Returns a new pointer shifted by the specified offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            rhs: The offset.
-
-        Returns:
-            The new DTypePointer shifted by the offset.
-        """
-        return self.offset(rhs)
-
-    @always_inline("nodebug")
-    fn __sub__[T: Intable](self, rhs: T) -> Self:
-        """Returns a new pointer shifted back by the specified offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            rhs: The offset.
-
-        Returns:
-            The new DTypePointer shifted by the offset.
-        """
-        return self.offset(-int(rhs))
-
-    @always_inline("nodebug")
-    fn __iadd__[T: Intable](inout self, rhs: T):
-        """Shifts the current pointer by the specified offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            rhs: The offset.
-        """
-        self = self + rhs
-
-    @always_inline("nodebug")
-    fn __isub__[T: Intable](inout self, rhs: T):
-        """Shifts back the current pointer by the specified offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            rhs: The offset.
-        """
-        self = self - rhs
