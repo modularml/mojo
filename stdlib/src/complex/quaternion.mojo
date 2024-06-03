@@ -156,7 +156,7 @@ struct Quaternion[T: DType = DType.float64]:
         self.vec += other.vec
 
     fn __sub__(self, other: Self) -> Self:
-        """Subtract other to self.
+        """Subtract other from self.
 
         Args:
             other: The other Quaternion.
@@ -167,7 +167,7 @@ struct Quaternion[T: DType = DType.float64]:
         return Self(self.vec - other.vec)
 
     fn __isub__(inout self, other: Self):
-        """Subtract other to self inplace."""
+        """Subtract other from self inplace."""
         self.vec -= other.vec
 
     fn conjugate(self) -> Self:
@@ -521,7 +521,7 @@ struct DualQuaternion[T: DType = DType.float64]:
         self.vec += other.vec
 
     fn __sub__(self, other: Self) -> Self:
-        """Subtract other to self.
+        """Subtract other from self.
 
         Args:
             other: The other DualQuaternion.
@@ -532,7 +532,7 @@ struct DualQuaternion[T: DType = DType.float64]:
         return Self(self.vec - other.vec)
 
     fn __isub__(inout self, other: Self):
-        """Subtract other to self inplace."""
+        """Subtract other from self inplace."""
         self.vec -= other.vec
 
     fn __mul__(self, other: Self) -> Self:
@@ -647,7 +647,7 @@ struct DualQuaternion[T: DType = DType.float64]:
             This assumes it's a normalized dual quaternion.
 
         Returns:
-            Tuple[SIMD[T, 8], SIMD[T, 2])]: (screw vector, dual_angle).
+            Tuple[SIMD[T, 8], SIMD[T, 2])]: (screw_vec, dual_angle).
         """
 
         var theta = acos(self.w) * 2
