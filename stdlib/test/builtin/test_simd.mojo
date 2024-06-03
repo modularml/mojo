@@ -121,6 +121,28 @@ def test_simd_repr():
     )
 
 
+def test_issue_1625():
+    var size = 16
+    alias simd_width = 8
+    var ptr = DTypePointer[DType.int64].alloc(size)
+    for i in range(size):
+        ptr[i] = i
+
+    var x = SIMD[size = 2 * simd_width].load(ptr, 0)
+    var evens_and_odds = x.deinterleave()
+
+    # FIXME (40568) should directly use the SIMD assert_equal
+    assert_equal(
+        str(evens_and_odds[0]),
+        str(SIMD[DType.int64, 8](0, 2, 4, 6, 8, 10, 12, 14)),
+    )
+    assert_equal(
+        str(evens_and_odds[1]),
+        str(SIMD[DType.int64, 8](1, 3, 5, 7, 9, 11, 13, 15)),
+    )
+    ptr.free()
+
+
 def test_issue_20421():
     var a = DTypePointer[DType.uint8]().alloc(16 * 64, alignment=64)
     for i in range(16 * 64):
@@ -828,8 +850,13 @@ def test_insert():
 
 
 def test_join():
-    vec = SIMD[DType.int32, 4](100, 101, 102, 103)
+    alias I2 = SIMD[DType.int32, 2]
+    assert_equal(Int32(3).join(Int32(4)), I2(3, 4))
 
+    alias I4 = SIMD[DType.int32, 4]
+    assert_equal(I2(5, 6).join(I2(9, 10)), I4(5, 6, 9, 10))
+
+    vec = I4(100, 101, 102, 103)
     assert_equal(
         vec.join(vec),
         SIMD[DType.int32, 8](100, 101, 102, 103, 100, 101, 102, 103),
@@ -1458,6 +1485,7 @@ def main():
     test_indexing()
     test_insert()
     test_interleave()
+    test_issue_1625()
     test_issue_20421()
     test_issue_30237()
     test_isub()
@@ -1484,3 +1512,4 @@ def main():
     test_sub_with_overflow()
     test_trunc()
     test_truthy()
+    # TODO: add tests for __and__, __or__, anc comparison operators
