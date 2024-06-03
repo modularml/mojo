@@ -107,6 +107,11 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 ### ❌ Removed
 
+- It is no longer possible to cast (implicitly or explicitly) from `Reference`
+  to `UnsafePointer`.  Instead of `UnsafePointer(someRef)` please use the
+  `UnsafePointer.address_of(someRef[])` which makes the code explicit that the
+  `UnsafePointer` gets the address of what the reference points to.
+
 - Removed `String.unsafe_uint8_ptr()`. `String.unsafe_ptr()` now returns the
   same thing.
 
