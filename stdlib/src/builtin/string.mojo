@@ -2003,7 +2003,7 @@ struct String(
             Ts: The types of the variadic arguments.
 
         Returns:
-            The formated template.
+            The template with the given values substituted.
 
         Variadic arguments are required to implement `Stringable`.
 
