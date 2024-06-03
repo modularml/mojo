@@ -1178,15 +1178,6 @@ def test_format_args():
         String("{0} {1} {0} {1}").format("{1}", "Mojo"), "{1} Mojo {1} Mojo"
     )
 
-    # Cannot call potentially raising function function in alias initializer
-    # alias A = "Mojo"
-    # alias B = !
-    # alias Result = String("{0} {1}").format(A,B)
-
-    # @parameter
-    # if Result != "Mojo !":
-    #    raise "Assertion failed (alias): "
-
 
 def main():
     test_constructors()
