@@ -309,3 +309,27 @@ fn range[
         The constructed range.
     """
     return _StridedRange(int(start), int(end), int(step))
+
+
+fn map[
+    ElementType: CollectionElement,
+    ResultElementType: CollectionElement, //,
+    func: fn (ElementType) -> ResultElementType,
+](input_list: List[ElementType], /) -> List[ResultElementType]:
+    """Maps a function over a list.
+
+    Parameters:
+        ElementType: The type of the input list elements.
+        ResultElementType: The type of the output list elements.
+        func: The function to apply to each element.
+
+    Args:
+        input_list: The list to map over.
+
+    Returns:
+        A new list with the function applied to each element.
+    """
+    var result = List[ResultElementType](capacity=len(input_list))
+    for elem in input_list:
+        result.append(func(elem[]))
+    return result

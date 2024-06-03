@@ -122,8 +122,30 @@ def test_indexing():
     assert_equal(r[3], 3)
 
 
+def test_map_to_str():
+    var input_list = List[Int](0, 1, 2, 3)
+    var output_list = map[str[Int]](input_list)
+    var expected = List[String]("0", "1", "2", "3")
+    for i in range(len(expected)):
+        assert_equal(output_list[i], expected[i])
+
+
+fn remove_0_suffix(s: String) -> String:
+    return s.removesuffix("_0")
+
+
+def test_map_remove_suffix():
+    var input_list = List[String]("a_0", "b_0", "c_0", "d_0")
+    var output_list = map[remove_0_suffix](input_list)
+    var expected = List[String]("a", "b", "c", "d")
+    for i in range(len(expected)):
+        assert_equal(output_list[i], expected[i])
+
+
 def main():
     test_range_len()
     test_range_getitem()
     test_range_reversed()
     test_indexing()
+    test_map_to_str()
+    test_map_remove_suffix()
