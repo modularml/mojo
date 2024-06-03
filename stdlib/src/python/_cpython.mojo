@@ -256,7 +256,7 @@ struct CPython:
     fn _Py_REFCNT(inout self, ptr: PyObjectPtr) -> Int:
         if ptr._get_ptr_as_int() == 0:
             return -1
-        return int(ptr.value.load())
+        return int(Scalar.load(ptr.value))
 
     fn PyDict_New(inout self) -> PyObjectPtr:
         var r = self.lib.get_function[fn () -> PyObjectPtr]("PyDict_New")()

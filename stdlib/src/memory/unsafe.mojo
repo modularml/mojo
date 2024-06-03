@@ -27,8 +27,6 @@ from sys import (
     sizeof,
     triple_is_nvidia_cuda,
 )
-from sys.intrinsics import PrefetchOptions, _mlirtype_is_eq
-from sys.intrinsics import prefetch as _prefetch
 from sys.intrinsics import gather, scatter, strided_load, strided_store
 from bit import is_power_of_two
 
@@ -688,7 +686,7 @@ struct DTypePointer[
         Returns:
             The loaded value.
         """
-        return self.load(offset)
+        return Scalar.load(self, offset)
 
     @always_inline("nodebug")
     fn __setitem__(self, offset: Int, val: Scalar[type]):
@@ -698,7 +696,7 @@ struct DTypePointer[
             offset: The offset to store to.
             val: The value to store.
         """
-        return self.store(offset, val)
+        return Scalar.store(self, offset, val)
 
     # ===------------------------------------------------------------------=== #
     # Comparisons
@@ -805,125 +803,6 @@ struct DTypePointer[
     alias _default_alignment = alignof[
         Scalar[type]
     ]() if triple_is_nvidia_cuda() else 1
-
-    @always_inline
-    fn prefetch[params: PrefetchOptions](self):
-        # Prefetch at the underlying address.
-        """Prefetches memory at the underlying address.
-
-        Parameters:
-            params: Prefetch options (see `PrefetchOptions` for details).
-        """
-        _prefetch[params](self)
-
-    @always_inline("nodebug")
-    fn load[
-        *, width: Int = 1, alignment: Int = Self._default_alignment
-    ](self) -> SIMD[type, width]:
-        """Loads the value the Pointer object points to.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Returns:
-            The loaded value.
-        """
-        return self.load[width=width, alignment=alignment](0)
-
-    @always_inline("nodebug")
-    fn load[
-        T: Intable, *, width: Int = 1, alignment: Int = Self._default_alignment
-    ](self, offset: T) -> SIMD[type, width]:
-        """Loads the value the Pointer object points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            T: The Intable type of the offset.
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-
-        @parameter
-        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
-            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
-            # regardless of the alignment that is passed. This causes issues if
-            # this method is called on an unaligned pointer.
-            # TODO #37823 We can make this smarter when we add an `aligned`
-            # trait to the pointer class.
-            var v = SIMD[type, width]()
-
-            # intentionally don't unroll, otherwise the compiler vectorizes
-            for i in range(width):
-                v[i] = self.address.offset(int(offset) + i).load[
-                    alignment=alignment
-                ]()
-            return v
-
-        return (
-            self.address.offset(offset)
-            .bitcast[SIMD[type, width]]()
-            .load[alignment=alignment]()
-        )
-
-    @always_inline("nodebug")
-    fn store[
-        T: Intable,
-        /,
-        *,
-        width: Int = 1,
-        alignment: Int = Self._default_alignment,
-    ](self, offset: T, val: SIMD[type, width]):
-        """Stores a single element value at the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            T: The Intable type of the offset.
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        self.offset(offset).store[width=width, alignment=alignment](val)
-
-    @always_inline("nodebug")
-    fn store[
-        *, width: Int = 1, alignment: Int = Self._default_alignment
-    ](self, val: SIMD[type, width]):
-        """Stores a single element value.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            val: The value to store.
-        """
-        constrained[width > 0, "width must be a positive integer value"]()
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-        self.address.bitcast[SIMD[type, width]]().store[alignment=alignment](
-            val
-        )
 
     @always_inline("nodebug")
     fn simd_nt_store[

@@ -41,7 +41,7 @@ struct Matrix[type: DType, rows: Int, cols: Int]:
         self.data = DTypePointer[type].alloc(rows * cols)
 
     fn store[nelts: Int](self, row: Int, col: Int, val: SIMD[type, nelts]):
-        self.data.store[width=nelts](row * cols + col, val)
+        SIMD[size=nelts].store(self.data, row * cols + col, val)
 
 
 fn mandelbrot_kernel_SIMD[

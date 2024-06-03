@@ -277,30 +277,30 @@ struct _DictIndex:
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return int(data.load(slot % reserved))
+            return int(Scalar.load(data, slot % reserved))
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return int(data.load(slot % reserved))
+            return int(Scalar.load(data, slot % reserved))
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return int(data.load(slot % reserved))
+            return int(Scalar.load(data, slot % reserved))
         else:
             var data = self.data.bitcast[DType.int64]()
-            return int(data.load(slot % reserved))
+            return int(Scalar.load(data, slot % reserved))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return data.store(slot % reserved, value)
+            return Scalar.store(data, slot % reserved, value)
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return data.store(slot % reserved, value)
+            return Scalar.store(data, slot % reserved, value)
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return data.store(slot % reserved, value)
+            return Scalar.store(data, slot % reserved, value)
         else:
             var data = self.data.bitcast[DType.int64]()
-            return data.store(slot % reserved, value)
+            return Scalar.store(data, slot % reserved, value)
 
     fn __del__(owned self):
         self.data.free()
