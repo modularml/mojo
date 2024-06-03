@@ -73,7 +73,7 @@ struct Arc[T: Movable](CollectionElement):
             value: The value to manage.
         """
         self._inner = UnsafePointer[Self._inner_type].alloc(1)
-        # Cannot use initialize_pointee_move as _ArcInner isn't movable.
+        # Cannot use init_pointee_move as _ArcInner isn't movable.
         __get_address_as_uninit_lvalue(self._inner.address) = Self._inner_type(
             value^
         )
@@ -96,18 +96,18 @@ struct Arc[T: Movable](CollectionElement):
         references, delete the object and free its memory."""
         if self._inner[].drop_ref():
             # Call inner destructor, then free the memory.
-            destroy_pointee(self._inner)
+            (self._inner).destroy_pointee()
             self._inner.free()
 
     # FIXME: This isn't right - the element should be mutable regardless
     # of whether the 'self' type is mutable.
-    fn __getitem__(self: Reference[Self, _, _]) -> ref [self.lifetime] T:
+    fn __getitem__(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
         """Returns a Reference to the managed value.
 
         Returns:
             A Reference to the managed value.
         """
-        return self[]._inner[].payload
+        return self._inner[].payload
 
     fn as_ptr(self) -> UnsafePointer[T]:
         """Retrieves a pointer to the underlying memory.
@@ -115,4 +115,4 @@ struct Arc[T: Movable](CollectionElement):
         Returns:
             The UnsafePointer to the underlying memory.
         """
-        return UnsafePointer.address_of(self._inner[].payload)[]
+        return UnsafePointer.address_of(self._inner[].payload)
