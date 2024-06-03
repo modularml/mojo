@@ -415,8 +415,6 @@ struct StringRef(
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves  a pointer to the underlying memory.
 
-        Prefer to use `as_uint8_ptr()` instead.
-
         Returns:
             The pointer to the underlying memory.
         """

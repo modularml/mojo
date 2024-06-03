@@ -256,8 +256,7 @@ fn _try_write_int[
         #   This static lifetime is valid as long as we're using a
         #   `StringLiteral` for `digit_chars`.
         var zero = StringSlice[ImmutableStaticLifetime](
-            # TODO: Remove cast after transition to UInt8 strings is complete.
-            unsafe_from_utf8_ptr=digit_chars_array.bitcast[UInt8](),
+            unsafe_from_utf8_ptr=digit_chars_array,
             len=1,
         )
         fmt.write_str(zero)
@@ -269,7 +268,7 @@ fn _try_write_int[
     # TODO: use a dynamic size when #2194 is resolved
     alias CAPACITY: Int = 64
 
-    var buf = InlineArray[Int8, CAPACITY](unsafe_uninitialized=True)
+    var buf = InlineArray[UInt8, CAPACITY](unsafe_uninitialized=True)
 
     # Start the buf pointer at the end. We will write the least-significant
     # digits later in the buffer, and then decrement the pointer to move
