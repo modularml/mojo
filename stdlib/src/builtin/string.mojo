@@ -680,7 +680,7 @@ fn _utf8_byte_type(b: UInt8) -> UInt8:
 
 @value
 struct _StringIter[
-    is_mutable: Bool,
+    is_mutable: Bool, //,
     lifetime: AnyLifetime[is_mutable].type,
     forward: Bool = True,
 ]:
@@ -711,7 +711,7 @@ struct _StringIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> StringSlice[is_mutable, lifetime]:
+    fn __next__(inout self) -> StringSlice[lifetime]:
         @parameter
         if forward:
             var byte_len = 1
@@ -721,8 +721,8 @@ struct _StringIter[
                     byte_len = int(byte_type)
                     self.continuation_bytes -= byte_len - 1
             self.index += byte_len
-            return StringSlice[is_mutable, lifetime](
-                unsafe_from_utf8_ptr=self.ptr.offset(self.index - byte_len),
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
                 len=byte_len,
             )
         else:
@@ -736,8 +736,8 @@ struct _StringIter[
                         byte_type = _utf8_byte_type(b)
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
-            return StringSlice[is_mutable, lifetime](
-                unsafe_from_utf8_ptr=self.ptr.offset(self.index), len=byte_len
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
             )
 
     fn __len__(self) -> Int:
@@ -1191,28 +1191,24 @@ struct String(
             count=other_len + 1,
         )
 
-    fn __iter__(
-        self: Reference[Self, _, _]
-    ) -> _StringIter[self.is_mutable, self.lifetime]:
+    fn __iter__(ref [_]self) -> _StringIter[__lifetime_of(self)]:
         """Iterate over elements of the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringIter[self.is_mutable, self.lifetime](
-            unsafe_pointer=self[].unsafe_uint8_ptr(), length=len(self[])
+        return _StringIter[__lifetime_of(self)](
+            unsafe_pointer=self.unsafe_ptr(), length=len(self)
         )
 
-    fn __reversed__(
-        self: Reference[Self, _, _]
-    ) -> _StringIter[self.is_mutable, self.lifetime, False]:
+    fn __reversed__(ref [_]self) -> _StringIter[__lifetime_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringIter[self.is_mutable, self.lifetime, forward=False](
-            unsafe_pointer=self[].unsafe_uint8_ptr(), length=len(self[])
+        return _StringIter[__lifetime_of(self), forward=False](
+            unsafe_pointer=self.unsafe_ptr(), length=len(self)
         )
 
     # ===------------------------------------------------------------------=== #
