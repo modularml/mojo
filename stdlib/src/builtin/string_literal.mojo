@@ -235,7 +235,7 @@ struct StringLiteral(
             uint8Ptr
         )
         memcpy(DTypePointer(buffer.data), data, length)
-        initialize_pointee_move(buffer.data + length, 0)
+        (buffer.data + length).init_pointee_move(0)
         string._buffer = buffer^
         return string
 
@@ -250,7 +250,7 @@ struct StringLiteral(
         return self.__str__().__repr__()
 
     @always_inline
-    fn as_string_slice(self) -> StringSlice[False, ImmutableStaticLifetime]:
+    fn as_string_slice(self) -> StringSlice[ImmutableStaticLifetime]:
         """Returns a string slice of this static string literal.
 
         Returns:
@@ -262,12 +262,10 @@ struct StringLiteral(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in StringLiteral so this is actually
         #   guaranteed to be valid.
-        return StringSlice[False, ImmutableStaticLifetime](
-            unsafe_from_utf8=bytes
-        )
+        return StringSlice[ImmutableStaticLifetime](unsafe_from_utf8=bytes)
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, False, ImmutableStaticLifetime]:
+    fn as_bytes_slice(self) -> Span[UInt8, ImmutableStaticLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -277,7 +275,7 @@ struct StringLiteral(
 
         var ptr = self.unsafe_uint8_ptr()
 
-        return Span[UInt8, False, ImmutableStaticLifetime](
+        return Span[UInt8, ImmutableStaticLifetime](
             unsafe_ptr=ptr,
             len=self._byte_length(),
         )

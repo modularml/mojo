@@ -37,7 +37,7 @@ def test_basic():
     assert_true(b or True)
     assert_false(b or False)
 
-    assert_equal(1, a.value()[])
+    assert_equal(1, a.value())
 
     # Test invert operator
     assert_false(~a)
@@ -56,8 +56,8 @@ def test_basic():
     # We may want to come back and add an immutable test once
     # there are the language features to do so.
     var a2 = Optional(1)
-    a2.value()[] = 2
-    assert_equal(a2.value()[], 2)
+    a2.value() = 2
+    assert_equal(a2.value(), 2)
 
 
 def test_optional_reg_basic():
