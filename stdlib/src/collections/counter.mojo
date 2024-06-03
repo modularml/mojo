@@ -32,7 +32,7 @@ struct Counter[V: KeyElement](
 
     ```mojo
     from collections import Counter
-    var c = Counter[String](["a", "a", "a", "b", "b", "c", "d", "c", "c"])
+    var c = Counter[String](List("a", "a", "a", "b", "b", "c", "d", "c", "c"))
     print(c["a"]) # prints 3
     print(c["b"]) # prints 2
     ```
@@ -62,7 +62,7 @@ struct Counter[V: KeyElement](
 
         Usage:
         ```mojo
-        c = Counter(['g', 'a', 't', 't', 'a', 'c', 'a'])
+        c = Counter(List('g', 'a', 't', 't', 'a', 'c', 'a'))
         ```
         """
         self._data = Dict[V, Int]()
