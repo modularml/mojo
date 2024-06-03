@@ -60,7 +60,11 @@ struct UInt:
             value: The init value.
         """
         # TODO: Find a way to convert directly without using UInt64.
-        # This will require  kgen.int_literal.convert
+        # This is because the existing
+        # __mlir_op.`kgen.int_literal.convert`
+        # in IntLiteral.__as_mlir_index()
+        # assumes that the index represents an unsigned integer.
+        # We need a variant for signed integers.
         self.value = int(UInt64(value)).value
 
     @always_inline("nodebug")
