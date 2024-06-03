@@ -201,7 +201,7 @@ fn _write_int[
 ) raises:
     var err = _try_write_int[prefix](fmt, value, radix, digit_chars)
     if err:
-        raise err.value()[]
+        raise err.value()
 
 
 @always_inline

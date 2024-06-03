@@ -399,7 +399,7 @@ struct Int(
             if err:
                 abort(
                     "unreachable: unexpected write int failure condition: "
-                    + str(err.value()[])
+                    + str(err.value())
                 )
         else:
             _format_scalar(writer, Int64(self))
