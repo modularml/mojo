@@ -237,9 +237,9 @@ def test_truthy():
 
     unroll[test_dtype_unrolled, dtypes.__len__()]()
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
-        # TODO bfloat16 is not supported on neon #30525
         test_dtype[DType.bfloat16]()
 
 
@@ -263,6 +263,7 @@ def test_len():
     var i6 = UI64(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     assert_equal(16, i6.__len__())
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         alias BF16 = SIMD[DType.bfloat16, 2]
@@ -403,6 +404,7 @@ def test_ceil():
     assert_equal(Float32.__ceil__(Float32(-1.5)), -1.0)
     assert_equal(Float32.__ceil__(Float32(3.0)), 3.0)
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         assert_equal(BFloat16.__ceil__(BFloat16(2.5)), 3.0)
@@ -430,6 +432,7 @@ def test_floor():
     assert_equal(Float32.__floor__(Float32(-1.5)), -2.0)
     assert_equal(Float32.__floor__(Float32(3.0)), 3.0)
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         assert_equal(BFloat16.__floor__(BFloat16(2.5)), 2.0)
@@ -1423,6 +1426,7 @@ def test_reduce():
     test_dtype[DType.float64]()
     test_dtype[DType.index]()
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         test_dtype[DType.bfloat16]()
