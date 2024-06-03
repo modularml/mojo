@@ -14,6 +14,7 @@
 from collections.dict import Dict, _DictKeyIter, _DictValueIter, _DictEntryIter
 
 
+@value
 struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     """A container for counting hashable items.
 
@@ -105,22 +106,6 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             `False` if the Counter is empty, `True` if there is at least one element.
         """
         return len(self).__bool__()
-
-    fn __copyinit__(inout self, existing: Self):
-        """Copy an existing Counter.
-
-        Args:
-            existing: The existing counter.
-        """
-        self._data.__copyinit__(existing._data)
-
-    fn __moveinit__(inout self, owned existing: Self):
-        """Move an existing Counter.
-
-        Args:
-            existing: The existing counter.
-        """
-        self._data.__moveinit__(existing._data)
 
     fn __eq__(self, other: Self) -> Bool:
         """Check if all counts agree. Missing counts are treated as zero.
