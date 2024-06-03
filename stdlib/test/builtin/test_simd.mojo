@@ -14,6 +14,7 @@
 
 from sys import has_neon
 from utils.numerics import isfinite, isinf, isnan, nan
+from utils.static_tuple import StaticTuple
 
 from testing import assert_equal, assert_not_equal, assert_true, assert_false
 
@@ -130,6 +131,57 @@ def test_issue_20421():
         SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448),
     )
     a.free()
+
+
+def test_issue_30237():
+    alias dtype = DType.float32
+    alias simd_width = 1
+    alias coefficients_len = 7
+    alias coefficients = StaticTuple[SIMD[dtype, simd_width], coefficients_len](
+        4.89352455891786e-03,
+        6.37261928875436e-04,
+        1.48572235717979e-05,
+        5.12229709037114e-08,
+        -8.60467152213735e-11,
+        2.00018790482477e-13,
+        -2.76076847742355e-16,
+    )
+
+    @parameter
+    @always_inline
+    fn eval1(x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
+        var c_last = coefficients[coefficients_len - 1]
+        var c_second_from_last = coefficients[coefficients_len - 2]
+
+        var result = x.fma(c_last, c_second_from_last)
+
+        @parameter
+        for idx in range(coefficients_len - 2):
+            var c = coefficients[coefficients_len - 3 - idx]
+            result = x.fma(result, c)
+
+        return result
+
+    @parameter
+    @always_inline
+    fn eval2(x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
+        var c_last = coefficients[coefficients_len - 1]
+        var c_second_from_last = coefficients[coefficients_len - 2]
+
+        var result = x.fma(c_last, c_second_from_last)
+
+        for idx in range(coefficients_len - 2):
+            var c = coefficients[coefficients_len - 3 - idx]
+            result = x.fma(result, c)
+
+        return result
+
+    var x = 6.0
+    var x2 = x * x
+    var result1 = eval1(x2)
+    var result2 = eval2(x2)
+
+    assert_equal(result1, result2)
 
 
 def test_truthy():
@@ -1407,6 +1459,7 @@ def main():
     test_insert()
     test_interleave()
     test_issue_20421()
+    test_issue_30237()
     test_isub()
     test_join()
     test_len()
