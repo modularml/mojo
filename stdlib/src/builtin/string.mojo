@@ -2259,6 +2259,6 @@ struct _FormatCurlyEntry:
                             tmp.value = tmp3
                         except:
                             tmp.value = tmp2
-                    Entries.append(tmp)
+                    Entries.append(tmp^)
                 start = None
-        return Entries
+        return Entries^
