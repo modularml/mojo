@@ -2242,7 +2242,7 @@ struct _FormatCurlyEntry:
         Returns:
             A `List` of structured format entries.
         """
-        var Entries = List[Self]()
+        var entries = List[Self]()
         var start = Optional[Int](None)
         for i in range(len(arg)):
             if arg[i] == "{":
