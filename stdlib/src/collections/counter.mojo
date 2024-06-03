@@ -44,11 +44,6 @@ struct Counter[V: KeyElement](
 
     def __init__(inout self):
         """Create a new, empty Counter object.
-
-        Usage:
-        ```mojo
-        c = Counter()
-        ```
         """
         self._data = Dict[V, Int]()
 
