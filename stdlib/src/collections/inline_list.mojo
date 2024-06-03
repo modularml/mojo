@@ -152,7 +152,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     fn __del__(owned self):
         """Destroy all the elements in the list and free the memory."""
         for i in range(self._size):
-            destroy_pointee(UnsafePointer(self._array[i]))
+            destroy_pointee(UnsafePointer.address_of(self._array[i]))
 
     fn __iter__(
         ref [_]self: Self,

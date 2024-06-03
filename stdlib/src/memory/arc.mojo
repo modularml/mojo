@@ -115,4 +115,4 @@ struct Arc[T: Movable](CollectionElement):
         Returns:
             The UnsafePointer to the underlying memory.
         """
-        return UnsafePointer.address_of(self._inner[].payload)[]
+        return UnsafePointer.address_of(self._inner[].payload)

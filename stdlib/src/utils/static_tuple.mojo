@@ -315,7 +315,7 @@ struct InlineArray[
 
         @parameter
         for i in range(size):
-            var ptr = UnsafePointer(self._get_reference_unsafe(i))
+            var ptr = UnsafePointer.address_of(self._get_reference_unsafe(i)[])
             ptr.initialize_pointee_explicit_copy(fill)
 
     @always_inline
@@ -349,8 +349,8 @@ struct InlineArray[
         for i in range(size):
             var eltref = self._get_reference_unsafe(i)
             move_pointee(
-                dst=UnsafePointer[Self.ElementType](eltref),
-                src=UnsafePointer(storage[i]),
+                dst=UnsafePointer[Self.ElementType].address_of(eltref[]),
+                src=UnsafePointer.address_of(storage[i]),
             )
 
         # Mark the elements as already destroyed.
@@ -477,7 +477,7 @@ struct InlineArray[
         Returns:
             An `UnsafePointer` to the underlying array.
         """
-        return UnsafePointer(self._array).bitcast[Self.ElementType]()
+        return UnsafePointer.address_of(self._array).bitcast[Self.ElementType]()
 
     @always_inline
     fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
