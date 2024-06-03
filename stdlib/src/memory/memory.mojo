@@ -60,8 +60,7 @@ fn _memcmp_impl_unconstrained(
         has_side_effect=False,
     ]()
 
-    var vector_end_simd = _align_down(count, simd_width)
-    for i in range(0, vector_end_simd, simd_width):
+    for i in range(0, count - simd_width, simd_width):
         var s1i = s1.load[width=simd_width](i)
         var s2i = s2.load[width=simd_width](i)
         var diff = s1i != s2i
@@ -74,8 +73,6 @@ fn _memcmp_impl_unconstrained(
             return -1 if s1i[index] < s2i[index] else 1
 
     var last = count - simd_width
-    if last <= 0:
-        return 0
 
     var s1i = s1.load[width=simd_width](last)
     var s2i = s2.load[width=simd_width](last)
