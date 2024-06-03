@@ -144,7 +144,7 @@ fn mkdtemp(
     Raises:
         If the directory can not be created.
     """
-    var final_dir = Path(dir.value()[]) if dir else Path(_get_default_tempdir())
+    var final_dir = Path(dir.value()) if dir else Path(_get_default_tempdir())
 
     for _ in range(TMP_MAX):
         var dir_name = final_dir / (prefix + _get_random_name() + suffix)
