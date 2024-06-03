@@ -604,6 +604,17 @@ struct DualQuaternion[T: DType = DType.float64]:
         """
         return self.vec / self.__abs__()
 
+    fn dot(self, other: Self) -> Self._scalar_type:
+        """Calculate the dot product of self with other.
+
+        Args:
+            other: The other DualQuaternion.
+
+        Returns:
+            The result.
+        """
+        return (self.vec * other.vec).reduce_add()
+
     fn displace(inout self, *dual_quaternions: Self):
         """Displace the DualQuaternion by a set of DualQuaternions.
 
@@ -776,3 +787,243 @@ struct DualQuaternion[T: DType = DType.float64]:
     #         return vec / sqrt((vec**2).reduce_add())
 
     #     return closure
+
+
+# ===----------------------------------------------------------------------===#
+# BiQuaternion
+# ===----------------------------------------------------------------------===#
+
+
+@register_passable("trivial")
+struct BiQuaternion[T: DType = DType.float64]:
+    """BiQuaternion, a structure used in the field of quantum mechanics.
+    Allocated on the stack with very efficient vectorized operations.
+
+    Parameters:
+        T: The type of the elements in the BiQuaternion, must be a
+            floating point type.
+    """
+
+    alias _vec_type = SIMD[T, 8]
+    alias _scalar_type = Scalar[T]
+    var vec: Self._vec_type
+    """The underlying SIMD vector."""
+
+    fn __init__(
+        inout self,
+        w: Self._scalar_type = 1,
+        i: Self._scalar_type = 0,
+        j: Self._scalar_type = 0,
+        k: Self._scalar_type = 0,
+        hw: Self._scalar_type = 0,
+        hi: Self._scalar_type = 0,
+        hj: Self._scalar_type = 0,
+        hk: Self._scalar_type = 0,
+    ):
+        """Construct a Quaternion from a real, imaginary, and dual
+        vector part.
+
+        Args:
+            w: Real part.
+            i: Imaginary i, equivalent to vector part x.
+            j: Imaginary j, equivalent to vector part y.
+            k: Imaginary k, equivalent to vector part z.
+            hw: Bi Real Part.
+            hi: Bi Imaginary i, equivalent to vector part x.
+            hj: Bi Imaginary j, equivalent to vector part y.
+            hk: Bi Imaginary k, equivalent to vector part z.
+        """
+
+        alias msg = "BiQuaternions can only be expressed with floating point types"
+        constrained[T.is_floating_point(), msg=msg]()
+        self.vec = Self._vec_type(w, i, j, k, hw, hi, hj, hk)
+
+    fn __init__(inout self, vec: Self._vec_type):
+        """Construct a BiQuaternion from a SIMD vector.
+
+        Args:
+            vec: The SIMD vector.
+        """
+
+        alias msg = "BiQuaternions can only be expressed with floating point types"
+        constrained[T.is_floating_point(), msg=msg]()
+        self.vec = vec
+
+    fn __getattr__[name: StringLiteral](self) -> Self._scalar_type:
+        """Get the attribute.
+
+        Parameters:
+            name: The name of the attribute: {"w", "i", "j", "k",
+                "hw", "hi", "hj", "hk"}.
+
+        Returns:
+            The attribute value.
+        """
+
+        @parameter
+        if name == "w":
+            return self.vec[0]
+        elif name == "i":
+            return self.vec[1]
+        elif name == "j":
+            return self.vec[2]
+        elif name == "k":
+            return self.vec[3]
+        elif name == "hw":
+            return self.vec[3]
+        elif name == "hi":
+            return self.vec[3]
+        elif name == "hj":
+            return self.vec[3]
+        elif name == "hk":
+            return self.vec[3]
+        else:
+            constrained[False, msg="that attribute isn't defined"]()
+            return 0
+
+    fn __add__(self, other: Self) -> Self:
+        """Add other to self.
+
+        Args:
+            other: The other BiQuaternion.
+
+        Returns:
+            The result.
+        """
+        return Self(self.vec + other.vec)
+
+    fn __iadd__(inout self, other: Self):
+        """Add other to self inplace."""
+        self.vec += other.vec
+
+    fn __sub__(self, other: Self) -> Self:
+        """Subtract other from self.
+
+        Args:
+            other: The other BiQuaternion.
+
+        Returns:
+            The result.
+        """
+        return Self(self.vec - other.vec)
+
+    fn __isub__(inout self, other: Self):
+        """Subtract other from self inplace."""
+        self.vec -= other.vec
+
+    fn __mul__(self, other: Self) -> Self:
+        """Multiply self with other.
+
+        Args:
+            other: The other BiQuaternion.
+
+        Returns:
+            The result.
+        """
+        alias sign1 = Self._vec_type(1, 1, 1, -1, -1, -1, -1, 1)
+        alias sign2 = Self._vec_type(1, -1, 1, 1, -1, 1, -1, -1)
+        alias sign3 = Self._vec_type(1, 1, -1, 1, -1, -1, 1, -1)
+        alias sign4 = Self._vec_type(1, -1, -1, -1, 1, -1, -1, -1)
+        alias sign5 = Self._vec_type(1, 1, 1, -1, 1, 1, 1, -1)
+        alias sign6 = Self._vec_type(1, -1, 1, 1, 1, -1, 1, 1)
+        alias sign7 = Self._vec_type(1, 1, -1, 1, 1, 1, -1, 1)
+        alias mask1 = Self._vec_type(1, 0, 1, 0, 1, 0, 1, 0)
+        alias mask2 = Self._vec_type(1, 1, 0, 0, 1, 1, 0, 0)
+        alias mask6 = Self._vec_type(1, 1, 0, 0, 1, 1, 0, 0)
+
+        var w = self.dot(other)
+        var vec1 = mask1.select(
+            other.vec.shift_left[1](), other.vec.shift_right[1]()
+        )
+        var i = self.dot(vec1 * sign1)
+        var j = self.dot(
+            mask2.select(other.vec.shift_left[2](), other.vec.shift_right[2]())
+            * sign2
+        )
+        var rev = Self._vec_type(
+            other.hk,
+            other.hj,
+            other.hi,
+            other.hw,
+            other.k,
+            other.j,
+            other.i,
+            other.w,
+        )
+        var k = self.dot(rev.rotate_left[4]() * sign3)
+        var hw = self.dot(other.vec.rotate_left[4]() * sign4)
+        var hi = self.dot(vec1.rotate_left[4]() * sign5)
+        var hj = self.dot(
+            mask6.select(
+                other.vec.rotate_right[2](), other.vec.rotate_left[2]()
+            )
+            * sign6
+        )
+        var hk = self.dot(rev * sign7)
+        return Self(w, i, j, k, hw, hi, hj, hk)
+
+    fn __imul__(inout self, other: Self):
+        """Multiply self with other inplace.
+
+        Args:
+            other: The other BiQuaternion.
+        """
+        self = self * other
+
+    fn conjugate_v(self) -> Self:
+        """Return the vector conjugate of the BiQuaternion.
+        `self.vec * (1, -1, -1, -1, -1, -1, -1, -1)`.
+
+        Returns:
+            The vector conjugate.
+        """
+        return Self(self.vec * Self._vec_type(1, -1, -1, -1, -1, -1, -1, -1))
+
+    fn __invert__(self) -> Self:
+        """Return the vector conjugate of the BiQuaternion.
+        `self.vec * (1, -1, -1, -1, -1, -1, -1, -1)`.
+
+        Returns:
+            The vector conjugate.
+        """
+        return self.conjugate_v()
+
+    fn conjugate_h(self) -> Self:
+        """Return the complex conjugate of the BiQuaternion.
+        `self.vec * (1, 1, 1, 1, -1, -1, -1, -1)`.
+
+        Returns:
+            The complex conjugate.
+        """
+        return Self(self.vec * Self._vec_type(1, 1, 1, 1, -1, -1, -1, -1))
+
+    fn __abs__(self) -> Self._scalar_type:
+        """Get the magnitude of the BiQuaternion.
+
+        Returns:
+            The magnitude.
+        """
+        return sqrt((self.vec**2).reduce_add())
+
+    fn normalize(inout self):
+        """Normalize the BiQuaternion."""
+        self.vec /= self.__abs__()
+
+    fn normalized(self) -> Self:
+        """Get the normalized BiQuaternion.
+
+        Returns:
+            The normalized BiQuaternion.
+        """
+        return self.vec / self.__abs__()
+
+    fn dot(self, other: Self) -> Self._scalar_type:
+        """Calculate the dot product of self with other.
+
+        Args:
+            other: The other BiQuaternion.
+
+        Returns:
+            The result.
+        """
+        return (self.vec * other.vec).reduce_add()
