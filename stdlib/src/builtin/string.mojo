@@ -667,16 +667,17 @@ fn isprintable(c: UInt8) -> Bool:
 
 
 fn _utf8_byte_type(b: UInt8) -> UInt8:
-    if b < 0b1000_0000:
-        return 0
-    elif b < 0b1100_0000:
-        return 1  # is continuation byte
-    elif b < 0b1110_0000:
-        return 2  # is 2 byte long
-    elif b < 0b1111_0000:
-        return 3  # is 3 byte long
-    else:
-        return 4  # is 4 byte long
+    """UTF-8 byte type.
+
+    Returns:
+        The byte type:
+            0 -> ASCII byte.
+            1 -> continuation byte.
+            2 -> start of 2 byte long sequence.
+            3 -> start of 3 byte long sequence.
+            4 -> start of 4 byte long sequence.
+    """
+    return countl_zero(~(b & 0b1111_0000))
 
 
 @value
@@ -696,14 +697,16 @@ struct _StringIter[
     var index: Int
     var continuation_bytes: Int
     var ptr: UnsafePointer[UInt8]
-    var len: Int
+    var length: Int
 
-    fn __init__(inout self, unsafe_pointer: UnsafePointer[UInt8], len: Int):
-        self.index = 0 if forward else len
+    fn __init__(
+        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
+    ):
+        self.index = 0 if forward else length
         self.ptr = unsafe_pointer
-        self.len = len
+        self.length = length
         self.continuation_bytes = 0
-        for i in range(len):
+        for i in range(length):
             if _utf8_byte_type(int(unsafe_pointer[i])) == 1:
                 self.continuation_bytes += 1
 
@@ -715,10 +718,10 @@ struct _StringIter[
         if forward:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var value = _utf8_byte_type(int(self.ptr[self.index]))
-                if value != 0:
-                    byte_len = int(value)
-                    self.continuation_bytes -= int(value) - 1
+                var byte_type = _utf8_byte_type(int(self.ptr[self.index]))
+                if byte_type != 0:
+                    byte_len = int(byte_type)
+                    self.continuation_bytes -= byte_len - 1
             self.index += byte_len
             return StringSlice[is_mutable, lifetime](
                 unsafe_from_utf8_ptr=self.ptr.offset(self.index - byte_len),
@@ -727,12 +730,12 @@ struct _StringIter[
         else:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var value = _utf8_byte_type(int(self.ptr[self.index - 1]))
-                if value != 0:
-                    while value == 1:
+                var byte_type = _utf8_byte_type(int(self.ptr[self.index - 1]))
+                if byte_type != 0:
+                    while byte_type == 1:
                         byte_len += 1
                         var b = int(self.ptr[self.index - byte_len])
-                        value = _utf8_byte_type(b)
+                        byte_type = _utf8_byte_type(b)
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
             return StringSlice[is_mutable, lifetime](
@@ -742,7 +745,7 @@ struct _StringIter[
     fn __len__(self) -> Int:
         @parameter
         if forward:
-            return self.len - self.index - self.continuation_bytes
+            return self.length - self.index - self.continuation_bytes
         else:
             return self.index - self.continuation_bytes
 
@@ -1182,7 +1185,7 @@ struct String(
             An iterator of references to the string elements.
         """
         return _StringIter[self.is_mutable, self.lifetime](
-            self[].unsafe_uint8_ptr(), len(self[])
+            unsafe_pointer=self[].unsafe_uint8_ptr(), length=len(self[])
         )
 
     fn __reversed__(
@@ -1194,7 +1197,7 @@ struct String(
             A reversed iterator of references to the string elements.
         """
         return _StringIter[self.is_mutable, self.lifetime, forward=False](
-            self[].unsafe_uint8_ptr(), len(self[])
+            unsafe_pointer=self[].unsafe_uint8_ptr(), length=len(self[])
         )
 
     # ===------------------------------------------------------------------=== #

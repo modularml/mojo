@@ -1095,11 +1095,26 @@ def test_string_iter():
     #     v.unsafe_ptr().store(0, "1")
 
     # # Borrow immutably
-    # var concat: String
     # for v in vs:
     #     concat += v
 
     # assert_equal(111, atol(concat))
+
+    var idx = -1
+    vs = String("mojo🔥")
+    for item in vs:
+        idx += 1
+        if idx == 0:
+            assert_equal("m", item)
+        elif idx == 1:
+            assert_equal("o", item)
+        elif idx == 2:
+            assert_equal("j", item)
+        elif idx == 3:
+            assert_equal("o", item)
+        elif idx == 4:
+            assert_equal("🔥", item)
+    assert_equal(4, idx)
 
     var items = List[String](
         "mojo🔥",
@@ -1127,19 +1142,19 @@ def test_string_iter():
         "álO",
         "етйувтсвардЗ",
     )
-    var utf8_lengths = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
-    var item_idx = 0
-    for item in items:
-        var amnt = 0
+    var utf8_sequence_lengths = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
+    for item_idx in range(len(items)):
+        var item = items[item_idx]
+        var utf8_sequence_len = 0
         var byte_idx = 0
-        for v in item[]:
+        for v in item:
             var byte_len = len(v)
-            assert_equal(item[][byte_idx : byte_idx + byte_len], v)
+            assert_equal(item[byte_idx : byte_idx + byte_len], v)
             byte_idx += byte_len
-            amnt += 1
-        assert_equal(amnt, utf8_lengths[item_idx])
+            utf8_sequence_len += 1
+        assert_equal(utf8_sequence_len, utf8_sequence_lengths[item_idx])
         var concat = String("")
-        for v in item[].__reversed__():
+        for v in item.__reversed__():
             concat += v
         assert_equal(rev[item_idx], concat)
         item_idx += 1
