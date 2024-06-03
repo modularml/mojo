@@ -49,6 +49,11 @@ def test_bool_to_string():
     assert_equal(str(False), "False")
 
 
+def test_bool_representation():
+    assert_equal(repr(True), "True")
+    assert_equal(repr(False), "False")
+
+
 def test_bitwise():
     var value: Bool
 
@@ -142,6 +147,7 @@ def main():
     test_bool_none()
     test_convert_from_boolable()
     test_bool_to_string()
+    test_bool_representation()
     test_bitwise()
     test_neg()
     test_indexer()
