@@ -311,6 +311,8 @@ fn range[
     return _StridedRange(int(start), int(end), int(step))
 
 
+# TODO: Use iterators instead of List when it's possible to
+# represent them using traits.
 fn map[
     ElementType: CollectionElement,
     ResultElementType: CollectionElement, //,
