@@ -239,6 +239,28 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ](casted)
 
     @always_inline("nodebug")
+    fn __init__(inout self, value: UInt):
+        """Initializes the SIMD vector with an integer.
+
+        The integer value is splatted across all the elements of the SIMD
+        vector.
+
+        Args:
+            value: The input value.
+        """
+        _simd_construction_checks[type, size]()
+
+        var t0 = __mlir_op.`pop.cast_from_builtin`[
+            _type = __mlir_type.`!pop.scalar<index>`
+        ](value.value)
+        var casted = __mlir_op.`pop.cast`[
+            _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
+        ](t0)
+        self.value = __mlir_op.`pop.simd.splat`[
+            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        ](casted)
+
+    @always_inline("nodebug")
     fn __init__(inout self, value: IntLiteral):
         """Initializes the SIMD vector with an integer.
 
