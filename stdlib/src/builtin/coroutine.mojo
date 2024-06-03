@@ -81,7 +81,7 @@ fn _coro_resume_noop_callback(handle: AnyCoroutine, null: AnyCoroutine):
 
 
 @register_passable
-struct Coroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
+struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
     """Represents a coroutine.
 
     Coroutines can pause execution saving the state of the program (including
@@ -97,7 +97,7 @@ struct Coroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
     var _handle: AnyCoroutine
 
     @always_inline
-    fn _get_ctx[ctx_type: AnyTrivialRegType](self) -> UnsafePointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyType](self) -> UnsafePointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:
@@ -115,13 +115,12 @@ struct Coroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
         ](self._handle)
 
     @always_inline
-    fn get(self) -> type:
-        """Get the value of the fulfilled coroutine promise.
-
-        Returns:
-            The value of the fulfilled promise.
-        """
-        return __mlir_op.`co.get_results`[_type=type](self._handle)
+    fn _set_result_slot(self, slot: UnsafePointer[type]):
+        __mlir_op.`co.set_byref_error_result`(
+            self._handle,
+            __mlir_attr.`#interp.pointer<0> : !kgen.pointer<none>`,
+            slot.address,
+        )
 
     @always_inline
     fn __init__(handle: AnyCoroutine) -> Self:
@@ -141,12 +140,18 @@ struct Coroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
         __mlir_op.`co.destroy`(self._handle)
 
     @always_inline
+    @__named_result(out)
     fn __await__(self) -> type:
         """Suspends the current coroutine until the coroutine is complete.
 
         Returns:
             The coroutine promise.
         """
+
+        # Black magic! Internal implementation detail!
+        # Don't you dare copy this code! 😤
+        __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
+        self._set_result_slot(UnsafePointer.address_of(out))
 
         @always_inline
         @parameter
@@ -159,9 +164,9 @@ struct Coroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
             __mlir_op.`co.resume`(self._handle)
 
         _suspend_async[await_body]()
-        return self.get()
 
     # Never call this method.
+    @__named_result(out)
     fn _deprecated_direct_resume(self) -> type:
         LegacyPointer(self._get_ctx[_CoroutineContext]().address).store(
             _CoroutineContext {
@@ -169,8 +174,13 @@ struct Coroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
                 _parent_hdl: self._handle,
             }
         )
+        __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
+        __mlir_op.`co.set_byref_error_result`(
+            self._handle,
+            __mlir_attr.`#interp.pointer<0> : !kgen.pointer<none>`,
+            UnsafePointer.address_of(out).address,
+        )
         __mlir_op.`co.resume`(self._handle)
-        return self.get()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -179,7 +189,7 @@ struct Coroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
 
 
 @register_passable
-struct RaisingCoroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
+struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
     """Represents a coroutine that can raise.
 
     Coroutines can pause execution saving the state of the program (including
@@ -192,25 +202,10 @@ struct RaisingCoroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
         lifetimes: The lifetime set of the coroutine's captures.
     """
 
-    alias _var_type = __mlir_type[`!kgen.variant<`, Error, `, `, type, `>`]
     var _handle: AnyCoroutine
 
     @always_inline
-    fn get(self) raises -> type:
-        """Get the value of the fulfilled coroutine promise.
-
-        Returns:
-            The value of the fulfilled promise.
-        """
-        var variant = __mlir_op.`co.get_results`[_type = Self._var_type](
-            self._handle
-        )
-        if __mlir_op.`kgen.variant.is`[index = Int(0).value](variant):
-            raise __mlir_op.`kgen.variant.take`[index = Int(0).value](variant)
-        return __mlir_op.`kgen.variant.take`[index = Int(1).value](variant)
-
-    @always_inline
-    fn _get_ctx[ctx_type: AnyTrivialRegType](self) -> UnsafePointer[ctx_type]:
+    fn _get_ctx[ctx_type: AnyType](self) -> UnsafePointer[ctx_type]:
         """Returns the pointer to the coroutine context.
 
         Parameters:
@@ -228,13 +223,24 @@ struct RaisingCoroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
         ](self._handle)
 
     @always_inline
-    fn __init__(inout self, handle: AnyCoroutine):
+    fn _set_result_slot(
+        self, slot: UnsafePointer[type], err: UnsafePointer[Error]
+    ):
+        __mlir_op.`co.set_byref_error_result`(
+            self._handle, err.address, slot.address
+        )
+
+    @always_inline
+    fn __init__(handle: AnyCoroutine) -> Self:
         """Construct a coroutine object from a handle.
 
         Args:
             handle: The init handle.
+
+        Returns:
+            An owning coroutine.
         """
-        self = Self {_handle: handle}
+        return Self {_handle: handle}
 
     @always_inline
     fn __del__(owned self):
@@ -242,12 +248,22 @@ struct RaisingCoroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
         __mlir_op.`co.destroy`(self._handle)
 
     @always_inline
+    @__named_result(out)
     fn __await__(self) raises -> type:
         """Suspends the current coroutine until the coroutine is complete.
 
         Returns:
             The coroutine promise.
         """
+
+        # Black magic! Internal implementation detail!
+        # Don't you dare copy this code! 😤
+        self._set_result_slot(
+            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
+            __mlir_op.`lit.ref.to_pointer`(
+                __get_mvalue_as_litref(__get_nearest_error_slot())
+            ),
+        )
 
         @always_inline
         @parameter
@@ -260,4 +276,9 @@ struct RaisingCoroutine[type: AnyTrivialRegType, lifetimes: LifetimeSet]:
             __mlir_op.`co.resume`(self._handle)
 
         _suspend_async[await_body]()
-        return self.get()
+        if __mlir_op.`co.get_results`[_type = __mlir_type.i1](self._handle):
+            __mlir_op.`lit.ownership.mark_initialized`(
+                __get_mvalue_as_litref(__get_nearest_error_slot())
+            )
+            __mlir_op.`lit.raise`()
+        __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))

@@ -16,6 +16,11 @@ what we publish.
 
 ### ⭐️ New
 
+- `async` functions now support memory-only results (like `String`, `List`,
+  etc.) and `raises`. Accordingly, both `Coroutine` and `RaisingCoroutine` have
+  been changed to accept `AnyType` instead of `AnyTrivialRegType`. This means
+  the result types of `async` functions do not need to be `Movable`.
+
 - The `Reference` type (and many iterators) now use "inferred" parameters to
   represent the mutability of their lifetime, simplifying the interface.
 
