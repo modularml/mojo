@@ -86,7 +86,7 @@ def check_float64_values():
 def main():
     check_float64_values()
 
-    # TODO re-enable this test when we sort out BF16 support for graviton3 #30525
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         test_methods()

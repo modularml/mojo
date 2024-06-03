@@ -721,15 +721,17 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self[i] == rhs[i]`.
         """
 
-        @parameter  # Because of #30525, we roll our own implementation for eq.
+        # TODO(KERN-228): support BF16 on neon systems.
+        # As a workaround, we roll our own implementation
+        @parameter
         if has_neon() and type == DType.bfloat16:
             var int_self = bitcast[_integral_type_of[type](), size](self)
             var int_rhs = bitcast[_integral_type_of[type](), size](rhs)
             return int_self == int_rhs
-
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
-            self.value, rhs.value
-        )
+        else:
+            return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred eq>`](
+                self.value, rhs.value
+            )
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: Self) -> Self._Mask:
@@ -744,15 +746,17 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self[i] != rhs[i]`.
         """
 
-        @parameter  # Because of #30525, we roll our own implementation for ne.
+        # TODO(KERN-228): support BF16 on neon systems.
+        # As a workaround, we roll our own implementation.
+        @parameter
         if has_neon() and type == DType.bfloat16:
             var int_self = bitcast[_integral_type_of[type](), size](self)
             var int_rhs = bitcast[_integral_type_of[type](), size](rhs)
             return int_self != int_rhs
-
-        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
-            self.value, rhs.value
-        )
+        else:
+            return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
+                self.value, rhs.value
+            )
 
     @always_inline("nodebug")
     fn __gt__(self, rhs: Self) -> Self._Mask:
@@ -1444,14 +1448,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if type == target:
             return rebind[SIMD[target, size]](self)
-
-        @parameter
-        if has_neon() and (type == DType.bfloat16 or target == DType.bfloat16):
-            # BF16 support on neon systems is not supported.
+        elif has_neon() and (
+            type == DType.bfloat16 or target == DType.bfloat16
+        ):
+            # TODO(KERN-228): support BF16 on neon systems.
             return _unchecked_zero[target, size]()
-
-        @parameter
-        if type == DType.bool:
+        elif type == DType.bool:
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
         elif target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
@@ -1620,16 +1622,16 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         @parameter
         if type.is_bool() or type.is_integral():
             return self
-
-        @parameter
-        if has_neon() and type == DType.bfloat16:
+        elif has_neon() and type == DType.bfloat16:
+            # TODO(KERN-228): support BF16 on neon systems.
+            # As a workaround, we cast to float32.
             return (
                 self.cast[DType.float32]()
                 ._floor_ceil_trunc_impl[intrinsic]()
                 .cast[type]()
             )
-
-        return llvm_intrinsic[intrinsic, Self, has_side_effect=False](self)
+        else:
+            return llvm_intrinsic[intrinsic, Self, has_side_effect=False](self)
 
     fn clamp(self, lower_bound: Self, upper_bound: Self) -> Self:
         """Clamps the values in a SIMD vector to be in a certain range.
@@ -2883,7 +2885,7 @@ fn _bfloat16_to_f32_scalar(
 ) -> Scalar[DType.float32]:
     @parameter
     if has_neon():
-        # BF16 support on neon systems is not supported.
+        # TODO(KERN-228): support BF16 on neon systems.
         return _unchecked_zero[DType.float32, 1]()
 
     var bfloat_bits = FPUtils[DType.bfloat16].bitcast_to_integer(val)
@@ -2898,7 +2900,7 @@ fn _bfloat16_to_f32[
 ](val: SIMD[DType.bfloat16, size]) -> SIMD[DType.float32, size]:
     @parameter
     if has_neon():
-        # BF16 support on neon systems is not supported.
+        # TODO(KERN-228): support BF16 on neon systems.
         return _unchecked_zero[DType.float32, size]()
 
     @always_inline
@@ -2919,7 +2921,7 @@ fn _f32_to_bfloat16_scalar(
 ) -> Scalar[DType.bfloat16]:
     @parameter
     if has_neon():
-        # BF16 support on neon systems is not supported.
+        # TODO(KERN-228): support BF16 on neon systems.
         return _unchecked_zero[DType.bfloat16, 1]()
 
     if _isnan(val):
@@ -2944,7 +2946,7 @@ fn _f32_to_bfloat16[
 ](val: SIMD[DType.float32, size]) -> SIMD[DType.bfloat16, size]:
     @parameter
     if has_neon():
-        # BF16 support on neon systems is not supported.
+        # TODO(KERN-228): support BF16 on neon systems.
         return _unchecked_zero[DType.bfloat16, size]()
 
     @always_inline

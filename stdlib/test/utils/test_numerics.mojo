@@ -77,6 +77,7 @@ def test_get_accum_type():
 def test_isfinite():
     assert_true(isfinite(Float32(33)))
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         assert_false(isfinite(inf[DType.bfloat16]()))
@@ -97,6 +98,7 @@ def test_isfinite():
 def test_isinf():
     assert_false(isinf(Float32(33)))
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         assert_true(isinf(inf[DType.bfloat16]()))
@@ -117,6 +119,7 @@ def test_isinf():
 def test_isnan():
     assert_false(isnan(Float32(33)))
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         assert_false(isnan(inf[DType.bfloat16]()))
