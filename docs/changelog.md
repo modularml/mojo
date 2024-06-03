@@ -61,6 +61,12 @@ by [@jayzhan211](https://github.com/jayzhan211))
   - `initialize_pointee_copy(p, value)` => `p.init_pointee_copy(value)`
   - `move_pointee(src=p1, dst=p2)` => `p.move_pointee_into(p2)`
 
+- `DTypePointer.load/store/prefetch` has been now moved to `SIMD`. Instead of
+  using `ptr.load[width=4](offset)` one should use `SIMD[size=4].load(ptr, offset)`.
+  Note the default load width before was 1, but the default size of `SIMD` is
+  the size of the SIMD type.
+  The default store size is the size of the `SIMD` value to be stored.
+
 ### ❌ Removed
 
 - Removed `String.unsafe_uint8_ptr()`. `String.unsafe_ptr()` now returns the

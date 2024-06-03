@@ -23,6 +23,8 @@ from sys import (
     triple_is_nvidia_cuda,
     simdwidthof,
     _RegisterPackType,
+    PrefetchOptions,
+    prefetch,
 )
 
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
@@ -435,6 +437,157 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                     )
                 )
             )
+
+    alias _default_alignment = alignof[
+        Scalar[type]
+    ]() if triple_is_nvidia_cuda() else 1
+
+    @staticmethod
+    @always_inline
+    fn prefetch[
+        params: PrefetchOptions,
+        *,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space]):
+        # Prefetch at the underlying address.
+        """Prefetches memory at the underlying address.
+
+        Parameters:
+            params: Prefetch options (see `PrefetchOptions` for details).
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to prefetch from.
+        """
+        prefetch[params](ptr)
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn load[
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space]) -> Self:
+        """Loads the value the Pointer object points to.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to load from.
+
+        Returns:
+            The loaded value.
+        """
+        return Self.load[alignment=alignment, address_space=address_space](
+            ptr, 0
+        )
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn load[
+        T: Intable,
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space], offset: T) -> Self:
+        """Loads the value the Pointer object points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            T: The Intable type of the offset.
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to load from.
+            offset: The offset to load from.
+
+        Returns:
+            The loaded value.
+        """
+
+        @parameter
+        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
+            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
+            # regardless of the alignment that is passed. This causes issues if
+            # this method is called on an unaligned pointer.
+            # TODO #37823 We can make this smarter when we add an `aligned`
+            # trait to the pointer class.
+            var v = SIMD[type, size]()
+
+            # intentionally don't unroll, otherwise the compiler vectorizes
+            for i in range(size):
+                v[i] = ptr.address.offset(int(offset) + i).load[
+                    alignment=alignment
+                ]()
+            return v
+
+        return (
+            ptr.address.offset(offset)
+            .bitcast[SIMD[type, size]]()
+            .load[alignment=alignment]()
+        )
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn store[
+        T: Intable,
+        /,
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space], offset: T, val: Self):
+        """Stores a single element value at the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            T: The Intable type of the offset.
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to store to.
+            offset: The offset to store to.
+            val: The value to store.
+        """
+        Self.store[alignment=alignment, address_space=address_space](
+            ptr.offset(offset), val
+        )
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn store[
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space], val: Self):
+        """Stores a single element value.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to store to.
+            val: The value to store.
+        """
+        constrained[size > 0, "width must be a positive integer value"]()
+        constrained[
+            alignment > 0, "alignment must be a positive integer value"
+        ]()
+        ptr.address.bitcast[SIMD[type, size]]().store[alignment=alignment](val)
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:

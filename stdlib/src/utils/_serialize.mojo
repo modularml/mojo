@@ -47,10 +47,10 @@ fn _serialize_elements_complete[
 ](ptr: DTypePointer, len: Int):
     if len == 0:
         return
-    serialize_fn(ptr.load())
+    serialize_fn(Scalar.load(ptr))
     for i in range(1, len):
         serialize_fn(", ")
-        serialize_fn(ptr.load(i))
+        serialize_fn(Scalar.load(ptr, i))
 
 
 fn _serialize_elements[
