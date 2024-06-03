@@ -86,15 +86,13 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         self._data[value] = count
 
-    fn __iter__(
-        self: Reference[Self, _, _]
-    ) -> _DictKeyIter[V, Int, self.is_mutable, self.lifetime]:
+    fn __iter__(ref [_]self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
             An iterator of immutable references to the Counter values.
         """
-        return self[]._data.__iter__()
+        return self._data.__iter__()
 
     fn __len__(self) -> Int:
         """The number of elements currently stored in the Counter."""
@@ -136,7 +134,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         @parameter
         @always_inline
-        fn is_eq(keys: _DictKeyIter[V, Int, False, _]) -> Bool:
+        fn is_eq(keys: _DictKeyIter[V, Int, _]) -> Bool:
             for e_ref in keys:
                 var e = e_ref[]
                 if self.get(e, 0) != other.get(e, 0):
@@ -168,7 +166,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         @parameter
         @always_inline
-        fn is_le(keys: _DictKeyIter[V, Int, False, _]) -> Bool:
+        fn is_le(keys: _DictKeyIter[V, Int, _]) -> Bool:
             for e_ref in keys:
                 var e = e_ref[]
                 if self.get(e, 0) > other.get(e, 0):
@@ -284,35 +282,29 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.pop(value, default)
 
-    fn keys(
-        self: Reference[Self, _, _]
-    ) -> _DictKeyIter[V, Int, self.is_mutable, self.lifetime]:
+    fn keys(ref [_]self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self)]:
         """Iterate over the Counter's keys as immutable references.
 
         Returns:
             An iterator of immutable references to the Counter keys.
         """
-        return self[]._data.keys()
+        return self._data.keys()
 
-    fn values(
-        self: Reference[Self, _, _]
-    ) -> _DictValueIter[V, Int, self.is_mutable, self.lifetime]:
+    fn values(ref [_]self: Self) -> _DictValueIter[V, Int, __lifetime_of(self)]:
         """Iterate over the Counter's values as references.
 
         Returns:
             An iterator of references to the Counter values.
         """
-        return self[]._data.values()
+        return self._data.values()
 
-    fn items(
-        self: Reference[Self, _, _]
-    ) -> _DictEntryIter[V, Int, self.is_mutable, self.lifetime]:
+    fn items(ref [_]self: Self) -> _DictEntryIter[V, Int, __lifetime_of(self)]:
         """Iterate over the dict's entries as immutable references.
 
         Returns:
             An iterator of immutable references to the Counter entries.
         """
-        return self[]._data.items()
+        return self._data.items()
 
     fn clear(inout self):
         """Remove all elements from the Counter."""
