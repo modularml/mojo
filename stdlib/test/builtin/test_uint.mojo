@@ -21,7 +21,9 @@ def test_simple_uint():
     assert_equal(str(UInt(0)), "0")
     assert_equal(str(UInt()), "0")
 
-    # (2 ** 64) - 1, we'll probably want to raise a error in the future
+    # (2 ** 64) - 1
+    # TODO: raise an error in the future when
+    # https://github.com/modularml/mojo/issues/2933 is fixed
     assert_equal(str(UInt(-1)), "18446744073709551615")
 
     assert_equal(str(UInt(18446744073709551615)), "18446744073709551615")

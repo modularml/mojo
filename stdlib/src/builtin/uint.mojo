@@ -65,6 +65,7 @@ struct UInt:
         # in IntLiteral.__as_mlir_index()
         # assumes that the index represents an unsigned integer.
         # We need a variant for signed integers.
+        # Change when https://github.com/modularml/mojo/issues/2933 is fixed
         self.value = int(UInt64(value)).value
 
     @always_inline("nodebug")
