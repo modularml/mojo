@@ -218,9 +218,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn __init__(inout self, value: UInt):
-        """Initializes the SIMD vector with an integer.
+        """Initializes the SIMD vector with an unsigned integer.
 
-        The integer value is splatted across all the elements of the SIMD
+        The unsigned integer value is splatted across all the elements of the SIMD
         vector.
 
         Args:
@@ -230,9 +230,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn __init__(inout self, value: Int):
-        """Initializes the SIMD vector with an unsigned integer.
+        """Initializes the SIMD vector with a signed integer.
 
-        The unsigned integer value is splatted across all the elements of the SIMD
+        The signed integer value is splatted across all the elements of the SIMD
         vector.
 
         Args:
