@@ -740,10 +740,11 @@ struct DualQuaternion[T: DType = DType.float64]:
         var qs = self.to_quaternions()
         var r = qs[0]
         var t = qs[1]
-        var half = SIMD[T, 4](0.5)
-        var q1 = w * r * half
-        var q2 = (v * r + (t * w * r) * half) * half
-        return Self(q1.w, q1.i, q1.j, q1.k, q2.w, q2.i, q2.j, q2.k)
+        var half_4 = SIMD[T, 4](0.5)
+        var half_8 = SIMD[T, 8](0.5)
+        var q1 = w * r
+        var q2 = (v + (t * w) * half_4) * r
+        return Self(q1.vec.join(q2.vec) * half_8)
 
     # TODO: capturing closures cannot be materialized as runtime values
     # fn sclerp(self, other: Self) -> fn (Int) capturing -> Self:
