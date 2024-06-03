@@ -1994,68 +1994,53 @@ struct String(
         print(x) #True hello world
         ```
 
-        ⚠️ Raising functions does not work in the parameter domain.
-
         Args:
-            args: Values passed as variadic arguments.
+            args: The substitution values.
 
         Parameters:
-            Ts: The types of the variadic arguments.
+            Ts: The types of the substitution values.
+              Are required to implement `Stringable`.
 
         Returns:
             The template with the given values substituted.
 
-        Variadic arguments are required to implement `Stringable`.
-
         """
-        var entries = _FormatCurlyEntry.create_entries(self)
-        var manual_indexing_count = 0
-        var automatic_indexing_count = 0
-        for e in entries:
-            if e[].value.isa[Int]():
-                manual_indexing_count += 1
-                if e[].value[Int] >= len(args):
-                    raise ("Index " + str(e[].value[Int]) + " not in *args")
-            elif e[].value.isa[NoneType]():
-                automatic_indexing_count += 1
-            elif e[].value.isa[String]():
-                raise "Index " + e[].value[String] + " not in kwargs"
-            if manual_indexing_count and automatic_indexing_count:
-                raise "Cannot both use manual and automatic indexing"
-
-        if automatic_indexing_count > len(args):
-            raise ("Automatic indexing require more args in *args")
+        alias NUM_POS_ARGS = len(VariadicList(Ts))
+        var entries = _FormatCurlyEntry.create_entries(self, NUM_POS_ARGS)
 
         var res: String = ""
-        var start = 0
+        var pos_in_self = 0
 
-        if manual_indexing_count:
-            for e in entries:
-                debug_assert(start < len(self), "start >= len(self)")
-                res += self[start : e[].first_curly]
-                if e[].value.isa[Int]():
+        var current_automatic_arg_index = 0
+        for e in entries:
+            debug_assert(pos_in_self < len(self), "pos_in_self >= len(self)")
+            res += self[pos_in_self : e[].first_curly]
 
-                    @parameter
-                    for i in range(len(VariadicList(Ts))):
-                        if i == e[].value[Int]:
-                            res += str(args[i])
-                start = e[].last_curly + 1
+            if e[]._is_escaped_brace():
+                if e[].field[Bool]:
+                    res += "}"
+                else:
+                    res += "{"
 
-        if automatic_indexing_count:
-            var current_arg_index = 0
-            for e in entries:
-                debug_assert(start < len(self), "start >= len(self)")
-                res += self[start : e[].first_curly]
-                if e[].value.isa[NoneType]():
+            if e[]._is_manual_indexing():
 
-                    @parameter
-                    for i in range(len(VariadicList(Ts))):
-                        if i == current_arg_index:
-                            res += str(args[i])
-                    current_arg_index += 1
-                start = e[].last_curly + 1
-        if start < len(self):
-            res += self[start : len(self)]
+                @parameter
+                for i in range(NUM_POS_ARGS):
+                    if i == e[].field[Int]:
+                        res += str(args[i])
+
+            if e[]._is_automatic_indexing():
+
+                @parameter
+                for i in range(NUM_POS_ARGS):
+                    if i == current_automatic_arg_index:
+                        res += str(args[i])
+                current_automatic_arg_index += 1
+
+            pos_in_self = e[].last_curly + 1
+
+        if pos_in_self < len(self):
+            res += self[pos_in_self : len(self)]
 
         return res^
 
@@ -2201,64 +2186,157 @@ struct _FormatCurlyEntry:
     """
     Internally used by the `format()` method.
 
-    Purpose of the variant types:
+    Specifically to structure fields.
 
-
-    - `Int` for manual indexing of *args
-
-        ```mojo
-        "{0}".format("hello")
-        ```
-
-        value field contains `0`
-
-    - `NoneType` for automatic indexing of *args
-
-        ```mojo
-        "{}".format("hello")
-        ```
-
-        value field contains `None`
-
-    `*_curly` are the indexes of the enclosing curlies
-
-    This struct only supports theses:
-
-    `{number|name|nothing}`
+    Does not contains any substitution values.
 
     """
 
     var first_curly: Int
+    """the index of an opening brace around a substitution field"""
+
     var last_curly: Int
-    var field: Variant[String, Int, NoneType]
+    """the index of an closing brace around a substitution field"""
+
+    var field: Variant[
+        String,  # kwargs indexing (`{field_name}`)
+        Int,  # args manual indexing (`{3}`)
+        NoneType,  # args automatic indexing (`{}`)
+        Bool,  # for escaped curlies ('{{')
+    ]
+    """Store the substitution field."""
+
+    fn _is_escaped_brace(ref [_]self) -> Bool:
+        return self.field.isa[Bool]()
+
+    fn _is_kwargs_field(ref [_]self) -> Bool:
+        return self.field.isa[String]()
+
+    fn _is_automatic_indexing(ref [_]self) -> Bool:
+        return self.field.isa[NoneType]()
+
+    fn _is_manual_indexing(ref [_]self) -> Bool:
+        return self.field.isa[Int]()
 
     @staticmethod
-    fn create_entries(arg: String) -> List[Self]:
+    fn create_entries(
+        format_src: String, len_pos_args: Int
+    ) raises -> List[Self]:
         """Used internally by the `format()` method.
 
         Args:
-            arg: The "format" part provided by the user.
+            format_src: The "format" part provided by the user.
+            len_pos_args: The len of *args
 
         Returns:
-            A `List` of structured format entries.
+            A `List` of structured field entries.
+
+        Purpose of the `Variant` `Self.field`:
+
+        - `Int` for manual indexing
+            (value field contains `0`)
+
+        - `NoneType` for automatic indexing
+            (value field contains `None`)
+
+        - `String` for **kwargs indexing
+            (value field contains `foo`)
+
+        - `Bool` for escaped curlies
+            (value field contains False for `{` or True for '}')
         """
+        var manual_indexing_count = 0
+        var automatic_indexing_count = 0
+        var kwargs_indexing_count = 0
+        var raised_manual_index = Optional[Int](None)
+        var raised_automatic_index = Optional[Int](None)
+        var raised_kwarg_field = Optional[String](None)
+
         var entries = List[Self]()
         var start = Optional[Int](None)
-        for i in range(len(arg)):
-            if arg[i] == "{":
-                start = i
+        var skip_next = False
+        for i in range(len(format_src)):
+            if skip_next:
+                skip_next = False
                 continue
-            if arg[i] == "}":
+            if format_src[i] == "{":
                 if start:
-                    var start_value = start.value()[]
-                    var tmp = Self(start_value, i, None)
+                    # already one there.
+                    if i - start.value() == 1:
+                        # python escapes double curlies
+                        var curren_entry = Self(
+                            first_curly=start.value(), last_curly=i, field=False
+                        )
+                        entries.append(curren_entry)
+                        start = None
+                        continue
+                    raise (
+                        "there is a single curly { left unclosed or unescaped"
+                    )
+                else:
+                    start = i
+                continue
+            if format_src[i] == "}":
+                if start:
+                    var start_value = start.value()
+                    var current_entry = Self(
+                        first_curly=start_value, last_curly=i, field=None
+                    )
                     if i - start_value != 1:
-                        var tmp2 = arg[start_value + 1 : i]
+                        var field = format_src[start_value + 1 : i]
                         try:
-                            var tmp3 = int(tmp2)
-                            tmp.value = tmp3
-                        except:
-                            tmp.value = tmp2
-                    Entries.append(tmp^)
-                start = None
-        return Entries^
+                            # field is a number for manual indexing:
+                            var number = int(field)
+                            current_entry.field = number
+                            if number >= len_pos_args or number < 0:
+                                raised_manual_index = number
+                                break
+                            manual_indexing_count += 1
+                        except e:
+                            debug_assert(
+                                "not convertible to integer" in str(e),
+                                "Not the expected error from atol",
+                            )
+                            # field is an keyword for **kwargs:
+                            current_entry.field = field
+                            kwargs_indexing_count += 1
+                            raised_kwarg_field = field
+                            break
+                    else:
+                        # automatic indexing
+                        # current_entry.field is already None
+                        if automatic_indexing_count >= len_pos_args:
+                            raised_automatic_index = automatic_indexing_count
+                            break
+                        automatic_indexing_count += 1
+                    entries.append(current_entry^)
+                    start = None
+                else:
+                    # python escapes double curlies
+                    if (i + 1) < len(format_src):
+                        if format_src[i + 1] == "}":
+                            var curren_entry = Self(
+                                first_curly=i, last_curly=i + 1, field=True
+                            )
+                            entries.append(curren_entry)
+                            skip_next = True
+                            continue
+                    # if it is not an escaped one, it is an error
+                    raise (
+                        "there is a single curly } left unclosed or unescaped"
+                    )
+
+        if raised_automatic_index:
+            raise "Automatic indexing require more args in *args"
+        if raised_kwarg_field:
+            raise "Index " + raised_kwarg_field.value() + " not in kwargs"
+        if manual_indexing_count and automatic_indexing_count:
+            raise "Cannot both use manual and automatic indexing"
+        if raised_manual_index:
+            raise (
+                "Index " + str(raised_manual_index.value()) + " not in *args"
+            )
+        if start:
+            raise "there is a single curly { left unclosed or unescaped"
+
+        return entries^

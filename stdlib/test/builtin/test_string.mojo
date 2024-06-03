@@ -1108,6 +1108,9 @@ def test_indexing():
 
 
 def test_format_args():
+    with assert_raises(contains="Index -1 not in *args"):
+        _ = String("{-1} {0}").format("First")
+
     with assert_raises(contains="Index 1 not in *args"):
         _ = String("A {0} B {1}").format("First")
 
@@ -1139,12 +1142,52 @@ def test_format_args():
         " Hello , Beautiful World !",
     )
 
-    assert_equal(String("{{0}}").format("foo"), "{foo}")
-    assert_equal(String("{{}}").format("foo"), "{foo}")
-    assert_equal(String("{{0}").format("foo"), "{foo")
-    assert_equal(String("{{}").format("foo"), "{foo")
-    assert_equal(String("{0}}").format("foo"), "foo}")
-    assert_equal(String("{}}").format("foo"), "foo}")
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{ {}").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{ {0}").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{}{").format(1)
+
+    with assert_raises(
+        contains="there is a single curly } left unclosed or unescaped"
+    ):
+        _ = String("{}}").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{} {").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{").format(1)
+
+    with assert_raises(
+        contains="there is a single curly } left unclosed or unescaped"
+    ):
+        _ = String("}").format(1)
+
+    assert_equal(String("}}").format(), "}")
+    assert_equal(String("{{").format(), "{")
+
+    assert_equal(String("{{}}{}{{}}").format("foo"), "{}foo{}")
+
+    assert_equal(String("{{ {0}").format("foo"), "{ foo")
+    assert_equal(String("{{{0}").format("foo"), "{foo")
+    assert_equal(String("{{0}}").format("foo"), "{0}")
+    assert_equal(String("{{}}").format("foo"), "{}")
+    assert_equal(String("{{0}}").format("foo"), "{0}")
+    assert_equal(String("{{{0}}}").format("foo"), "{foo}")
 
     var vinput = "{} {}"
     var output = String(vinput).format("123", 456)
