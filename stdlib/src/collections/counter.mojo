@@ -25,8 +25,7 @@ struct Counter[V: KeyElement](
     Counter, which can accept arbitrary value types.
 
     The value type must implement the `KeyElement` trait, as its values are
-    stored in the dictionary as keys. `KeyElement` includes
-    `Movable`, `Hashable`, and `EqualityComparable`.
+    stored in the dictionary as keys.
 
     Usage:
 
