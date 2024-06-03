@@ -329,6 +329,10 @@ def test_ceil():
     assert_equal(Float32.__ceil__(Float32(-1.5)), -1.0)
     assert_equal(Float32.__ceil__(Float32(3.0)), 3.0)
 
+    @parameter
+    if not has_neon():
+        assert_equal(BFloat16.__ceil__(BFloat16(2.5)), 3.0)
+
     alias F = SIMD[DType.float32, 4]
     assert_equal(
         F.__ceil__(F(0.0, 1.4, -42.5, -12.6)), F(0.0, 2.0, -42.0, -12.0)
@@ -351,6 +355,10 @@ def test_floor():
     assert_equal(Float32.__floor__(Float32(1.5)), 1.0)
     assert_equal(Float32.__floor__(Float32(-1.5)), -2.0)
     assert_equal(Float32.__floor__(Float32(3.0)), 3.0)
+
+    @parameter
+    if not has_neon():
+        assert_equal(BFloat16.__floor__(BFloat16(2.5)), 2.0)
 
     alias F = SIMD[DType.float32, 4]
     assert_equal(
