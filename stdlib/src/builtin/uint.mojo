@@ -63,8 +63,8 @@ struct UInt:
         # This is because the existing
         # __mlir_op.`kgen.int_literal.convert`
         # in IntLiteral.__as_mlir_index()
-        # assumes that the index represents an unsigned integer.
-        # We need a variant for signed integers.
+        # assumes that the index represents an signed integer.
+        # We need a variant for unsigned integers.
         # Change when https://github.com/modularml/mojo/issues/2933 is fixed
         self.value = int(UInt64(value)).value
 
