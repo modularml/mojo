@@ -23,7 +23,14 @@ from random import rand
 from algorithm import vectorize
 
 from benchmark import Unit, run
-from benchmark import Bench, Bencher, BenchId, keep
+from benchmark import (
+    Bench,
+    Bencher,
+    BenchId,
+    BenchMetric,
+    ThroughputMeasure,
+    keep,
+)
 
 from memory.unsafe import DTypePointer
 from memory import memcmp
@@ -189,7 +196,9 @@ fn test_vectorize[
         + str(unroll_factor)
     )
 
-    m.bench_function[bench_](bench_id, throughput_elems=N)
+    m.bench_function[bench_](
+        bench_id, ThroughputMeasure(BenchMetric.elements, N)
+    )
     vector.free()
     result.free()
 
