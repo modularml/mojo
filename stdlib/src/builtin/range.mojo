@@ -311,27 +311,60 @@ fn range[
     return _StridedRange(int(start), int(end), int(step))
 
 
+@value
+struct _MapIterator[
+    ElementType: CollectionElement,
+    ResultElementType: CollectionElement,
+    list_mutability: Bool, //,
+    list_lifetime: AnyLifetime[list_mutability].type,
+    func: fn (ElementType) -> ResultElementType,
+]:
+    var input_list: Reference[List[ElementType], list_lifetime]
+    var index: Int
+
+    fn __init__(
+        inout self, input_list: Reference[List[ElementType], list_lifetime]
+    ):
+        self.input_list = input_list
+        self.index = 0
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(
+        inout self,
+    ) -> ResultElementType:
+        self.index += 1
+        return func(self.input_list[self.index - 1][])
+
+    fn __len__(self) -> Int:
+        return len(self.src[]) - self.index
+
+
 # TODO: Use iterators instead of List when it's possible to
 # represent them using traits.
 fn map[
     ElementType: CollectionElement,
-    ResultElementType: CollectionElement, //,
+    ResultElementType: CollectionElement,
+    list_mutability: Bool, //,
+    list_lifetime: AnyLifetime[list_mutability].type,
     func: fn (ElementType) -> ResultElementType,
-](input_list: List[ElementType], /) -> List[ResultElementType]:
+](input_list: Reference[List[ElementType], list_lifetime], /) -> _MapIterator[
+    ElementType, ResultElementType, list_mutability, list_lifetime, func
+]:
     """Maps a function over a list.
 
     Parameters:
         ElementType: The type of the input list elements.
         ResultElementType: The type of the output list elements.
+        list_mutability: The mutability of the input list.
+        list_lifetime: The lifetime of the input list.
         func: The function to apply to each element.
 
     Args:
         input_list: The list to map over.
 
     Returns:
-        A new list with the function applied to each element.
+        An iterator with the function applied to each element.
     """
-    var result = List[ResultElementType](capacity=len(input_list))
-    for elem in input_list:
-        result.append(func(elem[]))
-    return result
+    return _MapIterator[list_lifetime, func](input_list)
