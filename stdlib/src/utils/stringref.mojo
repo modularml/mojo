@@ -17,6 +17,7 @@ from bit import countr_zero
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol, _isspace
 from memory import DTypePointer, UnsafePointer, memcmp
+from memory.memory import _memcmp_impl_unconstrained
 
 
 # ===----------------------------------------------------------------------=== #
@@ -294,7 +295,9 @@ struct StringRef(
         Returns:
           True if the strings do not match and False otherwise.
         """
-        return len(self) != len(rhs) or self._memcmp(rhs, len(self))
+        return len(self) != len(rhs) or _memcmp_impl_unconstrained(
+            self.data, rhs.data, len(self)
+        )
 
     @always_inline
     fn __lt__(self, rhs: StringRef) -> Bool:
@@ -309,7 +312,9 @@ struct StringRef(
         """
         var len1 = len(self)
         var len2 = len(rhs)
-        return self._memcmp(rhs, min(len1, len2)) < int(len1 < len2)
+        return int(len1 < len2) > _memcmp_impl_unconstrained(
+            self.data, rhs.data, min(len1, len2)
+        )
 
     @always_inline
     fn __le__(self, rhs: StringRef) -> Bool:
@@ -405,17 +410,6 @@ struct StringRef(
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
-
-    # Use a local memcmp rather than memory.memcpy to avoid indirect recursions.
-    @always_inline("nodebug")
-    fn _memcmp(self, other: StringRef, count: Int) -> Int:
-        for i in range(count):
-            var s1i = self.data[i]
-            var s2i = other.data[i]
-            if s1i == s2i:
-                continue
-            return 1 if s1i > s2i else -1
-        return 0
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
