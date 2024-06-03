@@ -24,7 +24,7 @@ from utils import Span
 
 
 struct StringSlice[
-    is_mutable: Bool,
+    is_mutable: Bool, //,
     lifetime: AnyLifetime[is_mutable].type,
 ](Stringable):
     """
@@ -38,16 +38,14 @@ struct StringSlice[
         lifetime: The lifetime of the underlying string data.
     """
 
-    var _slice: Span[UInt8, is_mutable, lifetime]
+    var _slice: Span[UInt8, lifetime]
 
     # ===------------------------------------------------------------------===#
     # Initializers
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(
-        inout self, *, owned unsafe_from_utf8: Span[UInt8, is_mutable, lifetime]
-    ):
+    fn __init__(inout self, *, owned unsafe_from_utf8: Span[UInt8, lifetime]):
         """
         Construct a new StringSlice from a sequence of UTF-8 encoded bytes.
 
@@ -75,7 +73,7 @@ struct StringSlice[
         """
         var strref = unsafe_from_utf8_strref
 
-        var byte_slice = Span[UInt8, is_mutable, lifetime](
+        var byte_slice = Span[UInt8, lifetime](
             unsafe_ptr=strref.unsafe_ptr(),
             len=len(strref),
         )
@@ -104,7 +102,7 @@ struct StringSlice[
               UTF-8.
             len: The number of bytes of encoded data.
         """
-        var byte_slice = Span[UInt8, is_mutable, lifetime](
+        var byte_slice = Span[UInt8, lifetime](
             unsafe_ptr=unsafe_from_utf8_ptr,
             len=len,
         )
@@ -123,7 +121,7 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, is_mutable, lifetime]:
+    fn as_bytes_slice(self) -> Span[UInt8, lifetime]:
         """
         Get the sequence of encoded bytes as a slice of the underlying string.
 

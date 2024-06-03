@@ -141,8 +141,12 @@ trait ExplicitlyCopyable:
     ```
     """
 
-    fn __init__(inout self, other: Self):
-        """Construct a deep copy of the provided value.
+    # Note:
+    #   `other` is a required named argument for the time being to minimize
+    #   implicit conversion overload ambiguity errors, particularly
+    #   with SIMD and Int.
+    fn __init__(inout self, *, other: Self):
+        """Explicitly construct a deep copy of the provided value.
 
         Args:
             other: The value to copy.
@@ -191,6 +195,15 @@ trait CollectionElement(Copyable, Movable):
     This is useful to have as a named entity since Mojo does not
     currently support anonymous trait compositions to constrain
     on `Copyable & Movable` in the parameter.
+    """
+
+    pass
+
+
+trait CollectionElementNew(ExplicitlyCopyable, Movable):
+    """A temporary explicitly-copyable alternative to `CollectionElement`.
+
+    This trait will eventually replace `CollectionElement`.
     """
 
     pass

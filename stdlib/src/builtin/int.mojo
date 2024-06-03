@@ -268,10 +268,22 @@ struct Int(
     alias MIN = int(Scalar[DType.index].MIN)
     """Returns the minimum value of type."""
 
+    # ===------------------------------------------------------------------=== #
+    # Life cycle methods
+    # ===------------------------------------------------------------------=== #
+
     @always_inline("nodebug")
     fn __init__(inout self):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
 
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
@@ -387,7 +399,7 @@ struct Int(
             if err:
                 abort(
                     "unreachable: unexpected write int failure condition: "
-                    + str(err.value()[])
+                    + str(err.value())
                 )
         else:
             _format_scalar(writer, Int64(self))

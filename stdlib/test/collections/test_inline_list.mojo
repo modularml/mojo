@@ -58,9 +58,18 @@ def test_append_triggers_a_move():
 
 
 @value
-struct ValueToCountDestructor(CollectionElement):
+struct ValueToCountDestructor(CollectionElementNew):
     var value: Int
     var destructor_counter: UnsafePointer[List[Int]]
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.value = other.value
+        self.destructor_counter = other.destructor_counter
 
     fn __del__(owned self):
         self.destructor_counter[].append(self.value)

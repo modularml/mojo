@@ -33,6 +33,9 @@ alias ImmutableStaticLifetime = __mlir_attr.`#lit.lifetime<0>: !lit.lifetime<0>`
 alias MutableStaticLifetime = __mlir_attr.`#lit.lifetime<1>: !lit.lifetime<1>`
 """The mutable lifetime that lasts for the entire duration of program execution."""
 
+alias LifetimeSet = __mlir_type.`!lit.lifetime.set`
+"""A set of lifetime parameters."""
+
 
 # Helper to build !lit.lifetime type.
 # TODO: Should be a parametric alias.
