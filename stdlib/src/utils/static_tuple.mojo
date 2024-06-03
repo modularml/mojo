@@ -36,11 +36,7 @@ fn _set_array_elem[
     type: AnyTrivialRegType,
 ](
     val: type,
-    array: Reference[
-        __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
-        __mlir_attr.`1 : i1`,
-        _,
-    ],
+    ref [_]array: __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
 ):
     """Sets the array element at position `index` with the value `val`.
 
@@ -54,7 +50,7 @@ fn _set_array_elem[
         array: the array which is captured by reference.
     """
     var ptr = __mlir_op.`pop.array.gep`(
-        UnsafePointer(array).address, index.value
+        UnsafePointer.address_of(array).address, index.value
     )
     UnsafePointer(ptr)[] = val
 
@@ -319,7 +315,7 @@ struct InlineArray[
 
         @parameter
         for i in range(size):
-            var ptr = UnsafePointer(self._get_reference_unsafe(i))
+            var ptr = UnsafePointer.address_of(self._get_reference_unsafe(i)[])
             ptr.initialize_pointee_explicit_copy(fill)
 
     @always_inline
@@ -352,9 +348,8 @@ struct InlineArray[
         @parameter
         for i in range(size):
             var eltref = self._get_reference_unsafe(i)
-            move_pointee(
-                dst=UnsafePointer[Self.ElementType](eltref),
-                src=UnsafePointer(storage[i]),
+            UnsafePointer.address_of(storage[i]).move_pointee_into(
+                UnsafePointer[Self.ElementType].address_of(eltref[])
             )
 
         # Mark the elements as already destroyed.
@@ -380,8 +375,8 @@ struct InlineArray[
 
     @always_inline("nodebug")
     fn __getitem__(
-        self: Reference[Self, _, _], idx: Int
-    ) -> ref [self.lifetime] Self.ElementType:
+        ref [_]self: Self, idx: Int
+    ) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Args:
@@ -390,15 +385,15 @@ struct InlineArray[
         Returns:
             A reference to the item at the given index.
         """
-        var normalized_index = normalize_index["InlineArray"](idx, self[])
+        var normalized_index = normalize_index["InlineArray"](idx, self)
 
-        return self[]._get_reference_unsafe(normalized_index)[]
+        return self._get_reference_unsafe(normalized_index)[]
 
     @always_inline("nodebug")
     fn __getitem__[
         IntableType: Intable,
         index: IntableType,
-    ](self: Reference[Self, _, _]) -> ref [self.lifetime] Self.ElementType:
+    ](ref [_]self: Self) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -417,7 +412,7 @@ struct InlineArray[
         if i < 0:
             normalized_idx += size
 
-        return self[]._get_reference_unsafe(normalized_idx)[]
+        return self._get_reference_unsafe(normalized_idx)[]
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
@@ -438,8 +433,8 @@ struct InlineArray[
 
     @always_inline("nodebug")
     fn _get_reference_unsafe(
-        self: Reference[Self, _, _], idx: Int
-    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
+        ref [_]self: Self, idx: Int
+    ) -> Reference[Self.ElementType, __lifetime_of(self)]:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__getitem__` instead of this method as it is
@@ -463,7 +458,7 @@ struct InlineArray[
             ),
         )
         var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(self[]._array).address,
+            UnsafePointer.address_of(self._array).address,
             idx_as_int.value,
         )
         return UnsafePointer(ptr)[]
@@ -481,7 +476,7 @@ struct InlineArray[
         Returns:
             An `UnsafePointer` to the underlying array.
         """
-        return UnsafePointer(self._array).bitcast[Self.ElementType]()
+        return UnsafePointer.address_of(self._array).bitcast[Self.ElementType]()
 
     @always_inline
     fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
@@ -511,9 +506,7 @@ struct InlineArray[
         # TODO: use @parameter for soon once it stabilizes a bit
         for i in range(size):
             if (
-                rebind[Reference[T, False, __lifetime_of(self)]](
-                    Reference(self[i])
-                )[]
+                rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
                 == value
             ):
                 return True

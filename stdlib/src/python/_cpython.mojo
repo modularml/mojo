@@ -184,12 +184,12 @@ struct CPython:
         existing.Py_DecRef(existing.none_value)
         if existing.logging_enabled:
             print("CPython destroy")
-            var remaining_refs = move_from_pointee(existing.total_ref_count)
+            var remaining_refs = existing.total_ref_count.take_pointee()
             print("Number of remaining refs:", remaining_refs)
             # Technically not necessary since we're working with register
             # passable types, by it's good practice to re-initialize the
             # pointer after a consuming move.
-            initialize_pointee_move(existing.total_ref_count, remaining_refs)
+            existing.total_ref_count.init_pointee_move(remaining_refs)
         _py_finalize(existing.lib)
         existing.lib.close()
         existing.total_ref_count.free()
@@ -219,12 +219,12 @@ struct CPython:
         self.total_ref_count = existing.total_ref_count
 
     fn _inc_total_rc(inout self):
-        var v = move_from_pointee(self.total_ref_count)
-        initialize_pointee_move(self.total_ref_count, v + 1)
+        var v = self.total_ref_count.take_pointee()
+        self.total_ref_count.init_pointee_move(v + 1)
 
     fn _dec_total_rc(inout self):
-        var v = move_from_pointee(self.total_ref_count)
-        initialize_pointee_move(self.total_ref_count, v - 1)
+        var v = self.total_ref_count.take_pointee()
+        self.total_ref_count.init_pointee_move(v - 1)
 
     fn Py_IncRef(inout self, ptr: PyObjectPtr):
         if self.logging_enabled:
@@ -847,6 +847,6 @@ struct CPython:
         return PyKeyValuePair {
             key: key,
             value: value,
-            position: move_from_pointee(position),
+            position: position.take_pointee(),
             success: result == 1,
         }

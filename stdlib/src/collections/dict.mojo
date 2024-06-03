@@ -73,17 +73,16 @@ struct _DictEntryIter[
     alias imm_dict_lifetime = __mlir_attr[
         `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
     ]
-    alias ref_type = Reference[DictEntry[K, V], False, Self.imm_dict_lifetime]
 
     var index: Int
     var seen: Int
-    var src: Reference[Dict[K, V], dict_mutability, dict_lifetime]
+    var src: Reference[Dict[K, V], dict_lifetime]
 
     fn __iter__(self) -> Self:
         return self
 
     @always_inline
-    fn __next__(inout self) -> Self.ref_type:
+    fn __next__(inout self) -> Reference[DictEntry[K, V], Self.dict_lifetime]:
         while True:
             var opt_entry_ref = self.src[]._entries.__get_ref(self.index)
             if opt_entry_ref[]:
@@ -95,7 +94,7 @@ struct _DictEntryIter[
                     self.index -= 1
 
                 self.seen += 1
-                return opt_entry_ref[].value()[]
+                return opt_entry_ref[].value()
 
             @parameter
             if forward:
@@ -125,11 +124,6 @@ struct _DictKeyIter[
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias imm_dict_lifetime = __mlir_attr[
-        `#lit.lifetime.mutcast<`, dict_lifetime, `> : !lit.lifetime<1>`
-    ]
-    alias ref_type = Reference[K, False, Self.imm_dict_lifetime]
-
     alias dict_entry_iter = _DictEntryIter[K, V, dict_lifetime, forward]
 
     var iter: Self.dict_entry_iter
@@ -137,7 +131,7 @@ struct _DictKeyIter[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__(inout self) -> Self.ref_type:
+    fn __next__(inout self) -> Reference[K, dict_lifetime]:
         return self.iter.__next__()[].key
 
     fn __len__(self) -> Int:
@@ -163,16 +157,14 @@ struct _DictValueIter[
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias ref_type = Reference[V, dict_mutability, dict_lifetime]
+    alias ref_type = Reference[V, dict_lifetime]
 
     var iter: _DictEntryIter[K, V, dict_lifetime, forward]
 
     fn __iter__(self) -> Self:
         return self
 
-    fn __reversed__[
-        mutability: Bool, self_life: AnyLifetime[mutability].type
-    ](self) -> _DictValueIter[K, V, dict_lifetime, False]:
+    fn __reversed__(self) -> _DictValueIter[K, V, dict_lifetime, False]:
         var src = self.iter.src
         return _DictValueIter(
             _DictEntryIter[K, V, dict_lifetime, False](
@@ -537,8 +529,8 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     # TODO(MSTDL-452): rename to __getitem__ returning a reference
     fn __get_ref(
-        self: Reference[Self, _, _], key: K
-    ) raises -> Reference[V, self.is_mutable, self.lifetime]:
+        ref [_]self: Self, key: K
+    ) raises -> Reference[V, __lifetime_of(self)]:
         """Retrieve a value out of the dictionary.
 
         Args:
@@ -550,7 +542,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Raises:
             "KeyError" if the key isn't present.
         """
-        return self[]._find_ref(key)
+        return self._find_ref(key)
 
     fn __setitem__(inout self, owned key: K, owned value: V):
         """Set a value in the dictionary by key.
@@ -573,8 +565,8 @@ struct Dict[K: KeyElement, V: CollectionElement](
         return self.find(key).__bool__()
 
     fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _DictKeyIter[K, V, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _DictKeyIter[K, V, __lifetime_of(self)]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -583,15 +575,15 @@ struct Dict[K: KeyElement, V: CollectionElement](
         return _DictKeyIter(_DictEntryIter(0, 0, self))
 
     fn __reversed__(
-        self: Reference[Self, _, _]
-    ) -> _DictKeyIter[K, V, self.lifetime, False]:
+        ref [_]self: Self,
+    ) -> _DictKeyIter[K, V, __lifetime_of(self), False]:
         """Iterate backwards over the dict keys, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the dict keys.
         """
         return _DictKeyIter(
-            _DictEntryIter[forward=False](self[]._reserved - 1, 0, self)
+            _DictEntryIter[forward=False](self._reserved - 1, 0, self)
         )
 
     fn __or__(self, other: Self) -> Self:
@@ -709,8 +701,8 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     # TODO(MOCO-604): Return Optional[Reference] instead of raising
     fn _find_ref(
-        self: Reference[Self, _, _], key: K
-    ) raises -> Reference[V, self.is_mutable, self.lifetime]:
+        ref [_]self: Self, key: K
+    ) raises -> Reference[V, __lifetime_of(self)]:
         """Find a value in the dictionary by key.
 
         Args:
@@ -724,11 +716,11 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var found: Bool
         var slot: Int
         var index: Int
-        found, slot, index = self[]._find_index(hash, key)
+        found, slot, index = self._find_index(hash, key)
         if found:
-            var entry = self[]._entries.__get_ref(index)
+            var entry = self._entries.__get_ref(index)
             debug_assert(entry[].__bool__(), "entry in index must be full")
-            return Reference(entry[].value()[].value)
+            return Reference(entry[].value().value)
         raise "KeyError"
 
     fn get(self, key: K) -> Optional[V]:
@@ -785,7 +777,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self.size -= 1
             return entry_value.value^
         elif default:
-            return default.value()[]
+            return default.value()
         raise "KeyError"
 
     fn popitem(inout self) raises -> DictEntry[K, V]:
@@ -811,12 +803,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
             break
 
         if key:
-            _ = self.pop(key.value()[])
-            return DictEntry[K, V](key.value()[], val.value()[])
+            _ = self.pop(key.value())
+            return DictEntry[K, V](key.value(), val.value())
 
         raise "KeyError: popitem(): dictionary is empty"
 
-    fn keys(self: Reference[Self, _, _]) -> _DictKeyIter[K, V, self.lifetime]:
+    fn keys(ref [_]self: Self) -> _DictKeyIter[K, V, __lifetime_of(self)]:
         """Iterate over the dict's keys as immutable references.
 
         Returns:
@@ -824,9 +816,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return Self.__iter__(self)
 
-    fn values(
-        self: Reference[Self, _, _]
-    ) -> _DictValueIter[K, V, self.lifetime]:
+    fn values(ref [_]self: Self) -> _DictValueIter[K, V, __lifetime_of(self)]:
         """Iterate over the dict's values as references.
 
         Returns:
@@ -834,9 +824,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return _DictValueIter(_DictEntryIter(0, 0, self))
 
-    fn items(
-        self: Reference[Self, _, _]
-    ) -> _DictEntryIter[K, V, self.lifetime]:
+    fn items(ref [_]self: Self) -> _DictEntryIter[K, V, __lifetime_of(self)]:
         """Iterate over the dict's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
@@ -927,10 +915,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             else:
                 var entry = self._entries.__get_ref(index)
                 debug_assert(entry[].__bool__(), "entry in index must be full")
-                if (
-                    hash == entry[].value()[].hash
-                    and key == entry[].value()[].key
-                ):
+                if hash == entry[].value().hash and key == entry[].value().key:
                     return (True, slot, index)
             self._next_index_slot(slot, perturb)
 
@@ -966,7 +951,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 debug_assert(right < self._reserved, "Invalid dict state")
             var entry = self._entries.__get_ref(right)
             debug_assert(entry[].__bool__(), "Logic error")
-            var slot = self._find_empty_index(entry[].value()[].hash)
+            var slot = self._find_empty_index(entry[].value().hash)
             self._set_index(slot, left)
             if left != right:
                 self._entries[left] = entry[].unsafe_take()
@@ -1106,8 +1091,8 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         return self._dict.pop(key, default^)
 
     fn __iter__(
-        self: Reference[Self, _, _]
-    ) -> _DictKeyIter[Self.key_type, V, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _DictKeyIter[Self.key_type, V, __lifetime_of(self)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -1115,11 +1100,11 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         # TODO(#36448): Use this instead of the current workaround
         # return self._dict.__iter__()
-        return _DictKeyIter(_DictEntryIter(0, 0, self[]._dict))
+        return _DictKeyIter(_DictEntryIter(0, 0, self._dict))
 
     fn keys(
-        self: Reference[Self, _, _],
-    ) -> _DictKeyIter[Self.key_type, V, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _DictKeyIter[Self.key_type, V, __lifetime_of(self)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -1130,8 +1115,8 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         return Self.__iter__(self)
 
     fn values(
-        self: Reference[Self, _, _],
-    ) -> _DictValueIter[Self.key_type, V, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _DictValueIter[Self.key_type, V, __lifetime_of(self)]:
         """Iterate over the keyword dict's values as references.
 
         Returns:
@@ -1139,11 +1124,11 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         # TODO(#36448): Use this instead of the current workaround
         # return self._dict.values()
-        return _DictValueIter(_DictEntryIter(0, 0, self[]._dict))
+        return _DictValueIter(_DictEntryIter(0, 0, self._dict))
 
     fn items(
-        self: Reference[Self, _, _]
-    ) -> _DictEntryIter[Self.key_type, V, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _DictEntryIter[Self.key_type, V, __lifetime_of(self)]:
         """Iterate over the keyword dictionary's entries as immutable references.
 
         These can't yet be unpacked like Python dict items, but you can
@@ -1160,7 +1145,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
         # TODO(#36448): Use this instead of the current workaround
         # return self[]._dict.items()
-        return _DictEntryIter(0, 0, self[]._dict)
+        return _DictEntryIter(0, 0, self._dict)
 
     @always_inline("nodebug")
     fn _insert(inout self, owned key: Self.key_type, owned value: V):
