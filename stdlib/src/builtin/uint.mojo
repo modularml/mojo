@@ -22,6 +22,8 @@ These are Mojo built-ins, so you don't need to import them.
 struct UInt:
     """This type represents an unsigned integer.
 
+    An unsigned integer is represents a positive integral number.
+
     The size of this unsigned integer is platform-dependent.
 
     If you wish to use a fixed size unsigned integer, consider using
@@ -70,7 +72,13 @@ struct UInt:
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
-        """Convert this Int to a string.
+        """Convert this UInt to a string.
+
+        A small example.
+        ```mojo
+        var x = UInt(50)
+        var x_as_string = str(x)  # x_as_string = "50"
+        ```
 
         Returns:
             The string representation of this Int.
