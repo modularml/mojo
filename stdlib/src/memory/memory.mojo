@@ -42,8 +42,9 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 
 
 @always_inline
-fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
-    constrained[s1.type.is_integral(), "the input dtype must be integral"]()
+fn _memcmp_impl_unconstrained(
+    s1: DTypePointer, s2: __type_of(s1), count: Int
+) -> Int:
     alias simd_width = simdwidthof[s1.type]()
     if count < simd_width:
         for i in range(count):
@@ -59,8 +60,9 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         has_side_effect=False,
     ]()
 
-    var vector_end_simd = _align_down(count, simd_width)
-    for i in range(0, vector_end_simd, simd_width):
+    var last = count - simd_width
+
+    for i in range(0, last, simd_width):
         var s1i = s1.load[width=simd_width](i)
         var s2i = s2.load[width=simd_width](i)
         var diff = s1i != s2i
@@ -72,10 +74,6 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
             )
             return -1 if s1i[index] < s2i[index] else 1
 
-    var last = count - simd_width
-    if last <= 0:
-        return 0
-
     var s1i = s1.load[width=simd_width](last)
     var s2i = s2.load[width=simd_width](last)
     var diff = s1i != s2i
@@ -85,6 +83,12 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         )
         return -1 if s1i[index] < s2i[index] else 1
     return 0
+
+
+@always_inline
+fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
+    constrained[s1.type.is_integral(), "the input dtype must be integral"]()
+    return _memcmp_impl_unconstrained(s1, s2, count)
 
 
 @always_inline
