@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from os import getenv
-from sys import external_call
+from sys import external_call, exit
 from sys.ffi import DLHandle
 
 from memory import DTypePointer, UnsafePointer
@@ -86,63 +86,11 @@ struct PythonVersion:
         return PythonVersion(components[0], components[1], components[2])
 
 
-fn _py_initialize(inout cpython: CPython):
-    # Configure the Python interpreter to search for libraries installed in
-    # "site-package" directories. If we don't do this, and a `virtualenv`
-    # is activated when invoking `mojo`, then the Python interpreter will
-    # use the system's `site-package` directories instead of the
-    # `virtualenv` ones.
-    #
-    # This function does not overwrite any existing `PYTHONPATH`, in case
-    # the user wants to specify this environment variable themselves.
-    #
-    # Finally, another approach is to use `Py_SetPath()`, but that requires
-    # setting explicitly every library search path, as well as needing to
-    # specify a `PYTHONHOME`. This is much more complicated and restrictive
-    # to be considered a better solution.
-    var error_message: StringRef = external_call[
-        "KGEN_CompilerRT_Python_SetPythonPath",
-        DTypePointer[DType.int8],
-    ]()
-    if len(error_message) != 0:
-        # Print the error message, but keep going in order to allow
-        # `Py_Initialize` to fail.
-        print("Mojo/Python interoperability error: ", error_message)
-
-    cpython.lib.get_function[fn () -> None]("Py_Initialize")()
-
-
 fn _py_get_version(lib: DLHandle) -> StringRef:
     var version_string = lib.get_function[fn () -> DTypePointer[DType.int8]](
         "Py_GetVersion"
     )()
     return StringRef(version_string)
-
-
-fn _py_initialize(lib: DLHandle):
-    # Configure the Python interpreter to search for libraries installed in
-    # "site-package" directories. If we don't do this, and a `virtualenv`
-    # is activated when invoking `mojo`, then the Python interpreter will
-    # use the system's `site-package` directories instead of the
-    # `virtualenv` ones.
-    #
-    # This function does not overwrite any existing `PYTHONPATH`, in case
-    # the user wants to specify this environment variable themselves.
-    #
-    # Finally, another approach is to use `Py_SetPath()`, but that requires
-    # setting explicitly every library search path, as well as needing to
-    # specify a `PYTHONHOME`. This is much more complicated and restrictive
-    # to be considered a better solution.
-    var error_message: StringRef = external_call[
-        "KGEN_CompilerRT_Python_SetPythonPath",
-        DTypePointer[DType.int8],
-    ]()
-    if len(error_message) != 0:
-        # Print the error message, but keep going in order to allow
-        # `Py_Initialize` to fail.
-        print("Mojo/Python interoperability error: ", error_message)
-
-    lib.get_function[fn () -> None]("Py_Initialize")()
 
 
 fn _py_finalize(lib: DLHandle):
@@ -161,21 +109,30 @@ struct CPython:
         var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
         if logging_enabled:
             print("CPython init")
+
+        var error_message: StringRef = external_call[
+            "KGEN_CompilerRT_Python_SetPythonPath",
+            DTypePointer[DType.int8],
+        ]()
+        if error_message:
+            print(error_message)
+            print("Mojo/Python interop error, troubleshooting docs at:")
+            print("    https://modul.ar/fix-python")
+            # TODO: bubble up error to Mojo in next PR on stack
+            exit(1)
+
         var python_lib = getenv("MOJO_PYTHON_LIBRARY")
-        if python_lib == "":
-            abort(
-                "Mojo/Python interoperability error: Unable to locate a"
-                " suitable libpython, please set `MOJO_PYTHON_LIBRARY`"
-            )
+        if not python_lib:
+            abort("unable to get MOJO_PYTHON_LIBRARY environment variable")
 
         self.lib = DLHandle(python_lib)
         self.total_ref_count = UnsafePointer[Int].alloc(1)
         self.none_value = PyObjectPtr()
         self.dict_type = PyObjectPtr()
         self.logging_enabled = logging_enabled
-        self.version = PythonVersion(_py_get_version(self.lib))
 
-        _py_initialize(self.lib)
+        self.lib.get_function[fn () -> None]("Py_Initialize")()
+        self.version = PythonVersion(_py_get_version(self.lib))
         _ = self.Py_None()
         _ = self.PyDict_Type()
 
