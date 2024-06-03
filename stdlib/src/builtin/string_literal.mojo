@@ -235,7 +235,7 @@ struct StringLiteral(
             uint8Ptr
         )
         memcpy(DTypePointer(buffer.data), data, length)
-        initialize_pointee_move(buffer.data + length, 0)
+        (buffer.data + length).init_pointee_move(0)
         string._buffer = buffer^
         return string
 

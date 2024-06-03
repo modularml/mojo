@@ -365,7 +365,7 @@ struct UnsafePointer[
         before writing `value`. Similarly, ownership of `value` is logically
         transferred into the pointer location.
 
-        When compared to `initialize_pointee_move`, this avoids an extra move on
+        When compared to `init_pointee_move`, this avoids an extra move on
         the callee side when the value must be copied.
 
         Parameters:
@@ -412,128 +412,108 @@ struct UnsafePointer[
             _type = UnsafePointer[new_type, address_space]._mlir_type,
         ](self.address)
 
+    @always_inline
+    fn destroy_pointee(self: UnsafePointer[_, AddressSpace.GENERIC]):
+        """Destroy the pointed-to value.
 
-# ===----------------------------------------------------------------------=== #
-# UnsafePointer extensions
-# ===----------------------------------------------------------------------=== #
+        The pointer must not be null, and the pointer memory location is assumed
+        to contain a valid initialized instance of `T`.  This is equivalent to
+        `_ = self.take_pointee()` but doesn't require `Movable` and is
+        more efficient becase it doesn't invoke `__moveinit__`.
 
-# TODO: These should be methods when we have conditional conformance.  None of
-# these can work with pointers in generic address spaces, because they need to
-# invoke methods like del or moveinit or copyinit, which take borrowed arguments
-# in the corresponding traits.
+        """
+        _ = __get_address_as_owned_value(self.address)
 
+    @always_inline
+    fn take_pointee[T: Movable](self: UnsafePointer[T]) -> T:
+        """Move the value at the pointer out, leaving it uninitialized.
 
-@always_inline
-fn destroy_pointee(ptr: UnsafePointer[_]):
-    """Destroy the pointed-to value.
+        The pointer must not be null, and the pointer memory location is assumed
+        to contain a valid initialized instance of `T`.
 
-    The pointer must not be null, and the pointer memory location is assumed
-    to contain a valid initialized instance of `T`.  This is equivalent to
-    `_ = move_from_pointee(ptr)` but doesn't require `Movable` and is more
-    efficient becase it doesn't invoke `__moveinit__`.
+        This performs a _consuming_ move, ending the lifetime of the value stored
+        in this pointer memory location. Subsequent reads of this pointer are
+        not valid. If a new valid value is stored using `init_pointee_move()`, then
+        reading from this pointer becomes valid again.
 
-    Args:
-        ptr: The pointer whose pointee this destroys.
-    """
-    _ = __get_address_as_owned_value(ptr.address)
+        Parameters:
+            T: The type the pointer points to, which must be `Movable`.
 
+        Returns:
+            The value at the pointer.
+        """
+        return __get_address_as_owned_value(self.address)
 
-@always_inline
-fn move_from_pointee[T: Movable](ptr: UnsafePointer[T]) -> T:
-    """Move the value at the pointer out.
+    # TODO: Allow overloading on more specific traits
+    @always_inline
+    fn init_pointee_move[T: Movable](self: UnsafePointer[T], owned value: T):
+        """Emplace a new value into the pointer location, moving from `value`.
 
-    The pointer must not be null, and the pointer memory location is assumed
-    to contain a valid initialized instance of `T`.
+        The pointer memory location is assumed to contain uninitialized data,
+        and consequently the current contents of this pointer are not destructed
+        before writing `value`. Similarly, ownership of `value` is logically
+        transferred into the pointer location.
 
-    This performs a _consuming_ move, ending the lifetime of the value stored
-    in this pointer memory location. Subsequent reads of this pointer are
-    not valid. If a new valid value is stored using `initialize_pointee_move()`, then
-    reading from this pointer becomes valid again.
+        When compared to `init_pointee_copy`, this avoids an extra copy on
+        the caller side when the value is an `owned` rvalue.
 
-    Parameters:
-        T: The type the pointer points to, which must be `Movable`.
+        Parameters:
+            T: The type the pointer points to, which must be `Movable`.
 
-    Args:
-        ptr: The pointer whose pointee this moves from.
+        Args:
+            value: The value to emplace.
+        """
+        __get_address_as_uninit_lvalue(self.address) = value^
 
-    Returns:
-        The value at the pointer.
-    """
-    return __get_address_as_owned_value(ptr.address)
+    @always_inline
+    fn init_pointee_copy[T: Copyable](self: UnsafePointer[T], value: T):
+        """Emplace a copy of `value` into the pointer location.
 
+        The pointer memory location is assumed to contain uninitialized data,
+        and consequently the current contents of this pointer are not destructed
+        before writing `value`. Similarly, ownership of `value` is logically
+        transferred into the pointer location.
 
-@always_inline
-fn initialize_pointee_move[T: Movable](ptr: UnsafePointer[T], owned value: T):
-    """Emplace a new value into the pointer location, moving from `value`.
+        When compared to `init_pointee_move`, this avoids an extra move on
+        the callee side when the value must be copied.
 
-    The pointer memory location is assumed to contain uninitialized data,
-    and consequently the current contents of this pointer are not destructed
-    before writing `value`. Similarly, ownership of `value` is logically
-    transferred into the pointer location.
+        Parameters:
+            T: The type the pointer points to, which must be `Copyable`.
 
-    When compared to `initialize_pointee_copy`, this avoids an extra copy on
-    the caller side when the value is an `owned` rvalue.
+        Args:
+            value: The value to emplace.
+        """
+        __get_address_as_uninit_lvalue(self.address) = value
 
-    Parameters:
-        T: The type the pointer points to, which must be `Movable`.
+    @always_inline
+    fn move_pointee_into[
+        T: Movable
+    ](self: UnsafePointer[T], dst: UnsafePointer[T]):
+        """Moves the value `self` points to into the memory location pointed to by
+        `dst`.
 
-    Args:
-        ptr: The pointer to initialize through.
-        value: The value to emplace.
-    """
-    __get_address_as_uninit_lvalue(ptr.address) = value^
+        This performs a consuming move (using `__moveinit__()`) out of the
+        memory location pointed to by `self`. Subsequent reads of this
+        pointer are not valid unless and until a new, valid value has been
+        moved into this pointer's memory location using `init_pointee_move()`.
 
+        This transfers the value out of `self` and into `dest` using at most one
+        `__moveinit__()` call.
 
-@always_inline
-fn initialize_pointee_copy[T: Copyable](ptr: UnsafePointer[T], value: T):
-    """Emplace a copy of `value` into the pointer location.
+        Safety:
+            * `self` must be non-null
+            * `self` must contain a valid, initialized instance of `T`
+            * `dst` must not be null
+            * The contents of `dst` should be uninitialized. If `dst` was
+                previously written with a valid value, that value will be be
+                overwritten and its destructor will NOT be run.
 
-    The pointer memory location is assumed to contain uninitialized data,
-    and consequently the current contents of this pointer are not destructed
-    before writing `value`. Similarly, ownership of `value` is logically
-    transferred into the pointer location.
+        Parameters:
+            T: The type the pointer points to, which must be `Movable`.
 
-    When compared to `initialize_pointee_move`, this avoids an extra move on
-    the callee side when the value must be copied.
-
-    Parameters:
-        T: The type the pointer points to, which must be `Copyable`.
-
-    Args:
-        ptr: The pointer to initialize through.
-        value: The value to emplace.
-    """
-    __get_address_as_uninit_lvalue(ptr.address) = value
-
-
-@always_inline
-fn move_pointee[T: Movable](*, src: UnsafePointer[T], dst: UnsafePointer[T]):
-    """Moves the value `src` points to into the memory location pointed to by
-    `dest`.
-
-    This performs a consuming move (using `__moveinit__()`) out of the
-    memory location pointed to by `src`. Subsequent reads of this
-    pointer are not valid unless and until a new, valid value has been
-    moved into this pointer's memory location using `initialize_pointee_move()`.
-
-    This transfers the value out of `self` and into `dest` using at most one
-    `__moveinit__()` call.
-
-    Safety:
-        * `src` must not be null
-        * `src` must contain a valid, initialized instance of `T`
-        * `dst` must not be null
-        * The contents of `dst` should be uninitialized. If `dst` was
-            previously written with a valid value, that value will be be
-            overwritten and its destructor will NOT be run.
-
-    Parameters:
-        T: The type the pointer points to, which must be `Movable`.
-
-    Args:
-        src: Source pointer that the value will be moved from.
-        dst: Destination pointer that the value will be moved into.
-    """
-    __get_address_as_uninit_lvalue(dst.address) = __get_address_as_owned_value(
-        src.address
-    )
+        Args:
+            dst: Destination pointer that the value will be moved into.
+        """
+        __get_address_as_uninit_lvalue(
+            dst.address
+        ) = __get_address_as_owned_value(self.address)

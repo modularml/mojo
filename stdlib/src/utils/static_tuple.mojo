@@ -348,9 +348,8 @@ struct InlineArray[
         @parameter
         for i in range(size):
             var eltref = self._get_reference_unsafe(i)
-            move_pointee(
-                dst=UnsafePointer[Self.ElementType].address_of(eltref[]),
-                src=UnsafePointer.address_of(storage[i]),
+            UnsafePointer.address_of(storage[i]).move_pointee_into(
+                UnsafePointer[Self.ElementType].address_of(eltref[])
             )
 
         # Mark the elements as already destroyed.
