@@ -722,9 +722,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return res^
 
     @always_inline
-    fn __getitem__(
-        self: Reference[Self, _, _], idx: Int
-    ) -> ref [self.lifetime] T:
+    fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
         """Gets the list element at the given index.
 
 
@@ -736,13 +734,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         var normalized_idx = idx
         debug_assert(
-            -self[].size <= normalized_idx < self[].size,
+            -self.size <= normalized_idx < self.size,
             "index must be within bounds",
         )
         if normalized_idx < 0:
-            normalized_idx += len(self[])
+            normalized_idx += len(self)
 
-        return (self[].data + normalized_idx)[]
+        return (self.data + normalized_idx)[]
 
     # TODO(30737): Replace __getitem__ with this, but lots of places use it
     fn __get_ref(
