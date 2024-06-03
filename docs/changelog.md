@@ -47,6 +47,15 @@ by [@jayzhan211](https://github.com/jayzhan211))
   - `String.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
 
+- The global functions for working with `UnsafePointer` have transitioned to
+  being methods through the use of conditional conformances:
+
+  - `destroy_pointee(p)` => `p.destroy_pointee()`
+  - `move_from_pointee(p)` => `p.take_pointee()`
+  - `initialize_pointee_move(p, value)` => `p.init_pointee_move(value)`
+  - `initialize_pointee_copy(p, value)` => `p.init_pointee_copy(value)`
+  - `move_pointee(src=p1, dst=p2)` => `p.move_pointee_into(p2)`
+
 ### ❌ Removed
 
 - Removed `String.unsafe_uint8_ptr()`. `String.unsafe_ptr()` now returns the

@@ -17,12 +17,6 @@ These are Mojo built-ins, so you don't need to import them.
 
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from memory.unsafe_pointer import (
-    initialize_pointee_move,
-    initialize_pointee_copy,
-    move_pointee,
-)
-
 from sys.intrinsics import _type_is_eq
 
 # ===----------------------------------------------------------------------===#
@@ -79,9 +73,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            move_pointee(
-                dst=UnsafePointer.address_of(self[idx]),
-                src=UnsafePointer.address_of(storage[idx]),
+            UnsafePointer.address_of(storage[idx]).move_pointee_into(
+                UnsafePointer.address_of(self[idx])
             )
 
         # Move each element into the tuple storage.
@@ -97,7 +90,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         # trivial and won't do anything.
         @parameter
         fn destroy_elt[idx: Int]():
-            destroy_pointee(UnsafePointer.address_of(self[idx]))
+            UnsafePointer.address_of(self[idx]).destroy_pointee()
 
         unroll[destroy_elt, Self.__len__()]()
 
@@ -115,9 +108,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            move_pointee(
-                src=UnsafePointer.address_of(existing[idx]),
-                dst=UnsafePointer.address_of(self[idx]),
+            UnsafePointer.address_of(existing[idx]).move_pointee_into(
+                UnsafePointer.address_of(self[idx])
             )
 
         unroll[initialize_elt, Self.__len__()]()

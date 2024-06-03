@@ -42,11 +42,6 @@ from sys import alignof, sizeof
 from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
-from memory.unsafe_pointer import (
-    initialize_pointee_move,
-    move_from_pointee,
-    move_pointee,
-)
 from utils import unroll
 
 # ===----------------------------------------------------------------------=== #
@@ -172,7 +167,7 @@ struct Variant[*Ts: CollectionElement](
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
         self._get_state()[] = Self._check[T]()
-        initialize_pointee_move(self._get_ptr[T](), value^)
+        self._get_ptr[T]().init_pointee_move(value^)
 
     fn __init__(inout self, *, other: Self):
         """Explicitly creates a deep copy of an existing variant.
@@ -187,8 +182,9 @@ struct Variant[*Ts: CollectionElement](
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias T = Ts[i]
-                initialize_pointee_move(
-                    UnsafePointer.address_of(self._impl).bitcast[T](),
+                UnsafePointer.address_of(self._impl).bitcast[
+                    T
+                ]().init_pointee_move(
                     UnsafePointer.address_of(other._impl).bitcast[T]()[],
                 )
 
@@ -218,7 +214,7 @@ struct Variant[*Ts: CollectionElement](
             if self._get_state()[] == i:
                 alias T = Ts[i]
                 # Calls the correct __moveinit__
-                move_pointee(src=other._get_ptr[T](), dst=self._get_ptr[T]())
+                other._get_ptr[T]().move_pointee_into(self._get_ptr[T]())
 
         unroll[each, len(VariadicList(Ts))]()
 
@@ -273,7 +269,7 @@ struct Variant[*Ts: CollectionElement](
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias q = Ts[i]
-                destroy_pointee(self._get_ptr[q]().address)
+                self._get_ptr[q]().destroy_pointee()
 
         unroll[each, len(VariadicList(Ts))]()
 
@@ -318,7 +314,7 @@ struct Variant[*Ts: CollectionElement](
         debug_assert(self.isa[T](), "taking wrong type")
         # don't call the variant's deleter later
         self._get_state()[] = Self._sentinel
-        return move_from_pointee(self._get_ptr[T]())
+        return self._get_ptr[T]().take_pointee()
 
     @always_inline
     fn replace[

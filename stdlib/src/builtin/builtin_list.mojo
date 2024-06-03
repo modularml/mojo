@@ -16,7 +16,6 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from memory import Reference, UnsafePointer, LegacyPointer
-from memory.unsafe_pointer import destroy_pointee
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
@@ -344,7 +343,7 @@ struct VariadicListMem[
             # destroy in backwards order to match how arguments are normally torn
             # down when CheckLifetimes is left to its own devices.
             for i in reversed(range(len(self))):
-                destroy_pointee(UnsafePointer.address_of(self[i]))
+                UnsafePointer.address_of(self[i]).destroy_pointee()
 
     @always_inline
     fn __len__(self) -> Int:
@@ -535,7 +534,7 @@ struct VariadicPack[
             @parameter
             fn destroy_elt[i: Int]():
                 # destroy the elements in reverse order.
-                destroy_pointee(UnsafePointer.address_of(self[len - i - 1]))
+                UnsafePointer.address_of(self[len - i - 1]).destroy_pointee()
 
             unroll[destroy_elt, len]()
 
