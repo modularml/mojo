@@ -1315,7 +1315,7 @@ struct String(
     @always_inline
     fn as_bytes_slice(
         self: Reference[Self, _, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    ) -> Span[UInt8, self.lifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1325,7 +1325,7 @@ struct String(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
+        return Span[UInt8, self.lifetime](
             unsafe_ptr=self[]._buffer.unsafe_ptr(),
             # Does NOT include the NUL terminator.
             len=self[]._byte_length(),

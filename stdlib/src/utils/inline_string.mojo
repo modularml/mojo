@@ -266,7 +266,7 @@ struct InlineString(Sized, Stringable, CollectionElement):
     @always_inline
     fn as_bytes_slice(
         self: Reference[Self, _, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    ) -> Span[UInt8, self.lifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -276,7 +276,7 @@ struct InlineString(Sized, Stringable, CollectionElement):
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
+        return Span[UInt8, self.lifetime](
             unsafe_ptr=self[].unsafe_ptr(),
             # Does NOT include the NUL terminator.
             len=len(self[]),
@@ -497,7 +497,7 @@ struct _FixedString[CAP: Int](
     @always_inline
     fn as_bytes_slice(
         self: Reference[Self, _, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    ) -> Span[UInt8, self.lifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -507,7 +507,7 @@ struct _FixedString[CAP: Int](
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
+        return Span[UInt8, self.lifetime](
             unsafe_ptr=self[].unsafe_ptr(),
             # Does NOT include the NUL terminator.
             len=self[].size,

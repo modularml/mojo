@@ -267,7 +267,7 @@ struct StringLiteral(
         )
 
     @always_inline
-    fn as_bytes_slice(self) -> Span[UInt8, False, ImmutableStaticLifetime]:
+    fn as_bytes_slice(self) -> Span[UInt8, ImmutableStaticLifetime]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -277,7 +277,7 @@ struct StringLiteral(
 
         var ptr = self.unsafe_uint8_ptr()
 
-        return Span[UInt8, False, ImmutableStaticLifetime](
+        return Span[UInt8, ImmutableStaticLifetime](
             unsafe_ptr=ptr,
             len=self._byte_length(),
         )
