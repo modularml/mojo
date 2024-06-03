@@ -111,7 +111,7 @@ struct InlineString(Sized, Stringable, CollectionElement):
         """
         self.__iadd__(string.as_string_slice())
 
-    fn __iadd__(inout self, str_slice: StringSlice[False]):
+    fn __iadd__(inout self, str_slice: StringSlice[_]):
         """Appends another string to this string.
 
         Args:
@@ -246,12 +246,10 @@ struct InlineString(Sized, Stringable, CollectionElement):
         if self._is_small():
             return self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr()
         else:
-            return self._storage[String].unsafe_uint8_ptr()
+            return self._storage[String].unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(
-        self: Reference[Self, _, _]
-    ) -> StringSlice[self.is_mutable, self.lifetime]:
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this inline string.
 
         Returns:
@@ -261,12 +259,10 @@ struct InlineString(Sized, Stringable, CollectionElement):
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in _FixedString so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self[].as_bytes_slice())
+        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
 
     @always_inline
-    fn as_bytes_slice(
-        self: Reference[Self, _, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -276,10 +272,10 @@ struct InlineString(Sized, Stringable, CollectionElement):
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
-            unsafe_ptr=self[].unsafe_ptr(),
+        return Span[UInt8, __lifetime_of(self)](
+            unsafe_ptr=self.unsafe_ptr(),
             # Does NOT include the NUL terminator.
-            len=len(self[]),
+            len=len(self),
         )
 
 
@@ -388,7 +384,7 @@ struct _FixedString[CAP: Int](
         self.__iadd__(string.as_string_slice())
 
     @always_inline
-    fn __iadd__(inout self, str_slice: StringSlice[False]) raises:
+    fn __iadd__(inout self, str_slice: StringSlice[_]) raises:
         """Appends another string to this string.
 
         Args:
@@ -396,7 +392,7 @@ struct _FixedString[CAP: Int](
         """
         var err = self._iadd_non_raising(str_slice)
         if err:
-            raise err.value()[]
+            raise err.value()
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
@@ -415,7 +411,7 @@ struct _FixedString[CAP: Int](
 
     fn _iadd_non_raising(
         inout self,
-        str_slice: StringSlice[False],
+        str_slice: StringSlice[_],
     ) -> Optional[Error]:
         var total_len = len(self) + str_slice._byte_length()
 
@@ -450,7 +446,7 @@ struct _FixedString[CAP: Int](
         fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
             var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
 
-            var str_slice = StringSlice[False, ImmutableStaticLifetime](
+            var str_slice = StringSlice[ImmutableStaticLifetime](
                 unsafe_from_utf8_strref=strref
             )
 
@@ -463,7 +459,7 @@ struct _FixedString[CAP: Int](
             #     abort("error formatting to FixedString: " + str(e))
             var err = ptr[]._iadd_non_raising(str_slice)
             if err:
-                abort("error formatting to FixedString: " + str(err.value()[]))
+                abort("error formatting to FixedString: " + str(err.value()))
 
         return Formatter(
             write_to_string,
@@ -480,9 +476,7 @@ struct _FixedString[CAP: Int](
         return self.buffer.unsafe_ptr()
 
     @always_inline
-    fn as_string_slice(
-        self: Reference[Self, _, _]
-    ) -> StringSlice[self.is_mutable, self.lifetime]:
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this fixed string.
 
         Returns:
@@ -492,12 +486,10 @@ struct _FixedString[CAP: Int](
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in _FixedString so this is actually
         #   guaranteed to be valid.
-        return StringSlice(unsafe_from_utf8=self[].as_bytes_slice())
+        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
 
     @always_inline
-    fn as_bytes_slice(
-        self: Reference[Self, _, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -507,8 +499,8 @@ struct _FixedString[CAP: Int](
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
-            unsafe_ptr=self[].unsafe_ptr(),
+        return Span[UInt8, __lifetime_of(self)](
+            unsafe_ptr=self.unsafe_ptr(),
             # Does NOT include the NUL terminator.
-            len=self[].size,
+            len=self.size,
         )
