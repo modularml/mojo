@@ -526,10 +526,12 @@ struct CPython:
     fn PyString_FromStringAndSize(inout self, strref: StringRef) -> PyObjectPtr:
         var r = self.lib.get_function[
             fn (
-                DTypePointer[DType.uint8], Int, DTypePointer[DType.int8]
+                DTypePointer[DType.uint8],
+                Int,
+                UnsafePointer[C_char],
             ) -> PyObjectPtr
         ](StringRef("PyUnicode_DecodeUTF8"))(
-            strref.data, strref.length, "strict".unsafe_ptr()
+            strref.data, strref.length, "strict".unsafe_cstr_ptr()
         )
         if self.logging_enabled:
             print(

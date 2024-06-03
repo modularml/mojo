@@ -192,9 +192,9 @@ fn bench_find_baseline(inout b: Bencher) raises:
     @parameter
     fn call_fn():
         _ = _memmem_baseline(
-            haystack.as_uint8_ptr(),
+            haystack.unsafe_ptr(),
             len(haystack),
-            needle.as_uint8_ptr(),
+            needle.unsafe_ptr(),
             len(needle),
         )
 
@@ -207,9 +207,9 @@ fn bench_find_optimized(inout b: Bencher) raises:
     @parameter
     fn call_fn():
         _ = _memmem(
-            haystack.as_uint8_ptr(),
+            haystack.unsafe_ptr(),
             len(haystack),
-            needle.as_uint8_ptr(),
+            needle.unsafe_ptr(),
             len(needle),
         )
 

@@ -44,8 +44,9 @@ what we publish.
 ([PR #2701](https://github.com/modularml/mojo/pull/2701)
 by [@jayzhan211](https://github.com/jayzhan211))
 
-- Added `String.unsafe_cstr_ptr(self)` that returns an `UnsafePointer[C_char]`
-  for convenient interoperability with C APIs.
+- Added `unsafe_cstr_ptr()` method to `String` and `StringLiteral`, that
+  returns an `UnsafePointer[C_char]` for convenient interoperability with C
+  APIs.
 
 - Added `C_char` type alias in `sys.ffi`.
 
@@ -60,6 +61,8 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
   - `String.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
+    (was `UnsafePointer[Int8]`)
+  - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
 
 - The global functions for working with `UnsafePointer` have transitioned to
@@ -81,6 +84,8 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Removed `String.unsafe_uint8_ptr()`. `String.unsafe_ptr()` now returns the
   same thing.
+
+- Removed `StringLiteral.unsafe_uint8_ptr()` and `StringLiteral.as_uint8_ptr()`.
 
 - Removed `UnsafePointer.offset(offset:Int)`.
 

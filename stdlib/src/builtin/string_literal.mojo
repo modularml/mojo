@@ -21,6 +21,8 @@ from utils import StringRef
 from utils._visualizers import lldb_formatter_wrapping_type
 from utils._format import Formattable, Formatter
 
+from sys.ffi import C_char
+
 from .string import _atol
 
 # ===----------------------------------------------------------------------===#
@@ -259,7 +261,7 @@ struct StringLiteral(
         return __mlir_op.`pop.string.size`(self.value)
 
     @always_inline("nodebug")
-    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Get raw pointer to the underlying data.
 
         Returns:
@@ -269,16 +271,20 @@ struct StringLiteral(
             __mlir_op.`pop.string.address`(self.value)
         )
 
-        return UnsafePointer[Int8]._from_dtype_ptr(ptr)
+        # TODO(MSTDL-555):
+        #   Remove bitcast after changing pop.string.address
+        #   return type.
+        return UnsafePointer[Int8]._from_dtype_ptr(ptr).bitcast[UInt8]()
 
-    @always_inline("nodebug")
-    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
-        """Get raw pointer to the underlying data.
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+        """Retrieves a C-string-compatible pointer to the underlying memory.
+
+        The returned pointer is guaranteed to be NUL terminated, and not null.
 
         Returns:
-            The raw pointer to the data.
+            The pointer to the underlying memory.
         """
-        return self.unsafe_ptr().bitcast[UInt8]()
+        return self.unsafe_ptr().bitcast[C_char]()
 
     @always_inline("nodebug")
     fn as_uint8_ptr(self) -> DTypePointer[DType.uint8]:
@@ -313,7 +319,7 @@ struct StringLiteral(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        var ptr = self.unsafe_uint8_ptr()
+        var ptr = self.unsafe_ptr()
 
         return Span[UInt8, ImmutableStaticLifetime](
             unsafe_ptr=ptr,
