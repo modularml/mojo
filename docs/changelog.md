@@ -21,6 +21,16 @@ what we publish.
   been changed to accept `AnyType` instead of `AnyTrivialRegType`. This means
   the result types of `async` functions do not need to be `Movable`.
 
+  ```mojo
+  async fn raise_or_string(c: Bool) raises -> String:
+      if c:
+          raise "whoops!"
+      return "hello world!"
+  ```
+
+  Note that `async` functions do not yet support indirect calls, `ref` results,
+  and constructors.
+
 - The `Reference` type (and many iterators) now use "inferred" parameters to
   represent the mutability of their lifetime, simplifying the interface.
 
