@@ -502,20 +502,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         )
 
     @always_inline("nodebug")
-    fn __setitem__(
-        inout self, idx: Int, val: __mlir_type[`!pop.scalar<`, type.value, `>`]
-    ):
-        """Sets an element in the vector.
-
-        Args:
-            idx: The index to set.
-            val: The value to set.
-        """
-        self.value = __mlir_op.`pop.simd.insertelement`(
-            self.value, val, index(idx).value
-        )
-
-    @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
         """Computes `self + rhs`.
 
