@@ -16,6 +16,7 @@
 import os
 from os import PathLike, listdir, stat_result
 from sys import os_is_windows
+from builtin._location import __call_location
 
 from memory import stack_allocation
 
@@ -42,6 +43,18 @@ fn cwd() raises -> Path:
         raise Error("unable to query the current directory")
 
     return String(StringRef(buf))
+
+
+@always_inline
+fn _dir_of_current_file() raises -> Path:
+    """Gets the directory the file is at.
+
+    Returns:
+      The directory the file calling is at.
+    """
+    var file_name = __call_location().file_name
+    var i = str(file_name).rfind(DIR_SEPARATOR)
+    return Path(str(file_name)[0:i])
 
 
 struct Path(Stringable, CollectionElement, PathLike, KeyElement):
