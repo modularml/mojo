@@ -56,15 +56,16 @@ struct _CoroutineContext:
     var _parent_hdl: AnyCoroutine
 
 
-fn _coro_resume_callback(parent: AnyCoroutine):
-    """Resume the parent Coroutine."""
-    _coro_resume_fn(parent)
+@always_inline
+fn _coro_get_resume_fn(handle: AnyCoroutine) -> fn (AnyCoroutine) -> None:
+    """This function is a generic coroutine resume function."""
+    return __mlir_op.`co.resume`[_type= fn (AnyCoroutine) -> None](handle)
 
 
 @always_inline
 fn _coro_resume_fn(handle: AnyCoroutine):
     """This function is a generic coroutine resume function."""
-    __mlir_op.`co.resume`(handle)
+    _coro_get_resume_fn(handle)(handle)
 
 
 fn _coro_resume_noop_callback(null: AnyCoroutine):
@@ -155,29 +156,13 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
         fn await_body(parent_hdl: AnyCoroutine):
             LegacyPointer(self._get_ctx[_CoroutineContext]().address).store(
                 _CoroutineContext {
-                    _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
+                    _resume_fn: _coro_get_resume_fn(parent_hdl),
+                    _parent_hdl: parent_hdl,
                 }
             )
-            __mlir_op.`co.resume`(self._handle)
+            _coro_resume_fn(self._handle)
 
         _suspend_async[await_body]()
-
-    # Never call this method.
-    @__named_result(out)
-    fn _deprecated_direct_resume(self) -> type:
-        LegacyPointer(self._get_ctx[_CoroutineContext]().address).store(
-            _CoroutineContext {
-                _resume_fn: _coro_resume_noop_callback,
-                _parent_hdl: self._handle,
-            }
-        )
-        __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
-        __mlir_op.`co.set_byref_error_result`(
-            self._handle,
-            __mlir_attr.`#interp.pointer<0> : !kgen.pointer<none>`,
-            UnsafePointer.address_of(out).address,
-        )
-        __mlir_op.`co.resume`(self._handle)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -267,10 +252,11 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
         fn await_body(parent_hdl: AnyCoroutine):
             LegacyPointer(self._get_ctx[_CoroutineContext]().address).store(
                 _CoroutineContext {
-                    _resume_fn: _coro_resume_callback, _parent_hdl: parent_hdl
+                    _resume_fn: _coro_get_resume_fn(parent_hdl),
+                    _parent_hdl: parent_hdl,
                 }
             )
-            __mlir_op.`co.resume`(self._handle)
+            _coro_resume_fn(self._handle)
 
         _suspend_async[await_body]()
         if __mlir_op.`co.get_results`[_type = __mlir_type.i1](self._handle):
