@@ -362,23 +362,6 @@ struct LegacyPointer[
         __mlir_op.`pop.store`[alignment = alignment.value](value, self.address)
 
     @always_inline("nodebug")
-    fn nt_store(self, value: type):
-        """Stores a value using non-temporal store.
-
-        The address must be properly aligned, 64B for avx512, 32B for avx2, and
-        16B for avx.
-
-        Args:
-            value: The value to store.
-        """
-        # Store a simd value into the pointer. The address must be properly
-        # aligned, 64B for avx512, 32B for avx2, and 16B for avx.
-        __mlir_op.`pop.store`[
-            alignment = int(8 * simdwidthof[type]()).value,
-            nonTemporal = __mlir_attr.unit,
-        ](value, self.address)
-
-    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
 
@@ -872,22 +855,6 @@ struct DTypePointer[
     ]() if triple_is_nvidia_cuda() else 1
 
     @always_inline("nodebug")
-    fn simd_nt_store[
-        width: Int, T: Intable
-    ](self, offset: T, val: SIMD[type, width]):
-        """Stores a SIMD vector using non-temporal store.
-
-        Parameters:
-            width: The SIMD width.
-            T: The Intable type of the offset.
-
-        Args:
-            offset: The offset to store to.
-            val: The SIMD value to store.
-        """
-        self.offset(offset).simd_nt_store[width](val)
-
-    @always_inline("nodebug")
     fn simd_strided_load[
         width: Int, T: Intable
     ](self, stride: T) -> SIMD[type, width]:
@@ -922,23 +889,6 @@ struct DTypePointer[
             stride: The stride between stores.
         """
         strided_store(val, self, int(stride), True)
-
-    @always_inline("nodebug")
-    fn simd_nt_store[width: Int](self, val: SIMD[type, width]):
-        """Stores a SIMD vector using non-temporal store.
-
-        The address must be properly aligned, 64B for avx512, 32B for avx2, and
-        16B for avx.
-
-        Parameters:
-            width: The SIMD width.
-
-        Args:
-            val: The SIMD value to store.
-        """
-        # Store a simd value into the pointer. The address must be properly
-        # aligned, 64B for avx512, 32B for avx2, and 16B for avx.
-        self.address.bitcast[SIMD[type, width]]().nt_store(val)
 
     # ===------------------------------------------------------------------=== #
     # Gather / Scatter

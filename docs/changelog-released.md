@@ -676,6 +676,8 @@ modular update mojo
 - The builtin `SIMD` struct no longer conforms to `Indexer`; users must
   explicitly cast `Scalar` values using `int`.
 
+- The pointer types no longer have the ability to perform a non-temporal store.
+
 ### 🛠️ Fixed
 
 - [#1837](https://github.com/modularml/mojo/issues/1837) Fix self-referential
