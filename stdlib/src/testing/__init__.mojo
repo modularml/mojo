@@ -20,4 +20,6 @@ from .testing import (
     assert_not_equal,
     assert_almost_equal,
     assert_raises,
+    assert_is,
+    assert_is_not,
 )
