@@ -69,6 +69,28 @@ struct DLHandle(CollectionElement, Boolable):
         else:
             self.handle = DTypePointer[DType.int8]()
 
+    fn check_symbol(self, name: String) -> Bool:
+        """Check that the symbol exists in the dynamic library.
+
+        Args:
+            name: The symbol to check.
+
+        Returns:
+            `True` if the symbol exists.
+        """
+        constrained[
+            not os_is_windows(),
+            "Checking dynamic library symbol is not supported on Windows",
+        ]()
+
+        var opaque_function_ptr = external_call[
+            "dlsym", DTypePointer[DType.int8]
+        ](self.handle.address, name.unsafe_ptr())
+        if opaque_function_ptr:
+            return True
+
+        return False
+
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
     fn close(inout self):

@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 from os import getenv
-from sys import external_call
+from sys import external_call, exit
 from sys.ffi import DLHandle
 
 from memory import DTypePointer, UnsafePointer
@@ -86,63 +86,11 @@ struct PythonVersion:
         return PythonVersion(components[0], components[1], components[2])
 
 
-fn _py_initialize(inout cpython: CPython):
-    # Configure the Python interpreter to search for libraries installed in
-    # "site-package" directories. If we don't do this, and a `virtualenv`
-    # is activated when invoking `mojo`, then the Python interpreter will
-    # use the system's `site-package` directories instead of the
-    # `virtualenv` ones.
-    #
-    # This function does not overwrite any existing `PYTHONPATH`, in case
-    # the user wants to specify this environment variable themselves.
-    #
-    # Finally, another approach is to use `Py_SetPath()`, but that requires
-    # setting explicitly every library search path, as well as needing to
-    # specify a `PYTHONHOME`. This is much more complicated and restrictive
-    # to be considered a better solution.
-    var error_message: StringRef = external_call[
-        "KGEN_CompilerRT_Python_SetPythonPath",
-        DTypePointer[DType.int8],
-    ]()
-    if len(error_message) != 0:
-        # Print the error message, but keep going in order to allow
-        # `Py_Initialize` to fail.
-        print("Mojo/Python interoperability error: ", error_message)
-
-    cpython.lib.get_function[fn () -> None]("Py_Initialize")()
-
-
 fn _py_get_version(lib: DLHandle) -> StringRef:
     var version_string = lib.get_function[fn () -> DTypePointer[DType.int8]](
         "Py_GetVersion"
     )()
     return StringRef(version_string)
-
-
-fn _py_initialize(lib: DLHandle):
-    # Configure the Python interpreter to search for libraries installed in
-    # "site-package" directories. If we don't do this, and a `virtualenv`
-    # is activated when invoking `mojo`, then the Python interpreter will
-    # use the system's `site-package` directories instead of the
-    # `virtualenv` ones.
-    #
-    # This function does not overwrite any existing `PYTHONPATH`, in case
-    # the user wants to specify this environment variable themselves.
-    #
-    # Finally, another approach is to use `Py_SetPath()`, but that requires
-    # setting explicitly every library search path, as well as needing to
-    # specify a `PYTHONHOME`. This is much more complicated and restrictive
-    # to be considered a better solution.
-    var error_message: StringRef = external_call[
-        "KGEN_CompilerRT_Python_SetPythonPath",
-        DTypePointer[DType.int8],
-    ]()
-    if len(error_message) != 0:
-        # Print the error message, but keep going in order to allow
-        # `Py_Initialize` to fail.
-        print("Mojo/Python interoperability error: ", error_message)
-
-    lib.get_function[fn () -> None]("Py_Initialize")()
 
 
 fn _py_finalize(lib: DLHandle):
@@ -156,28 +104,42 @@ struct CPython:
     var logging_enabled: Bool
     var version: PythonVersion
     var total_ref_count: UnsafePointer[Int]
+    var init_error: StringRef
 
     fn __init__(inout self: CPython):
         var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
         if logging_enabled:
             print("CPython init")
+            print("MOJO_PYTHON:", getenv("MOJO_PYTHON"))
+            print("MOJO_PYTHON_LIBRARY:", getenv("MOJO_PYTHON_LIBRARY"))
+
+        # TODO(MOCO-772) Allow raises to propagate through function pointers
+        # and make this initialization a raising function.
+        self.init_error = external_call[
+            "KGEN_CompilerRT_Python_SetPythonPath",
+            DTypePointer[DType.int8],
+        ]()
+
         var python_lib = getenv("MOJO_PYTHON_LIBRARY")
-        if python_lib == "":
-            abort(
-                "Mojo/Python interoperability error: Unable to locate a"
-                " suitable libpython, please set `MOJO_PYTHON_LIBRARY`"
-            )
+
+        if logging_enabled:
+            print("PYTHONEXECUTABLE:", getenv("PYTHONEXECUTABLE"))
+            print("libpython selected:", python_lib)
 
         self.lib = DLHandle(python_lib)
         self.total_ref_count = UnsafePointer[Int].alloc(1)
         self.none_value = PyObjectPtr()
         self.dict_type = PyObjectPtr()
         self.logging_enabled = logging_enabled
-        self.version = PythonVersion(_py_get_version(self.lib))
-
-        _py_initialize(self.lib)
-        _ = self.Py_None()
-        _ = self.PyDict_Type()
+        if not self.init_error:
+            if not self.lib.check_symbol("Py_Initialize"):
+                self.init_error = "compatible Python library not found"
+            self.lib.get_function[fn () -> None]("Py_Initialize")()
+            self.version = PythonVersion(_py_get_version(self.lib))
+            _ = self.Py_None()
+            _ = self.PyDict_Type()
+        else:
+            self.version = PythonVersion(0, 0, 0)
 
     @staticmethod
     fn destroy(inout existing: CPython):
@@ -193,6 +155,19 @@ struct CPython:
         _py_finalize(existing.lib)
         existing.lib.close()
         existing.total_ref_count.free()
+
+    fn check_init_error(self) raises:
+        """Used for entry points that initialize Python on first use, will
+        raise an error if one occured when initializing the global CPython.
+        """
+        if self.init_error:
+            var error: String = self.init_error
+            error += "\nMOJO_PYTHON: " + getenv("MOJO_PYTHON")
+            error += "\nMOJO_PYTHON_LIBRARY: " + getenv("MOJO_PYTHON_LIBRARY")
+            error += "\nPYTHONEXECUTABLE: " + getenv("PYTHONEXECUTABLE")
+            error += "\n\nMojo/Python interop error, troubleshooting docs at:"
+            error += "\n    https://modul.ar/fix-python\n"
+            raise error
 
     fn Py_None(inout self) -> PyObjectPtr:
         """Get a None value, of type NoneType."""
@@ -217,6 +192,7 @@ struct CPython:
         self.logging_enabled = existing.logging_enabled
         self.version = existing.version
         self.total_ref_count = existing.total_ref_count
+        self.init_error = existing.init_error
 
     fn _inc_total_rc(inout self):
         var v = move_from_pointee(self.total_ref_count)
