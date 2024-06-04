@@ -180,34 +180,38 @@ fn test_temporary_directory() raises -> None:
 
 fn test_named_temporary_file_deletion() raises:
     var tmp_file: NamedTemporaryFile
-    var file_name: String
+    var file_path: String
 
     with NamedTemporaryFile(
-        prefix=String("my_prefix"), suffix=String("my_suffix")
+        prefix="my_prefix", suffix="my_suffix", dir=Path().__fspath__()
     ) as my_tmp_file:
-        file_name = my_tmp_file.name
-        assert_true(exists(file_name), "Failed to create file " + file_name)
-        assert_true(file_name.split("/")[-1].startswith(String("my_prefix")))
-    assert_false(exists(file_name), "Failed to delete file " + file_name)
+        file_path = my_tmp_file.name
+        var file_name = file_path.split(os.sep)[-1]
+        assert_true(exists(file_path), "Failed to create file " + file_path)
+        assert_true(file_name.startswith("my_prefix"))
+        assert_true(file_name.endswith("my_suffix"))
+        # TODO use os.path.split when it exists
+        assert_equal(file_path[: -len(file_name) - 1], Path().__fspath__())
+    assert_false(exists(file_path), "Failed to delete file " + file_path)
 
     with NamedTemporaryFile(delete=False) as my_tmp_file:
-        file_name = my_tmp_file.name
-        assert_true(exists(file_name), "Failed to create file " + file_name)
-    assert_true(exists(file_name), "File " + file_name + " should still exist")
-    os.remove(file_name)
+        file_path = my_tmp_file.name
+        assert_true(exists(file_path), "Failed to create file " + file_path)
+    assert_true(exists(file_path), "File " + file_path + " should still exist")
+    os.remove(file_path)
 
     tmp_file = NamedTemporaryFile()
-    file_name = tmp_file.name
-    assert_true(exists(file_name), "Failed to create file " + file_name)
+    file_path = tmp_file.name
+    assert_true(exists(file_path), "Failed to create file " + file_path)
     tmp_file.close()
-    assert_false(exists(file_name), "Failed to delete file " + file_name)
+    assert_false(exists(file_path), "Failed to delete file " + file_path)
 
     tmp_file = NamedTemporaryFile(delete=False)
-    file_name = tmp_file.name
-    assert_true(exists(file_name), "Failed to create file " + file_name)
+    file_path = tmp_file.name
+    assert_true(exists(file_path), "Failed to create file " + file_path)
     tmp_file.close()
-    assert_true(exists(file_name), "File " + file_name + " should still exist")
-    os.remove(file_name)
+    assert_true(exists(file_path), "File " + file_path + " should still exist")
+    os.remove(file_path)
 
 
 fn test_named_temporary_file_write() raises:
