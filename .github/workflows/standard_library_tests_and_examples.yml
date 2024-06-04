@@ -11,8 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-name: Standard Library tests and examples
-
+name: Test stdlib and examples
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -24,7 +23,7 @@ permissions:
 
 jobs:
   test-examples:
-    name: Test stdlib and examples in ${{ matrix.os }} with assertion=${{ matrix.mojo-enable-assertions }}
+    name: With ${{ matrix.os }} and assertion=${{ matrix.mojo-enable-assertions }}
     strategy:
       matrix:
         os: ["ubuntu-latest", "macos-14"]
