@@ -40,10 +40,9 @@ struct PyKeyValuePair:
 struct PyObjectPtr:
     var value: DTypePointer[DType.int8]
 
-    @staticmethod
-    fn null_ptr() -> PyObjectPtr:
-        var null_pointer = DTypePointer[DType.int8].get_null()
-        return PyObjectPtr {value: null_pointer}
+    @always_inline("nodebug")
+    fn __init__(inout self):
+        self.value = DTypePointer[DType.int8]()
 
     fn is_null(self) -> Bool:
         return int(self.value) == 0
@@ -169,12 +168,10 @@ struct CPython:
                 " suitable libpython, please set `MOJO_PYTHON_LIBRARY`"
             )
 
-        var null_pointer = DTypePointer[DType.int8].get_null()
-
         self.lib = DLHandle(python_lib)
         self.total_ref_count = UnsafePointer[Int].alloc(1)
-        self.none_value = PyObjectPtr(null_pointer)
-        self.dict_type = PyObjectPtr(null_pointer)
+        self.none_value = PyObjectPtr()
+        self.dict_type = PyObjectPtr()
         self.logging_enabled = logging_enabled
         self.version = PythonVersion(_py_get_version(self.lib))
 
@@ -187,12 +184,12 @@ struct CPython:
         existing.Py_DecRef(existing.none_value)
         if existing.logging_enabled:
             print("CPython destroy")
-            var remaining_refs = move_from_pointee(existing.total_ref_count)
+            var remaining_refs = existing.total_ref_count.take_pointee()
             print("Number of remaining refs:", remaining_refs)
             # Technically not necessary since we're working with register
             # passable types, by it's good practice to re-initialize the
             # pointer after a consuming move.
-            initialize_pointee_move(existing.total_ref_count, remaining_refs)
+            existing.total_ref_count.init_pointee_move(remaining_refs)
         _py_finalize(existing.lib)
         existing.lib.close()
         existing.total_ref_count.free()
@@ -222,12 +219,12 @@ struct CPython:
         self.total_ref_count = existing.total_ref_count
 
     fn _inc_total_rc(inout self):
-        var v = move_from_pointee(self.total_ref_count)
-        initialize_pointee_move(self.total_ref_count, v + 1)
+        var v = self.total_ref_count.take_pointee()
+        self.total_ref_count.init_pointee_move(v + 1)
 
     fn _dec_total_rc(inout self):
-        var v = move_from_pointee(self.total_ref_count)
-        initialize_pointee_move(self.total_ref_count, v - 1)
+        var v = self.total_ref_count.take_pointee()
+        self.total_ref_count.init_pointee_move(v - 1)
 
     fn Py_IncRef(inout self, ptr: PyObjectPtr):
         if self.logging_enabled:
@@ -363,6 +360,36 @@ struct CPython:
             )
         self._inc_total_rc()
         return result
+
+    fn PyEval_EvalCode(
+        inout self,
+        co: PyObjectPtr,
+        globals: PyObjectPtr,
+        locals: PyObjectPtr,
+    ) -> PyObjectPtr:
+        var result = PyObjectPtr(
+            self.lib.get_function[
+                fn (
+                    PyObjectPtr, PyObjectPtr, PyObjectPtr
+                ) -> DTypePointer[DType.int8]
+            ]("PyEval_EvalCode")(co, globals, locals)
+        )
+        self._inc_total_rc()
+        return result
+
+    fn Py_CompileString(
+        inout self,
+        strref: StringRef,
+        filename: StringRef,
+        compile_mode: Int,
+    ) -> PyObjectPtr:
+        var r = self.lib.get_function[
+            fn (
+                DTypePointer[DType.uint8], DTypePointer[DType.uint8], Int32
+            ) -> PyObjectPtr
+        ]("Py_CompileString")(strref.data, filename.data, Int32(compile_mode))
+        self._inc_total_rc()
+        return r
 
     fn PyObject_GetAttrString(
         inout self,
@@ -780,8 +807,8 @@ struct CPython:
     fn PyDict_Next(
         inout self, dictionary: PyObjectPtr, p: Int
     ) -> PyKeyValuePair:
-        var key = DTypePointer[DType.int8].get_null()
-        var value = DTypePointer[DType.int8].get_null()
+        var key = DTypePointer[DType.int8]()
+        var value = DTypePointer[DType.int8]()
         var v = p
         var position = UnsafePointer[Int].address_of(v)
         var value_ptr = UnsafePointer[DTypePointer[DType.int8]].address_of(
@@ -820,6 +847,6 @@ struct CPython:
         return PyKeyValuePair {
             key: key,
             value: value,
-            position: move_from_pointee(position),
+            position: position.take_pointee(),
             success: result == 1,
         }

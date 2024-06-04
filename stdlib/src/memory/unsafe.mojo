@@ -164,9 +164,7 @@ struct LegacyPointer[
     var address: Self._mlir_type
     """The pointed-to address."""
 
-    alias _ref_type = Reference[
-        type, True, MutableStaticLifetime, address_space
-    ]
+    alias _ref_type = Reference[type, MutableStaticLifetime, address_space]
 
     @always_inline("nodebug")
     fn __init__() -> Self:
@@ -175,7 +173,7 @@ struct LegacyPointer[
         Returns:
             Constructed LegacyPointer object.
         """
-        return Self.get_null()
+        return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
     @always_inline("nodebug")
     fn __init__(address: Self._mlir_type) -> Self:
@@ -218,16 +216,6 @@ struct LegacyPointer[
             Scalar[DType.index](address).value
         )
 
-    @staticmethod
-    @always_inline("nodebug")
-    fn get_null() -> Self:
-        """Constructs a LegacyPointer representing nullptr.
-
-        Returns:
-            Constructed nullptr LegacyPointer object.
-        """
-        return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
-
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
 
@@ -235,7 +223,7 @@ struct LegacyPointer[
             A String containing the hexadecimal representation of the memory
             location destination of this pointer.
         """
-        return hex(self)
+        return hex(int(self))
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
@@ -244,11 +232,11 @@ struct LegacyPointer[
         Returns:
             Returns False if the LegacyPointer is null and True otherwise.
         """
-        return self != Self.get_null()
+        return self != Self()
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: Reference[type, _, _, address_space]) -> Self:
+    fn address_of(ref [_, address_space._value.value]arg: type) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -259,7 +247,7 @@ struct LegacyPointer[
         """
         # Work around AnyTrivialRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
-            UnsafePointer(arg).address
+            UnsafePointer.address_of(arg).address
         )
 
     @always_inline("nodebug")
@@ -591,15 +579,15 @@ struct DTypePointer[
     """
 
     alias element_type = Scalar[type]
-    alias _mlir_type = Pointer[Scalar[type], address_space]
-    var address: Self._mlir_type
+    alias _pointer_type = Pointer[Scalar[type], address_space]
+    var address: Self._pointer_type
     """The pointed-to address."""
 
     @always_inline("nodebug")
     fn __init__(inout self):
         """Constructs a null `DTypePointer` from the given type."""
 
-        self.address = Self._mlir_type()
+        self.address = Self._pointer_type()
 
     @always_inline("nodebug")
     fn __init__(
@@ -647,7 +635,7 @@ struct DTypePointer[
             value: The input pointer index.
         """
         var address = __mlir_op.`pop.index_to_pointer`[
-            _type = Self._mlir_type._mlir_type
+            _type = Self._pointer_type._mlir_type
         ](value.cast[DType.index]().value)
         self.address = address
 
@@ -658,17 +646,7 @@ struct DTypePointer[
         Args:
             address: The input address.
         """
-        self.address = Self._mlir_type(address=address)
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn get_null() -> Self:
-        """Constructs a `DTypePointer` representing *nullptr*.
-
-        Returns:
-            Constructed *nullptr* `DTypePointer` object.
-        """
-        return Self._mlir_type()
+        self.address = Self._pointer_type(address=address)
 
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
@@ -690,7 +668,7 @@ struct DTypePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: Reference[Scalar[type], _, _, address_space]) -> Self:
+    fn address_of(ref [_, address_space._value.value]arg: Scalar[type]) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -699,7 +677,7 @@ struct DTypePointer[
         Returns:
             A DTypePointer struct which contains the address of the argument.
         """
-        return LegacyPointer.address_of(arg[])
+        return LegacyPointer.address_of(arg)
 
     @always_inline("nodebug")
     fn __getitem__(self, offset: Int) -> Scalar[type]:

@@ -22,7 +22,7 @@ struct MoveOnly[T: Movable](Movable):
     var data: T
     """Test data payload."""
 
-    fn __init__(inout self, i: T):
+    fn __init__(inout self, owned i: T):
         """Construct a MoveOnly providing the payload data.
 
         Args:
@@ -37,6 +37,19 @@ struct MoveOnly[T: Movable](Movable):
             other: The other instance that we copying the payload from.
         """
         self.data = other.data^
+
+
+struct ExplicitCopyOnly(ExplicitlyCopyable):
+    var value: Int
+    var copy_count: Int
+
+    fn __init__(inout self, value: Int):
+        self.value = value
+        self.copy_count = 0
+
+    fn __init__(inout self, *, other: Self):
+        self.value = other.value
+        self.copy_count = other.copy_count + 1
 
 
 struct CopyCounter(CollectionElement):
@@ -54,7 +67,10 @@ struct CopyCounter(CollectionElement):
         self.copy_count = existing.copy_count + 1
 
 
-struct MoveCounter[T: CollectionElement](CollectionElement):
+struct MoveCounter[T: CollectionElementNew](
+    CollectionElement,
+    CollectionElementNew,
+):
     """Counts the number of moves performed on a value."""
 
     var value: T
@@ -66,6 +82,17 @@ struct MoveCounter[T: CollectionElement](CollectionElement):
         self.value = value^
         self.move_count = 0
 
+    # TODO: This type should not be ExplicitlyCopyable, but has to be to satisfy
+    #       CollectionElementNew at the moment.
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.value = T(other=other.value)
+        self.move_count = other.move_count
+
     fn __moveinit__(inout self, owned existing: Self):
         self.value = existing.value^
         self.move_count = existing.move_count + 1
@@ -74,5 +101,5 @@ struct MoveCounter[T: CollectionElement](CollectionElement):
     #       CollectionElement at the moment.
     fn __copyinit__(inout self, existing: Self):
         # print("ERROR: _MoveCounter copy constructor called unexpectedly!")
-        self.value = existing.value
+        self.value = T(other=existing.value)
         self.move_count = existing.move_count

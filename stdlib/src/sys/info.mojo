@@ -522,14 +522,14 @@ fn sizeof[
         The size of the type in bytes.
     """
     alias mlir_type = __mlir_attr[
-        `#kgen.param.expr<rebind, #kgen.parameterizedtype.constant<!kgen.paramref<`,
+        `#kgen.param.expr<rebind, #kgen.type<!kgen.paramref<`,
         type,
         `>> : `,
         AnyType,
         `> : !kgen.type`,
     ]
     return __mlir_attr[
-        `#kgen.param.expr<get_sizeof, #kgen.parameterizedtype.constant<`,
+        `#kgen.param.expr<get_sizeof, #kgen.type<`,
         mlir_type,
         `> : !kgen.type,`,
         target,
@@ -551,7 +551,7 @@ fn sizeof[
         The size of the dtype in bytes.
     """
     return __mlir_attr[
-        `#kgen.param.expr<get_sizeof, #kgen.parameterizedtype.constant<`,
+        `#kgen.param.expr<get_sizeof, #kgen.type<`,
         `!pop.scalar<`,
         type.value,
         `>`,
@@ -575,15 +575,15 @@ fn alignof[
         The alignment of the type in bytes.
     """
     alias mlir_type = __mlir_attr[
-        `#kgen.param.expr<rebind, #kgen.parameterizedtype.constant<!kgen.paramref<`,
+        `#kgen.param.expr<rebind, #kgen.type<!kgen.paramref<`,
         type,
         `>> : `,
         AnyType,
         `> : !kgen.type`,
     ]
     return __mlir_attr[
-        `#kgen.param.expr<get_alignof, #kgen.parameterizedtype.constant<`,
-        mlir_type,
+        `#kgen.param.expr<get_alignof, #kgen.type<`,
+        +mlir_type,
         `> : !kgen.type,`,
         target,
         `> : !kgen.int_literal`,
@@ -604,7 +604,7 @@ fn alignof[
         The alignment of the dtype in bytes.
     """
     return __mlir_attr[
-        `#kgen.param.expr<get_alignof, #kgen.parameterizedtype.constant<`,
+        `#kgen.param.expr<get_alignof, #kgen.type<`,
         `!pop.scalar<`,
         type.value,
         `>`,

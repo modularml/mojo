@@ -18,6 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from bit import countl_zero
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
+from sys.ffi import C_char
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
@@ -161,10 +162,7 @@ fn _repr_ascii(c: UInt8) -> String:
         return r"\r"
     else:
         var uc = c.cast[DType.uint8]()
-        if uc < 16:
-            return hex(uc, r"\x0")
-        else:
-            return hex(uc, r"\x")
+        return hex[r"\x0"](uc) if uc < 16 else hex[r"\x"](uc)
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
@@ -582,6 +580,7 @@ fn _isspace(c: UInt8) -> Bool:
         True iff the character is one of the whitespace characters listed above.
     """
 
+    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
     alias ` ` = UInt8(ord(" "))
     alias `\t` = UInt8(ord("\t"))
     alias `\n` = UInt8(ord("\n"))
@@ -605,27 +604,34 @@ fn _isspace(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_newlines_table() -> InlineArray[UInt8, 128]:
-    var table = InlineArray[UInt8, 128](0)
-    table[ord("\n")] = 1
-    table[ord("\r")] = 1
-    table[ord("\f")] = 1
-    table[ord("\v")] = 1
-    table[ord("\x1c")] = 1
-    table[ord("\x1d")] = 1
-    table[ord("\x1e")] = 1
-    return table
+fn _isnewline(s: String) -> Bool:
+    if len(s._buffer) != 2:
+        return False
 
-
-alias _NEWLINES_TABLE = _get_newlines_table()
-
-
-fn _isnewline(c: String) -> Bool:
     # TODO: add \u2028 and \u2029 when they are properly parsed
     # FIXME: \x85 is parsed but not encoded in utf-8
-    if len(c._buffer) == 2:
-        return c == "\x85" or _NEWLINES_TABLE[ord(c)]
-    return False
+    if s == "\x85":
+        return True
+
+    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
+    alias `\n` = UInt8(ord("\n"))
+    alias `\r` = UInt8(ord("\r"))
+    alias `\f` = UInt8(ord("\f"))
+    alias `\v` = UInt8(ord("\v"))
+    alias `\x1c` = UInt8(ord("\x1c"))
+    alias `\x1d` = UInt8(ord("\x1d"))
+    alias `\x1e` = UInt8(ord("\x1e"))
+
+    var c = UInt8(ord(s))
+    return (
+        c == `\n`
+        or c == `\r`
+        or c == `\f`
+        or c == `\v`
+        or c == `\x1c`
+        or c == `\x1d`
+        or c == `\x1e`
+    )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -716,6 +722,14 @@ struct String(
     fn __init__(inout self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.__copyinit__(other)
 
     @always_inline
     fn __init__(inout self, str: StringRef):
@@ -813,6 +827,15 @@ struct String(
             len: The length of the buffer, including the null terminator.
         """
         self = String(ptr.address, len)
+
+    @always_inline
+    fn __init__(inout self, obj: PythonObject):
+        """Creates a string from a python object.
+
+        Args:
+            obj: A python object.
+        """
+        self = str(obj)
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
@@ -934,7 +957,7 @@ struct String(
 
         var buffer = Self._buffer_type()
         buffer.resize(adjusted_span_len + 1, 0)
-        var ptr = self.unsafe_uint8_ptr()
+        var ptr = self.unsafe_ptr()
         for i in range(adjusted_span_len):
             buffer[i] = ptr[adjusted_span[i]]
         buffer[adjusted_span_len] = 0
@@ -1033,12 +1056,12 @@ struct String(
         buffer.resize(total_len + 1, 0)
         memcpy(
             DTypePointer(buffer.data),
-            self.unsafe_uint8_ptr(),
+            self.unsafe_ptr(),
             self_len,
         )
         memcpy(
             DTypePointer(buffer.data + self_len),
-            other.unsafe_uint8_ptr(),
+            other.unsafe_ptr(),
             other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
@@ -1248,27 +1271,23 @@ struct String(
         """
         pass
 
-    # TODO: Remove this method when #2317 is done
-    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
-        """Retrieves a pointer to the underlying memory.
-
-        Note that you should use `unsafe_uint8_ptr()` if you need to access the
-        pointer as we are now storing the bytes as UInt8.
-
-        See https://github.com/modularml/mojo/issues/2317 for more information.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
-        return self._buffer.data.bitcast[Int8]()
-
-    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return self._buffer.data.bitcast[UInt8]()
+        return self._buffer.data
+
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+        """Retrieves a C-string-compatible pointer to the underlying memory.
+
+        The returned pointer is guaranteed to be null, or NUL terminated.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.unsafe_ptr().bitcast[C_char]()
 
     fn as_bytes(self) -> List[UInt8]:
         """Retrieves the underlying byte sequence encoding the characters in
@@ -1291,9 +1310,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(
-        self: Reference[Self, _, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1303,28 +1320,24 @@ struct String(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
-            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+        return Span[UInt8, __lifetime_of(self)](
+            unsafe_ptr=self._buffer.unsafe_ptr(),
             # Does NOT include the NUL terminator.
-            len=self[]._byte_length(),
+            len=self._byte_length(),
         )
 
     @always_inline
-    fn as_string_slice(
-        self: Reference[Self, _, _]
-    ) -> StringSlice[self.is_mutable, self.lifetime]:
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        var bytes = self[].as_bytes_slice()
-
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice[self.is_mutable, self.lifetime](
-            unsafe_from_utf8=bytes
+        return StringSlice[__lifetime_of(self)](
+            unsafe_from_utf8=self.as_bytes_slice()
         )
 
     fn _byte_length(self) -> Int:
@@ -1343,7 +1356,7 @@ struct String(
         else:
             return buffer_len
 
-    fn _steal_ptr(inout self) -> DTypePointer[DType.int8]:
+    fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
 
@@ -1655,9 +1668,9 @@ struct String(
         if occurrences == -1:
             return self
 
-        var self_start = self.unsafe_uint8_ptr()
-        var self_ptr = self.unsafe_uint8_ptr()
-        var new_ptr = new.unsafe_uint8_ptr()
+        var self_start = self.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
+        var new_ptr = new.unsafe_ptr()
 
         var self_len = len(self)
         var old_len = len(old)
@@ -1784,8 +1797,8 @@ struct String(
 
     fn _interleave(self, val: String) -> String:
         var res = List[UInt8]()
-        var val_ptr = val.unsafe_uint8_ptr()
-        var self_ptr = self.unsafe_uint8_ptr()
+        var val_ptr = val.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
@@ -1824,7 +1837,7 @@ struct String(
     fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
         var copy: String = self
 
-        var char_ptr = copy.unsafe_uint8_ptr()
+        var char_ptr = copy.unsafe_ptr()
 
         for i in range(len(self)):
             var char: UInt8 = char_ptr[i]
@@ -1952,7 +1965,7 @@ struct String(
         for i in range(n):
             memcpy(
                 dest=buf.data + len_self * i,
-                src=self.unsafe_uint8_ptr(),
+                src=self.unsafe_ptr(),
                 count=len_self,
             )
         return String(buf^)

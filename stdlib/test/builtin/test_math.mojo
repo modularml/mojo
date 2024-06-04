@@ -66,9 +66,15 @@ def test_round():
     assert_equal(0, round(0.0))
     assert_equal(1, round(1.0))
     assert_equal(1, round(1.1))
+    assert_equal(1, round(1.4))
     assert_equal(2, round(1.5))
-    assert_equal(2, round(1.9))
     assert_equal(2, round(2.0))
+    assert_equal(1, round(1.4, 0))
+    # FIXME: round(2.5) is 2.0 (roundeven) but it's using roundhalfup
+    # Fix when the math libray is open sourced
+    # assert_equal(2, round(2.5))
+    # assert_equal(1.5, round(1.5, 1))
+    # assert_equal(1.61, round(1.613, 2))
 
     var lhs = SIMD[DType.float32, 4](1.1, 1.5, 1.9, 2.0)
     var expected = SIMD[DType.float32, 4](1.0, 2.0, 2.0, 2.0)
@@ -87,7 +93,7 @@ def test_pow():
 def test_gcd():
     var l = List(2, 4, 6, 8, 16)
     var il = InlineArray[Int, 5](4, 16, 2, 8, 6)
-    assert_equal(gcd(Span(il)), 2)
+    assert_equal(gcd(Span[Int](il)), 2)
     assert_equal(gcd(2, 4, 6, 8, 16), 2)
     assert_equal(gcd(l), 2)
     assert_equal(gcd(88, 24), 8)
@@ -104,6 +110,25 @@ def test_gcd():
     assert_equal(gcd(List(16)), 16)
 
 
+def test_lcm():
+    assert_equal(lcm(-2, 4), 4)
+    assert_equal(lcm(2345, 23452), 54994940)
+    var l = List(4, 6, 7, 3)
+    assert_equal(lcm(Span(l)), 84)
+    assert_equal(lcm(l), 84)
+    assert_equal(lcm(4, 6, 7, 3), 84)
+    assert_equal(lcm(), 1)
+    assert_equal(lcm(List(3)), 3)
+    assert_equal(lcm(List[Int]()), 1)
+    assert_equal(lcm(0, 4), 0)
+    assert_equal(lcm(5, 33), 165)
+    assert_equal(lcm(-34, -56, -32), 3808)
+    var il = InlineArray[Int, 5](4, 16, 2, 8, 6)
+    assert_equal(lcm(Span[Int](il)), 48)
+    assert_equal(lcm(345, 623, 364, 84, 93), 346475220)
+    assert_equal(lcm(0, 0), 0)
+
+
 def main():
     test_abs()
     test_divmod()
@@ -112,3 +137,4 @@ def main():
     test_round()
     test_pow()
     test_gcd()
+    test_lcm()

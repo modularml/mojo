@@ -28,18 +28,18 @@ from sys.intrinsics import _type_is_eq
 # ===----------------------------------------------------------------------===#
 @value
 struct _InlineListIter[
-    T: CollectionElement,
+    list_mutability: Bool, //,
+    T: CollectionElementNew,
     capacity: Int,
-    list_mutability: Bool,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for InlineList.
 
     Parameters:
+        list_mutability: Whether the reference to the list is mutable.
         T: The type of the elements in the list.
         capacity: The maximum number of elements that the list can hold.
-        list_mutability: Whether the reference to the list is mutable.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
@@ -47,14 +47,14 @@ struct _InlineListIter[
     alias list_type = InlineList[T, capacity]
 
     var index: Int
-    var src: Reference[Self.list_type, list_mutability, list_lifetime]
+    var src: Reference[Self.list_type, list_lifetime]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_mutability, list_lifetime]:
+    ) -> Reference[T, list_lifetime]:
         @parameter
         if forward:
             self.index += 1
@@ -72,7 +72,7 @@ struct _InlineListIter[
 
 
 # TODO: Provide a smarter default for the capacity.
-struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
+struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     """A list allocated on the stack with a maximum size known at compile time.
 
     It is backed by an `InlineArray` and an `Int` to represent the size.
@@ -109,7 +109,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         debug_assert(len(values) <= capacity, "List is full.")
         self = Self()
         for value in values:
-            self.append(value[])
+            self.append(ElementType(other=value[]))
 
     @always_inline
     fn __len__(self) -> Int:
@@ -129,8 +129,8 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
 
     @always_inline
     fn __getitem__(
-        self: Reference[Self, _, _], owned idx: Int
-    ) -> ref [self.lifetime] Self.ElementType:
+        ref [_]self: Self, owned idx: Int
+    ) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Args:
@@ -140,23 +140,23 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
             A reference to the item at the given index.
         """
         debug_assert(
-            -self[]._size <= idx < self[]._size, "Index must be within bounds."
+            -self._size <= idx < self._size, "Index must be within bounds."
         )
 
         if idx < 0:
-            idx += len(self[])
+            idx += len(self)
 
-        return self[]._array[idx]
+        return self._array[idx]
 
     @always_inline
     fn __del__(owned self):
         """Destroy all the elements in the list and free the memory."""
         for i in range(self._size):
-            destroy_pointee(UnsafePointer(self._array[i]))
+            UnsafePointer.address_of(self._array[i]).destroy_pointee()
 
     fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _InlineListIter[ElementType, capacity, self.is_mutable, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _InlineListIter[ElementType, capacity, __lifetime_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -176,7 +176,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
+              traits `EqualityComparable` and `CollectionElementNew`.
 
         Args:
             value: The value to find.
@@ -189,7 +189,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
             _type_is_eq[ElementType, C](), "value type is not self.ElementType"
         ]()
         for i in self:
-            if value == rebind[Reference[C, False, __lifetime_of(self)]](i)[]:
+            if value == rebind[Reference[C, __lifetime_of(self)]](i)[]:
                 return True
         return False
 
@@ -203,7 +203,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
+              traits `EqualityComparable` and `CollectionElementNew`.
 
         Args:
             value: The value to count.
@@ -217,10 +217,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
 
         var count = 0
         for elem in self:
-            if (
-                value
-                == rebind[Reference[C, False, __lifetime_of(self)]](elem)[]
-            ):
+            if value == rebind[Reference[C, __lifetime_of(self)]](elem)[]:
                 count += 1
         return count
 

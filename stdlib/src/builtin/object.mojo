@@ -21,7 +21,6 @@ from sys.intrinsics import _type_is_eq
 
 from memory import memcmp, memcpy
 from memory import Arc
-from memory.unsafe_pointer import move_from_pointee
 
 from utils import StringRef, unroll, Variant
 
@@ -132,7 +131,7 @@ struct _RefCountedAttrsDict:
     fn get(self, key: StringLiteral) raises -> _ObjectImpl:
         var iter = self.impl[].find(key)
         if iter:
-            return iter.value()[]
+            return iter.value()
         raise Error(
             "AttributeError: Object does not have an attribute of name '"
             + key
@@ -555,7 +554,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
                 + "'"
             )
         if self.is_func():
-            return "Function at address " + hex(self.get_as_func().value)
+            return "Function at address " + hex(int(self.get_as_func().value))
         if self.is_list():
             var res = String("[")
             for j in range(self.get_list_length()):
@@ -1735,9 +1734,8 @@ struct object(IntableRaising, Boolable, Stringable):
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
             var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
-            initialize_pointee_copy(
-                impl.data,
-                move_from_pointee(self._value.get_as_string().data + index),
+            impl.data.init_pointee_copy(
+                (self._value.get_as_string().data + index).take_pointee(),
             )
             return _ObjectImpl(impl)
         return self._value.get_list_element(i._value.get_as_int().value)

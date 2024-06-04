@@ -1494,11 +1494,11 @@ fn _mlirtype_is_eq[t1: AnyTrivialRegType, t2: AnyTrivialRegType]() -> Bool:
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        `#kgen.parameterizedtype.constant<`,
+        `#kgen.type<`,
         t1,
         `> : !kgen.type`,
         `,`,
-        `#kgen.parameterizedtype.constant<`,
+        `#kgen.type<`,
         t2,
         `> : !kgen.type`,
         `> : i1`,
@@ -1517,11 +1517,11 @@ fn _type_is_eq[t1: AnyType, t2: AnyType]() -> Bool:
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        `#kgen.parameterizedtype.constant<`,
+        `#kgen.type<`,
         +t1,
         `> : !kgen.type`,
         `,`,
-        `#kgen.parameterizedtype.constant<`,
+        `#kgen.type<`,
         +t2,
         `> : !kgen.type`,
         `> : i1`,

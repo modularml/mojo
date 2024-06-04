@@ -10,8 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %bare-mojo %s
 
+# TODO: Replace %bare-mojo with %mojo
+# when  https://github.com/modularml/mojo/issues/2751 is fixed.
 from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
@@ -26,6 +28,7 @@ from testing import (
 )
 
 from utils import StringRef
+from python import Python
 
 
 @value
@@ -89,6 +92,11 @@ fn test_constructors() raises:
     ptr[3] = 0
     var s3 = String(ptr, 4)
     assert_equal(s3, "abc")
+
+    # Construction from PythonObject
+    var py = Python.evaluate("1 + 1")
+    var s4 = String(py)
+    assert_equal(s4, "2")
 
 
 fn test_copy() raises:
@@ -981,27 +989,44 @@ fn test_strip() raises:
     # with default strip chars
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
+    alias comp_empty_string_stripped = String("").strip()
+    assert_true(comp_empty_string_stripped == "")
 
     var space_string = String(" \t\n\r\v\f  ")
     assert_true(space_string.strip() == "")
+    alias comp_space_string_stripped = String(" \t\n\r\v\f  ").strip()
+    assert_true(comp_space_string_stripped == "")
 
     var str0 = String("     n ")
     assert_true(str0.strip() == "n")
+    alias comp_str0_stripped = String("     n ").strip()
+    assert_true(comp_str0_stripped == "n")
 
     var str1 = String("string")
     assert_true(str1.strip() == "string")
+    alias comp_str1_stripped = String("string").strip()
+    assert_true(comp_str1_stripped == "string")
 
     var str2 = String(" \t\n\t\v\fsomething \t\n\t\v\f")
+    alias comp_str2_stripped = String(" \t\n\t\v\fsomething \t\n\t\v\f").strip()
     assert_true(str2.strip() == "something")
+    assert_true(comp_str2_stripped == "something")
 
     # with custom strip chars
     var str3 = String("mississippi")
     assert_true(str3.strip("mips") == "")
     assert_true(str3.strip("mip") == "ssiss")
+    alias comp_str3_stripped = String("mississippi").strip("mips")
+    assert_true(comp_str3_stripped == "")
 
     var str4 = String(" \n mississippimississippi \n ")
     assert_true(str4.strip(" ") == "\n mississippimississippi \n")
     assert_true(str4.strip("\nmip ") == "ssissippimississ")
+
+    alias comp_str4_stripped = String(" \n mississippimississippi \n ").strip(
+        " "
+    )
+    assert_true(comp_str4_stripped == "\n mississippimississippi \n")
 
 
 fn test_hash() raises:

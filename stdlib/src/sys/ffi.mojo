@@ -19,6 +19,9 @@ from utils import StringRef
 from .info import os_is_linux, os_is_windows
 from .intrinsics import _mlirtype_is_eq
 
+alias C_char = Int8
+"""C `char` type."""
+
 
 struct RTLD:
     """Enumeration of the RTLD flags used during dynamic library loading."""
@@ -78,7 +81,7 @@ struct DLHandle(CollectionElement, Boolable):
         @parameter
         if not os_is_windows():
             _ = external_call["dlclose", Int](self.handle)
-            self.handle = DTypePointer[DType.int8].get_null()
+            self.handle = DTypePointer[DType.int8]()
 
     fn __bool__(self) -> Bool:
         """Checks if the handle is valid.
@@ -106,12 +109,12 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](name.unsafe_ptr())
+        return self._get_function[result_type](name.unsafe_cstr_ptr())
 
     @always_inline
     fn _get_function[
         result_type: AnyTrivialRegType
-    ](self, name: DTypePointer[DType.int8]) -> result_type:
+    ](self, name: UnsafePointer[C_char]) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -130,7 +133,9 @@ struct DLHandle(CollectionElement, Boolable):
             var opaque_function_ptr = external_call[
                 "dlsym", DTypePointer[DType.int8]
             ](self.handle.address, name)
-            return UnsafePointer(opaque_function_ptr).bitcast[result_type]()[]
+            return UnsafePointer.address_of(opaque_function_ptr).bitcast[
+                result_type
+            ]()[]
         else:
             return abort[result_type]("get_function isn't supported on windows")
 
@@ -149,7 +154,9 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](func_name.unsafe_ptr())
+        return self._get_function[result_type](
+            func_name.unsafe_ptr().bitcast[C_char]()
+        )
 
 
 # ===----------------------------------------------------------------------===#
@@ -213,13 +220,13 @@ fn _get_dylib_function[
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
-        return UnsafePointer(func_ptr).bitcast[result_type]()[]
+        return UnsafePointer.address_of(func_ptr).bitcast[result_type]()[]
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        UnsafePointer(new_func).bitcast[Pointer[NoneType]]()[],
+        UnsafePointer.address_of(new_func).bitcast[Pointer[NoneType]]()[],
     )
 
     return new_func

@@ -21,7 +21,7 @@ from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from builtin.string import _calc_initial_buffer_size
 from builtin.io import _snprintf
-from builtin.hex import _try_write_int
+from builtin.format_int import _try_write_int
 from builtin.simd import _format_scalar
 
 from utils._visualizers import lldb_formatter_wrapping_type
@@ -268,10 +268,22 @@ struct Int(
     alias MIN = int(Scalar[DType.index].MIN)
     """Returns the minimum value of type."""
 
+    # ===------------------------------------------------------------------=== #
+    # Life cycle methods
+    # ===------------------------------------------------------------------=== #
+
     @always_inline("nodebug")
     fn __init__(inout self):
         """Default constructor that produces zero."""
         self.value = __mlir_op.`index.constant`[value = __mlir_attr.`0:index`]()
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
 
     @always_inline("nodebug")
     fn __init__(inout self, value: __mlir_type.index):
@@ -387,7 +399,7 @@ struct Int(
             if err:
                 abort(
                     "unreachable: unexpected write int failure condition: "
-                    + str(err.value()[])
+                    + str(err.value())
                 )
         else:
             _format_scalar(writer, Int64(self))
@@ -572,6 +584,18 @@ struct Int(
             The Int value itself.
         """
         return self
+
+    @always_inline("nodebug")
+    fn __round__(self, ndigits: Int) -> Self:
+        """Return the rounded value of the Int value, which is itself.
+        Args:
+            ndigits: The number of digits to round to.
+        Returns:
+            The Int value itself if ndigits >= 0 else the rounded value.
+        """
+        if ndigits >= 0:
+            return self
+        return self - (self % 10 ** -(ndigits))
 
     @always_inline("nodebug")
     fn __trunc__(self) -> Self:
