@@ -428,6 +428,15 @@ struct StringRef(
         """
         return self.data
 
+    @always_inline
+    fn empty(self) -> Bool:
+        """Returns True if the StringRef has length = 0.
+
+        Returns:
+            Whether the stringref is empty.
+        """
+        return self.length == 0
+
     fn count(self, substr: StringRef) -> Int:
         """Return the number of non-overlapping occurrences of substring
         `substr` in the string.

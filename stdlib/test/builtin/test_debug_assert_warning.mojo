@@ -14,7 +14,7 @@
 # This file only tests the debug_assert function
 #
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -D ASSERT_WARNING -debug-level full %s | FileCheck %s -check-prefix=CHECK-WARN
+# RUN: %bare-mojo -D ASSERT_WARNING -debug-level full %s | FileCheck %s -check-prefix=CHECK-WARN
 
 
 # CHECK-WARN: test_ok

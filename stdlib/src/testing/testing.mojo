@@ -399,5 +399,5 @@ struct assert_raises:
             Error: If the error raised doesn't match the expected error to raise.
         """
         if self.message_contains:
-            return self.message_contains.value()[] in str(error)
+            return self.message_contains.value() in str(error)
         return True
