@@ -116,7 +116,6 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
     fn _set_result_slot(self, slot: UnsafePointer[type]):
         __mlir_op.`co.set_byref_error_result`(
             self._handle,
-            __mlir_attr.`#interp.pointer<0> : !kgen.pointer<none>`,
             slot.address,
         )
 
@@ -150,7 +149,6 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
         # Don't you dare copy this code! 😤
         __mlir_op.`co.await`[_type=NoneType](
             self._handle,
-            __mlir_attr.`#interp.pointer<0> : !kgen.pointer<none>`,
             __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
         )
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
@@ -200,7 +198,7 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
         self, slot: UnsafePointer[type], err: UnsafePointer[Error]
     ):
         __mlir_op.`co.set_byref_error_result`(
-            self._handle, err.address, slot.address
+            self._handle, slot.address, err.address
         )
 
     @always_inline
@@ -233,10 +231,10 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
         # Don't you dare copy this code! 😤
         if __mlir_op.`co.await`[_type = __mlir_type.i1](
             self._handle,
+            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
             __mlir_op.`lit.ref.to_pointer`(
                 __get_mvalue_as_litref(__get_nearest_error_slot())
             ),
-            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
         ):
             __mlir_op.`lit.ownership.mark_initialized`(
                 __get_mvalue_as_litref(__get_nearest_error_slot())
