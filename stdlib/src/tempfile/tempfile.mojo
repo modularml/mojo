@@ -282,19 +282,21 @@ struct NamedTemporaryFile:
             var potential_name = final_dir / (
                 prefix + _get_random_name() + suffix
             )
-            if not os.path.exists(potential_name):
+            if os.path.exists(potential_name):
+                continue
+            try:
                 # TODO for now this name could be relative,
                 # python implementation expands the path,
                 # but several functions are not yet implemented in mojo
                 # i.e. abspath, normpath
                 self.name = potential_name.__fspath__()
-                break
+                self._file_handle = FileHandle(
+                    potential_name.__fspath__(), mode=mode
+                )
+                return
+            except:
+                continue
         else:
-            raise Error("Failed to create temporary file")
-
-        try:
-            self._file_handle = FileHandle(self.name, mode=mode)
-        except:
             raise Error("Failed to create temporary file")
 
     @always_inline
