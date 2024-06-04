@@ -109,47 +109,6 @@ fn bench_dict_large_lookup(inout b: Bencher) raises:
     keep(large)
 
 
-# NOTE: The delete element benchmarks are commented out because they fail to compile.
-#
-# ===----------------------------------------------------------------------===#
-# Benchmark Dict Small Lookup
-# ===----------------------------------------------------------------------===#
-@parameter
-fn bench_dict_small_del(inout b: Bencher) raises:
-    pass
-    # var small_copy = small
-    #
-    # @always_inline
-    # @parameter
-    # fn call_fn() raises:
-    #     for key in range(0, partial_n):
-    #         # del small_copy[key]
-    #         _ = small_copy.pop(key)
-    #
-    # b.iter[call_fn]()
-    # keep(small_copy)
-
-
-# ===----------------------------------------------------------------------===#
-# Benchmark Dict Large Lookup
-# ===----------------------------------------------------------------------===#
-@parameter
-fn bench_dict_large_del(inout b: Bencher) raises:
-    pass
-
-
-#     var large_copy = large
-#     @always_inline
-#     @parameter
-#     fn call_fn() raises:
-#         for key in range(0, partial_n):
-#             # del large_copy[key]
-#             _ = large_copy.pop(key)
-#
-#     b.iter[call_fn]()
-#     keep(large_copy)
-
-
 # ===----------------------------------------------------------------------===#
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
@@ -169,6 +128,4 @@ def main():
     m.bench_function[bench_dict_large_lookup](
         BenchId("bench_dict_large_lookup")
     )
-    m.bench_function[bench_dict_small_del](BenchId("bench_dict_small_del"))
-    m.bench_function[bench_dict_large_del](BenchId("bench_dict_large_del"))
     m.dump_report()
