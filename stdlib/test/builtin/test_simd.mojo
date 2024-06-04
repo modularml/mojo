@@ -13,10 +13,11 @@
 # RUN: %mojo %s
 
 from sys import has_neon
+
+from testing import assert_equal, assert_false, assert_not_equal, assert_true
+
 from utils.numerics import isfinite, isinf, isnan, nan
 from utils.static_tuple import StaticTuple
-
-from testing import assert_equal, assert_not_equal, assert_true, assert_false
 
 
 def test_cast():

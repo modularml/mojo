@@ -16,10 +16,10 @@ from sys.ffi import C_char
 
 from testing import (
     assert_equal,
-    assert_not_equal,
-    assert_true,
     assert_false,
+    assert_not_equal,
     assert_raises,
+    assert_true,
 )
 
 

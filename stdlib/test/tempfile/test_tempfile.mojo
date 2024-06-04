@@ -15,8 +15,9 @@
 import os
 from os.path import exists
 from pathlib import Path
-from testing import assert_true, assert_false, assert_equal
-from tempfile import gettempdir, mkdtemp, TemporaryDirectory
+from tempfile import TemporaryDirectory, gettempdir, mkdtemp
+
+from testing import assert_equal, assert_false, assert_true
 
 
 fn test_mkdtemp() raises:

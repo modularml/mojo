@@ -13,13 +13,13 @@
 # RUN: %mojo -D CURRENT_DIR=%S %s
 
 from pathlib import Path
-from sys import os_is_windows, env_get_string
+from sys import env_get_string, os_is_windows
 
 alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
-from testing import assert_true, assert_equal, assert_false
-from random import random_si64, random_ui64, random_float64, seed
+from random import random_float64, random_si64, random_ui64, seed
 
 from builtin.sort import _quicksort, _small_sort
+from testing import assert_equal, assert_false, assert_true
 
 
 fn random_numbers[

@@ -14,8 +14,7 @@
 
 from sys import sizeof
 
-from memory import memcmp, memcpy, memset, memset_zero, DTypePointer, Pointer
-from utils.numerics import nan
+from memory import DTypePointer, Pointer, memcmp, memcpy, memset, memset_zero
 from testing import (
     assert_almost_equal,
     assert_equal,
@@ -24,6 +23,7 @@ from testing import (
 )
 
 from utils import Index
+from utils.numerics import nan
 
 alias void = __mlir_attr.`#kgen.dtype.constant<invalid> : !kgen.dtype`
 alias int8_pop = __mlir_type.`!pop.scalar<si8>`

@@ -13,7 +13,9 @@
 # RUN: %mojo %s
 
 from sys.info import has_neon
-from testing import assert_equal, assert_true, assert_false, assert_almost_equal
+
+from testing import assert_almost_equal, assert_equal, assert_false, assert_true
+
 from utils.numerics import (
     FPUtils,
     get_accum_type,

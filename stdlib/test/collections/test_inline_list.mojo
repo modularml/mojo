@@ -13,8 +13,9 @@
 # RUN: %mojo %s
 
 from collections import InlineList, Set
-from testing import assert_equal, assert_false, assert_true, assert_raises
+
 from test_utils import MoveCounter
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_list():
