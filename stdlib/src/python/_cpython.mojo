@@ -110,6 +110,8 @@ struct CPython:
         var logging_enabled = getenv("MODULAR_CPYTHON_LOGGING") == "ON"
         if logging_enabled:
             print("CPython init")
+            print("MOJO_PYTHON:", getenv("MOJO_PYTHON"))
+            print("MOJO_PYTHON_LIBRARY:", getenv("MOJO_PYTHON_LIBRARY"))
 
         # TODO(MOCO-772) Allow raises to propagate through function pointers
         # and make this initialization a raising function.
@@ -119,6 +121,10 @@ struct CPython:
         ]()
 
         var python_lib = getenv("MOJO_PYTHON_LIBRARY")
+
+        if logging_enabled:
+            print("PYTHONEXECUTABLE:", getenv("PYTHONEXECUTABLE"))
+            print("libpython selected:", python_lib)
 
         self.lib = DLHandle(python_lib)
         self.total_ref_count = UnsafePointer[Int].alloc(1)
