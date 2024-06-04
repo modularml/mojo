@@ -24,7 +24,6 @@ from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import StringRef, StaticIntTuple, Span, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
-from collections.dict import OwnedKwargsDict
 
 # ===----------------------------------------------------------------------=== #
 # ord
