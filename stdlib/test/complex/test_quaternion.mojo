@@ -14,7 +14,7 @@
 
 from testing import assert_equal, assert_false, assert_true, assert_almost_equal
 
-from complex.quaternion import Quaternion, DualQuaternion
+from complex import Quaternion, DualQuaternion
 
 
 fn test_quaternion_ops() raises:
