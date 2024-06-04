@@ -10,21 +10,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -D CURRENT_DIR=%S -D TEMP_FILE_DIR=%T -debug-level full %s
+# RUN: %mojo -D TEMP_FILE_DIR=%T -debug-level full %s
 
 
-from pathlib import Path
-from sys import env_get_string, os_is_windows
+from pathlib import Path, _dir_of_current_file
+from sys import os_is_windows, env_get_string
 
 from testing import assert_equal, assert_true
 
-alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
 alias TEMP_FILE_DIR = env_get_string["TEMP_FILE_DIR"]()
 
 
 def test_file_read():
     var f = open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
+        _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     )
     assert_true(
@@ -37,7 +36,7 @@ def test_file_read():
 
 def test_file_read_multi():
     var f = open(
-        (Path(CURRENT_DIR) / "test_file_dummy_input.txt"),
+        _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     )
 
@@ -50,7 +49,7 @@ def test_file_read_multi():
 
 def test_file_read_bytes_multi():
     var f = open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
+        _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     )
 
@@ -80,7 +79,7 @@ def test_file_read_bytes_multi():
 
 
 def test_file_read_path():
-    var file_path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
+    var file_path = _dir_of_current_file() / "test_file_dummy_input.txt"
 
     var f = open(file_path, "r")
     assert_true(
@@ -92,7 +91,7 @@ def test_file_read_path():
 
 
 def test_file_path_direct_read():
-    var file_path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
+    var file_path = _dir_of_current_file() / "test_file_dummy_input.txt"
     assert_true(
         file_path.read_text().startswith(
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
@@ -102,7 +101,7 @@ def test_file_path_direct_read():
 
 def test_file_read_context():
     with open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
+        _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
         assert_true(
@@ -116,7 +115,7 @@ def test_file_seek():
     import os
 
     with open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
+        _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
         var pos = f.seek(6)
@@ -196,7 +195,7 @@ struct Word:
 
 
 def test_file_read_to_dtype_pointer():
-    var f = open(Path(CURRENT_DIR) / "test_file_dummy_input.txt", "r")
+    var f = open(_dir_of_current_file() / "test_file_dummy_input.txt", "r")
 
     var ptr = DTypePointer[DType.int8].alloc(8)
     var data = f.read(ptr, 8)
@@ -217,7 +216,7 @@ def test_file_get_raw_fd():
     # if we printed to the right file.
     var f1 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_1", "rw")
     var f2 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_2", "rw")
-    var f3 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_2", "rw")
+    var f3 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_3", "rw")
 
     print(
         "test from file 1",
@@ -243,6 +242,10 @@ def test_file_get_raw_fd():
     assert_equal(f3.read(), "test from file 3")
     assert_equal(f2.read(), "test from file 2")
     assert_equal(f1.read(), "test from file 1")
+
+    f1.close()
+    f2.close()
+    f3.close()
 
 
 def main():
