@@ -2189,10 +2189,10 @@ struct _FormatCurlyEntry:
     """
 
     var first_curly: Int
-    """the index of an opening brace around a substitution field"""
+    """The index of an opening brace around a substitution field."""
 
     var last_curly: Int
-    """the index of an closing brace around a substitution field"""
+    """The index of an closing brace around a substitution field."""
 
     var field: Variant[
         String,  # kwargs indexing (`{field_name}`)
