@@ -689,27 +689,18 @@ struct DTypePointer[
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self, offset: Int) -> Scalar[type]:
-        """Loads a single element (SIMD of size 1) from the pointer at the
-        specified index.
+    fn __getitem__(
+        self, offset: Int = 0
+    ) -> ref [MutableStaticLifetime, address_space._value.value] Scalar[type]:
+        """Enable subscript syntax `ptr[]` to access the element.
 
         Args:
             offset: The offset to load from.
 
         Returns:
-            The loaded value.
+            The reference for the Mojo compiler to use.
         """
-        return Scalar.load(self, offset)
-
-    @always_inline("nodebug")
-    fn __setitem__(self, offset: Int, val: Scalar[type]):
-        """Stores a single element value at the given offset.
-
-        Args:
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        return Scalar.store(self, offset, val)
+        return self.address[offset]
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
