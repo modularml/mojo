@@ -65,6 +65,7 @@ struct CopyCounter(CollectionElement):
 
     fn __copyinit__(inout self, existing: Self):
         self.copy_count = existing.copy_count + 1
+        print("copy now at ", self.copy_count)
 
 
 struct MoveCounter[T: CollectionElementNew](

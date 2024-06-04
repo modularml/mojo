@@ -15,9 +15,25 @@
 # TODO: Make this public when we are certain of the design.
 # TODO: Move _size into an alias when the bug https://github.com/modularml/mojo/issues/2889
 # is fixed.
-struct _MaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
+struct UnsafeMaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
     CollectionElement
 ):
+    """A memory location that may or may not be initialized.
+
+    Note that the destructor is a no-op. If the memory was initialized, the caller
+    is responsible for calling `assume_initialized_destroy` before the memory is
+    deallocated.
+
+    Every method in this struct is unsafe and the caller must know at all
+    times if the memory is initialized or not. Calling a method
+    that assumes the memory is initialized when it is not will result in
+    undefined behavior.
+
+    Parameters:
+        ElementType: The type of the element to store.
+        _size: This is an implementation detail and should never be used by the user.
+    """
+
     alias type = __mlir_type[
         `!pop.array<`, _size.value, `, `, Self.ElementType, `>`
     ]
@@ -30,48 +46,121 @@ struct _MaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
 
     @always_inline
     fn __init__(inout self, owned value: Self.ElementType):
-        """The memory is now considered initialized."""
+        """The memory is now considered initialized.
+
+        Args:
+            value: The value to initialize the memory with.
+        """
         self = Self()
         self.write(value^)
 
     @always_inline
     fn __copyinit__(inout self, other: Self):
-        """Calling this method assumes that the memory is initialized."""
-        self = Self()
-        initialize_pointee_copy(self.unsafe_ptr(), other.assume_initialized())
+        """Copy another object.
+
+        Note that this method is actually a no-op and leaves the memory uninitialized.
+        It is unadvised to actually call this function.
+
+        If you wish to perform a copy, you should manually call the method
+        `copy_from` instead.
+
+        Args:
+            other: The object to copy.
+        """
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
+    fn copy_from(inout self, other: Self):
+        """Copy another object.
+
+        This function assumes that the current memory is uninitialized
+        and the other object is initialized memory.
+
+        Args:
+            other: The object to copy.
+        """
+        self.unsafe_ptr().init_pointee_copy(other.assume_initialized())
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
-        """Calling this method assumes that the memory is initialized."""
-        self = Self()
-        move_pointee(src=other.unsafe_ptr(), dst=self.unsafe_ptr())
+        """Move another object.
+
+        Note that this method is actually a no-op and leaves the memory uninitialized.
+        It is unadvised to actually call this function.
+
+        If you wish to perform a move, you should manually call the method
+        `move_from` instead.
+
+        Args:
+            other: The object to move.
+        """
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
+    fn move_from(inout self, inout other: Self):
+        """Move another object.
+
+        This function assumes that the current memory is uninitialized
+        and the other object is initialized memory.
+
+        After the function is called, the other object is considered uninitialized.
+
+        Args:
+            other: The object to move.
+        """
+        other.unsafe_ptr().move_pointee_into(self.unsafe_ptr())
 
     @always_inline
     fn write(inout self, owned value: Self.ElementType):
-        """Calling this method assumes that the memory is uninitialized."""
+        """Write a value into an uninitialized memory location.
+
+        Calling this method assumes that the memory is uninitialized.
+
+        Args:
+            value: The value to write.
+        """
         self.unsafe_ptr()[] = value^
 
     @always_inline
     fn assume_initialized(
-        self: Reference[Self, _, _]
-    ) -> ref [self.lifetime] Self.ElementType:
-        """Calling this method assumes that the memory is initialized."""
-        return self[].unsafe_ptr()[]
+        ref [_]self: Self,
+    ) -> ref [__lifetime_of(self)] Self.ElementType:
+        """Returns a reference to the internal value.
+
+        Calling this method assumes that the memory is initialized.
+
+        Returns:
+            A reference to the internal value.
+        """
+        return self.unsafe_ptr()[]
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[Self.ElementType]:
-        """Get a pointer to the underlying element."""
+        """Get a pointer to the underlying element.
+
+        Note that this method does not assumes that the memory is initialized
+        or not. It can always be called.
+
+        Returns:
+            A pointer to the underlying element.
+        """
         return UnsafePointer(self._array).bitcast[Self.ElementType]()
 
     @always_inline
     fn assume_initialized_destroy(inout self):
-        """Calling this method assumes that the memory is initialized."""
-        destroy_pointee(self.unsafe_ptr())
+        """Runs the destructor of the internal value.
+
+        Calling this method assumes that the memory is initialized.
+
+        """
+        self.unsafe_ptr().destroy_pointee()
 
     @always_inline
     fn __del__(owned self):
-        """Calling this method assumes that the memory is uninitialized. This is a no-op.
+        """This is a no-op.
 
-        If the memory was initialized, the caller should use `assume_initialized_destroy` before.
+        Calling this method assumes that the memory is uninitialized.
+        If the memory was initialized, the caller should
+        use `assume_initialized_destroy` before.
         """
         pass

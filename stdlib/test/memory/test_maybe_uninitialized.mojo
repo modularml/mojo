@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from memory.unsafe import _MaybeUninitialized
+from memory.unsafe import UnsafeMaybeUninitialized
 from testing import assert_equal
 from test_utils import MoveCounter, CopyCounter
 
@@ -30,7 +30,7 @@ def test_maybe_uninitialized():
     # Every time an Int is destroyed, it's going to be reccorded here.
     var destructor_counter = List[Int]()
 
-    var a = _MaybeUninitialized[ValueToCountDestructor]()
+    var a = UnsafeMaybeUninitialized[ValueToCountDestructor]()
     a.write(ValueToCountDestructor(42, UnsafePointer(destructor_counter)))
 
     assert_equal(a.assume_initialized().value, 42)
@@ -58,31 +58,40 @@ struct ImpossibleToDestroy(CollectionElement):
 
 
 def test_write_does_not_trigger_destructor():
-    var a = _MaybeUninitialized[ImpossibleToDestroy]()
+    var a = UnsafeMaybeUninitialized[ImpossibleToDestroy]()
     a.write(ImpossibleToDestroy(42))
 
     # Using the initializer should not trigger the destructor too.
-    var b = _MaybeUninitialized[ImpossibleToDestroy](ImpossibleToDestroy(42))
+    var b = UnsafeMaybeUninitialized[ImpossibleToDestroy](
+        ImpossibleToDestroy(42)
+    )
 
     # The destructor of a and b have already run at this point, and it shouldn't have
     # caused a crash since we assume uninitialized memory.
 
 
 def test_maybe_uninitialized_move():
-    var a = _MaybeUninitialized[MoveCounter[Int]](MoveCounter(10))
+    var a = UnsafeMaybeUninitialized[MoveCounter[Int]](MoveCounter(10))
     assert_equal(a.assume_initialized().move_count, 1)
 
-    var b = a^
+    var b = a
+    # b is uninitialized here.
+    b.move_from(a)
+    # a is uninitialized now.
     assert_equal(b.assume_initialized().move_count, 2)
     b.assume_initialized_destroy()
 
 
 def test_maybe_uninitialized_copy():
-    var a = _MaybeUninitialized[CopyCounter]()
+    var a = UnsafeMaybeUninitialized[CopyCounter]()
     a.write(CopyCounter())
     assert_equal(a.assume_initialized().copy_count, 0)
 
     var b = a
+    assert_equal(a.assume_initialized().copy_count, 0)
+
+    # b is uninitialized here.
+    b.copy_from(a)
     a.assume_initialized_destroy()
 
     assert_equal(b.assume_initialized().copy_count, 1)
