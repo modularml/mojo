@@ -2187,7 +2187,7 @@ struct _FormatCurlyEntry:
 
     Specifically to structure fields.
 
-    Does not contains any substitution values.
+    Does not contain any substitution values.
 
     """
 
