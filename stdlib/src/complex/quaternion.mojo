@@ -375,6 +375,17 @@ struct Quaternion[T: DType = DType.float64]:
     #     )
     #     return mat
 
+    fn __eq__(self, other: Self) -> Bool:
+        """Whether self is equal to other.
+
+        Args:
+            other: The other Quaternion.
+
+        Returns:
+            The result.
+        """
+        return (self.vec == other.vec).reduce_and()
+
 
 # ===----------------------------------------------------------------------===#
 # DualQuaternion
@@ -793,3 +804,14 @@ struct DualQuaternion[T: DType = DType.float64]:
     #         return vec / sqrt((vec**2).reduce_add())
 
     #     return closure
+
+    fn __eq__(self, other: Self) -> Bool:
+        """Whether self is equal to other.
+
+        Args:
+            other: The other DualQuaternion.
+
+        Returns:
+            The result.
+        """
+        return (self.vec == other.vec).reduce_and()
