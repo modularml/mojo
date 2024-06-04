@@ -2004,7 +2004,7 @@ struct String(
             The template with the given values substituted.
 
         """
-        alias NUM_POS_ARGS = len(VariadicList(Ts))
+        alias num_pos_args = len(VariadicList(Ts))
         var entries = _FormatCurlyEntry.create_entries(self, NUM_POS_ARGS)
 
         var res: String = ""
