@@ -843,19 +843,11 @@ fn test_isspace() raises:
 
     # test all utf8 and unicode separators
     # 0 is to build a String with null terminator
-    alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
-    """TODO: \\x1c"""
-    alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
-    """TODO: \\x1e"""
-    alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+    alias next_line = List[UInt8](0xC2, 0x85, 0)
     """TODO: \\x85"""
-    alias unicode_line_sep = List[UInt8](
-        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
-    )
+    alias unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
     """TODO: \\u2028"""
-    alias unicode_paragraph_sep = List[UInt8](
-        0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
-    )
+    alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
     """TODO: \\u2029"""
     # TODO add line and paragraph separator as stringliteral once unicode
     # escape secuences are accepted
@@ -866,28 +858,27 @@ fn test_isspace() raises:
         String("\r"),
         String("\v"),
         String("\f"),
+        String("\x1c"),
+        String("\x1d"),
+        String("\x1e"),
         String(next_line),
-        String(information_sep_four),
-        String(information_sep_two),
         String(unicode_line_sep),
         String(unicode_paragraph_sep),
     )
-
-    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0):
-        var val = String(List[UInt8](b[], 0))
-        if not (val in univ_sep_var):
-            assert_false(val.isspace())
-
-    for b in List[UInt8](0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0):
-        var val = String(List[UInt8](b[], 0))
-        if not (val in univ_sep_var):
-            assert_false(val.isspace())
 
     for i in univ_sep_var:
         assert_true(i[].isspace())
 
     for i in List[String]("not", "space", "", "s", "a", "c"):
         assert_false(i[].isspace())
+
+    for i in range(len(univ_sep_var)):
+        var sep = String("")
+        for j in range(len(univ_sep_var)):
+            sep += univ_sep_var[i]
+            sep += univ_sep_var[j]
+        assert_true(sep.isspace())
+        _ = sep
 
 
 fn test_ascii_aliases() raises:
@@ -1107,6 +1098,93 @@ def test_indexing():
     assert_equal(a[2], "c")
 
 
+def test_string_iter():
+    var vs = String("123")
+
+    # Borrow immutably
+    fn conc(vs: String) -> String:
+        var c = String("")
+        for v in vs:
+            c += v
+        return c
+
+    assert_equal(123, atol(conc(vs)))
+
+    concat = String("")
+    for v in vs.__reversed__():
+        concat += v
+    assert_equal(321, atol(concat))
+
+    # TODO: UnsafePointer does not have a store or __setitem__ method
+    # for v in vs:
+    #     v.unsafe_ptr().store(0, "1")
+
+    # # Borrow immutably
+    # for v in vs:
+    #     concat += v
+
+    # assert_equal(111, atol(concat))
+
+    var idx = -1
+    vs = String("mojo🔥")
+    for item in vs:
+        idx += 1
+        if idx == 0:
+            assert_equal("m", item)
+        elif idx == 1:
+            assert_equal("o", item)
+        elif idx == 2:
+            assert_equal("j", item)
+        elif idx == 3:
+            assert_equal("o", item)
+        elif idx == 4:
+            assert_equal("🔥", item)
+    assert_equal(4, idx)
+
+    var items = List[String](
+        "mojo🔥",
+        "السلام عليكم",
+        "Dobrý den",
+        "Hello",
+        "שָׁלוֹם",
+        "नमस्ते",
+        "こんにちは",
+        "안녕하세요",
+        "你好",
+        "Olá",
+        "Здравствуйте",
+    )
+    var rev = List[String](
+        "🔥ojom",
+        "مكيلع مالسلا",
+        "ned ýrboD",
+        "olleH",
+        "םֹולָׁש",
+        "ेत्समन",
+        "はちにんこ",
+        "요세하녕안",
+        "好你",
+        "álO",
+        "етйувтсвардЗ",
+    )
+    var utf8_sequence_lengths = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
+    for item_idx in range(len(items)):
+        var item = items[item_idx]
+        var utf8_sequence_len = 0
+        var byte_idx = 0
+        for v in item:
+            var byte_len = len(v)
+            assert_equal(item[byte_idx : byte_idx + byte_len], v)
+            byte_idx += byte_len
+            utf8_sequence_len += 1
+        assert_equal(utf8_sequence_len, utf8_sequence_lengths[item_idx])
+        var concat = String("")
+        for v in item.__reversed__():
+            concat += v
+        assert_equal(rev[item_idx], concat)
+        item_idx += 1
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1151,3 +1229,4 @@ def main():
     test_intable()
     test_string_mul()
     test_indexing()
+    test_string_iter()
