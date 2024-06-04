@@ -74,7 +74,7 @@ def test_maybe_uninitialized_move():
     var a = UnsafeMaybeUninitialized[MoveCounter[Int]](MoveCounter(10))
     assert_equal(a.assume_initialized().move_count, 1)
 
-    var b = a
+    var b = UnsafeMaybeUninitialized[MoveCounter[Int]]()
     # b is uninitialized here.
     b.move_from(a)
     # a is uninitialized now.
@@ -87,7 +87,7 @@ def test_maybe_uninitialized_copy():
     a.write(CopyCounter())
     assert_equal(a.assume_initialized().copy_count, 0)
 
-    var b = a
+    var b = UnsafeMaybeUninitialized[CopyCounter]()
     assert_equal(a.assume_initialized().copy_count, 0)
 
     # b is uninitialized here.

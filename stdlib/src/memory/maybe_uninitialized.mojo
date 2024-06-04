@@ -67,7 +67,8 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
         Args:
             other: The object to copy.
         """
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        abort("You should never call __copyinit__ on MaybeUninitialized")
+        self = Self()
 
     @always_inline
     fn copy_from(inout self, other: Self):
@@ -94,7 +95,8 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
         Args:
             other: The object to move.
         """
-        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        abort("You should never call __moveinit__ on MaybeUninitialized")
+        self = Self()
 
     @always_inline
     fn move_from(inout self, inout other: Self):
