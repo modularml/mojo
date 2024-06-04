@@ -267,3 +267,74 @@ fn gcd(*values: Int) -> Int:
         if result == 1:
             return result
     return result
+
+
+# ===----------------------------------------------------------------------=== #
+# lcm
+# ===----------------------------------------------------------------------=== #
+
+
+fn lcm(owned m: Int, owned n: Int, /) -> Int:
+    """Computes the least common multiple of two integers.
+
+    Args:
+        m: The first integer.
+        n: The second integer.
+
+    Returns:
+        The least common multiple of the two integers.
+    """
+    var d: Int
+    if d := gcd(m, n):
+        return abs((m // d) * n if m > n else (n // d) * m)
+    return 0
+
+
+fn lcm(s: Span[Int], /) -> Int:
+    """Computes the least common multiple of a span of integers.
+
+    Args:
+        s: A span of integers.
+
+    Returns:
+        The least common multiple of the span.
+    """
+    if len(s) == 0:
+        return 1
+
+    var result = s[0]
+    for item in s[1:]:
+        result = lcm(result, item[])
+    return result
+
+
+@always_inline
+fn lcm(l: List[Int], /) -> Int:
+    """Computes the least common multiple of a list of integers.
+
+    Args:
+        l: A list of integers.
+
+    Returns:
+        The least common multiple of the list.
+    """
+    return lcm(Span(l))
+
+
+fn lcm(*values: Int) -> Int:
+    """Computes the least common multiple of a variadic list of integers.
+
+    Args:
+        values: A variadic list of integers.
+
+    Returns:
+        The least common multiple of the list.
+    """
+    # TODO: Deduplicate when we can create a Span from VariadicList
+    if len(values) == 0:
+        return 1
+
+    var result = values[0]
+    for i in range(1, len(values)):
+        result = lcm(result, values[i])
+    return result

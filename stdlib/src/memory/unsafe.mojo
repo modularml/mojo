@@ -162,9 +162,7 @@ struct LegacyPointer[
     var address: Self._mlir_type
     """The pointed-to address."""
 
-    alias _ref_type = Reference[
-        type, True, MutableStaticLifetime, address_space
-    ]
+    alias _ref_type = Reference[type, MutableStaticLifetime, address_space]
 
     @always_inline("nodebug")
     fn __init__() -> Self:
@@ -236,7 +234,7 @@ struct LegacyPointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: Reference[type, _, _, address_space]) -> Self:
+    fn address_of(ref [_, address_space._value.value]arg: type) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -247,7 +245,7 @@ struct LegacyPointer[
         """
         # Work around AnyTrivialRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
-            UnsafePointer(arg).address
+            UnsafePointer.address_of(arg).address
         )
 
     @always_inline("nodebug")
@@ -668,7 +666,7 @@ struct DTypePointer[
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: Reference[Scalar[type], _, _, address_space]) -> Self:
+    fn address_of(ref [_, address_space._value.value]arg: Scalar[type]) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -677,7 +675,7 @@ struct DTypePointer[
         Returns:
             A DTypePointer struct which contains the address of the argument.
         """
-        return LegacyPointer.address_of(arg[])
+        return LegacyPointer.address_of(arg)
 
     @always_inline("nodebug")
     fn __getitem__(self, offset: Int) -> Scalar[type]:

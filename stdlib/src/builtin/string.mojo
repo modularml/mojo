@@ -162,10 +162,7 @@ fn _repr_ascii(c: UInt8) -> String:
         return r"\r"
     else:
         var uc = c.cast[DType.uint8]()
-        if uc < 16:
-            return hex(uc, r"\x0")
-        else:
-            return hex(uc, r"\x")
+        return hex[r"\x0"](uc) if uc < 16 else hex[r"\x"](uc)
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
@@ -725,6 +722,14 @@ struct String(
     fn __init__(inout self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.__copyinit__(other)
 
     @always_inline
     fn __init__(inout self, str: StringRef):
@@ -1305,9 +1310,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(
-        self: Reference[Self, _, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1317,28 +1320,24 @@ struct String(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
-            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+        return Span[UInt8, __lifetime_of(self)](
+            unsafe_ptr=self._buffer.unsafe_ptr(),
             # Does NOT include the NUL terminator.
-            len=self[]._byte_length(),
+            len=self._byte_length(),
         )
 
     @always_inline
-    fn as_string_slice(
-        self: Reference[Self, _, _]
-    ) -> StringSlice[self.is_mutable, self.lifetime]:
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        var bytes = self[].as_bytes_slice()
-
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice[self.is_mutable, self.lifetime](
-            unsafe_from_utf8=bytes
+        return StringSlice[__lifetime_of(self)](
+            unsafe_from_utf8=self.as_bytes_slice()
         )
 
     fn _byte_length(self) -> Int:
