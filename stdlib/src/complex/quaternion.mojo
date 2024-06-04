@@ -152,7 +152,11 @@ struct Quaternion[T: DType = DType.float64]:
         return Self(self.vec + other.vec)
 
     fn __iadd__(inout self, other: Self):
-        """Add other to self inplace."""
+        """Add other to self inplace.
+
+        Args:
+            other: The other Quaternion.
+        """
         self.vec += other.vec
 
     fn __sub__(self, other: Self) -> Self:
@@ -167,7 +171,11 @@ struct Quaternion[T: DType = DType.float64]:
         return Self(self.vec - other.vec)
 
     fn __isub__(inout self, other: Self):
-        """Subtract other from self inplace."""
+        """Subtract other from self inplace.
+
+        Args:
+            other: The other Quaternion.
+        """
         self.vec -= other.vec
 
     fn conjugate(self) -> Self:
@@ -199,6 +207,9 @@ struct Quaternion[T: DType = DType.float64]:
 
     fn __mul__(self, other: Self) -> Self:
         """Calculate the Hamilton product of self with other.
+
+        Args:
+            other: The other Quaternion.
 
         Returns:
             The result.
@@ -533,7 +544,11 @@ struct DualQuaternion[T: DType = DType.float64]:
         return Self(self.vec + other.vec)
 
     fn __iadd__(inout self, other: Self):
-        """Add other to self inplace."""
+        """Add other to self inplace.
+
+        Args:
+            other: The other DualQuaternion.
+        """
         self.vec += other.vec
 
     fn __sub__(self, other: Self) -> Self:
@@ -548,7 +563,11 @@ struct DualQuaternion[T: DType = DType.float64]:
         return Self(self.vec - other.vec)
 
     fn __isub__(inout self, other: Self):
-        """Subtract other from self inplace."""
+        """Subtract other from self inplace.
+
+        Args:
+            other: The other DualQuaternion.
+        """
         self.vec -= other.vec
 
     fn __mul__(self, other: Self) -> Self:
