@@ -27,6 +27,7 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "macos-14"]
+        mojo-enable-assertions: [0, 1]
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -99,6 +100,8 @@ jobs:
           echo $(brew --prefix llvm@15)/bin/ >> $GITHUB_PATH
 
       - name: Run standard library tests and examples
+        env:
+          MOJO_ENABLE_ASSERTIONS_IN_TESTS: ${{ matrix.mojo-enable-assertions }}
         run: |
           ./stdlib/scripts/run-tests.sh
           ./examples/run-examples.sh

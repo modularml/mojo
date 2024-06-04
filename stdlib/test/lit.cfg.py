@@ -47,7 +47,14 @@ config.available_features.add(platform.system().lower())
 # Substitute %mojo for just `mojo` itself
 # since we're not supporting `--sanitize` initially
 # to allow running the tests with LLVM sanitizers.
-config.substitutions.insert(0, ("%mojo", "mojo -D MOJO_ENABLE_ASSERTIONS"))
+
+if bool(int(os.environ.get("MOJO_ENABLE_ASSERTIONS_IN_TESTS", 1))):
+    base_mojo_command = "mojo -D MOJO_ENABLE_ASSERTIONS"
+else:
+    print("Running tests with assertions disabled.")
+    base_mojo_command = "mojo"
+
+config.substitutions.insert(0, ("%mojo", base_mojo_command))
 config.substitutions.insert(1, ("%bare-mojo", "mojo"))
 
 # The `mojo` nightly compiler ships with its own `stdlib.mojopkg`. For the
