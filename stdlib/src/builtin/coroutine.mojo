@@ -148,21 +148,12 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
 
         # Black magic! Internal implementation detail!
         # Don't you dare copy this code! 😤
+        __mlir_op.`co.await`[_type=NoneType](
+            self._handle,
+            __mlir_attr.`#interp.pointer<0> : !kgen.pointer<none>`,
+            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
+        )
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
-        self._set_result_slot(UnsafePointer.address_of(out))
-
-        @always_inline
-        @parameter
-        fn await_body(parent_hdl: AnyCoroutine):
-            LegacyPointer(self._get_ctx[_CoroutineContext]().address).store(
-                _CoroutineContext {
-                    _resume_fn: _coro_get_resume_fn(parent_hdl),
-                    _parent_hdl: parent_hdl,
-                }
-            )
-            _coro_resume_fn(self._handle)
-
-        _suspend_async[await_body]()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -240,26 +231,13 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
 
         # Black magic! Internal implementation detail!
         # Don't you dare copy this code! 😤
-        self._set_result_slot(
-            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
+        if __mlir_op.`co.await`[_type = __mlir_type.i1](
+            self._handle,
             __mlir_op.`lit.ref.to_pointer`(
                 __get_mvalue_as_litref(__get_nearest_error_slot())
             ),
-        )
-
-        @always_inline
-        @parameter
-        fn await_body(parent_hdl: AnyCoroutine):
-            LegacyPointer(self._get_ctx[_CoroutineContext]().address).store(
-                _CoroutineContext {
-                    _resume_fn: _coro_get_resume_fn(parent_hdl),
-                    _parent_hdl: parent_hdl,
-                }
-            )
-            _coro_resume_fn(self._handle)
-
-        _suspend_async[await_body]()
-        if __mlir_op.`co.get_results`[_type = __mlir_type.i1](self._handle):
+            __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
+        ):
             __mlir_op.`lit.ownership.mark_initialized`(
                 __get_mvalue_as_litref(__get_nearest_error_slot())
             )
