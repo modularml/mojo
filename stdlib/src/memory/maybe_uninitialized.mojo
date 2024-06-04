@@ -58,8 +58,10 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
     fn __copyinit__(inout self, other: Self):
         """Copy another object.
 
-        Note that this method is actually a no-op and leaves the memory uninitialized.
-        It is unadvised to actually call this function.
+        This method should never be called as implicit copy should not
+        be done on memory that may be uninitialized.
+
+        Calling this method will actally cause the program to abort.
 
         If you wish to perform a copy, you should manually call the method
         `copy_from` instead.
@@ -86,8 +88,10 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
     fn __moveinit__(inout self, owned other: Self):
         """Move another object.
 
-        Note that this method is actually a no-op and leaves the memory uninitialized.
-        It is unadvised to actually call this function.
+        This method should never be called as implicit moves should not
+        be done on memory that may be uninitialized.
+
+        Calling this method will actally cause the program to abort.
 
         If you wish to perform a move, you should manually call the method
         `move_from` instead.
