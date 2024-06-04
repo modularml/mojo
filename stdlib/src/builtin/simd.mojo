@@ -324,7 +324,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                    constructed.
         """
         _simd_construction_checks[type, size]()
-        var num_elements: Int = len(elems)
+
+        var num_elements = len(elems)
         if num_elements == 1:
             # Construct by broadcasting a scalar.
             self.value = __mlir_op.`pop.simd.splat`[
@@ -345,7 +346,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 " constructor"
             ),
         )
-        self = Self()
+
+        self = __mlir_op.`kgen.undef`[
+            _type = __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`]
+        ]()
 
         @parameter
         for i in range(size):
