@@ -1239,10 +1239,16 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
                 o_vec_l[i] = other.vec[i - capacity]
 
             var x0 = s_vec_l.rotate_left[1]()
+            var y1 = o_vec_l.rotate_left[1]()
+
+            @parameter
+            if capacity == 3:
+                s_vec_l[0] = s_vec_l[1]
+                o_vec_l[0] = o_vec_l[1]
+
             var y0 = o_vec_l.rotate_left[2]()
             var vec0 = x0.join(y0)
             var x1 = s_vec_l.rotate_left[2]()
-            var y1 = o_vec_l.rotate_left[1]()
             var vec1 = x1.join(y1)
             return Self(vec0.reduce_mul[size]() - vec1.reduce_mul[size]())
 
