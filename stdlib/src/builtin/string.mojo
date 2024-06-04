@@ -2202,7 +2202,7 @@ struct _FormatCurlyEntry:
     ]
     """Store the substitution field."""
 
-    fn _is_escaped_brace(ref [_]self) -> Bool:
+    fn is_escaped_brace(ref [_]self) -> Bool:
         return self.field.isa[Bool]()
 
     fn _is_kwargs_field(ref [_]self) -> Bool:
