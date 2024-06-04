@@ -10,7 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo-no-debug %s -t
+# RUN: %mojo %s -t
 
 from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
 from stdlib.collections import Dict
