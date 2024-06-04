@@ -270,30 +270,32 @@ struct NamedTemporaryFile:
             dir: Directory in which the file will be created.
             delete: Whether the file is deleted on close.
         """
+
         var final_dir = Path(dir.value()) if dir else Path(
             _get_default_tempdir()
         )
 
         self._delete = delete
+        self.name = ""
 
         for _ in range(TMP_MAX):
             var potential_name = final_dir / (
                 prefix + _get_random_name() + suffix
             )
-            try:
-                if os.path.exists(potential_name) == False:
-                    # TODO for now this name could be relative,
-                    # python implementation expands the path,
-                    # but several functions are not yet implemented in mojo
-                    # i.e. abspath, normpath
-                    self.name = potential_name.__fspath__()
-                    self._file_handle = FileHandle(
-                        potential_name.__fspath__(), mode=mode
-                    )
-                    return
-            except:
-                continue
-        raise Error("Failed to create temporary file")
+            if not os.path.exists(potential_name):
+                # TODO for now this name could be relative,
+                # python implementation expands the path,
+                # but several functions are not yet implemented in mojo
+                # i.e. abspath, normpath
+                self.name = potential_name.__fspath__()
+                break
+        else:
+            raise Error("Failed to create temporary file")
+
+        try:
+            self._file_handle = FileHandle(self.name, mode=mode)
+        except:
+            raise Error("Failed to create temporary file")
 
     @always_inline
     fn __del__(owned self):
