@@ -1218,10 +1218,33 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
-        # TODO using matmul for big vectors
-        # TODO fma for 3d vectors
-        var magns = abs(self.vec) * abs(other.vec)
-        return magns * sin((self * other) / magns)
+        alias size = Self._vec_type.size
+
+        @parameter
+        if capacity == size:
+            var x0 = self.vec.rotate_left[1]()
+            var y0 = other.vec.rotate_left[2]()
+            var vec0 = x0.join(y0)
+            var x1 = self.vec.rotate_left[2]()
+            var y1 = other.vec.rotate_left[1]()
+            var vec1 = x1.join(y1)
+            return Self(vec0.reduce_mul[size]() - vec1.reduce_mul[size]())
+        else:
+            var s_vec_l = self.vec
+            var o_vec_l = other.vec
+
+            @parameter
+            for i in range(capacity, size):
+                s_vec_l[i] = self.vec[i - capacity]
+                o_vec_l[i] = other.vec[i - capacity]
+
+            var x0 = s_vec_l.rotate_left[1]()
+            var y0 = o_vec_l.rotate_left[2]()
+            var vec0 = x0.join(y0)
+            var x1 = s_vec_l.rotate_left[2]()
+            var y1 = o_vec_l.rotate_left[1]()
+            var vec1 = x1.join(y1)
+            return Self(vec0.reduce_mul[size]() - vec1.reduce_mul[size]())
 
     fn apply(inout self, func: fn (Self._scalar_type) -> Self._scalar_type):
         """Apply a function to the Array inplace.
