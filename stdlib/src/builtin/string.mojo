@@ -2016,10 +2016,7 @@ struct String(
             res += self[pos_in_self : e[].first_curly]
 
             if e[].is_escaped_brace():
-                if e[].field[Bool]:
-                    res += "}"
-                else:
-                    res += "{"
+                res += "}" if e[].field[Bool] else "{"
 
             if e[].is_manual_indexing():
 
