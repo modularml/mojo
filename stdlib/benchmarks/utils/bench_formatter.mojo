@@ -11,7 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-# RUN: %mojo %s
+# RUN: %mojo-no-debug %s -t
 
 from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
 from utils.stringref import _memmem, _memchr, _align_down
