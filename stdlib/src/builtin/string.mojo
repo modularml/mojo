@@ -2005,7 +2005,7 @@ struct String(
 
         """
         alias num_pos_args = len(VariadicList(Ts))
-        var entries = _FormatCurlyEntry.create_entries(self, NUM_POS_ARGS)
+        var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
 
         var res: String = ""
         var pos_in_self = 0
@@ -2015,20 +2015,23 @@ struct String(
             debug_assert(pos_in_self < len(self), "pos_in_self >= len(self)")
             res += self[pos_in_self : e[].first_curly]
 
-            if e[]._is_escaped_brace():
-                res += "}" if e[].field[Bool] "{"
+            if e[].is_escaped_brace():
+                if e[].field[Bool]:
+                    res += "}"
+                else:
+                    res += "{"
 
-            if e[]._is_manual_indexing():
+            if e[].is_manual_indexing():
 
                 @parameter
-                for i in range(NUM_POS_ARGS):
+                for i in range(num_pos_args):
                     if i == e[].field[Int]:
                         res += str(args[i])
 
-            if e[]._is_automatic_indexing():
+            if e[].is_automatic_indexing():
 
                 @parameter
-                for i in range(NUM_POS_ARGS):
+                for i in range(num_pos_args):
                     if i == current_automatic_arg_index:
                         res += str(args[i])
                 current_automatic_arg_index += 1
@@ -2205,13 +2208,13 @@ struct _FormatCurlyEntry:
     fn is_escaped_brace(ref [_]self) -> Bool:
         return self.field.isa[Bool]()
 
-    fn _is_kwargs_field(ref [_]self) -> Bool:
+    fn is_kwargs_field(ref [_]self) -> Bool:
         return self.field.isa[String]()
 
-    fn _is_automatic_indexing(ref [_]self) -> Bool:
+    fn is_automatic_indexing(ref [_]self) -> Bool:
         return self.field.isa[NoneType]()
 
-    fn _is_manual_indexing(ref [_]self) -> Bool:
+    fn is_manual_indexing(ref [_]self) -> Bool:
         return self.field.isa[Int]()
 
     @staticmethod
@@ -2243,7 +2246,6 @@ struct _FormatCurlyEntry:
         """
         var manual_indexing_count = 0
         var automatic_indexing_count = 0
-        var kwargs_indexing_count = 0
         var raised_manual_index = Optional[Int](None)
         var raised_automatic_index = Optional[Int](None)
         var raised_kwarg_field = Optional[String](None)
@@ -2263,7 +2265,7 @@ struct _FormatCurlyEntry:
                         var curren_entry = Self(
                             first_curly=start.value(), last_curly=i, field=False
                         )
-                        entries.append(curren_entry)
+                        entries.append(curren_entry^)
                         start = None
                         continue
                     raise (
@@ -2295,7 +2297,6 @@ struct _FormatCurlyEntry:
                             )
                             # field is an keyword for **kwargs:
                             current_entry.field = field
-                            kwargs_indexing_count += 1
                             raised_kwarg_field = field
                             break
                     else:
@@ -2314,7 +2315,7 @@ struct _FormatCurlyEntry:
                             var curren_entry = Self(
                                 first_curly=i, last_curly=i + 1, field=True
                             )
-                            entries.append(curren_entry)
+                            entries.append(curren_entry^)
                             skip_next = True
                             continue
                     # if it is not an escaped one, it is an error
