@@ -571,7 +571,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 (self.data + i).init_pointee_copy(value)
             self.size = new_size
 
-    @always_inline
     fn resize(inout self, new_size: Int):
         """Resizes the list to the given new size.
 
@@ -581,13 +580,16 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Args:
             new_size: The new size.
         """
-        debug_assert(
-            new_size <= self.size,
-            (
-                "New size must be smaller than or equal to current size when no"
-                " new value is provided."
-            ),
-        )
+        if self.size < new_size:
+            abort(
+                "You are calling List.resize("
+                + str(new_size)
+                + ") on a List of size "
+                + str(len(self))
+                + ". If you want to make the List bigger, provide a value to"
+                " fill the new slots with. If not, make sure the new size is"
+                " smaller than the current size."
+            )
         for i in range(new_size, self.size):
             (self.data + i).destroy_pointee()
         self.size = new_size
