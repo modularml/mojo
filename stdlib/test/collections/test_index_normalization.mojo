@@ -16,6 +16,7 @@ from collections._index_normalization import (
     get_out_of_bounds_error_message,
     normalize_index,
 )
+
 from testing import assert_equal
 
 

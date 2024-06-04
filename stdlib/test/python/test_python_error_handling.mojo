@@ -16,7 +16,6 @@
 from sys import env_get_string
 
 from python import Python, PythonObject
-
 from testing import assert_equal, assert_raises
 
 alias TEST_DIR = env_get_string["TEST_DIR"]()

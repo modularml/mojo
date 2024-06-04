@@ -14,7 +14,7 @@
 
 
 from pathlib import Path
-from sys import os_is_windows, env_get_string
+from sys import env_get_string, os_is_windows
 
 from testing import assert_equal, assert_true
 

@@ -19,6 +19,7 @@ from builtin.string import (
     _calc_initial_buffer_size_int64,
     _isspace,
 )
+from python import Python
 from testing import (
     assert_equal,
     assert_false,
@@ -28,7 +29,6 @@ from testing import (
 )
 
 from utils import StringRef
-from python import Python
 
 
 @value

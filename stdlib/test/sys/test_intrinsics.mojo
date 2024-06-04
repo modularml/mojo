@@ -20,8 +20,8 @@ from sys import (
     strided_store,
 )
 
-from testing import assert_equal
 from memory import DTypePointer
+from testing import assert_equal
 
 alias F32x4 = SIMD[DType.float32, 4]
 alias F32x8 = SIMD[DType.float32, 8]
