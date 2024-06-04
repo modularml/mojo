@@ -50,16 +50,13 @@ struct _CoroutineContext:
     and contain the resume function and a payload pointer."""
 
     # Passed the coroutine being completed and its context's payload.
-    alias _resume_fn_type = fn (AnyCoroutine, AnyCoroutine) -> None
+    alias _resume_fn_type = fn (AnyCoroutine) -> None
 
     var _resume_fn: Self._resume_fn_type
     var _parent_hdl: AnyCoroutine
 
 
-fn _coro_resume_callback(
-    handle: AnyCoroutine,
-    parent: AnyCoroutine,
-):
+fn _coro_resume_callback(parent: AnyCoroutine):
     """Resume the parent Coroutine."""
     _coro_resume_fn(parent)
 
@@ -70,7 +67,7 @@ fn _coro_resume_fn(handle: AnyCoroutine):
     __mlir_op.`co.resume`(handle)
 
 
-fn _coro_resume_noop_callback(handle: AnyCoroutine, null: AnyCoroutine):
+fn _coro_resume_noop_callback(null: AnyCoroutine):
     """Return immediately since nothing to resume."""
     return
 
