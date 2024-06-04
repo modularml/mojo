@@ -24,6 +24,7 @@ permissions:
 
 jobs:
   test-examples:
+    name: Test stdlib and examples in ${{ matrix.os }} with assertion=${{ matrix.mojo-enable-assertions }}
     strategy:
       matrix:
         os: ["ubuntu-latest", "macos-14"]
