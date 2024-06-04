@@ -83,7 +83,9 @@ def test_destructor():
 
     for index in range(capacity):
         inline_list.append(
-            ValueToCountDestructor(index, UnsafePointer(destructor_counter))
+            ValueToCountDestructor(
+                index, UnsafePointer.address_of(destructor_counter)
+            )
         )
 
     # Private api use here:
