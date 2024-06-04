@@ -21,7 +21,6 @@ from collections import List
 
 
 from memory import UnsafePointer, Reference
-from memory.unsafe_pointer import move_pointee, move_from_pointee
 from sys.intrinsics import _type_is_eq
 from .optional import Optional
 from utils import Span
@@ -33,16 +32,16 @@ from utils import Span
 
 @value
 struct _ListIter[
+    list_mutability: Bool, //,
     T: CollectionElement,
-    list_mutability: Bool,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.
 
     Parameters:
-        T: The type of the elements in the list.
         list_mutability: Whether the reference to the list is mutable.
+        T: The type of the elements in the list.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
@@ -50,21 +49,21 @@ struct _ListIter[
     alias list_type = List[T]
 
     var index: Int
-    var src: Reference[Self.list_type, list_mutability, list_lifetime]
+    var src: Reference[Self.list_type, list_lifetime]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_mutability, list_lifetime]:
+    ) -> Reference[T, list_lifetime]:
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__get_ref(self.index - 1)
+            return self.src[].__get_ref(self.index - 1)[]
         else:
             self.index -= 1
-            return self.src[].__get_ref(self.index)
+            return self.src[].__get_ref(self.index)[]
 
     fn __len__(self) -> Int:
         @parameter
@@ -186,7 +185,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
-            destroy_pointee(self.data + i)
+            (self.data + i).destroy_pointee()
         if self.data:
             self.data.free()
 
@@ -210,8 +209,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if normalized_idx < 0:
             normalized_idx += len(self)
 
-        destroy_pointee(self.data + normalized_idx)
-        initialize_pointee_move(self.data + normalized_idx, value^)
+        (self.data + normalized_idx).destroy_pointee()
+        (self.data + normalized_idx).init_pointee_move(value^)
 
     @always_inline
     fn __contains__[
@@ -236,7 +235,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
         for i in self:
-            if rebind[Reference[T2, False, __lifetime_of(self)]](i)[] == value:
+            if rebind[Reference[T2, __lifetime_of(self)]](i)[] == value:
                 return True
         return False
 
@@ -289,9 +288,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self.extend(other^)
 
-    fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _ListIter[T, self.is_mutable, self.lifetime]:
+    fn __iter__(ref [_]self: Self) -> _ListIter[T, __lifetime_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -300,14 +297,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return _ListIter(0, self)
 
     fn __reversed__(
-        self: Reference[Self, _, _]
-    ) -> _ListIter[T, self.is_mutable, self.lifetime, False]:
+        ref [_]self: Self,
+    ) -> _ListIter[T, __lifetime_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
             A reversed iterator of immutable references to the list elements.
         """
-        return _ListIter[forward=False](len(self[]), self)
+        return _ListIter[forward=False](len(self), self)
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations
@@ -403,7 +400,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
         for i in range(self.size):
-            move_pointee(src=self.data + i, dst=new_data + i)
+            (self.data + i).move_pointee_into(new_data + i)
 
         if self.data:
             self.data.free()
@@ -419,7 +416,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         if self.size >= self.capacity:
             self._realloc(max(1, self.capacity * 2))
-        initialize_pointee_move(self.data + self.size, value^)
+        (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
     @always_inline
@@ -445,9 +442,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             var earlier_ptr = self.data + earlier_idx
             var later_ptr = self.data + later_idx
 
-            var tmp = move_from_pointee(earlier_ptr)
-            move_pointee(src=later_ptr, dst=earlier_ptr)
-            initialize_pointee_move(later_ptr, tmp^)
+            var tmp = earlier_ptr.take_pointee()
+            later_ptr.move_pointee_into(earlier_ptr)
+            later_ptr.init_pointee_move(tmp^)
 
             earlier_idx -= 1
             later_idx -= 1
@@ -505,7 +502,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             # `other` list into this list using a single `T.__moveinit()__`
             # call, without moving into an intermediate temporary value
             # (avoiding an extra redundant move constructor call).
-            move_pointee(src=src_ptr, dst=dest_ptr)
+            src_ptr.move_pointee_into(dest_ptr)
 
             dest_ptr = dest_ptr + 1
 
@@ -529,9 +526,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if i < 0:
             normalized_idx += len(self)
 
-        var ret_val = move_from_pointee(self.data + normalized_idx)
+        var ret_val = (self.data + normalized_idx).take_pointee()
         for j in range(normalized_idx + 1, self.size):
-            move_pointee(src=self.data + j, dst=self.data + j - 1)
+            (self.data + j).move_pointee_into(self.data + j - 1)
         self.size -= 1
         if self.size * 4 < self.capacity:
             if self.capacity > 1:
@@ -569,9 +566,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         else:
             self.reserve(new_size)
             for i in range(new_size, self.size):
-                destroy_pointee(self.data + i)
+                (self.data + i).destroy_pointee()
             for i in range(self.size, new_size):
-                initialize_pointee_copy(self.data + i, value)
+                (self.data + i).init_pointee_copy(value)
             self.size = new_size
 
     @always_inline
@@ -592,7 +589,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             ),
         )
         for i in range(new_size, self.size):
-            destroy_pointee(self.data + i)
+            (self.data + i).destroy_pointee()
         self.size = new_size
         self.reserve(new_size)
 
@@ -625,9 +622,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             var earlier_ptr = self.data + earlier_idx
             var later_ptr = self.data + later_idx
 
-            var tmp = move_from_pointee(earlier_ptr)
-            move_pointee(src=later_ptr, dst=earlier_ptr)
-            initialize_pointee_move(later_ptr, tmp^)
+            var tmp = earlier_ptr.take_pointee()
+            later_ptr.move_pointee_into(earlier_ptr)
+            later_ptr.init_pointee_move(tmp^)
 
             earlier_idx += 1
             later_idx -= 1
@@ -636,7 +633,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn index[
         C: ComparableCollectionElement
     ](
-        self: Reference[List[C]],
+        ref [_]self: List[C],
         value: C,
         start: Int = 0,
         stop: Optional[Int] = None,
@@ -672,27 +669,27 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         var stop_normalized: Int
         if stop is None:
             # Default end
-            stop_normalized = len(self[])
+            stop_normalized = len(self)
         else:
-            stop_normalized = stop.value()[]
+            stop_normalized = stop.value()
 
         if start_normalized < 0:
-            start_normalized += len(self[])
+            start_normalized += len(self)
         if stop_normalized < 0:
-            stop_normalized += len(self[])
+            stop_normalized += len(self)
 
-        start_normalized = _clip(start_normalized, 0, len(self[]))
-        stop_normalized = _clip(stop_normalized, 0, len(self[]))
+        start_normalized = _clip(start_normalized, 0, len(self))
+        stop_normalized = _clip(stop_normalized, 0, len(self))
 
         for i in range(start_normalized, stop_normalized):
-            if self[][i] == value:
+            if self[i] == value:
                 return i
         raise "ValueError: Given element is not in list"
 
     fn clear(inout self):
         """Clears the elements in the list."""
         for i in range(self.size):
-            destroy_pointee(self.data + i)
+            (self.data + i).destroy_pointee()
         self.size = 0
 
     fn steal_data(inout self) -> UnsafePointer[T]:
@@ -774,8 +771,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     # TODO(30737): Replace __getitem__ with this, but lots of places use it
     fn __get_ref(
-        self: Reference[Self, _, _], i: Int
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+        ref [_]self: Self, i: Int
+    ) -> Reference[T, __lifetime_of(self)]:
         """Gets a reference to the list element at the given index.
 
         Args:
@@ -786,14 +783,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         var normalized_idx = i
         if i < 0:
-            normalized_idx += self[].size
+            normalized_idx += self.size
 
-        return self[].unsafe_get(normalized_idx)
+        return self.unsafe_get(normalized_idx)
 
     @always_inline
     fn unsafe_get(
-        self: Reference[Self, _, _], idx: Int
-    ) -> Reference[Self.T, self.is_mutable, self.lifetime]:
+        ref [_]self: Self, idx: Int
+    ) -> Reference[Self.T, __lifetime_of(self)]:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it
@@ -812,13 +809,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             A reference to the element at the given index.
         """
         debug_assert(
-            0 <= idx < len(self[]),
+            0 <= idx < len(self),
             (
                 "The index provided must be within the range [0, len(List) -1]"
                 " when using List.unsafe_get()"
             ),
         )
-        return (self[].data + idx)[]
+        return (self.data + idx)[]
 
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.

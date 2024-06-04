@@ -12,4 +12,4 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the tempfile package."""
 
-from .tempfile import gettempdir, mkdtemp
+from .tempfile import gettempdir, mkdtemp, TemporaryDirectory
