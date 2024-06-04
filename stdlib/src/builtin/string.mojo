@@ -847,15 +847,14 @@ struct String(
         """
 
         # Calculate length in bytes
-        var length: Int = len(str_slice.as_bytes_slice())
+        var bytes = str_slice.as_bytes_slice()
+        var length: Int = len(bytes)
         var buffer = Self._buffer_type()
         # +1 for null terminator, initialized to 0
         buffer.resize(length + 1, 0)
-        memcpy(
-            dest=buffer.data,
-            src=str_slice.as_bytes_slice().unsafe_ptr(),
-            count=length,
-        )
+        for i in range(length):
+            buffer[i] = bytes[i]
+
         self = Self(buffer^)
 
     @always_inline
