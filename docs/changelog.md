@@ -84,6 +84,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 ### 🦋 Changed
 
+- `await` on a coroutine now consumes it. This strengthens the invariant that
+  coroutines can only be awaited once.
+
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
   - `String.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
