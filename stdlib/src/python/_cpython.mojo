@@ -241,11 +241,17 @@ struct CPython:
         self.lib.get_function[fn (PyObjectPtr) -> None]("Py_DecRef")(ptr)
         self._dec_total_rc()
 
-    fn PyGILState_Ensure(inout self) -> Int64:
-        return self.lib.get_function[fn () -> Int64]("PyGILState_Ensure")()
+    fn PyGILState_Ensure(inout self) -> Bool:
+        return self.lib.get_function[fn () -> Bool]("PyGILState_Ensure")()
 
-    fn PyGILState_Release(inout self, state: Int64):
-        self.lib.get_function[fn (Int64) -> None]("PyGILState_Release")(state)
+    fn PyGILState_Release(inout self, state: Bool):
+        self.lib.get_function[fn (Bool) -> None]("PyGILState_Release")(state)
+
+    fn PyEval_SaveThread(inout self) -> Int64:
+        return self.lib.get_function[fn () -> Int64]("PyEval_SaveThread")()
+
+    fn PyEval_RestoreThread(inout self, state: Int64):
+        self.lib.get_function[fn (Int64) -> None]("PyEval_RestoreThread")(state)
 
     # This function assumes a specific way PyObjectPtr is implemented, namely
     # that the refcount has offset 0 in that structure. That generally doesn't
