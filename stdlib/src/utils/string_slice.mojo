@@ -21,6 +21,7 @@ from utils import StringSlice
 """
 
 from utils import Span
+from builtin.string import _isspace
 
 
 struct StringSlice[
@@ -180,3 +181,44 @@ struct StringSlice[
         without the string getting deallocated early.
         """
         pass
+
+    fn isspace(self) -> Bool:
+        """Determines whether the given StringSlice is a python
+        whitespace String. This corresponds to Python's
+        [universal separators](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `" \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
+
+        Returns:
+            True if the String is one of the whitespace characters
+                listed above, otherwise False.
+        """
+        # TODO add line and paragraph separator as stringliteral
+        # once unicode escape secuences are accepted
+        var next_line = List[UInt8](0xC2, 0x85)
+        """TODO: \\x85"""
+        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
+        """TODO: \\u2028"""
+        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
+        """TODO: \\u2029"""
+
+        @always_inline
+        fn _compare(
+            item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
+        ) -> Bool:
+            var ptr1 = DTypePointer(item1)
+            var ptr2 = DTypePointer(item2)
+            return memcmp(ptr1, ptr2, amnt) == 0
+
+        var no_null_len = len(self)
+        var ptr = self.unsafe_ptr()
+        if no_null_len == 1 and not _isspace(ptr[0]):
+            return False
+        elif no_null_len == 2 and not _compare(ptr, next_line.unsafe_ptr(), 2):
+            return False
+        elif no_null_len == 3 and not (
+            _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
+            or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
+        ):
+            return False
+        return False
