@@ -86,10 +86,10 @@ struct _dirent_macos:
 
 
 fn _strnlen(ptr: UnsafePointer[Int8], max: Int) -> Int:
-    var len = 0
-    while len < max and (ptr + len)[0]:
-        len += 1
-    return len
+    var offset = 0
+    while offset < max and ptr[offset]:
+        offset += 1
+    return offset
 
 
 struct _DirHandle:

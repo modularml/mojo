@@ -93,21 +93,6 @@ fn random_ui64(min: UInt64, max: UInt64) -> UInt64:
     )
 
 
-fn random_si32(min: Int, max: Int) -> Int:
-    """Returns a random `Int` number from the given range.
-
-    Args:
-        min: The minimum number in the range.
-        max: The maximum number in the range.
-
-    Returns:
-        A random number from the specified range.
-    """
-    return external_call["KGEN_CompilerRT_RandomSInt64", Int](
-        _get_random_state(), min, max
-    )
-
-
 fn randint[
     type: DType
 ](ptr: DTypePointer[type], size: Int, low: Int, high: Int):

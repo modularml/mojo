@@ -21,9 +21,8 @@ from python import Python
 
 from sys import external_call, sizeof
 from sys.ffi import _get_global
-
+from os.env import getenv
 from memory import UnsafePointer
-
 from utils import StringRef
 
 from ._cpython import CPython, Py_eval_input, Py_file_input
@@ -199,6 +198,8 @@ struct Python:
             The Python module.
         """
         var cpython = _get_global_python_itf().cpython()
+        # Throw error if it occured during initialization
+        cpython.check_init_error()
         var module_maybe = cpython.PyImport_ImportModule(module)
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(module_maybe)

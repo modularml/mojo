@@ -414,6 +414,14 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
+    fn write(self, data: Span[UInt8, _]) raises:
+        """Write a borrowed sequence of data to the file.
+
+        Args:
+          data: The data to write to the file.
+        """
+        self._write(data.unsafe_ptr(), len(data))
+
     @always_inline
     fn write(self, data: StringRef) raises:
         """Write the data to the file.
