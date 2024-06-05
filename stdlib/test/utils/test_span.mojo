@@ -19,7 +19,7 @@ from testing import assert_equal
 
 def test_span_list_int():
     var l = List[Int](1, 2, 3, 4, 5, 6, 7)
-    var s = Span(l)
+    var s = Span(list=l)
     assert_equal(len(s), len(l))
     for i in range(len(s)):
         assert_equal(l[i], s[i])
@@ -66,7 +66,7 @@ def test_span_list_str():
 
 def test_span_array_int():
     var l = InlineArray[Int, 7](1, 2, 3, 4, 5, 6, 7)
-    var s = Span(l)
+    var s = Span[Int](array=l)
     assert_equal(len(s), len(l))
     for i in range(len(s)):
         assert_equal(l[i], s[i])
@@ -89,7 +89,7 @@ def test_span_array_int():
 
 def test_span_array_str():
     var l = InlineArray[String, 7]("a", "b", "c", "d", "e", "f", "g")
-    var s = Span(l)
+    var s = Span[String](array=l)
     assert_equal(len(s), len(l))
     for i in range(len(s)):
         assert_equal(l[i], s[i])
@@ -112,7 +112,7 @@ def test_span_array_str():
 
 def test_indexing():
     var l = InlineArray[Int, 7](1, 2, 3, 4, 5, 6, 7)
-    var s = Span(l)
+    var s = Span[Int](array=l)
     assert_equal(s[True], 2)
     assert_equal(s[int(0)], 1)
     assert_equal(s[3], 4)

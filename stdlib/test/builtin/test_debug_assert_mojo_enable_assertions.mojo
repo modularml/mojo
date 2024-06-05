@@ -15,7 +15,7 @@
 #
 # ===----------------------------------------------------------------------=== #
 # REQUIRES: has_not
-# RUN: not --crash %mojo -D MOJO_ENABLE_ASSERTIONS -debug-level full %s 2>&1 | FileCheck %s
+# RUN: not --crash %mojo -debug-level full %s 2>&1 | FileCheck %s
 
 
 # CHECK-LABEL: test_fail
