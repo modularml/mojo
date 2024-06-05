@@ -162,9 +162,15 @@ struct CPython:
         """
         if self.init_error:
             var error: String = self.init_error
-            error += "\nMOJO_PYTHON: " + getenv("MOJO_PYTHON")
-            error += "\nMOJO_PYTHON_LIBRARY: " + getenv("MOJO_PYTHON_LIBRARY")
-            error += "\nPYTHONEXECUTABLE: " + getenv("PYTHONEXECUTABLE")
+            var mojo_python = getenv("MOJO_PYTHON")
+            var python_lib = getenv("MOJO_PYTHON_LIBRARY")
+            var python_exe = getenv("PYTHONEXECUTABLE")
+            if mojo_python:
+                error += "\nMOJO_PYTHON: " + mojo_python
+            if python_lib:
+                error += "\nMOJO_PYTHON_LIBRARY: " + python_lib
+            if python_exe:
+                error += "\npython executable: " + python_exe
             error += "\n\nMojo/Python interop error, troubleshooting docs at:"
             error += "\n    https://modul.ar/fix-python\n"
             raise error
