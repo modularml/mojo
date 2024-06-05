@@ -78,6 +78,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Added `TemporaryDirectory` in module `tempfile`.
   ([PR 2743](https://github.com/modularml/mojo/pull/2743) by [@artemiogr97](https://github.com/artemiogr97))
 
+- Added `NamedTemporaryFile` in module `tempfile`.
+  ([PR 2762](https://github.com/modularml/mojo/pull/2762) by [@artemiogr97](https://github.com/artemiogr97))
+
 - Added temporary `SliceNew` type with corrected behaviour from `Slice` to facilitate
   an incremental internal migration due to reliance on the old, incorrect behaviour.
   ([PR #2894](https://github.com/modularml/mojo/pull/2894) by [@bgreni](https://github.com/bgreni))
