@@ -16,6 +16,11 @@ what we publish.
 
 ### ⭐️ New
 
+- Added a new [`Counter`](/mojo/stdlib/collections/counter/Counter)
+  dictionary-like type, matching most of the features of the Python one.
+  ([PR 2910#](https://github.com/modularml/mojo/pull/2910) by
+  [@msaelices](https://github.com/msaelices))
+
 - Now supports "conditional conformances" where some methods on a struct have
   additional trait requirements that the struct itself doesn't.  This is
   expressed through an explicitly declared `self` type:
