@@ -810,10 +810,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         debug_assert(
             0 <= idx < len(self),
-            (
-                "The index provided must be within the range [0, len(List) -1]"
-                " when using List.unsafe_get()"
-            ),
+            "The index provided must be within the range [0,",
+            len(self),
+            "[",
+            " when using List.unsafe_get(). But you provided: ",
+            idx,
+            ".",
         )
         return (self.data + idx)[]
 
