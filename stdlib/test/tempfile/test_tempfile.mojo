@@ -20,7 +20,7 @@ from tempfile import NamedTemporaryFile, TemporaryDirectory, gettempdir, mkdtemp
 from testing import assert_equal, assert_false, assert_true
 
 
-fn test_mkdtemp() raises:
+def test_mkdtemp():
     var dir_name: String
 
     dir_name = mkdtemp()
@@ -62,7 +62,7 @@ struct TempEnvWithCleanup:
         self._vars_back = Dict[String, String]()
         self.clean_up_function = clean_up_function
 
-    fn __enter__(inout self) raises:
+    def __enter__(inout self):
         for key_value in self.vars_to_set.items():
             var key = key_value[].key
             var value = key_value[].value
@@ -75,7 +75,7 @@ struct TempEnvWithCleanup:
             var value = key_value[].value
             _ = os.setenv(key, value, overwrite=True)
 
-    fn __exit__(inout self, error: Error) raises -> Bool:
+    def __exit__(inout self, error: Error) -> Bool:
         self.__exit__()
         self.clean_up_function()
         return False
@@ -90,9 +90,9 @@ fn _clean_up_gettempdir_test() raises:
         os.rmdir(dir_with_writing_access)
 
 
-fn _set_up_gettempdir_test(
+def _set_up_gettempdir_test(
     dir_with_writing_access: Path, dir_without_writing_access: Path
-) raises:
+):
     os.mkdir(dir_with_writing_access, mode=0o700)
     try:
         os.mkdir(dir_without_writing_access, mode=0o100)
@@ -101,7 +101,7 @@ fn _set_up_gettempdir_test(
         raise Error("Failed to setup test")
 
 
-fn test_gettempdir() raises:
+def test_gettempdir():
     var non_existing_dir = Path() / "non_existing_dir"
     assert_false(
         exists(non_existing_dir),
@@ -162,7 +162,7 @@ fn test_gettempdir() raises:
     _clean_up_gettempdir_test()
 
 
-fn test_temporary_directory() raises -> None:
+def test_temporary_directory() -> None:
     var tmp_dir: String = ""
     with TemporaryDirectory(suffix="my_suffix", prefix="my_prefix") as tmp_dir:
         assert_true(exists(tmp_dir), "Failed to create temp dir " + tmp_dir)
@@ -178,7 +178,7 @@ fn test_temporary_directory() raises -> None:
     assert_false(exists(tmp_dir), "Failed to delete temp dir " + tmp_dir)
 
 
-fn test_named_temporary_file_deletion() raises:
+def test_named_temporary_file_deletion():
     var tmp_file: NamedTemporaryFile
     var file_path: String
 
@@ -214,7 +214,7 @@ fn test_named_temporary_file_deletion() raises:
     os.remove(file_path)
 
 
-fn test_named_temporary_file_write() raises:
+def test_named_temporary_file_write():
     var file_name: String
     var contents: String
 
@@ -228,7 +228,7 @@ fn test_named_temporary_file_write() raises:
     os.remove(file_name)
 
 
-fn main() raises:
+def main():
     test_mkdtemp()
     test_gettempdir()
     test_temporary_directory()

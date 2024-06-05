@@ -317,7 +317,7 @@ struct NamedTemporaryFile:
         """Moves constructor for the file handle.
 
         Args:
-          existing: The existing file handle.
+            existing: The existing file handle.
         """
         self._file_handle = existing._file_handle^
         self._delete = existing._delete
@@ -331,7 +331,7 @@ struct NamedTemporaryFile:
             size: Requested number of bytes to read.
 
         Returns:
-          The contents of the file.
+            The contents of the file.
         """
         return self._file_handle.read(size)
 
@@ -343,7 +343,7 @@ struct NamedTemporaryFile:
             size: Requested number of bytes to read.
 
         Returns:
-          The contents of the file.
+            The contents of the file.
         """
         return self._file_handle.read_bytes(size)
 
@@ -366,7 +366,7 @@ struct NamedTemporaryFile:
         """Write the data to the file.
 
         Args:
-          data: The data to write to the file.
+            data: The data to write to the file.
         """
         self._file_handle.write(data)
 
