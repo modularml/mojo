@@ -16,6 +16,7 @@
 import os
 from os import PathLike, listdir, stat_result
 from sys import os_is_windows
+from builtin._location import __call_location
 
 from memory import stack_allocation
 
@@ -44,6 +45,18 @@ fn cwd() raises -> Path:
     return String(StringRef(buf))
 
 
+@always_inline
+fn _dir_of_current_file() raises -> Path:
+    """Gets the directory the file is at.
+
+    Returns:
+      The directory the file calling is at.
+    """
+    var file_name = __call_location().file_name
+    var i = str(file_name).rfind(DIR_SEPARATOR)
+    return Path(str(file_name)[0:i])
+
+
 struct Path(Stringable, CollectionElement, PathLike, KeyElement):
     """The Path object."""
 
@@ -53,14 +66,6 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
     fn __init__(inout self) raises:
         """Initializes a path with the current directory."""
         self = cwd()
-
-    fn __init__(inout self, path: StringLiteral):
-        """Initializes a path with the provided path.
-
-        Args:
-          path: The file system path.
-        """
-        self.path = path
 
     fn __init__(inout self, path: String):
         """Initializes a path with the provided path.
@@ -97,17 +102,6 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
           A new path with the suffix appended to the current path.
         """
         return self.__truediv__(suffix.path)
-
-    fn __truediv__(self, suffix: StringLiteral) -> Self:
-        """Joins two paths using the system-defined path separator.
-
-        Args:
-          suffix: The suffix to append to the path.
-
-        Returns:
-          A new path with the suffix appended to the current path.
-        """
-        return self.__truediv__(String(suffix))
 
     fn __truediv__(self, suffix: String) -> Self:
         """Joins two paths using the system-defined path separator.

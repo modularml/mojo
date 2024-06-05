@@ -14,7 +14,8 @@
 
 from random import randn_float64
 from sys import has_neon
-from testing import assert_equal, assert_almost_equal
+
+from testing import assert_almost_equal, assert_equal
 
 
 def test_methods():
@@ -86,7 +87,7 @@ def check_float64_values():
 def main():
     check_float64_values()
 
-    # TODO re-enable this test when we sort out BF16 support for graviton3 #30525
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         test_methods()

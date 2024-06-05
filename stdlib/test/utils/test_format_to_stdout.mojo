@@ -12,9 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from utils._format import Formatter, write_to, Formattable
-
 from builtin.io import _print_fmt
+
+from utils._format import Formattable, Formatter, write_to
 
 
 fn main() raises:

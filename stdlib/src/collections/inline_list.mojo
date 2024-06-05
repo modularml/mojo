@@ -87,8 +87,13 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         capacity: The maximum number of elements that the list can hold.
     """
 
+    # Fields
     var _array: InlineArray[ElementType, capacity]
     var _size: Int
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __init__(inout self):
@@ -112,20 +117,14 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
             self.append(ElementType(other=value[]))
 
     @always_inline
-    fn __len__(self) -> Int:
-        """Returns the length of the list."""
-        return self._size
+    fn __del__(owned self):
+        """Destroy all the elements in the list and free the memory."""
+        for i in range(self._size):
+            UnsafePointer.address_of(self._array[i]).destroy_pointee()
 
-    @always_inline
-    fn append(inout self, owned value: ElementType):
-        """Appends a value to the list.
-
-        Args:
-            value: The value to append.
-        """
-        debug_assert(self._size < capacity, "List is full.")
-        self._array[self._size] = value^
-        self._size += 1
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __getitem__(
@@ -148,11 +147,23 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
         return self._array[idx]
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
-    fn __del__(owned self):
-        """Destroy all the elements in the list and free the memory."""
-        for i in range(self._size):
-            UnsafePointer.address_of(self._array[i]).destroy_pointee()
+    fn __len__(self) -> Int:
+        """Returns the length of the list."""
+        return self._size
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        """Checks whether the list has any elements or not.
+
+        Returns:
+            `False` if the list is empty, `True` if there is at least one element.
+        """
+        return len(self) > 0
 
     fn __iter__(
         ref [_]self: Self,
@@ -193,6 +204,10 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
                 return True
         return False
 
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
     @always_inline
     fn count[C: ComparableCollectionElement](self: Self, value: C) -> Int:
         """Counts the number of occurrences of a value in the list.
@@ -222,10 +237,12 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
         return count
 
     @always_inline
-    fn __bool__(self) -> Bool:
-        """Checks whether the list has any elements or not.
+    fn append(inout self, owned value: ElementType):
+        """Appends a value to the list.
 
-        Returns:
-            `False` if the list is empty, `True` if there is at least one element.
+        Args:
+            value: The value to append.
         """
-        return len(self) > 0
+        debug_assert(self._size < capacity, "List is full.")
+        self._array[self._size] = value^
+        self._size += 1

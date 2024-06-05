@@ -50,10 +50,7 @@ fn is_defined[name: StringLiteral]() -> Bool:
     Returns:
         True if the name is defined.
     """
-    alias result = __mlir_attr[
-        `#kgen.param.expr<get_env, `, name.value, `> : i1`
-    ]
-    return result
+    return __mlir_attr[`#kgen.param.expr<get_env, `, name.value, `> : i1`]
 
 
 fn env_get_int[name: StringLiteral]() -> Int:
@@ -66,10 +63,7 @@ fn env_get_int[name: StringLiteral]() -> Int:
     Returns:
         An integer parameter value.
     """
-    alias result = __mlir_attr[
-        `#kgen.param.expr<get_env, `, name.value, `> : index`
-    ]
-    return result
+    return __mlir_attr[`#kgen.param.expr<get_env, `, name.value, `> : index`]
 
 
 fn env_get_int[name: StringLiteral, default: Int]() -> Int:
@@ -101,10 +95,9 @@ fn env_get_string[name: StringLiteral]() -> StringLiteral:
     Returns:
         A string parameter value.
     """
-    alias result = __mlir_attr[
+    return __mlir_attr[
         `#kgen.param.expr<get_env, `, name.value, `> : !kgen.string`
     ]
-    return result
 
 
 fn env_get_string[

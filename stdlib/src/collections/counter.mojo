@@ -22,8 +22,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     Counter, which can accept arbitrary value types.
 
     The value type must implement the `KeyElement` trait, as its values are
-    stored in the dictionary as keys. `KeyElement` includes
-    `Movable`, `Hashable`, and `EqualityComparable`.
+    stored in the dictionary as keys.
 
     Usage:
 
@@ -33,7 +32,6 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     print(c["a"]) # prints 3
     print(c["b"]) # prints 2
     ```
-
     Parameters:
         V: The value type to be counted. Currently must be KeyElement.
     """
@@ -41,13 +39,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     var _data: Dict[V, Int]
 
     def __init__(inout self):
-        """Create a new, empty Counter object.
-
-        Usage:
-        ```mojo
-        c = Counter()
-        ```
-        """
+        """Create a new, empty Counter object."""
         self._data = Dict[V, Int]()
 
     # TODO: Change List to Iterable when it is supported in Mojo
@@ -56,11 +48,6 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
 
         Args:
             items: A list of items to count.
-
-        Usage:
-        ```mojo
-        c = Counter(List('g', 'a', 't', 't', 'a', 'c', 'a'))
-        ```
         """
         self._data = Dict[V, Int]()
         for item_ref in items:

@@ -13,11 +13,11 @@
 # RUN: %mojo %s
 
 from testing import (
-    assert_equal,
-    assert_not_equal,
     assert_almost_equal,
-    assert_true,
+    assert_equal,
     assert_false,
+    assert_not_equal,
+    assert_true,
 )
 
 alias nan = FloatLiteral.nan

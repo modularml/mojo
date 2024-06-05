@@ -19,6 +19,7 @@ from sys.info import (
     num_physical_cores,
     sizeof,
 )
+
 from testing import assert_equal, assert_true
 
 

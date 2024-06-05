@@ -13,11 +13,11 @@
 # REQUIRES: !windows
 # RUN: %mojo  -D TEMP_FILE=%t %s
 
-from pathlib import cwd, Path, DIR_SEPARATOR
+from pathlib import DIR_SEPARATOR, Path, cwd
 from sys import env_get_string
-from builtin._location import __source_location
 
-from testing import assert_true, assert_false, assert_equal, assert_not_equal
+from builtin._location import __source_location
+from testing import assert_equal, assert_false, assert_not_equal, assert_true
 
 alias TEMP_FILE = env_get_string["TEMP_FILE"]()
 
