@@ -65,6 +65,7 @@ struct Bool(
     Intable,
     Indexer,
     CollectionElementNew,
+    Representable,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
@@ -151,10 +152,22 @@ struct Bool(
     fn __str__(self) -> String:
         """Get the bool as a string.
 
+        Returns `"True"` or `"False"`.
+
         Returns:
             A string representation.
         """
         return "True" if self else "False"
+
+    fn __repr__(self) -> String:
+        """Get the bool as a string.
+
+        Returns `"True"` or `"False"`.
+
+        Returns:
+            A string representation.
+        """
+        return str(self)
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:

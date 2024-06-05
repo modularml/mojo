@@ -38,6 +38,7 @@ struct IntLiteral(
     precision integer types.
     """
 
+    # Fields
     alias _mlir_type = __mlir_type.`!kgen.int_literal`
 
     var value: Self._mlir_type
@@ -46,6 +47,10 @@ struct IntLiteral(
     alias _one = IntLiteral(
         __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
     )
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __init__(inout self):
@@ -61,43 +66,9 @@ struct IntLiteral(
         """
         self.value = value
 
-    @always_inline("nodebug")
-    fn __int__(self) -> Int:
-        """Convert from IntLiteral to Int.
-
-        Returns:
-            The value as an integer.
-        """
-        return Int(self.__as_mlir_index())
-
-    @always_inline("nodebug")
-    fn _bit_width(self) -> IntLiteral:
-        """Get the (signed) bit width of the IntLiteral.
-
-        Returns:
-            The bit width.
-        """
-        return __mlir_op.`kgen.int_literal.bit_width`(self.value)
-
-    @always_inline
-    fn __str__(self) -> String:
-        """Convert from IntLiteral to String.
-
-        Returns:
-            The value as a string.
-        """
-        return str(Int(self))
-
-    @always_inline("nodebug")
-    fn __as_mlir_index(self) -> __mlir_type.index:
-        """Convert from IntLiteral to index.
-
-        Returns:
-            The corresponding __mlir_type.index value.
-        """
-        return __mlir_op.`kgen.int_literal.convert`[_type = __mlir_type.index](
-            self.value
-        )
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: Self) -> Bool:
@@ -186,25 +157,6 @@ struct IntLiteral(
         ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __bool__(self) -> Bool:
-        """Convert this IntLiteral to Bool.
-
-        Returns:
-            False Bool value if the value is equal to 0 and True otherwise.
-        """
-        return self != Self()
-
-    @always_inline("nodebug")
-    fn __index__(self) -> Int:
-        """Return self converted to an integer, if self is suitable for use as
-        an index into a list.
-
-        Returns:
-            The corresponding Int value.
-        """
-        return self.__int__()
-
-    @always_inline("nodebug")
     fn __pos__(self) -> Self:
         """Return +self.
 
@@ -223,53 +175,6 @@ struct IntLiteral(
         return Self() - self
 
     @always_inline("nodebug")
-    fn __abs__(self) -> Self:
-        """Return the absolute value of the IntLiteral value.
-
-        Returns:
-            The absolute value.
-        """
-        if self >= 0:
-            return self
-        return -self
-
-    @always_inline("nodebug")
-    fn __ceil__(self) -> Self:
-        """Return the ceiling of the IntLiteral value, which is itself.
-
-        Returns:
-            The IntLiteral value itself.
-        """
-        return self
-
-    @always_inline("nodebug")
-    fn __floor__(self) -> Self:
-        """Return the floor of the IntLiteral value, which is itself.
-
-        Returns:
-            The IntLiteral value itself.
-        """
-        return self
-
-    @always_inline("nodebug")
-    fn __round__(self) -> Self:
-        """Return the rounded value of the IntLiteral value, which is itself.
-
-        Returns:
-            The IntLiteral value itself.
-        """
-        return self
-
-    @always_inline("nodebug")
-    fn __trunc__(self) -> Self:
-        """Return the truncated of the IntLiteral value, which is itself.
-
-        Returns:
-            The IntLiteral value itself.
-        """
-        return self
-
-    @always_inline("nodebug")
     fn __divmod__(self, rhs: Self) -> Tuple[Self, Self]:
         """Return the quotient and remainder of the division of self by rhs.
 
@@ -282,32 +187,6 @@ struct IntLiteral(
         var quotient: Self = self.__floordiv__(rhs)
         var remainder: Self = self - (quotient * rhs)
         return quotient, remainder
-
-    @always_inline("nodebug")
-    fn __round__(self, ndigits: Int) -> Self:
-        """Return the rounded value of the IntLiteral value, which is itself.
-
-        Args:
-            ndigits: The number of digits to round to.
-
-        Returns:
-            The IntLiteral value itself if ndigits >= 0 else the rounded value.
-        """
-        if ndigits >= 0:
-            return self
-        alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
-        alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
-        var multiplier = one
-        # TODO: Use IntLiteral.__pow__() when it's implemented.
-        for _ in range(-ndigits):
-            multiplier = __mlir_op.`kgen.int_literal.binop`[
-                oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
-            ](multiplier, ten)
-        alias Pair = Tuple[Self, Self]
-        var mod: IntLiteral = self % Self(multiplier)
-        if mod * 2 >= multiplier:
-            mod -= multiplier
-        return self - mod
 
     @always_inline("nodebug")
     fn __invert__(self) -> Self:
@@ -688,3 +567,141 @@ struct IntLiteral(
             `value ^ self`.
         """
         return value ^ self
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline("nodebug")
+    fn __bool__(self) -> Bool:
+        """Convert this IntLiteral to Bool.
+
+        Returns:
+            False Bool value if the value is equal to 0 and True otherwise.
+        """
+        return self != Self()
+
+    @always_inline("nodebug")
+    fn __index__(self) -> Int:
+        """Return self converted to an integer, if self is suitable for use as
+        an index into a list.
+
+        Returns:
+            The corresponding Int value.
+        """
+        return self.__int__()
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Convert from IntLiteral to Int.
+
+        Returns:
+            The value as an integer.
+        """
+        return Int(self.__as_mlir_index())
+
+    @always_inline("nodebug")
+    fn __abs__(self) -> Self:
+        """Return the absolute value of the IntLiteral value.
+
+        Returns:
+            The absolute value.
+        """
+        if self >= 0:
+            return self
+        return -self
+
+    @always_inline("nodebug")
+    fn __ceil__(self) -> Self:
+        """Return the ceiling of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __floor__(self) -> Self:
+        """Return the floor of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __round__(self) -> Self:
+        """Return the rounded value of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __trunc__(self) -> Self:
+        """Return the truncated of the IntLiteral value, which is itself.
+
+        Returns:
+            The IntLiteral value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __round__(self, ndigits: Int) -> Self:
+        """Return the rounded value of the IntLiteral value, which is itself.
+
+        Args:
+            ndigits: The number of digits to round to.
+
+        Returns:
+            The IntLiteral value itself if ndigits >= 0 else the rounded value.
+        """
+        if ndigits >= 0:
+            return self
+        alias one = __mlir_attr.`#kgen.int_literal<1> : !kgen.int_literal`
+        alias ten = __mlir_attr.`#kgen.int_literal<10> : !kgen.int_literal`
+        var multiplier = one
+        # TODO: Use IntLiteral.__pow__() when it's implemented.
+        for _ in range(-ndigits):
+            multiplier = __mlir_op.`kgen.int_literal.binop`[
+                oper = __mlir_attr.`#kgen<int_literal.binop_kind mul>`
+            ](multiplier, ten)
+        alias Pair = Tuple[Self, Self]
+        var mod: IntLiteral = self % Self(multiplier)
+        if mod * 2 >= multiplier:
+            mod -= multiplier
+        return self - mod
+
+    @always_inline
+    fn __str__(self) -> String:
+        """Convert from IntLiteral to String.
+
+        Returns:
+            The value as a string.
+        """
+        return str(Int(self))
+
+    # ===----------------------------------------------------------------------===#
+    # Methods
+    # ===----------------------------------------------------------------------===#
+
+    @always_inline("nodebug")
+    fn _bit_width(self) -> IntLiteral:
+        """Get the (signed) bit width of the IntLiteral.
+
+        Returns:
+            The bit width.
+        """
+        return __mlir_op.`kgen.int_literal.bit_width`(self.value)
+
+    @always_inline("nodebug")
+    fn __as_mlir_index(self) -> __mlir_type.index:
+        """Convert from IntLiteral to index.
+
+        Returns:
+            The corresponding __mlir_type.index value.
+        """
+        return __mlir_op.`kgen.int_literal.convert`[_type = __mlir_type.index](
+            self.value
+        )

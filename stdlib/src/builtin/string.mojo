@@ -109,11 +109,11 @@ fn chr(c: Int) -> String:
     var shift = 6 * (num_bytes - 1)
     var mask = UInt8(0xFF) >> (num_bytes + 1)
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
-    p.store(((c >> shift) & mask) | num_bytes_marker)
+    Scalar.store(p, ((c >> shift) & mask) | num_bytes_marker)
     for i in range(1, num_bytes):
         shift -= 6
-        p.store(i, ((c >> shift) & 0b00111111) | 0b10000000)
-    p.store(num_bytes, 0)
+        Scalar.store(p, i, ((c >> shift) & 0b00111111) | 0b10000000)
+    Scalar.store(p, num_bytes, 0)
     return String(p.bitcast[DType.uint8](), num_bytes + 1)
 
 
@@ -587,6 +587,9 @@ fn _isspace(c: UInt8) -> Bool:
     alias `\r` = UInt8(ord("\r"))
     alias `\f` = UInt8(ord("\f"))
     alias `\v` = UInt8(ord("\v"))
+    alias `\x1c` = UInt8(ord("\x1c"))
+    alias `\x1d` = UInt8(ord("\x1d"))
+    alias `\x1e` = UInt8(ord("\x1e"))
 
     # This compiles to something very clever that's even faster than a LUT.
     return (
@@ -596,6 +599,9 @@ fn _isspace(c: UInt8) -> Bool:
         or c == `\r`
         or c == `\f`
         or c == `\v`
+        or c == `\x1c`
+        or c == `\x1d`
+        or c == `\x1e`
     )
 
 
@@ -656,6 +662,90 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # String
 # ===----------------------------------------------------------------------=== #
+
+
+fn _utf8_byte_type(b: UInt8) -> UInt8:
+    """UTF-8 byte type.
+
+    Returns:
+        The byte type:
+            0 -> ASCII byte.
+            1 -> continuation byte.
+            2 -> start of 2 byte long sequence.
+            3 -> start of 3 byte long sequence.
+            4 -> start of 4 byte long sequence.
+    """
+    return countl_zero(~(b & 0b1111_0000))
+
+
+@value
+struct _StringIter[
+    is_mutable: Bool, //,
+    lifetime: AnyLifetime[is_mutable].type,
+    forward: Bool = True,
+]:
+    """Iterator for String.
+
+    Parameters:
+        is_mutable: Whether the slice is mutable.
+        lifetime: The lifetime of the underlying string data.
+        forward: The iteration direction. `False` is backwards.
+    """
+
+    var index: Int
+    var continuation_bytes: Int
+    var ptr: UnsafePointer[UInt8]
+    var length: Int
+
+    fn __init__(
+        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
+    ):
+        self.index = 0 if forward else length
+        self.ptr = unsafe_pointer
+        self.length = length
+        self.continuation_bytes = 0
+        for i in range(length):
+            if _utf8_byte_type(int(unsafe_pointer[i])) == 1:
+                self.continuation_bytes += 1
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> StringSlice[lifetime]:
+        @parameter
+        if forward:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var byte_type = _utf8_byte_type(int(self.ptr[self.index]))
+                if byte_type != 0:
+                    byte_len = int(byte_type)
+                    self.continuation_bytes -= byte_len - 1
+            self.index += byte_len
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
+                len=byte_len,
+            )
+        else:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var byte_type = _utf8_byte_type(int(self.ptr[self.index - 1]))
+                if byte_type != 0:
+                    while byte_type == 1:
+                        byte_len += 1
+                        var b = int(self.ptr[self.index - byte_len])
+                        byte_type = _utf8_byte_type(b)
+                    self.continuation_bytes -= byte_len - 1
+            self.index -= byte_len
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
+            )
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return self.length - self.index - self.continuation_bytes
+        else:
+            return self.index - self.continuation_bytes
 
 
 struct String(
@@ -1101,6 +1191,26 @@ struct String(
             count=other_len + 1,
         )
 
+    fn __iter__(ref [_]self) -> _StringIter[__lifetime_of(self)]:
+        """Iterate over elements of the string, returning immutable references.
+
+        Returns:
+            An iterator of references to the string elements.
+        """
+        return _StringIter[__lifetime_of(self)](
+            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+        )
+
+    fn __reversed__(ref [_]self) -> _StringIter[__lifetime_of(self), False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator of references to the string elements.
+        """
+        return _StringIter[__lifetime_of(self), forward=False](
+            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+        )
+
     # ===------------------------------------------------------------------=== #
     # Trait implementations
     # ===------------------------------------------------------------------=== #
@@ -1116,10 +1226,10 @@ struct String(
 
     @always_inline
     fn __len__(self) -> Int:
-        """Returns the string length.
+        """Returns the string byte length.
 
         Returns:
-            The string length.
+            The string byte length.
         """
         # Avoid returning -1 if the buffer is not initialized
         if not self.unsafe_ptr():
@@ -1450,44 +1560,43 @@ struct String(
 
         Returns:
             True if the String is one of the whitespace characters
-                listed above, otherwise False."""
+                listed above, otherwise False.
+        """
         # TODO add line and paragraph separator as stringliteral
         # once unicode escape secuences are accepted
-        # 0 is to build a String with null terminator
-        alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
-        """TODO: \\x1c"""
-        alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
-        """TODO: \\x1e"""
-        alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+        var next_line = List[UInt8](0xC2, 0x85)
         """TODO: \\x85"""
-        alias unicode_line_sep = List[UInt8](
-            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
-        )
+        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
         """TODO: \\u2028"""
-        alias unicode_paragraph_sep = List[UInt8](
-            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
-        )
+        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
         """TODO: \\u2029"""
 
         @always_inline
-        fn compare(item1: List[UInt8], item2: List[UInt8], amnt: Int) -> Bool:
-            var ptr1 = DTypePointer(item1.unsafe_ptr())
-            var ptr2 = DTypePointer(item2.unsafe_ptr())
+        fn _compare(
+            item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
+        ) -> Bool:
+            var ptr1 = DTypePointer(item1)
+            var ptr2 = DTypePointer(item2)
             return memcmp(ptr1, ptr2, amnt) == 0
 
-        if len(self) == 1:
-            return _isspace(self._buffer.unsafe_get(0)[])
-        elif len(self) == 3:
-            return compare(self._buffer, next_line, 3)
-        elif len(self) == 4:
-            return compare(self._buffer, information_sep_four, 4) or compare(
-                self._buffer, information_sep_two, 4
-            )
-        elif len(self) == 7:
-            return compare(self._buffer, unicode_line_sep, 7) or compare(
-                self._buffer, unicode_paragraph_sep, 7
-            )
-        return False
+        if len(self) == 0:
+            return False
+
+        for s in self:
+            var no_null_len = len(s)
+            var ptr = s.unsafe_ptr()
+            if no_null_len == 1 and not _isspace(ptr[0]):
+                return False
+            elif no_null_len == 2 and not _compare(
+                ptr, next_line.unsafe_ptr(), 2
+            ):
+                return False
+            elif no_null_len == 3 and not (
+                _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
+                or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
+            ):
+                return False
+        return True
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string by a separator.
