@@ -72,6 +72,28 @@ struct DLHandle(CollectionElement, Boolable):
         else:
             self.handle = DTypePointer[DType.int8]()
 
+    fn check_symbol(self, name: String) -> Bool:
+        """Check that the symbol exists in the dynamic library.
+
+        Args:
+            name: The symbol to check.
+
+        Returns:
+            `True` if the symbol exists.
+        """
+        constrained[
+            not os_is_windows(),
+            "Checking dynamic library symbol is not supported on Windows",
+        ]()
+
+        var opaque_function_ptr = external_call[
+            "dlsym", DTypePointer[DType.int8]
+        ](self.handle.address, name.unsafe_ptr())
+        if opaque_function_ptr:
+            return True
+
+        return False
+
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
     fn close(inout self):
@@ -133,7 +155,9 @@ struct DLHandle(CollectionElement, Boolable):
             var opaque_function_ptr = external_call[
                 "dlsym", DTypePointer[DType.int8]
             ](self.handle.address, name)
-            return UnsafePointer(opaque_function_ptr).bitcast[result_type]()[]
+            return UnsafePointer.address_of(opaque_function_ptr).bitcast[
+                result_type
+            ]()[]
         else:
             return abort[result_type]("get_function isn't supported on windows")
 
@@ -152,9 +176,7 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](
-            func_name.unsafe_ptr().bitcast[C_char]()
-        )
+        return self._get_function[result_type](func_name.unsafe_cstr_ptr())
 
 
 # ===----------------------------------------------------------------------===#
@@ -218,13 +240,13 @@ fn _get_dylib_function[
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
-        return UnsafePointer(func_ptr).bitcast[result_type]()[]
+        return UnsafePointer.address_of(func_ptr).bitcast[result_type]()[]
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        UnsafePointer(new_func).bitcast[Pointer[NoneType]]()[],
+        UnsafePointer.address_of(new_func).bitcast[Pointer[NoneType]]()[],
     )
 
     return new_func

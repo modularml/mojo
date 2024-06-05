@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the collections package."""
 
+from .counter import Counter
 from .dict import Dict, KeyElement
 from .inline_list import InlineList
 from .list import List

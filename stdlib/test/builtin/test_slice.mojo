@@ -89,9 +89,68 @@ def test_indexing():
     assert_equal(s[2], 3)
 
 
+def test_slice_indices_new():
+    var start: Int
+    var end: Int
+    var step: Int
+    var s = slice_new(1, 10)
+    start, end, step = s.indices(9)
+    assert_equal(slice_new(start, end, step), slice_new(1, 9))
+    s = slice_new(1, None, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(1, 5))
+    s = slice_new(1, None, -1)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(1, -1, -1))
+    s = slice_new(-1, None, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(4, 5, 1))
+    s = slice_new(None, 2, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(0, 2, 1))
+    s = slice_new(None, 2, -1)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(4, 2, -1))
+    s = slice_new(0, -1, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(0, 4, 1))
+    s = slice_new(None, None, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(0, 5, 1))
+    s = slice_new(20)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(0, 5, 1))
+    s = slice_new(10, -10, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(5, 0, 1))
+    # FIXME(#38392)
+    # assert_equal(len(range(start, end, step)), 0)
+    s = slice_new(-12, -10, -1)
+    start, end, step = s.indices(5)
+    assert_equal(slice_new(start, end, step), slice_new(-1, -1, -1))
+    assert_equal(len(range(start, end, step)), 0)
+
+
+def test_slice_eq_new():
+    assert_equal(slice_new(1, 2, 3), slice_new(1, 2, 3))
+    assert_equal(slice_new(0, 1), slice_new(1))
+    assert_true(slice_new(2, 3) != slice_new(4, 5))
+    assert_equal(slice_new(1, None, 1), slice_new(1, None, None))
+
+
+def test_none_end_folds_new():
+    alias all_def_slice = slice_new(0, None, 1)
+    assert_equal(all_def_slice.start.value(), 0)
+    assert_true(all_def_slice.end is None)
+    assert_equal(all_def_slice.step, 1)
+
+
 def main():
     test_none_end_folds()
     test_slicable()
     test_has_end()
     test_slice_stringable()
     test_indexing()
+    test_slice_indices_new()
+    test_slice_eq_new()
+    test_none_end_folds_new()

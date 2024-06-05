@@ -13,10 +13,11 @@
 # RUN: %mojo %s | FileCheck %s
 
 
+import sys
+
 from memory import DTypePointer
 
-from utils import StringRef, StaticIntTuple
-import sys
+from utils import StaticIntTuple, StringRef
 
 
 # CHECK-LABEL: test_print

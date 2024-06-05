@@ -17,12 +17,6 @@ These are Mojo built-ins, so you don't need to import them.
 
 from utils._visualizers import lldb_formatter_wrapping_type
 
-from memory.unsafe_pointer import (
-    initialize_pointee_move,
-    initialize_pointee_copy,
-    move_pointee,
-)
-
 from sys.intrinsics import _type_is_eq
 
 # ===----------------------------------------------------------------------===#
@@ -79,9 +73,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            move_pointee(
-                dst=UnsafePointer(self[idx]),
-                src=UnsafePointer(storage[idx]),
+            UnsafePointer.address_of(storage[idx]).move_pointee_into(
+                UnsafePointer.address_of(self[idx])
             )
 
         # Move each element into the tuple storage.
@@ -97,7 +90,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         # trivial and won't do anything.
         @parameter
         fn destroy_elt[idx: Int]():
-            destroy_pointee(UnsafePointer(self[idx]))
+            UnsafePointer.address_of(self[idx]).destroy_pointee()
 
         unroll[destroy_elt, Self.__len__()]()
 
@@ -115,9 +108,8 @@ struct Tuple[*element_types: Movable](Sized, Movable):
 
         @parameter
         fn initialize_elt[idx: Int]():
-            var existing_elt_ptr = UnsafePointer(existing[idx]).address
-            move_pointee(
-                src=UnsafePointer(existing[idx]), dst=UnsafePointer(self[idx])
+            UnsafePointer.address_of(existing[idx]).move_pointee_into(
+                UnsafePointer.address_of(self[idx])
             )
 
         unroll[initialize_elt, Self.__len__()]()
@@ -152,9 +144,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
     @always_inline("nodebug")
     fn __getitem__[
         idx: Int
-    ](self: Reference[Self, _, _]) -> ref [self.lifetime] element_types[
-        idx.value
-    ]:
+    ](ref [_]self: Self) -> ref [__lifetime_of(self)] element_types[idx.value]:
         """Get a reference to an element in the tuple.
 
         Parameters:
@@ -165,7 +155,7 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         """
         # Return a reference to an element at the specified index, propagating
         # mutability of self.
-        var storage_kgen_ptr = UnsafePointer.address_of(self[].storage).address
+        var storage_kgen_ptr = UnsafePointer.address_of(self.storage).address
 
         # KGenPointer to the element.
         var elt_kgen_ptr = __mlir_op.`kgen.pack.gep`[index = idx.value](
@@ -187,51 +177,37 @@ struct Tuple[*element_types: Movable](Sized, Movable):
         Returns:
             The tuple element at the requested index.
         """
-        return rebind[Reference[T, False, __lifetime_of(self)]](
-            Reference(self[i])
-        )[]
+        return rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
 
     @always_inline("nodebug")
     fn __contains__[T: EqualityComparable](self, value: T) -> Bool:
-        """Verify if a given value is present in the tuple.
+        """Return whether the tuple contains the specified value.
+
+        For example:
 
         ```mojo
-        var x = Tuple(1,2,True)
-        if 1 in x: print("x contains 1")
+        var t = Tuple(True, 1, 2.5)
+        if 1 in t:
+            print("t contains 1")
         ```
 
         Args:
-            value: The value to find.
+            value: The value to search for.
 
         Parameters:
-            T: The type of the value argument. Must implement the
-              trait `EqualityComparable`.
+            T: The type of the value.
 
         Returns:
-            True if the value is contained in the tuple, False otherwise.
+            True if the value is in the tuple, False otherwise.
         """
-
-        @parameter
-        fn T_in_ts() -> Bool:
-            @parameter
-            for i in range(len(VariadicList(element_types))):
-
-                @parameter
-                if _type_is_eq[element_types[i], T]():
-                    return True
-            return False
-
-        @parameter
-        if not T_in_ts():
-            return False
 
         @parameter
         for i in range(len(VariadicList(element_types))):
 
             @parameter
-            if _type_is_eq[T, element_types[i]]():
+            if _type_is_eq[element_types[i], T]():
                 var elt_ptr = UnsafePointer.address_of(self[i]).bitcast[T]()
-                if elt_ptr[].__eq__(value):
+                if elt_ptr[] == value:
                     return True
 
         return False

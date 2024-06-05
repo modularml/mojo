@@ -64,11 +64,11 @@ struct _fdopen:
         @parameter
         if os_is_windows():
             handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
         else:
             handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
         self.handle = handle
 
@@ -112,7 +112,7 @@ fn _printf[
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_ptr(), UnsafePointer.address_of(loaded_pack)
+            fmt.unsafe_cstr_ptr(), UnsafePointer.address_of(loaded_pack)
         )
     else:
         with _fdopen(file) as fd:
@@ -125,7 +125,7 @@ fn _printf[
                     `) -> !pop.scalar<si32>`,
                 ],
                 _type=Int32,
-            ](fd, fmt.unsafe_ptr(), loaded_pack)
+            ](fd, fmt.unsafe_cstr_ptr(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -171,7 +171,7 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.unsafe_ptr(), loaded_pack)
+        ](str, size, fmt.unsafe_cstr_ptr(), loaded_pack)
     )
 
 
@@ -486,14 +486,11 @@ fn _print[
 #   default, replace `print` with this function.
 @no_inline
 fn _print_fmt[
-    T: Formattable, *Ts: Formattable
-](
-    first: T,
-    *rest: *Ts,
+    T: Formattable,
+    *Ts: Formattable,
     sep: StringLiteral = " ",
     end: StringLiteral = "\n",
-    flush: Bool = False,
-):
+](first: T, *rest: *Ts, flush: Bool = False):
     """Prints elements to the text stream. Each element is separated by `sep`
     and followed by `end`.
 
@@ -503,12 +500,12 @@ fn _print_fmt[
     Parameters:
         T: The first element type.
         Ts: The remaining element types.
+        sep: The separator used between elements.
+        end: The String to write after printing the elements.
 
     Args:
         first: The first element.
         rest: The remaining elements.
-        sep: The separator used between elements.
-        end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
     """
     var writer = Formatter.stdout()

@@ -35,7 +35,7 @@ modular update mojo
   [PR #2609](https://github.com/modularml/mojo/pull/2609) by
   [@mzaks](https://github.com/mzaks)
 
-- Mojo functions can return an auto-dereferenced refeference to storage with a
+- Mojo functions can return an auto-dereferenced reference to storage with a
   new `ref` keyword in the result type specifier.  For example:
 
   ```mojo
@@ -675,6 +675,8 @@ modular update mojo
 
 - The builtin `SIMD` struct no longer conforms to `Indexer`; users must
   explicitly cast `Scalar` values using `int`.
+
+- The pointer types no longer have the ability to perform a non-temporal store.
 
 ### 🛠️ Fixed
 

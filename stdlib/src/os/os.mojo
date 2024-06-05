@@ -25,7 +25,6 @@ from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
 from memory import (
     DTypePointer,
 )
-from memory.unsafe_pointer import move_from_pointee
 
 from utils import StringRef, InlineArray
 
@@ -87,10 +86,10 @@ struct _dirent_macos:
 
 
 fn _strnlen(ptr: UnsafePointer[Int8], max: Int) -> Int:
-    var len = 0
-    while len < max and move_from_pointee(ptr + len):
-        len += 1
-    return len
+    var offset = 0
+    while offset < max and ptr[offset]:
+        offset += 1
+    return offset
 
 
 struct _DirHandle:
@@ -149,7 +148,7 @@ struct _DirHandle:
             )
             if not ep:
                 break
-            var name = move_from_pointee(ep).name
+            var name = ep.take_pointee().name
             var name_ptr = UnsafePointer.address_of(name).bitcast[Int8]()
             var name_str = StringRef(
                 name_ptr, _strnlen(name_ptr, _dirent_linux.MAX_NAME_SIZE)
@@ -174,7 +173,7 @@ struct _DirHandle:
             )
             if not ep:
                 break
-            var name = move_from_pointee(ep).name
+            var name = ep.take_pointee().name
             var name_ptr = UnsafePointer.address_of(name).bitcast[Int8]()
             var name_str = StringRef(
                 name_ptr, _strnlen(name_ptr, _dirent_macos.MAX_NAME_SIZE)

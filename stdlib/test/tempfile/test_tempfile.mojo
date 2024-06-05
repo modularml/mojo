@@ -15,8 +15,9 @@
 import os
 from os.path import exists
 from pathlib import Path
-from testing import assert_true, assert_false, assert_equal
-from tempfile import gettempdir, mkdtemp
+from tempfile import TemporaryDirectory, gettempdir, mkdtemp
+
+from testing import assert_equal, assert_false, assert_true
 
 
 fn test_mkdtemp() raises:
@@ -29,7 +30,7 @@ fn test_mkdtemp() raises:
 
     dir_name = mkdtemp(prefix="my_prefix", suffix="my_suffix")
     assert_true(exists(dir_name), "Failed to create temporary directory")
-    var name = dir_name.split("/")[-1]
+    var name = dir_name.split(os.sep)[-1]
     assert_true(name.startswith("my_prefix"))
     assert_true(name.endswith("my_suffix"))
 
@@ -39,7 +40,7 @@ fn test_mkdtemp() raises:
     dir_name = mkdtemp(dir=Path().__fspath__())
     assert_true(exists(dir_name), "Failed to create temporary directory")
     assert_true(
-        exists(Path() / dir_name.split("/")[-1]),
+        exists(Path() / dir_name.split(os.sep)[-1]),
         "Expected directory to be created in cwd",
     )
     os.rmdir(dir_name)
@@ -122,7 +123,7 @@ fn test_gettempdir() raises:
         tmpdir_result = gettempdir()
         assert_true(tmpdir_result, "Failed to get temporary directory")
         assert_equal(
-            tmpdir_result.value()[],
+            tmpdir_result.value(),
             str(dir_with_writing_access),
             "expected to get:" + str(dir_with_writing_access),
         )
@@ -137,7 +138,7 @@ fn test_gettempdir() raises:
         tmpdir_result = gettempdir()
         assert_true(tmpdir_result, "Failed to get temporary directory")
         assert_equal(
-            tmpdir_result.value()[],
+            tmpdir_result.value(),
             str(dir_with_writing_access),
             "expected to get:" + str(dir_with_writing_access),
         )
@@ -153,7 +154,7 @@ fn test_gettempdir() raises:
         tmpdir_result = gettempdir()
         assert_true(tmpdir_result, "Failed to get temporary directory")
         assert_equal(
-            tmpdir_result.value()[],
+            tmpdir_result.value(),
             str(dir_with_writing_access),
             "expected to get:" + str(dir_with_writing_access),
         )
@@ -161,6 +162,23 @@ fn test_gettempdir() raises:
     _clean_up_gettempdir_test()
 
 
+fn test_temporary_directory() raises -> None:
+    var tmp_dir: String = ""
+    with TemporaryDirectory(suffix="my_suffix", prefix="my_prefix") as tmp_dir:
+        assert_true(exists(tmp_dir), "Failed to create temp dir " + tmp_dir)
+        assert_true(tmp_dir.endswith("my_suffix"))
+        assert_true(tmp_dir.split(os.sep)[-1].startswith("my_prefix"))
+    assert_false(exists(tmp_dir), "Failed to delete temp dir " + tmp_dir)
+
+    with TemporaryDirectory() as tmp_dir:
+        assert_true(exists(tmp_dir), "Failed to create temp dir " + tmp_dir)
+        _ = open(Path(tmp_dir) / "test_file", "w")
+        os.mkdir(Path(tmp_dir) / "test_dir")
+        _ = open(Path(tmp_dir) / "test_dir" / "test_file2", "w")
+    assert_false(exists(tmp_dir), "Failed to delete temp dir " + tmp_dir)
+
+
 fn main() raises:
     test_mkdtemp()
     test_gettempdir()
+    test_temporary_directory()

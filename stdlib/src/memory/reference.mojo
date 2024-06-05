@@ -196,16 +196,16 @@ struct AddressSpace(EqualityComparable):
 @value
 @register_passable("trivial")
 struct Reference[
+    is_mutable: Bool, //,
     type: AnyType,
-    is_mutable: Bool,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]:
     """Defines a non-nullable safe reference.
 
     Parameters:
-        type: Type of the underlying data.
         is_mutable: Whether the referenced data may be mutated through this.
+        type: Type of the underlying data.
         lifetime: The lifetime of the reference.
         address_space: The address space of the referenced data.
     """
@@ -228,13 +228,15 @@ struct Reference[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Self._mlir_type):
-        """Constructs a Reference from the MLIR reference.
+    fn __init__(
+        inout self, ref [lifetime, address_space._value.value]value: type
+    ):
+        """Constructs a Reference from a value reference.
 
         Args:
-            value: The MLIR reference.
+            value: The value reference.
         """
-        self.value = value
+        self.value = __get_mvalue_as_litref(value)
 
     # ===------------------------------------------------------------------===#
     # Operator dunders

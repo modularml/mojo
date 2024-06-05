@@ -13,8 +13,9 @@
 # RUN: %mojo %s
 
 from collections import InlineList, Set
-from testing import assert_equal, assert_false, assert_true, assert_raises
+
 from test_utils import MoveCounter
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_list():
@@ -58,9 +59,18 @@ def test_append_triggers_a_move():
 
 
 @value
-struct ValueToCountDestructor(CollectionElement):
+struct ValueToCountDestructor(CollectionElementNew):
     var value: Int
     var destructor_counter: UnsafePointer[List[Int]]
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.value = other.value
+        self.destructor_counter = other.destructor_counter
 
     fn __del__(owned self):
         self.destructor_counter[].append(self.value)
@@ -74,7 +84,9 @@ def test_destructor():
 
     for index in range(capacity):
         inline_list.append(
-            ValueToCountDestructor(index, UnsafePointer(destructor_counter))
+            ValueToCountDestructor(
+                index, UnsafePointer.address_of(destructor_counter)
+            )
         )
 
     # Private api use here:
