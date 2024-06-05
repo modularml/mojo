@@ -119,7 +119,7 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
         Args:
             value: The value to write.
         """
-        self.unsafe_ptr()[] = value^
+        self.unsafe_ptr().init_pointee_move(value^)
 
     @always_inline
     fn assume_initialized(
