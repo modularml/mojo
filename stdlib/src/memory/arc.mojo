@@ -25,6 +25,7 @@ print(3 == p.get())
 
 from os.atomic import Atomic
 from memory import UnsafePointer, stack_allocation
+from builtin.builtin_list import _lit_mut_cast
 
 
 struct _ArcInner[T: Movable]:
@@ -99,10 +100,22 @@ struct Arc[T: Movable](CollectionElement):
             (self._inner).destroy_pointee()
             self._inner.free()
 
-    # FIXME: This isn't right - the element should be mutable regardless
-    # of whether the 'self' type is mutable.
-    fn __getitem__(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
-        """Returns a Reference to the managed value.
+    # FIXME: The lifetime returned for this is currently self lifetime, which
+    # keeps the Arc object alive as long as there are references into it.  That
+    # said, this isn't really the right modeling, we need hierarchical lifetimes
+    # to model the mutability and invalidation of the returned reference
+    # correctly.
+    fn __getitem__[
+        self_life: ImmutableLifetime
+    ](
+        ref [self_life]self: Self,
+    ) -> ref [
+        _lit_mut_cast[self_life, result_mutable=True].result
+    ] T:
+        """Returns a mutable Reference to the managed value.
+
+        Parameters:
+            self_life: The lifetime of self.
 
         Returns:
             A Reference to the managed value.
