@@ -215,7 +215,6 @@ fn _quicksort[
 # ===----------------------------------------------------------------------===#
 # partition
 # ===----------------------------------------------------------------------===#
-@always_inline
 fn partition[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](buff: Pointer[type], k: Int, size: Int):
@@ -254,7 +253,6 @@ fn partition[
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline
 fn sort(inout buff: Pointer[Int], len: Int):
     """Sort the buffer inplace.
     The function doesn't return anything, the buffer is updated inplace.
@@ -271,7 +269,6 @@ fn sort(inout buff: Pointer[Int], len: Int):
     _quicksort[Int, _less_than_equal](buff, len)
 
 
-@always_inline
 fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
     """Sort the buffer inplace.
     The function doesn't return anything, the buffer is updated inplace.
@@ -291,7 +288,6 @@ fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
     _quicksort[Scalar[type], _less_than_equal](buff, len)
 
 
-@always_inline
 fn sort(inout list: List[Int]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -304,7 +300,6 @@ fn sort(inout list: List[Int]):
     sort(ptr, len(list))
 
 
-@always_inline
 fn sort[type: DType](inout list: List[Scalar[type]]):
     """Sort the list inplace.
     The function doesn't return anything, the list is updated inplace.
@@ -320,7 +315,6 @@ fn sort[type: DType](inout list: List[Scalar[type]]):
     sort[type](ptr, len(list))
 
 
-@always_inline
 fn sort[
     type: CollectionElement,
     cmp_fn: fn (type, type) capturing -> Bool,
@@ -339,7 +333,6 @@ fn sort[
     _quicksort[type, cmp_fn](list.data, len(list))
 
 
-@always_inline
 fn sort[type: ComparableCollectionElement](inout list: List[type]):
     """Sort list of the order comparable elements in-place.
 
@@ -354,7 +347,7 @@ fn sort[type: ComparableCollectionElement](inout list: List[type]):
     fn _less_than_equal(a: type, b: type) -> Bool:
         return a <= b
 
-    sort[type, _less_than_equal](list)
+    _quicksort[type, _less_than_equal](list.data, len(list))
 
 
 # ===----------------------------------------------------------------------===#
