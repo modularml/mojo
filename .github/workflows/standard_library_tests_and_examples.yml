@@ -12,6 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 name: Test stdlib and examples
+
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]

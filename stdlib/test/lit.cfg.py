@@ -49,7 +49,7 @@ if bool(int(os.environ.get("MOJO_ENABLE_ASSERTIONS_IN_TESTS", 1))):
 else:
     print("Running tests with assertions disabled.")
     base_mojo_command = "mojo"
-config.substitutions.insert(0, ("%mojo", mojo_base_command))
+config.substitutions.insert(0, ("%mojo", base_mojo_command))
 
 # Mojo without assertions.  Only use this for known tests that do not work
 # with assertions enabled.
