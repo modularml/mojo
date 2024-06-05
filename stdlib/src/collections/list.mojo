@@ -565,8 +565,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             self.resize(new_size)
         else:
             self.reserve(new_size)
-            for i in range(new_size, self.size):
-                (self.data + i).destroy_pointee()
             for i in range(self.size, new_size):
                 (self.data + i).init_pointee_copy(value)
             self.size = new_size
