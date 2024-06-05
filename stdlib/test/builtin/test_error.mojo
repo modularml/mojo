@@ -32,6 +32,7 @@ def test_from_and_to_string():
     assert_equal(str(error), "FOO")
 
     assert_equal(str(Error("bad")), "bad")
+    assert_equal(repr(Error("err")), "Error('err')")
 
 
 def main():

@@ -26,7 +26,7 @@ from memory import memcmp, memcpy, UnsafePointer
 
 
 @register_passable
-struct Error(Stringable, Boolable):
+struct Error(Stringable, Boolable, Representable):
     """This type represents an Error."""
 
     var data: UnsafePointer[UInt8]
@@ -151,7 +151,7 @@ struct Error(Stringable, Boolable):
         Returns:
             A printable representation of the error message.
         """
-        return str(self)
+        return "Error(" + repr(self._message()) + ")"
 
     @always_inline
     fn _message(self) -> String:
