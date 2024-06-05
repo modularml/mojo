@@ -12,10 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
-# TODO: Make this public when we are certain of the design.
-# TODO: Move _size into an alias when the bug https://github.com/modularml/mojo/issues/2889
-# is fixed.
-struct UnsafeMaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
+struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
     CollectionElement
 ):
     """A memory location that may or may not be initialized.
@@ -31,12 +28,9 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement, _size: Int = 1](
 
     Parameters:
         ElementType: The type of the element to store.
-        _size: This is an implementation detail and should never be used by the user.
     """
 
-    alias type = __mlir_type[
-        `!pop.array<`, _size.value, `, `, Self.ElementType, `>`
-    ]
+    alias type = __mlir_type[`!pop.array<1, `, Self.ElementType, `>`]
     var _array: Self.type
 
     @always_inline
