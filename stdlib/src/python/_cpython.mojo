@@ -11,8 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from os import getenv
-from sys import external_call, exit
+from os import getenv, setenv
+from pathlib import Path
+from os.path import dirname
+from sys import external_call
+from sys.arg import argv
 from sys.ffi import DLHandle
 
 from memory import DTypePointer, UnsafePointer
@@ -112,6 +115,20 @@ struct CPython:
             print("CPython init")
             print("MOJO_PYTHON:", getenv("MOJO_PYTHON"))
             print("MOJO_PYTHON_LIBRARY:", getenv("MOJO_PYTHON_LIBRARY"))
+
+        # Add directory of target file to top of sys.path to find python modules
+        var file_dir = dirname(argv()[0])
+        if Path(file_dir).is_dir() or file_dir == "":
+            var python_path = getenv("PYTHONPATH")
+            # A leading `:` will put the current dir at the top of sys.path.
+            # If we're doing `mojo run main.mojo` or `./main`, the returned
+            # `dirname` will be an empty string.
+            if file_dir == "" and not python_path:
+                file_dir = ":"
+            if python_path:
+                _ = setenv("PYTHONPATH", file_dir + ":" + python_path)
+            else:
+                _ = setenv("PYTHONPATH", file_dir)
 
         # TODO(MOCO-772) Allow raises to propagate through function pointers
         # and make this initialization a raising function.
