@@ -930,12 +930,13 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
+        var index = idx
         if idx < 0:
-            return self.__getitem__(len(self) + idx)
+            index = len(self) + index
 
-        debug_assert(0 <= idx < len(self), "index must be in range")
+        debug_assert(0 <= index < len(self), "index must be in range")
         var buf = Self._buffer_type(capacity=1)
-        buf.append(self._buffer[idx])
+        buf.append(self._buffer[index])
         buf.append(0)
         return String(buf^)
 
