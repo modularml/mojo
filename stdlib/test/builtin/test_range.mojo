@@ -30,7 +30,6 @@ def test_range_len():
     assert_equal(range(0, 0).__len__(), 0, "len(range(0, 0))")
     assert_equal(range(10, 0).__len__(), 0, "len(range(10, 0))")
     assert_equal(range(0, 0, 1).__len__(), 0, "len(range(0, 0, 1))")
-
     assert_equal(range(5, 10, -1).__len__(), 0, "len(range(5, 10, -1))")
     assert_equal(range(10, 5, 1).__len__(), 0, "len(range(10, 5, 1))")
     assert_equal(range(5, 10, -10).__len__(), 0, "len(range(5, 10, -10))")
@@ -118,6 +117,11 @@ def test_indexing():
     assert_equal(r[True], 1)
     assert_equal(r[int(4)], 4)
     assert_equal(r[3], 3)
+
+    assert_equal(range(10)[-1], 9)
+    assert_equal(range(10)[-2], 8)
+    assert_equal(range(1, 10)[-1], 9)
+    assert_equal(range(1, 10, 4)[-1], 9)
 
 
 def main():

@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from .range import _StridedRange
+from .range import _Range
 
 from collections.list import _ListIter
 
@@ -43,7 +43,7 @@ trait ReversibleRange:
     # iterators currently check __len__() instead of raising an exception
     # so there is no ReversibleRaising trait yet.
 
-    fn __reversed__(self) -> _StridedRange:
+    fn __reversed__(self) -> _Range:
         """Get a reversed iterator for the type.
 
         **Note**: iterators are currently non-raising.
@@ -59,7 +59,7 @@ trait ReversibleRange:
 # ===----------------------------------------------------------------------=== #
 
 
-fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
+fn reversed[T: ReversibleRange](value: T) -> _Range:
     """Get a reversed iterator of the input range.
 
     **Note**: iterators are currently non-raising.

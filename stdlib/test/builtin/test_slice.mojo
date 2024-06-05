@@ -84,7 +84,7 @@ def test_slice_eq():
     assert_equal(slice(1, None, 1), slice(1, None, None))
 
 
-def test_slice_adjust():
+def test_slice_indices():
     var start: Int
     var end: Int
     var step: Int
@@ -143,4 +143,4 @@ def main():
     test_slice_stringable()
     test_indexing()
     test_slice_eq()
-    test_slice_adjust()
+    test_slice_indices()

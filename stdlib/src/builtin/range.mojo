@@ -20,6 +20,7 @@ from python import PythonObject
 
 # FIXME(MOCO-658): Explicit conformance to these traits shouldn't be needed.
 from builtin._stubs import _IntIterable, _StridedIterable
+from collections._index_normalization import normalize_index
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -61,70 +62,6 @@ fn _sign(x: Int) -> Int:
 # ===----------------------------------------------------------------------=== #
 
 
-@register_passable("trivial")
-struct _ZeroStartingRange(Sized, ReversibleRange, _IntIterable):
-    var curr: Int
-    var end: Int
-
-    @always_inline("nodebug")
-    fn __init__(inout self, end: Int):
-        self.curr = max(0, end)
-        self.end = self.curr
-
-    @always_inline("nodebug")
-    fn __iter__(self) -> Self:
-        return self
-
-    @always_inline
-    fn __next__(inout self) -> Int:
-        var curr = self.curr
-        self.curr -= 1
-        return self.end - curr
-
-    @always_inline("nodebug")
-    fn __len__(self) -> Int:
-        return self.curr
-
-    @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> Int:
-        return index(idx)
-
-    @always_inline("nodebug")
-    fn __reversed__(self) -> _StridedRange:
-        return range(self.end - 1, -1, -1)
-
-
-@value
-@register_passable("trivial")
-struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
-    var start: Int
-    var end: Int
-
-    @always_inline("nodebug")
-    fn __iter__(self) -> Self:
-        return self
-
-    @always_inline
-    fn __next__(inout self) -> Int:
-        var start = self.start
-        self.start += 1
-        return start
-
-    @always_inline("nodebug")
-    fn __len__(self) -> Int:
-        # FIXME(#38392):
-        # return max(0, self.end - self.start)
-        return self.end - self.start if self.start < self.end else 0
-
-    @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> Int:
-        return self.start + index(idx)
-
-    @always_inline("nodebug")
-    fn __reversed__(self) -> _StridedRange:
-        return range(self.end - 1, self.start - 1, -1)
-
-
 @value
 @register_passable("trivial")
 struct _StridedRangeIterator(Sized):
@@ -150,7 +87,7 @@ struct _StridedRangeIterator(Sized):
 
 @value
 @register_passable("trivial")
-struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
+struct _Range(Sized, ReversibleRange, _StridedIterable):
     var start: Int
     var end: Int
     var step: Int
@@ -187,10 +124,10 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
-        return self.start + index(idx) * self.step
+        return self.start + normalize_index["_Range"](idx, self) * self.step
 
     @always_inline("nodebug")
-    fn __reversed__(self) -> _StridedRange:
+    fn __reversed__(self) -> Self:
         var shifted_end = self.end - _sign(self.step)
         var start = shifted_end - ((shifted_end - self.start) % self.step)
         var end = self.start - self.step
@@ -199,7 +136,7 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
 
 
 @always_inline("nodebug")
-fn range[type: Intable](end: type) -> _ZeroStartingRange:
+fn range[type: Intable](end: type) -> _Range:
     """Constructs a [0; end) Range.
 
     Parameters:
@@ -211,11 +148,11 @@ fn range[type: Intable](end: type) -> _ZeroStartingRange:
     Returns:
         The constructed range.
     """
-    return _ZeroStartingRange(int(end))
+    return _Range(0, int(end), 1)
 
 
 @always_inline
-fn range[type: IntableRaising](end: type) raises -> _ZeroStartingRange:
+fn range[type: IntableRaising](end: type) raises -> _Range:
     """Constructs a [0; end) Range.
 
     Parameters:
@@ -227,11 +164,11 @@ fn range[type: IntableRaising](end: type) raises -> _ZeroStartingRange:
     Returns:
         The constructed range.
     """
-    return _ZeroStartingRange(int(end))
+    return _Range(0, int(end), 1)
 
 
 @always_inline("nodebug")
-fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _SequentialRange:
+fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _Range:
     """Constructs a [start; end) Range.
 
     Parameters:
@@ -245,13 +182,13 @@ fn range[t0: Intable, t1: Intable](start: t0, end: t1) -> _SequentialRange:
     Returns:
         The constructed range.
     """
-    return _SequentialRange(int(start), int(end))
+    return _Range(int(start), int(end), 1)
 
 
 @always_inline("nodebug")
 fn range[
     t0: IntableRaising, t1: IntableRaising
-](start: t0, end: t1) raises -> _SequentialRange:
+](start: t0, end: t1) raises -> _Range:
     """Constructs a [start; end) Range.
 
     Parameters:
@@ -265,13 +202,13 @@ fn range[
     Returns:
         The constructed range.
     """
-    return _SequentialRange(int(start), int(end))
+    return _Range(int(start), int(end), 1)
 
 
 @always_inline
 fn range[
     t0: Intable, t1: Intable, t2: Intable
-](start: t0, end: t1, step: t2) -> _StridedRange:
+](start: t0, end: t1, step: t2) -> _Range:
     """Constructs a [start; end) Range with a given step.
 
     Parameters:
@@ -287,13 +224,13 @@ fn range[
     Returns:
         The constructed range.
     """
-    return _StridedRange(int(start), int(end), int(step))
+    return _Range(int(start), int(end), int(step))
 
 
 @always_inline
 fn range[
     t0: IntableRaising, t1: IntableRaising, t2: IntableRaising
-](start: t0, end: t1, step: t2) raises -> _StridedRange:
+](start: t0, end: t1, step: t2) raises -> _Range:
     """Constructs a [start; end) Range with a given step.
 
     Parameters:
@@ -309,4 +246,4 @@ fn range[
     Returns:
         The constructed range.
     """
-    return _StridedRange(int(start), int(end), int(step))
+    return _Range(int(start), int(end), int(step))
