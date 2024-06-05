@@ -32,6 +32,8 @@ from bit import is_power_of_two
 
 from .memory import _free, _malloc
 from .reference import AddressSpace
+from .maybe_uninitialized import UnsafeMaybeUninitialized
+
 
 # ===----------------------------------------------------------------------===#
 # bitcast
