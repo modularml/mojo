@@ -64,11 +64,11 @@ struct _fdopen:
         @parameter
         if os_is_windows():
             handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
         else:
             handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
         self.handle = handle
 
@@ -112,7 +112,7 @@ fn _printf[
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_ptr(), UnsafePointer.address_of(loaded_pack)
+            fmt.unsafe_cstr_ptr(), UnsafePointer.address_of(loaded_pack)
         )
     else:
         with _fdopen(file) as fd:
@@ -125,7 +125,7 @@ fn _printf[
                     `) -> !pop.scalar<si32>`,
                 ],
                 _type=Int32,
-            ](fd, fmt.unsafe_ptr(), loaded_pack)
+            ](fd, fmt.unsafe_cstr_ptr(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -171,7 +171,7 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.unsafe_ptr(), loaded_pack)
+        ](str, size, fmt.unsafe_cstr_ptr(), loaded_pack)
     )
 
 

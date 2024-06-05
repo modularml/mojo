@@ -14,8 +14,6 @@
 
 from testing import assert_equal
 
-from testing import assert_equal
-
 
 def test_range_len():
     # Usual cases
