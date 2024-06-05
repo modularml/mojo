@@ -12,9 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from utils._format import Formattable, write_to, Formatter
-from utils.inline_string import _FixedString
 from testing import assert_equal
+
+from utils._format import Formattable, Formatter, write_to
+from utils.inline_string import _FixedString
 
 
 fn main() raises:

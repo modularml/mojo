@@ -25,6 +25,7 @@ permissions:
 jobs:
   test-examples:
     strategy:
+      fail-fast: false
       matrix:
         os: ["ubuntu-latest", "macos-14"]
 

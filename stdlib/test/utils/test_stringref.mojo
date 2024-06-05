@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal, assert_true, assert_false, assert_raises
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from utils import StringRef
 
