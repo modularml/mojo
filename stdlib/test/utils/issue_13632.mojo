@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from collections import List
+
 from testing import assert_equal
 
 

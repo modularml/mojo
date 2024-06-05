@@ -20,6 +20,7 @@ from testing import (
     assert_raises,
     assert_true,
 )
+
 from utils.numerics import inf, nan
 
 
@@ -62,22 +63,22 @@ def test_assert_messages():
     try:
         assert_true(False)
     except e:
-        assert_true("test_assertion.mojo:63:20: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:64:20: AssertionError:" in str(e))
 
     try:
         assert_false(True)
     except e:
-        assert_true("test_assertion.mojo:68:21: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:69:21: AssertionError:" in str(e))
 
     try:
         assert_equal(1, 0)
     except e:
-        assert_true("test_assertion.mojo:73:21: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:74:21: AssertionError:" in str(e))
 
     try:
         assert_not_equal(0, 0)
     except e:
-        assert_true("test_assertion.mojo:78:25: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:79:25: AssertionError:" in str(e))
 
 
 def test_assert_almost_equal():

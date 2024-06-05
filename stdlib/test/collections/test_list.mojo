@@ -15,7 +15,8 @@
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
-from testing import assert_equal, assert_false, assert_true, assert_raises
+from testing import assert_equal, assert_false, assert_raises, assert_true
+
 from utils import Span
 
 

@@ -14,7 +14,7 @@
 
 from collections import Optional, OptionalReg
 
-from testing import assert_true, assert_false, assert_equal
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_basic():

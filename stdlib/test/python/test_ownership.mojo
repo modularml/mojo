@@ -11,19 +11,16 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 # XFAIL: asan && !system-darwin
-# RUN: %mojo -D TEST_DIR=%S %s
+# RUN: %mojo  %s
 
-from sys import env_get_string
+from pathlib import _dir_of_current_file
 
-from python import PythonObject, Python
-
+from python import Python, PythonObject
 from testing import assert_equal
-
-alias TEST_DIR = env_get_string["TEST_DIR"]()
 
 
 fn test_import(inout python: Python) raises:
-    Python.add_to_path(TEST_DIR)
+    Python.add_to_path(str(_dir_of_current_file()))
     var my_module: PythonObject = Python.import_module("my_module")
     var py_string = my_module.my_function("Hello")
     var str = String(python.__str__(py_string))
@@ -59,7 +56,7 @@ fn test_getitem_ownership(inout python: Python) raises:
 
 
 fn test_getattr_ownership(inout python: Python) raises:
-    Python.add_to_path(TEST_DIR)
+    Python.add_to_path(str(_dir_of_current_file()))
     var my_module: PythonObject = Python.import_module("my_module")
     var obj = my_module.Foo(4)
     var py_string = str(obj.bar)

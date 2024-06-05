@@ -125,8 +125,28 @@ fn test_heap_string_from_string_slice() raises:
     assert_equal(heap_string, "Hello")
 
 
+fn test_slice_len() raises:
+    alias str1: StringLiteral = "12345"
+    alias str2: StringLiteral = "1234"
+    alias str3: StringLiteral = "123"
+    alias str4: StringLiteral = "12"
+    alias str5: StringLiteral = "1"
+
+    alias slice1: StringSlice[ImmutableStaticLifetime] = str1.as_string_slice()
+    alias slice2: StringSlice[ImmutableStaticLifetime] = str2.as_string_slice()
+    alias slice3: StringSlice[ImmutableStaticLifetime] = str3.as_string_slice()
+    alias slice4: StringSlice[ImmutableStaticLifetime] = str4.as_string_slice()
+    alias slice5: StringSlice[ImmutableStaticLifetime] = str5.as_string_slice()
+
+    assert_equal(5, len(slice1))
+    assert_equal(4, len(slice2))
+    assert_equal(3, len(slice3))
+    assert_equal(2, len(slice4))
+    assert_equal(1, len(slice5))
+
+
 fn main() raises:
     test_string_literal_byte_slice()
     test_string_byte_slice()
-
     test_heap_string_from_string_slice()
+    test_slice_len()

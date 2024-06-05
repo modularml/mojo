@@ -60,8 +60,7 @@ struct Error(Stringable, Boolable):
             The constructed Error object.
         """
         return Error {
-            # TODO: Remove cast once string UInt8 transition is complete.
-            data: value.unsafe_ptr().bitcast[UInt8](),
+            data: value.unsafe_ptr(),
             loaded_length: len(value),
         }
 

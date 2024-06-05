@@ -15,5 +15,6 @@
 from .path import (
     DIR_SEPARATOR,
     cwd,
+    _dir_of_current_file,
     Path,
 )

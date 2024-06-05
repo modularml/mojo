@@ -858,7 +858,9 @@ fn gather[
 
     @parameter
     if size == 1:
-        return DTypePointer[type](base[0]).load() if mask else passthrough[0]
+        return Scalar.load(
+            DTypePointer[type](base[0])
+        ) if mask else passthrough[0]
     return llvm_intrinsic[
         "llvm.masked.gather",
         __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
@@ -935,7 +937,7 @@ fn scatter[
     if size == 1:
         if mask:
             var ptr = DTypePointer[type](base[0])
-            ptr.store(value[0])
+            Scalar.store(ptr, value[0])
         return
     llvm_intrinsic["llvm.masked.scatter", NoneType](
         value,
@@ -1223,7 +1225,7 @@ fn masked_load[
 
     @parameter
     if size == 1:
-        return addr.load() if mask else passthrough[0]
+        return Scalar.load(addr) if mask else passthrough[0]
 
     return llvm_intrinsic["llvm.masked.load", SIMD[addr.type, size]](
         addr.bitcast[DType.invalid.value]().address,
@@ -1264,7 +1266,7 @@ fn masked_store[
     @parameter
     if size == 1:
         if mask:
-            addr.store(value[0])
+            Scalar.store(addr, value[0])
         return
 
     llvm_intrinsic["llvm.masked.store", NoneType](
@@ -1305,7 +1307,7 @@ fn compressed_store[
     @parameter
     if size == 1:
         if mask:
-            addr.store(value[0])
+            Scalar.store(addr, value[0])
         return
 
     llvm_intrinsic["llvm.masked.compressstore", NoneType](
@@ -1350,7 +1352,7 @@ fn strided_load[
 
     @parameter
     if simd_width == 1:
-        return addr.load() if mask else Scalar[type]()
+        return Scalar.load(addr) if mask else Scalar[type]()
 
     alias IndexTy = SIMD[DType.index, simd_width]
     var iota = llvm_intrinsic[
@@ -1391,7 +1393,7 @@ fn strided_load[
 
     @parameter
     if simd_width == 1:
-        return addr.load()
+        return Scalar.load(addr)
 
     return strided_load[type, simd_width](addr, stride, True)
 
@@ -1431,7 +1433,7 @@ fn strided_store[
     @parameter
     if simd_width == 1:
         if mask:
-            addr.store(value[0])
+            Scalar.store(addr, value[0])
         return
 
     alias IndexTy = SIMD[DType.index, simd_width]
@@ -1471,7 +1473,7 @@ fn strided_store[
 
     @parameter
     if simd_width == 1:
-        addr.store(value[0])
+        Scalar.store(addr, value[0])
         return
 
     strided_store[type, simd_width](value, addr, stride, True)
