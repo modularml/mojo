@@ -77,7 +77,7 @@ else:
 
     # The tests are executed inside this build directory to avoid
     # polluting the source tree.
-    config.test_exec_root = build_root / "stdlib"
+    config.test_exec_root = build_root / "stdlib" / "test"
 
     # The `mojo` nightly compiler ships with its own `stdlib.mojopkg`. For the
     # open-source stdlib, we need to specify the paths to the just-built
