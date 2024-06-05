@@ -19,8 +19,8 @@ from collections import Array
 ```
 """
 
-from math import sqrt, acos, sin
-from algorithm import vectorize
+# from math import sqrt, acos, sin # FIXME: math module
+# from algorithm import vectorize
 
 # ===----------------------------------------------------------------------===#
 # Array
@@ -981,7 +981,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
-        return sqrt((self.vec**2).reduce_add())
+        return 1  # FIXME: math module
+        # return sqrt((self.vec**2).reduce_add())
 
     @always_inline
     fn __add__[
@@ -1206,7 +1207,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
-        return acos(self.cos(other))
+        return 0  # FIXME: math module
+        # return acos(self.cos(other))
 
     @always_inline("nodebug")
     fn cross(self, other: Self) -> Self:
@@ -1258,13 +1260,13 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Args:
             func: The function to apply.
         """
+        pass
+        # @parameter
+        # fn closure[simd_width: Int](i: Int):
+        #     self.vec[i] = func(self.vec[i])
 
-        @parameter
-        fn closure[simd_width: Int](i: Int):
-            self.vec[i] = func(self.vec[i])
-
-        # FIXME will this work?
-        vectorize[closure, simdwidthof[T]()](Self._vec_type.size)
+        # # FIXME will this work?
+        # vectorize[closure, simdwidthof[T]()](Self._vec_type.size)
 
     fn map(
         owned self, func: fn (Self._scalar_type) -> Self._scalar_type

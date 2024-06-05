@@ -445,8 +445,8 @@ fn test_constructor_from_other_list_through_pointer() raises:
 
 
 fn test_array_to_string() raises:
-    var my_list = Array[DType.int8](1, 2, 3)
-    assert_equal(str(my_list), "[1, 2, 3]")
+    var my_array = Array[DType.int8](1, 2, 3)
+    assert_equal(str(my_array), "[1, 2, 3]")
 
     # TODO: need bin func for StringLiteral
     # var a = bin("a")
@@ -454,9 +454,9 @@ fn test_array_to_string() raises:
     # var c = bin("c")
     # var foo = bin("foo")
 
-    # var my_list4 = Array[UInt64]("a", "b", "c", "foo")
+    # var my_array4 = Array[UInt64]("a", "b", "c", "foo")
     # assert_equal(
-    #     str(my_list4), "['" + a + "', '" + b + "', '" + c + "', '" + foo + " ']"
+    #     str(my_array4), "['" + a + "', '" + b + "', '" + c + "', '" + foo + " ']"
     # )
 
 
