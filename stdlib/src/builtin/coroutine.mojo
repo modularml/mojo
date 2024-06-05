@@ -138,7 +138,7 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
 
     @always_inline
     @__named_result(out)
-    fn __await__(self) -> type:
+    fn __await__(owned self) -> type:
         """Suspends the current coroutine until the coroutine is complete.
 
         Returns:
@@ -152,6 +152,7 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
             __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
         )
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
+        _ = self^
 
 
 # ===----------------------------------------------------------------------=== #
@@ -220,7 +221,7 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
 
     @always_inline
     @__named_result(out)
-    fn __await__(self) raises -> type:
+    fn __await__(owned self) raises -> type:
         """Suspends the current coroutine until the coroutine is complete.
 
         Returns:
@@ -239,5 +240,7 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
             __mlir_op.`lit.ownership.mark_initialized`(
                 __get_mvalue_as_litref(__get_nearest_error_slot())
             )
+            _ = self^
             __mlir_op.`lit.raise`()
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
+        _ = self^
