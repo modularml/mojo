@@ -22,6 +22,8 @@ from memory import stack_allocation
 
 from utils import StringRef
 
+from sys.ffi import C_char
+
 alias DIR_SEPARATOR = "\\" if os_is_windows() else "/"
 
 
@@ -32,14 +34,16 @@ fn cwd() raises -> Path:
       The current directory.
     """
     alias MAX_CWD_BUFFER_SIZE = 1024
-    var buf = stack_allocation[MAX_CWD_BUFFER_SIZE, DType.int8]()
+    var buf0 = stack_allocation[MAX_CWD_BUFFER_SIZE, C_char.type]()
 
-    var res = external_call["getcwd", DTypePointer[DType.int8]](
+    var buf = UnsafePointer[C_char]._from_dtype_ptr(buf0)
+
+    var res = external_call["getcwd", UnsafePointer[C_char]](
         buf, MAX_CWD_BUFFER_SIZE
     )
 
     # If we get a nullptr, then we raise an error.
-    if res == DTypePointer[DType.int8]():
+    if res == UnsafePointer[C_char]():
         raise Error("unable to query the current directory")
 
     return String(StringRef(buf))
