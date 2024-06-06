@@ -82,10 +82,8 @@ struct StringRef(
         """
         return StringRef(str.unsafe_ptr(), len(str))
 
-    # TODO: #2317 Drop support for this constructor when we have fully
-    # transitioned to UInt8 as the main byte type.
     @always_inline
-    fn __init__(ptr: DTypePointer[DType.int8], len: Int) -> Self:
+    fn __init__(ptr: UnsafePointer[C_char], len: Int) -> Self:
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -102,9 +100,8 @@ struct StringRef(
         Returns:
             Constructed `StringRef` object.
         """
-        var unsafe_ptr = UnsafePointer[Int8]._from_dtype_ptr(ptr)
 
-        return Self {data: unsafe_ptr.bitcast[UInt8](), length: len}
+        return Self {data: ptr.bitcast[UInt8](), length: len}
 
     @always_inline
     fn __init__(ptr: DTypePointer[DType.uint8], len: Int) -> Self:
@@ -137,10 +134,8 @@ struct StringRef(
 
         return DTypePointer[DType.uint8](ptr)
 
-    # TODO: #2317 Drop support for this constructor when we have fully
-    # transitioned to UInt8 as the main byte type.
     @always_inline
-    fn __init__(ptr: DTypePointer[DType.int8]) -> Self:
+    fn __init__(ptr: UnsafePointer[C_char]) -> Self:
         """Construct a StringRef value given a null-terminated string.
 
         Note that you should use the constructor from `DTypePointer[DType.uint8]` instead
@@ -175,7 +170,9 @@ struct StringRef(
         while Scalar.load(ptr, len):
             len += 1
 
-        return StringRef(ptr.bitcast[DType.int8](), len)
+        var ptr1 = UnsafePointer[C_char]._from_dtype_ptr(ptr)
+
+        return StringRef(ptr1, len)
 
     # ===-------------------------------------------------------------------===#
     # Helper methods for slicing

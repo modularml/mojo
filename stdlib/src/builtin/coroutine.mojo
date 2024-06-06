@@ -147,12 +147,13 @@ struct Coroutine[type: AnyType, lifetimes: LifetimeSet]:
 
         # Black magic! Internal implementation detail!
         # Don't you dare copy this code! 😤
+        var handle = self._handle
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
         __mlir_op.`co.await`[_type=NoneType](
-            self._handle,
+            handle,
             __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
         )
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
-        _ = self^
 
 
 # ===----------------------------------------------------------------------=== #
@@ -230,8 +231,10 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
 
         # Black magic! Internal implementation detail!
         # Don't you dare copy this code! 😤
+        var handle = self._handle
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
         if __mlir_op.`co.await`[_type = __mlir_type.i1](
-            self._handle,
+            handle,
             __mlir_op.`lit.ref.to_pointer`(__get_mvalue_as_litref(out)),
             __mlir_op.`lit.ref.to_pointer`(
                 __get_mvalue_as_litref(__get_nearest_error_slot())
@@ -240,7 +243,5 @@ struct RaisingCoroutine[type: AnyType, lifetimes: LifetimeSet]:
             __mlir_op.`lit.ownership.mark_initialized`(
                 __get_mvalue_as_litref(__get_nearest_error_slot())
             )
-            _ = self^
             __mlir_op.`lit.raise`()
         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(out))
-        _ = self^

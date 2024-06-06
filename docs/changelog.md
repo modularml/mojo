@@ -87,6 +87,25 @@ by [@jayzhan211](https://github.com/jayzhan211))
   an incremental internal migration due to reliance on the old, incorrect behaviour.
   ([PR #2894](https://github.com/modularml/mojo/pull/2894) by [@bgreni](https://github.com/bgreni))
 
+- Added `String.format` method.
+  ([PR #2771](https://github.com/modularml/mojo/pull/2771) by [@rd4com](https://github.com/rd4com))
+
+  Support automatic and manual indexing of `*args`.
+  
+  Examples:
+
+  ```mojo
+  print(
+    String("{1} Welcome to {0} {1}").format("mojo", "🔥")
+  )
+  # 🔥 Wecome to mojo 🔥
+  ```
+
+  ```mojo
+  print(String("{} {} {}").format(True, 1.125, 2))
+  #True 1.125 2
+  ```
+
 ### 🦋 Changed
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that
@@ -97,6 +116,10 @@ by [@jayzhan211](https://github.com/jayzhan211))
     (was `UnsafePointer[Int8]`)
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
+
+- The `StringRef` constructors from `DTypePointer.int8` have been changed to
+  take a `UnsafePointer[C_char]`, reflecting their use for compatibility with
+  C APIs.
 
 - The global functions for working with `UnsafePointer` have transitioned to
   being methods through the use of conditional conformances:

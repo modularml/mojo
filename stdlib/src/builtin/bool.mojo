@@ -64,12 +64,25 @@ struct Bool(
     Boolable,
     Intable,
     Indexer,
+    CollectionElementNew,
     Representable,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
     var value: __mlir_type.i1
     """The underlying storage of the boolean value."""
+
+    @always_inline("nodebug")
+    fn __init__(*, other: Self) -> Bool:
+        """Explicitly construct a deep copy of the provided value.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            The constructed Bool value.
+        """
+        return Self {value: other.value}
 
     @always_inline("nodebug")
     fn __init__(value: __mlir_type.i1) -> Bool:

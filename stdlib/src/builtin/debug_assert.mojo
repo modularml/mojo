@@ -23,7 +23,9 @@ from builtin._location import __call_location, _SourceLocation
 
 
 @always_inline
-fn debug_assert[stringable: Stringable](cond: Bool, msg: stringable):
+fn debug_assert[
+    *stringable: Stringable
+](cond: Bool, *message_parts: *stringable):
     """Asserts that the condition is true.
 
     The `debug_assert` is similar to `assert` in C++. It is a no-op in release
@@ -34,11 +36,12 @@ fn debug_assert[stringable: Stringable](cond: Bool, msg: stringable):
     for enabling assertions in the library.
 
     Parameters:
-        stringable: The type of the message.
+        stringable: The type of the message parts.
 
     Args:
         cond: The bool value to assert.
-        msg: The message to display on failure.
+        message_parts: The message parts to convert to `String` and concatenate
+            before displaying it on failure.
     """
 
     # Print an error and fail.
@@ -52,13 +55,21 @@ fn debug_assert[stringable: Stringable](cond: Bool, msg: stringable):
     @parameter
     if err or warn:
         if not cond:
-            _debug_assert_msg[err](msg, __call_location())
+            var full_message: String = ""
+
+            @parameter
+            fn add_to_full_message[
+                i: Int, StringableType: Stringable
+            ](msg: StringableType):
+                full_message += str(msg)
+
+            message_parts.each_idx[add_to_full_message]()
+
+            _debug_assert_msg[err](full_message, __call_location())
 
 
 @no_inline
-fn _debug_assert_msg[
-    err: Bool, stringable: Stringable
-](msg: stringable, loc: _SourceLocation):
+fn _debug_assert_msg[err: Bool](msg: String, loc: _SourceLocation):
     """Aborts with (or prints) the given message and location.
 
     Note that it's important that this function doesn't get inlined; otherwise,
@@ -79,6 +90,6 @@ fn _debug_assert_msg[
 
     @parameter
     if err:
-        abort(loc.prefix("Assert Error: " + str(msg)))
+        abort(loc.prefix("Assert Error: " + msg))
     else:
-        print(loc.prefix("Assert Warning:"), str(msg))
+        print(loc.prefix("Assert Warning:"), msg)
