@@ -86,14 +86,14 @@ def test_maybe_uninitialized_move():
 
 def test_maybe_uninitialized_move_from_pointer():
     var a = MoveCounter[Int](10)
-    assert_equal(a.move_count, 1)
+    assert_equal(a.move_count, 0)
 
     var b = UnsafeMaybeUninitialized[MoveCounter[Int]]()
     # b is uninitialized here.
     b.move_from(UnsafePointer.address_of(a))
 
     # a is uninitialized now. Thankfully, we're working with trivial types
-    assert_equal(b.assume_initialized().move_count, 2)
+    assert_equal(b.assume_initialized().move_count, 1)
     b.assume_initialized_destroy()
 
 
