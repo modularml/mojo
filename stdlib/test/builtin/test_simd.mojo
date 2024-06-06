@@ -13,9 +13,11 @@
 # RUN: %mojo %s
 
 from sys import has_neon
-from utils.numerics import isfinite, isinf, isnan, nan
 
-from testing import assert_equal, assert_not_equal, assert_true, assert_false
+from testing import assert_equal, assert_false, assert_not_equal, assert_true
+
+from utils.numerics import isfinite, isinf, isnan, nan
+from utils.static_tuple import StaticTuple
 
 
 def test_cast():
@@ -120,16 +122,89 @@ def test_simd_repr():
     )
 
 
+def test_issue_1625():
+    var size = 16
+    alias simd_width = 8
+    var ptr = DTypePointer[DType.int64].alloc(size)
+    for i in range(size):
+        ptr[i] = i
+
+    var x = SIMD[size = 2 * simd_width].load(ptr, 0)
+    var evens_and_odds = x.deinterleave()
+
+    # FIXME (40568) should directly use the SIMD assert_equal
+    assert_equal(
+        str(evens_and_odds[0]),
+        str(SIMD[DType.int64, 8](0, 2, 4, 6, 8, 10, 12, 14)),
+    )
+    assert_equal(
+        str(evens_and_odds[1]),
+        str(SIMD[DType.int64, 8](1, 3, 5, 7, 9, 11, 13, 15)),
+    )
+    ptr.free()
+
+
 def test_issue_20421():
     var a = DTypePointer[DType.uint8]().alloc(16 * 64, alignment=64)
     for i in range(16 * 64):
         a[i] = i & 255
-    var av16 = a.offset(128 + 64 + 4).bitcast[DType.int32]().load[width=4]()
+    var av16 = SIMD[size=4].load(a.offset(128 + 64 + 4).bitcast[DType.int32]())
     assert_equal(
         av16,
         SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448),
     )
     a.free()
+
+
+def test_issue_30237():
+    alias dtype = DType.float32
+    alias simd_width = 1
+    alias coefficients_len = 7
+    alias coefficients = StaticTuple[SIMD[dtype, simd_width], coefficients_len](
+        4.89352455891786e-03,
+        6.37261928875436e-04,
+        1.48572235717979e-05,
+        5.12229709037114e-08,
+        -8.60467152213735e-11,
+        2.00018790482477e-13,
+        -2.76076847742355e-16,
+    )
+
+    @parameter
+    @always_inline
+    fn eval1(x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
+        var c_last = coefficients[coefficients_len - 1]
+        var c_second_from_last = coefficients[coefficients_len - 2]
+
+        var result = x.fma(c_last, c_second_from_last)
+
+        @parameter
+        for idx in range(coefficients_len - 2):
+            var c = coefficients[coefficients_len - 3 - idx]
+            result = x.fma(result, c)
+
+        return result
+
+    @parameter
+    @always_inline
+    fn eval2(x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
+        var c_last = coefficients[coefficients_len - 1]
+        var c_second_from_last = coefficients[coefficients_len - 2]
+
+        var result = x.fma(c_last, c_second_from_last)
+
+        for idx in range(coefficients_len - 2):
+            var c = coefficients[coefficients_len - 3 - idx]
+            result = x.fma(result, c)
+
+        return result
+
+    var x = 6.0
+    var x2 = x * x
+    var result1 = eval1(x2)
+    var result2 = eval2(x2)
+
+    assert_equal(result1, result2)
 
 
 def test_truthy():
@@ -163,9 +238,9 @@ def test_truthy():
 
     unroll[test_dtype_unrolled, dtypes.__len__()]()
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
-        # TODO bfloat16 is not supported on neon #30525
         test_dtype[DType.bfloat16]()
 
 
@@ -189,6 +264,7 @@ def test_len():
     var i6 = UI64(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     assert_equal(16, i6.__len__())
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         alias BF16 = SIMD[DType.bfloat16, 2]
@@ -329,6 +405,11 @@ def test_ceil():
     assert_equal(Float32.__ceil__(Float32(-1.5)), -1.0)
     assert_equal(Float32.__ceil__(Float32(3.0)), 3.0)
 
+    # TODO(KERN-228): support BF16 on neon systems.
+    @parameter
+    if not has_neon():
+        assert_equal(BFloat16.__ceil__(BFloat16(2.5)), 3.0)
+
     alias F = SIMD[DType.float32, 4]
     assert_equal(
         F.__ceil__(F(0.0, 1.4, -42.5, -12.6)), F(0.0, 2.0, -42.0, -12.0)
@@ -351,6 +432,11 @@ def test_floor():
     assert_equal(Float32.__floor__(Float32(1.5)), 1.0)
     assert_equal(Float32.__floor__(Float32(-1.5)), -2.0)
     assert_equal(Float32.__floor__(Float32(3.0)), 3.0)
+
+    # TODO(KERN-228): support BF16 on neon systems.
+    @parameter
+    if not has_neon():
+        assert_equal(BFloat16.__floor__(BFloat16(2.5)), 2.0)
 
     alias F = SIMD[DType.float32, 4]
     assert_equal(
@@ -768,8 +854,13 @@ def test_insert():
 
 
 def test_join():
-    vec = SIMD[DType.int32, 4](100, 101, 102, 103)
+    alias I2 = SIMD[DType.int32, 2]
+    assert_equal(Int32(3).join(Int32(4)), I2(3, 4))
 
+    alias I4 = SIMD[DType.int32, 4]
+    assert_equal(I2(5, 6).join(I2(9, 10)), I4(5, 6, 9, 10))
+
+    vec = I4(100, 101, 102, 103)
     assert_equal(
         vec.join(vec),
         SIMD[DType.int32, 8](100, 101, 102, 103, 100, 101, 102, 103),
@@ -1336,6 +1427,7 @@ def test_reduce():
     test_dtype[DType.float64]()
     test_dtype[DType.index]()
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         test_dtype[DType.bfloat16]()
@@ -1398,7 +1490,9 @@ def main():
     test_indexing()
     test_insert()
     test_interleave()
+    test_issue_1625()
     test_issue_20421()
+    test_issue_30237()
     test_isub()
     test_join()
     test_len()
@@ -1423,3 +1517,4 @@ def main():
     test_sub_with_overflow()
     test_trunc()
     test_truthy()
+    # TODO: add tests for __and__, __or__, anc comparison operators

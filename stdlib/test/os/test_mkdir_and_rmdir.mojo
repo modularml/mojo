@@ -12,11 +12,11 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from os import mkdir, rmdir, remove
+from os import mkdir, remove, rmdir
 from os.path import exists
 from pathlib import Path
 
-from testing import assert_true, assert_false, assert_raises
+from testing import assert_false, assert_raises, assert_true
 
 
 fn create_dir_and_test_delete_string[

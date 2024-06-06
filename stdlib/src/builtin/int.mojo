@@ -259,6 +259,7 @@ struct Int(
 ):
     """This type represents an integer value."""
 
+    # Fields
     var value: __mlir_type.index
     """The underlying storage for the integer value."""
 
@@ -367,59 +368,9 @@ struct Int(
         """
         self = value.__index__()
 
-    @always_inline("nodebug")
-    fn __int__(self) -> Int:
-        """Gets the integral value (this is an identity function for Int).
-
-        Returns:
-            The value as an integer.
-        """
-        return self
-
-    fn __str__(self) -> String:
-        """Get the integer as a string.
-
-        Returns:
-            A string representation.
-        """
-
-        return String.format_sequence(self)
-
-    fn format_to(self, inout writer: Formatter):
-        """
-        Formats this integer to the provided formatter.
-
-        Args:
-            writer: The formatter to write to.
-        """
-
-        @parameter
-        if triple_is_nvidia_cuda():
-            var err = _try_write_int(writer, Int64(self))
-            if err:
-                abort(
-                    "unreachable: unexpected write int failure condition: "
-                    + str(err.value())
-                )
-        else:
-            _format_scalar(writer, Int64(self))
-
-    fn __repr__(self) -> String:
-        """Get the integer as a string. Returns the same `String` as `__str__`.
-
-        Returns:
-            A string representation.
-        """
-        return str(self)
-
-    @always_inline("nodebug")
-    fn __mlir_index__(self) -> __mlir_type.index:
-        """Convert to index.
-
-        Returns:
-            The corresponding __mlir_type.index value.
-        """
-        return self.value
+    # ===------------------------------------------------------------------=== #
+    # Operator dunders
+    # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: Int) -> Bool:
@@ -508,27 +459,6 @@ struct Int(
         ](self.value, rhs.value)
 
     @always_inline("nodebug")
-    fn __bool__(self) -> Bool:
-        """Convert this Int to Bool.
-
-        Returns:
-            False Bool value if the value is equal to 0 and True otherwise.
-        """
-        return self != 0
-
-    @always_inline("nodebug")
-    fn __index__(self) -> Int:
-        """Return self converted to an integer, if self is suitable for use as
-        an index into a list.
-
-        For Int type this is simply the value.
-
-        Returns:
-            The corresponding Int value.
-        """
-        return self
-
-    @always_inline("nodebug")
     fn __pos__(self) -> Int:
         """Return +self.
 
@@ -548,63 +478,6 @@ struct Int(
             self.value,
             __mlir_op.`index.constant`[value = __mlir_attr.`-1:index`](),
         )
-
-    @always_inline("nodebug")
-    fn __abs__(self) -> Self:
-        """Return the absolute value of the Int value.
-
-        Returns:
-            The absolute value.
-        """
-        return -self if self < 0 else self
-
-    @always_inline("nodebug")
-    fn __ceil__(self) -> Self:
-        """Return the ceiling of the Int value, which is itself.
-
-        Returns:
-            The Int value itself.
-        """
-        return self
-
-    @always_inline("nodebug")
-    fn __floor__(self) -> Self:
-        """Return the floor of the Int value, which is itself.
-
-        Returns:
-            The Int value itself.
-        """
-        return self
-
-    @always_inline("nodebug")
-    fn __round__(self) -> Self:
-        """Return the rounded value of the Int value, which is itself.
-
-        Returns:
-            The Int value itself.
-        """
-        return self
-
-    @always_inline("nodebug")
-    fn __round__(self, ndigits: Int) -> Self:
-        """Return the rounded value of the Int value, which is itself.
-        Args:
-            ndigits: The number of digits to round to.
-        Returns:
-            The Int value itself if ndigits >= 0 else the rounded value.
-        """
-        if ndigits >= 0:
-            return self
-        return self - (self % 10 ** -(ndigits))
-
-    @always_inline("nodebug")
-    fn __trunc__(self) -> Self:
-        """Return the truncated Int value, which is itself.
-
-        Returns:
-            The Int value itself.
-        """
-        return self
 
     @always_inline("nodebug")
     fn __invert__(self) -> Int:
@@ -661,32 +534,6 @@ struct Int(
             `float(self)/float(rhs)` value.
         """
         return Float64(self) / Float64(rhs)
-
-    @always_inline("nodebug")
-    fn _positive_div(self, rhs: Int) -> Int:
-        """Return the division of `self` and `rhs` assuming that the arguments
-        are both positive.
-
-        Args:
-            rhs: The value to divide on.
-
-        Returns:
-            The integer division of `self` and `rhs` .
-        """
-        return __mlir_op.`index.divs`(self.value, rhs.value)
-
-    @always_inline("nodebug")
-    fn _positive_rem(self, rhs: Int) -> Int:
-        """Return the modulus of `self` and `rhs` assuming that the arguments
-        are both positive.
-
-        Args:
-            rhs: The value to divide on.
-
-        Returns:
-            The integer modulus of `self` and `rhs` .
-        """
-        return __mlir_op.`index.rems`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __floordiv__(self, rhs: Int) -> Int:
@@ -1092,6 +939,114 @@ struct Int(
         """
         return value ^ self
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline("nodebug")
+    fn __bool__(self) -> Bool:
+        """Convert this Int to Bool.
+
+        Returns:
+            False Bool value if the value is equal to 0 and True otherwise.
+        """
+        return self != 0
+
+    @always_inline("nodebug")
+    fn __index__(self) -> Int:
+        """Return self converted to an integer, if self is suitable for use as
+        an index into a list.
+
+        For Int type this is simply the value.
+
+        Returns:
+            The corresponding Int value.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Gets the integral value (this is an identity function for Int).
+
+        Returns:
+            The value as an integer.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __abs__(self) -> Self:
+        """Return the absolute value of the Int value.
+
+        Returns:
+            The absolute value.
+        """
+        return -self if self < 0 else self
+
+    @always_inline("nodebug")
+    fn __ceil__(self) -> Self:
+        """Return the ceiling of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __floor__(self) -> Self:
+        """Return the floor of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __round__(self) -> Self:
+        """Return the rounded value of the Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
+
+    @always_inline("nodebug")
+    fn __round__(self, ndigits: Int) -> Self:
+        """Return the rounded value of the Int value, which is itself.
+        Args:
+            ndigits: The number of digits to round to.
+        Returns:
+            The Int value itself if ndigits >= 0 else the rounded value.
+        """
+        if ndigits >= 0:
+            return self
+        return self - (self % 10 ** -(ndigits))
+
+    @always_inline("nodebug")
+    fn __trunc__(self) -> Self:
+        """Return the truncated Int value, which is itself.
+
+        Returns:
+            The Int value itself.
+        """
+        return self
+
+    fn __str__(self) -> String:
+        """Get the integer as a string.
+
+        Returns:
+            A string representation.
+        """
+
+        return String.format_sequence(self)
+
+    fn __repr__(self) -> String:
+        """Get the integer as a string. Returns the same `String` as `__str__`.
+
+        Returns:
+            A string representation.
+        """
+        return str(self)
+
     fn __hash__(self) -> Int:
         """Hash the int using builtin hash.
 
@@ -1102,3 +1057,61 @@ struct Int(
         """
         # TODO(MOCO-636): switch to DType.index
         return _hash_simd(Scalar[DType.int64](self))
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this integer to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        @parameter
+        if triple_is_nvidia_cuda():
+            var err = _try_write_int(writer, Int64(self))
+            if err:
+                abort(
+                    "unreachable: unexpected write int failure condition: "
+                    + str(err.value())
+                )
+        else:
+            _format_scalar(writer, Int64(self))
+
+    @always_inline("nodebug")
+    fn __mlir_index__(self) -> __mlir_type.index:
+        """Convert to index.
+
+        Returns:
+            The corresponding __mlir_type.index value.
+        """
+        return self.value
+
+    @always_inline("nodebug")
+    fn _positive_div(self, rhs: Int) -> Int:
+        """Return the division of `self` and `rhs` assuming that the arguments
+        are both positive.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            The integer division of `self` and `rhs` .
+        """
+        return __mlir_op.`index.divs`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn _positive_rem(self, rhs: Int) -> Int:
+        """Return the modulus of `self` and `rhs` assuming that the arguments
+        are both positive.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            The integer modulus of `self` and `rhs` .
+        """
+        return __mlir_op.`index.rems`(self.value, rhs.value)

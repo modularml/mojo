@@ -43,15 +43,15 @@ struct _ImmutableString:
     pointer and integer pair. Memory will be dynamically allocated.
     """
 
-    var data: UnsafePointer[Int8]
+    var data: UnsafePointer[UInt8]
     """The pointer to the beginning of the string contents. It is not
     null-terminated."""
     var length: Int
     """The length of the string."""
 
     @always_inline
-    fn __init__(inout self, data: UnsafePointer[Int8], length: Int):
-        self.data = data.address
+    fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
+        self.data = data
         self.length = length
 
     @always_inline
@@ -331,7 +331,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
         if self.is_str():
             var str = self.get_as_string()
             var impl = _ImmutableString(
-                UnsafePointer[Int8].alloc(str.length), str.length
+                UnsafePointer[UInt8].alloc(str.length), str.length
             )
             memcpy(
                 dest=impl.data,
@@ -743,13 +743,12 @@ struct object(IntableRaising, Boolable, Stringable):
             value: The string value.
         """
         var impl = _ImmutableString(
-            UnsafePointer[Int8].alloc(value.length), value.length
+            UnsafePointer[UInt8].alloc(value.length), value.length
         )
         memcpy(
-            impl.data,
-            # TODO: Remove bitcast once transition to UInt8 strings is complete.
-            value.unsafe_ptr().bitcast[Int8](),
-            value.length,
+            dest=impl.data,
+            src=value.unsafe_ptr(),
+            count=value.length,
         )
         self._value = impl
 
@@ -1239,7 +1238,7 @@ struct object(IntableRaising, Boolable, Stringable):
             var rhsStr = rhs._value.get_as_string()
             var length = lhsStr.length + rhsStr.length
             var impl = _ImmutableString(
-                UnsafePointer[Int8].alloc(length), length
+                UnsafePointer[UInt8].alloc(length), length
             )
             memcpy(impl.data, lhsStr.data, lhsStr.length)
             memcpy(impl.data + lhsStr.length, rhsStr.data, rhsStr.length)
@@ -1733,7 +1732,7 @@ struct object(IntableRaising, Boolable, Stringable):
             raise Error("TypeError: can only index into lists and strings")
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
-            var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
+            var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
             impl.data.init_pointee_copy(
                 (self._value.get_as_string().data + index).take_pointee(),
             )

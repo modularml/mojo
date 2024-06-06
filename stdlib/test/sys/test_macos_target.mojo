@@ -26,7 +26,8 @@ from sys import (
     os_is_windows,
 )
 from sys.info import _macos_version
-from testing import assert_true, assert_false
+
+from testing import assert_false, assert_true
 
 
 fn test_os_query() raises:

@@ -12,7 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from base64 import b64encode, b64decode, b16encode, b16decode
+from base64 import b16decode, b16encode, b64decode, b64encode
+
 from testing import assert_equal
 
 

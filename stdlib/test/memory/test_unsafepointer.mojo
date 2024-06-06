@@ -13,7 +13,7 @@
 # RUN: %mojo %s
 
 from memory import UnsafePointer
-from test_utils import MoveCounter, ExplicitCopyOnly
+from test_utils import ExplicitCopyOnly, MoveCounter
 from testing import assert_equal, assert_not_equal, assert_true
 
 

@@ -14,9 +14,9 @@
 
 from os.path import isdir
 from pathlib import Path, cwd
-from builtin._location import __source_location
 
-from testing import assert_true, assert_false
+from builtin._location import __source_location
+from testing import assert_false, assert_true
 
 
 def main():

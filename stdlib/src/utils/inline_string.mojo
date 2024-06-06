@@ -330,7 +330,7 @@ struct _FixedString[CAP: Int](
         self.buffer = InlineArray[UInt8, CAP]()
         self.size = len(literal)
 
-        memcpy(self.buffer.unsafe_ptr(), literal.as_uint8_ptr(), len(literal))
+        memcpy(self.buffer.unsafe_ptr(), literal.unsafe_ptr(), len(literal))
 
     # ===------------------------------------------------------------------=== #
     # Factory methods

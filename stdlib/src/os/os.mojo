@@ -21,6 +21,7 @@ from os import listdir
 
 from collections import List
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
+from sys.ffi import C_char
 
 from memory import (
     DTypePointer,
@@ -64,7 +65,7 @@ struct _dirent_linux:
     """Length of the record."""
     var d_type: Int8
     """Type of file."""
-    var name: InlineArray[Int8, Self.MAX_NAME_SIZE]
+    var name: InlineArray[C_char, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
@@ -81,15 +82,15 @@ struct _dirent_macos:
     """Length of the name."""
     var d_type: Int8
     """Type of file."""
-    var name: InlineArray[Int8, Self.MAX_NAME_SIZE]
+    var name: InlineArray[C_char, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
-fn _strnlen(ptr: UnsafePointer[Int8], max: Int) -> Int:
-    var len = 0
-    while len < max and (ptr + len)[0]:
-        len += 1
-    return len
+fn _strnlen(ptr: UnsafePointer[C_char], max: Int) -> Int:
+    var offset = 0
+    while offset < max and ptr[offset]:
+        offset += 1
+    return offset
 
 
 struct _DirHandle:
@@ -149,7 +150,7 @@ struct _DirHandle:
             if not ep:
                 break
             var name = ep.take_pointee().name
-            var name_ptr = UnsafePointer.address_of(name).bitcast[Int8]()
+            var name_ptr = name.unsafe_ptr()
             var name_str = StringRef(
                 name_ptr, _strnlen(name_ptr, _dirent_linux.MAX_NAME_SIZE)
             )
@@ -174,7 +175,7 @@ struct _DirHandle:
             if not ep:
                 break
             var name = ep.take_pointee().name
-            var name_ptr = UnsafePointer.address_of(name).bitcast[Int8]()
+            var name_ptr = name.unsafe_ptr()
             var name_str = StringRef(
                 name_ptr, _strnlen(name_ptr, _dirent_macos.MAX_NAME_SIZE)
             )

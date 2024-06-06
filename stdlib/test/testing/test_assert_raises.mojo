@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_raises, assert_equal, assert_true
+from testing import assert_equal, assert_raises, assert_true
 
 
 fn test_assert_raises_catches_error() raises:

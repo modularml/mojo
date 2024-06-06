@@ -17,7 +17,8 @@
 # RUN: %mojo %s
 
 from sys import alignof, has_avx512f, has_neon, simdbitwidth
-from testing import assert_false, assert_true, assert_equal
+
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_arch_query():
