@@ -126,7 +126,7 @@ If you already have the `modular` tool,
       MOJO_PATH=$(modular config mojo.path) \
         && echo 'export MODULAR_HOME="'$HOME'/.modular"' >> ~/.zshrc \
         && echo 'export PATH="'$MOJO_PATH'/bin:$PATH"' >> ~/.zshrc \
-        && source ~/.zshrc
+        && exec zsh
       ```
 
       </TabItem>
