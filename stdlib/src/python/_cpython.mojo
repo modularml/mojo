@@ -11,8 +11,11 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-from os import getenv
-from sys import external_call, exit
+from os import getenv, setenv
+from pathlib import Path
+from os.path import dirname
+from sys import external_call
+from sys.arg import argv
 from sys.ffi import DLHandle
 
 from memory import DTypePointer, UnsafePointer
@@ -87,7 +90,7 @@ struct PythonVersion:
 
 
 fn _py_get_version(lib: DLHandle) -> StringRef:
-    var version_string = lib.get_function[fn () -> DTypePointer[DType.int8]](
+    var version_string = lib.get_function[fn () -> UnsafePointer[C_char]](
         "Py_GetVersion"
     )()
     return StringRef(version_string)
@@ -113,11 +116,25 @@ struct CPython:
             print("MOJO_PYTHON:", getenv("MOJO_PYTHON"))
             print("MOJO_PYTHON_LIBRARY:", getenv("MOJO_PYTHON_LIBRARY"))
 
+        # Add directory of target file to top of sys.path to find python modules
+        var file_dir = dirname(argv()[0])
+        if Path(file_dir).is_dir() or file_dir == "":
+            var python_path = getenv("PYTHONPATH")
+            # A leading `:` will put the current dir at the top of sys.path.
+            # If we're doing `mojo run main.mojo` or `./main`, the returned
+            # `dirname` will be an empty string.
+            if file_dir == "" and not python_path:
+                file_dir = ":"
+            if python_path:
+                _ = setenv("PYTHONPATH", file_dir + ":" + python_path)
+            else:
+                _ = setenv("PYTHONPATH", file_dir)
+
         # TODO(MOCO-772) Allow raises to propagate through function pointers
         # and make this initialization a raising function.
         self.init_error = external_call[
             "KGEN_CompilerRT_Python_SetPythonPath",
-            DTypePointer[DType.int8],
+            UnsafePointer[C_char],
         ]()
 
         var python_lib = getenv("MOJO_PYTHON_LIBRARY")
@@ -162,9 +179,15 @@ struct CPython:
         """
         if self.init_error:
             var error: String = self.init_error
-            error += "\nMOJO_PYTHON: " + getenv("MOJO_PYTHON")
-            error += "\nMOJO_PYTHON_LIBRARY: " + getenv("MOJO_PYTHON_LIBRARY")
-            error += "\nPYTHONEXECUTABLE: " + getenv("PYTHONEXECUTABLE")
+            var mojo_python = getenv("MOJO_PYTHON")
+            var python_lib = getenv("MOJO_PYTHON_LIBRARY")
+            var python_exe = getenv("PYTHONEXECUTABLE")
+            if mojo_python:
+                error += "\nMOJO_PYTHON: " + mojo_python
+            if python_lib:
+                error += "\nMOJO_PYTHON_LIBRARY: " + python_lib
+            if python_exe:
+                error += "\npython executable: " + python_exe
             error += "\n\nMojo/Python interop error, troubleshooting docs at:"
             error += "\n    https://modul.ar/fix-python\n"
             raise error
@@ -218,11 +241,17 @@ struct CPython:
         self.lib.get_function[fn (PyObjectPtr) -> None]("Py_DecRef")(ptr)
         self._dec_total_rc()
 
-    fn PyGILState_Ensure(inout self) -> Int64:
-        return self.lib.get_function[fn () -> Int64]("PyGILState_Ensure")()
+    fn PyGILState_Ensure(inout self) -> Bool:
+        return self.lib.get_function[fn () -> Bool]("PyGILState_Ensure")()
 
-    fn PyGILState_Release(inout self, state: Int64):
-        self.lib.get_function[fn (Int64) -> None]("PyGILState_Release")(state)
+    fn PyGILState_Release(inout self, state: Bool):
+        self.lib.get_function[fn (Bool) -> None]("PyGILState_Release")(state)
+
+    fn PyEval_SaveThread(inout self) -> Int64:
+        return self.lib.get_function[fn () -> Int64]("PyEval_SaveThread")()
+
+    fn PyEval_RestoreThread(inout self, state: Int64):
+        self.lib.get_function[fn (Int64) -> None]("PyEval_RestoreThread")(state)
 
     # This function assumes a specific way PyObjectPtr is implemented, namely
     # that the refcount has offset 0 in that structure. That generally doesn't
@@ -651,7 +680,7 @@ struct CPython:
 
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
         var result = self.lib.get_function[
-            fn (PyObjectPtr, UnsafePointer[Int]) -> DTypePointer[DType.int8]
+            fn (PyObjectPtr, UnsafePointer[Int]) -> UnsafePointer[C_char]
         ]("PyUnicode_AsUTF8AndSize")(py_object, UnsafePointer[Int]())
         return StringRef(result)
 

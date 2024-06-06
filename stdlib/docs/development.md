@@ -130,6 +130,10 @@ Reminder that if you’re choosing to invoke `lit` directly and not use the
 system right now to ensure these dependencies are up-to-date before running the
 tests.
 
+This is rarely useful, but if you wish to run the unit tests with assertions
+disabled, you can set the environment
+variable `MOJO_ENABLE_ASSERTIONS_IN_TESTS=0`.
+
 If you run into any issues when running the tests,
 [please file an issue](https://github.com/modularml/mojo/issues) and we’ll take
 a look.

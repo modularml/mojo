@@ -332,18 +332,6 @@ struct SliceNew(Stringable, EqualityComparable):
 
         return len(range(self.start.value(), self.end.value(), self.step))
 
-    @always_inline
-    fn __getitem__(self, idx: Int) -> Int:
-        """Get the slice index.
-
-        Args:
-            idx: The index.
-
-        Returns:
-            The slice index.
-        """
-        return self.start.value() + idx * self.step
-
     fn indices(self, src_len: Int) -> (Int, Int, Int):
         """Returns a tuple of 3 intergers representing the start, end, and step
            of the slice if applied to a container of the given length.
