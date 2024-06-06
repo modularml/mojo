@@ -112,6 +112,10 @@ by [@jayzhan211](https://github.com/jayzhan211))
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
 
+- The `StringRef` constructors from `DTypePointer.int8` have been changed to
+  take a `UnsafePointer[C_char]`, reflecting their use for compatibility with
+  C APIs.
+
 - The global functions for working with `UnsafePointer` have transitioned to
   being methods through the use of conditional conformances:
 
