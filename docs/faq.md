@@ -6,7 +6,7 @@ description: Answers to questions we expect about Mojo.
 
 We tried to anticipate your questions about Mojo on this page. If this page
 doesn't answer all your questions, also check out our [Mojo community
-channels](/mojo/community.html).
+channels](/mojo/community).
 
 ## Motivation
 
@@ -20,7 +20,7 @@ to unify AI software and we can’t do that without a unified language that can
 scale across the AI infrastructure stack. That said, we don’t plan to stop at
 AI—the north star is for Mojo to support the whole gamut of general-purpose
 programming over time. For a longer answer, read [Why
-Mojo](/mojo/why-mojo.html).
+Mojo](/mojo/why-mojo).
 
 ### Why is it called Mojo?
 
@@ -43,7 +43,7 @@ it’s missing. We are guided more by pragmatism than novelty, but Mojo’s use 
 [MLIR](https://mlir.llvm.org/) allows it to scale to new exotic hardware types
 and domains in a way that other languages haven’t demonstrated (for an example
 of Mojo talking directly to MLIR, see our [low-level IR in Mojo
-notebook](/mojo/notebooks/BoolMLIR.html)). It also
+notebook](/mojo/notebooks/BoolMLIR)). It also
 includes autotuning, and has caching and distributed compilation built into its
 core. We also believe Mojo has a good chance of unifying hybrid packages in the
 broader Python community.
@@ -84,7 +84,7 @@ Codon and PyPy aim to improve performance compared to CPython, but Mojo’s goal
 are much deeper than this. Our objective isn’t just to create “a faster
 Python,” but to enable a whole new layer of systems programming that includes
 direct access to accelerated hardware, as outlined in [Why
-Mojo](/mojo/why-mojo.html). Our technical implementation
+Mojo](/mojo/why-mojo). Our technical implementation
 approach is also very different, for example, we are not relying on heroic
 compiler and JIT technologies to “devirtualize” Python.
 
@@ -123,7 +123,7 @@ you to try Mojo and if you find it useful, then that's great too.
 
 The best place to start is the [Mojo Manual](/mojo/manual). And if you want to
 see what features are coming in the future, take a look at [the
-roadmap](/mojo/roadmap.html).
+roadmap](/mojo/roadmap).
 
 ### What does it mean that Mojo is designed for MLIR?
 
@@ -138,7 +138,7 @@ ground up with MLIR design principles. This means that Mojo not only offers
 high-performance compilation for heterogeneous hardware, but it also provides
 direct programming support for the MLIR intermediate representations. For a
 simple example of Mojo talking directly to MLIR, see our [low-level IR in Mojo
-notebook](/mojo/notebooks/BoolMLIR.html).
+notebook](/mojo/notebooks/BoolMLIR).
 
 ### Is Mojo only for AI or can it be used for other stuff?
 
@@ -165,7 +165,7 @@ language that will support more architectures over time and includes a
 debugger, a full tool suite, etc. For more about embedded domain-specific
 languages (EDSLs) like Triton, read the “Embedded DSLs in Python” section of
 [Why
-Mojo](/mojo/why-mojo.html#embedded-dsls-in-python).
+Mojo](/mojo/why-mojo#embedded-dsls-in-python).
 
 ### How does Mojo help with PyTorch and TensorFlow acceleration?
 
@@ -200,7 +200,7 @@ and build migration tools as the language matures.
 Yes, we want to enable developers to port code from languages other than Python
 to Mojo as well. We expect that due to Mojo’s similarity to the C/C++ type
 systems, migrating code from C/C++ should work well and it’s in [our
-roadmap](/mojo/roadmap.html#cc-interop).
+roadmap](/mojo/roadmap#cc-interop).
 
 ### How does Mojo support hardware lowering?
 
@@ -379,7 +379,7 @@ more detail such as the time spend compiling.
 
 Mojo is still in early development and not at a 1.0 version yet. It’s
 still missing many foundational features, but please take a look at our
-[roadmap](/mojo/roadmap.html) to understand where things are headed. As such,
+[roadmap](/mojo/roadmap) to understand where things are headed. As such,
 the language is evolving rapidly and source stability is not guaranteed.
 
 ### How often will you be releasing new versions of Mojo?
@@ -424,9 +424,9 @@ Clang, Swift, MLIR, etc.).
 ### Where can I ask more questions or share feedback?
 
 If you have questions about upcoming features or have suggestions
-for the language, be sure you first read the [Mojo roadmap](roadmap.html), which
+for the language, be sure you first read the [Mojo roadmap](/mojo/roadmap), which
 provides important information about our current priorities and links to
 our GitHub channels where you can report issues and discuss new features.
 
 To get in touch with the Mojo team and developer community, use the resources
-on our [Mojo community page](/mojo/community.html).
+on our [Mojo community page](/mojo/community).
