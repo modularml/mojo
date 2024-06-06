@@ -81,6 +81,26 @@ def test_list_unsafe_get():
     assert_equal(2, list.unsafe_get(0)[])
 
 
+def test_list_unsafe_set():
+    var list = List[Int]()
+
+    for i in range(5):
+        list.append(i)
+
+    assert_equal(5, len(list))
+    list.unsafe_set(0, 0)
+    list.unsafe_set(1, 10)
+    list.unsafe_set(2, 20)
+    list.unsafe_set(3, 30)
+    list.unsafe_set(4, 40)
+
+    assert_equal(list[0], 0)
+    assert_equal(list[1], 10)
+    assert_equal(list[2], 20)
+    assert_equal(list[3], 30)
+    assert_equal(list[4], 40)
+
+
 def test_list_clear():
     var list = List[Int](1, 2, 3)
     assert_equal(len(list), 3)
@@ -812,6 +832,7 @@ def main():
     test_mojo_issue_698()
     test_list()
     test_list_unsafe_get()
+    test_list_unsafe_set()
     test_list_clear()
     test_list_to_bool_conversion()
     test_list_pop()

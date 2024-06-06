@@ -209,8 +209,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if normalized_idx < 0:
             normalized_idx += len(self)
 
-        (self.data + normalized_idx).destroy_pointee()
-        (self.data + normalized_idx).init_pointee_move(value^)
+        self.unsafe_set(normalized_idx, value^)
 
     @always_inline
     fn __contains__[
@@ -816,6 +815,33 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             ),
         )
         return (self.data + idx)[]
+
+    @always_inline
+    fn unsafe_set(self, idx: Int, owned value: T):
+        """Write a value to a given location without checking index bounds.
+
+        Users should consider using `my_list[idx] = value` instead of this method as it
+        is unsafe. If an index is out of bounds, this method will not abort, it
+        will be considered undefined behavior.
+
+        Note that there is no wraparound for negative indices, caution is
+        advised. Using negative indices is considered undefined behavior. Never
+        use `my_list.unsafe_set(-1, value)` to set the last element of the list.
+        Instead, do `my_list.unsafe_set(len(my_list) - 1, value)`.
+
+        Args:
+            idx: The index of the element to set.
+            value: The value to set.
+        """
+        debug_assert(
+            0 <= idx < len(self),
+            (
+                "The index provided must be within the range [0, len(List) -1]"
+                " when using List.unsafe_set()"
+            ),
+        )
+        (self.data + idx).destroy_pointee()
+        (self.data + idx).init_pointee_move(value^)
 
     fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
