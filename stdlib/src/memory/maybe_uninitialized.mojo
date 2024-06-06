@@ -12,8 +12,8 @@
 # ===----------------------------------------------------------------------=== #
 
 
-struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
-    CollectionElement
+struct UnsafeMaybeUninitialized[ElementType: CollectionElementNew](
+    CollectionElementNew
 ):
     """A memory location that may or may not be initialized.
 
@@ -37,6 +37,17 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
     fn __init__(inout self):
         """The memory is now considered uninitialized."""
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Leave this memory location uninitialized. No copy is actually performed here.
+
+        If you wish to actually copy the internal value, use `copy_from()` instead.
+
+        Args:
+            other: The object to copy.
+        """
+        self = Self()
 
     @always_inline
     fn __init__(inout self, owned value: Self.ElementType):
@@ -76,7 +87,18 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
         Args:
             other: The object to copy.
         """
-        self.unsafe_ptr().init_pointee_copy(other.assume_initialized())
+        self.write(ElementType(other=other.assume_initialized()))
+
+    @always_inline
+    fn copy_from(inout self, other: ElementType):
+        """Copy another object.
+
+        This function assumes that the current memory is uninitialized.
+
+        Args:
+            other: The object to copy.
+        """
+        self.write(ElementType(other=other))
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):

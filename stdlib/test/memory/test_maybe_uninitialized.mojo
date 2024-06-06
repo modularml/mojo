@@ -18,9 +18,13 @@ from test_utils import MoveCounter, CopyCounter
 
 
 @value
-struct ValueToCountDestructor(CollectionElement):
+struct ValueToCountDestructor(CollectionElementNew):
     var value: Int
     var destructor_counter: UnsafePointer[List[Int]]
+
+    fn __init__(inout self, *, other: Self):
+        self.value = other.value
+        self.destructor_counter = other.destructor_counter
 
     fn __del__(owned self):
         self.destructor_counter[].append(self.value)
@@ -52,8 +56,11 @@ def test_maybe_uninitialized():
 
 
 @value
-struct ImpossibleToDestroy(CollectionElement):
+struct ImpossibleToDestroy(CollectionElementNew):
     var value: Int
+
+    fn __init__(inout self, *, other: Self):
+        self.value = other.value
 
     fn __del__(owned self):
         abort("We should never call the destructor of ImpossibleToDestroy")
