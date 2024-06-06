@@ -33,6 +33,7 @@ feedback](/mojo/community).
   - [Functions](/mojo/manual/functions)
   - [Variables](/mojo/manual/variables)
   - [Types](/mojo/manual/types)
+  - [Control flow](/mojo/manual/control-flow)
   - [Structs](/mojo/manual/structs)
   - [Modules and packages](/mojo/manual/packages)
 
