@@ -90,7 +90,7 @@ struct PythonVersion:
 
 
 fn _py_get_version(lib: DLHandle) -> StringRef:
-    var version_string = lib.get_function[fn () -> DTypePointer[DType.int8]](
+    var version_string = lib.get_function[fn () -> UnsafePointer[C_char]](
         "Py_GetVersion"
     )()
     return StringRef(version_string)
@@ -134,7 +134,7 @@ struct CPython:
         # and make this initialization a raising function.
         self.init_error = external_call[
             "KGEN_CompilerRT_Python_SetPythonPath",
-            DTypePointer[DType.int8],
+            UnsafePointer[C_char],
         ]()
 
         var python_lib = getenv("MOJO_PYTHON_LIBRARY")
@@ -680,7 +680,7 @@ struct CPython:
 
     fn PyUnicode_AsUTF8AndSize(inout self, py_object: PyObjectPtr) -> StringRef:
         var result = self.lib.get_function[
-            fn (PyObjectPtr, UnsafePointer[Int]) -> DTypePointer[DType.int8]
+            fn (PyObjectPtr, UnsafePointer[Int]) -> UnsafePointer[C_char]
         ]("PyUnicode_AsUTF8AndSize")(py_object, UnsafePointer[Int]())
         return StringRef(result)
 
