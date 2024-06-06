@@ -94,27 +94,6 @@ systems. Here are some of the notable issues that we plan to fix:
   processors and Apple Silicon macOS. Support for more Linux distributions
   (including Debian and RHEL) and Windows is in progress.
 
-- Python interoperability might fail when running a compiled Mojo program, with
-  the message
-  `Unable to locate a suitable libpython, please set MOJO_PYTHON_LIBRARY`. This
-  is because we currently do not embed the Python version into the Mojo binary.
-  For details and the workaround, see [issue
-  #551](https://github.com/modularml/mojo/issues/551).
-
-- Mojo programs that import NumPy might fail with the following error:
-
-  ```plaintext
-  Importing the numpy C-extensions failed. This error can happen for
-  many reasons, often due to issues with your setup or how NumPy was
-  installed.
-  ```
-
-  This may occur because the version of NumPy doesn't match the Python
-  interpreter Mojo is using. As a workaround, follow the instructions in
-  [issue #1085](https://github.com/modularml/mojo/issues/1085#issuecomment-1771403719)
-  to install a Python virtual environment using Conda. This can solve many
-  issues with Python interoperability.
-
 - Modular CLI install might fail and require `modular clean` before you
   re-install.
 

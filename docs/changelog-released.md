@@ -516,6 +516,14 @@ modular update mojo
   removed `let` declarations but still provided an error message to users. Now,
   it is completely gone from the grammar. Long live `var`!
 
+- Mojo will now link to a Python dynamic library based on the Python on top of
+  your search path: `PATH`. This enables you to activate a virtual environment
+  like `conda` and have access to Python modules installed in that environment
+  without setting `MOJO_PYTHON_LIBRARY`. Previously Mojo would find a
+  `libpython` dynamic library on installation and put the path in
+  `.modular/modular.cfg`, which could result in version conflicts if you
+  activated a virtual environment of a different Python version.
+
 - The `abs`, `round`, `min`, `max`, `pow`, and `divmod` functions have moved
   from `math` to `builtin`, so you no longer need to do
   `from math import abs, round, min, max, divmod, pow`.
