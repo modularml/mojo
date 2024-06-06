@@ -368,6 +368,31 @@ def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
     return head, tail
 
 
+fn basename[PathLike: os.PathLike, //](path: PathLike) -> String:
+    """Returns the tail section of a path.
+
+    ```mojo
+    basename("a/path/foo.txt") # returns "foo.txt"
+    ```
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path to retrieve the basename from.
+
+    Returns:
+        The basename from the path.
+    """
+    var fspath = path.__fspath__()
+    alias sep = str(os.sep)
+    var i = fspath.rfind(sep) + 1
+    var head = fspath[i:]
+    if head and head != sep * len(head):
+        return head.rstrip(sep)
+    return head
+
+
 # TODO uncomment this when unpacking is supported
 # fn join[PathLike: os.PathLike](path: PathLike, *paths: PathLike) -> String:
 #     """Join two or more pathname components, inserting '/' as needed.

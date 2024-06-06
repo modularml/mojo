@@ -13,6 +13,7 @@
 
 from .path import (
     dirname,
+    basename,
     exists,
     expanduser,
     expandvars,
