@@ -194,12 +194,7 @@ fn dirname(path: String) -> String:
     Returns:
         The directory component of a pathname.
     """
-    alias sep = str(os.sep)
-    var i = path.rfind(sep) + 1
-    var head = path[:i]
-    if head and head != sep * len(head):
-        return head.rstrip(sep)
-    return head
+    return split(path)[0]
 
 
 fn dirname[PathLike: os.PathLike, //](path: PathLike) -> String:
@@ -352,6 +347,92 @@ fn join(path: String, *paths: String) -> String:
             joined_path += sep + cur_path[]
 
     return joined_path
+
+
+fn split(path: String) -> (String, String):
+    """Splits a path into head and tail components.
+    Where the head is everything after the last separator,
+    and tail is the rest.
+
+    ```mojo
+    split("a/path/foo.txt") # returns ("a/path", "foo.txt")
+    ```
+
+    Args:
+        path: The path to split.
+
+    Returns:
+        A (head, tail) tuple.
+    """
+    alias sep = str(os.sep)
+
+    var last_slash = path.rfind(sep) + 1
+
+    var head: String
+    var tail: String
+
+    head, tail = path[:last_slash], path[last_slash:]
+
+    if head and head != sep * len(head):
+        head = head.rstrip(sep)
+
+    return (head, tail)
+
+
+fn split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
+    """Splits a path into head and tail components.
+    Where the head is everything after the last separator,
+    and tail is the rest.
+
+    ```mojo
+    split("a/path/foo.txt") # returns ("a/path", "foo.txt")
+    ```
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path to split.
+
+    Returns:
+        A (head, tail) tuple.
+    """
+    return split(path.__fspath__())
+
+
+fn basename(path: String) -> String:
+    """Returns the tail section of a path.
+
+    ```mojo
+    basename("a/path/foo.txt") # returns "foo.txt"
+    ```
+
+    Args:
+        path: The path to retrieve the basename from.
+
+    Returns:
+        The basename from the path.
+    """
+    return split(path)[1]
+
+
+fn basename[PathLike: os.PathLike, //](path: PathLike) -> String:
+    """Returns the tail section of a path.
+
+    ```mojo
+    basename("a/path/foo.txt") # returns "foo.txt"
+    ```
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path to retrieve the basename from.
+
+    Returns:
+        The basename from the path.
+    """
+    return basename(path.__fspath__())
 
 
 # TODO uncomment this when unpacking is supported
