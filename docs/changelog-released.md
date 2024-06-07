@@ -51,7 +51,7 @@ Big themes for this release:
 ### Language changes
 
 - Mojo has changed how `def` function arguments are processed.  Previously, by
-  default, arguments to a `def` were treated treated according to the `owned`
+  default, arguments to a `def` were treated according to the `owned`
   convention, which makes a copy of the value, enabling that value to be mutable
   in the callee.
 
