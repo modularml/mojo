@@ -55,7 +55,7 @@ Big themes for this release:
   convention, which makes a copy of the value, enabling that value to be mutable
   in the callee.
 
-  This could lead to a major performance issues because of the proliferation of
+  This could lead to major performance issues because of the proliferation of
   unnecessary copies. It also required you to declare non-copyable types as
   `borrowed` explicitly.  Now Mojo takes a different approach: `def` functions
   take arguments as `borrowed` by default (consistent with `fn` functions) but
