@@ -104,6 +104,11 @@ struct Span[
 
     @always_inline
     fn __init__(inout self, *, other: Self):
+        """Explicitly construct a deep copy of the provided Span.
+
+        Args:
+            other: The Span to copy.
+        """
         self._data = other._data
         self._len = other._len
 
