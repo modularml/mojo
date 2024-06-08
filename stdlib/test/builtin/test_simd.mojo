@@ -1348,13 +1348,13 @@ def test_reduce_bit_count():
     var int_iota8 = SIMD[DType.int32, 8](0, 1, 2, 3, 4, 5, 6, 7)
     assert_equal(int_iota8.reduce_bit_count(), 12)
 
-    var bool_true = Scalar[DType.bool].splat(True)
+    var bool_true = Scalar[DType.bool](True)
     assert_equal(bool_true.reduce_bit_count(), 1)
 
-    var bool_false = Scalar[DType.bool].splat(False)
+    var bool_false = Scalar[DType.bool](False)
     assert_equal(bool_false.reduce_bit_count(), 0)
 
-    var bool_true16 = SIMD[DType.bool, 16].splat(True)
+    var bool_true16 = SIMD[DType.bool, 16](True)
     assert_equal(bool_true16.reduce_bit_count(), 16)
 
 
