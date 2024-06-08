@@ -246,7 +246,7 @@ fn bit_not[
         NOT of the integer value at position `i` of the input value.
     """
     constrained[type.is_integral(), "must be integral"]()
-    var neg_one = SIMD[type, simd_width].splat(-1)
+    var neg_one = SIMD[type, simd_width](-1)
     return __mlir_op.`pop.xor`(val.value, neg_one.value)
 
 
@@ -402,7 +402,7 @@ fn bit_ceil[
     """
     constrained[type.is_integral(), "must be integral"]()
 
-    alias ones = SIMD[type, simd_width].splat(1)
+    alias ones = SIMD[type, simd_width](1)
 
     return (val > 1).select(1 << bit_width(val - ones), ones)
 
@@ -455,7 +455,7 @@ fn bit_floor[
     """
     constrained[type.is_integral(), "must be integral and unsigned"]()
 
-    alias zeros = SIMD[type, simd_width].splat(0)
+    alias zeros = SIMD[type, simd_width](0)
 
     return (val > 0).select(1 << (bit_width(val) - 1), zeros)
 
