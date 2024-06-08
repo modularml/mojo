@@ -39,7 +39,7 @@ To learn more about Mojo, see the
 
 ## Installing Mojo
 
-### Latest Releases
+### Latest Release
 
 To install the last released build of Mojo, you can install the MAX SDK
 or the standalone Mojo SDK:
