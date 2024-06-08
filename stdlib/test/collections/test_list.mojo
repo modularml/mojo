@@ -710,6 +710,10 @@ def test_constructor_from_other_list_through_pointer():
 
 
 def test_converting_list_to_string():
+    # This is also testing the method `to_format` because
+    # essentially, `List.__str__()` just creates a String and applies `to_format` to it.
+    # If we were to write unit tests for `to_format`, we would essentially copy-paste the code
+    # of `List.__str__()`
     var my_list = List[Int](1, 2, 3)
     assert_equal(my_list.__str__(), "[1, 2, 3]")
 
