@@ -21,7 +21,7 @@ fn swap[T: Movable](inout lhs: T, inout rhs: T):
     """Swaps the two given arguments.
 
     Parameters:
-       T: Constrained to Copyable types.
+       T: Constrained to Movable types.
 
     Args:
         lhs: Argument value swapped with rhs.

@@ -13,58 +13,64 @@ ideal for heterogeneous hardware, from CPUs and GPUs, to various AI ASICs). We
 also designed Mojo as a superset of Python because we love Python and its
 community, but we couldn't realistically enhance Python to do all the things we
 wanted. For a longer discussion on this topic, read [Why
-Mojo](/mojo/why-mojo.html).
+Mojo](/mojo/why-mojo).
 
 Beware that Mojo is still a very young language, so there's a lot that hasn't
 been built yet. Likewise, there's a lot of documentation that hasn't been
 written yet. But we're excited to share Mojo with you and [get your
-feedback](/mojo/community.html).
+feedback](/mojo/community).
 
 ## Contents
 
 - **Get started**
 
-  - [Why Mojo](/mojo/manual/why-mojo)
+  - [Why Mojo](/mojo/why-mojo)
   - [Get started with Mojo](/mojo/manual/get-started)
 
 - **Language basics**
 
-  - [Introduction to Mojo](/mojo/manual/basics.html)
-  - [Functions](/mojo/manual/functions.html)
-  - [Variables](/mojo/manual/variables.html)
-  - [Structs](/mojo/manual/structs.html)
-  - [Modules and packages](/mojo/manual/packages.html)
+  - [Introduction to Mojo](/mojo/manual/basics)
+  - [Functions](/mojo/manual/functions)
+  - [Variables](/mojo/manual/variables)
+  - [Types](/mojo/manual/types)
+  - [Control flow](/mojo/manual/control-flow)
+  - [Structs](/mojo/manual/structs)
+  - [Modules and packages](/mojo/manual/packages)
 
 - **Value ownership**
 
-  - [Intro to value ownership](/mojo/manual/values/index.html)
-  - [Value semantics](/mojo/manual/values/value-semantics.html)
-  - [Ownership and borrowing](/mojo/manual/values/ownership.html)
+  - [Intro to value ownership](/mojo/manual/values/index)
+  - [Value semantics](/mojo/manual/values/value-semantics)
+  - [Ownership and borrowing](/mojo/manual/values/ownership)
 
 - **Value lifecycle**
 
-  - [Intro to value lifecycle](/mojo/manual/lifecycle/index.html)
-  - [Life of a value](/mojo/manual/lifecycle/life.html)
-  - [Death of a value](/mojo/manual/lifecycle/death.html)
+  - [Intro to value lifecycle](/mojo/manual/lifecycle/index)
+  - [Life of a value](/mojo/manual/lifecycle/life)
+  - [Death of a value](/mojo/manual/lifecycle/death)
 
 - **Traits and parameters**
 
-  - [Traits](/mojo/manual/traits.html)
-  - [Parameterization: compile-time metaprogramming](/mojo/manual/parameters/index.html)
+  - [Traits](/mojo/manual/traits)
+  - [Parameterization: compile-time metaprogramming](/mojo/manual/parameters/index)
+
+- **Pointers**
+
+  - [Unsafe pointers](/mojo/manual/pointers)
 
 - **Python**
 
-  - [Python integration](/mojo/manual/python/index.html)
-  - [Python types](/mojo/manual/python/types.html)
+  - [Python integration](/mojo/manual/python/index)
+  - [Python types](/mojo/manual/python/types)
 
 - **Tools**
 
-  - [Debugging](/mojo/tools/debugging.html)
-  - [Testing](/mojo/tools/testing.html)
+  - [Debugging](/mojo/tools/debugging)
+  - [Testing](/mojo/tools/testing)
 
 - **Project information**
 
-  - [Roadmap and sharp edges](/mojo/roadmap.html)
-  - [Changelog](/mojo/changelog.html)
-  - [FAQ](/mojo/faq.html)
-  - [Community](/mojo/community.html)
+  - [Roadmap and sharp edges](/mojo/roadmap)
+  - [Changelog](/mojo/changelog)
+  - [FAQ](/mojo/faq)
+  - [Community](/mojo/community)
