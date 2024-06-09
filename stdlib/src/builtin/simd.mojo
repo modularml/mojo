@@ -55,7 +55,7 @@ from .string import _calc_initial_buffer_size, _calc_format_buffer_size
 # Type Aliases
 # ===----------------------------------------------------------------------=== #
 
-alias Scalar = SIMD[size=1]
+alias Scalar = SIMD[_, size=1]
 """Represents a scalar dtype."""
 
 alias Int8 = Scalar[DType.int8]
