@@ -57,7 +57,7 @@ view of how the development of Mojo is progressing.  Use at your own risk
 and be patient!
 
 To get nightly builds, see the same instructions to [install the Mojo
-SDK](https://docs.modular.com/mojo/manual/get-started/#install-mojo), but use
+SDK](https://docs.modular.com/mojo/manual/get-started/#1-install-mojo), but use
 the command shown there to install `nightly/mojo`.
 
 When you clone this repo, be sure you switch to the `nightly` branch, because
