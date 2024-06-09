@@ -88,9 +88,3 @@ podman run \
 The Mojo examples and notebooks in this repository are licensed  
 under the Apache License v2.0 with LLVM Exceptions  
 (see the LLVM [License](https://llvm.org/LICENSE.txt)).
-
-## Contributing
-
-Thanks for your interest in contributing to this repository!  
-We are not accepting pull requests at this time, but are actively  
-working on a process to accept contributions. Please stay tuned.
