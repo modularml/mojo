@@ -88,3 +88,13 @@ podman run \
 The Mojo examples and notebooks in this repository are licensed  
 under the Apache License v2.0 with LLVM Exceptions  
 (see the LLVM [License](https://llvm.org/LICENSE.txt)).
+
+## Contributing
+
+As a contributor, your efforts and expertise are invaluable in driving the
+evolution of the Mojo programming language. The [Mojo contributor
+guide](../CONTRIBUTING.md) provides all the information necessary to make
+meaningful contributions—from understanding the submission process to
+adhering to best practices:
+
+- [Mojo contributor guide](../CONTRIBUTING.md)
