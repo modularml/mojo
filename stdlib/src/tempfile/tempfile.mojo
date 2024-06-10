@@ -254,6 +254,7 @@ struct NamedTemporaryFile:
     fn __init__(
         inout self,
         mode: String = "w",
+        name: Optional[String] = None,
         suffix: String = "",
         prefix: String = "tmp",
         dir: Optional[String] = None,
@@ -265,26 +266,26 @@ struct NamedTemporaryFile:
 
         Args:
             mode: The mode to open the file in (the mode can be "r" or "w").
-            suffix: Suffix to use for the file name.
-            prefix: Prefix to use for the file name.
+            name: The name of the temp file; if it is unspecified, then random name will be provided.
+            suffix: Suffix to use for the file name if name is not provided.
+            prefix: Prefix to use for the file name if name is not provided.
             dir: Directory in which the file will be created.
             delete: Whether the file is deleted on close.
         """
 
-        var final_dir = Path(dir.value()) if dir else Path(
-            _get_default_tempdir()
-        )
+        var final_dir = dir.value() if dir else _get_default_tempdir()
 
         self._delete = delete
         self.name = ""
 
-        for _ in range(TMP_MAX):
-            var potential_name = final_dir / (
-                prefix + _get_random_name() + suffix
-            )
-            if not os.path.exists(potential_name):
-                self.name = potential_name.__fspath__()
-                break
+        if name:
+            self.name = name.value()
+        else:
+            for _ in range(TMP_MAX):
+                var potential_name = final_dir + os.sep + prefix + _get_random_name() + suffix
+                if not os.path.exists(potential_name):
+                    self.name = potential_name
+                    break
         try:
             # TODO for now this name could be relative,
             # python implementation expands the path,
