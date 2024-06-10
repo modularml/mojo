@@ -870,7 +870,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             return self.__get_ref(key)
         except KeyError:
             self[key] = default^
-        return self.__get_ref(key)
+            return self.__get_ref(key)
 
     @staticmethod
     @always_inline
