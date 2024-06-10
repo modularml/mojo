@@ -74,7 +74,7 @@ struct Span[
     is_mutable: Bool, //,
     T: CollectionElement,
     lifetime: AnyLifetime[is_mutable].type,
-]:
+](CollectionElementNew):
     """A non owning view of contiguous data.
 
     Parameters:
@@ -101,6 +101,16 @@ struct Span[
         """
         self._data = unsafe_ptr
         self._len = len
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Explicitly construct a deep copy of the provided Span.
+
+        Args:
+            other: The Span to copy.
+        """
+        self._data = other._data
+        self._len = other._len
 
     @always_inline
     fn __init__(inout self, ref [lifetime]list: List[T]):
