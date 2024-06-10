@@ -45,7 +45,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     var _data: Dict[T, NoneType]
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self, *ts: T):
@@ -87,7 +87,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         self._data = other._data^
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Operator dunders
     # ===-------------------------------------------------------------------===#
 
     fn __contains__(self, t: T) -> Bool:
@@ -262,7 +262,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         self.symmetric_difference_update(other)
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Trait implementations
     # ===-------------------------------------------------------------------===#
 
     fn __bool__(self) -> Bool:
@@ -301,15 +301,15 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     # ===-------------------------------------------------------------------===#
 
     fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _DictKeyIter[T, NoneType, self.is_mutable, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _DictKeyIter[T, NoneType, __lifetime_of(self)]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
             An iterator of immutable references to the set elements.
         """
         # here we rely on Set being a trivial wrapper of a Dict
-        return _DictKeyIter(_DictEntryIter(0, 0, self[]._data))
+        return _DictKeyIter(_DictEntryIter(0, 0, self._data))
 
     fn add(inout self, t: T):
         """Add an element to the set.

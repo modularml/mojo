@@ -16,13 +16,13 @@ from .param_env import env_get_string, is_defined
 
 
 @always_inline("nodebug")
-fn _build_info_type() -> StringLiteral:
+fn _build_type() -> StringLiteral:
     constrained[is_defined["BUILD_TYPE"](), "the build type must be defined"]()
     return env_get_string["BUILD_TYPE"]()
 
 
 @always_inline("nodebug")
-fn _kernels_build_info_type() -> StringLiteral:
+fn _kernels_build_type() -> StringLiteral:
     constrained[
         is_defined["KERNELS_BUILD_TYPE"](),
         "the kernels build type must be defined",
@@ -42,11 +42,10 @@ fn is_kernels_debug_build() -> Bool:
     @parameter
     if is_defined["DEBUG"]():
         return True
-
-    @parameter
-    if not is_defined["KERNELS_BUILD_TYPE"]():
+    elif is_defined["KERNELS_BUILD_TYPE"]():
+        return _kernels_build_type() == "debug"
+    else:
         return False
-    return _kernels_build_info_type() == "debug"
 
 
 @always_inline("nodebug")
@@ -61,11 +60,10 @@ fn is_debug_build() -> Bool:
     @parameter
     if is_defined["DEBUG"]():
         return True
-
-    @parameter
-    if not is_defined["BUILD_TYPE"]():
+    elif is_defined["BUILD_TYPE"]():
+        return _build_type() == "debug"
+    else:
         return False
-    return _build_info_type() == "debug"
 
 
 @always_inline("nodebug")
@@ -80,15 +78,15 @@ fn is_release_build() -> Bool:
     @parameter
     if is_defined["DEBUG"]():
         return False
-
-    @parameter
-    if not is_defined["BUILD_TYPE"]():
+    elif is_defined["BUILD_TYPE"]():
+        alias build_type: StringLiteral = _build_type()
+        return (
+            build_type == "release"
+            or build_type == "relwithdebinfo"
+            or build_type == "minsizerel"
+        )
+    else:
         return True
-    return (
-        _build_info_type() == "release"
-        or _build_info_type() == "relwithdebinfo"
-        or _build_info_type() == "minsizerel"
-    )
 
 
 @always_inline("nodebug")
@@ -103,8 +101,7 @@ fn is_relwithdebinfo_build() -> Bool:
     @parameter
     if is_defined["DEBUG"]():
         return True
-
-    @parameter
-    if not is_defined["BUILD_TYPE"]():
+    elif is_defined["BUILD_TYPE"]():
+        return _build_type() == "relwithdebinfo"
+    else:
         return False
-    return _build_info_type() == "relwithdebinfo"

@@ -414,6 +414,14 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
+    fn write(self, data: Span[UInt8, _]) raises:
+        """Write a borrowed sequence of data to the file.
+
+        Args:
+          data: The data to write to the file.
+        """
+        self._write(data.unsafe_ptr(), len(data))
+
     @always_inline
     fn write(self, data: StringRef) raises:
         """Write the data to the file.
@@ -421,13 +429,12 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        # TODO: Remove cast when transition to UInt8 strings is complete.
-        self._write(data.unsafe_ptr().bitcast[Int8](), len(data))
+        self._write(data.unsafe_ptr(), len(data))
 
     @always_inline
     fn _write[
         address_space: AddressSpace
-    ](self, ptr: DTypePointer[DType.int8, address_space], len: Int) raises:
+    ](self, ptr: UnsafePointer[UInt8, address_space], len: Int) raises:
         """Write the data to the file.
 
         Params:

@@ -17,6 +17,22 @@ And if you're using VS Code:
 - [Install the nightly VS Code
   extension](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo-nightly)
 
+### Dev Container
+
+There is an externally maintained
+[Mojo Dev Container](https://github.com/benz0li/mojo-dev-container) with all
+prerequisites installed.
+
+The Dev Container also includes the unit test dependencies `lit` and `FileCheck`
+(from LLVM) and has `pre-commit` already set up.
+
+See [Mojo Dev Container &gt; Usage](https://github.com/benz0li/mojo-dev-container#usage)
+on how to use with [Github Codespaces](https://docs.github.com/en/codespaces/developing-in-codespaces/creating-a-codespace-for-a-repository#creating-a-codespace-for-a-repository)
+or [VS Code](https://code.visualstudio.com/docs/devcontainers/containers).
+
+If there is a problem with the Dev Container, please open an issue
+[here](https://github.com/benz0li/mojo-dev-container/issues).
+
 ## Building the standard library
 
 To build the standard library, you can run the
@@ -73,6 +89,8 @@ run all the tests automatically.
 ./stdlib/scripts/run-tests.sh
 ```
 
+Note that tests are run with `-D MOJO_ENABLE_ASSERTIONS`.
+
 If you wish to run the unit tests that are in a specific test file, you can do
 so with
 
@@ -111,6 +129,10 @@ Reminder that if you’re choosing to invoke `lit` directly and not use the
 `test_utils.mojopkg` are up-to-date. We’re not currently imposing any build
 system right now to ensure these dependencies are up-to-date before running the
 tests.
+
+This is rarely useful, but if you wish to run the unit tests with assertions
+disabled, you can set the environment
+variable `MOJO_ENABLE_ASSERTIONS_IN_TESTS=0`.
 
 If you run into any issues when running the tests,
 [please file an issue](https://github.com/modularml/mojo/issues) and we’ll take

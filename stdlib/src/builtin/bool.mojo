@@ -64,11 +64,25 @@ struct Bool(
     Boolable,
     Intable,
     Indexer,
+    CollectionElementNew,
+    Representable,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
     var value: __mlir_type.i1
     """The underlying storage of the boolean value."""
+
+    @always_inline("nodebug")
+    fn __init__(*, other: Self) -> Bool:
+        """Explicitly construct a deep copy of the provided value.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            The constructed Bool value.
+        """
+        return Self {value: other.value}
 
     @always_inline("nodebug")
     fn __init__(value: __mlir_type.i1) -> Bool:
@@ -141,10 +155,22 @@ struct Bool(
     fn __str__(self) -> String:
         """Get the bool as a string.
 
+        Returns `"True"` or `"False"`.
+
         Returns:
             A string representation.
         """
         return "True" if self else "False"
+
+    fn __repr__(self) -> String:
+        """Get the bool as a string.
+
+        Returns `"True"` or `"False"`.
+
+        Returns:
+            A string representation.
+        """
+        return str(self)
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -441,7 +467,7 @@ fn bool[T: Boolable](value: T) -> Bool:
 
 
 fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
-    """Checks if **any** elements in the list are truthy.
+    """Checks if **any** element in the list is truthy.
 
     Parameters:
         T: The type of elements to check.
@@ -450,7 +476,7 @@ fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
         list: The list to check.
 
     Returns:
-        Returns `True` if **any** elements in the list are truthy, `False` otherwise.
+        `True` if **any** element in the list is truthy, `False` otherwise.
     """
     for item in list:
         if item[]:
@@ -459,7 +485,7 @@ fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
 
 
 fn any[T: BoolableKeyElement](set: Set[T]) -> Bool:
-    """Checks if **any** elements in the set are truthy.
+    """Checks if **any** element in the set is truthy.
 
     Parameters:
         T: The type of elements to check.
@@ -468,7 +494,7 @@ fn any[T: BoolableKeyElement](set: Set[T]) -> Bool:
         set: The set to check.
 
     Returns:
-        Returns `True` if **any** elements in the set are truthy, `False` otherwise.
+        `True` if **any** element in the set is truthy, `False` otherwise.
     """
     for item in set:
         if item[]:
@@ -477,15 +503,16 @@ fn any[T: BoolableKeyElement](set: Set[T]) -> Bool:
 
 
 fn any(value: SIMD) -> Bool:
-    """Checks if **any** elements in the simd vector are truthy.
+    """Checks if **any** element in the simd vector is truthy.
 
     Args:
         value: The simd vector to check.
 
     Returns:
-        Returns `True` if **any** elements in the simd vector are truthy, `False` otherwise.
+        `True` if **any** element in the simd vector is truthy, `False`
+        otherwise.
     """
-    return value._reduce_any()
+    return value.cast[DType.bool]().reduce_or()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -506,7 +533,7 @@ fn all[T: BoolableCollectionElement](list: List[T]) -> Bool:
         list: The list to check.
 
     Returns:
-        Returns `True` if **all** elements in the list are truthy, `False` otherwise.
+        `True` if **all** elements in the list are truthy, `False` otherwise.
     """
     for item in list:
         if not item[]:
@@ -524,7 +551,7 @@ fn all[T: BoolableKeyElement](set: Set[T]) -> Bool:
         set: The set to check.
 
     Returns:
-        Returns `True` if **all** elements in the set are truthy, `False` otherwise.
+        `True` if **all** elements in the set are truthy, `False` otherwise.
     """
     for item in set:
         if not item[]:
@@ -539,6 +566,7 @@ fn all(value: SIMD) -> Bool:
         value: The simd vector to check.
 
     Returns:
-        Returns `True` if **all** elements in the simd vector are truthy, `False` otherwise.
+        `True` if **all** elements in the simd vector are truthy, `False`
+        otherwise.
     """
-    return value._reduce_all()
+    return value.cast[DType.bool]().reduce_and()

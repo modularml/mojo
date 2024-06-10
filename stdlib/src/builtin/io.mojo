@@ -64,11 +64,11 @@ struct _fdopen:
         @parameter
         if os_is_windows():
             handle = external_call["_fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
         else:
             handle = external_call["fdopen", UnsafePointer[NoneType]](
-                _dup(stream_id.value), mode.unsafe_ptr()
+                _dup(stream_id.value), mode.unsafe_cstr_ptr()
             )
         self.handle = handle
 
@@ -112,7 +112,7 @@ fn _printf[
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_ptr(), UnsafePointer.address_of(loaded_pack)
+            fmt.unsafe_cstr_ptr(), UnsafePointer.address_of(loaded_pack)
         )
     else:
         with _fdopen(file) as fd:
@@ -125,7 +125,7 @@ fn _printf[
                     `) -> !pop.scalar<si32>`,
                 ],
                 _type=Int32,
-            ](fd, fmt.unsafe_ptr(), loaded_pack)
+            ](fd, fmt.unsafe_cstr_ptr(), loaded_pack)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -135,19 +135,17 @@ fn _printf[
 
 @no_inline
 fn _snprintf[
-    *types: AnyType
-](
-    str: UnsafePointer[UInt8],
-    size: Int,
-    fmt: StringLiteral,
-    *arguments: *types,
-) -> Int:
+    fmt: StringLiteral, *types: AnyType
+](str: UnsafePointer[UInt8], size: Int, *arguments: *types) -> Int:
     """Writes a format string into an output pointer.
+
+    Parameters:
+        fmt: A format string.
+        types: The types of arguments interpolated into the format string.
 
     Args:
         str: A pointer into which the format string is written.
         size: At most, `size - 1` bytes are written into the output string.
-        fmt: A format string.
         arguments: Arguments interpolated into the format string.
 
     Returns:
@@ -173,31 +171,30 @@ fn _snprintf[
                 `) -> !pop.scalar<si32>`,
             ],
             _type=Int32,
-        ](str, size, fmt.unsafe_ptr(), loaded_pack)
+        ](str, size, fmt.unsafe_cstr_ptr(), loaded_pack)
     )
 
 
 @no_inline
 fn _snprintf_scalar[
-    type: DType
+    type: DType,
+    float_format: StringLiteral = "%.17g",
 ](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type]) -> Int:
-    alias format = _get_dtype_printf_format[type]()
-
     @parameter
     if type == DType.bool:
         if x:
-            return _snprintf(buffer, size, "True")
+            return _snprintf["True"](buffer, size)
         else:
-            return _snprintf(buffer, size, "False")
+            return _snprintf["False"](buffer, size)
     elif type.is_integral() or type == DType.address:
-        return _snprintf(buffer, size, format, x)
+        return _snprintf[_get_dtype_printf_format[type]()](buffer, size, x)
     elif (
         type == DType.float16 or type == DType.bfloat16 or type == DType.float32
     ):
         # We need to cast the value to float64 to print it.
-        return _float_repr(buffer, size, x.cast[DType.float64]())
+        return _float_repr[float_format](buffer, size, x.cast[DType.float64]())
     elif type == DType.float64:
-        return _float_repr(buffer, size, rebind[Float64](x))
+        return _float_repr[float_format](buffer, size, rebind[Float64](x))
     return 0
 
 
@@ -207,11 +204,13 @@ fn _snprintf_scalar[
 
 
 @no_inline
-fn _float_repr(buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
+fn _float_repr[
+    fmt: StringLiteral = "%.17g"
+](buffer: UnsafePointer[UInt8], size: Int, x: Float64) -> Int:
     # Using `%.17g` with decimal check is equivalent to CPython's fallback path
     # when its more complex dtoa library (forked from
     # https://github.com/dtolnay/dtoa) is not available.
-    var n = _snprintf(buffer, size, "%.17g", x.value)
+    var n = _snprintf[fmt](buffer, size, x.value)
     # If the buffer isn't big enough to add anything, then just return.
     if n + 2 >= size:
         return n
@@ -363,10 +362,73 @@ fn _put(x: DType, file: FileDescriptor = stdout):
 @no_inline
 fn print[
     *Ts: Stringable
+](*values: *Ts, flush: Bool = False, file: FileDescriptor = stdout):
+    """Prints elements to the text stream. Each element is separated by a
+    whitespace and followed by a newline character.
+
+    Parameters:
+        Ts: The elements types.
+
+    Args:
+        values: The elements to print.
+        flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
+    """
+    _print(values, sep=" ", end="\n", flush=flush, file=file)
+
+
+@no_inline
+fn print[
+    *Ts: Stringable, EndTy: Stringable
 ](
     *values: *Ts,
-    sep: StringLiteral = " ",
-    end: StringLiteral = "\n",
+    end: EndTy,
+    flush: Bool = False,
+    file: FileDescriptor = stdout,
+):
+    """Prints elements to the text stream. Each element is separated by a
+    whitespace and followed by `end`.
+
+    Parameters:
+        Ts: The elements types.
+        EndTy: The type of end argument.
+
+    Args:
+        values: The elements to print.
+        end: The String to write after printing the elements.
+        flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
+    """
+    _print(values, sep=" ", end=str(end), flush=flush, file=file)
+
+
+@no_inline
+fn print[
+    SepTy: Stringable, *Ts: Stringable
+](*values: *Ts, sep: SepTy, flush: Bool = False, file: FileDescriptor = stdout):
+    """Prints elements to the text stream. Each element is separated by `sep`
+    and followed by a newline character.
+
+    Parameters:
+        SepTy: The type of separator.
+        Ts: The elements types.
+
+    Args:
+        values: The elements to print.
+        sep: The separator used between elements.
+        flush: If set to true, then the stream is forcibly flushed.
+        file: The output stream.
+    """
+    _print(values, sep=str(sep), end="\n", flush=flush, file=file)
+
+
+@no_inline
+fn print[
+    SepTy: Stringable, EndTy: Stringable, *Ts: Stringable
+](
+    *values: *Ts,
+    sep: SepTy,
+    end: EndTy,
     flush: Bool = False,
     file: FileDescriptor = stdout,
 ):
@@ -374,6 +436,8 @@ fn print[
     and followed by `end`.
 
     Parameters:
+        SepTy: The type of separator.
+        EndTy: The type of end argument.
         Ts: The elements types.
 
     Args:
@@ -383,8 +447,7 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
         file: The output stream.
     """
-
-    _print(values=values, sep=sep, end=end, flush=flush, file=file.value)
+    _print(values, sep=str(sep), end=str(end), flush=flush, file=file)
 
 
 @no_inline
@@ -392,10 +455,11 @@ fn _print[
     *Ts: Stringable
 ](
     values: VariadicPack[_, _, Stringable, Ts],
-    sep: StringLiteral = " ",
-    end: StringLiteral = "\n",
-    flush: Bool = False,
-    file: Int = 1,
+    *,
+    sep: String,
+    end: String,
+    flush: Bool,
+    file: FileDescriptor,
 ):
     @parameter
     fn print_with_separator[i: Int, T: Stringable](value: T):
@@ -403,11 +467,11 @@ fn _print[
 
         @parameter
         if i < values.__len__() - 1:
-            _put(StringRef(sep), file=file)
+            _put(sep, file=file)
 
     values.each_idx[print_with_separator]()
 
-    _put(StringRef(end), file=file)
+    _put(end, file=file)
     if flush:
         _flush(file=file)
 
@@ -422,14 +486,11 @@ fn _print[
 #   default, replace `print` with this function.
 @no_inline
 fn _print_fmt[
-    T: Formattable, *Ts: Formattable
-](
-    first: T,
-    *rest: *Ts,
+    T: Formattable,
+    *Ts: Formattable,
     sep: StringLiteral = " ",
     end: StringLiteral = "\n",
-    flush: Bool = False,
-):
+](first: T, *rest: *Ts, flush: Bool = False):
     """Prints elements to the text stream. Each element is separated by `sep`
     and followed by `end`.
 
@@ -439,12 +500,12 @@ fn _print_fmt[
     Parameters:
         T: The first element type.
         Ts: The remaining element types.
+        sep: The separator used between elements.
+        end: The String to write after printing the elements.
 
     Args:
         first: The first element.
         rest: The remaining elements.
-        sep: The separator used between elements.
-        end: The String to write after printing the elements.
         flush: If set to true, then the stream is forcibly flushed.
     """
     var writer = Formatter.stdout()

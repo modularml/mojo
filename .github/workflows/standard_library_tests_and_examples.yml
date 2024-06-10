@@ -11,8 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-name: Standard Library tests and examples
-
+name: Test stdlib and examples
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -24,9 +23,12 @@ permissions:
 
 jobs:
   test-examples:
+    name: with ${{ matrix.os }} and assertions=${{ matrix.mojo-enable-assertions }}
     strategy:
+      fail-fast: false
       matrix:
         os: ["ubuntu-latest", "macos-14"]
+        mojo-enable-assertions: [0, 1]
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -40,7 +42,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Download Modular installer
         run: |
@@ -99,6 +101,8 @@ jobs:
           echo $(brew --prefix llvm@15)/bin/ >> $GITHUB_PATH
 
       - name: Run standard library tests and examples
+        env:
+          MOJO_ENABLE_ASSERTIONS_IN_TESTS: ${{ matrix.mojo-enable-assertions }}
         run: |
           ./stdlib/scripts/run-tests.sh
           ./examples/run-examples.sh

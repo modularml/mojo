@@ -19,6 +19,9 @@ from utils import StringRef
 from .info import os_is_linux, os_is_windows
 from .intrinsics import _mlirtype_is_eq
 
+alias C_char = Int8
+"""C `char` type."""
+
 
 struct RTLD:
     """Enumeration of the RTLD flags used during dynamic library loading."""
@@ -40,11 +43,11 @@ alias DEFAULT_RTLD = RTLD.NOW | RTLD.GLOBAL
 
 
 @value
-@register_passable
+@register_passable("trivial")
 struct DLHandle(CollectionElement, Boolable):
     """Represents a dynamically linked library that can be loaded and unloaded.
 
-    The library is loaded on initialization and unloaded on deletion of the object.
+    The library is loaded on initialization and unloaded by `close`.
     """
 
     var handle: DTypePointer[DType.int8]
@@ -69,6 +72,28 @@ struct DLHandle(CollectionElement, Boolable):
         else:
             self.handle = DTypePointer[DType.int8]()
 
+    fn check_symbol(self, name: String) -> Bool:
+        """Check that the symbol exists in the dynamic library.
+
+        Args:
+            name: The symbol to check.
+
+        Returns:
+            `True` if the symbol exists.
+        """
+        constrained[
+            not os_is_windows(),
+            "Checking dynamic library symbol is not supported on Windows",
+        ]()
+
+        var opaque_function_ptr = external_call[
+            "dlsym", DTypePointer[DType.int8]
+        ](self.handle.address, name.unsafe_ptr())
+        if opaque_function_ptr:
+            return True
+
+        return False
+
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
     fn close(inout self):
@@ -78,7 +103,7 @@ struct DLHandle(CollectionElement, Boolable):
         @parameter
         if not os_is_windows():
             _ = external_call["dlclose", Int](self.handle)
-            self.handle = DTypePointer[DType.int8].get_null()
+            self.handle = DTypePointer[DType.int8]()
 
     fn __bool__(self) -> Bool:
         """Checks if the handle is valid.
@@ -90,7 +115,9 @@ struct DLHandle(CollectionElement, Boolable):
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
-    fn get_function[result_type: AnyRegType](self, name: String) -> result_type:
+    fn get_function[
+        result_type: AnyTrivialRegType
+    ](self, name: String) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -104,12 +131,12 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](name.unsafe_ptr())
+        return self._get_function[result_type](name.unsafe_cstr_ptr())
 
     @always_inline
     fn _get_function[
-        result_type: AnyRegType
-    ](self, name: DTypePointer[DType.int8]) -> result_type:
+        result_type: AnyTrivialRegType
+    ](self, name: UnsafePointer[C_char]) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -128,13 +155,15 @@ struct DLHandle(CollectionElement, Boolable):
             var opaque_function_ptr = external_call[
                 "dlsym", DTypePointer[DType.int8]
             ](self.handle.address, name)
-            return UnsafePointer(opaque_function_ptr).bitcast[result_type]()[]
+            return UnsafePointer.address_of(opaque_function_ptr).bitcast[
+                result_type
+            ]()[]
         else:
             return abort[result_type]("get_function isn't supported on windows")
 
     @always_inline
     fn _get_function[
-        func_name: StringLiteral, result_type: AnyRegType
+        func_name: StringLiteral, result_type: AnyTrivialRegType
     ](self) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
@@ -147,7 +176,7 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](func_name.unsafe_ptr())
+        return self._get_function[result_type](func_name.unsafe_cstr_ptr())
 
 
 # ===----------------------------------------------------------------------===#
@@ -206,18 +235,18 @@ fn _get_dylib_function[
     func_name: StringLiteral,
     init_fn: fn (UnsafePointer[NoneType]) -> UnsafePointer[NoneType],
     destroy_fn: fn (UnsafePointer[NoneType]) -> None,
-    result_type: AnyRegType,
+    result_type: AnyTrivialRegType,
 ](payload: UnsafePointer[NoneType] = UnsafePointer[NoneType]()) -> result_type:
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
-        return UnsafePointer(func_ptr).bitcast[result_type]()[]
+        return UnsafePointer.address_of(func_ptr).bitcast[result_type]()[]
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        UnsafePointer(new_func).bitcast[Pointer[NoneType]]()[],
+        UnsafePointer.address_of(new_func).bitcast[Pointer[NoneType]]()[],
     )
 
     return new_func
@@ -229,7 +258,7 @@ fn _get_dylib_function[
 
 
 @always_inline("nodebug")
-fn external_call[callee: StringLiteral, type: AnyRegType]() -> type:
+fn external_call[callee: StringLiteral, type: AnyTrivialRegType]() -> type:
     """Calls an external function.
 
     Parameters:
@@ -250,7 +279,7 @@ fn external_call[callee: StringLiteral, type: AnyRegType]() -> type:
 
 @always_inline("nodebug")
 fn external_call[
-    callee: StringLiteral, type: AnyRegType, T0: AnyRegType
+    callee: StringLiteral, type: AnyTrivialRegType, T0: AnyTrivialRegType
 ](arg0: T0) -> type:
     """Calls an external function.
 
@@ -278,7 +307,10 @@ fn external_call[
 
 @always_inline("nodebug")
 fn external_call[
-    callee: StringLiteral, type: AnyRegType, T0: AnyRegType, T1: AnyRegType
+    callee: StringLiteral,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
 ](arg0: T0, arg1: T1) -> type:
     """Calls an external function.
 
@@ -311,10 +343,10 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
 ](arg0: T0, arg1: T1, arg2: T2) -> type:
     """Calls an external function.
 
@@ -349,11 +381,11 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3) -> type:
     """Calls an external function.
 
@@ -390,12 +422,12 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4) -> type:
     """Calls an external function.
 
@@ -434,13 +466,13 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5) -> type:
     """Calls an external function.
 
@@ -481,14 +513,14 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
 ](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5, arg6: T6) -> type:
     """Calls an external function.
 
@@ -531,15 +563,15 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
 ](
     arg0: T0,
     arg1: T1,
@@ -593,16 +625,16 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
 ](
     arg0: T0,
     arg1: T1,
@@ -659,17 +691,17 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
+    T9: AnyTrivialRegType,
 ](
     arg0: T0,
     arg1: T1,
@@ -729,18 +761,18 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
+    T9: AnyTrivialRegType,
+    T10: AnyTrivialRegType,
 ](
     arg0: T0,
     arg1: T1,
@@ -803,19 +835,19 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
-    T11: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
+    T9: AnyTrivialRegType,
+    T10: AnyTrivialRegType,
+    T11: AnyTrivialRegType,
 ](
     arg0: T0,
     arg1: T1,
@@ -903,20 +935,20 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
-    T11: AnyRegType,
-    T12: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
+    T9: AnyTrivialRegType,
+    T10: AnyTrivialRegType,
+    T11: AnyTrivialRegType,
+    T12: AnyTrivialRegType,
 ](
     arg0: T0,
     arg1: T1,
@@ -1009,21 +1041,21 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
-    T11: AnyRegType,
-    T12: AnyRegType,
-    T13: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
+    T9: AnyTrivialRegType,
+    T10: AnyTrivialRegType,
+    T11: AnyTrivialRegType,
+    T12: AnyTrivialRegType,
+    T13: AnyTrivialRegType,
 ](
     arg0: T0,
     arg1: T1,
@@ -1121,22 +1153,22 @@ fn external_call[
 @always_inline("nodebug")
 fn external_call[
     callee: StringLiteral,
-    type: AnyRegType,
-    T0: AnyRegType,
-    T1: AnyRegType,
-    T2: AnyRegType,
-    T3: AnyRegType,
-    T4: AnyRegType,
-    T5: AnyRegType,
-    T6: AnyRegType,
-    T7: AnyRegType,
-    T8: AnyRegType,
-    T9: AnyRegType,
-    T10: AnyRegType,
-    T11: AnyRegType,
-    T12: AnyRegType,
-    T13: AnyRegType,
-    T14: AnyRegType,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
+    T2: AnyTrivialRegType,
+    T3: AnyTrivialRegType,
+    T4: AnyTrivialRegType,
+    T5: AnyTrivialRegType,
+    T6: AnyTrivialRegType,
+    T7: AnyTrivialRegType,
+    T8: AnyTrivialRegType,
+    T9: AnyTrivialRegType,
+    T10: AnyTrivialRegType,
+    T11: AnyTrivialRegType,
+    T12: AnyTrivialRegType,
+    T13: AnyTrivialRegType,
+    T14: AnyTrivialRegType,
 ](
     arg0: T0,
     arg1: T1,
@@ -1242,7 +1274,9 @@ fn external_call[
 
 
 @always_inline("nodebug")
-fn _external_call_const[callee: StringLiteral, type: AnyRegType]() -> type:
+fn _external_call_const[
+    callee: StringLiteral, type: AnyTrivialRegType
+]() -> type:
     """Mark the external function call as having no observable effects to the
     program state. This allows the compiler to optimize away successive calls
     to the same function.
@@ -1269,7 +1303,7 @@ fn _external_call_const[callee: StringLiteral, type: AnyRegType]() -> type:
 
 @always_inline("nodebug")
 fn _external_call_const[
-    callee: StringLiteral, type: AnyRegType, T0: AnyRegType
+    callee: StringLiteral, type: AnyTrivialRegType, T0: AnyTrivialRegType
 ](arg0: T0) -> type:
     """Mark the external function call as having no observable effects to the
     program state. This allows the compiler to optimize away successive calls
@@ -1301,7 +1335,10 @@ fn _external_call_const[
 
 @always_inline("nodebug")
 fn _external_call_const[
-    callee: StringLiteral, type: AnyRegType, T0: AnyRegType, T1: AnyRegType
+    callee: StringLiteral,
+    type: AnyTrivialRegType,
+    T0: AnyTrivialRegType,
+    T1: AnyTrivialRegType,
 ](arg0: T0, arg1: T1) -> type:
     """Mark the external function call as having no observable effects to the
     program state. This allows the compiler to optimize away successive calls

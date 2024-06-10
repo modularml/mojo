@@ -27,104 +27,21 @@ from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply
 from memory import UnsafePointer, bitcast
 
-# ===----------------------------------------------------------------------=== #
-# _digits
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline("nodebug")
-fn _digits[type: DType]() -> IntLiteral:
-    """Returns the number of digits in base-radix that can be represented by
-    the type without change.
-
-    For integer types, this is the number of bits not counting the sign bit and
-    the padding bits (if any). For floating-point types, this is the digits of
-    the mantissa (for IEC 559/IEEE 754 implementations, this is the number of
-    digits stored for the mantissa plus one, because the mantissa has an
-    implicit leading 1 and binary point).
-
-    Parameters:
-        type: The type to get the digits for.
-
-    Returns:
-        The number of digits that can be represented by the type without change.
-    """
-    alias mlir_type = __mlir_type[`!pop.scalar<`, type.value, `>`]
-
-    @parameter
-    if type == DType.bool:
-        return 1
-    elif type.is_integral():
-
-        @parameter
-        if type.is_signed():
-            return bitwidthof[mlir_type]() - 1
-        else:
-            return bitwidthof[mlir_type]()
-    elif type == DType.float16:
-        return 11
-    elif type == DType.bfloat16:
-        return 8
-    elif type == DType.float32:
-        return 24
-    elif type == DType.float64:
-        return 53
-    else:
-        constrained[False, "unsupported DType"]()
-        return -1
-
-
-# ===----------------------------------------------------------------------=== #
-# _fp_bitcast_to_integer
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _fp_bitcast_to_integer[type: DType](value: Scalar[type]) -> Int:
-    """Bitcasts the floating-point value to an integer.
-
-    Parameters:
-        type: The floating-point type.
-
-    Args:
-        value: The value to bitcast.
-
-    Returns:
-        An integer representation of the floating-point value.
-    """
-    alias integer_type = _integral_type_of[type]()
-    return int(bitcast[integer_type, 1](value))
-
-
-# ===----------------------------------------------------------------------=== #
-# _fp_bitcast_from_integer
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _fp_bitcast_from_integer[type: DType](value: Int) -> Scalar[type]:
-    """Bitcasts the integer value to a floating-point value.
-
-    Parameters:
-        type: The floating-point type.
-
-    Args:
-        value: The value to bitcast.
-
-    Returns:
-        A float-point representation of the integer value.
-    """
-    alias integer_type = _integral_type_of[type]()
-    var int_val = SIMD[integer_type, 1](value)
-    return bitcast[type, 1](int_val)
-
 
 # ===----------------------------------------------------------------------=== #
 # FPUtils
 # ===----------------------------------------------------------------------=== #
 
 
-struct FPUtils[type: DType]:
+fn _constrain_fp_type[type: DType]():
+    constrained[
+        type.is_floating_point(), "dtype must be a floating point type"
+    ]()
+
+
+struct FPUtils[
+    type: DType, *, _constraint: NoneType = _constrain_fp_type[type]()
+]:
     """Collection of utility functions for working with FP values.
 
     Constraints:
@@ -132,6 +49,7 @@ struct FPUtils[type: DType]:
 
     Parameters:
         type: The concrete FP dtype (FP32/FP64/etc).
+        _constraint: Implements the constraint. Do not pass explicitly.
     """
 
     alias integral_type = _integral_type_of[type]()
@@ -145,11 +63,17 @@ struct FPUtils[type: DType]:
         Returns:
             The mantissa width.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
-        return _digits[type]() - 1
+
+        @parameter
+        if type == DType.float16:
+            return 10
+        elif type == DType.bfloat16:
+            return 7
+        elif type == DType.float32:
+            return 23
+        else:
+            constrained[type == DType.float64, "unsupported float type"]()
+            return 52
 
     @staticmethod
     @always_inline("nodebug")
@@ -159,10 +83,6 @@ struct FPUtils[type: DType]:
         Returns:
             The max exponent.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
 
         @parameter
         if type == DType.float16:
@@ -170,7 +90,7 @@ struct FPUtils[type: DType]:
         elif type == DType.float32 or type == DType.bfloat16:
             return 128
         else:
-            debug_assert(type == DType.float64, "must be float64")
+            constrained[type == DType.float64, "unsupported float type"]()
             return 1024
 
     @staticmethod
@@ -181,10 +101,6 @@ struct FPUtils[type: DType]:
         Returns:
             The exponent width.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
 
         @parameter
         if type == DType.float16:
@@ -192,7 +108,7 @@ struct FPUtils[type: DType]:
         elif type == DType.float32 or type == DType.bfloat16:
             return 8
         else:
-            debug_assert(type == DType.float64, "must be float64")
+            constrained[type == DType.float64, "unsupported float type"]()
             return 11
 
     @staticmethod
@@ -203,10 +119,6 @@ struct FPUtils[type: DType]:
         Returns:
             The mantissa mask.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
         return (1 << Self.mantissa_width()) - 1
 
     @staticmethod
@@ -217,56 +129,42 @@ struct FPUtils[type: DType]:
         Returns:
             The exponent bias.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
         return Self.max_exponent() - 1
 
     @staticmethod
     @always_inline
     fn sign_mask() -> Int:
-        """Returns the sign mask of a floating point type. It is computed by
-        `1 << (exponent_width + mantissa_mask)`.
+        """Returns the sign mask of a floating point type.
+
+        It is computed by `1 << (exponent_width + mantissa_width)`.
 
         Returns:
             The sign mask.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
-        alias shift = int(Self.exponent_width() + Self.mantissa_width())
-        return 1 << shift
+        return 1 << int(Self.exponent_width() + Self.mantissa_width())
 
     @staticmethod
     @always_inline
     fn exponent_mask() -> Int:
-        """Returns the exponent mask of a floating point type. It is computed by
-        `~(sign_mask | mantissa_mask)`.
+        """Returns the exponent mask of a floating point type.
+
+        It is computed by `~(sign_mask | mantissa_mask)`.
 
         Returns:
             The exponent mask.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
         return ~(Self.sign_mask() | Self.mantissa_mask())
 
     @staticmethod
     @always_inline
     fn exponent_mantissa_mask() -> Int:
-        """Returns the exponent and mantissa mask of a floating point type. It is
-        computed by `exponent_mask + mantissa_mask`.
+        """Returns the exponent and mantissa mask of a floating point type.
+
+        It is computed by `exponent_mask + mantissa_mask`.
 
         Returns:
             The exponent and mantissa mask.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
         return Self.exponent_mask() + Self.mantissa_mask()
 
     @staticmethod
@@ -283,10 +181,6 @@ struct FPUtils[type: DType]:
         Returns:
             The quiet NaN mask.
         """
-        constrained[
-            type.is_floating_point(),
-            "dtype must be a floating point type",
-        ]()
         alias mantissa_width_val = Self.mantissa_width()
         return (1 << Self.exponent_width() - 1) << mantissa_width_val + (
             1 << (mantissa_width_val - 1)
@@ -303,7 +197,7 @@ struct FPUtils[type: DType]:
         Returns:
             An integer representation of the floating-point value.
         """
-        return _fp_bitcast_to_integer[type](value)
+        return int(bitcast[Self.integral_type, 1](value))
 
     @staticmethod
     @always_inline
@@ -316,13 +210,12 @@ struct FPUtils[type: DType]:
         Returns:
             An floating-point representation of the Int.
         """
-        return _fp_bitcast_from_integer[type](value)
+        return bitcast[type, 1](SIMD[Self.integral_type, 1](value))
 
     @staticmethod
     @always_inline
     fn get_sign(value: Scalar[type]) -> Bool:
-        """Returns the sign of the floating point value. True if the sign is set
-        and False otherwise.
+        """Returns the sign of the floating point value.
 
         Args:
             value: The floating-point type.
@@ -330,7 +223,6 @@ struct FPUtils[type: DType]:
         Returns:
             Returns True if the sign is set and False otherwise.
         """
-
         return (Self.bitcast_to_integer(value) & Self.sign_mask()) != 0
 
     @staticmethod
@@ -640,7 +532,7 @@ fn isnan[
     alias quiet_nan_test: UInt32 = 0x0002
     return llvm_intrinsic[
         "llvm.is.fpclass", SIMD[DType.bool, simd_width], has_side_effect=False
-    ](val.value, (signaling_nan_test | quiet_nan_test).value)
+    ](val.value, (signaling_nan_test | quiet_nan_test))
 
 
 # ===----------------------------------------------------------------------=== #
@@ -910,7 +802,7 @@ fn isinf[
     alias negative_infinity_test: UInt32 = 0x0004
     alias positive_infinity_test: UInt32 = 0x0200
     return llvm_intrinsic["llvm.is.fpclass", SIMD[DType.bool, simd_width]](
-        val.value, (negative_infinity_test | positive_infinity_test).value
+        val.value, (negative_infinity_test | positive_infinity_test)
     )
 
 
@@ -943,7 +835,7 @@ fn isfinite[
         return True
 
     return llvm_intrinsic["llvm.is.fpclass", SIMD[DType.bool, simd_width]](
-        val.value, UInt32(0x1F8).value
+        val.value, UInt32(0x1F8)
     )
 
 

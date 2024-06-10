@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_true, assert_false
 from sys import os_is_macos
+
+from testing import assert_false, assert_true
 
 
 def test_tuple_contains():

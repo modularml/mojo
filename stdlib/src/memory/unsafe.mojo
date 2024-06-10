@@ -27,29 +27,12 @@ from sys import (
     sizeof,
     triple_is_nvidia_cuda,
 )
-from sys.intrinsics import PrefetchOptions, _mlirtype_is_eq
-from sys.intrinsics import prefetch as _prefetch
 from sys.intrinsics import gather, scatter, strided_load, strided_store
+from bit import is_power_of_two
 
 from .memory import _free, _malloc
 from .reference import AddressSpace
-
-# ===----------------------------------------------------------------------===#
-# Utilities
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn _is_power_of_2(val: Int) -> Bool:
-    """Checks whether an integer is a power of two.
-
-    Args:
-      val: The integer to check.
-
-    Returns:
-      True if val is a power of two, otherwise False.
-    """
-    return (val & (val - 1) == 0) & (val != 0)
+from .maybe_uninitialized import UnsafeMaybeUninitialized
 
 
 # ===----------------------------------------------------------------------===#
@@ -162,7 +145,7 @@ alias Pointer = LegacyPointer
 @value
 @register_passable("trivial")
 struct LegacyPointer[
-    type: AnyRegType, address_space: AddressSpace = AddressSpace.GENERIC
+    type: AnyTrivialRegType, address_space: AddressSpace = AddressSpace.GENERIC
 ](Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
     """Defines a LegacyPointer struct that contains the address of a register passable
     type.
@@ -179,9 +162,7 @@ struct LegacyPointer[
     var address: Self._mlir_type
     """The pointed-to address."""
 
-    alias _ref_type = Reference[
-        type, True, MutableStaticLifetime, address_space
-    ]
+    alias _ref_type = Reference[type, MutableStaticLifetime, address_space]
 
     @always_inline("nodebug")
     fn __init__() -> Self:
@@ -190,7 +171,7 @@ struct LegacyPointer[
         Returns:
             Constructed LegacyPointer object.
         """
-        return Self.get_null()
+        return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
     @always_inline("nodebug")
     fn __init__(address: Self._mlir_type) -> Self:
@@ -233,16 +214,6 @@ struct LegacyPointer[
             Scalar[DType.index](address).value
         )
 
-    @staticmethod
-    @always_inline("nodebug")
-    fn get_null() -> Self:
-        """Constructs a LegacyPointer representing nullptr.
-
-        Returns:
-            Constructed nullptr LegacyPointer object.
-        """
-        return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
-
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
 
@@ -250,7 +221,7 @@ struct LegacyPointer[
             A String containing the hexadecimal representation of the memory
             location destination of this pointer.
         """
-        return hex(self)
+        return hex(int(self))
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
@@ -259,11 +230,11 @@ struct LegacyPointer[
         Returns:
             Returns False if the LegacyPointer is null and True otherwise.
         """
-        return self != Self.get_null()
+        return self != Self()
 
     @staticmethod
     @always_inline("nodebug")
-    fn address_of(arg: Reference[type, _, _, address_space]) -> Self:
+    fn address_of(ref [_, address_space._value.value]arg: type) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -272,33 +243,39 @@ struct LegacyPointer[
         Returns:
             A LegacyPointer struct which contains the address of the argument.
         """
-        # Work around AnyRegType vs AnyType.
+        # Work around AnyTrivialRegType vs AnyType.
         return __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
-            UnsafePointer(arg).address
+            UnsafePointer.address_of(arg).address
         )
 
     @always_inline("nodebug")
-    fn __refitem__(self) -> Self._ref_type:
-        """Enable subscript syntax `ref[]` to access the element.
+    fn __getitem__(
+        self,
+    ) -> ref [MutableStaticLifetime, address_space._value.value] type:
+        """Enable subscript syntax `ptr[]` to access the element.
 
         Returns:
-            The MLIR reference for the Mojo compiler to use.
+            The reference for the Mojo compiler to use.
         """
-        return __mlir_op.`lit.ref.from_pointer`[
-            _type = Self._ref_type._mlir_type
-        ](self.address)
+        return __get_litref_as_mvalue(
+            __mlir_op.`lit.ref.from_pointer`[_type = Self._ref_type._mlir_type](
+                self.address
+            )
+        )
 
     @always_inline("nodebug")
-    fn __refitem__(self, offset: Int) -> Self._ref_type:
-        """Enable subscript syntax `ref[idx]` to access the element.
+    fn __getitem__(
+        self, offset: Int
+    ) -> ref [MutableStaticLifetime, address_space._value.value] type:
+        """Enable subscript syntax `ptr[idx]` to access the element.
 
         Args:
             offset: The offset to load from.
 
         Returns:
-            The MLIR reference for the Mojo compiler to use.
+            The reference for the Mojo compiler to use.
         """
-        return (self + offset).__refitem__()
+        return (self + offset)[]
 
     # ===------------------------------------------------------------------=== #
     # Load/Store
@@ -387,23 +364,6 @@ struct LegacyPointer[
         __mlir_op.`pop.store`[alignment = alignment.value](value, self.address)
 
     @always_inline("nodebug")
-    fn nt_store(self, value: type):
-        """Stores a value using non-temporal store.
-
-        The address must be properly aligned, 64B for avx512, 32B for avx2, and
-        16B for avx.
-
-        Args:
-            value: The value to store.
-        """
-        # Store a simd value into the pointer. The address must be properly
-        # aligned, 64B for avx512, 32B for avx2, and 16B for avx.
-        __mlir_op.`pop.store`[
-            alignment = int(8 * simdwidthof[type]()).value,
-            nonTemporal = __mlir_attr.unit,
-        ](value, self.address)
-
-    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
 
@@ -447,7 +407,7 @@ struct LegacyPointer[
 
     @always_inline("nodebug")
     fn bitcast[
-        new_type: AnyRegType = type,
+        new_type: AnyTrivialRegType = type,
         /,
         address_space: AddressSpace = Self.address_space,
     ](self) -> LegacyPointer[new_type, address_space]:
@@ -599,16 +559,21 @@ struct DTypePointer[
         address_space: The address space the pointer is in.
     """
 
+    # Fields
     alias element_type = Scalar[type]
-    alias _mlir_type = Pointer[Scalar[type], address_space]
-    var address: Self._mlir_type
+    alias _pointer_type = Pointer[Scalar[type], address_space]
+    var address: Self._pointer_type
     """The pointed-to address."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
     fn __init__(inout self):
         """Constructs a null `DTypePointer` from the given type."""
 
-        self.address = Self._mlir_type()
+        self.address = Self._pointer_type()
 
     @always_inline("nodebug")
     fn __init__(
@@ -656,7 +621,7 @@ struct DTypePointer[
             value: The input pointer index.
         """
         var address = __mlir_op.`pop.index_to_pointer`[
-            _type = Self._mlir_type._mlir_type
+            _type = Self._pointer_type._mlir_type
         ](value.cast[DType.index]().value)
         self.address = address
 
@@ -667,39 +632,15 @@ struct DTypePointer[
         Args:
             address: The input address.
         """
-        self.address = Self._mlir_type(address=address)
+        self.address = Self._pointer_type(address=address)
+
+    # ===------------------------------------------------------------------=== #
+    # Factory methods
+    # ===------------------------------------------------------------------=== #
 
     @staticmethod
     @always_inline("nodebug")
-    fn get_null() -> Self:
-        """Constructs a `DTypePointer` representing *nullptr*.
-
-        Returns:
-            Constructed *nullptr* `DTypePointer` object.
-        """
-        return Self._mlir_type()
-
-    fn __str__(self) -> String:
-        """Format this pointer as a hexadecimal string.
-
-        Returns:
-            A String containing the hexadecimal representation of the memory location
-            destination of this pointer.
-        """
-        return str(self.address)
-
-    @always_inline("nodebug")
-    fn __bool__(self) -> Bool:
-        """Checks if the DTypePointer is *null*.
-
-        Returns:
-            Returns False if the DTypePointer is *null* and True otherwise.
-        """
-        return self.address.__bool__()
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn address_of(arg: Reference[Scalar[type], _, _, address_space]) -> Self:
+    fn address_of(ref [_, address_space._value.value]arg: Scalar[type]) -> Self:
         """Gets the address of the argument.
 
         Args:
@@ -708,34 +649,43 @@ struct DTypePointer[
         Returns:
             A DTypePointer struct which contains the address of the argument.
         """
-        return LegacyPointer.address_of(arg[])
+        return LegacyPointer.address_of(arg)
+
+    @staticmethod
+    @always_inline
+    fn alloc(count: Int, /, *, alignment: Int = alignof[type]()) -> Self:
+        """Heap-allocates a number of element of the specified type using
+        the specified alignment.
+
+        Args:
+            count: The number of elements to allocate (note that this is not
+              the bytecount).
+            alignment: The alignment used for the allocation.
+
+        Returns:
+            A new `DTypePointer` object which has been allocated on the heap.
+        """
+        return _malloc[Self.element_type, address_space=address_space](
+            count * sizeof[type](), alignment=alignment
+        )
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __getitem__(self, offset: Int) -> Scalar[type]:
-        """Loads a single element (SIMD of size 1) from the pointer at the
-        specified index.
+    fn __getitem__(
+        self, offset: Int = 0
+    ) -> ref [MutableStaticLifetime, address_space._value.value] Scalar[type]:
+        """Enable subscript syntax `ptr[]` to access the element.
 
         Args:
             offset: The offset to load from.
 
         Returns:
-            The loaded value.
+            The reference for the Mojo compiler to use.
         """
-        return self.load(offset)
-
-    @always_inline("nodebug")
-    fn __setitem__(self, offset: Int, val: Scalar[type]):
-        """Stores a single element value at the given offset.
-
-        Args:
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        return self.store(offset, val)
-
-    # ===------------------------------------------------------------------=== #
-    # Comparisons
-    # ===------------------------------------------------------------------=== #
+        return self.address[offset]
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
@@ -774,26 +724,97 @@ struct DTypePointer[
         return self.address < rhs.address
 
     # ===------------------------------------------------------------------=== #
-    # Allocate/Free
+    # Pointer arithmetic
     # ===------------------------------------------------------------------=== #
 
-    @staticmethod
-    @always_inline
-    fn alloc(count: Int, /, *, alignment: Int = alignof[type]()) -> Self:
-        """Heap-allocates a number of element of the specified type using
-        the specified alignment.
+    @always_inline("nodebug")
+    fn __add__[T: Intable](self, rhs: T) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
 
         Args:
-            count: The number of elements to allocate (note that this is not
-              the bytecount).
-            alignment: The alignment used for the allocation.
+            rhs: The offset.
 
         Returns:
-            A new `DTypePointer` object which has been allocated on the heap.
+            The new DTypePointer shifted by the offset.
         """
-        return _malloc[Self.element_type, address_space=address_space](
-            count * sizeof[type](), alignment=alignment
-        )
+        return self.offset(rhs)
+
+    @always_inline("nodebug")
+    fn __sub__[T: Intable](self, rhs: T) -> Self:
+        """Returns a new pointer shifted back by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
+
+        Args:
+            rhs: The offset.
+
+        Returns:
+            The new DTypePointer shifted by the offset.
+        """
+        return self.offset(-int(rhs))
+
+    @always_inline("nodebug")
+    fn __iadd__[T: Intable](inout self, rhs: T):
+        """Shifts the current pointer by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
+
+        Args:
+            rhs: The offset.
+        """
+        self = self + rhs
+
+    @always_inline("nodebug")
+    fn __isub__[T: Intable](inout self, rhs: T):
+        """Shifts back the current pointer by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
+
+        Args:
+            rhs: The offset.
+        """
+        self = self - rhs
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline("nodebug")
+    fn __int__(self) -> Int:
+        """Returns the pointer address as an integer.
+
+        Returns:
+          The address of the pointer as an Int.
+        """
+        return int(self.address)
+
+    fn __str__(self) -> String:
+        """Format this pointer as a hexadecimal string.
+
+        Returns:
+            A String containing the hexadecimal representation of the memory location
+            destination of this pointer.
+        """
+        return str(self.address)
+
+    @always_inline("nodebug")
+    fn __bool__(self) -> Bool:
+        """Checks if the DTypePointer is *null*.
+
+        Returns:
+            Returns False if the DTypePointer is *null* and True otherwise.
+        """
+        return self.address.__bool__()
+
+    # ===------------------------------------------------------------------=== #
+    # Methods
+    # ===------------------------------------------------------------------=== #
 
     @always_inline
     fn free(self):
@@ -831,148 +852,9 @@ struct DTypePointer[
         """
         return self.address
 
-    # ===------------------------------------------------------------------=== #
-    # Load/Store
-    # ===------------------------------------------------------------------=== #
-
     alias _default_alignment = alignof[
         Scalar[type]
     ]() if triple_is_nvidia_cuda() else 1
-
-    @always_inline
-    fn prefetch[params: PrefetchOptions](self):
-        # Prefetch at the underlying address.
-        """Prefetches memory at the underlying address.
-
-        Parameters:
-            params: Prefetch options (see `PrefetchOptions` for details).
-        """
-        _prefetch[params](self)
-
-    @always_inline("nodebug")
-    fn load[
-        *, width: Int = 1, alignment: Int = Self._default_alignment
-    ](self) -> SIMD[type, width]:
-        """Loads the value the Pointer object points to.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Returns:
-            The loaded value.
-        """
-        return self.load[width=width, alignment=alignment](0)
-
-    @always_inline("nodebug")
-    fn load[
-        T: Intable, *, width: Int = 1, alignment: Int = Self._default_alignment
-    ](self, offset: T) -> SIMD[type, width]:
-        """Loads the value the Pointer object points to with the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            T: The Intable type of the offset.
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-
-        @parameter
-        if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
-            # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
-            # regardless of the alignment that is passed. This causes issues if
-            # this method is called on an unaligned pointer.
-            # TODO #37823 We can make this smarter when we add an `aligned`
-            # trait to the pointer class.
-            var v = SIMD[type, width]()
-
-            # intentionally don't unroll, otherwise the compiler vectorizes
-            for i in range(width):
-                v[i] = self.address.offset(int(offset) + i).load[
-                    alignment=alignment
-                ]()
-            return v
-
-        return (
-            self.address.offset(offset)
-            .bitcast[SIMD[type, width]]()
-            .load[alignment=alignment]()
-        )
-
-    @always_inline("nodebug")
-    fn store[
-        T: Intable,
-        /,
-        *,
-        width: Int = 1,
-        alignment: Int = Self._default_alignment,
-    ](self, offset: T, val: SIMD[type, width]):
-        """Stores a single element value at the given offset.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            T: The Intable type of the offset.
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The offset to store to.
-            val: The value to store.
-        """
-        self.offset(offset).store[width=width, alignment=alignment](val)
-
-    @always_inline("nodebug")
-    fn store[
-        *, width: Int = 1, alignment: Int = Self._default_alignment
-    ](self, val: SIMD[type, width]):
-        """Stores a single element value.
-
-        Constraints:
-            The width and alignment must be positive integer values.
-
-        Parameters:
-            width: The SIMD width.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            val: The value to store.
-        """
-        constrained[width > 0, "width must be a positive integer value"]()
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-        self.address.bitcast[SIMD[type, width]]().store[alignment=alignment](
-            val
-        )
-
-    @always_inline("nodebug")
-    fn simd_nt_store[
-        width: Int, T: Intable
-    ](self, offset: T, val: SIMD[type, width]):
-        """Stores a SIMD vector using non-temporal store.
-
-        Parameters:
-            width: The SIMD width.
-            T: The Intable type of the offset.
-
-        Args:
-            offset: The offset to store to.
-            val: The SIMD value to store.
-        """
-        self.offset(offset).simd_nt_store[width](val)
 
     @always_inline("nodebug")
     fn simd_strided_load[
@@ -1010,25 +892,8 @@ struct DTypePointer[
         """
         strided_store(val, self, int(stride), True)
 
-    @always_inline("nodebug")
-    fn simd_nt_store[width: Int](self, val: SIMD[type, width]):
-        """Stores a SIMD vector using non-temporal store.
-
-        The address must be properly aligned, 64B for avx512, 32B for avx2, and
-        16B for avx.
-
-        Parameters:
-            width: The SIMD width.
-
-        Args:
-            val: The SIMD value to store.
-        """
-        # Store a simd value into the pointer. The address must be properly
-        # aligned, 64B for avx512, 32B for avx2, and 16B for avx.
-        self.address.bitcast[SIMD[type, width]]().nt_store(val)
-
     # ===------------------------------------------------------------------=== #
-    # Gather/Scatter
+    # Gather / Scatter
     # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
@@ -1104,7 +969,7 @@ struct DTypePointer[
             "offset type must be an integral type",
         ]()
         constrained[
-            _is_power_of_2(alignment),
+            is_power_of_two(alignment),
             "alignment must be a power of two integer value",
         ]()
 
@@ -1182,21 +1047,12 @@ struct DTypePointer[
             "offset type must be an integral type",
         ]()
         constrained[
-            _is_power_of_2(alignment),
+            is_power_of_two(alignment),
             "alignment must be a power of two integer value",
         ]()
 
         var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
         scatter(val, base.cast[DType.address](), mask, alignment)
-
-    @always_inline("nodebug")
-    fn __int__(self) -> Int:
-        """Returns the pointer address as an integer.
-
-        Returns:
-          The address of the pointer as an Int.
-        """
-        return int(self.address)
 
     @always_inline
     fn is_aligned[alignment: Int](self) -> Bool:
@@ -1210,13 +1066,9 @@ struct DTypePointer[
             otherwise.
         """
         constrained[
-            _is_power_of_2(alignment), "alignment must be a power of 2."
+            is_power_of_two(alignment), "alignment must be a power of 2."
         ]()
         return int(self) % alignment == 0
-
-    # ===------------------------------------------------------------------=== #
-    # Pointer Arithmetic
-    # ===------------------------------------------------------------------=== #
 
     @always_inline("nodebug")
     fn offset[T: Intable](self, idx: T) -> Self:
@@ -1232,57 +1084,3 @@ struct DTypePointer[
             The new constructed DTypePointer.
         """
         return self.address.offset(idx)
-
-    @always_inline("nodebug")
-    fn __add__[T: Intable](self, rhs: T) -> Self:
-        """Returns a new pointer shifted by the specified offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            rhs: The offset.
-
-        Returns:
-            The new DTypePointer shifted by the offset.
-        """
-        return self.offset(rhs)
-
-    @always_inline("nodebug")
-    fn __sub__[T: Intable](self, rhs: T) -> Self:
-        """Returns a new pointer shifted back by the specified offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            rhs: The offset.
-
-        Returns:
-            The new DTypePointer shifted by the offset.
-        """
-        return self.offset(-int(rhs))
-
-    @always_inline("nodebug")
-    fn __iadd__[T: Intable](inout self, rhs: T):
-        """Shifts the current pointer by the specified offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            rhs: The offset.
-        """
-        self = self + rhs
-
-    @always_inline("nodebug")
-    fn __isub__[T: Intable](inout self, rhs: T):
-        """Shifts back the current pointer by the specified offset.
-
-        Parameters:
-            T: The Intable type of the offset.
-
-        Args:
-            rhs: The offset.
-        """
-        self = self - rhs

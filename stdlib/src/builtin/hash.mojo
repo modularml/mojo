@@ -34,15 +34,6 @@ from memory import memcpy, memset_zero, stack_allocation
 # TODO remove this import onece InlineArray is moved to collections
 from utils import InlineArray
 
-# ===----------------------------------------------------------------------=== #
-# Utilities
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
-    return (numerator + denominator - 1)._positive_div(denominator)
-
 
 # ===----------------------------------------------------------------------=== #
 # Implementation
@@ -282,7 +273,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     # 2. Compute the hash, but strided across the SIMD vector width.
     var hash_data = _HASH_INIT[type, simd_width]()
     for i in range(k):
-        var update = simd_data.load[width=simd_width](i * simd_width)
+        var update = SIMD[size=simd_width].load(simd_data, i * simd_width)
         hash_data = _HASH_UPDATE(hash_data, update)
 
     # 3. Copy the tail data (smaller than the SIMD register) into
@@ -294,7 +285,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
         )
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
-        var last_value = ptr.bitcast[type]().load[width=simd_width]()
+        var last_value = SIMD[size=simd_width].load(ptr.bitcast[type]())
         hash_data = _HASH_UPDATE(hash_data, last_value)
 
     # Now finally, hash the final SIMD vector state.

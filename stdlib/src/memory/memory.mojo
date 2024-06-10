@@ -42,8 +42,9 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 
 
 @always_inline
-fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
-    constrained[s1.type.is_integral(), "the input dtype must be integral"]()
+fn _memcmp_impl_unconstrained(
+    s1: DTypePointer, s2: __type_of(s1), count: Int
+) -> Int:
     alias simd_width = simdwidthof[s1.type]()
     if count < simd_width:
         for i in range(count):
@@ -59,10 +60,11 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         has_side_effect=False,
     ]()
 
-    var vector_end_simd = _align_down(count, simd_width)
-    for i in range(0, vector_end_simd, simd_width):
-        var s1i = s1.load[width=simd_width](i)
-        var s2i = s2.load[width=simd_width](i)
+    var last = count - simd_width
+
+    for i in range(0, last, simd_width):
+        var s1i = SIMD[size=simd_width].load(s1, i)
+        var s2i = SIMD[size=simd_width].load(s2, i)
         var diff = s1i != s2i
         if any(diff):
             var index = int(
@@ -72,12 +74,8 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
             )
             return -1 if s1i[index] < s2i[index] else 1
 
-    var last = count - simd_width
-    if last <= 0:
-        return 0
-
-    var s1i = s1.load[width=simd_width](last)
-    var s2i = s2.load[width=simd_width](last)
+    var s1i = SIMD[size=simd_width].load(s1, last)
+    var s2i = SIMD[size=simd_width].load(s2, last)
     var diff = s1i != s2i
     if any(diff):
         var index = int(
@@ -85,6 +83,12 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         )
         return -1 if s1i[index] < s2i[index] else 1
     return 0
+
+
+@always_inline
+fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
+    constrained[s1.type.is_integral(), "the input dtype must be integral"]()
+    return _memcmp_impl_unconstrained(s1, s2, count)
 
 
 @always_inline
@@ -124,7 +128,7 @@ fn memcmp(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
 
 @always_inline
 fn memcmp[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](
     s1: LegacyPointer[type, address_space],
     s2: LegacyPointer[type, address_space],
@@ -214,9 +218,11 @@ fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
     alias chunk_size = 32
     alias vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=chunk_size](i))
+        SIMD.store(
+            dest_dtype_ptr, i, SIMD[size=chunk_size].load(src_dtype_ptr, i)
+        )
     for i in range(vector_end, n):
-        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=1](i))
+        Scalar.store(dest_dtype_ptr, i, Scalar.load(src_dtype_ptr, i))
 
 
 @always_inline
@@ -234,19 +240,16 @@ fn memcpy[count: Int](dest: DTypePointer, src: __type_of(dest)):
 
 
 @always_inline
-fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
+fn memcpy(
+    dest_data: LegacyPointer[Int8, *_], src_data: __type_of(dest_data), n: Int
+):
     """Copies a memory area.
 
     Args:
-        dest: The destination pointer.
-        src: The source pointer.
-        count: The number of elements to copy.
+        dest_data: The destination pointer.
+        src_data: The source pointer.
+        n: The number of bytes to copy.
     """
-    var n = count * sizeof[dest.type]()
-
-    var dest_data = dest.bitcast[Int8]()
-    var src_data = src.bitcast[Int8]()
-
     if n < 5:
         if n == 0:
             return
@@ -285,16 +288,48 @@ fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
     #    )
     #    return
 
-    var dest_dtype_ptr = DTypePointer[DType.int8, dest.address_space](dest_data)
-    var src_dtype_ptr = DTypePointer[DType.int8, src.address_space](src_data)
+    var dest_dtype_ptr = DTypePointer[DType.int8, dest_data.address_space](
+        dest_data
+    )
+    var src_dtype_ptr = DTypePointer[DType.int8, src_data.address_space](
+        src_data
+    )
 
     # Copy in 32-byte chunks.
     alias chunk_size = 32
     var vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=chunk_size](i))
+        SIMD.store(
+            dest_dtype_ptr, i, SIMD[size=chunk_size].load(src_dtype_ptr, i)
+        )
     for i in range(vector_end, n):
-        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=1](i))
+        Scalar.store(dest_dtype_ptr, i, Scalar.load(src_dtype_ptr, i))
+
+
+@always_inline
+fn memcpy(dest: LegacyPointer, src: __type_of(dest), count: Int):
+    """Copies a memory area.
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+        count: The number of elements to copy.
+    """
+    var n = count * sizeof[dest.type]()
+    memcpy(dest.bitcast[Int8](), src.bitcast[Int8](), n)
+
+
+@always_inline
+fn memcpy(dest: UnsafePointer, src: __type_of(dest), count: Int):
+    """Copies a memory area.
+
+    Args:
+        dest: The destination pointer.
+        src: The source pointer.
+        count: The number of elements to copy.
+    """
+    var n = count * sizeof[dest.type]()
+    memcpy(dest.bitcast[Int8]().address, src.bitcast[Int8]().address, n)
 
 
 @always_inline
@@ -364,7 +399,7 @@ fn memset[
 
 @always_inline
 fn memset[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], value: UInt8, count: Int):
     """Fills memory with the given value.
 
@@ -382,7 +417,7 @@ fn memset[
 
 @always_inline
 fn memset[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: LegacyPointer[type, address_space], value: UInt8, count: Int):
     """Fills memory with the given value.
 
@@ -422,7 +457,7 @@ fn memset_zero[
 
 @always_inline
 fn memset_zero[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
@@ -439,7 +474,7 @@ fn memset_zero[
 
 @always_inline
 fn memset_zero[
-    type: AnyRegType, address_space: AddressSpace
+    type: AnyTrivialRegType, address_space: AddressSpace
 ](ptr: LegacyPointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
@@ -488,7 +523,7 @@ fn stack_allocation[
 @always_inline
 fn stack_allocation[
     count: Int,
-    type: AnyRegType,
+    type: AnyTrivialRegType,
     /,
     alignment: Int = 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
@@ -530,7 +565,7 @@ fn stack_allocation[
 
 @always_inline
 fn _malloc[
-    type: AnyRegType,
+    type: AnyTrivialRegType,
     /,
     *,
     address_space: AddressSpace = AddressSpace.GENERIC,

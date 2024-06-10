@@ -17,7 +17,7 @@
 
 # Example command line:
 # Use no-cache to force docker to rebuild layers of the image by downloading the SDK from the repos
-# ./build-image.sh --auth-key <your-modular-auth-key>
+# ./build-image.sh --mojo-version
 #
 
 FROM ubuntu:20.04
@@ -50,12 +50,7 @@ RUN pip install \
         matplotlib \
         ipywidgets
 
-# A random default token
-ARG AUTH_KEY=5ca1ab1e
-ENV AUTH_KEY=$AUTH_KEY
-
-RUN curl https://get.modular.com | sh - && \
-    modular auth $AUTH_KEY 
+RUN curl -s https://get.modular.com | sh -
 RUN modular install mojo
 
 ARG MODULAR_HOME="/root/.modular"

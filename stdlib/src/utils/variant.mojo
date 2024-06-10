@@ -39,14 +39,9 @@ print(to_string(who_knows))
 """
 
 from sys import alignof, sizeof
-from sys.intrinsics import _mlirtype_is_eq
+from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
-from memory.unsafe_pointer import (
-    initialize_pointee_move,
-    move_from_pointee,
-    move_pointee,
-)
 from utils import unroll
 
 # ===----------------------------------------------------------------------=== #
@@ -90,15 +85,17 @@ struct _UnionTypeIndex[T: CollectionElement, *Ts: CollectionElement]:
             alias q = Ts[i]
 
             @parameter
-            if _mlirtype_is_eq[q, T]():
+            if _type_is_eq[q, T]():
                 result = i
 
         unroll[each, len(VariadicList(Ts))]()
         return result
 
 
-@value
-struct Variant[*Ts: CollectionElement](CollectionElement):
+struct Variant[*Ts: CollectionElement](
+    CollectionElement,
+    ExplicitlyCopyable,
+):
     """A runtime-variant type.
 
     Data for this type is stored internally. Currently, its size is the
@@ -150,6 +147,14 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
+    fn __init__(inout self, *, unsafe_uninitialized: ()):
+        """Unsafely create an uninitialized Variant.
+
+        Args:
+            unsafe_uninitialized: Marker argument indicating this initializer is unsafe.
+        """
+        self._impl = __mlir_attr[`#kgen.unknown : `, Self._mlir_type]
+
     fn __init__[T: CollectionElement](inout self, owned value: T):
         """Create a variant with one of the types.
 
@@ -162,7 +167,28 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         """
         self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
         self._get_state()[] = Self._check[T]()
-        initialize_pointee_move(self._get_ptr[T](), value^)
+        self._get_ptr[T]().init_pointee_move(value^)
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly creates a deep copy of an existing variant.
+
+        Args:
+            other: The value to copy from.
+        """
+        self = Self(unsafe_uninitialized=())
+        self._get_state()[] = other._get_state()[]
+
+        @parameter
+        fn each[i: Int]():
+            if self._get_state()[] == i:
+                alias T = Ts[i]
+                UnsafePointer.address_of(self._impl).bitcast[
+                    T
+                ]().init_pointee_move(
+                    UnsafePointer.address_of(other._impl).bitcast[T]()[],
+                )
+
+        unroll[each, len(VariadicList(Ts))]()
 
     fn __copyinit__(inout self, other: Self):
         """Creates a deep copy of an existing variant.
@@ -170,19 +196,9 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Args:
             other: The variant to copy from.
         """
-        self._impl = __mlir_attr[`#kgen.unknown : `, self._mlir_type]
-        self._get_state()[] = other._get_state()[]
 
-        @parameter
-        fn each[i: Int]():
-            if self._get_state()[] == i:
-                alias T = Ts[i]
-                initialize_pointee_move(
-                    UnsafePointer.address_of(self._impl).bitcast[T](),
-                    UnsafePointer.address_of(other._impl).bitcast[T]()[],
-                )
-
-        unroll[each, len(VariadicList(Ts))]()
+        # Delegate to explicit copy initializer.
+        self = Self(other=other)
 
     fn __moveinit__(inout self, owned other: Self):
         """Move initializer for the variant.
@@ -198,7 +214,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
             if self._get_state()[] == i:
                 alias T = Ts[i]
                 # Calls the correct __moveinit__
-                move_pointee(src=other._get_ptr[T](), dst=self._get_ptr[T]())
+                other._get_ptr[T]().move_pointee_into(self._get_ptr[T]())
 
         unroll[each, len(VariadicList(Ts))]()
 
@@ -212,7 +228,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     fn __getitem__[
         T: CollectionElement
-    ](self: Reference[Self, _, _]) -> ref [self.lifetime] T:
+    ](ref [_]self: Self) -> ref [__lifetime_of(self)] T:
         """Get the value out of the variant as a type-checked type.
 
         This explicitly check that your value is of that type!
@@ -228,10 +244,10 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Returns:
             The internal data represented as a `Reference[T]`.
         """
-        if not self[].isa[T]():
+        if not self.isa[T]():
             abort("get: wrong variant type")
 
-        return self[].unsafe_get[T]()[]
+        return self.unsafe_get[T]()[]
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -243,10 +259,8 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         ]()
         return UnsafePointer.address_of(self._impl).bitcast[T]()
 
-    fn _get_state(
-        self: Reference[Self, _, _]
-    ) -> Reference[Int8, self.is_mutable, self.lifetime]:
-        var int8_self = UnsafePointer(self).bitcast[Int8]()
+    fn _get_state(ref [_]self: Self) -> Reference[Int8, __lifetime_of(self)]:
+        var int8_self = UnsafePointer.address_of(self).bitcast[Int8]()
         return (int8_self + _UnionSize[Ts].compute())[]
 
     @always_inline
@@ -255,7 +269,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         fn each[i: Int]():
             if self._get_state()[] == i:
                 alias q = Ts[i]
-                destroy_pointee(self._get_ptr[q]().address)
+                self._get_ptr[q]().destroy_pointee()
 
         unroll[each, len(VariadicList(Ts))]()
 
@@ -300,7 +314,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         debug_assert(self.isa[T](), "taking wrong type")
         # don't call the variant's deleter later
         self._get_state()[] = Self._sentinel
-        return move_from_pointee(self._get_ptr[T]())
+        return self._get_ptr[T]().take_pointee()
 
     @always_inline
     fn replace[
@@ -386,9 +400,7 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
 
     fn unsafe_get[
         T: CollectionElement
-    ](self: Reference[Self, _, _]) -> Reference[
-        T, self.is_mutable, self.lifetime
-    ]:
+    ](ref [_]self: Self) -> Reference[T, __lifetime_of(self)]:
         """Get the value out of the variant as a type-checked type.
 
         This doesn't explicitly check that your value is of that type!
@@ -405,8 +417,8 @@ struct Variant[*Ts: CollectionElement](CollectionElement):
         Returns:
             The internal data represented as a `Reference[T]`.
         """
-        debug_assert(self[].isa[T](), "get: wrong variant type")
-        return self[]._get_ptr[T]()[]
+        debug_assert(self.isa[T](), "get: wrong variant type")
+        return self._get_ptr[T]()[]
 
     @staticmethod
     fn _check[T: CollectionElement]() -> Int8:

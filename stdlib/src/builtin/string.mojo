@@ -18,17 +18,16 @@ These are Mojo built-ins, so you don't need to import them.
 from bit import countl_zero
 from collections import List, KeyElement
 from sys import llvm_intrinsic, bitwidthof
+from sys.ffi import C_char
 
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import StringRef, StaticIntTuple, Span, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
-from .io import _snprintf
-
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # ord
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn ord(s: String) -> Int:
@@ -66,17 +65,17 @@ fn ord(s: String) -> Int:
     return result
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # chr
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn chr(c: Int) -> String:
     """Returns a string based on the given Unicode code point.
 
-    Returns the string representing a character whose code point is the integer `c`.
-    For example, `chr(97)` returns the string `"a"`. This is the inverse of the `ord()`
-    function.
+    Returns the string representing a character whose code point is the integer
+    `c`. For example, `chr(97)` returns the string `"a"`. This is the inverse of
+    the `ord()` function.
 
     Args:
         c: An integer that represents a code point.
@@ -110,17 +109,17 @@ fn chr(c: Int) -> String:
     var shift = 6 * (num_bytes - 1)
     var mask = UInt8(0xFF) >> (num_bytes + 1)
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
-    p.store(((c >> shift) & mask) | num_bytes_marker)
+    Scalar.store(p, ((c >> shift) & mask) | num_bytes_marker)
     for i in range(1, num_bytes):
         shift -= 6
-        p.store(i, ((c >> shift) & 0b00111111) | 0b10000000)
-    p.store(num_bytes, 0)
+        Scalar.store(p, i, ((c >> shift) & 0b00111111) | 0b10000000)
+    Scalar.store(p, num_bytes, 0)
     return String(p.bitcast[DType.uint8](), num_bytes + 1)
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # ascii
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline("nodebug")
@@ -163,10 +162,7 @@ fn _repr_ascii(c: UInt8) -> String:
         return r"\r"
     else:
         var uc = c.cast[DType.uint8]()
-        if uc < 16:
-            return hex(uc, r"\x0")
-        else:
-            return hex(uc, r"\x")
+        return hex[r"\x0"](uc) if uc < 16 else hex[r"\x"](uc)
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
@@ -183,28 +179,16 @@ fn ascii(value: String) -> String:
     return value.__repr__()
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # strtol
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 @always_inline
 fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
-    """Parses the given string as an integer in the given base and returns that value.
+    """Implementation of `atol` for StringRef inputs.
 
-    For example, `atol("19")` returns `19`. If the given string cannot be parsed
-    as an integer value, an error is raised. For example, `atol("hi")` raises an
-    error.
-
-    If base is 0 the the string is parsed as an Integer literal,
-    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
-
-    Args:
-        str_ref: A string to be parsed as an integer in the given base.
-        base: Base used for conversion, value must be between 2 and 36, or 0.
-
-    Returns:
-        An integer value that represents the string, or otherwise raises.
+    Please see its docstring for details.
     """
     if (base != 0) and (base < 2 or base > 36):
         raise Error("Base must be >= 2 and <= 36, or 0.")
@@ -222,7 +206,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     var buff = str_ref.unsafe_ptr()
 
     for pos in range(start, str_len):
-        if isspace(int(buff[pos])):
+        if _isspace(buff[pos]):
             continue
 
         if str_ref[pos] == "-":
@@ -233,6 +217,20 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         else:
             start = pos
         break
+
+    if str_ref[start] == "0" and start + 1 < str_len:
+        if base == 2 and (
+            str_ref[start + 1] == "b" or str_ref[start + 1] == "B"
+        ):
+            start += 2
+        elif base == 8 and (
+            str_ref[start + 1] == "o" or str_ref[start + 1] == "O"
+        ):
+            start += 2
+        elif base == 16 and (
+            str_ref[start + 1] == "x" or str_ref[start + 1] == "X"
+        ):
+            start += 2
 
     alias ord_0 = ord("0")
     # FIXME:
@@ -283,13 +281,13 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
         elif ord_letter_min[1] <= ord_current <= ord_letter_max[1]:
             result += ord_current - ord_letter_min[1] + 10
             found_valid_chars_after_start = True
-        elif isspace(ord_current):
+        elif _isspace(ord_current):
             has_space_after_number = True
             start = pos + 1
             break
         else:
             raise Error(_atol_error(base, str_ref))
-        if pos + 1 < str_len and not isspace(int(buff[pos + 1])):
+        if pos + 1 < str_len and not _isspace(buff[pos + 1]):
             var nextresult = result * real_base
             if nextresult < result:
                 raise Error(
@@ -303,7 +301,7 @@ fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
 
     if has_space_after_number:
         for pos in range(start, str_len):
-            if not isspace(int(buff[pos])):
+            if not _isspace(buff[pos]):
                 raise Error(_atol_error(base, str_ref))
     if is_negative:
         result = -result
@@ -355,14 +353,14 @@ fn _identify_base(str_ref: StringRef, start: Int) -> Tuple[Int, Int]:
 
 
 fn atol(str: String, base: Int = 10) raises -> Int:
-    """Parses the given string as an integer in the given base and returns that value.
+    """Parses and returns the given string as an integer in the given base.
 
-    For example, `atol("19")` returns `19`. If the given string cannot be parsed
-    as an integer value, an error is raised. For example, `atol("hi")` raises an
-    error.
+    For example, `atol("19")` returns `19`. If base is 0 the the string is
+    parsed as an Integer literal, see: https://docs.python.org/3/reference/lexical_analysis.html#integers.
 
-    If base is 0 the the string is parsed as an Integer literal,
-    see: https://docs.python.org/3/reference/lexical_analysis.html#integers
+    Raises:
+        If the given string cannot be parsed as an integer value. For example in
+        `atol("hi")`.
 
     Args:
         str: A string to be parsed as an integer in the given base.
@@ -380,20 +378,12 @@ fn _atof_error(str_ref: StringRef) -> Error:
 
 @always_inline
 fn _atof(str_ref: StringRef) raises -> Float64:
-    """Parses the given string as a floating point and returns that value.
+    """Implementation of `atof` for StringRef inputs.
 
-    For example, `atof("2.25")` returns `2.25`. If the given string cannot be parsed
-    as an float value, an error is raised. For example, `atof("hi")` raises an
-    error.
-
-    Args:
-        str_ref: A string to be parsed as a floating point.
-
-    Returns:
-        An float value that represents the string, or otherwise raises.
+    Please see its docstring for details.
     """
     if not str_ref:
-        raise Error(_atof_error(str_ref))
+        raise _atof_error(str_ref)
 
     var result: Float64 = 0.0
     var exponent: Int = 0
@@ -485,9 +475,11 @@ fn _atof(str_ref: StringRef) raises -> Float64:
 fn atof(str: String) raises -> Float64:
     """Parses the given string as a floating point and returns that value.
 
-    For example, `atof("2.25")` returns `2.25`. If the given string cannot be parsed
-    as an floating point value, an error is raised. For example, `atof("hi")` raises an
-    error.
+    For example, `atof("2.25")` returns `2.25`.
+
+    Raises:
+        If the given string cannot be parsed as an floating point value, for
+        example in `atof("hi")`.
 
     Args:
         str: A string to be parsed as a floating point.
@@ -498,9 +490,9 @@ fn atof(str: String) raises -> Float64:
     return _atof(str._strref_dangerous())
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # isdigit
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn isdigit(c: UInt8) -> Bool:
@@ -517,15 +509,16 @@ fn isdigit(c: UInt8) -> Bool:
     return ord_0 <= int(c) <= ord_9
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # isupper
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn isupper(c: UInt8) -> Bool:
     """Determines whether the given character is an uppercase character.
-       This currently only respects the default "C" locale, i.e. returns
-       True only if the character specified is one of ABCDEFGHIJKLMNOPQRSTUVWXYZ.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
 
     Args:
         c: The character to check.
@@ -542,15 +535,16 @@ fn _is_ascii_uppercase(c: UInt8) -> Bool:
     return ord_a <= int(c) <= ord_z
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # islower
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn islower(c: UInt8) -> Bool:
     """Determines whether the given character is an lowercase character.
-       This currently only respects the default "C" locale, i.e. returns
-       True only if the character specified is one of abcdefghijklmnopqrstuvwxyz.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "abcdefghijklmnopqrstuvwxyz".
 
     Args:
         c: The character to check.
@@ -567,34 +561,88 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
     return ord_a <= int(c) <= ord_z
 
 
-# ===----------------------------------------------------------------------===#
-# isspace
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
+# _isspace
+# ===----------------------------------------------------------------------=== #
 
 
-fn isspace(c: UInt8) -> Bool:
+fn _isspace(c: UInt8) -> Bool:
     """Determines whether the given character is a whitespace character.
-       This currently only respects the default "C" locale, i.e. returns
-       True only if the character specified is one of
-       " \n\t\r\f\v".
+
+    This only respects the default "C" locale, i.e. returns True only if the
+    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
+    to Python, use `String.isspace()`.
 
     Args:
         c: The character to check.
 
     Returns:
-        True if the character is one of the whitespace characters listed above, otherwise False.
+        True iff the character is one of the whitespace characters listed above.
     """
 
-    alias ord_space = ord(" ")
-    alias ord_tab = ord("\t")
-    alias ord_carriage_return = ord("\r")
+    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
+    alias ` ` = UInt8(ord(" "))
+    alias `\t` = UInt8(ord("\t"))
+    alias `\n` = UInt8(ord("\n"))
+    alias `\r` = UInt8(ord("\r"))
+    alias `\f` = UInt8(ord("\f"))
+    alias `\v` = UInt8(ord("\v"))
+    alias `\x1c` = UInt8(ord("\x1c"))
+    alias `\x1d` = UInt8(ord("\x1d"))
+    alias `\x1e` = UInt8(ord("\x1e"))
 
-    return c == ord_space or ord_tab <= int(c) <= ord_carriage_return
+    # This compiles to something very clever that's even faster than a LUT.
+    return (
+        c == ` `
+        or c == `\t`
+        or c == `\n`
+        or c == `\r`
+        or c == `\f`
+        or c == `\v`
+        or c == `\x1c`
+        or c == `\x1d`
+        or c == `\x1e`
+    )
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
+# _isnewline
+# ===----------------------------------------------------------------------=== #
+
+
+fn _isnewline(s: String) -> Bool:
+    if len(s._buffer) != 2:
+        return False
+
+    # TODO: add \u2028 and \u2029 when they are properly parsed
+    # FIXME: \x85 is parsed but not encoded in utf-8
+    if s == "\x85":
+        return True
+
+    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
+    alias `\n` = UInt8(ord("\n"))
+    alias `\r` = UInt8(ord("\r"))
+    alias `\f` = UInt8(ord("\f"))
+    alias `\v` = UInt8(ord("\v"))
+    alias `\x1c` = UInt8(ord("\x1c"))
+    alias `\x1d` = UInt8(ord("\x1d"))
+    alias `\x1e` = UInt8(ord("\x1e"))
+
+    var c = UInt8(ord(s))
+    return (
+        c == `\n`
+        or c == `\r`
+        or c == `\f`
+        or c == `\v`
+        or c == `\x1c`
+        or c == `\x1d`
+        or c == `\x1e`
+    )
+
+
+# ===----------------------------------------------------------------------=== #
 # isprintable
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn isprintable(c: UInt8) -> Bool:
@@ -611,9 +659,95 @@ fn isprintable(c: UInt8) -> Bool:
     return ord_space <= int(c) <= ord_tilde
 
 
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 # String
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
+
+
+fn _utf8_byte_type(b: UInt8) -> UInt8:
+    """UTF-8 byte type.
+
+    Returns:
+        The byte type:
+            0 -> ASCII byte.
+            1 -> continuation byte.
+            2 -> start of 2 byte long sequence.
+            3 -> start of 3 byte long sequence.
+            4 -> start of 4 byte long sequence.
+    """
+    return countl_zero(~(b & 0b1111_0000))
+
+
+@value
+struct _StringIter[
+    is_mutable: Bool, //,
+    lifetime: AnyLifetime[is_mutable].type,
+    forward: Bool = True,
+]:
+    """Iterator for String.
+
+    Parameters:
+        is_mutable: Whether the slice is mutable.
+        lifetime: The lifetime of the underlying string data.
+        forward: The iteration direction. `False` is backwards.
+    """
+
+    var index: Int
+    var continuation_bytes: Int
+    var ptr: UnsafePointer[UInt8]
+    var length: Int
+
+    fn __init__(
+        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
+    ):
+        self.index = 0 if forward else length
+        self.ptr = unsafe_pointer
+        self.length = length
+        self.continuation_bytes = 0
+        for i in range(length):
+            if _utf8_byte_type(int(unsafe_pointer[i])) == 1:
+                self.continuation_bytes += 1
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> StringSlice[lifetime]:
+        @parameter
+        if forward:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var byte_type = _utf8_byte_type(int(self.ptr[self.index]))
+                if byte_type != 0:
+                    byte_len = int(byte_type)
+                    self.continuation_bytes -= byte_len - 1
+            self.index += byte_len
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
+                len=byte_len,
+            )
+        else:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var byte_type = _utf8_byte_type(int(self.ptr[self.index - 1]))
+                if byte_type != 0:
+                    while byte_type == 1:
+                        byte_len += 1
+                        var b = int(self.ptr[self.index - byte_len])
+                        byte_type = _utf8_byte_type(b)
+                    self.continuation_bytes -= byte_len - 1
+            self.index -= byte_len
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
+            )
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return self.length - self.index - self.continuation_bytes
+        else:
+            return self.index - self.continuation_bytes
+
+
 struct String(
     Sized,
     Stringable,
@@ -633,7 +767,6 @@ struct String(
     """The underlying storage for the string."""
 
     """ Useful string aliases. """
-    alias WHITESPACE = String(" \n\t\r\f\v")
     alias ASCII_LOWERCASE = String("abcdefghijklmnopqrstuvwxyz")
     alias ASCII_UPPERCASE = String("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     alias ASCII_LETTERS = String.ASCII_LOWERCASE + String.ASCII_UPPERCASE
@@ -641,11 +774,16 @@ struct String(
     alias HEX_DIGITS = String.DIGITS + String("abcdef") + String("ABCDEF")
     alias OCT_DIGITS = String("01234567")
     alias PUNCTUATION = String("""!"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~""")
-    alias PRINTABLE = String.DIGITS + String.ASCII_LETTERS + String.PUNCTUATION + String.WHITESPACE
+    alias PRINTABLE = (
+        String.DIGITS
+        + String.ASCII_LETTERS
+        + String.PUNCTUATION
+        + " \t\n\r\v\f"  # single byte utf8 whitespaces
+    )
 
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Life cycle methods
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     @always_inline
     fn __init__(inout self, owned impl: List[UInt8]):
@@ -674,6 +812,14 @@ struct String(
     fn __init__(inout self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.__copyinit__(other)
 
     @always_inline
     fn __init__(inout self, str: StringRef):
@@ -720,18 +866,6 @@ struct String(
             literal: The input constant string.
         """
         self = literal.__str__()
-
-    fn __init__[stringable: Stringable](inout self, value: stringable):
-        """Creates a string from a value that conforms to Stringable trait.
-
-        Parameters:
-            stringable: The Stringable type.
-
-        Args:
-            value: The value that conforms to Stringable.
-        """
-
-        self = str(value)
 
     @always_inline
     fn __init__(inout self, ptr: UnsafePointer[UInt8], len: Int):
@@ -785,6 +919,15 @@ struct String(
         self = String(ptr.address, len)
 
     @always_inline
+    fn __init__(inout self, obj: PythonObject):
+        """Creates a string from a python object.
+
+        Args:
+            obj: A python object.
+        """
+        self = str(obj)
+
+    @always_inline
     fn __copyinit__(inout self, existing: Self):
         """Creates a deep copy of an existing string.
 
@@ -802,9 +945,9 @@ struct String(
         """
         self._buffer = existing._buffer^
 
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Factory dunders
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     @staticmethod
     fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
@@ -816,7 +959,7 @@ struct String(
 
         Parameters:
             Ts: The types of the arguments to format. Each type must be satisfy
-              `Formattable`.
+                `Formattable`.
 
         Returns:
             A string formed by formatting the argument sequence.
@@ -864,9 +1007,9 @@ struct String(
 
         return String(buff^)
 
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Operator dunders
-    # ===------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn __getitem__(self, idx: Int) -> String:
         """Gets the character at the specified position.
@@ -898,16 +1041,13 @@ struct String(
         """
 
         var adjusted_span = self._adjust_span(span)
+        var adjusted_span_len = adjusted_span.unsafe_indices()
         if adjusted_span.step == 1:
-            return StringRef(
-                self._buffer.data + span.start,
-                len(adjusted_span),
-            )
+            return StringRef(self._buffer.data + span.start, adjusted_span_len)
 
         var buffer = Self._buffer_type()
-        var adjusted_span_len = len(adjusted_span)
         buffer.resize(adjusted_span_len + 1, 0)
-        var ptr = self.unsafe_uint8_ptr()
+        var ptr = self.unsafe_ptr()
         for i in range(adjusted_span_len):
             buffer[i] = ptr[adjusted_span[i]]
         buffer[adjusted_span_len] = 0
@@ -957,7 +1097,7 @@ struct String(
             rhs: The other String to compare against.
 
         Returns:
-            True if this String is less than or equal to the RHS String and False otherwise.
+            True iff this String is less than or equal to the RHS String.
         """
         return not (rhs < self)
 
@@ -969,7 +1109,7 @@ struct String(
             rhs: The other String to compare against.
 
         Returns:
-            True if this String is strictly greater than the RHS String and False otherwise.
+            True iff this String is strictly greater than the RHS String.
         """
         return rhs < self
 
@@ -981,7 +1121,7 @@ struct String(
             rhs: The other String to compare against.
 
         Returns:
-            True if this String is greater than or equal to the RHS String and False otherwise.
+            True iff this String is greater than or equal to the RHS String.
         """
         return not (self < rhs)
 
@@ -1006,12 +1146,12 @@ struct String(
         buffer.resize(total_len + 1, 0)
         memcpy(
             DTypePointer(buffer.data),
-            self.unsafe_uint8_ptr(),
+            self.unsafe_ptr(),
             self_len,
         )
         memcpy(
             DTypePointer(buffer.data + self_len),
-            other.unsafe_uint8_ptr(),
+            other.unsafe_ptr(),
             other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
@@ -1051,6 +1191,26 @@ struct String(
             count=other_len + 1,
         )
 
+    fn __iter__(ref [_]self) -> _StringIter[__lifetime_of(self)]:
+        """Iterate over elements of the string, returning immutable references.
+
+        Returns:
+            An iterator of references to the string elements.
+        """
+        return _StringIter[__lifetime_of(self)](
+            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+        )
+
+    fn __reversed__(ref [_]self) -> _StringIter[__lifetime_of(self), False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator of references to the string elements.
+        """
+        return _StringIter[__lifetime_of(self), forward=False](
+            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+        )
+
     # ===------------------------------------------------------------------=== #
     # Trait implementations
     # ===------------------------------------------------------------------=== #
@@ -1066,10 +1226,10 @@ struct String(
 
     @always_inline
     fn __len__(self) -> Int:
-        """Returns the string length.
+        """Returns the string byte length.
 
         Returns:
-            The string length.
+            The string byte length.
         """
         # Avoid returning -1 if the buffer is not initialized
         if not self.unsafe_ptr():
@@ -1085,8 +1245,6 @@ struct String(
     @always_inline
     fn __repr__(self) -> String:
         """Return a Mojo-compatible representation of the `String` instance.
-
-        You don't need to call this method directly, use `repr(my_string)` instead.
 
         Returns:
             A new representation of the string.
@@ -1137,10 +1295,7 @@ struct String(
             writer: The formatter to write to.
         """
 
-        # SAFETY:
-        #   Safe because `self` is borrowed, so its lifetime
-        #   extends beyond this function.
-        writer.write_str(self._strref_dangerous())
+        writer.write_str(self.as_string_slice())
 
     fn _unsafe_to_formatter(inout self) -> Formatter:
         """
@@ -1226,27 +1381,23 @@ struct String(
         """
         pass
 
-    # TODO: Remove this method when #2317 is done
-    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
-        """Retrieves a pointer to the underlying memory.
-
-        Note that you should use `unsafe_uint8_ptr()` if you need to access the
-        pointer as we are now storing the bytes as UInt8.
-
-        See https://github.com/modularml/mojo/issues/2317 for more information.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
-        return self._buffer.data.bitcast[Int8]()
-
-    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return self._buffer.data.bitcast[UInt8]()
+        return self._buffer.data
+
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+        """Retrieves a C-string-compatible pointer to the underlying memory.
+
+        The returned pointer is guaranteed to be null, or NUL terminated.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.unsafe_ptr().bitcast[C_char]()
 
     fn as_bytes(self) -> List[UInt8]:
         """Retrieves the underlying byte sequence encoding the characters in
@@ -1269,9 +1420,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(
-        self: Reference[Self, _, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1281,28 +1430,24 @@ struct String(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
-            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+        return Span[UInt8, __lifetime_of(self)](
+            unsafe_ptr=self._buffer.unsafe_ptr(),
             # Does NOT include the NUL terminator.
-            len=self[]._byte_length(),
+            len=self._byte_length(),
         )
 
     @always_inline
-    fn as_string_slice(
-        self: Reference[Self, _, _]
-    ) -> StringSlice[self.is_mutable, self.lifetime]:
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        var bytes = self[].as_bytes_slice()
-
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice[self.is_mutable, self.lifetime](
-            unsafe_from_utf8=bytes
+        return StringSlice[__lifetime_of(self)](
+            unsafe_from_utf8=self.as_bytes_slice()
         )
 
     fn _byte_length(self) -> Int:
@@ -1321,7 +1466,7 @@ struct String(
         else:
             return buffer_len
 
-    fn _steal_ptr(inout self) -> DTypePointer[DType.int8]:
+    fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
 
@@ -1406,36 +1551,211 @@ struct String(
             substr._strref_dangerous(), start=start
         )
 
-    fn split(self, delimiter: String) raises -> List[String]:
-        """Split the string by a delimiter.
-
-        Args:
-          delimiter: The string to split on.
+    fn isspace(self) -> Bool:
+        """Determines whether the given String is a python
+        whitespace String. This corresponds to Python's
+        [universal separators](
+            https://docs.python.org/3/library/stdtypes.html#str.splitlines)
+        `" \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
 
         Returns:
-          A List of Strings containing the input split by the delimiter.
-
-        Raises:
-          Error if an empty delimiter is specified.
+            True if the String is one of the whitespace characters
+                listed above, otherwise False.
         """
-        if not delimiter:
-            raise Error("empty delimiter not allowed to be passed to split.")
+        # TODO add line and paragraph separator as stringliteral
+        # once unicode escape secuences are accepted
+        var next_line = List[UInt8](0xC2, 0x85)
+        """TODO: \\x85"""
+        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
+        """TODO: \\u2028"""
+        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
+        """TODO: \\u2029"""
+
+        @always_inline
+        fn _compare(
+            item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
+        ) -> Bool:
+            var ptr1 = DTypePointer(item1)
+            var ptr2 = DTypePointer(item2)
+            return memcmp(ptr1, ptr2, amnt) == 0
+
+        if len(self) == 0:
+            return False
+
+        for s in self:
+            var no_null_len = len(s)
+            var ptr = s.unsafe_ptr()
+            if no_null_len == 1 and not _isspace(ptr[0]):
+                return False
+            elif no_null_len == 2 and not _compare(
+                ptr, next_line.unsafe_ptr(), 2
+            ):
+                return False
+            elif no_null_len == 3 and not (
+                _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
+                or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
+            ):
+                return False
+        return True
+
+    fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
+        """Split the string by a separator.
+
+        Args:
+            sep: The string to split on.
+            maxsplit: The maximum amount of items to split from String.
+                Defaults to unlimited.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting a space
+        _ = String("hello world").split(" ") # ["hello", "world"]
+        # Splitting adjacent separators
+        _ = String("hello,,world").split(",") # ["hello", "", "world"]
+        # Splitting with maxsplit
+        _ = String("1,2,3").split(",", 1) # ['1', '2,3']
+        ```
+        .
+        """
+        var output = List[String]()
+
+        var str_iter_len = len(self) - 1
+        var lhs = 0
+        var rhs = 0
+        var items = 0
+        var sep_len = len(sep)
+        if sep_len == 0:
+            raise Error("ValueError: empty separator")
+
+        while lhs <= str_iter_len:
+            rhs = self.find(sep, lhs)
+            if rhs == -1:
+                output.append(self[lhs:])
+                break
+
+            if maxsplit > -1:
+                if items == maxsplit:
+                    output.append(self[lhs:])
+                    break
+                items += 1
+
+            output.append(self[lhs:rhs])
+            lhs = rhs + sep_len
+
+        if self.endswith(sep):
+            output.append("")
+        return output
+
+    fn split(self, *, maxsplit: Int = -1) -> List[String]:
+        """Split the string by every Whitespace separator.
+
+        Currently only uses C style separators.
+
+        Args:
+            maxsplit: The maximum amount of items to split from String. Defaults
+                to unlimited.
+
+        Returns:
+            A List of Strings containing the input split by the separator.
+
+        Examples:
+
+        ```mojo
+        # Splitting an empty string or filled with whitespaces
+        _ = String("      ").split() # []
+        _ = String("").split() # []
+
+        # Splitting a string with leading, trailing, and middle whitespaces
+        _ = String("      hello    world     ").split() # ["hello", "world"]
+        ```
+        .
+        """
+        # TODO: implement and document splitting adjacent universal newlines:
+        # _ = String(
+        #     "hello \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029world"
+        # ).split()  # ["hello", "world"]
 
         var output = List[String]()
 
+        var str_iter_len = len(self) - 1
+        var lhs = 0
+        var rhs = 0
+        var items = 0
+        # FIXME: this should iterate and build unicode strings
+        # and use self.isspace()
+        while lhs <= str_iter_len:
+            # Python adds all "whitespace chars" as one separator
+            # if no separator was specified
+            while lhs <= str_iter_len:
+                if not _isspace(self._buffer.unsafe_get(lhs)[]):
+                    break
+                lhs += 1
+            # if it went until the end of the String, then
+            # it should be sliced up until the original
+            # start of the whitespace which was already appended
+            if lhs - 1 == str_iter_len:
+                break
+            elif lhs == str_iter_len:
+                # if the last char is not whitespace
+                output.append(self[str_iter_len])
+                break
+            rhs = lhs + 1
+            while rhs <= str_iter_len:
+                if _isspace(self._buffer.unsafe_get(rhs)[]):
+                    break
+                rhs += 1
+
+            if maxsplit > -1:
+                if items == maxsplit:
+                    output.append(self[lhs:])
+                    break
+                items += 1
+
+            output.append(self[lhs:rhs])
+            lhs = rhs
+
+        return output
+
+    fn splitlines(self, keepends: Bool = False) -> List[String]:
+        """Split the string at line boundaries.
+
+        Args:
+            keepends: If True, line breaks are kept in the resulting strings.
+
+        Returns:
+            A List of Strings containing the input split by line boundaries.
+        """
+        var output = List[String]()
+        var length = len(self)
         var current_offset = 0
-        while True:
-            var loc = self.find(delimiter, current_offset)
-            # delimiter not found, so add the search slice from where we're currently at
-            if loc == -1:
+
+        while current_offset < length:
+            var loc = -1
+            var eol_length = 1
+
+            for i in range(current_offset, length):
+                var char = self[i]
+                var next_char = self[i + 1] if i + 1 < length else ""
+
+                if _isnewline(char):
+                    loc = i
+                    if char == "\r" and next_char == "\n":
+                        eol_length = 2
+                    break
+            else:
                 output.append(self[current_offset:])
                 break
 
-            # We found a delimiter, so add the preceding string slice
-            output.append(self[current_offset:loc])
+            if keepends:
+                output.append(self[current_offset : loc + eol_length])
+            else:
+                output.append(self[current_offset:loc])
 
-            # Advance our search offset past the delimiter
-            current_offset = loc + len(delimiter)
+            current_offset = loc + eol_length
 
         return output
 
@@ -1444,11 +1764,11 @@ struct String(
         if replaced by `new`.
 
         Args:
-          old: The substring to replace.
-          new: The substring to replace with.
+            old: The substring to replace.
+            new: The substring to replace with.
 
         Returns:
-          The string where all occurrences of `old` are replaced with `new`.
+            The string where all occurrences of `old` are replaced with `new`.
         """
         if not old:
             return self._interleave(new)
@@ -1457,9 +1777,9 @@ struct String(
         if occurrences == -1:
             return self
 
-        var self_start = self.unsafe_uint8_ptr()
-        var self_ptr = self.unsafe_uint8_ptr()
-        var new_ptr = new.unsafe_uint8_ptr()
+        var self_start = self.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
+        var new_ptr = new.unsafe_ptr()
 
         var self_len = len(self)
         var old_len = len(old)
@@ -1496,26 +1816,36 @@ struct String(
         res.append(0)
         return String(res^)
 
-    fn strip(self, chars: String = String.WHITESPACE) -> String:
-        """Return a copy of the string with leading and trailing characters removed.
+    fn strip(self, chars: String) -> String:
+        """Return a copy of the string with leading and trailing characters
+        removed.
 
         Args:
             chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no leading or trailing characters.
+            A copy of the string with no leading or trailing characters.
         """
 
         return self.lstrip(chars).rstrip(chars)
 
-    fn rstrip(self, chars: String = String.WHITESPACE) -> String:
+    fn strip(self) -> String:
+        """Return a copy of the string with leading and trailing whitespaces
+        removed.
+
+        Returns:
+            A copy of the string with no leading or trailing whitespaces.
+        """
+        return self.lstrip().rstrip()
+
+    fn rstrip(self, chars: String) -> String:
         """Return a copy of the string with trailing characters removed.
 
         Args:
             chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no trailing characters.
+            A copy of the string with no trailing characters.
         """
 
         var r_idx = len(self)
@@ -1524,20 +1854,44 @@ struct String(
 
         return self[:r_idx]
 
-    fn lstrip(self, chars: String = String.WHITESPACE) -> String:
+    fn rstrip(self) -> String:
+        """Return a copy of the string with trailing whitespaces removed.
+
+        Returns:
+            A copy of the string with no trailing whitespaces.
+        """
+        # TODO: should use self.__iter__ and self.isspace()
+        var r_idx = len(self)
+        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)[]):
+            r_idx -= 1
+        return self[:r_idx]
+
+    fn lstrip(self, chars: String) -> String:
         """Return a copy of the string with leading characters removed.
 
         Args:
             chars: A set of characters to be removed. Defaults to whitespace.
 
         Returns:
-          A copy of the string with no leading characters.
+            A copy of the string with no leading characters.
         """
 
         var l_idx = 0
         while l_idx < len(self) and self[l_idx] in chars:
             l_idx += 1
 
+        return self[l_idx:]
+
+    fn lstrip(self) -> String:
+        """Return a copy of the string with leading whitespaces removed.
+
+        Returns:
+            A copy of the string with no leading whitespaces.
+        """
+        # TODO: should use self.__iter__ and self.isspace()
+        var l_idx = 0
+        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)[]):
+            l_idx += 1
         return self[l_idx:]
 
     fn __hash__(self) -> Int:
@@ -1552,8 +1906,8 @@ struct String(
 
     fn _interleave(self, val: String) -> String:
         var res = List[UInt8]()
-        var val_ptr = val.unsafe_uint8_ptr()
-        var self_ptr = self.unsafe_uint8_ptr()
+        var val_ptr = val.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
@@ -1592,7 +1946,7 @@ struct String(
     fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
         var copy: String = self
 
-        var char_ptr = copy.unsafe_uint8_ptr()
+        var char_ptr = copy.unsafe_ptr()
 
         for i in range(len(self)):
             var char: UInt8 = char_ptr[i]
@@ -1645,8 +1999,9 @@ struct String(
         )
 
     fn removeprefix(self, prefix: String, /) -> String:
-        """If the string starts with the prefix string, return `string[len(prefix):]`.
-        Otherwise, return a copy of the original string.
+        """Returns a new string with the prefix removed if it was present.
+
+        For example:
 
         ```mojo
         print(String('TestHook').removeprefix('Test'))
@@ -1656,18 +2011,20 @@ struct String(
         ```
 
         Args:
-          prefix: The prefix to remove from the string.
+            prefix: The prefix to remove from the string.
 
         Returns:
-          A new string with the prefix removed if it was present.
+            `string[len(prefix):]` if the string starts with the prefix string,
+            or a copy of the original string otherwise.
         """
         if self.startswith(prefix):
             return self[len(prefix) :]
         return self
 
     fn removesuffix(self, suffix: String, /) -> String:
-        """If the string ends with the suffix string, return `string[:-len(suffix)]`.
-        Otherwise, return a copy of the original string.
+        """Returns a new string with the suffix removed if it was present.
+
+        For example:
 
         ```mojo
         print(String('TestHook').removesuffix('Hook'))
@@ -1677,10 +2034,11 @@ struct String(
         ```
 
         Args:
-          suffix: The suffix to remove from the string.
+            suffix: The suffix to remove from the string.
 
         Returns:
-          A new string with the suffix removed if it was present.
+            `string[:-len(suffix)]` if the string ends with the suffix string,
+            or a copy of the original string otherwise.
         """
         if self.endswith(suffix):
             return self[: -len(suffix)]
@@ -1716,19 +2074,90 @@ struct String(
         for i in range(n):
             memcpy(
                 dest=buf.data + len_self * i,
-                src=self.unsafe_uint8_ptr(),
+                src=self.unsafe_ptr(),
                 count=len_self,
             )
         return String(buf^)
 
+    @always_inline
+    fn format[*Ts: Stringable](self, *args: *Ts) raises -> String:
+        """Format a template with *args.
 
-# ===----------------------------------------------------------------------===#
+        Example of manual indexing:
+
+        ```mojo
+        print(
+            String("{0} {1} {0}").format(
+                "Mojo", 1.125
+            )
+        ) #Mojo 1.125 Mojo
+        ```
+
+        Example of automatic indexing:
+
+        ```mojo
+        var x = String("{} {}").format(
+            True, "hello world"
+        )
+        print(x) #True hello world
+        ```
+
+        Args:
+            args: The substitution values.
+
+        Parameters:
+            Ts: The types of the substitution values.
+              Are required to implement `Stringable`.
+
+        Returns:
+            The template with the given values substituted.
+
+        """
+        alias num_pos_args = len(VariadicList(Ts))
+        var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
+
+        var res: String = ""
+        var pos_in_self = 0
+
+        var current_automatic_arg_index = 0
+        for e in entries:
+            debug_assert(pos_in_self < len(self), "pos_in_self >= len(self)")
+            res += self[pos_in_self : e[].first_curly]
+
+            if e[].is_escaped_brace():
+                res += "}" if e[].field[Bool] else "{"
+
+            if e[].is_manual_indexing():
+
+                @parameter
+                for i in range(num_pos_args):
+                    if i == e[].field[Int]:
+                        res += str(args[i])
+
+            if e[].is_automatic_indexing():
+
+                @parameter
+                for i in range(num_pos_args):
+                    if i == current_automatic_arg_index:
+                        res += str(args[i])
+                current_automatic_arg_index += 1
+
+            pos_in_self = e[].last_curly + 1
+
+        if pos_in_self < len(self):
+            res += self[pos_in_self : len(self)]
+
+        return res^
+
+
+# ===----------------------------------------------------------------------=== #
 # Utilities
-# ===----------------------------------------------------------------------===#
+# ===----------------------------------------------------------------------=== #
 
 
 fn _toggle_ascii_case(char: UInt8) -> UInt8:
-    """Assuming char is a cased ASCII character, this function will return the opposite-cased letter
+    """Assuming char is a cased ASCII character, this function will return the
+    opposite-cased letter.
     """
 
     # ASCII defines A-Z and a-z as differing only in their 6th bit,
@@ -1850,3 +2279,167 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
         return 64 + 1
     else:
         return 128 + 1  # Add 1 for the terminator
+
+
+# ===----------------------------------------------------------------------===#
+# Format method structures
+# ===----------------------------------------------------------------------===#
+
+
+@value
+struct _FormatCurlyEntry:
+    """
+    Internally used by the `format()` method.
+
+    Specifically to structure fields.
+
+    Does not contain any substitution values.
+
+    """
+
+    var first_curly: Int
+    """The index of an opening brace around a substitution field."""
+
+    var last_curly: Int
+    """The index of an closing brace around a substitution field."""
+
+    var field: Variant[
+        String,  # kwargs indexing (`{field_name}`)
+        Int,  # args manual indexing (`{3}`)
+        NoneType,  # args automatic indexing (`{}`)
+        Bool,  # for escaped curlies ('{{')
+    ]
+    """Store the substitution field."""
+
+    fn is_escaped_brace(ref [_]self) -> Bool:
+        return self.field.isa[Bool]()
+
+    fn is_kwargs_field(ref [_]self) -> Bool:
+        return self.field.isa[String]()
+
+    fn is_automatic_indexing(ref [_]self) -> Bool:
+        return self.field.isa[NoneType]()
+
+    fn is_manual_indexing(ref [_]self) -> Bool:
+        return self.field.isa[Int]()
+
+    @staticmethod
+    fn create_entries(
+        format_src: String, len_pos_args: Int
+    ) raises -> List[Self]:
+        """Used internally by the `format()` method.
+
+        Args:
+            format_src: The "format" part provided by the user.
+            len_pos_args: The len of *args
+
+        Returns:
+            A `List` of structured field entries.
+
+        Purpose of the `Variant` `Self.field`:
+
+        - `Int` for manual indexing
+            (value field contains `0`)
+
+        - `NoneType` for automatic indexing
+            (value field contains `None`)
+
+        - `String` for **kwargs indexing
+            (value field contains `foo`)
+
+        - `Bool` for escaped curlies
+            (value field contains False for `{` or True for '}')
+        """
+        var manual_indexing_count = 0
+        var automatic_indexing_count = 0
+        var raised_manual_index = Optional[Int](None)
+        var raised_automatic_index = Optional[Int](None)
+        var raised_kwarg_field = Optional[String](None)
+
+        var entries = List[Self]()
+        var start = Optional[Int](None)
+        var skip_next = False
+        for i in range(len(format_src)):
+            if skip_next:
+                skip_next = False
+                continue
+            if format_src[i] == "{":
+                if start:
+                    # already one there.
+                    if i - start.value() == 1:
+                        # python escapes double curlies
+                        var curren_entry = Self(
+                            first_curly=start.value(), last_curly=i, field=False
+                        )
+                        entries.append(curren_entry^)
+                        start = None
+                        continue
+                    raise (
+                        "there is a single curly { left unclosed or unescaped"
+                    )
+                else:
+                    start = i
+                continue
+            if format_src[i] == "}":
+                if start:
+                    var start_value = start.value()
+                    var current_entry = Self(
+                        first_curly=start_value, last_curly=i, field=None
+                    )
+                    if i - start_value != 1:
+                        var field = format_src[start_value + 1 : i]
+                        try:
+                            # field is a number for manual indexing:
+                            var number = int(field)
+                            current_entry.field = number
+                            if number >= len_pos_args or number < 0:
+                                raised_manual_index = number
+                                break
+                            manual_indexing_count += 1
+                        except e:
+                            debug_assert(
+                                "not convertible to integer" in str(e),
+                                "Not the expected error from atol",
+                            )
+                            # field is an keyword for **kwargs:
+                            current_entry.field = field
+                            raised_kwarg_field = field
+                            break
+                    else:
+                        # automatic indexing
+                        # current_entry.field is already None
+                        if automatic_indexing_count >= len_pos_args:
+                            raised_automatic_index = automatic_indexing_count
+                            break
+                        automatic_indexing_count += 1
+                    entries.append(current_entry^)
+                    start = None
+                else:
+                    # python escapes double curlies
+                    if (i + 1) < len(format_src):
+                        if format_src[i + 1] == "}":
+                            var curren_entry = Self(
+                                first_curly=i, last_curly=i + 1, field=True
+                            )
+                            entries.append(curren_entry^)
+                            skip_next = True
+                            continue
+                    # if it is not an escaped one, it is an error
+                    raise (
+                        "there is a single curly } left unclosed or unescaped"
+                    )
+
+        if raised_automatic_index:
+            raise "Automatic indexing require more args in *args"
+        if raised_kwarg_field:
+            raise "Index " + raised_kwarg_field.value() + " not in kwargs"
+        if manual_indexing_count and automatic_indexing_count:
+            raise "Cannot both use manual and automatic indexing"
+        if raised_manual_index:
+            raise (
+                "Index " + str(raised_manual_index.value()) + " not in *args"
+            )
+        if start:
+            raise "there is a single curly { left unclosed or unescaped"
+
+        return entries^

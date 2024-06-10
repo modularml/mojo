@@ -19,14 +19,14 @@ from utils import Span
 
 fn test_string_literal_byte_slice() raises:
     alias string: StringLiteral = "Hello"
-    alias slice = string.as_bytes_slice()
+    alias slc = string.as_bytes_slice()
 
-    assert_equal(len(slice), 5)
-    assert_equal(slice[0][], ord("H"))
-    assert_equal(slice[1][], ord("e"))
-    assert_equal(slice[2][], ord("l"))
-    assert_equal(slice[3][], ord("l"))
-    assert_equal(slice[4][], ord("o"))
+    assert_equal(len(slc), 5)
+    assert_equal(slc[0], ord("H"))
+    assert_equal(slc[1], ord("e"))
+    assert_equal(slc[2], ord("l"))
+    assert_equal(slc[3], ord("l"))
+    assert_equal(slc[4], ord("o"))
 
 
 fn test_string_byte_slice() raises:
@@ -34,11 +34,11 @@ fn test_string_byte_slice() raises:
     var str_slice = string.as_bytes_slice()
 
     assert_equal(len(str_slice), 5)
-    assert_equal(str_slice[0][], ord("H"))
-    assert_equal(str_slice[1][], ord("e"))
-    assert_equal(str_slice[2][], ord("l"))
-    assert_equal(str_slice[3][], ord("l"))
-    assert_equal(str_slice[4][], ord("o"))
+    assert_equal(str_slice[0], ord("H"))
+    assert_equal(str_slice[1], ord("e"))
+    assert_equal(str_slice[2], ord("l"))
+    assert_equal(str_slice[3], ord("l"))
+    assert_equal(str_slice[4], ord("o"))
 
     # ----------------------------------
     # Test subslicing
@@ -47,32 +47,32 @@ fn test_string_byte_slice() raises:
     # Slice the whole thing
     var sub1 = str_slice[:5]
     assert_equal(len(sub1), 5)
-    assert_equal(sub1[0][], ord("H"))
-    assert_equal(sub1[1][], ord("e"))
-    assert_equal(sub1[2][], ord("l"))
-    assert_equal(sub1[3][], ord("l"))
-    assert_equal(sub1[4][], ord("o"))
+    assert_equal(sub1[0], ord("H"))
+    assert_equal(sub1[1], ord("e"))
+    assert_equal(sub1[2], ord("l"))
+    assert_equal(sub1[3], ord("l"))
+    assert_equal(sub1[4], ord("o"))
 
     # Slice the end
     var sub2 = str_slice[2:5]
     assert_equal(len(sub2), 3)
-    assert_equal(sub2[0][], ord("l"))
-    assert_equal(sub2[1][], ord("l"))
-    assert_equal(sub2[2][], ord("o"))
+    assert_equal(sub2[0], ord("l"))
+    assert_equal(sub2[1], ord("l"))
+    assert_equal(sub2[2], ord("o"))
 
     # Slice the first element
     var sub3 = str_slice[0:1]
     assert_equal(len(sub3), 1)
-    assert_equal(sub3[0][], ord("H"))
+    assert_equal(sub3[0], ord("H"))
 
     #
     # Test mutation through slice
     #
 
-    sub1[0][] = ord("J")
+    sub1[0] = ord("J")
     assert_equal(string, "Jello")
 
-    sub2[2][] = ord("y")
+    sub2[2] = ord("y")
     assert_equal(string, "Jelly")
 
     # ----------------------------------
@@ -117,7 +117,7 @@ fn test_heap_string_from_string_slice() raises:
     alias string_lit: StringLiteral = "Hello"
 
     alias static_str: StringSlice[
-        False, ImmutableStaticLifetime
+        ImmutableStaticLifetime
     ] = string_lit.as_string_slice()
 
     alias heap_string = String(static_str)
@@ -125,8 +125,28 @@ fn test_heap_string_from_string_slice() raises:
     assert_equal(heap_string, "Hello")
 
 
+fn test_slice_len() raises:
+    alias str1: StringLiteral = "12345"
+    alias str2: StringLiteral = "1234"
+    alias str3: StringLiteral = "123"
+    alias str4: StringLiteral = "12"
+    alias str5: StringLiteral = "1"
+
+    alias slice1: StringSlice[ImmutableStaticLifetime] = str1.as_string_slice()
+    alias slice2: StringSlice[ImmutableStaticLifetime] = str2.as_string_slice()
+    alias slice3: StringSlice[ImmutableStaticLifetime] = str3.as_string_slice()
+    alias slice4: StringSlice[ImmutableStaticLifetime] = str4.as_string_slice()
+    alias slice5: StringSlice[ImmutableStaticLifetime] = str5.as_string_slice()
+
+    assert_equal(5, len(slice1))
+    assert_equal(4, len(slice2))
+    assert_equal(3, len(slice3))
+    assert_equal(2, len(slice4))
+    assert_equal(1, len(slice5))
+
+
 fn main() raises:
     test_string_literal_byte_slice()
     test_string_byte_slice()
-
     test_heap_string_from_string_slice()
+    test_slice_len()
