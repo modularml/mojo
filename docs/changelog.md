@@ -148,4 +148,6 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Removed `UnsafePointer.offset(offset:Int)`.
 
+- Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD instead.
+
 ### 🛠️ Fixed
