@@ -452,30 +452,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             )
 
     # ===-------------------------------------------------------------------===#
-    # Factory methods
-    # ===-------------------------------------------------------------------===#
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn splat(x: Scalar[type]) -> Self:
-        """Splats (broadcasts) the element onto the vector.
-
-        Args:
-            x: The input scalar value.
-
-        Returns:
-            A new SIMD vector whose elements are the same as the input value.
-        """
-        _simd_construction_checks[type, size]()
-        return Self {
-            value: __mlir_op.`pop.simd.splat`[
-                _type = __mlir_type[
-                    `!pop.simd<`, size.value, `, `, type.value, `>`
-                ]
-            ](x.value)
-        }
-
-    # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
