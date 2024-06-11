@@ -86,22 +86,16 @@ struct _DictEntryIter[
     fn __next__(inout self) -> Self.ref_type:
         while True:
             var opt_entry_ref = self.src[]._entries.__get_ref(self.index)
-            if opt_entry_ref[]:
-
-                @parameter
-                if forward:
-                    self.index += 1
-                else:
-                    self.index -= 1
-
-                self.seen += 1
-                return opt_entry_ref[].value()[]
 
             @parameter
             if forward:
                 self.index += 1
             else:
                 self.index -= 1
+
+            if opt_entry_ref[]:
+                self.seen += 1
+                return opt_entry_ref[].value()[]
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.seen
