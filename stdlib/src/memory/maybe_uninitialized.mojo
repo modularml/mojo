@@ -46,7 +46,7 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElementNew](
             False,
             (
                 "You should never call the explicit copy constructor of"
-                " UnsafeMaybeUninitialized because it's not clear what it means"
+                " UnsafeMaybeUninitialized because it's ambiguous"
                 " to copy possibly uninitialized memory."
             ),
         ]()
