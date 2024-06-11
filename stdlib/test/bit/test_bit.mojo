@@ -13,20 +13,19 @@
 # RUN: %bare-mojo %s
 
 from bit import (
-    rotate_bits_left,
-    rotate_bits_right,
-    bit_width,
     bit_ceil,
     bit_floor,
-    is_power_of_two,
+    bit_not,
+    bit_reverse,
+    bit_width,
+    byte_swap,
     countl_zero,
     countr_zero,
-    bit_reverse,
-    byte_swap,
+    is_power_of_two,
     pop_count,
-    bit_not,
+    rotate_bits_left,
+    rotate_bits_right,
 )
-
 from testing import assert_equal
 
 

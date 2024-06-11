@@ -10,16 +10,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -D CURRENT_DIR=%S %s
+# RUN: %mojo %s
 
-from pathlib import Path
+from pathlib import Path, _dir_of_current_file
 from sys import os_is_windows, env_get_string
 
-alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
-from testing import assert_true, assert_equal, assert_false
 from random import random_si64, random_ui64, random_float64, seed
 
 from builtin.sort import _quicksort, _small_sort
+from testing import assert_equal, assert_false, assert_true
 
 
 fn random_numbers[
@@ -535,7 +534,9 @@ def test_sort_string_big_list():
 
 
 def test_sort_strings():
-    var text = (Path(CURRENT_DIR) / "test_file_dummy_input.txt").read_text()
+    var text = (
+        _dir_of_current_file() / "test_file_dummy_input.txt"
+    ).read_text()
     var strings = text.split(" ")
     sort(strings)
     assert_sorted_string(strings)
@@ -594,11 +595,9 @@ def test_sort_comparamble_elements_list():
     assert_sorted(list)
 
 
-fn test_sort_empty_comparamble_elements_list() raises:
+fn test_sort_empty_comparable_elements_list() raises:
     var person_list = List[Person]()
     sort(person_list)
-    insertion_sort(person_list)
-    quick_sort(person_list)
     assert_true(len(person_list) == 0)
 
 
@@ -630,4 +629,4 @@ def main():
     test_sort_string_big_list()
     test_sort_strings()
     test_sort_comparamble_elements_list()
-    test_sort_empty_comparamble_elements_list()
+    test_sort_empty_comparable_elements_list()

@@ -42,8 +42,9 @@ fn _align_down(value: Int, alignment: Int) -> Int:
 
 
 @always_inline
-fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
-    constrained[s1.type.is_integral(), "the input dtype must be integral"]()
+fn _memcmp_impl_unconstrained(
+    s1: DTypePointer, s2: __type_of(s1), count: Int
+) -> Int:
     alias simd_width = simdwidthof[s1.type]()
     if count < simd_width:
         for i in range(count):
@@ -59,10 +60,11 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         has_side_effect=False,
     ]()
 
-    var vector_end_simd = _align_down(count, simd_width)
-    for i in range(0, vector_end_simd, simd_width):
-        var s1i = s1.load[width=simd_width](i)
-        var s2i = s2.load[width=simd_width](i)
+    var last = count - simd_width
+
+    for i in range(0, last, simd_width):
+        var s1i = SIMD[size=simd_width].load(s1, i)
+        var s2i = SIMD[size=simd_width].load(s2, i)
         var diff = s1i != s2i
         if any(diff):
             var index = int(
@@ -72,12 +74,8 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
             )
             return -1 if s1i[index] < s2i[index] else 1
 
-    var last = count - simd_width
-    if last <= 0:
-        return 0
-
-    var s1i = s1.load[width=simd_width](last)
-    var s2i = s2.load[width=simd_width](last)
+    var s1i = SIMD[size=simd_width].load(s1, last)
+    var s2i = SIMD[size=simd_width].load(s2, last)
     var diff = s1i != s2i
     if any(diff):
         var index = int(
@@ -85,6 +83,12 @@ fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
         )
         return -1 if s1i[index] < s2i[index] else 1
     return 0
+
+
+@always_inline
+fn _memcmp_impl(s1: DTypePointer, s2: __type_of(s1), count: Int) -> Int:
+    constrained[s1.type.is_integral(), "the input dtype must be integral"]()
+    return _memcmp_impl_unconstrained(s1, s2, count)
 
 
 @always_inline
@@ -214,9 +218,11 @@ fn memcpy[count: Int](dest: LegacyPointer, src: __type_of(dest)):
     alias chunk_size = 32
     alias vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=chunk_size](i))
+        SIMD.store(
+            dest_dtype_ptr, i, SIMD[size=chunk_size].load(src_dtype_ptr, i)
+        )
     for i in range(vector_end, n):
-        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=1](i))
+        Scalar.store(dest_dtype_ptr, i, Scalar.load(src_dtype_ptr, i))
 
 
 @always_inline
@@ -293,9 +299,11 @@ fn memcpy(
     alias chunk_size = 32
     var vector_end = _align_down(n, chunk_size)
     for i in range(0, vector_end, chunk_size):
-        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=chunk_size](i))
+        SIMD.store(
+            dest_dtype_ptr, i, SIMD[size=chunk_size].load(src_dtype_ptr, i)
+        )
     for i in range(vector_end, n):
-        dest_dtype_ptr.store(i, src_dtype_ptr.load[width=1](i))
+        Scalar.store(dest_dtype_ptr, i, Scalar.load(src_dtype_ptr, i))
 
 
 @always_inline

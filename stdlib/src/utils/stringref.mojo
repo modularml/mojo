@@ -17,6 +17,7 @@ from bit import countr_zero
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol, _isspace
 from memory import DTypePointer, UnsafePointer, memcmp
+from memory.memory import _memcmp_impl_unconstrained
 
 
 # ===----------------------------------------------------------------------=== #
@@ -81,10 +82,8 @@ struct StringRef(
         """
         return StringRef(str.unsafe_ptr(), len(str))
 
-    # TODO: #2317 Drop support for this constructor when we have fully
-    # transitioned to UInt8 as the main byte type.
     @always_inline
-    fn __init__(ptr: DTypePointer[DType.int8], len: Int) -> Self:
+    fn __init__(ptr: UnsafePointer[C_char], len: Int) -> Self:
         """Construct a StringRef value given a (potentially non-0 terminated
         string).
 
@@ -101,9 +100,8 @@ struct StringRef(
         Returns:
             Constructed `StringRef` object.
         """
-        var unsafe_ptr = UnsafePointer[Int8]._from_dtype_ptr(ptr)
 
-        return Self {data: unsafe_ptr.bitcast[UInt8](), length: len}
+        return Self {data: ptr.bitcast[UInt8](), length: len}
 
     @always_inline
     fn __init__(ptr: DTypePointer[DType.uint8], len: Int) -> Self:
@@ -136,10 +134,8 @@ struct StringRef(
 
         return DTypePointer[DType.uint8](ptr)
 
-    # TODO: #2317 Drop support for this constructor when we have fully
-    # transitioned to UInt8 as the main byte type.
     @always_inline
-    fn __init__(ptr: DTypePointer[DType.int8]) -> Self:
+    fn __init__(ptr: UnsafePointer[C_char]) -> Self:
         """Construct a StringRef value given a null-terminated string.
 
         Note that you should use the constructor from `DTypePointer[DType.uint8]` instead
@@ -154,7 +150,7 @@ struct StringRef(
         """
 
         var len = 0
-        while ptr.load(len):
+        while Scalar.load(ptr, len):
             len += 1
 
         return StringRef(ptr, len)
@@ -171,10 +167,12 @@ struct StringRef(
         """
 
         var len = 0
-        while ptr.load(len):
+        while Scalar.load(ptr, len):
             len += 1
 
-        return StringRef(ptr.bitcast[DType.int8](), len)
+        var ptr1 = UnsafePointer[C_char]._from_dtype_ptr(ptr)
+
+        return StringRef(ptr1, len)
 
     # ===-------------------------------------------------------------------===#
     # Helper methods for slicing
@@ -294,7 +292,9 @@ struct StringRef(
         Returns:
           True if the strings do not match and False otherwise.
         """
-        return len(self) != len(rhs) or self._memcmp(rhs, len(self))
+        return len(self) != len(rhs) or _memcmp_impl_unconstrained(
+            self.data, rhs.data, len(self)
+        )
 
     @always_inline
     fn __lt__(self, rhs: StringRef) -> Bool:
@@ -309,7 +309,9 @@ struct StringRef(
         """
         var len1 = len(self)
         var len2 = len(rhs)
-        return self._memcmp(rhs, min(len1, len2)) < int(len1 < len2)
+        return int(len1 < len2) > _memcmp_impl_unconstrained(
+            self.data, rhs.data, min(len1, len2)
+        )
 
     @always_inline
     fn __le__(self, rhs: StringRef) -> Bool:
@@ -406,22 +408,9 @@ struct StringRef(
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    # Use a local memcmp rather than memory.memcpy to avoid indirect recursions.
-    @always_inline("nodebug")
-    fn _memcmp(self, other: StringRef, count: Int) -> Int:
-        for i in range(count):
-            var s1i = self.data[i]
-            var s2i = other.data[i]
-            if s1i == s2i:
-                continue
-            return 1 if s1i > s2i else -1
-        return 0
-
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves  a pointer to the underlying memory.
-
-        Prefer to use `as_uint8_ptr()` instead.
 
         Returns:
             The pointer to the underlying memory.
@@ -649,7 +638,9 @@ fn _memchr[
     var vectorized_end = _align_down(len, bool_mask_width)
 
     for i in range(0, vectorized_end, bool_mask_width):
-        var bool_mask = source.load[width=bool_mask_width](i) == first_needle
+        var bool_mask = SIMD[size=bool_mask_width].load(
+            source, i
+        ) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
             return source + i + countr_zero(mask)
@@ -685,9 +676,9 @@ fn _memmem[
     var last_needle = SIMD[type, bool_mask_width](needle[needle_len - 1])
 
     for i in range(0, vectorized_end, bool_mask_width):
-        var first_block = haystack.load[width=bool_mask_width](i)
-        var last_block = haystack.load[width=bool_mask_width](
-            i + needle_len - 1
+        var first_block = SIMD[size=bool_mask_width].load(haystack, i)
+        var last_block = SIMD[size=bool_mask_width].load(
+            haystack, i + needle_len - 1
         )
 
         var eq_first = first_needle == first_block

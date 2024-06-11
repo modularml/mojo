@@ -12,12 +12,14 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from sys.ffi import C_char
+
 from testing import (
     assert_equal,
-    assert_not_equal,
-    assert_true,
     assert_false,
+    assert_not_equal,
     assert_raises,
+    assert_true,
 )
 
 
@@ -122,6 +124,32 @@ def test_intable():
         _ = int("hi")
 
 
+def test_layout():
+    #
+    # Test empty StringLiteral contents
+    #
+
+    var empty = "".unsafe_ptr()
+
+    # An empty string literal is stored as just the NUL terminator.
+    assert_true(int(empty) != 0)
+    # TODO(MSTDL-596): This seems to hang?
+    # assert_equal(empty[0], 0)
+
+    #
+    # Test non-empty StringLiteral C string
+    #
+
+    var ptr: UnsafePointer[C_char] = "hello".unsafe_cstr_ptr()
+
+    assert_equal(ptr[0], ord("h"))
+    assert_equal(ptr[1], ord("e"))
+    assert_equal(ptr[2], ord("l"))
+    assert_equal(ptr[3], ord("l"))
+    assert_equal(ptr[4], ord("o"))
+    assert_equal(ptr[5], 0)  # Verify NUL terminated
+
+
 fn test_repr() raises:
     # Usual cases
     assert_equal(StringLiteral.__repr__("hello"), "'hello'")
@@ -150,4 +178,5 @@ def main():
     test_comparison_operators()
     test_hash()
     test_intable()
+    test_layout()
     test_repr()

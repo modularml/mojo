@@ -85,22 +85,16 @@ struct _DictEntryIter[
     fn __next__(inout self) -> Reference[DictEntry[K, V], Self.dict_lifetime]:
         while True:
             var opt_entry_ref = self.src[]._entries.__get_ref(self.index)
-            if opt_entry_ref[]:
-
-                @parameter
-                if forward:
-                    self.index += 1
-                else:
-                    self.index -= 1
-
-                self.seen += 1
-                return opt_entry_ref[].value()
 
             @parameter
             if forward:
                 self.index += 1
             else:
                 self.index -= 1
+
+            if opt_entry_ref[]:
+                self.seen += 1
+                return opt_entry_ref[].value()
 
     fn __len__(self) -> Int:
         return len(self.src[]) - self.seen
@@ -168,7 +162,7 @@ struct _DictValueIter[
         var src = self.iter.src
         return _DictValueIter(
             _DictEntryIter[K, V, dict_lifetime, False](
-                src[]._reserved - 1, 0, src
+                src[]._reserved() - 1, 0, src
             )
         )
 
@@ -277,30 +271,30 @@ struct _DictIndex:
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return int(data.load(slot % reserved))
+            return int(Scalar.load(data, slot % reserved))
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return int(data.load(slot % reserved))
+            return int(Scalar.load(data, slot % reserved))
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return int(data.load(slot % reserved))
+            return int(Scalar.load(data, slot % reserved))
         else:
             var data = self.data.bitcast[DType.int64]()
-            return int(data.load(slot % reserved))
+            return int(Scalar.load(data, slot % reserved))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return data.store(slot % reserved, value)
+            return Scalar.store(data, slot % reserved, value)
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return data.store(slot % reserved, value)
+            return Scalar.store(data, slot % reserved, value)
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return data.store(slot % reserved, value)
+            return Scalar.store(data, slot % reserved, value)
         else:
             var data = self.data.bitcast[DType.int64]()
-            return data.store(slot % reserved, value)
+            return Scalar.store(data, slot % reserved, value)
 
     fn __del__(owned self):
         self.data.free()
@@ -419,10 +413,11 @@ struct Dict[K: KeyElement, V: CollectionElement](
     """The number of elements currently stored in the dict."""
     var _n_entries: Int
     """The number of entries currently allocated."""
-    var _reserved: Int
-    """The current reserved size of the dictionary."""
 
     var _index: _DictIndex
+
+    # We use everything available in the list. Which means that
+    # len(self._entries) == self._entries.capacity == self._reserved()
     var _entries: List[Optional[DictEntry[K, V]]]
 
     # ===-------------------------------------------------------------------===#
@@ -434,9 +429,14 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """Initialize an empty dictiontary."""
         self.size = 0
         self._n_entries = 0
-        self._reserved = Self._initial_reservation
-        self._index = _DictIndex(self._reserved)
-        self._entries = Self._new_entries(self._reserved)
+        self._entries = Self._new_entries(Self._initial_reservation)
+        self._index = _DictIndex(len(self._entries))
+
+    # TODO: add @property when Mojo supports it to make
+    # it possible to do `self._reserved`.
+    @always_inline
+    fn _reserved(self) -> Int:
+        return len(self._entries)
 
     @always_inline
     fn __init__(inout self, existing: Self):
@@ -447,8 +447,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         self.size = existing.size
         self._n_entries = existing._n_entries
-        self._reserved = existing._reserved
-        self._index = existing._index.copy(existing._reserved)
+        self._index = existing._index.copy(existing._reserved())
         self._entries = existing._entries
 
     @staticmethod
@@ -493,8 +492,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         self.size = existing.size
         self._n_entries = existing._n_entries
-        self._reserved = existing._reserved
-        self._index = existing._index.copy(existing._reserved)
+        self._index = existing._index.copy(existing._reserved())
         self._entries = existing._entries
 
     fn __moveinit__(inout self, owned existing: Self):
@@ -505,7 +503,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         self.size = existing.size
         self._n_entries = existing._n_entries
-        self._reserved = existing._reserved
         self._index = existing._index^
         self._entries = existing._entries^
 
@@ -583,7 +580,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             A reversed iterator of immutable references to the dict keys.
         """
         return _DictKeyIter(
-            _DictEntryIter[forward=False](self._reserved - 1, 0, self)
+            _DictEntryIter[forward=False](self._reserved() - 1, 0, self)
         )
 
     fn __or__(self, other: Self) -> Self:
@@ -854,15 +851,15 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """Remove all elements from the dictionary."""
         self.size = 0
         self._n_entries = 0
-        self._reserved = Self._initial_reservation
-        self._index = _DictIndex(self._reserved)
-        self._entries = Self._new_entries(self._reserved)
+        self._entries = Self._new_entries(Self._initial_reservation)
+        self._index = _DictIndex(self._reserved())
 
     @staticmethod
     @always_inline
-    fn _new_entries(reserved: Int) -> List[Optional[DictEntry[K, V]]]:
-        var entries = List[Optional[DictEntry[K, V]]](capacity=reserved)
-        for i in range(reserved):
+    fn _new_entries(reserve_at_least: Int) -> List[Optional[DictEntry[K, V]]]:
+        var entries = List[Optional[DictEntry[K, V]]](capacity=reserve_at_least)
+        # We have memory available, we'll use everything.
+        for i in range(entries.capacity):
             entries.append(None)
         return entries
 
@@ -883,18 +880,18 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self._n_entries += 1
 
     fn _get_index(self, slot: Int) -> Int:
-        return self._index.get_index(self._reserved, slot)
+        return self._index.get_index(self._reserved(), slot)
 
     fn _set_index(inout self, slot: Int, index: Int):
-        return self._index.set_index(self._reserved, slot, index)
+        return self._index.set_index(self._reserved(), slot, index)
 
     fn _next_index_slot(self, inout slot: Int, inout perturb: UInt64):
         alias PERTURB_SHIFT = 5
         perturb >>= PERTURB_SHIFT
-        slot = ((5 * slot) + int(perturb + 1)) % self._reserved
+        slot = ((5 * slot) + int(perturb + 1)) % self._reserved()
 
     fn _find_empty_index(self, hash: Int) -> Int:
-        var slot = hash % self._reserved
+        var slot = hash % self._reserved()
         var perturb = bitcast[DType.uint64](Int64(hash))
         while True:
             var index = self._get_index(slot)
@@ -904,7 +901,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
         # Return (found, slot, index)
-        var slot = hash % self._reserved
+        var slot = hash % self._reserved()
         var perturb = bitcast[DType.uint64](Int64(hash))
         while True:
             var index = self._get_index(slot)
@@ -920,22 +917,22 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self._next_index_slot(slot, perturb)
 
     fn _over_load_factor(self) -> Bool:
-        return 3 * self.size > 2 * self._reserved
+        return 3 * self.size > 2 * self._reserved()
 
     fn _over_compact_factor(self) -> Bool:
-        return 4 * self._n_entries > 3 * self._reserved
+        return 4 * self._n_entries > 3 * self._reserved()
 
     fn _maybe_resize(inout self):
         if not self._over_load_factor():
             if self._over_compact_factor():
                 self._compact()
             return
-        self._reserved *= 2
+        var _reserved = self._reserved() * 2
         self.size = 0
         self._n_entries = 0
-        self._index = _DictIndex(self._reserved)
         var old_entries = self._entries^
-        self._entries = self._new_entries(self._reserved)
+        self._entries = self._new_entries(_reserved)
+        self._index = _DictIndex(self._reserved())
 
         for i in range(len(old_entries)):
             var entry = old_entries.__get_ref(i)
@@ -943,12 +940,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
                 self._insert(entry[].unsafe_take())
 
     fn _compact(inout self):
-        self._index = _DictIndex(self._reserved)
+        self._index = _DictIndex(self._reserved())
         var right = 0
         for left in range(self.size):
             while not self._entries.__get_ref(right)[]:
                 right += 1
-                debug_assert(right < self._reserved, "Invalid dict state")
+                debug_assert(right < self._reserved(), "Invalid dict state")
             var entry = self._entries.__get_ref(right)
             debug_assert(entry[].__bool__(), "Logic error")
             var slot = self._find_empty_index(entry[].value().hash)
