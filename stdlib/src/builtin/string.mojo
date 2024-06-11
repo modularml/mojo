@@ -1563,7 +1563,7 @@ struct String(
                 listed above, otherwise False.
         """
 
-        if len(self) == 0:
+        if self.byte_length() == 0:
             return False
 
         for s in self:
@@ -1596,11 +1596,11 @@ struct String(
         """
         var output = List[String]()
 
-        var str_byte_len = len(self) - 1
+        var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
         var items = 0
-        var sep_len = len(sep)
+        var sep_len = sep.byte_length()
         if sep_len == 0:
             raise Error("ValueError: empty separator")
 
