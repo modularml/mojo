@@ -46,8 +46,11 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElementNew](
             False,
             (
                 "You should never call the explicit copy constructor of"
-                " UnsafeMaybeUninitialized because it's ambiguous"
-                " to copy possibly uninitialized memory."
+                " UnsafeMaybeUninitialized because it's ambiguous to copy"
+                " possibly uninitialized memory.Use"
+                " `UnsafeMaybeUninitialized.copy_from()` instead if you want to"
+                " trigger an explicit copy of the content of"
+                " UnsafeMaybeUninitialized. It has very specific semantics."
             ),
         ]()
         self = Self()
