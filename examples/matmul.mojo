@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo %s | FileCheck %s
 
 # This sample demonstrates how various systems optimizations can be applied to a
 # naive matmul implementation in Mojo to gain significant performance speedups
@@ -22,6 +23,7 @@ from algorithm import parallelize, vectorize
 from sys import info
 from memory import memset_zero
 from python import Python
+from os.env import getenv
 
 alias M = 512  # rows of A and C
 alias N = 4096  # cols of B and C
@@ -61,31 +63,28 @@ struct Matrix[rows: Int, cols: Int]:
         self.store[1](y, x, val)
 
     fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[type, nelts]:
-        return self.data.load[width=nelts](y * self.cols + x)
+        return SIMD[size=nelts].load(self.data, y * self.cols + x)
 
     fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[type, nelts]):
-        return self.data.store[width=nelts](y * self.cols + x, val)
+        SIMD[size=nelts].store(self.data, y * self.cols + x, val)
 
 
 def run_matmul_python() -> Float64:
-    Python.add_to_path(".")
     var pymatmul: PythonObject = Python.import_module("pymatmul")
     var py = Python.import_module("builtins")
 
     var gflops = pymatmul.benchmark_matmul_python(128, 128, 128).to_float64()
-    py.print(py.str("{:<13}{:>8.3f} GFLOPS").format("Python:", gflops))
+    py.print(py.str("{:<18}{:>8.3f} GFLOPS").format("Python:", gflops))
 
     return gflops
 
 
-def run_matmul_numpy() -> Float64:
+def run_matmul_numpy():
     var pymatmul: PythonObject = Python.import_module("pymatmul")
     var py = Python.import_module("builtins")
 
     var gflops = pymatmul.benchmark_matmul_numpy(M, N, K).to_float64()
-    py.print(py.str("{:<13}{:>8.3f} GFLOPS").format("Numpy:", gflops))
-
-    return gflops
+    py.print(py.str("{:<18}{:>8.3f} GFLOPS").format("Numpy:", gflops))
 
 
 fn matmul_naive(inout C: Matrix, A: Matrix, B: Matrix):
@@ -226,7 +225,7 @@ fn bench[
 
     var py = Python.import_module("builtins")
     _ = py.print(
-        py.str("{:<13}{:>8.3f} GFLOPS {:>9.2f}x Python").format(
+        py.str("{:<18}{:>8.3f} GFLOPS {:>9.2f}x Python").format(
             name, gflops, speedup
         )
     )
@@ -248,7 +247,7 @@ fn test_matrix_equal[
     return True
 
 
-fn test_all() raises:
+def test_all():
     var A = Matrix[M, K].rand()
     var B = Matrix[K, N].rand()
     var C = Matrix[M, N]()
@@ -263,59 +262,35 @@ fn test_all() raises:
         raise Error("Tiled output does not match naive implementation")
     if not test_matrix_equal[matmul_unrolled[0]](C, A, B):
         raise Error("Unroll output does not match naive implementation")
-    if not test_matrix_equal[matmul_unrolled[1]](
-        C,
-        A,
-        B,
-    ):
-        raise Error(
-            "Unroll with workers as physical cores output does not match naive"
-            " implementation"
-        )
-    if not test_matrix_equal[matmul_unrolled[2]](
-        C,
-        A,
-        B,
-    ):
-        raise Error(
-            "Unroll with workers as logical cores output does not match naive"
-            " implementation"
-        )
-    if not test_matrix_equal[matmul_unrolled[3]](
-        C,
-        A,
-        B,
-    ):
-        raise Error(
-            "Unroll with workers as performance cores output does not match"
-            " naive implementation"
-        )
+    if not test_matrix_equal[matmul_unrolled[1]](C, A, B):
+        raise Error("Unroll/physical cores does not match naive implementation")
+    if not test_matrix_equal[matmul_unrolled[2]](C, A, B):
+        raise Error("Unroll/logical cores does not match naive implementation")
+    if not test_matrix_equal[matmul_unrolled[3]](C, A, B):
+        raise Error("Unroll/perf cores does not match naive implementation")
 
     A.data.free()
     B.data.free()
     C.data.free()
 
 
-fn main() raises:
+def main():
     constrained[N % tile_n == 0, "N must be a multiple of tile_n"]()
     constrained[K % tile_k == 0, "K must be a multiple of tile_k"]()
 
     test_all()
     print("CPU Results\n")
     var python_gflops = run_matmul_python()
-    var numpy_gflops = run_matmul_numpy()
+    run_matmul_numpy()
 
-    bench[matmul_naive, "Naive:"](python_gflops)
-    bench[matmul_vectorized, "Vectorized: "](python_gflops)
-    bench[matmul_parallelized, "Parallelized:"](python_gflops)
-    bench[matmul_tiled, "Tiled:"](python_gflops)
-    bench[matmul_unrolled[0], "Unrolled:"](python_gflops)
-    bench[matmul_unrolled[1], "Unrolled w/ workers == physical cores:"](
-        python_gflops
-    )
-    bench[matmul_unrolled[2], "Unrolled w/ workers == logical cores:"](
-        python_gflops
-    )
-    bench[matmul_unrolled[3], "Unrolled w/ workers == performance cores:"](
-        python_gflops
-    )
+    # Don't run all these benchmarks in CI, too resource intensive
+    if not getenv("CI"):
+        bench[matmul_naive, "Naive:"](python_gflops)
+        bench[matmul_vectorized, "Vectorized: "](python_gflops)
+        bench[matmul_parallelized, "Parallelized:"](python_gflops)
+        bench[matmul_tiled, "Tiled:"](python_gflops)
+        bench[matmul_unrolled[0], "Unrolled:"](python_gflops)
+        bench[matmul_unrolled[1], "Physical Cores:"](python_gflops)
+        bench[matmul_unrolled[2], "Logical Cores:"](python_gflops)
+    # CHECK: Performance Cores
+    bench[matmul_unrolled[3], "Performance Cores:"](python_gflops)

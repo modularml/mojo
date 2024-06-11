@@ -78,9 +78,27 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Added `TemporaryDirectory` in module `tempfile`.
   ([PR 2743](https://github.com/modularml/mojo/pull/2743) by [@artemiogr97](https://github.com/artemiogr97))
 
-- Added temporary `SliceNew` type with corrected behaviour from `Slice` to facilitate
-  an incremental internal migration due to reliance on the old, incorrect behaviour.
-  ([PR #2894](https://github.com/modularml/mojo/pull/2894) by [@bgreni](https://github.com/bgreni))
+- Added `NamedTemporaryFile` in module `tempfile`.
+  ([PR 2762](https://github.com/modularml/mojo/pull/2762) by [@artemiogr97](https://github.com/artemiogr97))
+
+- Added `String.format` method.
+  ([PR #2771](https://github.com/modularml/mojo/pull/2771) by [@rd4com](https://github.com/rd4com))
+
+  Support automatic and manual indexing of `*args`.
+
+  Examples:
+
+  ```mojo
+  print(
+    String("{1} Welcome to {0} {1}").format("mojo", "🔥")
+  )
+  # 🔥 Wecome to mojo 🔥
+  ```
+
+  ```mojo
+  print(String("{} {} {}").format(True, 1.125, 2))
+  #True 1.125 2
+  ```
 
 ### 🦋 Changed
 
@@ -92,6 +110,10 @@ by [@jayzhan211](https://github.com/jayzhan211))
     (was `UnsafePointer[Int8]`)
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
+
+- The `StringRef` constructors from `DTypePointer.int8` have been changed to
+  take a `UnsafePointer[C_char]`, reflecting their use for compatibility with
+  C APIs.
 
 - The global functions for working with `UnsafePointer` have transitioned to
   being methods through the use of conditional conformances:
@@ -108,6 +130,16 @@ by [@jayzhan211](https://github.com/jayzhan211))
   the size of the SIMD type.
   The default store size is the size of the `SIMD` value to be stored.
 
+- `Slice` now uses `OptionalReg[Int]` for `start` and `end` and implements
+  a constructor which accepts optional values. `Slice._has_end()` has also been removed
+  since a Slice with no end is now represented by an empty `Slice.end` option.
+  ([PR #2495](https://github.com/modularml/mojo/pull/2495) by [@bgreni](https://github.com/bgreni))
+
+  ```mojo
+    var s = Slice(1, None, 2)
+    print(s.start.value()) # must retrieve the value from the optional
+  ```
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
@@ -121,5 +153,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Removed `StringLiteral.unsafe_uint8_ptr()` and `StringLiteral.as_uint8_ptr()`.
 
 - Removed `UnsafePointer.offset(offset:Int)`.
+
+- Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD instead.
 
 ### 🛠️ Fixed

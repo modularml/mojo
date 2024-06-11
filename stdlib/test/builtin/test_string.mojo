@@ -293,11 +293,19 @@ fn test_string_indexing() raises:
 
     assert_equal("!!ojoM olleH", str[::-1])
 
-    assert_equal("!!ojoM oll", str[2::-1])
+    assert_equal("leH", str[2::-1])
 
     assert_equal("!oo le", str[::-2])
 
-    assert_equal("!jMolH", str[:-1:-2])
+    assert_equal("", str[:-1:-2])
+    assert_equal("", str[-50::-1])
+    assert_equal("Hello Mojo!!", str[-50::])
+    assert_equal("!!ojoM olleH", str[:-50:-1])
+    assert_equal("Hello Mojo!!", str[:50:])
+    assert_equal("H", str[::50])
+    assert_equal("!", str[::-50])
+    assert_equal("!", str[50::-50])
+    assert_equal("H", str[-50::50])
 
 
 fn test_atol() raises:
@@ -1185,6 +1193,121 @@ def test_string_iter():
         item_idx += 1
 
 
+def test_format_args():
+    with assert_raises(contains="Index -1 not in *args"):
+        _ = String("{-1} {0}").format("First")
+
+    with assert_raises(contains="Index 1 not in *args"):
+        _ = String("A {0} B {1}").format("First")
+
+    with assert_raises(contains="Index 1 not in *args"):
+        _ = String("A {1} B {0}").format("First")
+
+    with assert_raises(contains="Index 1 not in *args"):
+        _ = String("A {1} B {0}").format()
+
+    with assert_raises(
+        contains="Automatic indexing require more args in *args"
+    ):
+        _ = String("A {} B {}").format("First")
+
+    with assert_raises(
+        contains="Cannot both use manual and automatic indexing"
+    ):
+        _ = String("A {} B {1}").format("First", "Second")
+
+    with assert_raises(contains="Index first not in kwargs"):
+        _ = String("A {first} B {second}").format(1, 2)
+
+    assert_equal(
+        String(" {} , {} {} !").format(
+            "Hello",
+            "Beautiful",
+            "World",
+        ),
+        " Hello , Beautiful World !",
+    )
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{ {}").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{ {0}").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{}{").format(1)
+
+    with assert_raises(
+        contains="there is a single curly } left unclosed or unescaped"
+    ):
+        _ = String("{}}").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{} {").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{").format(1)
+
+    with assert_raises(
+        contains="there is a single curly } left unclosed or unescaped"
+    ):
+        _ = String("}").format(1)
+
+    assert_equal(String("}}").format(), "}")
+    assert_equal(String("{{").format(), "{")
+
+    assert_equal(String("{{}}{}{{}}").format("foo"), "{}foo{}")
+
+    assert_equal(String("{{ {0}").format("foo"), "{ foo")
+    assert_equal(String("{{{0}").format("foo"), "{foo")
+    assert_equal(String("{{0}}").format("foo"), "{0}")
+    assert_equal(String("{{}}").format("foo"), "{}")
+    assert_equal(String("{{0}}").format("foo"), "{0}")
+    assert_equal(String("{{{0}}}").format("foo"), "{foo}")
+
+    var vinput = "{} {}"
+    var output = String(vinput).format("123", 456)
+    assert_equal(len(output), 7)
+
+    vinput = "{1}{0}"
+    output = String(vinput).format("123", 456)
+    assert_equal(len(output), 6)
+    assert_equal(output, "456123")
+
+    vinput = "123"
+    output = String(vinput).format()
+    assert_equal(len(output), 3)
+
+    vinput = ""
+    output = String(vinput).format()
+    assert_equal(len(output), 0)
+
+    assert_equal(
+        String("{0} {1} ❤️‍🔥 {1} {0}").format(
+            "🔥",
+            "Mojo",
+        ),
+        "🔥 Mojo ❤️‍🔥 Mojo 🔥",
+    )
+
+    assert_equal(String("{0} {1}").format(True, 1.125), "True 1.125")
+
+    assert_equal(String("{0} {1}").format("{1}", "Mojo"), "{1} Mojo")
+    assert_equal(
+        String("{0} {1} {0} {1}").format("{1}", "Mojo"), "{1} Mojo {1} Mojo"
+    )
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1230,3 +1353,4 @@ def main():
     test_string_mul()
     test_indexing()
     test_string_iter()
+    test_format_args()
