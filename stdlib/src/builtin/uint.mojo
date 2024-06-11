@@ -71,6 +71,64 @@ struct UInt:
         self.value = int(UInt64(value)).value
 
     @always_inline("nodebug")
+    fn __lt__(self, rhs: UInt) -> Bool:
+        """Compare this UInt to the RHS using LT comparison.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is less-than the RHS UInt and False otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate ult>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __le__(self, rhs: UInt) -> Bool:
+        """Compare this UInt to the RHS using LE comparison.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is less-or-equal than the RHS UInt and False
+            otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate ule>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __gt__(self, rhs: UInt) -> Bool:
+        """Compare this UInt to the RHS using GT comparison.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is greater-than the RHS UInt and False otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate ugt>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __ge__(self, rhs: UInt) -> Bool:
+        """Compare this UInt to the RHS using GE comparison.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is greater-or-equal than the RHS UInt and False
+            otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate uge>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
     fn __str__(self) -> String:
         """Convert this UInt to a string.
 
@@ -81,6 +139,6 @@ struct UInt:
         ```
 
         Returns:
-            The string representation of this Int.
+            The string representation of this UInt.
         """
         return str(UInt64(self))
