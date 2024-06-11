@@ -129,7 +129,7 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline
-    fn alloc[alignment: Optional[Int] = None](count: Int) -> Self:
+    fn alloc[alignment: Int = alignof[T]()](count: Int) -> Self:
         """Allocate an array with specified or default alignment.
 
         Parameters:
@@ -142,18 +142,17 @@ struct UnsafePointer[
             The pointer to the newly allocated array.
         """
         alias sizeof_t = sizeof[T]()
-        alias alignof_t = alignment.or_else(alignof[T]())
 
         constrained[sizeof_t > 0, "size must be greater than zero"]()
-        constrained[alignof_t > 0, "alignment must be greater than zero"]()
+        constrained[alignment > 0, "alignment must be greater than zero"]()
         constrained[
-            sizeof_t % alignof_t == 0, "size must be a multiple of alignment"
+            sizeof_t % alignment == 0, "size must be a multiple of alignment"
         ]()
 
         return Self(
             address=int(
                 _malloc[Int8, address_space=address_space](
-                    sizeof_t * count, alignment=alignof_t
+                    sizeof_t * count, alignment=alignment
                 )
             )
         )
