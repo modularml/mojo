@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from utils import StaticIntTuple, unroll
 from testing import assert_equal, assert_raises
+
+from utils import StaticIntTuple, unroll
 
 
 def test_unroll():

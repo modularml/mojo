@@ -13,8 +13,8 @@
 # XFAIL: asan && !system-darwin
 # RUN: %mojo %s
 
-from python import PythonObject, Python
-from testing import assert_false, assert_raises, assert_true, assert_equal
+from python import Python, PythonObject
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 from utils import StringRef
 

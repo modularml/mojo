@@ -301,15 +301,15 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     # ===-------------------------------------------------------------------===#
 
     fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _DictKeyIter[T, NoneType, self.is_mutable, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _DictKeyIter[T, NoneType, __lifetime_of(self)]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
             An iterator of immutable references to the set elements.
         """
         # here we rely on Set being a trivial wrapper of a Dict
-        return _DictKeyIter(_DictEntryIter(0, 0, self[]._data))
+        return _DictKeyIter(_DictEntryIter(0, 0, self._data))
 
     fn add(inout self, t: T):
         """Add an element to the set.

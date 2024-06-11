@@ -14,8 +14,7 @@
 
 from random import random_float64
 
-
-from testing import assert_equal, assert_false, assert_true, assert_raises
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_object_ctors():

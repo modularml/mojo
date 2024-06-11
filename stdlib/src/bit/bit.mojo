@@ -113,13 +113,14 @@ fn countr_zero[
 # ===----------------------------------------------------------------------===#
 # bit_reverse
 # ===----------------------------------------------------------------------===#
+# TODO: implement bit_reverse for Int type
 
 
 @always_inline("nodebug")
 fn bit_reverse[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Element-wise reverses the bitpattern of an integral value.
+    """Element-wise reverses the bitpattern of a SIMD vector of integer values.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -144,13 +145,14 @@ fn bit_reverse[
 # ===----------------------------------------------------------------------===#
 # byte_swap
 # ===----------------------------------------------------------------------===#
+# TODO: implement byte_swap for Int type
 
 
 @always_inline("nodebug")
 fn byte_swap[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Byte-swaps a value.
+    """Byte-swaps a SIMD vector of integer values with an even number of bytes.
 
     Byte swap an integer value or vector of integer values with an even number
     of bytes (positive multiple of 16 bits). This is equivalent to `llvm.bswap`
@@ -188,13 +190,14 @@ fn byte_swap[
 # ===----------------------------------------------------------------------===#
 # pop_count
 # ===----------------------------------------------------------------------===#
+# TODO: implement pop_count for Int type
 
 
 @always_inline("nodebug")
 fn pop_count[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Counts the number of bits set in a value.
+    """Counts the number of bits set in a SIMD vector of integer values.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -219,13 +222,14 @@ fn pop_count[
 # ===----------------------------------------------------------------------===#
 # bit_not
 # ===----------------------------------------------------------------------===#
+# TODO: implement bit_not for Int type
 
 
 @always_inline("nodebug")
 fn bit_not[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Performs a bitwise NOT operation on an integral.
+    """Performs a bitwise NOT operation on an SIMD vector of integer values.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -242,7 +246,7 @@ fn bit_not[
         NOT of the integer value at position `i` of the input value.
     """
     constrained[type.is_integral(), "must be integral"]()
-    var neg_one = SIMD[type, simd_width].splat(-1)
+    var neg_one = SIMD[type, simd_width](-1)
     return __mlir_op.`pop.xor`(val.value, neg_one.value)
 
 
@@ -270,7 +274,8 @@ fn bit_width(val: Int) -> Int:
 fn bit_width[
     type: DType, simd_width: Int
 ](val: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
-    """Computes the minimum number of bits required to represent the integer.
+    """Computes the minimum number of bits required to represent the SIMD vector
+    of integer values.
 
     Parameters:
         type: `dtype` used for the computation.
@@ -298,7 +303,7 @@ fn bit_width[
     else:
         var leading_zero_pos = countl_zero(val)
         var leading_zero_neg = countl_zero(bit_not(val))
-        var leading_zero = (val > 0).select(leading_zero_pos, leading_zero_neg)
+        var leading_zero = (val < 0).select(leading_zero_neg, leading_zero_pos)
         return bitwidth - leading_zero
 
 
@@ -397,7 +402,7 @@ fn bit_ceil[
     """
     constrained[type.is_integral(), "must be integral"]()
 
-    alias ones = SIMD[type, simd_width].splat(1)
+    alias ones = SIMD[type, simd_width](1)
 
     return (val > 1).select(1 << bit_width(val - ones), ones)
 
@@ -450,7 +455,7 @@ fn bit_floor[
     """
     constrained[type.is_integral(), "must be integral and unsigned"]()
 
-    alias zeros = SIMD[type, simd_width].splat(0)
+    alias zeros = SIMD[type, simd_width](0)
 
     return (val > 0).select(1 << (bit_width(val) - 1), zeros)
 

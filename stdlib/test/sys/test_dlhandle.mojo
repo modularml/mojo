@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from sys.ffi import DLHandle
+
 from testing import assert_false
 
 

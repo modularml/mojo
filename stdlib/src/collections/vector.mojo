@@ -20,7 +20,7 @@ from collections.vector import InlinedFixedVector
 """
 
 from memory import UnsafePointer, Reference
-from utils import InlineArray
+from utils import StaticTuple
 
 # ===----------------------------------------------------------------------===#
 # _VecIter
@@ -97,7 +97,7 @@ struct InlinedFixedVector[
     """
 
     alias static_size: Int = size
-    alias static_data_type = InlineArray[type, size]
+    alias static_data_type = StaticTuple[type, size]
     var static_data: Self.static_data_type
     """The underlying static storage, used for small vectors."""
     var dynamic_data: UnsafePointer[type]
@@ -116,7 +116,7 @@ struct InlinedFixedVector[
         Args:
             capacity: The requested maximum capacity of the vector.
         """
-        self.static_data = Self.static_data_type(unsafe_uninitialized=True)
+        self.static_data = Self.static_data_type()  # Undef initialization
         self.dynamic_data = UnsafePointer[type]()
         if capacity > Self.static_size:
             self.dynamic_data = UnsafePointer[type].alloc(capacity - size)
@@ -243,5 +243,5 @@ struct InlinedFixedVector[
             An iterator to the start of the vector.
         """
         return Self._iterator(
-            0, self.current_size, UnsafePointer(Reference(self))
+            0, self.current_size, UnsafePointer.address_of(self)
         )

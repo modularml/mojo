@@ -144,11 +144,7 @@ fn mkdtemp(
     Raises:
         If the directory can not be created.
     """
-    var final_dir: Path
-    if not dir:
-        final_dir = Path(_get_default_tempdir())
-    else:
-        final_dir = Path(dir.value()[])
+    var final_dir = Path(dir.value()) if dir else Path(_get_default_tempdir())
 
     for _ in range(TMP_MAX):
         var dir_name = final_dir / (prefix + _get_random_name() + suffix)
@@ -164,3 +160,213 @@ fn mkdtemp(
         except:
             continue
     raise Error("Failed to create temporary file")
+
+
+# TODO use shutil.rmtree (or equivalent) when it exists
+fn _rmtree(path: String, ignore_errors: Bool = False) raises:
+    """Removes the specified directory and all its contents.
+
+    If the path is a symbolic link, an error is raised. If ignore_errors is
+    True, errors resulting from failed removals will be ignored. Absolute and
+    relative paths are allowed, relative paths are resolved from cwd.
+
+    Args:
+        path: The path to the directory.
+        ignore_errors: Whether to ignore errors.
+    """
+    if os.path.islink(path):
+        raise Error("`path`can not be a symbolic link: " + path)
+
+    for file_or_dir in os.listdir(path):
+        var curr_path = os.path.join(path, file_or_dir[])
+        if os.path.isfile(curr_path):
+            try:
+                os.remove(curr_path)
+            except e:
+                if not ignore_errors:
+                    raise e
+            continue
+        if os.path.isdir(curr_path):
+            try:
+                _rmtree(curr_path, ignore_errors)
+            except e:
+                if ignore_errors:
+                    continue
+                raise e
+    try:
+        os.rmdir(path)
+    except e:
+        if not ignore_errors:
+            raise e
+
+
+struct TemporaryDirectory:
+    """A temporary directory."""
+
+    var name: String
+    """The name of the temporary directory."""
+    var _ignore_cleanup_errors: Bool
+    """Whether to ignore cleanup errors."""
+
+    fn __init__(
+        inout self,
+        suffix: String = "",
+        prefix: String = "tmp",
+        dir: Optional[String] = None,
+        ignore_cleanup_errors: Bool = False,
+    ) raises:
+        """Create a temporary directory. Can be used as a context manager.
+
+        Args:
+            suffix: Suffix to use for the directory name.
+            prefix: Prefix to use for the directory name.
+            dir: Directory in which the directory will be created.
+            ignore_cleanup_errors: Whether to ignore cleanup errors.
+        """
+        self._ignore_cleanup_errors = ignore_cleanup_errors
+
+        self.name = mkdtemp(suffix, prefix, dir)
+
+    fn __enter__(self) -> String:
+        return self.name
+
+    fn __exit__(self) raises:
+        _rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+
+    fn __exit__(self, err: Error) -> Bool:
+        try:
+            self.__exit__()
+            return True
+        except:
+            return False
+
+
+struct NamedTemporaryFile:
+    """A handle to a temporary file."""
+
+    var _file_handle: FileHandle
+    """The underlying file handle."""
+    var _delete: Bool
+    """Whether the file is deleted on close."""
+    var name: String
+    """Name of the file."""
+
+    fn __init__(
+        inout self,
+        mode: String = "w",
+        name: Optional[String] = None,
+        suffix: String = "",
+        prefix: String = "tmp",
+        dir: Optional[String] = None,
+        delete: Bool = True,
+    ) raises:
+        """Create a named temporary file. Can be used as a context manager.
+        This is a wrapper around a `FileHandle`,
+        os.remove is called in close method if `delete` is True.
+
+        Args:
+            mode: The mode to open the file in (the mode can be "r" or "w").
+            name: The name of the temp file; if it is unspecified, then random name will be provided.
+            suffix: Suffix to use for the file name if name is not provided.
+            prefix: Prefix to use for the file name if name is not provided.
+            dir: Directory in which the file will be created.
+            delete: Whether the file is deleted on close.
+        """
+
+        var final_dir = dir.value() if dir else _get_default_tempdir()
+
+        self._delete = delete
+        self.name = ""
+
+        if name:
+            self.name = name.value()
+        else:
+            for _ in range(TMP_MAX):
+                var potential_name = final_dir + os.sep + prefix + _get_random_name() + suffix
+                if not os.path.exists(potential_name):
+                    self.name = potential_name
+                    break
+        try:
+            # TODO for now this name could be relative,
+            # python implementation expands the path,
+            # but several functions are not yet implemented in mojo
+            # i.e. abspath, normpath
+            self._file_handle = FileHandle(self.name, mode=mode)
+            return
+        except:
+            raise Error("Failed to create temporary file")
+
+    @always_inline
+    fn __del__(owned self):
+        """Closes the file handle."""
+        try:
+            self.close()
+        except:
+            pass
+
+    fn close(inout self) raises:
+        """Closes the file handle."""
+        self._file_handle.close()
+        if self._delete:
+            os.remove(self.name)
+
+    fn __moveinit__(inout self, owned existing: Self):
+        """Moves constructor for the file handle.
+
+        Args:
+            existing: The existing file handle.
+        """
+        self._file_handle = existing._file_handle^
+        self._delete = existing._delete
+        self.name = existing.name^
+
+    @always_inline
+    fn read(self, size: Int64 = -1) raises -> String:
+        """Reads the data from the file.
+
+        Args:
+            size: Requested number of bytes to read.
+
+        Returns:
+            The contents of the file.
+        """
+        return self._file_handle.read(size)
+
+    fn read_bytes(self, size: Int64 = -1) raises -> List[UInt8]:
+        """Read from file buffer until we have `size` characters or we hit EOF.
+        If `size` is negative or omitted, read until EOF.
+
+        Args:
+            size: Requested number of bytes to read.
+
+        Returns:
+            The contents of the file.
+        """
+        return self._file_handle.read_bytes(size)
+
+    fn seek(self, offset: UInt64) raises -> UInt64:
+        """Seeks to the given offset in the file.
+
+        Args:
+            offset: The byte offset to seek to from the start of the file.
+
+        Raises:
+            An error if this file handle is invalid, or if file seek returned a
+            failure.
+
+        Returns:
+            The resulting byte offset from the start of the file.
+        """
+        return self._file_handle.seek(offset)
+
+    fn write(self, data: String) raises:
+        """Write the data to the file.
+
+        Args:
+            data: The data to write to the file.
+        """
+        self._file_handle.write(data)
+
+    fn __enter__(owned self) -> Self:
+        """The function to call when entering the context."""
+        return self^

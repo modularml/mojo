@@ -70,7 +70,7 @@ fn b64encode(str: String) -> String:
       Base64 encoding of the input string.
     """
     alias lookup = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    var b64chars = lookup.as_uint8_ptr()
+    var b64chars = lookup.unsafe_ptr()
 
     var length = len(str)
     var out = String._buffer_type(capacity=length + 1)
@@ -169,7 +169,7 @@ fn b16encode(str: String) -> String:
       Base16 encoding of the input string.
     """
     alias lookup = "0123456789ABCDEF"
-    var b16chars = lookup.as_uint8_ptr()
+    var b16chars = lookup.unsafe_ptr()
 
     var length = len(str)
     var out = List[UInt8](capacity=length * 2 + 1)
