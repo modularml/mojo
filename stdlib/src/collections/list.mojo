@@ -866,8 +866,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @always_inline
     fn __eq__[
-        Rhs_t: EqualityCollectionElement, //
-    ](self: Self, rhs: List[Rhs_t]) -> Bool:
+        ElementType: EqualityCollectionElement, //
+    ](self: List[ElementType], rhs: List[ElementType]) -> Bool:
         """Compare this List to the RHS using EQ comparison.
 
         Note that it is not yet possible to compare lists of lists.
@@ -876,36 +876,23 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             rhs: The other List to compare against.
 
         Parameters:
-            Rhs_t: The inferred type of rhs.T.
+            ElementType: The inferred type of rhs.T.
 
         Returns:
             True if this List is equal to the RHS List and False otherwise.
         """
-
-        @parameter
-        if not _type_is_eq[T, Rhs_t]():
-            return False
-
         if len(self) != len(rhs):
             return False
 
         for i in range(len(self)):
-            var tmp_ref = self.__get_ref(i)
-            if rebind[
-                Reference[
-                    Rhs_t,
-                    tmp_ref.is_mutable,
-                    tmp_ref.lifetime,
-                    tmp_ref.address_space,
-                ]
-            ](tmp_ref)[].__ne__[](rhs[i]):
+            if self.unsafe_get(i)[] != rhs.unsafe_get(i)[]:
                 return False
         return True
 
     @always_inline
     fn __ne__[
-        Rhs_t: EqualityCollectionElement, //
-    ](inout self, rhs: List[Rhs_t]) -> Bool:
+        ElementType: EqualityCollectionElement, //
+    ](self: List[ElementType], rhs: List[ElementType]) -> Bool:
         """Compare this List to the RHS using NE comparison.
 
         Note that it is not yet possible to compare lists of lists.
@@ -914,13 +901,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             rhs: The other List to compare against.
 
         Parameters:
-            Rhs_t: The inferred type of rhs.T.
+            ElementType: The inferred type of rhs.T.
 
         Returns:
             True if this List is non-equal to the RHS List and False otherwise.
         """
 
-        return not self.__eq__(rhs)
+        return not (self.__eq__(rhs))
 
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:

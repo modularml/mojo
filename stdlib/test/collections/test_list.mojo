@@ -875,41 +875,35 @@ def test_list_eq():
     assert_true(a.__eq__(b))
     assert_false(a.__eq__(c))
     assert_false(a.__eq__(d))
-    assert_true(a == b)
-    assert_false(a == c)
-    assert_false(a == d)
-
-    var e = List[StringLiteral]("Mojo", "Is", "Awesome")
-    var E = List[StringLiteral]("Hello", "World", "!")
-    var e_ = List[StringLiteral]("Mojo", "Is", "Awesome")
-    assert_true(e.__eq__(e))
-    assert_false(e.__eq__(E))
-    assert_true(e == e)
-    assert_false(e == E)
-    assert_true(e.__eq__(e_))
-    assert_true(e == e_)
+    # TODO: add those tests when conditional traits are available
+    # assert_true(a == b)
+    # assert_false(a == c)
+    # assert_false(a == d)
 
     var same_len_A = List[Int](8, 9, 10)
     var same_len_B = List[Int](5, 6, 7)
     assert_false(same_len_A.__eq__(same_len_B))
-    assert_false(same_len_A == same_len_B)
+    # TODO: add those tests when conditional traits are available
+    # assert_false(same_len_A == same_len_B)
 
     var not_same_len_A = List[Int](8, 9, 10)
     var not_same_len_B = List[Int](8, 9)
     assert_false(not_same_len_A.__eq__(not_same_len_B))
     assert_true(not_same_len_A.__eq__(List[Int](8, 9, 10)))
-    assert_false(not_same_len_A == not_same_len_B)
-    assert_true(not_same_len_A == List[Int](8, 9, 10))
+    # TODO: add those tests when conditional traits are available
+    # assert_false(not_same_len_A == not_same_len_B)
+    # assert_true(not_same_len_A == List[Int](8, 9, 10))
 
     var A_memory_only = List[String]("Mojo", "Is", "Awesome")
     var B_memory_only = List[String]("Hello", "World", "!")
     var C_memory_only = List[String]("Mojo", "Is", "Awesome")
     assert_true(A_memory_only.__eq__(C_memory_only))
-    assert_true(A_memory_only == C_memory_only)
     assert_false(A_memory_only.__eq__(B_memory_only))
     assert_false(B_memory_only.__eq__(A_memory_only))
-    assert_false(A_memory_only == B_memory_only)
-    assert_false(B_memory_only == A_memory_only)
+    # TODO: add those tests when conditional traits are available
+    # assert_true(A_memory_only == C_memory_only)
+    # assert_false(A_memory_only == B_memory_only)
+    # assert_false(B_memory_only == A_memory_only)
 
 
 def test_list_ne():
@@ -920,40 +914,34 @@ def test_list_ne():
     assert_false(a.__ne__(b))
     assert_true(a.__ne__(c))
     assert_true(a.__ne__(d))
-    assert_false(a != b)
-    assert_true(a != c)
-    assert_true(a != d)
-
-    var e = List[StringLiteral]("Mojo", "Is", "Awesome")
-    var E = List[StringLiteral]("Hello", "World", "!")
-    var E_ = List[StringLiteral]("Hello", "World", "!")
-
-    assert_true(e.__ne__(E))
-    assert_true(E.__ne__(e))
-    assert_true(e != E)
-    assert_true(E != e)
-    assert_false(E != E_)
+    # TODO: add those tests when conditional traits are available
+    # assert_false(a != b)
+    # assert_true(a != c)
+    # assert_true(a != d)
 
     var A_memory_only = List[String]("Mojo", "Is", "Awesome")
     var B_memory_only = List[String]("Hello", "World", "!")
     var C_memory_only = List[String]("Mojo", "Is", "Awesome")
     assert_true(A_memory_only.__ne__(B_memory_only))
     assert_true(B_memory_only.__ne__(A_memory_only))
-    assert_true(A_memory_only != B_memory_only)
-    assert_true(B_memory_only != A_memory_only)
-    assert_false(A_memory_only != C_memory_only)
+    # TODO: add those tests when conditional traits are available
+    # assert_true(A_memory_only != B_memory_only)
+    # assert_true(B_memory_only != A_memory_only)
+    # assert_false(A_memory_only != C_memory_only)
 
     var same_len_A = List[Int](8, 9, 10)
     var same_len_B = List[Int](5, 6, 7)
     assert_true(same_len_A.__ne__(same_len_B))
-    assert_true(same_len_A != same_len_B)
+    # TODO: add those tests when conditional traits are available
+    # assert_true(same_len_A != same_len_B)
 
     var not_same_len_A = List[Int](8, 9, 10)
     var not_same_len_B = List[Int](8, 9)
     assert_true(not_same_len_A.__ne__(not_same_len_B))
     assert_true(not_same_len_B.__ne__(not_same_len_A))
-    assert_true(not_same_len_B != not_same_len_A)
-    assert_true(not_same_len_A != not_same_len_B)
+    # TODO: add those tests when conditional traits are available
+    # assert_true(not_same_len_B != not_same_len_A)
+    # assert_true(not_same_len_A != not_same_len_B)
 
 
 def test_list_eq_alias():
@@ -964,41 +952,35 @@ def test_list_eq_alias():
     assert_true(a.__eq__(b))
     assert_false(a.__eq__(c))
     assert_false(a.__eq__(d))
-    assert_true(a == b)
-    assert_false(a == c)
-    assert_false(a == d)
-
-    alias e = List[StringLiteral]("Mojo", "Is", "Awesome")
-    alias E = List[StringLiteral]("Hello", "World", "!")
-    alias e_ = List[StringLiteral]("Mojo", "Is", "Awesome")
-    assert_true(e.__eq__(e))
-    assert_false(e.__eq__(E))
-    assert_true(e == e)
-    assert_false(e == E)
-    assert_true(e.__eq__(e_))
-    assert_true(e == e_)
+    # TODO: add those tests when conditional traits are available
+    # assert_true(a == b)
+    # assert_false(a == c)
+    # assert_false(a == d)
 
     alias same_len_A = List[Int](8, 9, 10)
     alias same_len_B = List[Int](5, 6, 7)
     assert_false(same_len_A.__eq__(same_len_B))
-    assert_false(same_len_A == same_len_B)
+    # TODO: add those tests when conditional traits are available
+    # assert_false(same_len_A == same_len_B)
 
     alias not_same_len_A = List[Int](8, 9, 10)
     alias not_same_len_B = List[Int](8, 9)
     assert_false(not_same_len_A.__eq__(not_same_len_B))
     assert_true(not_same_len_A.__eq__(List[Int](8, 9, 10)))
-    assert_false(not_same_len_A == not_same_len_B)
-    assert_true(not_same_len_A == List[Int](8, 9, 10))
+    # TODO: add those tests when conditional traits are available
+    # assert_false(not_same_len_A == not_same_len_B)
+    # assert_true(not_same_len_A == List[Int](8, 9, 10))
 
     alias A_memory_only = List[String]("Mojo", "Is", "Awesome")
     alias B_memory_only = List[String]("Hello", "World", "!")
     alias C_memory_only = List[String]("Mojo", "Is", "Awesome")
     assert_true(A_memory_only.__eq__(C_memory_only))
-    assert_true(A_memory_only == C_memory_only)
     assert_false(A_memory_only.__eq__(B_memory_only))
     assert_false(B_memory_only.__eq__(A_memory_only))
-    assert_false(A_memory_only == B_memory_only)
-    assert_false(B_memory_only == A_memory_only)
+    # TODO: add those tests when conditional traits are available
+    # assert_false(A_memory_only == B_memory_only)
+    # assert_false(B_memory_only == A_memory_only)
+    # assert_true(A_memory_only == C_memory_only)
 
 
 def test_list_ne_alias():
@@ -1009,40 +991,34 @@ def test_list_ne_alias():
     assert_false(a.__ne__(b))
     assert_true(a.__ne__(c))
     assert_true(a.__ne__(d))
-    assert_false(a != b)
-    assert_true(a != c)
-    assert_true(a != d)
-
-    alias e = List[StringLiteral]("Mojo", "Is", "Awesome")
-    alias E = List[StringLiteral]("Hello", "World", "!")
-    alias E_ = List[StringLiteral]("Hello", "World", "!")
-
-    assert_true(e.__ne__(E))
-    assert_true(E.__ne__(e))
-    assert_true(e != E)
-    assert_true(E != e)
-    assert_false(E != E_)
+    # TODO: add those tests when conditional traits are available
+    # assert_false(a != b)
+    # assert_true(a != c)
+    # assert_true(a != d)
 
     alias A_memory_only = List[String]("Mojo", "Is", "Awesome")
     alias B_memory_only = List[String]("Hello", "World", "!")
     alias C_memory_only = List[String]("Mojo", "Is", "Awesome")
     assert_true(A_memory_only.__ne__(B_memory_only))
     assert_true(B_memory_only.__ne__(A_memory_only))
-    assert_true(A_memory_only != B_memory_only)
-    assert_true(B_memory_only != A_memory_only)
-    assert_false(A_memory_only != C_memory_only)
+    # TODO: add those tests when conditional traits are available
+    # assert_true(A_memory_only != B_memory_only)
+    # assert_true(B_memory_only != A_memory_only)
+    # assert_false(A_memory_only != C_memory_only)
 
     alias same_len_A = List[Int](8, 9, 10)
     alias same_len_B = List[Int](5, 6, 7)
     assert_true(same_len_A.__ne__(same_len_B))
-    assert_true(same_len_A != same_len_B)
+    # TODO: add those tests when conditional traits are available
+    # assert_true(same_len_A != same_len_B)
 
     alias not_same_len_A = List[Int](8, 9, 10)
     alias not_same_len_B = List[Int](8, 9)
     assert_true(not_same_len_A.__ne__(not_same_len_B))
     assert_true(not_same_len_B.__ne__(not_same_len_A))
-    assert_true(not_same_len_B != not_same_len_A)
-    assert_true(not_same_len_A != not_same_len_B)
+    # TODO: add those tests when conditional traits are available
+    # assert_true(not_same_len_B != not_same_len_A)
+    # assert_true(not_same_len_A != not_same_len_B)
 
 
 def main():
