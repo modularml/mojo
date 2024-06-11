@@ -45,7 +45,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
             (
                 "You should never call the explicit copy constructor of"
                 " UnsafeMaybeUninitialized because it's ambiguous to copy"
-                " possibly uninitialized memory.Use"
+                " possibly uninitialized memory. Use"
                 " `UnsafeMaybeUninitialized.copy_from()` instead if you want to"
                 " trigger an explicit copy of the content of"
                 " UnsafeMaybeUninitialized. It has very specific semantics."
@@ -113,7 +113,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     @always_inline
     fn copy_from[
         CopyableType: ExplicitlyCopyable
-    ](inout self: UnsafeMaybeUninitialized[CopyableType], other: CopyableType,):
+    ](inout self: UnsafeMaybeUninitialized[CopyableType], other: CopyableType):
         """Copy another object.
 
         This function assumes that the current memory is uninitialized.

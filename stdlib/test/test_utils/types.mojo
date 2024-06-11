@@ -52,7 +52,7 @@ struct ExplicitCopyOnly(ExplicitlyCopyable):
         self.copy_count = other.copy_count + 1
 
 
-struct CopyCounter(CollectionElement, CollectionElementNew):
+struct CopyCounter(CollectionElement, ExplicitlyCopyable):
     """Counts the number of copies performed on a value."""
 
     var copy_count: Int
@@ -109,13 +109,9 @@ struct MoveCounter[T: CollectionElementNew](
 
 
 @value
-struct ValueDestructorRecorder(CollectionElementNew):
+struct ValueDestructorRecorder:
     var value: Int
     var destructor_counter: UnsafePointer[List[Int]]
-
-    fn __init__(inout self, *, other: Self):
-        self.value = other.value
-        self.destructor_counter = other.destructor_counter
 
     fn __del__(owned self):
         self.destructor_counter[].append(self.value)
