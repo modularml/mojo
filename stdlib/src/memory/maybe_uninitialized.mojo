@@ -91,10 +91,10 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
 
     @always_inline
     fn copy_from[
-        CollectionElementType: CollectionElementNew
+        CopyableType: ExplicitlyCopyable
     ](
-        inout self: UnsafeMaybeUninitialized[CollectionElementType],
-        other: UnsafeMaybeUninitialized[CollectionElementType],
+        inout self: UnsafeMaybeUninitialized[CopyableType],
+        other: UnsafeMaybeUninitialized[CopyableType],
     ):
         """Copy another object.
 
@@ -102,31 +102,30 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         and the other object is initialized memory.
 
         Parameters:
-            CollectionElementType: The type object to copy.
+            CopyableType: The type object to copy.
 
         Args:
             other: The object to copy.
         """
-        self.write(CollectionElementType(other=other.assume_initialized()))
+        var ptr = self.unsafe_ptr()
+        ptr.initialize_pointee_explicit_copy(other.assume_initialized())
 
     @always_inline
     fn copy_from[
-        CollectionElementType: CollectionElementNew
-    ](
-        inout self: UnsafeMaybeUninitialized[CollectionElementType],
-        other: CollectionElementType,
-    ):
+        CopyableType: ExplicitlyCopyable
+    ](inout self: UnsafeMaybeUninitialized[CopyableType], other: CopyableType,):
         """Copy another object.
 
         This function assumes that the current memory is uninitialized.
 
         Parameters:
-            CollectionElementType: The type object to copy.
+            CopyableType: The type object to copy.
 
         Args:
             other: The object to copy.
         """
-        self.write(CollectionElementType(other=other))
+        var ptr = self.unsafe_ptr()
+        ptr.initialize_pointee_explicit_copy(other)
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
