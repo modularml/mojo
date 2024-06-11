@@ -813,7 +813,7 @@ Special thanks to our community contributors:
 
 [@rd4com](https://github.com/rd4com),
 [@toiletsandpaper](https://github.com/toiletsandpaper),
-[@helehex](https://github.com/helehex), [@rd4com](https://github.com/rd4com/),
+[@helehex](https://github.com/helehex),
 [@artemiogr97](https://github.com/artemiogr97),
 [@mikowals](https://github.com/mikowals),
 [@kernhanda](https://github.com/kernhanda), [@lsh](https://github.com/lsh),
@@ -1787,8 +1787,8 @@ fixed in a future release.
 
 - The [`memcpy()`](/mojo/stdlib/memory/memory/memcpy) overload that worked on
   [`Buffer`](/mojo/stdlib/buffer/buffer/Buffer) types has been removed in favor
-  of just overloads for [`Pointer`](/mojo/stdlib/memory/unsafe/Pointer) and
-  [`DTypePointer`](/mojo/stdlib/memory/unsafe/DTypePointer):
+  of just overloads for [`Pointer`](/mojo/stdlib/memory/unsafe/LegacyPointer)
+  and [`DTypePointer`](/mojo/stdlib/memory/unsafe/DTypePointer):
 
   ```mojo
   # Doesn't work
@@ -2073,8 +2073,8 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
 - Added [`AnyPointer.move_into()`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer#move_into)
   method, for moving a value from one pointer memory location to another.
 
-- Added built-in [`hex()`](/mojo/stdlib/builtin/hex/hex) function, which can be
-  used to format any value whose type implements the
+- Added built-in [`hex()`](/mojo/stdlib/builtin/format_int/hex) function, which
+  can be used to format any value whose type implements the
   [`Intable`](/mojo/stdlib/builtin/int/Intable) trait as a hexadecimal string.
 
 - [`PythonObject`](/mojo/stdlib/python/object/PythonObject) now implements
@@ -3098,7 +3098,7 @@ the previous "read to EOF" behavior when size is negative.
 
 - Subscripting added to
   [`DTypePointer`](/mojo/stdlib/memory/unsafe/DTypePointer) and
-  [`Pointer`](/mojo/stdlib/memory/unsafe/Pointer):
+  [`Pointer`](/mojo/stdlib/memory/unsafe/LegacyPointer):
 
   ```mojo
   let p = DTypePointer[DType.float16].alloc(4)
