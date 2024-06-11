@@ -907,7 +907,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             True if this List is non-equal to the RHS List and False otherwise.
         """
 
-        return not (self.__eq__(rhs))
+        return not self.__eq__(rhs)
 
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:
