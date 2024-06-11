@@ -168,6 +168,7 @@ def test_unsafepointer_address_space():
     var p2 = UnsafePointer[Int, AddressSpace.GENERIC].alloc(1)
     p2.free()
 
+
 def test_unsafepointer_aligned_alloc():
     var ptr = UnsafePointer[UInt8].alloc[alignment=64](1)
     # Not sure how to test this. Maybe:
