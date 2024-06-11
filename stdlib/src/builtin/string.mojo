@@ -1651,8 +1651,8 @@ struct String(
         .
         """
 
+        _ = sep
         var output = List[String]()
-
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
