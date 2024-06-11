@@ -39,7 +39,10 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     @doc_private
     @always_inline
     fn __init__(inout self, *, other: Self):
-        """It is not possible to call this method."""
+        """It is not possible to call this method.
+
+        Trying to call this method will fail early, at compile-time.
+        """
         constrained[
             False,
             (
@@ -78,7 +81,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         This method should never be called as implicit copy should not
         be done on memory that may be uninitialized.
 
-        Calling this method will actally cause the program to abort.
+        Trying to call this method will fail early, at compile-time.
 
         If you wish to perform a copy, you should manually call the method
         `copy_from` instead.
@@ -86,7 +89,9 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to copy.
         """
-        abort("You should never call __copyinit__ on MaybeUninitialized")
+        constrained[
+            False, "You should never call __copyinit__ on MaybeUninitialized"
+        ]()
         self = Self()
 
     @always_inline
@@ -107,8 +112,9 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to copy.
         """
-        var ptr = self.unsafe_ptr()
-        ptr.initialize_pointee_explicit_copy(other.assume_initialized())
+        self.unsafe_ptr().initialize_pointee_explicit_copy(
+            other.assume_initialized()
+        )
 
     @always_inline
     fn copy_from[
@@ -124,8 +130,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to copy.
         """
-        var ptr = self.unsafe_ptr()
-        ptr.initialize_pointee_explicit_copy(other)
+        self.unsafe_ptr().initialize_pointee_explicit_copy(other)
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
@@ -134,7 +139,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         This method should never be called as implicit moves should not
         be done on memory that may be uninitialized.
 
-        Calling this method will actally cause the program to abort.
+        Trying to call this method will fail early, at compile-time.
 
         If you wish to perform a move, you should manually call the method
         `move_from` instead.
@@ -142,7 +147,9 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to move.
         """
-        abort("You should never call __moveinit__ on MaybeUninitialized")
+        constrained[
+            False, "You should never call __moveinit__ on MaybeUninitialized"
+        ]()
         self = Self()
 
     @always_inline
