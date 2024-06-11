@@ -1626,8 +1626,6 @@ struct String(
     fn split(self, sep: NoneType = None, maxsplit: Int = -1) -> List[String]:
         """Split the string by every Whitespace separator.
 
-        Currently only uses C style separators.
-
         Args:
             sep: None.
             maxsplit: The maximum amount of items to split from String. Defaults
