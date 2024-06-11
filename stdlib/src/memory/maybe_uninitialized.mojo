@@ -38,15 +38,18 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElementNew](
         """The memory is now considered uninitialized."""
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
+    @doc_private
     @always_inline
     fn __init__(inout self, *, other: Self):
-        """Leave this memory location uninitialized. No copy is actually performed here.
-
-        If you wish to actually copy the internal value, use `copy_from()` instead.
-
-        Args:
-            other: The object to copy.
-        """
+        """It is not possible to call this method."""
+        constrained[
+            False,
+            (
+                "You should never call the explicit copy constructor of"
+                " UnsafeMaybeUninitialized because it's not clear what it means"
+                " to copy possibly uninitialized memory."
+            ),
+        ]()
         self = Self()
 
     @always_inline
