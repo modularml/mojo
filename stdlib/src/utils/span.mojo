@@ -175,15 +175,16 @@ struct Span[
         Returns:
             A new span that points to the same data as the current span.
         """
-        var adjusted_span = self._adjust_span(slc)
+        var start: Int
+        var end: Int
+        var step: Int
+        start, end, step = slc.indices(len(self))
         debug_assert(
-            0 <= adjusted_span.start <= self._len
-            and 0 <= adjusted_span.end <= self._len,
-            "Slice must be within bounds.",
+            step == 1, "Slice must be within bounds and step must be 1"
         )
         var res = Self(
-            unsafe_ptr=(self._data + adjusted_span.start),
-            len=adjusted_span.unsafe_indices(),
+            unsafe_ptr=(self._data + start),
+            len=len(range(start, end, step)),
         )
 
         return res
@@ -213,26 +214,6 @@ struct Span[
     # ===------------------------------------------------------------------===#
     # Methods
     # ===------------------------------------------------------------------===#
-
-    @always_inline
-    fn _adjust_span(self, span: Slice) -> Slice:
-        """Adjusts the span based on the list length."""
-        var adjusted_span = span
-
-        if adjusted_span.start < 0:
-            adjusted_span.start = len(self) + adjusted_span.start
-
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
-            adjusted_span.end = len(self) + adjusted_span.end
-
-        if span.step < 0:
-            var tmp = adjusted_span.end
-            adjusted_span.end = adjusted_span.start - 1
-            adjusted_span.start = tmp - 1
-
-        return adjusted_span
 
     fn unsafe_ptr(self) -> UnsafePointer[T]:
         """
