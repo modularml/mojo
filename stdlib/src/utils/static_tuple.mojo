@@ -315,7 +315,7 @@ struct InlineArray[
 
         @parameter
         for i in range(size):
-            var ptr = UnsafePointer.address_of(self._get_reference_unsafe(i)[])
+            var ptr = UnsafePointer.address_of(self.unsafe_get(i))
             ptr.initialize_pointee_explicit_copy(fill)
 
     @always_inline
@@ -347,7 +347,9 @@ struct InlineArray[
         # Move each element into the array storage.
         @parameter
         for i in range(size):
-            var eltref = self._get_reference_unsafe(i)
+            var eltref: Reference[
+                Self.ElementType, __lifetime_of(self)
+            ] = self.unsafe_get(i)
             UnsafePointer.address_of(storage[i]).move_pointee_into(
                 UnsafePointer[Self.ElementType].address_of(eltref[])
             )
@@ -387,7 +389,7 @@ struct InlineArray[
         """
         var normalized_index = normalize_index["InlineArray"](idx, self)
 
-        return self._get_reference_unsafe(normalized_index)[]
+        return self.unsafe_get(normalized_index)
 
     @always_inline("nodebug")
     fn __getitem__[
@@ -412,7 +414,7 @@ struct InlineArray[
         if i < 0:
             normalized_idx += size
 
-        return self._get_reference_unsafe(normalized_idx)[]
+        return self.unsafe_get(normalized_idx)
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
@@ -432,9 +434,9 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn _get_reference_unsafe(
+    fn unsafe_get(
         ref [_]self: Self, idx: Int
-    ) -> Reference[Self.ElementType, __lifetime_of(self)]:
+    ) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__getitem__` instead of this method as it is
