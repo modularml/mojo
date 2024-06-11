@@ -89,7 +89,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
   ([PR #2771](https://github.com/modularml/mojo/pull/2771) by [@rd4com](https://github.com/rd4com))
 
   Support automatic and manual indexing of `*args`.
-  
+
   Examples:
 
   ```mojo
@@ -133,6 +133,16 @@ by [@jayzhan211](https://github.com/jayzhan211))
   Note the default load width before was 1, but the default size of `SIMD` is
   the size of the SIMD type.
   The default store size is the size of the `SIMD` value to be stored.
+
+- `Slice` now uses `OptionalReg[Int]` for `start` and `end` and implements
+  a constructor which accepts optional values. `Slice._has_end()` has also been removed
+  since a Slice with no end is now represented by an empty `Slice.end` option.
+  ([PR #2495](https://github.com/modularml/mojo/pull/2495) by [@bgreni](https://github.com/bgreni))
+
+  ```mojo
+    var s = Slice(1, None, 2)
+    print(s.start.value()) # must retrieve the value from the optional
+  ```
 
 ### ❌ Removed
 

@@ -20,24 +20,10 @@ from collections import OptionalReg
 
 
 @always_inline("nodebug")
-fn _int_max_value() -> Int:
-    # FIXME: The `slice` type should have the concept of `None` indices, but the
-    # effect of a `None` end index is the same as a very large end index.
-    return int(Int32.MAX)
-
-
-@always_inline("nodebug")
-fn _default_or[T: AnyTrivialRegType](value: T, default: Int) -> Int:
-    # TODO: Handle `__index__` for other types when we have traits!
-    @parameter
-    if _mlirtype_is_eq[T, Int]():
-        return __mlir_op.`kgen.rebind`[_type=Int](value)
-    else:
-        __mlir_op.`kgen.param.assert`[
-            cond = (_mlirtype_is_eq[T, NoneType]()).__mlir_i1__(),
-            message = "expected Int or NoneType".value,
-        ]()
-        return default
+fn _compare_optional(x: OptionalReg[Int], y: OptionalReg[Int]) -> Bool:
+    if x and y:
+        return x.value() == y.value()
+    return not x and not y
 
 
 @register_passable("trivial")
@@ -56,9 +42,9 @@ struct Slice(Stringable, EqualityComparable):
     ```
     """
 
-    var start: Int
+    var start: OptionalReg[Int]
     """The starting index of the slice."""
-    var end: Int
+    var end: OptionalReg[Int]
     """The end index of the slice."""
     var step: Int
     """The step increment value of the slice."""
@@ -76,24 +62,22 @@ struct Slice(Stringable, EqualityComparable):
         self.step = 1
 
     @always_inline("nodebug")
-    fn __init__[
-        T0: AnyTrivialRegType, T1: AnyTrivialRegType, T2: AnyTrivialRegType
-    ](inout self, start: T0, end: T1, step: T2):
+    fn __init__(
+        inout self,
+        start: OptionalReg[Int],
+        end: OptionalReg[Int],
+        step: OptionalReg[Int],
+    ):
         """Construct slice given the start, end and step values.
-
-        Parameters:
-            T0: Type of the start value.
-            T1: Type of the end value.
-            T2: Type of the step value.
 
         Args:
             start: The start value.
             end: The end value.
             step: The step value.
         """
-        self.start = _default_or(start, 0)
-        self.end = _default_or(end, _int_max_value())
-        self.step = _default_or(step, 1)
+        self.start = start
+        self.end = end
+        self.step = step.value() if step else 1
 
     fn __str__(self) -> String:
         """Gets the string representation of the span.
@@ -101,10 +85,10 @@ struct Slice(Stringable, EqualityComparable):
         Returns:
             The string representation of the span.
         """
-        var res = str(self.start)
+        var res = str(self.start.value()) if self.start else ""
         res += ":"
-        if self._has_end():
-            res += str(self.end)
+        if self.end:
+            res += str(self.end.value()) if self.end else ""
         res += ":"
         res += str(self.step)
         return res
@@ -121,8 +105,8 @@ struct Slice(Stringable, EqualityComparable):
             corresponding values of the other slice and False otherwise.
         """
         return (
-            self.start == other.start
-            and self.end == other.end
+            _compare_optional(self.start, other.start)
+            and _compare_optional(self.end, other.end)
             and self.step == other.step
         )
 
@@ -149,7 +133,7 @@ struct Slice(Stringable, EqualityComparable):
             The length of the slice.
         """
 
-        return len(range(self.start, self.end, self.step))
+        return len(range(self.start.value(), self.end.value(), self.step))
 
     @always_inline
     fn __getitem__(self, idx: Int) -> Int:
@@ -161,11 +145,63 @@ struct Slice(Stringable, EqualityComparable):
         Returns:
             The slice index.
         """
-        return self.start + index(idx) * self.step
+        return self.start.value() + idx * self.step
 
-    @always_inline("nodebug")
-    fn _has_end(self) -> Bool:
-        return self.end != _int_max_value()
+    fn indices(self, length: Int) -> (Int, Int, Int):
+        """Returns a tuple of 3 intergers representing the start, end, and step
+           of the slice if applied to a container of the given length.
+
+        Uses the target container length to normalize negative, out of bounds,
+        or None indices.
+
+        Negative indices are wrapped using the length of the container.
+        ```mojo
+        s = slice(0, -1, 1)
+        s.indices(5) # returns (0, 4, 1)
+        ```
+
+        None indices are defaulted to the start or the end of the container
+        based on whether `step` is positive or negative.
+        ```mojo
+        s = slice(None, None, 1)
+        s.indices(5) # returns (0, 5, 1)
+        ```
+
+        Out of bounds indices are clamped using the size of the container.
+        ```mojo
+        s = slice(20)
+        s.indices(5) # returns (0, 5, 1)
+        ```
+
+        Args:
+            length: The length of the target container.
+
+        Returns:
+            A tuple containing three integers for start, end, and step.
+        """
+        var start = self.start
+        var end = self.end
+        var positive_step = self.step > 0
+
+        if not start:
+            start = 0 if positive_step else length - 1
+        elif start.value() < 0:
+            start = start.value() + length
+            if start.value() < 0:
+                start = 0 if positive_step else -1
+        elif start.value() >= length:
+            start = length if positive_step else length - 1
+
+        if not end:
+            end = length if positive_step else -1
+        elif end.value() < 0:
+            end = end.value() + length
+            if end.value() < 0:
+                end = 0 if positive_step else -1
+        elif end.value() >= length:
+            end = length if positive_step else length - 1
+
+        return (start.value(), end.value(), self.step)
 
 
 @always_inline("nodebug")
@@ -195,17 +231,11 @@ fn slice(start: Int, end: Int) -> Slice:
     return Slice(start, end)
 
 
-# TODO(30496): Modernize the slice type
 @always_inline("nodebug")
-fn slice[
-    T0: AnyTrivialRegType, T1: AnyTrivialRegType, T2: AnyTrivialRegType
-](start: T0, end: T1, step: T2) -> Slice:
+fn slice(
+    start: OptionalReg[Int], end: OptionalReg[Int], step: OptionalReg[Int]
+) -> Slice:
     """Construct a Slice given the start, end and step values.
-
-    Parameters:
-        T0: Type of the start value.
-        T1: Type of the end value.
-        T2: Type of the step value.
 
     Args:
         start: The start value.
@@ -221,13 +251,6 @@ fn slice[
 # ===-------------------------------------------------------------------===#
 # SliceNew
 # ===-------------------------------------------------------------------===#
-
-
-@always_inline("nodebug")
-fn _compare_optional(x: OptionalReg[Int], y: OptionalReg[Int]) -> Bool:
-    if x and y:
-        return x.value() == y.value()
-    return not x and not y
 
 
 @register_passable("trivial")
