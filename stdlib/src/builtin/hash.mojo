@@ -287,6 +287,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
         memset_zero(ptr + r, stride - r)  # set the rest to 0
         var last_value = SIMD[size=simd_width].load(ptr.bitcast[type]())
         hash_data = _HASH_UPDATE(hash_data, last_value)
+        _ = remaining  # We make sure the array lives long enough.
 
     # Now finally, hash the final SIMD vector state.
     return _hash_simd(hash_data)
