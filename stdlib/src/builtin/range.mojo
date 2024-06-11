@@ -179,9 +179,10 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        # FIXME(#38392)
-        # if (self.step > 0) == (self.start > self.end):
-        #     return 0
+        if (self.step > 0 and self.start > self.end) or (
+            self.step < 0 and self.start < self.end
+        ):
+            return 0
         return _div_ceil_positive(abs(self.start - self.end), abs(self.step))
 
     @always_inline("nodebug")
