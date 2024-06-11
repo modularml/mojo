@@ -19,3 +19,5 @@ venv.bak/
 
 # MacOS
 .DS_Store
+
+install_id

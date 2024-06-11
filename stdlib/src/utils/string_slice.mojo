@@ -212,13 +212,14 @@ struct StringSlice[
 
         var no_null_len = len(self)
         var ptr = self.unsafe_ptr()
-        if no_null_len == 1 and not _isspace(ptr[0]):
-            return False
-        elif no_null_len == 2 and not _compare(ptr, next_line.unsafe_ptr(), 2):
-            return False
-        elif no_null_len == 3 and not (
+        if no_null_len == 1 and _isspace(ptr[0]):
+            return True
+        elif no_null_len == 2 and _compare(ptr, next_line.unsafe_ptr(), 2):
+            return True
+        elif no_null_len == 3 and (
             _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
             or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
         ):
-            return False
+            return True
+        _ = next_line, unicode_line_sep, unicode_paragraph_sep
         return False

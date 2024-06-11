@@ -1656,17 +1656,17 @@ struct String(
 
         var output = List[String]()
 
-        var str_byte_len = len(self) - 1
+        var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
         var items = 0
-        for substr in self:
+        while lhs <= str_byte_len:
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
-            while lhs <= str_byte_len:
-                if not substr.isspace():
+            for s in self[lhs:]:
+                if not s.isspace():
                     break
-                lhs += 1
+                lhs += len(s)
             # if it went until the end of the String, then
             # it should be sliced up until the original
             # start of the whitespace which was already appended
@@ -1677,10 +1677,10 @@ struct String(
                 output.append(self[str_byte_len])
                 break
             rhs = lhs + 1
-            while rhs <= str_byte_len:
-                if substr.isspace():
+            for s in self[lhs + 1 :]:
+                if s.isspace():
                     break
-                rhs += 1
+                rhs += len(s)
 
             if maxsplit > -1:
                 if items == maxsplit:
@@ -1834,9 +1834,12 @@ struct String(
             A copy of the string with no trailing whitespaces.
         """
         var r_idx = len(self)
-        for s in self.__reversed__():
-            if not s.isspace():
-                break
+        # TODO: should use this once llvm intrinsics can be used at comp time
+        # for s in self.__reversed__():
+        #     if not s.isspace():
+        #         break
+        #     r_idx -= 1
+        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)[]):
             r_idx -= 1
         return self[:r_idx]
 
@@ -1863,9 +1866,12 @@ struct String(
             A copy of the string with no leading whitespaces.
         """
         var l_idx = 0
-        for s in self:
-            if not s.isspace():
-                break
+        # TODO: should use this once llvm intrinsics can be used at comp time
+        # for s in self:
+        #     if not s.isspace():
+        #         break
+        #     l_idx += 1
+        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)[]):
             l_idx += 1
         return self[l_idx:]
 
