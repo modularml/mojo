@@ -12,9 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
-struct UnsafeMaybeUninitialized[ElementType: CollectionElementNew](
-    CollectionElementNew
-):
+struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     """A memory location that may or may not be initialized.
 
     Note that the destructor is a no-op. If the memory was initialized, the caller
@@ -56,13 +54,21 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElementNew](
         self = Self()
 
     @always_inline
-    fn __init__(inout self, owned value: Self.ElementType):
+    fn __init__[
+        MovableType: Movable
+    ](
+        inout self: UnsafeMaybeUninitialized[MovableType],
+        owned value: MovableType,
+    ):
         """The memory is now considered initialized.
+
+        Parameters:
+            MovableType: The type of the element to store.
 
         Args:
             value: The value to initialize the memory with.
         """
-        self = Self()
+        self = UnsafeMaybeUninitialized[MovableType]()
         self.write(value^)
 
     @always_inline
@@ -84,27 +90,43 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElementNew](
         self = Self()
 
     @always_inline
-    fn copy_from(inout self, other: Self):
+    fn copy_from[
+        CollectionElementType: CollectionElementNew
+    ](
+        inout self: UnsafeMaybeUninitialized[CollectionElementType],
+        other: UnsafeMaybeUninitialized[CollectionElementType],
+    ):
         """Copy another object.
 
         This function assumes that the current memory is uninitialized
         and the other object is initialized memory.
 
+        Parameters:
+            CollectionElementType: The type object to copy.
+
         Args:
             other: The object to copy.
         """
-        self.write(ElementType(other=other.assume_initialized()))
+        self.write(CollectionElementType(other=other.assume_initialized()))
 
     @always_inline
-    fn copy_from(inout self, other: ElementType):
+    fn copy_from[
+        CollectionElementType: CollectionElementNew
+    ](
+        inout self: UnsafeMaybeUninitialized[CollectionElementType],
+        other: CollectionElementType,
+    ):
         """Copy another object.
 
         This function assumes that the current memory is uninitialized.
 
+        Parameters:
+            CollectionElementType: The type object to copy.
+
         Args:
             other: The object to copy.
         """
-        self.write(ElementType(other=other))
+        self.write(CollectionElementType(other=other))
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
@@ -125,7 +147,12 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElementNew](
         self = Self()
 
     @always_inline
-    fn move_from(inout self, inout other: Self):
+    fn move_from[
+        MovableType: Movable
+    ](
+        inout self: UnsafeMaybeUninitialized[MovableType],
+        inout other: UnsafeMaybeUninitialized[MovableType],
+    ):
         """Move another object.
 
         This function assumes that the current memory is uninitialized
@@ -133,16 +160,27 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElementNew](
 
         After the function is called, the other object is considered uninitialized.
 
+        Parameters:
+            MovableType: The type object to move.
+
         Args:
             other: The object to move.
         """
         other.unsafe_ptr().move_pointee_into(self.unsafe_ptr())
 
     @always_inline
-    fn write(inout self, owned value: Self.ElementType):
+    fn write[
+        MovableType: Movable
+    ](
+        inout self: UnsafeMaybeUninitialized[MovableType],
+        owned value: MovableType,
+    ):
         """Write a value into an uninitialized memory location.
 
         Calling this method assumes that the memory is uninitialized.
+
+        Parameters:
+            MovableType: The type of the element to store.
 
         Args:
             value: The value to write.
