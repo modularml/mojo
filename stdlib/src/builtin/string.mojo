@@ -1236,15 +1236,14 @@ struct String(
         Returns:
             The string byte length.
         """
-        # TODO: everything uses this method assuming it's byte length
-        # var unicode_length = self.byte_length()
+        var unicode_length = self.byte_length()
 
+        # TODO: everything uses this method assuming it's byte length
         # for i in range(unicode_length):
         #     if _utf8_byte_type(self._buffer[i]) == 1:
         #         unicode_length -= 1
 
-        # return unicode_length
-        return self.byte_length()
+        return unicode_length
 
     @always_inline
     fn __str__(self) -> String:
