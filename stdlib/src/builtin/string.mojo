@@ -1645,7 +1645,7 @@ struct String(
         _ = String("      hello    world     ").split() # ["hello", "world"]
         # Splitting adjacent universal newlines:
         _ = String(
-            "hello \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029world"
+            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
         ).split()  # ["hello", "world"]
         ```
         .
