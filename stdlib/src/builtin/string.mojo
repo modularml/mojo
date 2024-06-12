@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from bit import countl_zero
 from collections import List, KeyElement
+from collections._index_normalization import normalize_index
 from sys import llvm_intrinsic, bitwidthof
 from sys.ffi import C_char
 
@@ -1010,8 +1011,11 @@ struct String(
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __getitem__(self, idx: Int) -> String:
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
         """Gets the character at the specified position.
+
+        Parameters:
+            IndexerType: The inferred type of an indexer argument.
 
         Args:
             idx: The index value.
@@ -1019,12 +1023,9 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
-        if idx < 0:
-            return self.__getitem__(len(self) + idx)
-
-        debug_assert(0 <= idx < len(self), "index must be in range")
+        var normalized_idx = normalize_index["String"](idx, self)
         var buf = Self._buffer_type(capacity=1)
-        buf.append(self._buffer[idx])
+        buf.append(self._buffer[normalized_idx])
         buf.append(0)
         return String(buf^)
 
