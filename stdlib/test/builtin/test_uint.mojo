@@ -158,9 +158,19 @@ def test_simple_uint():
     assert_equal(str(UInt(18446744073709551615)), "18446744073709551615")
 
 
+def test_uint_representation():
+    assert_equal(repr(UInt(32)), "UInt(32)")
+
+    assert_equal(repr(UInt(0)), "UInt(0)")
+    assert_equal(repr(UInt()), "UInt(0)")
+
+    assert_equal(repr(UInt(18446744073709551615)), "UInt(18446744073709551615)")
+
+
 def main():
     test_uint_lower_than()
     test_uint_lower_equal()
     test_uint_greater_than()
     test_uint_greater_equal()
     test_simple_uint()
+    test_uint_representation()

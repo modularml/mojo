@@ -19,7 +19,7 @@ These are Mojo built-ins, so you don't need to import them.
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt:
+struct UInt(Stringable, Representable):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
@@ -142,3 +142,18 @@ struct UInt:
             The string representation of this UInt.
         """
         return str(UInt64(self))
+
+    @always_inline("nodebug")
+    fn __repr__(self) -> String:
+        """Convert this UInt to a string.
+
+        A small example.
+        ```mojo
+        var x = UInt(50)
+        var x_as_string = repr(x)  # x_as_string = "UInt(50)"
+        ```
+
+        Returns:
+            The string representation of this UInt.
+        """
+        return "UInt(" + str(self) + ")"
