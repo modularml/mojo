@@ -51,11 +51,11 @@ Big themes for this release:
 ### Language changes
 
 - Mojo has changed how `def` function arguments are processed.  Previously, by
-  default, arguments to a `def` were treated treated according to the `owned`
+  default, arguments to a `def` were treated according to the `owned`
   convention, which makes a copy of the value, enabling that value to be mutable
   in the callee.
 
-  This could lead to a major performance issues because of the proliferation of
+  This could lead to major performance issues because of the proliferation of
   unnecessary copies. It also required you to declare non-copyable types as
   `borrowed` explicitly.  Now Mojo takes a different approach: `def` functions
   take arguments as `borrowed` by default (consistent with `fn` functions) but
@@ -221,7 +221,7 @@ Big themes for this release:
 
 - New traits and related features:
 
-  - Added built-in [`repr()`](mojo/stdlib/builtin/repr/repr) function and
+  - Added built-in [`repr()`](/mojo/stdlib/builtin/repr/repr) function and
    [`Representable`](/mojo/stdlib/builtin/repr/Representable) trait.
     ([PR #2361](https://github.com/modularml/mojo/pull/2361))
 
@@ -488,6 +488,9 @@ Big themes for this release:
 
   - Many functions returning a pointer type have been unified to have a public
     API function of `unsafe_ptr()`.
+
+  - The `Tensor.data()` method has been renamed to `unsafe_ptr()`. The return
+    type is still a `DTypePointer[T]`.
 
 - Collections:
 
@@ -783,7 +786,9 @@ Big themes for this release:
   - `math.limit.min_finite()`: use `utils.numerics.min_finite()`
 
 - The `tensor.random` module has been removed. The same functionality is now
-  accessible via the `Tensor.rand()` and `Tensor.randn()` static methods.
+  accessible via the [`Tensor.rand()`](/mojo/stdlib/tensor/tensor/Tensor#rand)
+  and [`Tensor.randn()`](/mojo/stdlib/tensor/tensor/Tensor#randn) static
+  methods.
 
 - The builtin `SIMD` struct no longer conforms to `Indexer`; users must
   explicitly cast `Scalar` values using `int`.
@@ -808,7 +813,7 @@ Special thanks to our community contributors:
 
 [@rd4com](https://github.com/rd4com),
 [@toiletsandpaper](https://github.com/toiletsandpaper),
-[@helehex](https://github.com/helehex), [@rd4com](https://github.com/rd4com/),
+[@helehex](https://github.com/helehex),
 [@artemiogr97](https://github.com/artemiogr97),
 [@mikowals](https://github.com/mikowals),
 [@kernhanda](https://github.com/kernhanda), [@lsh](https://github.com/lsh),
@@ -1611,7 +1616,7 @@ fixed in a future release.
   type, a register-passable alternative to
   [`Optional`](/mojo/stdlib/collections/optional/Optional).
 
-- The [`ulp()`](/mojo/stdlib/math/math/ulp) function has been added to the
+- The [`ulp()`](/mojo/stdlib/utils/numerics/ulp) function has been added to the
   `math` module. This allows you to get the units of least precision (or units
   of last place) of a floating point value.
 
@@ -1700,10 +1705,11 @@ fixed in a future release.
     from buffer import parallel_memcpy
     ```
 
-  - The [`rand()`](/mojo/stdlib/tensor/random/rand) and
-    [`randn()`](/mojo/stdlib/tensor/random/randn) functions from the `random`
-    package that return a `Tensor` have moved to the `tensor` package. Note that
-    the overloads that write to a `DTypePointer` remain in the `random` package.
+  - The [`rand()`](/mojo/stdlib/tensor/tensor/Tensor#rand) and
+    [`randn()`](/mojo/stdlib/tensor/tensor/Tensor#randn) functions from the
+    `random` package that return a `Tensor` have moved to the `tensor` package.
+    Note that the overloads that write to a `DTypePointer` remain in the
+    `random` package.
 
     If you happen to be using both versions in the same source file, you can
     import them both using the `import as` syntax:
@@ -1721,9 +1727,9 @@ fixed in a future release.
     from os import abort
     ```
 
-  - The [`isinf()`](/mojo/stdlib/math/math/isinf) and
-    [`isfinite()`](/mojo/stdlib/math/math/isfinite) methods have been moved from
-    `math.limits` to the `math` module.
+  - The [`isinf()`](/mojo/stdlib/utils/numerics/isfinite) and
+    [`isfinite()`](/mojo/stdlib/utils/numerics/isfinite) methods have been moved
+    from `math.limits` to the `math` module.
 
     ```mojo
     from math import ininf, isfinite
@@ -1781,8 +1787,8 @@ fixed in a future release.
 
 - The [`memcpy()`](/mojo/stdlib/memory/memory/memcpy) overload that worked on
   [`Buffer`](/mojo/stdlib/buffer/buffer/Buffer) types has been removed in favor
-  of just overloads for [`Pointer`](/mojo/stdlib/memory/unsafe/Pointer) and
-  [`DTypePointer`](/mojo/stdlib/memory/unsafe/DTypePointer):
+  of just overloads for [`Pointer`](/mojo/stdlib/memory/unsafe/LegacyPointer)
+  and [`DTypePointer`](/mojo/stdlib/memory/unsafe/DTypePointer):
 
   ```mojo
   # Doesn't work
@@ -2061,14 +2067,14 @@ installation issues. Otherwise it is functionally identical to Mojo 24.1.
   `UnusualSlice` constructor.
 
 - The `__refitem__()` accessor method may now return a
-  [`Reference`](/mojo/stdlib/memory/reference/reference) instead of having to
+  [`Reference`](/mojo/stdlib/memory/reference/Reference) instead of having to
   return an MLIR internal reference type.
 
 - Added [`AnyPointer.move_into()`](/mojo/stdlib/memory/unsafe_pointer/UnsafePointer#move_into)
   method, for moving a value from one pointer memory location to another.
 
-- Added built-in [`hex()`](/mojo/stdlib/builtin/hex/hex) function, which can be
-  used to format any value whose type implements the
+- Added built-in [`hex()`](/mojo/stdlib/builtin/format_int/hex) function, which
+  can be used to format any value whose type implements the
   [`Intable`](/mojo/stdlib/builtin/int/Intable) trait as a hexadecimal string.
 
 - [`PythonObject`](/mojo/stdlib/python/object/PythonObject) now implements
@@ -3092,7 +3098,7 @@ the previous "read to EOF" behavior when size is negative.
 
 - Subscripting added to
   [`DTypePointer`](/mojo/stdlib/memory/unsafe/DTypePointer) and
-  [`Pointer`](/mojo/stdlib/memory/unsafe/Pointer):
+  [`Pointer`](/mojo/stdlib/memory/unsafe/LegacyPointer):
 
   ```mojo
   let p = DTypePointer[DType.float16].alloc(4)
