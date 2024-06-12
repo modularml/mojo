@@ -137,25 +137,23 @@ struct Iterator[T: CollectionElement, A: Nextable[T]]:
 
 `zip` implementation would be something like 
 ```mojo
-struct _zip[*Ts: CollectionElement, *A: HasIter[Ts]]:
+struct _zip[size: Int, *Ts: CollectionElement, *A: HasIter[Ts]]:
     var _iters: Tuple[*A]
-    var _len: Int
 
     fn __init__(inout self, *values: *A):
-        self._len = len(values)
         @parameter
-        for i in range(self._len):
+        for i in range(size):
             self._iters[i] = iter(values[i])
 
     fn __next__(self) -> Optional[Tuple[*Ts]]:
         var items: Optional[Tuple[*Ts]]
         @parameter
-        for i in range(self._len):
+        for i in range(size):
             item[i] = next(self._iters[i])
         return items
 
 fn zip[*Ts: CollectionElement, *A: HasIter[Ts]](*values: *A) -> Iterator[*Ts]:
-    return Iterator(_zip(values))
+    return Iterator(_zip[len(values)](values))
 ```
 
 And once we have capable enough generics for this code to be feasible, implementing a generator would be as simple as taking a yielding function
