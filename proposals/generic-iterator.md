@@ -137,7 +137,7 @@ struct Iterator[T: CollectionElement, A: Nextable[T]]:
 
 `zip` implementation would be something like 
 ```mojo
-struct _zip[*Ts: CollectionElement, *A: Iterable[Ts]]:
+struct _zip[*Ts: CollectionElement, *A: HasIter[Ts]]:
     var _iters: Tuple[*A]
     var _len: Int
 
@@ -154,7 +154,7 @@ struct _zip[*Ts: CollectionElement, *A: Iterable[Ts]]:
             item[i] = next(self._iters[i])
         return items
 
-fn zip[*Ts: CollectionElement, *A: Iterable[Ts]](*values: *A) -> Iterator[*Ts]:
+fn zip[*Ts: CollectionElement, *A: HasIter[Ts]](*values: *A) -> Iterator[*Ts]:
     return Iterator(_zip(values))
 ```
 
