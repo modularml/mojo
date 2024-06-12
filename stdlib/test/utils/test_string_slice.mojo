@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal, assert_not_equal
+from testing import assert_equal
 
 from utils import Span
 
@@ -86,8 +86,7 @@ fn test_string_byte_slice() raises:
     assert_equal(len(sub5), 0)
 
     # Empty slices still have a pointer value
-    assert_not_equal(int(sub4.unsafe_ptr()), 0)
-    assert_not_equal(int(sub5.unsafe_ptr()), 0)
+    assert_equal(int(sub5.unsafe_ptr()) - int(sub4.unsafe_ptr()), 2)
 
     # ----------------------------------
     # Test invalid slicing
