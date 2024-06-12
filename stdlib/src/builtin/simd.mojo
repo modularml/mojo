@@ -55,7 +55,7 @@ from .string import _calc_initial_buffer_size, _calc_format_buffer_size
 # Type Aliases
 # ===----------------------------------------------------------------------=== #
 
-alias Scalar = SIMD[size=1]
+alias Scalar = SIMD[_, size=1]
 """Represents a scalar dtype."""
 
 alias Int8 = Scalar[DType.int8]
@@ -228,20 +228,37 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         self.__copyinit__(other)
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: Int):
-        """Initializes the SIMD vector with an integer.
+    fn __init__(inout self, value: UInt):
+        """Initializes the SIMD vector with an unsigned integer.
 
-        The integer value is splatted across all the elements of the SIMD
+        The unsigned integer value is splatted across all the elements of the SIMD
         vector.
 
         Args:
             value: The input value.
         """
+        self = Self(value.value)
+
+    @always_inline("nodebug")
+    fn __init__(inout self, value: Int):
+        """Initializes the SIMD vector with a signed integer.
+
+        The signed integer value is splatted across all the elements of the SIMD
+        vector.
+
+        Args:
+            value: The input value.
+        """
+        self = Self(value.value)
+
+    @doc_private
+    @always_inline("nodebug")
+    fn __init__(inout self, value: __mlir_type.index):
         _simd_construction_checks[type, size]()
 
         var t0 = __mlir_op.`pop.cast_from_builtin`[
             _type = __mlir_type.`!pop.scalar<index>`
-        ](value.value)
+        ](value)
         var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
         ](t0)
@@ -450,30 +467,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                     )
                 )
             )
-
-    # ===-------------------------------------------------------------------===#
-    # Factory methods
-    # ===-------------------------------------------------------------------===#
-
-    @staticmethod
-    @always_inline("nodebug")
-    fn splat(x: Scalar[type]) -> Self:
-        """Splats (broadcasts) the element onto the vector.
-
-        Args:
-            x: The input scalar value.
-
-        Returns:
-            A new SIMD vector whose elements are the same as the input value.
-        """
-        _simd_construction_checks[type, size]()
-        return Self {
-            value: __mlir_op.`pop.simd.splat`[
-                _type = __mlir_type[
-                    `!pop.simd<`, size.value, `, `, type.value, `>`
-                ]
-            ](x.value)
-        }
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
