@@ -288,6 +288,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         """Verify if a given value is present in the Array.
 
         ```mojo
+        %# from collections import Array
         var x = Array(1,2,3)
         if 3 in x: print("x contains 3")
         ```
@@ -345,6 +346,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         the way to call this method is a bit special. Here is an example below:
 
         ```mojo
+        %# from collections import Array
         var my_array = Array(1, 2, 3)
         print(str(my_array))
         ```
@@ -381,6 +383,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         the way to call this method is a bit special. Here is an example below:
 
         ```mojo
+        %# from collections import Array
         var my_array = Array(1, 2, 3)
         print(repr(my_array))
         ```
@@ -474,6 +477,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         restricted by the range given the start and stop bounds.
 
         ```mojo
+        %# from collections import Array
         var my_array = Array(1, 2, 3)
         print(my_array.index(2)) # prints `1`
         ```
@@ -514,44 +518,29 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         return None
 
     @always_inline
-    fn _adjust_span(self, span: Slice) -> Slice:
-        """Adjusts the span based on the Array length."""
-        var adjusted_span = span
-
-        if adjusted_span.start < 0:
-            adjusted_span.start = len(self) + adjusted_span.start
-
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
-            adjusted_span.end = len(self) + adjusted_span.end
-
-        if span.step < 0:
-            var tmp = adjusted_span.end
-            adjusted_span.end = adjusted_span.start - 1
-            adjusted_span.start = tmp - 1
-
-        return adjusted_span
-
-    @always_inline
     fn __getitem__(self, span: Slice) -> Self:
         """Gets the sequence of elements at the specified positions.
 
         Args:
-            span: A slice that specifies positions of the new Array.
+            span: A slice that specifies positions of the new array.
 
         Returns:
-            A new Array containing the Array at the specified span.
+            A new array containing the array at the specified span.
         """
-        var adjusted_span = self._adjust_span(span)
-        var adjusted_span_len = adjusted_span.unsafe_indices()
+
+        var start: Int
+        var end: Int
+        var step: Int
+        start, end, step = span.indices(len(self))
+        var r = range(start, end, step)
+
+        if not len(r):
+            return Self()
 
         var res = Self()
-        if not adjusted_span_len:
-            return res
+        for i in r:
+            res.append(self[i])
 
-        for i in range(adjusted_span_len):  # FIXME using memcpy?
-            res.append(self.unsafe_get(adjusted_span[i]))
         return res
 
     fn __setitem__(inout self, idx: Int, owned value: Self._scalar_type):
@@ -596,6 +585,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         the way to call this method is a bit special. Here is an example below.
 
         ```mojo
+        %# from collections import Array
         var my_array = Array(1, 2, 3)
         print(my_array.count(1))
         ```
@@ -1115,7 +1105,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
     fn clear(inout self):
         """Zeroes the Array."""
-        self.vec = self.vec.splat(0)
+        self.vec = self._vec_type(0)
         self.capacity_left = capacity
 
     fn __eq__(self, other: Self) -> Bool:
