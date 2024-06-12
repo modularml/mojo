@@ -170,10 +170,23 @@ def test_unsafepointer_address_space():
 
 
 def test_unsafepointer_aligned_alloc():
-    var ptr = UnsafePointer[UInt8].alloc[alignment=64](1)
-    # Not sure how to test this. Maybe:
-    # assert_true(ptr.address % (64*8) == 0)
+    alias alignment_1 = 32
+    var ptr = UnsafePointer[UInt8].alloc[alignment=alignment_1](1)
+    var ptr_uint64 = UInt64(int(ptr))
     ptr.free()
+    assert_equal(ptr_uint64 % alignment_1, 0)
+
+    alias alignment_2 = 64
+    var ptr_2 = UnsafePointer[UInt8].alloc[alignment=alignment_2](1)
+    var ptr_uint64_2 = UInt64(int(ptr_2))
+    ptr_2.free()
+    assert_equal(ptr_uint64_2 % alignment_2, 0)
+
+    alias alignment_3 = 128
+    var ptr_3 = UnsafePointer[UInt8].alloc[alignment=alignment_3](1)
+    var ptr_uint64_3 = UInt64(int(ptr_3))
+    ptr_3.free()
+    assert_equal(ptr_uint64_3 % alignment_3, 0)
 
 
 # NOTE: Tests fails due to a `UnsafePointer` size
