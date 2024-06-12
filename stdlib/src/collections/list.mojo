@@ -885,7 +885,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             return False
 
         for i in range(len(self)):
-            if self.unsafe_get(i)[] != rhs.unsafe_get(i)[]:
+            if self.unsafe_get(i) != rhs.unsafe_get(i):
                 return False
         return True
 
