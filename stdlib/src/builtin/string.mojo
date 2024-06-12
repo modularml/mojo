@@ -1676,7 +1676,7 @@ struct String(
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
             while lhs <= str_iter_len:
-                if not _isspace(self._buffer.unsafe_get(lhs)[]):
+                if not _isspace(self._buffer.unsafe_get(lhs)):
                     break
                 lhs += 1
             # if it went until the end of the String, then
@@ -1690,7 +1690,7 @@ struct String(
                 break
             rhs = lhs + 1
             while rhs <= str_iter_len:
-                if _isspace(self._buffer.unsafe_get(rhs)[]):
+                if _isspace(self._buffer.unsafe_get(rhs)):
                     break
                 rhs += 1
 
@@ -1847,7 +1847,7 @@ struct String(
         """
         # TODO: should use self.__iter__ and self.isspace()
         var r_idx = len(self)
-        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)[]):
+        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)):
             r_idx -= 1
         return self[:r_idx]
 
@@ -1875,7 +1875,7 @@ struct String(
         """
         # TODO: should use self.__iter__ and self.isspace()
         var l_idx = 0
-        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)[]):
+        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)):
             l_idx += 1
         return self[l_idx:]
 
