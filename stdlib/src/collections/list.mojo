@@ -20,6 +20,7 @@ from collections import List
 """
 
 
+from collections._index_normalization import normalize_index
 from memory import UnsafePointer, Reference
 from sys.intrinsics import _type_is_eq
 from .optional import Optional
@@ -200,15 +201,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             idx: The index of the element.
             value: The value to assign.
         """
-        var normalized_idx = idx
-        debug_assert(
-            -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
-        )
-
-        if normalized_idx < 0:
-            normalized_idx += len(self)
-
+        var normalized_idx = normalize_index["List"](idx, self)
         self.unsafe_set(normalized_idx, value^)
 
     @always_inline
