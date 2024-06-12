@@ -10,15 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -D TEMP_FILE_DIR=%T -debug-level full %s
+# RUN: %mojo -debug-level full %s
 
 
 from pathlib import Path, _dir_of_current_file
-from sys import os_is_windows, env_get_string
+from tempfile import gettempdir
+from sys import os_is_windows
 
 from testing import assert_equal, assert_true
-
-alias TEMP_FILE_DIR = env_get_string["TEMP_FILE_DIR"]()
 
 
 def test_file_read():
@@ -141,7 +140,7 @@ def test_file_open_nodir():
 
 def test_file_write():
     var content: String = "The quick brown fox jumps over the lazy dog"
-    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write"
+    var TEMP_FILE = Path(gettempdir().value()) / "test_file_write"
     with open(TEMP_FILE, "w") as f:
         f.write(content)
 
@@ -151,7 +150,7 @@ def test_file_write():
 
 def test_file_write_span():
     var content: String = "The quick brown fox jumps over the lazy dog"
-    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write_span"
+    var TEMP_FILE = Path(gettempdir().value()) / "test_file_write_span"
     with open(TEMP_FILE, "w") as f:
         f.write(content.as_bytes_slice())
 
@@ -162,7 +161,7 @@ def test_file_write_span():
 def test_file_write_again():
     var unexpected_content: String = "foo bar baz"
     var expected_content: String = "foo bar"
-    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write_again"
+    var TEMP_FILE = Path(gettempdir().value()) / "test_file_write_again"
     with open(TEMP_FILE, "w") as f:
         f.write(unexpected_content)
 
@@ -213,9 +212,9 @@ def test_file_read_to_dtype_pointer():
 def test_file_get_raw_fd():
     # since JIT and build give different file descriptors, we test by checking
     # if we printed to the right file.
-    var f1 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_1", "rw")
-    var f2 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_2", "rw")
-    var f3 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_3", "rw")
+    var f1 = open(Path(gettempdir().value()) / "test_file_dummy_1", "rw")
+    var f2 = open(Path(gettempdir().value()) / "test_file_dummy_2", "rw")
+    var f3 = open(Path(gettempdir().value()) / "test_file_dummy_3", "rw")
 
     print(
         "test from file 1",

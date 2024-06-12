@@ -67,18 +67,38 @@ def test_list_unsafe_get():
         list.append(i)
 
     assert_equal(5, len(list))
-    assert_equal(0, list.unsafe_get(0)[])
-    assert_equal(1, list.unsafe_get(1)[])
-    assert_equal(2, list.unsafe_get(2)[])
-    assert_equal(3, list.unsafe_get(3)[])
-    assert_equal(4, list.unsafe_get(4)[])
+    assert_equal(0, list.unsafe_get(0))
+    assert_equal(1, list.unsafe_get(1))
+    assert_equal(2, list.unsafe_get(2))
+    assert_equal(3, list.unsafe_get(3))
+    assert_equal(4, list.unsafe_get(4))
 
     list[2] = -2
-    assert_equal(-2, list.unsafe_get(2)[])
+    assert_equal(-2, list.unsafe_get(2))
 
     list.clear()
     list.append(2)
-    assert_equal(2, list.unsafe_get(0)[])
+    assert_equal(2, list.unsafe_get(0))
+
+
+def test_list_unsafe_set():
+    var list = List[Int]()
+
+    for i in range(5):
+        list.append(i)
+
+    assert_equal(5, len(list))
+    list.unsafe_set(0, 0)
+    list.unsafe_set(1, 10)
+    list.unsafe_set(2, 20)
+    list.unsafe_set(3, 30)
+    list.unsafe_set(4, 40)
+
+    assert_equal(list[0], 0)
+    assert_equal(list[1], 10)
+    assert_equal(list[2], 20)
+    assert_equal(list[3], 30)
+    assert_equal(list[4], 40)
 
 
 def test_list_clear():
@@ -672,6 +692,45 @@ def test_list_span():
     assert_equal(es[2], 3)
     assert_equal(len(es), 3)
 
+    assert_equal(vs[1:0:-1][0], 2)
+    assert_equal(vs[2:1:-1][0], 3)
+    es = vs[:0:-1]
+    assert_equal(es[0], 3)
+    assert_equal(es[1], 2)
+    assert_equal(vs[2::-1][0], 3)
+
+    assert_equal(len(vs[1:2:-1]), 0)
+
+    assert_equal(0, len(vs[:-1:-2]))
+    assert_equal(0, len(vs[-50::-1]))
+    es = vs[-50::]
+    assert_equal(3, len(es))
+    assert_equal(es[0], 1)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 3)
+    es = vs[:-50:-1]
+    assert_equal(3, len(es))
+    assert_equal(es[0], 3)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 1)
+    es = vs[:50:]
+    assert_equal(3, len(es))
+    assert_equal(es[0], 1)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 3)
+    es = vs[::50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 1)
+    es = vs[::-50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 3)
+    es = vs[50::-50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 3)
+    es = vs[-50::50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 1)
+
 
 def test_list_boolable():
     assert_true(List[Int](1))
@@ -812,6 +871,7 @@ def main():
     test_mojo_issue_698()
     test_list()
     test_list_unsafe_get()
+    test_list_unsafe_set()
     test_list_clear()
     test_list_to_bool_conversion()
     test_list_pop()
