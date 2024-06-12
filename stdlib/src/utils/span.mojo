@@ -86,21 +86,30 @@ struct Span[
     # Field
     var _data: UnsafePointer[T]
     var _len: Int
+    var _slice: Slice
 
     # ===------------------------------------------------------------------===#
     # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
-    fn __init__(inout self, *, unsafe_ptr: UnsafePointer[T], len: Int):
+    fn __init__(
+        inout self,
+        *,
+        unsafe_ptr: UnsafePointer[T],
+        len: Int,
+        slc: Optional[Slice] = None,
+    ):
         """Unsafe construction from a pointer and length.
 
         Args:
             unsafe_ptr: The underlying pointer of the span.
             len: The length of the view.
+            slc: The slice of we want to use of the source data.
         """
         self._data = unsafe_ptr
         self._len = len
+        self._slice = slc.value() if slc else Slice(0, self._len, 1)
 
     @always_inline
     fn __init__(inout self, *, other: Self):
@@ -111,21 +120,29 @@ struct Span[
         """
         self._data = other._data
         self._len = other._len
+        self._slice = other._slice
 
-    @always_inline
-    fn __init__(inout self, ref [lifetime]list: List[T]):
+    fn __init__(
+        inout self, ref [lifetime]list: List[T], slc: Optional[Slice] = None
+    ):
         """Construct a Span from a List.
 
         Args:
             list: The list to which the span refers.
+            slc: The slice of we want to use of the source data.
         """
         self._data = list.data
         self._len = len(list)
+        self._slice = slc.value() if slc else Slice(0, self._len, 1)
 
     @always_inline
     fn __init__[
         T2: CollectionElementNew, size: Int
-    ](inout self, ref [lifetime]array: InlineArray[T2, size]):
+    ](
+        inout self,
+        ref [lifetime]array: InlineArray[T2, size],
+        slc: Optional[Slice] = None,
+    ):
         """Construct a Span from an InlineArray.
 
         Parameters:
@@ -134,12 +151,14 @@ struct Span[
 
         Args:
             array: The array to which the span refers.
+            slc: The slice of we want to use of the source data.
         """
 
         constrained[_type_is_eq[T, T2](), "array element is not Span.T"]()
 
         self._data = UnsafePointer.address_of(array).bitcast[T]()
         self._len = size
+        self._slice = slc.value() if slc else Slice(0, self._len, 1)
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
@@ -163,7 +182,7 @@ struct Span[
         var offset = idx
         if offset < 0:
             offset += len(self)
-        return self._data[offset]
+        return self._data[self._slice[offset]]
 
     @always_inline
     fn __getitem__(self, slc: Slice) -> Self:
@@ -179,12 +198,10 @@ struct Span[
         var end: Int
         var step: Int
         start, end, step = slc.indices(len(self))
-        debug_assert(
-            step == 1, "Slice must be within bounds and step must be 1"
-        )
         var res = Self(
-            unsafe_ptr=(self._data + start),
+            unsafe_ptr=self._data,
             len=len(range(start, end, step)),
+            slc=Slice(start, end, step),
         )
 
         return res
