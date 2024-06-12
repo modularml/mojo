@@ -22,7 +22,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  test-examples:
+  lint:
     runs-on: "ubuntu-latest"
     timeout-minutes: 30
 
