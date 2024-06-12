@@ -1275,10 +1275,10 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     fn byte_length(self) -> Int:
-        """Returns the string byte length.
+        """Returns the string byte length without null terminator.
 
         Returns:
-            The string byte length.
+            The string byte length without null terminator.
         """
         # Avoid returning -1 if the buffer is not initialized
         if not self.unsafe_ptr():
