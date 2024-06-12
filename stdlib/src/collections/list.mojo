@@ -20,6 +20,7 @@ from collections import List
 """
 
 
+from collections._index_normalization import normalize_index
 from memory import UnsafePointer, Reference
 from sys.intrinsics import _type_is_eq
 from .optional import Optional
@@ -200,15 +201,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             idx: The index of the element.
             value: The value to assign.
         """
-        var normalized_idx = idx
-        debug_assert(
-            -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
-        )
-
-        if normalized_idx < 0:
-            normalized_idx += len(self)
-
+        var normalized_idx = normalize_index["List"](idx, self)
         self.unsafe_set(normalized_idx, value^)
 
     @always_inline
@@ -519,12 +512,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             The popped value.
         """
-        debug_assert(-len(self) <= i < len(self), "pop index out of range")
-
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += len(self)
-
+        var normalized_idx = normalize_index["List"](i, self)
         var ret_val = (self.data + normalized_idx).take_pointee()
         for j in range(normalized_idx + 1, self.size):
             (self.data + j).move_pointee_into(self.data + j - 1)
@@ -739,14 +727,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A copy of the element at the given index.
         """
-        var normalized_idx = idx
-        debug_assert(
-            -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
-        )
-        if normalized_idx < 0:
-            normalized_idx += len(self)
-
+        var normalized_idx = normalize_index["List"](idx, self)
         return (self.data + normalized_idx)[]
 
     # TODO(30737): Replace __getitem__ with this, but lots of places use it
@@ -761,10 +742,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             An immutable reference to the element at the given index.
         """
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += self.size
-
+        var normalized_idx = normalize_index["List"](i, self)
         return self.unsafe_get(normalized_idx)
 
     @always_inline
