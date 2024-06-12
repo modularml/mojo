@@ -12,9 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from collections.array import Array
-
 from testing import assert_equal, assert_false, assert_true, assert_raises
+
+from collections.array import Array
 
 
 fn test_array() raises:

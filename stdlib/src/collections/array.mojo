@@ -19,8 +19,8 @@ from collections import Array
 ```
 """
 
-from math import sqrt, acos, sin
-from algorithm import vectorize
+# from math import sqrt, acos, sin
+# from algorithm import vectorize
 
 # ===----------------------------------------------------------------------===#
 # Array
@@ -478,8 +478,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
 
         ```mojo
         %# from collections import Array
-        var my_array = Array(1, 2, 3)
-        print(my_array.index(2)) # prints `1`
+        var item = Array(1, 2, 3).index(2)
+        print(item.value() if item else -1) # prints `1`
         ```
 
         Args:
@@ -971,6 +971,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
+        from math import sqrt
+
         return sqrt((self.vec**2).reduce_add())
 
     @always_inline
@@ -1196,6 +1198,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
+        from math import acos
+
         return acos(self.cos(other))
 
     @always_inline("nodebug")
@@ -1248,6 +1252,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Args:
             func: The function to apply.
         """
+
+        from algorithm import vectorize
 
         @parameter
         fn closure[simd_width: Int](i: Int):
