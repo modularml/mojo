@@ -546,16 +546,7 @@ struct Int(
         Returns:
             `floor(self/rhs)` value.
         """
-        if rhs == 0:
-            # this should raise an exception.
-            return 0
-        var div: Int = self._positive_div(rhs)
-        if self > 0 and rhs > 0:
-            return div
-        var mod = self - div * rhs
-        if ((rhs < 0) ^ (self < 0)) and mod:
-            return div - 1
-        return div
+        return __mlir_op.`index.floordivs`(self.value, rhs.value)
 
     @always_inline("nodebug")
     fn __mod__(self, rhs: Int) -> Int:

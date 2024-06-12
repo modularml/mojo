@@ -81,8 +81,12 @@ def test_floordiv():
     assert_equal(1, Int(2) // Int(2))
     assert_equal(0, Int(2) // Int(3))
     assert_equal(-1, Int(2) // Int(-2))
+    assert_equal(-1, Int(1) // Int(-2))
+    assert_equal(-1, Int(1) // Int(-3))
     assert_equal(-50, Int(99) // Int(-2))
     assert_equal(-1, Int(-1) // Int(10))
+    assert_equal(-1, Int(-1) // Int(2))
+    assert_equal(2, Int(-10) // Int(-5))
 
 
 def test_mod():
