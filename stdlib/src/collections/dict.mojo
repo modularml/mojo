@@ -522,12 +522,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Raises:
             "KeyError" if the key isn't present.
         """
-        return self._find_ref(key)[]
+        return self._find_ref(key)
 
     # TODO(MSTDL-452): rename to __getitem__ returning a reference
     fn __get_ref(
         ref [_]self: Self, key: K
-    ) raises -> Reference[V, __lifetime_of(self)]:
+    ) raises -> ref [__lifetime_of(self)] Self.V:
         """Retrieve a value out of the dictionary.
 
         Args:
@@ -692,14 +692,14 @@ struct Dict[K: KeyElement, V: CollectionElement](
             otherwise an empty Optional.
         """
         try:  # TODO(MOCO-604): push usage through
-            return self._find_ref(key)[]
+            return self._find_ref(key)
         except:
             return None
 
     # TODO(MOCO-604): Return Optional[Reference] instead of raising
     fn _find_ref(
         ref [_]self: Self, key: K
-    ) raises -> Reference[V, __lifetime_of(self)]:
+    ) raises -> ref [__lifetime_of(self)] Self.V:
         """Find a value in the dictionary by key.
 
         Args:
@@ -717,7 +717,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         if found:
             var entry = self._entries.__get_ref(index)
             debug_assert(entry[].__bool__(), "entry in index must be full")
-            return Reference(entry[].value().value)
+            return entry[].value().value
         raise "KeyError"
 
     fn get(self, key: K) -> Optional[V]:

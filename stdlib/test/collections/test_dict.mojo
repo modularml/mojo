@@ -66,6 +66,15 @@ def test_basic():
     assert_equal(2, dict["b"])
 
 
+def test_basic_no_copies():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    assert_equal(1, dict["a"])
+    assert_equal(2, dict["b"])
+
+
 def test_multiple_resizes():
     var dict = Dict[String, Int]()
     for i in range(20):
@@ -274,8 +283,8 @@ def test_dict_copy_calls_copy_constructor():
     # are coming from :)
     assert_equal(1, orig["a"].copy_count)
     assert_equal(2, copy["a"].copy_count)
-    assert_equal(0, orig.__get_ref("a")[].copy_count)
-    assert_equal(1, copy.__get_ref("a")[].copy_count)
+    assert_equal(0, orig.__get_ref("a").copy_count)
+    assert_equal(1, copy.__get_ref("a").copy_count)
 
 
 def test_dict_update_nominal():
