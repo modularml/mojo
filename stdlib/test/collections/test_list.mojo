@@ -67,18 +67,18 @@ def test_list_unsafe_get():
         list.append(i)
 
     assert_equal(5, len(list))
-    assert_equal(0, list.unsafe_get(0)[])
-    assert_equal(1, list.unsafe_get(1)[])
-    assert_equal(2, list.unsafe_get(2)[])
-    assert_equal(3, list.unsafe_get(3)[])
-    assert_equal(4, list.unsafe_get(4)[])
+    assert_equal(0, list.unsafe_get(0))
+    assert_equal(1, list.unsafe_get(1))
+    assert_equal(2, list.unsafe_get(2))
+    assert_equal(3, list.unsafe_get(3))
+    assert_equal(4, list.unsafe_get(4))
 
     list[2] = -2
-    assert_equal(-2, list.unsafe_get(2)[])
+    assert_equal(-2, list.unsafe_get(2))
 
     list.clear()
     list.append(2)
-    assert_equal(2, list.unsafe_get(0)[])
+    assert_equal(2, list.unsafe_get(0))
 
 
 def test_list_unsafe_set():
