@@ -99,3 +99,35 @@ struct UInt(Stringable, Representable):
             The string representation of this UInt.
         """
         return "UInt(" + str(self) + ")"
+
+    @always_inline("nodebug")
+    fn __eq__(self, rhs: UInt) -> Bool:
+        """Compare this UInt to the RHS using EQ comparison.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is equal to the RHS UInt and False otherwise.
+        """
+        return Bool(
+            __mlir_op.`index.cmp`[
+                pred = __mlir_attr.`#index<cmp_predicate eq>`
+            ](self.value, rhs.value)
+        )
+
+    @always_inline("nodebug")
+    fn __ne__(self, rhs: UInt) -> Bool:
+        """Compare this UInt to the RHS using NE comparison.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is non-equal to the RHS UInt and False otherwise.
+        """
+        return Bool(
+            __mlir_op.`index.cmp`[
+                pred = __mlir_attr.`#index<cmp_predicate ne>`
+            ](self.value, rhs.value)
+        )
