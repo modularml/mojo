@@ -133,7 +133,7 @@ struct UnsafePointer[
         """Allocate an array with specified or default alignment.
 
         Parameters:
-            alignment: (Optional) The alignment in bytes of the allocated memory.
+            alignment: The alignment in bytes of the allocated memory.
 
         Args:
             count: The number of elements in the array.
