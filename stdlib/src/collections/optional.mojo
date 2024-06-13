@@ -46,7 +46,9 @@ struct _NoneType(CollectionElement):
 
 
 @value
-struct Optional[T: CollectionElement](CollectionElement, CollectionElementNew, Boolable):
+struct Optional[T: CollectionElement](
+    CollectionElement, CollectionElementNew, Boolable
+):
     """A type modeling a value which may or may not be present.
 
     Optional values can be thought of as a type-safe nullable pattern.

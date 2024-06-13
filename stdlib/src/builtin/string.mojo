@@ -759,7 +759,7 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
-    CollectionElementNew
+    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
