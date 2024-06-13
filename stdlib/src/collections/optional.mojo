@@ -46,7 +46,7 @@ struct _NoneType(CollectionElement):
 
 
 @value
-struct Optional[T: CollectionElement](CollectionElement, Boolable):
+struct Optional[T: CollectionElement](CollectionElement, CollectionElementNew, Boolable):
     """A type modeling a value which may or may not be present.
 
     Optional values can be thought of as a type-safe nullable pattern.
@@ -103,6 +103,14 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             value: Must be exactly `None`.
         """
         self = Self()
+
+    fn __init__(inout self, *, other: Self):
+        """Copy construct an Optional.
+
+        Args:
+            other: The Optional to copy.
+        """
+        self.__copyinit__(other)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
