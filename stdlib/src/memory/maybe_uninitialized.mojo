@@ -172,7 +172,21 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to move.
         """
-        other.unsafe_ptr().move_pointee_into(self.unsafe_ptr())
+        self.move_from(other.unsafe_ptr())
+
+    @always_inline
+    fn move_from(inout self, other: UnsafePointer[ElementType]):
+        """Move another object.
+
+        This function assumes that the current memory is uninitialized
+        and the other object is initialized memory.
+
+        After the function is called, the `other` object is considered uninitialized.
+
+        Args:
+            other: The pointer to the object to move.
+        """
+        other.move_pointee_into(self.unsafe_ptr())
 
     @always_inline
     fn write[

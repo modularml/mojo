@@ -77,6 +77,19 @@ def test_maybe_uninitialized_move():
     b.assume_initialized_destroy()
 
 
+def test_maybe_uninitialized_move_from_pointer():
+    var a = MoveCounter[Int](10)
+    assert_equal(a.move_count, 0)
+
+    var b = UnsafeMaybeUninitialized[MoveCounter[Int]]()
+    # b is uninitialized here.
+    b.move_from(UnsafePointer.address_of(a))
+
+    # a is uninitialized now. Thankfully, we're working with trivial types
+    assert_equal(b.assume_initialized().move_count, 1)
+    b.assume_initialized_destroy()
+
+
 def test_maybe_uninitialized_copy():
     var a = UnsafeMaybeUninitialized[CopyCounter]()
     a.write(CopyCounter())
@@ -97,4 +110,5 @@ def main():
     test_maybe_uninitialized()
     test_write_does_not_trigger_destructor()
     test_maybe_uninitialized_move()
+    test_maybe_uninitialized_move_from_pointer()
     test_maybe_uninitialized_copy()
