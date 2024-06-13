@@ -200,7 +200,7 @@ struct Reference[
     type: AnyType,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]:
+](CollectionElementNew):
     """Defines a non-nullable safe reference.
 
     Parameters:
@@ -237,6 +237,16 @@ struct Reference[
             value: The value reference.
         """
         self.value = __get_mvalue_as_litref(value)
+
+    fn __init__(inout self, *, other: Self):
+        """Constructs a copy from another Reference.
+
+        Note that this does **not** copy the underlying data.
+
+        Args:
+            other: The `Reference` to copy.
+        """
+        self.value = other.value
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
