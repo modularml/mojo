@@ -18,9 +18,30 @@ Example usage:
 from memory import Arc
 var p = Arc(4)
 var p2 = p
-p2.set(3)
-print(3 == p.get())
+p2[]=3
+print(3 == p[])
 ```
+
+Subscripting(`[]`) is done by `Reference`,
+in order to ensure that the underlying `Arc` outlive the operation.
+
+It is highly DISCOURAGED to manipulate an `Arc` trough `UnsafePointer`.
+Mojo's ASAP deletion policy ensure values are destroyed at last use.
+Do not unsafely dereference the `Arc` inner `UnsafePointer` field.
+See [Lifecycle](https://docs.modular.com/mojo/manual/lifecycle/).
+
+```mojo
+# Illustration of what NOT to do, in order to understand:
+print(Arc(String("ok"))._inner[].payload)
+#........................^ASAP ^already freed
+```
+
+Always use `Reference` subscripting (`[]`):
+
+```mojo
+print(Arc(String("ok"))[])
+```
+
 """
 
 from os.atomic import Atomic
@@ -122,10 +143,11 @@ struct Arc[T: Movable](CollectionElement):
         """
         return self._inner[].payload
 
-    fn as_ptr(self) -> UnsafePointer[T]:
+    fn unsafe_ptr(self) -> UnsafePointer[T]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The UnsafePointer to the underlying memory.
         """
+        # TODO: consider removing this method.
         return UnsafePointer.address_of(self._inner[].payload)

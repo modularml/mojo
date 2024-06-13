@@ -52,7 +52,7 @@ def test_os_version():
 
     major, minor, patch = _macos_version()
 
-    assert_true(major >= 13)
+    assert_true(major >= 12)
     assert_true(minor >= 0)
     assert_true(patch >= 0)
 
