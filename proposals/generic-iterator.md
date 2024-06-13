@@ -1,6 +1,9 @@
 # Iterator trait
 
-As started by @jayzhan211 in issue [#2629](https://github.com/modularml/mojo/issues/2629), an Iterable trait and Iterator implementation would be very useful. Especially since currently every stldlib type has its own iterator and support for each has to be added independently if a function wants to take iterable arguments.
+As started by @jayzhan211 in issue [#2629](https://github.com/modularml/mojo/issues/2629),
+an Iterable trait and Iterator implementation would be very useful. Especially since
+currently every stldlib type has its own iterator and support for each has to be added
+independently if a function wants to take iterable arguments.
 
 ## What is proposed?
 
@@ -111,7 +114,8 @@ trait HasIter[T: CollectionElement]:
 
 ## What would be needed?
 
-The for loop codegen implementation would need to check for None and break so that pythonic syntax is preserved
+The for loop codegen implementation would need to check for None and break so that
+pythonic syntax is preserved
 ```mojo
 for i in List("something", "something"):
     print(i)
@@ -156,7 +160,8 @@ fn zip[*Ts: CollectionElement, *A: HasIter[Ts]](*values: *A) -> Iterator[*Ts]:
     return Iterator(_zip[len(values)](values))
 ```
 
-And once we have capable enough generics for this code to be feasible, implementing a generator would be as simple as taking a yielding function
+And once we have capable enough generics for this code to be feasible,
+implementing a generator would be as simple as taking a yielding function
 ```mojo
 struct Generator[T: CollectionElement, *A: AnyType, **B: AnyType]:
     alias _coro = Coroutine[fn(*A, **B) -> Optional[T]]
