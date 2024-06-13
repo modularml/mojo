@@ -41,7 +41,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     fn __init__(inout self, *, other: Self):
         """It is not possible to call this method.
 
-        Trying to call this method will fail early, at compile-time.
+        Trying to call this method will abort.
         """
         abort(
             "You should never call the explicit copy constructor of"
@@ -78,7 +78,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         This method should never be called as implicit copy should not
         be done on memory that may be uninitialized.
 
-        Trying to call this method will fail early, at compile-time.
+        Trying to call this method will abort.
 
         If you wish to perform a copy, you should manually call the method
         `copy_from` instead.
@@ -134,7 +134,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         This method should never be called as implicit moves should not
         be done on memory that may be uninitialized.
 
-        Trying to call this method will fail early, at compile-time.
+        Trying to call this method will abort.
 
         If you wish to perform a move, you should manually call the method
         `move_from` instead.
