@@ -39,3 +39,7 @@ from .reference import (
 from .arc import (
     Arc,
 )
+
+from .heap_value import (
+    HeapValue,
+)
