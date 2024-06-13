@@ -13,6 +13,7 @@
 # RUN: %mojo %s
 
 from testing import assert_equal
+from utils.numerics import nan
 
 
 def test_abs():
@@ -106,6 +107,29 @@ def test_pow():
     assert_equal(pow(I(0, 1, 2, 3), int(2)), I(0, 1, 4, 9))
 
 
+def test_clamp():
+    assert_equal(clamp(4, 5, 7), 5)
+    assert_equal(clamp(9, 5, 7), 7)
+    assert_equal(clamp(6, 5, 7), 6)
+
+    var lower = Int32(3)
+    var upper = Int32(9)
+    assert_equal(clamp(Int32(1), lower, upper), lower)
+    assert_equal(clamp(Int32(12), lower, upper), upper)
+    assert_equal(clamp(Int32(7), lower, upper), 7)
+    assert_equal(clamp(Int32(1), upper, lower), lower)
+
+    assert_equal(clamp(nan[DType.float64](), 1.3, 5.4), 5.4)
+
+    var value = SIMD[DType.int32, 4](4, 6, 65, 1)
+    assert_equal(
+        clamp(value, Int32(3), Int32(8)), SIMD[DType.int32, 4](4, 6, 8, 3)
+    )
+
+    assert_equal(clamp(2, 6, 4), 4)
+    assert_equal(clamp(9, 6, 4), 6)
+
+
 def main():
     test_abs()
     test_divmod()
@@ -113,3 +137,4 @@ def main():
     test_min()
     test_round()
     test_pow()
+    test_clamp()

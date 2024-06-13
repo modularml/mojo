@@ -197,3 +197,66 @@ trait Truncable:
     # associated types.
     fn __trunc__(self) -> Self:
         ...
+
+
+# ===----------------------------------------------------------------------=== #
+# clamp
+# ===----------------------------------------------------------------------=== #
+
+
+fn clamp(value: Int, lower: Int, upper: Int) -> Int:
+    """Clamp value to the range of [lower, upper].
+
+    If value is less lower, or greater than upper, it becomes the respective
+    value, else value is returned.
+
+    If lower > upper, then the two are swapped.
+
+    Args:
+        value: The integer to clamp.
+        lower: The lower bound of the range.
+        upper: Then upper bound of the range.
+
+    Returns:
+        A value in the range [lower, upper].
+    """
+    var lo = lower
+    var hi = upper
+    if lo > hi:
+        swap(lo, hi)
+    return max(lo, min(value, hi))
+
+
+fn clamp[
+    type: DType, size: Int, //
+](value: SIMD[type, size], lower: Scalar[type], upper: Scalar[type]) -> SIMD[
+    type, size
+]:
+    """Clamp values to the range of [lower, upper].
+
+    If value is less lower, or greater than upper, it becomes the respective
+    value, else value is returned.
+
+    If value is NAN, then upper is returned.
+
+    If lower > upper, then the two are swapped.
+
+    This is equivalent to `value.clamp(lower, upper)`
+
+    Parameters:
+        type: The dtype of the arguments.
+        size: The SIMD size of the arguments.
+
+    Args:
+        value: The value to clamp.
+        lower: The lower bound of the range.
+        upper: Then upper bound of the range.
+
+    Returns:
+        Values in the range [lower, upper].
+    """
+    var lo = lower
+    var hi = upper
+    if lo > hi:
+        swap(lo, hi)
+    return value.clamp(lo, hi)

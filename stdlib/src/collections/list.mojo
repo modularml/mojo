@@ -652,8 +652,8 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if stop_normalized < 0:
             stop_normalized += len(self)
 
-        start_normalized = _clip(start_normalized, 0, len(self))
-        stop_normalized = _clip(stop_normalized, 0, len(self))
+        start_normalized = clamp(start_normalized, 0, len(self))
+        stop_normalized = clamp(stop_normalized, 0, len(self))
 
         for i in range(start_normalized, stop_normalized):
             if self[i] == value:
@@ -838,7 +838,3 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             The UnsafePointer to the underlying memory.
         """
         return self.data
-
-
-fn _clip(value: Int, start: Int, end: Int) -> Int:
-    return max(start, min(value, end))
