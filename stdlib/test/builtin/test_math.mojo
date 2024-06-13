@@ -80,6 +80,12 @@ def test_round():
     var expected = SIMD[DType.float32, 4](1.0, 2.0, 2.0, 2.0)
     assert_equal(expected, round(lhs))
 
+    # Ensure that round works on float literal
+    alias r1: FloatLiteral = round(2.3)
+    assert_equal(r1, 2.0)
+    alias r2: FloatLiteral = round(2.3324, 2)
+    assert_equal(r2, 2.33)
+
 
 def test_pow():
     alias F = SIMD[DType.float32, 4]
