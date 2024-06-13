@@ -21,127 +21,127 @@ alias UINTMAX = 18446744073709551615  # 2**64 - 1
 
 
 def test_uint_lower_than():
-    assert_true(UInt(1) < UInt(2))
-    assert_false(UInt(2) < UInt(1))
+    assert_true(UInt(1).__lt__(UInt(2)))
+    assert_false(UInt(2).__lt__(UInt(1)))
 
-    assert_true(UInt(0) < UInt(1))
-    assert_false(UInt(1) < UInt(0))
+    assert_true(UInt(0).__lt__(UInt(1)))
+    assert_false(UInt(1).__lt__(UInt(0)))
 
-    assert_true(UInt(0) < UInt(UINTMAX))
-    assert_false(UInt(UINTMAX) < UInt(0))
+    assert_true(UInt(0).__lt__(UInt(UINTMAX)))
+    assert_false(UInt(UINTMAX).__lt__(UInt(0)))
 
-    assert_true(UInt(1) < UInt(UINTMAX))
-    assert_false(UInt(UINTMAX) < UInt(1))
+    assert_true(UInt(1).__lt__(UInt(UINTMAX)))
+    assert_false(UInt(UINTMAX).__lt__(UInt(1)))
 
-    assert_true(UInt(1) < UInt(CLOSE_TO_UINTMAX))
-    assert_false(UInt(CLOSE_TO_UINTMAX) < UInt(1))
+    assert_true(UInt(1).__lt__(UInt(CLOSE_TO_UINTMAX)))
+    assert_false(UInt(CLOSE_TO_UINTMAX).__lt__(UInt(1)))
 
-    assert_true(UInt(0) < UInt(CLOSE_TO_UINTMAX))
-    assert_false(UInt(CLOSE_TO_UINTMAX) < UInt(0))
+    assert_true(UInt(0).__lt__(UInt(CLOSE_TO_UINTMAX)))
+    assert_false(UInt(CLOSE_TO_UINTMAX).__lt__(UInt(0)))
 
-    assert_true(UInt(CLOSE_TO_UINTMAX) < UInt(UINTMAX))
-    assert_false(UInt(UINTMAX) < UInt(CLOSE_TO_UINTMAX))
+    assert_true(UInt(CLOSE_TO_UINTMAX).__lt__(UInt(UINTMAX)))
+    assert_false(UInt(UINTMAX).__lt__(UInt(CLOSE_TO_UINTMAX)))
 
-    assert_true(UInt(ABOVE_32_BITS) < UInt(UINTMAX))
-    assert_false(UInt(UINTMAX) < UInt(ABOVE_32_BITS))
+    assert_true(UInt(ABOVE_32_BITS).__lt__(UInt(UINTMAX)))
+    assert_false(UInt(UINTMAX).__lt__(UInt(ABOVE_32_BITS)))
 
-    assert_false(UInt(0) < UInt(0))
-    assert_false(UInt(1) < UInt(1))
-    assert_false(UInt(ABOVE_32_BITS) < UInt(ABOVE_32_BITS))
-    assert_false(UInt(UINTMAX) < UInt(UINTMAX))
+    assert_false(UInt(0).__lt__(UInt(0)))
+    assert_false(UInt(1).__lt__(UInt(1)))
+    assert_false(UInt(ABOVE_32_BITS).__lt__(UInt(ABOVE_32_BITS)))
+    assert_false(UInt(UINTMAX).__lt__(UInt(UINTMAX)))
 
 
 def test_uint_lower_equal():
-    assert_true(UInt(1) <= UInt(2))
-    assert_false(UInt(2) <= UInt(1))
+    assert_true(UInt(1).__le__(UInt(2)))
+    assert_false(UInt(2).__le__(UInt(1)))
 
-    assert_true(UInt(0) <= UInt(1))
-    assert_false(UInt(1) <= UInt(0))
+    assert_true(UInt(0).__le__(UInt(1)))
+    assert_false(UInt(1).__le__(UInt(0)))
 
-    assert_true(UInt(0) <= UInt(UINTMAX))
-    assert_false(UInt(UINTMAX) <= UInt(0))
+    assert_true(UInt(0).__le__(UInt(UINTMAX)))
+    assert_false(UInt(UINTMAX).__le__(UInt(0)))
 
-    assert_true(UInt(1) <= UInt(UINTMAX))
-    assert_false(UInt(UINTMAX) <= UInt(1))
+    assert_true(UInt(1).__le__(UInt(UINTMAX)))
+    assert_false(UInt(UINTMAX).__le__(UInt(1)))
 
-    assert_true(UInt(1) <= UInt(CLOSE_TO_UINTMAX))
-    assert_false(UInt(CLOSE_TO_UINTMAX) <= UInt(1))
+    assert_true(UInt(1).__le__(UInt(CLOSE_TO_UINTMAX)))
+    assert_false(UInt(CLOSE_TO_UINTMAX).__le__(UInt(1)))
 
-    assert_true(UInt(0) <= UInt(CLOSE_TO_UINTMAX))
-    assert_false(UInt(CLOSE_TO_UINTMAX) <= UInt(0))
+    assert_true(UInt(0).__le__(UInt(CLOSE_TO_UINTMAX)))
+    assert_false(UInt(CLOSE_TO_UINTMAX).__le__(UInt(0)))
 
-    assert_true(UInt(CLOSE_TO_UINTMAX) <= UInt(UINTMAX))
-    assert_false(UInt(UINTMAX) <= UInt(CLOSE_TO_UINTMAX))
+    assert_true(UInt(CLOSE_TO_UINTMAX).__le__(UInt(UINTMAX)))
+    assert_false(UInt(UINTMAX).__le__(UInt(CLOSE_TO_UINTMAX)))
 
-    assert_true(UInt(ABOVE_32_BITS) <= UInt(UINTMAX))
-    assert_false(UInt(UINTMAX) <= UInt(ABOVE_32_BITS))
+    assert_true(UInt(ABOVE_32_BITS).__le__(UInt(UINTMAX)))
+    assert_false(UInt(UINTMAX).__le__(UInt(ABOVE_32_BITS)))
 
-    assert_true(UInt(0) <= UInt(0))
-    assert_true(UInt(1) <= UInt(1))
-    assert_true(UInt(ABOVE_32_BITS) <= UInt(ABOVE_32_BITS))
-    assert_true(UInt(UINTMAX) <= UInt(UINTMAX))
+    assert_true(UInt(0).__le__(UInt(0)))
+    assert_true(UInt(1).__le__(UInt(1)))
+    assert_true(UInt(ABOVE_32_BITS).__le__(UInt(ABOVE_32_BITS)))
+    assert_true(UInt(UINTMAX).__le__(UInt(UINTMAX)))
 
 
 def test_uint_greater_than():
-    assert_true(UInt(2) > UInt(1))
-    assert_false(UInt(1) > UInt(2))
+    assert_true(UInt(2).__gt__(UInt(1)))
+    assert_false(UInt(1).__gt__(UInt(2)))
 
-    assert_true(UInt(1) > UInt(0))
-    assert_false(UInt(0) > UInt(1))
+    assert_true(UInt(1).__gt__(UInt(0)))
+    assert_false(UInt(0).__gt__(UInt(1)))
 
-    assert_true(UInt(UINTMAX) > UInt(0))
-    assert_false(UInt(0) > UInt(UINTMAX))
+    assert_true(UInt(UINTMAX).__gt__(UInt(0)))
+    assert_false(UInt(0).__gt__(UInt(UINTMAX)))
 
-    assert_true(UInt(UINTMAX) > UInt(1))
-    assert_false(UInt(1) > UInt(UINTMAX))
+    assert_true(UInt(UINTMAX).__gt__(UInt(1)))
+    assert_false(UInt(1).__gt__(UInt(UINTMAX)))
 
-    assert_true(UInt(CLOSE_TO_UINTMAX) > UInt(1))
-    assert_false(UInt(1) > UInt(CLOSE_TO_UINTMAX))
+    assert_true(UInt(CLOSE_TO_UINTMAX).__gt__(UInt(1)))
+    assert_false(UInt(1).__gt__(UInt(CLOSE_TO_UINTMAX)))
 
-    assert_true(UInt(CLOSE_TO_UINTMAX) > UInt(0))
-    assert_false(UInt(0) > UInt(CLOSE_TO_UINTMAX))
+    assert_true(UInt(CLOSE_TO_UINTMAX).__gt__(UInt(0)))
+    assert_false(UInt(0).__gt__(UInt(CLOSE_TO_UINTMAX)))
 
-    assert_true(UInt(UINTMAX) > UInt(CLOSE_TO_UINTMAX))
-    assert_false(UInt(CLOSE_TO_UINTMAX) > UInt(UINTMAX))
+    assert_true(UInt(UINTMAX).__gt__(UInt(CLOSE_TO_UINTMAX)))
+    assert_false(UInt(CLOSE_TO_UINTMAX).__gt__(UInt(UINTMAX)))
 
-    assert_true(UInt(UINTMAX) > UInt(ABOVE_32_BITS))
-    assert_false(UInt(ABOVE_32_BITS) > UInt(UINTMAX))
+    assert_true(UInt(UINTMAX).__gt__(UInt(ABOVE_32_BITS)))
+    assert_false(UInt(ABOVE_32_BITS).__gt__(UInt(UINTMAX)))
 
-    assert_false(UInt(0) > UInt(0))
-    assert_false(UInt(1) > UInt(1))
-    assert_false(UInt(ABOVE_32_BITS) > UInt(ABOVE_32_BITS))
-    assert_false(UInt(UINTMAX) > UInt(UINTMAX))
+    assert_false(UInt(0).__gt__(UInt(0)))
+    assert_false(UInt(1).__gt__(UInt(1)))
+    assert_false(UInt(ABOVE_32_BITS).__gt__(UInt(ABOVE_32_BITS)))
+    assert_false(UInt(UINTMAX).__gt__(UInt(UINTMAX)))
 
 
 def test_uint_greater_equal():
-    assert_true(UInt(2) >= UInt(1))
-    assert_false(UInt(1) >= UInt(2))
+    assert_true(UInt(2).__ge__(UInt(1)))
+    assert_false(UInt(1).__ge__(UInt(2)))
 
-    assert_true(UInt(1) >= UInt(0))
-    assert_false(UInt(0) >= UInt(1))
+    assert_true(UInt(1).__ge__(UInt(0)))
+    assert_false(UInt(0).__ge__(UInt(1)))
 
-    assert_true(UInt(UINTMAX) >= UInt(0))
-    assert_false(UInt(0) >= UInt(UINTMAX))
+    assert_true(UInt(UINTMAX).__ge__(UInt(0)))
+    assert_false(UInt(0).__ge__(UInt(UINTMAX)))
 
-    assert_true(UInt(UINTMAX) >= UInt(1))
-    assert_false(UInt(1) >= UInt(UINTMAX))
+    assert_true(UInt(UINTMAX).__ge__(UInt(1)))
+    assert_false(UInt(1).__ge__(UInt(UINTMAX)))
 
-    assert_true(UInt(CLOSE_TO_UINTMAX) >= UInt(1))
-    assert_false(UInt(1) >= UInt(CLOSE_TO_UINTMAX))
+    assert_true(UInt(CLOSE_TO_UINTMAX).__ge__(UInt(1)))
+    assert_false(UInt(1).__ge__(UInt(CLOSE_TO_UINTMAX)))
 
-    assert_true(UInt(CLOSE_TO_UINTMAX) >= UInt(0))
-    assert_false(UInt(0) >= UInt(CLOSE_TO_UINTMAX))
+    assert_true(UInt(CLOSE_TO_UINTMAX).__ge__(UInt(0)))
+    assert_false(UInt(0).__ge__(UInt(CLOSE_TO_UINTMAX)))
 
-    assert_true(UInt(UINTMAX) >= UInt(CLOSE_TO_UINTMAX))
-    assert_false(UInt(CLOSE_TO_UINTMAX) >= UInt(UINTMAX))
+    assert_true(UInt(UINTMAX).__ge__(UInt(CLOSE_TO_UINTMAX)))
+    assert_false(UInt(CLOSE_TO_UINTMAX).__ge__(UInt(UINTMAX)))
 
-    assert_true(UInt(UINTMAX) >= UInt(ABOVE_32_BITS))
-    assert_false(UInt(ABOVE_32_BITS) >= UInt(UINTMAX))
+    assert_true(UInt(UINTMAX).__ge__(UInt(ABOVE_32_BITS)))
+    assert_false(UInt(ABOVE_32_BITS).__ge__(UInt(UINTMAX)))
 
-    assert_true(UInt(0) >= UInt(0))
-    assert_true(UInt(1) >= UInt(1))
-    assert_true(UInt(ABOVE_32_BITS) >= UInt(ABOVE_32_BITS))
-    assert_true(UInt(UINTMAX) >= UInt(UINTMAX))
+    assert_true(UInt(0).__ge__(UInt(0)))
+    assert_true(UInt(1).__ge__(UInt(1)))
+    assert_true(UInt(ABOVE_32_BITS).__ge__(UInt(ABOVE_32_BITS)))
+    assert_true(UInt(UINTMAX).__ge__(UInt(UINTMAX)))
 
 
 def test_simple_uint():
