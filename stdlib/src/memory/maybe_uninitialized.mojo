@@ -43,17 +43,14 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
 
         Trying to call this method will fail early, at compile-time.
         """
-        constrained[
-            False,
-            (
-                "You should never call the explicit copy constructor of"
-                " UnsafeMaybeUninitialized because it's ambiguous to copy"
-                " possibly uninitialized memory. Use"
-                " `UnsafeMaybeUninitialized.copy_from()` instead if you want to"
-                " trigger an explicit copy of the content of"
-                " UnsafeMaybeUninitialized. It has very specific semantics."
-            ),
-        ]()
+        abort(
+            "You should never call the explicit copy constructor of"
+            " UnsafeMaybeUninitialized because it's ambiguous to copy"
+            " possibly uninitialized memory. Use"
+            " `UnsafeMaybeUninitialized.copy_from()` instead if you want to"
+            " trigger an explicit copy of the content of"
+            " UnsafeMaybeUninitialized. It has very specific semantics."
+        )
         self = Self()
 
     @always_inline
@@ -89,9 +86,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to copy.
         """
-        constrained[
-            False, "You should never call __copyinit__ on MaybeUninitialized"
-        ]()
+        abort("You should never call __copyinit__ on MaybeUninitialized")
         self = Self()
 
     @always_inline
@@ -147,9 +142,7 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         Args:
             other: The object to move.
         """
-        constrained[
-            False, "You should never call __moveinit__ on MaybeUninitialized"
-        ]()
+        abort("You should never call __moveinit__ on MaybeUninitialized")
         self = Self()
 
     @always_inline
@@ -175,13 +168,21 @@ struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
         self.move_from(other.unsafe_ptr())
 
     @always_inline
-    fn move_from(inout self, other: UnsafePointer[ElementType]):
+    fn move_from[
+        MovableType: Movable
+    ](
+        inout self: UnsafeMaybeUninitialized[MovableType],
+        other: UnsafePointer[MovableType],
+    ):
         """Move another object.
 
         This function assumes that the current memory is uninitialized
         and the other object is initialized memory.
 
         After the function is called, the `other` object is considered uninitialized.
+
+        Parameters:
+            MovableType: The type object to move.
 
         Args:
             other: The pointer to the object to move.
