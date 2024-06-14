@@ -63,7 +63,7 @@ fn test_array() raises:
     for i in range(5):
         assert_equal(0, array[i])
 
-    var arr = Array[DType.int8]()
+    var arr = Array[DType.int8, 5]()
 
     for i in range(5):
         arr.append(i)
@@ -91,7 +91,7 @@ fn test_array() raises:
 
 
 fn test_array_with_default() raises:
-    var array = Array[DType.int8]()
+    var array = Array[DType.int8, 10]()
 
     for i in range(5):
         array.append(i)
@@ -120,15 +120,6 @@ fn test_array_with_default() raises:
     assert_equal(0, len(array))
 
 
-fn test_indexing_vec() raises:
-    var array = Array[DType.int8]()
-    for i in range(5):
-        array.append(i)
-    assert_equal(0, array[0])
-    assert_equal(1, array[True])
-    assert_equal(2, array[2])
-
-
 fn test_mojo_issue_698() raises:
     var arr = Array[DType.float64, 5]()
     for i in range(5):
@@ -142,14 +133,14 @@ fn test_mojo_issue_698() raises:
 
 
 fn test_array_to_bool_conversion() raises:
-    assert_false(Array[DType.int8]())
-    assert_true(Array[DType.int8](0))
-    assert_true(Array[DType.int8](0, 1))
-    assert_true(Array[DType.int8](1))
+    assert_false(Array[DType.int8, 2]())
+    assert_true(Array[DType.int8, 2](0))
+    assert_true(Array[DType.int8, 2](0, 1))
+    assert_true(Array[DType.int8, 2](1))
 
 
 fn test_array_pop() raises:
-    var arr = Array[DType.int8]()
+    var arr = Array[DType.int8, 6]()
     # Test pop with index
     for i in range(6):
         arr.append(i)
@@ -178,7 +169,7 @@ fn test_array_pop() raises:
 
 
 fn test_array_variadic_constructor() raises:
-    var l = Array[DType.int8](2, 4, 6)
+    var l = Array[DType.int8, 4](2, 4, 6)
     assert_equal(3, len(l))
     assert_equal(2, l[0])
     assert_equal(4, l[1])
@@ -194,7 +185,7 @@ fn test_array_insert() raises:
     # Test the list [1, 2, 3] created with insert
     #
 
-    var v1 = Array[DType.int8]()
+    var v1 = Array[DType.int8, 3]()
     v1.insert(len(v1), 1)
     v1.insert(1, 2)
     v1.insert(len(v1), 3)
@@ -242,7 +233,7 @@ fn test_array_insert() raises:
     # Test the list [1, 2, 3, 4, 5, 6, 7, 8] created with insert
     #
 
-    var v4 = Array[DType.int8]()
+    var v4 = Array[DType.int8, 8]()
     for i in range(4):
         v4.insert(0, 4 - i)
         v4.insert(len(v4), 4 + i + 1)
@@ -252,7 +243,7 @@ fn test_array_insert() raises:
 
 
 fn test_array_index() raises:
-    var test_array_a = Array[DType.int8](10, 20, 30, 40, 50)
+    var test_array_a = Array[DType.int8, 5](10, 20, 30, 40, 50)
 
     # Basic Functionality Tests
     assert_equal(test_array_a.index(10).value(), 0)
@@ -285,13 +276,13 @@ fn test_array_index() raises:
     assert_equal(test_array_a.index(50, start=0, stop=-1).value(), 4)
     assert_false(test_array_a.index(10, start=-4, stop=-1))
     assert_false(test_array_a.index(10, start=5, stop=50))
-    assert_false(Array[DType.int8]().index(10))
+    assert_false(Array[DType.int8, 1]().index(10))
     # print("5")
     # # Test empty slice
     assert_false(test_array_a.index(10, start=1, stop=1))
     # Test empty slice with 0 start and end
     assert_false(test_array_a.index(10, start=0, stop=0))
-    var test_array_b = Array[DType.int8](10, 20, 30, 20, 10)
+    var test_array_b = Array[DType.int8, 5](10, 20, 30, 20, 10)
 
     # Test finding the first occurrence of an item
     assert_equal(test_array_b.index(10).value(), 0)
@@ -311,7 +302,7 @@ fn test_array_extend() raises:
     # Test extending the list [1, 2, 3] with itself
     #
 
-    var vec = Array[DType.int8]()
+    var vec = Array[DType.int8, 6]()
     vec.append(1)
     vec.append(2)
     vec.append(3)
@@ -322,7 +313,7 @@ fn test_array_extend() raises:
     assert_equal(vec[2], 3)
 
     var copy = vec
-    vec.extend(copy)
+    vec.append(copy)
 
     # vec == [1, 2, 3, 1, 2, 3]
     assert_equal(len(vec), 6)
@@ -335,13 +326,13 @@ fn test_array_extend() raises:
 
 
 fn test_array_iter() raises:
-    var vs = Array[DType.index]()
+    var vs = Array[DType.index, 3]()
     vs.append(1)
     vs.append(2)
     vs.append(3)
 
     # Borrow immutably
-    fn sum(vs: Array[DType.index]) -> Int:
+    fn sum(vs: Array[DType.index, 3]) -> Int:
         var sum = 0
         for v in vs:
             sum += int(v)
@@ -351,7 +342,7 @@ fn test_array_iter() raises:
 
 
 fn test_array_iter_not_mutable() raises:
-    var vs = Array(1, 2, 3)
+    var vs = Array[DType.int8, 3](1, 2, 3)
 
     # should not mutate
     for v in vs:
@@ -360,21 +351,6 @@ fn test_array_iter_not_mutable() raises:
     for v in vs:
         sum += int(v)
     assert_equal(6, sum)
-
-
-fn test_array_broadcast_ops() raises:
-    alias arr = Array[DType.uint8, 3]
-    var vs = arr(1, 2, 3)
-    # should apply to all
-    vs += 1
-    assert_equal(9, vs.sum())
-    vs -= 1
-    assert_equal(6, vs.sum())
-    vs *= 2
-    assert_equal(12, vs.sum())
-    assert_equal(0, (arr(2, 2, 2) % 2).sum())
-    assert_equal(0, (arr(2, 2, 2) // 2).sum())
-    assert_equal(4 * 3, (arr(2, 2, 2) ** 2).sum())
 
 
 fn test_array_span() raises:
@@ -408,8 +384,8 @@ fn test_array_span() raises:
 
 
 fn test_array_boolable() raises:
-    assert_true(Array[DType.int8](1))
-    assert_false(Array[DType.int8]())
+    assert_true(Array[DType.int8, 1](1))
+    assert_false(Array[DType.int8, 1]())
 
 
 fn test_constructor_from_pointer() raises:
@@ -419,33 +395,42 @@ fn test_constructor_from_pointer() raises:
     new_pointer[2] = 2
     # rest is not initialized
 
-    var some_array = Array[DType.int8](unsafe_pointer=new_pointer, length=3)
+    var some_array = Array[DType.int8, 3](unsafe_pointer=new_pointer, length=3)
     assert_equal(some_array[0], 0)
     assert_equal(some_array[1], 1)
     assert_equal(some_array[2], 2)
     assert_equal(len(some_array), 3)
 
 
+fn test_constructor_from_other_list() raises:
+    var initial_list = List[UInt8](0, 1, 2)
+    var size = len(initial_list)
+    var capacity = initial_list.capacity
+    var some_array = Array[DType.uint8, 3](initial_list)
+    assert_equal(some_array[0], 0)
+    assert_equal(some_array[1], 1)
+    assert_equal(some_array[2], 2)
+    assert_equal(len(some_array), size)
+    assert_equal(some_array.capacity, capacity)
+
+
 fn test_constructor_from_other_list_through_pointer() raises:
-    # TODO
-    # var initial_array = Array[DType.](0, 1, 2)
-    # # we do a backup of the size and capacity because
-    # # the list attributes will be invalid after the steal_data call
-    # var size = len(initial_array)
-    # var capacity = initial_array.capacity
-    # var some_array = Array[DType.int8](
-    #     unsafe_pointer=initial_array.steal_data(), size=size
-    # )
-    # assert_equal(some_array[0], 0)
-    # assert_equal(some_array[1], 1)
-    # assert_equal(some_array[2], 2)
-    # assert_equal(len(some_list), size)
-    # assert_equal(some_list.capacity, capacity)
-    pass
+    var initial_list = List[UInt8](0, 1, 2)
+    var size = len(initial_list)
+    var capacity = initial_list.capacity
+    var some_array = Array[DType.uint8, 3](
+        unsafe_pointer=initial_list.unsafe_ptr(), length=size
+    )
+    assert_equal(some_array[0], 0)
+    assert_equal(some_array[1], 1)
+    assert_equal(some_array[2], 2)
+    assert_equal(len(some_array), size)
+    assert_equal(some_array.capacity, capacity)
+    _ = initial_list
 
 
 fn test_array_to_string() raises:
-    var my_array = Array[DType.int8](1, 2, 3)
+    var my_array = Array[DType.int8, 3](1, 2, 3)
     assert_equal(str(my_array), "[1, 2, 3]")
 
     # TODO: need bin func for StringLiteral
@@ -461,57 +446,51 @@ fn test_array_to_string() raises:
 
 
 fn test_array_count() raises:
-    var arr1 = Array[DType.int8, 10](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
+    var arr1 = Array[DType.int8, 55](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
     assert_equal(1, arr1.count(1))
     assert_equal(2, arr1.count(2))
     assert_equal(0, arr1.count(4))
     assert_equal(0, arr1.count(0))
 
-    var arr2 = Array[DType.int8]()
+    var arr2 = Array[DType.int8, 3]()
     assert_equal(0, arr2.count(1))
 
 
 fn test_array_concat() raises:
-    var a = Array[DType.int8](1, 2, 3)
-    var b = Array[DType.int8](4, 5, 6)
+    var a = Array[DType.int8, 6](1, 2, 3)
+    var b = Array[DType.int8, 3](4, 5, 6)
     # TODO: once lazy evaluation issue is solved
-    # var c = a.append(b)
-    # assert_equal(len(c), 6)
-    # check that original values aren't modified
     assert_equal(len(a), 3)
+    a.append(b)
+    assert_equal(len(a), 6)
     assert_equal(len(b), 3)
-    # assert_equal(str(c), "[1, 2, 3, 4, 5, 6]")
+    assert_equal(str(a), "[1, 2, 3, 4, 5, 6]")
 
-    # a.extend(b)
-    # assert_equal(len(a), 6)
-    # assert_equal(str(a), "[1, 2, 3, 4, 5, 6]")
-    # assert_equal(len(b), 3)
+    var c = Array[DType.int8, 3](1, 2, 3)
+    c.append(b)
+    assert_equal(len(c), 3)
+    assert_equal(str(c), "[1, 2, 3]")
 
-    # a = Array[DType.int8](1, 2, 3)
-    # a.extend(b^)
-    # assert_equal(len(a), 6)
-    # assert_equal(str(a), "[1, 2, 3, 4, 5, 6]")
+    var d = Array[DType.int8, 21](1, 2, 3)
+    var e = Array[DType.int8, 15](4, 5, 6)
+    var f = d.concat(e)
+    assert_equal(len(f), 6)
+    assert_equal(str(f), "[1, 2, 3, 4, 5, 6]")
 
-    # var d = Array[DType.int8](1, 2, 3)
-    # var e = Array[DType.int8](4, 5, 6)
-    # var f = d.append(e^)
-    # assert_equal(len(f), 6)
-    # assert_equal(str(f), "[1, 2, 3, 4, 5, 6]")
-
-    # var l = Array[DType.int8](1, 2, 3)
-    # l.extend(Array[DType.int8]())
-    # assert_equal(len(l), 3)
+    var l = Array[DType.int8, 3](1, 2, 3)
+    l.append(Array[DType.int8, 3]())
+    assert_equal(len(l), 3)
 
 
 fn test_array_contains() raises:
-    var x = Array[DType.int8, 3](1, 2, 3)
+    var x = Array[DType.int8, 21](1, 2, 3)
     assert_false(0 in x)
     assert_true(1 in x)
     assert_false(4 in x)
 
 
 fn test_indexing() raises:
-    var l = Array[DType.int8](1, 2, 3)
+    var l = Array[DType.int8, 3](1, 2, 3)
     assert_equal(l[int(1)], 2)
     assert_equal(l[False], 1)
     assert_equal(l[True], 2)
@@ -539,6 +518,21 @@ fn test_array_unsafe_set_and_get() raises:
     arr.unsafe_set(0, 2)
     assert_equal(2, arr.unsafe_get(0))
     assert_equal(0, len(arr))
+
+
+fn test_array_broadcast_ops() raises:
+    alias arr = Array[DType.uint8, 3]
+    var vs = arr(1, 2, 3)
+    # should apply to all
+    vs += 1
+    assert_equal(9, vs.sum())
+    vs -= 1
+    assert_equal(6, vs.sum())
+    vs *= 2
+    assert_equal(12, vs.sum())
+    assert_equal(0, (arr(2, 2, 2) % 2).sum())
+    assert_equal(3, (arr(2, 2, 2) // 2).sum())
+    assert_equal(4 * 3, (arr(2, 2, 2) ** 2).sum())
 
 
 fn test_min() raises:
@@ -599,7 +593,6 @@ fn test_filter() raises:
 fn main() raises:
     test_array()
     test_array_with_default()
-    test_indexing_vec()
     test_mojo_issue_698()
     test_array_to_bool_conversion()
     test_array_pop()
@@ -608,9 +601,11 @@ fn main() raises:
     test_array_index()
     test_array_extend()
     test_array_iter()
+    test_array_iter_not_mutable()
     test_array_span()
     test_array_boolable()
     test_constructor_from_pointer()
+    test_constructor_from_other_list()
     test_constructor_from_other_list_through_pointer()
     test_array_to_string()
     test_array_count()
@@ -618,7 +613,6 @@ fn main() raises:
     test_array_contains()
     test_indexing()
     test_array_unsafe_set_and_get()
-    test_array_iter_not_mutable()
     test_array_broadcast_ops()
     test_min()
     test_max()

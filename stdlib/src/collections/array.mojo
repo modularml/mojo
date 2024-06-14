@@ -10,17 +10,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Defines the `Array` type.
+"""Defines the `Array` type."""
 
-You can import these APIs from the `collections` package. For example:
-
-```mojo
-from collections import Array
-```
-"""
-
-# from math import sqrt, acos, sin
-# from algorithm import vectorize
+from math import sqrt, acos, sin
+from algorithm import vectorize
 
 # ===----------------------------------------------------------------------===#
 # Array
@@ -75,9 +68,7 @@ fn _closest_upper_pow_2(val: Int) -> Int:
 
 
 @register_passable("trivial")
-struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
-    CollectionElement, Sized, Boolable
-):
+struct Array[T: DType, capacity: Int](CollectionElement, Sized, Boolable):
     """An Array allocated on the stack with a capacity known at compile
     time.
 
@@ -138,7 +129,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         for value in values:
             self.append(value)
 
-    fn __init__[cap: Int](inout self, values: SIMD[T, cap]):
+    fn __init__[cap: Int](inout self, owned values: SIMD[T, cap]):
         """Constructs an Array from the given values.
 
         Parameters:
@@ -171,9 +162,9 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             existing: The existing Array.
         """
         self = Self()
-        for i in range(capacity):  # FIXME using memcpy?
-            self[i] = existing[i]
-        self.capacity_left = existing.capacity_left
+        for i in range(len(existing)):  # FIXME using memcpy?
+            self.vec[i] = existing.unsafe_get(i)
+        self.capacity_left = capacity - (cap - existing.capacity_left)
 
     fn __init__(
         inout self,
@@ -194,42 +185,17 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             self.vec[i] = unsafe_pointer[i]
         self.capacity_left = capacity - s
 
-    # FIXME
-    fn __init__[
-        size: Int
-    ](inout self, *, unsafe_pointer: UnsafePointer[Self._scalar_type]):
-        """Constructs an Array from a pointer and its size.
-
-        Parameters:
-            size: The number of elements pointed to.
-
-        Args:
-            unsafe_pointer: The pointer to the data.
-        """
-        alias s = min(capacity, size)
-        self.vec = Self._vec_type()
-
-        @parameter
-        for i in range(s):
-            self.vec[i] = unsafe_pointer[i]
-        self.capacity_left = capacity - s
-
-    fn __init__[size: Int](inout self, owned existing: List[Self._scalar_type]):
+    fn __init__(inout self, owned existing: List[Self._scalar_type]):
         """Constructs an Array from an existing List.
-
-        Parameters:
-            size: The size of the List.
 
         Args:
             existing: The existing List.
         """
         self.vec = Self._vec_type()
-        alias amnt = min(capacity, size)
-        self.capacity_left = capacity - amnt
+        self.capacity_left = capacity - existing.size
 
-        @parameter
-        for i in range(amnt):
-            self.unsafe_set(i, existing[i])
+        for i in range(existing.size):
+            self.unsafe_set(i, existing.unsafe_get(i))
 
     @always_inline
     fn __len__(self) -> Int:
@@ -260,7 +226,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Args:
             other: The Array to append.
         """
-        for i in range(self.capacity_left):
+
+        for i in range(min(self.capacity_left, len(other))):
             self.append(other[i])
 
     fn __iter__(
@@ -288,8 +255,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         """Verify if a given value is present in the Array.
 
         ```mojo
-        %# from collections import Array
-        var x = Array(1,2,3)
+        from collections import Array
+        var x = Array[DType.uint8, 3](1,2,3)
         if 3 in x: print("x contains 3")
         ```
 
@@ -300,14 +267,10 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             True if the value is contained in the Array, False otherwise.
         """
 
-        @parameter
-        if capacity != Self._vec_type.size:
-            var mask = Self._vec_type(~Self._scalar_type(0))
-            Self._mask_vec(mask)
-            var comp = (self.vec == value).cast[DType.bool]()
-            return (comp & mask.cast[DType.bool]()).reduce_or()
-        else:
-            return (self.vec == value).cast[DType.bool]().reduce_or()
+        var size_mask = SIMD[DType.bool, Self._vec_type.size](False)
+        for i in range(len(self)):
+            size_mask[i] = True
+        return ((self.vec == value).cast[DType.bool]() & size_mask).reduce_or()
 
     @always_inline
     fn __bool__(self) -> Bool:
@@ -321,9 +284,7 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
     @always_inline("nodebug")
     fn concat[
         cap: Int
-    ](self, owned other: Array[T, cap]) -> Array[
-        T, Self.capacity + other.capacity
-    ]:
+    ](owned self, owned other: Array[T, cap]) -> Array[T, capacity + cap]:
         """Concatenates self with other and returns the result as a new Array.
 
         Parameters:
@@ -335,8 +296,11 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The newly created Array.
         """
-        var arr = Array[T, Self.capacity + other.capacity](self)
-        arr.extend(other)
+        alias array = Array[T, capacity + cap]
+        var arr = array(self)
+        print(arr)
+        arr.append(other)
+        print(arr)
         return arr
 
     fn __str__(self) -> String:
@@ -346,8 +310,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         the way to call this method is a bit special. Here is an example below:
 
         ```mojo
-        %# from collections import Array
-        var my_array = Array(1, 2, 3)
+        from collections import Array
+        var my_array = Array[DType.uint8, 3](1, 2, 3)
         print(str(my_array))
         ```
 
@@ -383,8 +347,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         the way to call this method is a bit special. Here is an example below:
 
         ```mojo
-        %# from collections import Array
-        var my_array = Array(1, 2, 3)
+        from collections import Array
+        var my_array = Array[DType.uint8, 3](1, 2, 3)
         print(repr(my_array))
         ```
 
@@ -422,25 +386,6 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
                 self.capacity_left - 1, capacity - (norm_idx + 1)
             )
 
-    @always_inline
-    fn extend[cap: Int = capacity](inout self, owned other: Array[T, cap]):
-        """Extends this Array by consuming the elements of `other` up
-        to Self.capacity.
-
-        Parameters:
-            cap: The capacity of the other Array.
-
-        Args:
-            other: Array whose elements will be added in order at the end of this Array.
-        """
-        var size_s = len(self)
-        var size_o = len(other)
-        if size_s + size_o > capacity:
-            return
-        for i in range(size_o):
-            self.unsafe_set(size_s + i, other.unsafe_get(i))
-            self.capacity_left -= 1
-
     fn pop(inout self, i: Int = -1) -> Self._scalar_type:
         """Pops a value from the Array at the given index.
 
@@ -477,8 +422,8 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         restricted by the range given the start and stop bounds.
 
         ```mojo
-        %# from collections import Array
-        var item = Array(1, 2, 3).index(2)
+        from collections import Array
+        var item = Array[DType.uint8, 3](1, 2, 3).index(2)
         print(item.value() if item else -1) # prints `1`
         ```
 
@@ -570,13 +515,10 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             A copy of the element at the given index.
         """
-        debug_assert(
-            abs(idx) < len(self) or idx == -1 * len(self),
-            "index must be within bounds",
-        )
-        var norm_idx = min(idx, len(self) - 1) if idx > -1 else max(
-            0, len(self) + idx
-        )
+        var size = len(self)
+        debug_assert(-size <= idx < size, "index must be within bounds")
+        # var norm_idx = min(idx, size - 1) if idx > -1 else max(0, size + idx)
+        var norm_idx = idx if idx > -1 else max(0, size + idx)
         return self.vec[norm_idx]
 
     fn count(self, value: Self._scalar_type) -> Int:
@@ -585,9 +527,9 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         the way to call this method is a bit special. Here is an example below.
 
         ```mojo
-        %# from collections import Array
-        var my_array = Array(1, 2, 3)
-        print(my_array.count(1))
+        from collections import Array
+        var my_array = Array[DType.uint8, 3](1, 2, 3)
+        print(my_array.count(1)) # 1
         ```
 
         Args:
@@ -597,14 +539,20 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
             The number of occurrences of the value in the Array.
         """
 
+        var null_amnt: UInt8 = 0
+        if value == 0:
+            null_amnt = self.capacity_left
+
         @parameter
         if capacity != Self._vec_type.size:
             var same = (self.vec == value).cast[DType.uint8]()
             var mask = Self._vec_type(~Self._scalar_type(0))
             Self._mask_vec(mask)
-            return int((same & mask.cast[DType.uint8]()).reduce_add())
+            var count = (same & mask.cast[DType.uint8]()).reduce_add()
+            return int(count - null_amnt)
         else:
-            return int((self.vec == value).cast[DType.uint8]().reduce_add())
+            var count = (self.vec == value).cast[DType.uint8]().reduce_add()
+            return int(count - null_amnt)
 
     # FIXME: is this possible?
     # @always_inline
@@ -971,7 +919,6 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
-        from math import sqrt
 
         return sqrt((self.vec**2).reduce_add())
 
@@ -1198,7 +1145,6 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Returns:
             The result.
         """
-        from math import acos
 
         return acos(self.cos(other))
 
@@ -1252,8 +1198,6 @@ struct Array[T: DType = DType.int16, capacity: Int = 256 // T.bitwidth()](
         Args:
             func: The function to apply.
         """
-
-        from algorithm import vectorize
 
         @parameter
         fn closure[simd_width: Int](i: Int):
