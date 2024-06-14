@@ -32,6 +32,23 @@ def test_counter_getitem():
     assert_equal(c[5], 0)
 
 
+def test_get():
+    var counter = Counter[String]()
+    counter["a"] = 1
+    counter["b"] = 2
+
+    var a: Int = counter.get("a").value()
+    var b: Int = counter.get("b").value()
+    var c: Int = counter.get("c", 3)
+
+    var d: Optional[Int] = counter.get("d")
+
+    assert_equal(a, 1)
+    assert_equal(b, 2)
+    assert_equal(c, 3)
+    assert_false(d)
+
+
 def test_iter():
     var c = Counter[String]()
     c["a"] = 1
@@ -250,6 +267,7 @@ def main():
     test_counter_setitem()
     test_elements()
     test_eq_and_ne()
+    test_get()
     test_iter()
     test_iter_keys()
     test_iter_items()

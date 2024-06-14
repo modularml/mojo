@@ -210,7 +210,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             if self[key] <= 0:
                 _ = self.pop(key)
 
-    fn get(self, value: V) -> Optional[V]:
+    fn get(self, value: V) -> Optional[Int]:
         """Get a value from the counter.
 
         Args:
