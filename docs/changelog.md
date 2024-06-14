@@ -105,6 +105,22 @@ by [@jayzhan211](https://github.com/jayzhan211))
   #True 1.125 2
   ```
 
+- Environment variable `MOJO_PYTHON` can be pointed to an executable to pin Mojo
+  to a specific version:
+
+  ```sh
+  export MOJO_PYTHON="/usr/bin/python3.11"
+  ```
+
+  Or a virtual environment to always have access to those Python modules:
+
+  ```sh
+  export MOJO_PYTHON="~/venv/bin/python"
+  ```
+
+  `MOJO_PYTHON_LIBRARY` still exists for environments with a dynamic libpython,
+  but no Python executable.
+
 ### 🦋 Changed
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that
@@ -144,6 +160,12 @@ by [@jayzhan211](https://github.com/jayzhan211))
     var s = Slice(1, None, 2)
     print(s.start.value()) # must retrieve the value from the optional
   ```
+
+- Accessing local Python modules with `Python.add_to_path(".")` is no longer
+  required, it now behaves the same as Python, you can access modules in the
+  same folder as the target file:
+  - `mojo run /tmp/main.mojo` can access `/tmp/mymodule.py`
+  - `mojo build main.mojo -o ~/myexe && ~/myexe` can access `~/mymodule.py`
 
 ### ❌ Removed
 

@@ -12,9 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 
 
-struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
-    CollectionElement
-):
+struct UnsafeMaybeUninitialized[ElementType: AnyType](CollectionElementNew):
     """A memory location that may or may not be initialized.
 
     Note that the destructor is a no-op. If the memory was initialized, the caller
@@ -38,14 +36,39 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
         """The memory is now considered uninitialized."""
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
+    @doc_private
     @always_inline
-    fn __init__(inout self, owned value: Self.ElementType):
+    fn __init__(inout self, *, other: Self):
+        """It is not possible to call this method.
+
+        Trying to call this method will abort.
+        """
+        abort(
+            "You should never call the explicit copy constructor of"
+            " UnsafeMaybeUninitialized because it's ambiguous to copy"
+            " possibly uninitialized memory. Use"
+            " `UnsafeMaybeUninitialized.copy_from()` instead if you want to"
+            " trigger an explicit copy of the content of"
+            " UnsafeMaybeUninitialized. It has very specific semantics."
+        )
+        self = Self()
+
+    @always_inline
+    fn __init__[
+        MovableType: Movable
+    ](
+        inout self: UnsafeMaybeUninitialized[MovableType],
+        owned value: MovableType,
+    ):
         """The memory is now considered initialized.
+
+        Parameters:
+            MovableType: The type of the element to store.
 
         Args:
             value: The value to initialize the memory with.
         """
-        self = Self()
+        self = UnsafeMaybeUninitialized[MovableType]()
         self.write(value^)
 
     @always_inline
@@ -55,7 +78,7 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
         This method should never be called as implicit copy should not
         be done on memory that may be uninitialized.
 
-        Calling this method will actally cause the program to abort.
+        Trying to call this method will abort.
 
         If you wish to perform a copy, you should manually call the method
         `copy_from` instead.
@@ -67,16 +90,42 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
         self = Self()
 
     @always_inline
-    fn copy_from(inout self, other: Self):
+    fn copy_from[
+        CopyableType: ExplicitlyCopyable
+    ](
+        inout self: UnsafeMaybeUninitialized[CopyableType],
+        other: UnsafeMaybeUninitialized[CopyableType],
+    ):
         """Copy another object.
 
         This function assumes that the current memory is uninitialized
         and the other object is initialized memory.
 
+        Parameters:
+            CopyableType: The type object to copy.
+
         Args:
             other: The object to copy.
         """
-        self.unsafe_ptr().init_pointee_copy(other.assume_initialized())
+        self.unsafe_ptr().initialize_pointee_explicit_copy(
+            other.assume_initialized()
+        )
+
+    @always_inline
+    fn copy_from[
+        CopyableType: ExplicitlyCopyable
+    ](inout self: UnsafeMaybeUninitialized[CopyableType], other: CopyableType):
+        """Copy another object.
+
+        This function assumes that the current memory is uninitialized.
+
+        Parameters:
+            CopyableType: The type object to copy.
+
+        Args:
+            other: The object to copy.
+        """
+        self.unsafe_ptr().initialize_pointee_explicit_copy(other)
 
     @always_inline
     fn __moveinit__(inout self, owned other: Self):
@@ -85,7 +134,7 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
         This method should never be called as implicit moves should not
         be done on memory that may be uninitialized.
 
-        Calling this method will actally cause the program to abort.
+        Trying to call this method will abort.
 
         If you wish to perform a move, you should manually call the method
         `move_from` instead.
@@ -97,7 +146,12 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
         self = Self()
 
     @always_inline
-    fn move_from(inout self, inout other: Self):
+    fn move_from[
+        MovableType: Movable
+    ](
+        inout self: UnsafeMaybeUninitialized[MovableType],
+        inout other: UnsafeMaybeUninitialized[MovableType],
+    ):
         """Move another object.
 
         This function assumes that the current memory is uninitialized
@@ -105,16 +159,49 @@ struct UnsafeMaybeUninitialized[ElementType: CollectionElement](
 
         After the function is called, the other object is considered uninitialized.
 
+        Parameters:
+            MovableType: The type object to move.
+
         Args:
             other: The object to move.
         """
-        other.unsafe_ptr().move_pointee_into(self.unsafe_ptr())
+        self.move_from(other.unsafe_ptr())
 
     @always_inline
-    fn write(inout self, owned value: Self.ElementType):
+    fn move_from[
+        MovableType: Movable
+    ](
+        inout self: UnsafeMaybeUninitialized[MovableType],
+        other: UnsafePointer[MovableType],
+    ):
+        """Move another object.
+
+        This function assumes that the current memory is uninitialized
+        and the other object is initialized memory.
+
+        After the function is called, the `other` object is considered uninitialized.
+
+        Parameters:
+            MovableType: The type object to move.
+
+        Args:
+            other: The pointer to the object to move.
+        """
+        other.move_pointee_into(self.unsafe_ptr())
+
+    @always_inline
+    fn write[
+        MovableType: Movable
+    ](
+        inout self: UnsafeMaybeUninitialized[MovableType],
+        owned value: MovableType,
+    ):
         """Write a value into an uninitialized memory location.
 
         Calling this method assumes that the memory is uninitialized.
+
+        Parameters:
+            MovableType: The type of the element to store.
 
         Args:
             value: The value to write.
