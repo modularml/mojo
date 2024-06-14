@@ -389,3 +389,110 @@ def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
 #         paths_str.append(cur_path[].__fspath__())
 
 #     return join(path.__fspath__(), *paths_str)
+
+
+# ===----------------------------------------------------------------------=== #
+# splitroot
+# ===----------------------------------------------------------------------=== #
+
+
+fn splitroot(path: String) -> Tuple[String, String, String]:
+    """Split a pathname into drive, root and tail.
+
+    Args:
+        path: The path to a directory or file.
+
+    Returns:
+        The tuple with the drive, root and tail of the path.
+    """
+    alias empty = "".__str__()
+
+    if path[:1] != sep:
+        return (empty, empty, path)
+    elif path[1:2] != sep or path[2:3] == sep:
+        return (empty, sep.__str__(), path[1:])
+    else:
+        return (empty, path[:2], path[2:])
+
+
+fn splitroot[
+    PathLike: os.PathLike, //
+](path: PathLike) -> Tuple[String, String, String]:
+    """Split a pathname into drive, root and tail.
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path to a directory or file.
+
+    Returns:
+        The tuple with the drive, root and tail of the path.
+    """
+    return splitroot(path.__fspath__())
+
+
+# ===----------------------------------------------------------------------=== #
+# normpath
+# ===----------------------------------------------------------------------=== #
+
+
+fn normpath(path: String) raises -> String:
+    """Normalize path, eliminating double slashes, etc.
+    It should be understood that this may change the meaning of the path
+    if it contains symbolic links.
+
+    Args:
+        path: The path to a directory or file.
+
+    Returns:
+        The normalized path.
+    """
+    alias dot = "."
+    alias dotdot = ".."
+    if not path:
+        return dot
+    var initial_slashes: String
+    var _path: String
+    _, initial_slashes, _path = splitroot(path)
+    var comps = _path.split(sep)
+    var new_comps: List[String] = List[String]()
+
+    for comp in comps:
+        if not comp[] or comp[] == dot:
+            continue
+        if (
+            comp[] != dotdot
+            or (not initial_slashes and not new_comps)
+            or (new_comps and new_comps[-1] == dotdot)
+        ):
+            new_comps.append(comp[])
+        elif new_comps:
+            _ = new_comps.pop()
+
+    # TODO: use initial_slashes + sep.join(*new_comps) to reconstruct path when unpacking is supported
+    var normalized_path: String = initial_slashes
+    if new_comps:
+        normalized_path += new_comps[0]
+        for comp in new_comps[1:]:
+            normalized_path += (
+                sep.__str__() + comp[] if normalized_path else comp[]
+            )
+    return normalized_path or dot
+
+
+fn normpath[PathLike: os.PathLike, //](path: PathLike) raises -> String:
+    """Normalize path, eliminating double slashes, etc.
+    It should be understood that this may change the meaning of the path
+    if it contains symbolic links.
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path to a directory or file.
+
+    Returns:
+        The normalized path.
+    """
+    return normpath(path.__fspath__())
