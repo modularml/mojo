@@ -41,27 +41,38 @@ struct Error(Stringable, Boolable, Representable):
     """
 
     @always_inline("nodebug")
-    fn __init__(inout self):
-        """Default constructor."""
-        self.data = UnsafePointer[UInt8]()
-        self.loaded_length = 0
+    fn __init__() -> Error:
+        """Default constructor.
+
+        Returns:
+            The constructed Error object.
+        """
+        return Error {data: UnsafePointer[UInt8](), loaded_length: 0}
 
     @always_inline("nodebug")
-    fn __init__(inout self, value: StringLiteral):
+    fn __init__(value: StringLiteral) -> Error:
         """Construct an Error object with a given string literal.
 
         Args:
             value: The error message.
+
+        Returns:
+            The constructed Error object.
         """
-        self.data = value.unsafe_ptr()
-        self.loaded_length = len(value)
+        return Error {
+            data: value.unsafe_ptr(),
+            loaded_length: len(value),
+        }
 
     @always_inline("nodebug")
-    fn __init__(inout self, src: String):
+    fn __init__(src: String) -> Error:
         """Construct an Error object with a given string.
 
         Args:
             src: The error message.
+
+        Returns:
+            The constructed Error object.
         """
         var length = len(src)
         var dest = UnsafePointer[UInt8].alloc(length + 1)
@@ -72,15 +83,17 @@ struct Error(Stringable, Boolable, Representable):
             count=length,
         )
         dest[length] = 0
-        self.data = dest
-        self.loaded_length = -length
+        return Error {data: dest, loaded_length: -length}
 
     @always_inline("nodebug")
-    fn __init__(inout self, src: StringRef):
+    fn __init__(src: StringRef) -> Error:
         """Construct an Error object with a given string ref.
 
         Args:
             src: The error message.
+
+        Returns:
+            The constructed Error object.
         """
         var length = len(src)
         var dest = UnsafePointer[UInt8].alloc(length + 1)
@@ -90,8 +103,7 @@ struct Error(Stringable, Boolable, Representable):
             count=length,
         )
         dest[length] = 0
-        self.data = dest
-        self.loaded_length = -length
+        return Error {data: dest, loaded_length: -length}
 
     fn __del__(owned self):
         """Releases memory if allocated."""
@@ -99,22 +111,22 @@ struct Error(Stringable, Boolable, Representable):
             self.data.free()
 
     @always_inline("nodebug")
-    fn __copyinit__(inout self, existing: Self):
+    fn __copyinit__(existing: Self) -> Self:
         """Creates a deep copy of an existing error.
 
-        Args:
-            existing: The error to copy.
+        Returns:
+            The copy of the original error.
         """
         if existing.loaded_length < 0:
             var length = -existing.loaded_length
             var dest = UnsafePointer[UInt8].alloc(length + 1)
             memcpy(dest, existing.data, length)
             dest[length] = 0
-            self.data = dest
-            self.loaded_length = existing.loaded_length
+            return Error {data: dest, loaded_length: existing.loaded_length}
         else:
-            self.data = existing.data
-            self.loaded_length = existing.loaded_length
+            return Error {
+                data: existing.data, loaded_length: existing.loaded_length
+            }
 
     fn __bool__(self) -> Bool:
         """Returns True if the error is set and false otherwise.
