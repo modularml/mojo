@@ -510,6 +510,18 @@ fn isdigit(c: UInt8) -> Bool:
     return ord_0 <= int(c) <= ord_9
 
 
+fn isdigit(c: String) -> Bool:
+    """Determines whether the given character is a digit [0-9].
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is a digit.
+    """
+    return isdigit(ord(c))
+
+
 # ===----------------------------------------------------------------------=== #
 # isupper
 # ===----------------------------------------------------------------------=== #
@@ -2134,6 +2146,17 @@ struct String(
             res += self[pos_in_self : len(self)]
 
         return res^
+
+    fn isdigit(self) -> Bool:
+        """Returns True if all characters in the string are digits.
+
+        Returns:
+            True if all characters are digits else False.
+        """
+        for c in self:
+            if not isdigit(c):
+                return False
+        return True
 
 
 # ===----------------------------------------------------------------------=== #

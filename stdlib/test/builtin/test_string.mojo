@@ -1308,6 +1308,18 @@ def test_format_args():
     )
 
 
+def test_isdigit():
+    assert_true(isdigit(ord("1")))
+    assert_true(isdigit("1"))
+    # TODO: What to do with multi-character strings?
+    # assert_false(isdigit("1gt"))
+    assert_false(isdigit(ord("g")))
+    assert_false(isdigit("g"))
+    assert_true(String("123").isdigit())
+    assert_false(String("asdg").isdigit())
+    assert_false(String("123asdg").isdigit())
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1354,3 +1366,4 @@ def main():
     test_indexing()
     test_string_iter()
     test_format_args()
+    test_isdigit()
