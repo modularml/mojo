@@ -578,6 +578,12 @@ struct VariadicPack[
             A reference to the element.  The Reference's mutability follows the
             mutability of the pack argument convention.
         """
+
+        constrained[
+            0 <= index < Self.__len__(),
+            msg="The index of VariadicPack should be between `0` and `len(pack) - 1`. Negative indices are not supported.",
+        ]()
+
         var litref_elt = __mlir_op.`lit.ref.pack.extract`[index = index.value](
             self._value
         )
