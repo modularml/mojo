@@ -17,6 +17,8 @@ module should be exposed by the current `math` module. The contents of this
 module should be eventually moved to the `math` module when it's open sourced.
 """
 
+from bit import countr_zero
+
 # ===----------------------------------------------------------------------=== #
 # Ceilable
 # ===----------------------------------------------------------------------=== #
@@ -202,7 +204,7 @@ trait Truncable:
 # ===----------------------------------------------------------------------=== #
 
 
-fn gcd(owned m: Int, owned n: Int, /) -> Int:
+fn gcd(m: Int, n: Int, /) -> Int:
     """Compute the greatest common divisor of two integers.
 
     Args:
@@ -212,9 +214,34 @@ fn gcd(owned m: Int, owned n: Int, /) -> Int:
     Returns:
         The greatest common divisor of the two integers.
     """
-    while n:
-        m, n = n, m % n
-    return abs(m)
+    if m == 0 or n == 0:
+        return max(m, n)
+
+    if m > 0 and n > 0:
+        var trailing_zeros_a = countr_zero(m)
+        var trailing_zeros_b = countr_zero(n)
+
+        var u = m >> trailing_zeros_a
+        var v = n >> trailing_zeros_b
+        var trailing_zeros_common = min(trailing_zeros_a, trailing_zeros_b)
+
+        if u == 1 or v == 1:
+            return 1 << trailing_zeros_common
+
+        while u != v:
+            if u > v:
+                u, v = v, u
+            v -= u
+            if u == 0:
+                break
+            v >>= countr_zero(v)
+        return u << trailing_zeros_common
+
+    var u = m
+    var v = n
+    while v:
+        u, v = v, u % v
+    return abs(u)
 
 
 fn gcd(s: Span[Int], /) -> Int:
