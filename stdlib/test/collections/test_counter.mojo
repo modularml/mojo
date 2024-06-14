@@ -17,6 +17,26 @@ from collections.counter import Counter
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
+def test_bool():
+    var c = Counter[String]()
+    assert_false(c)
+    c["a"] = 1
+    assert_true(c)
+    c.pop("a")
+    assert_false(c)
+
+
+def test_clear():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    c.clear()
+
+    assert_equal(len(c), 0)
+    assert_false(c)
+
+
 def test_counter_construction():
     _ = Counter[Int]()
     _ = Counter[Int](List[Int]())
@@ -111,6 +131,18 @@ def test_iter_items():
 
     assert_equal(keys, "ab")
     assert_equal(sum, 3)
+
+
+def test_len():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    assert_equal(len(c), 2)
+    c.pop("a")
+    assert_equal(len(c), 1)
+    c.clear()
+    assert_equal(len(c), 0)
 
 
 def test_total():
@@ -260,8 +292,24 @@ def test_counter_setitem():
     assert_equal(c[3], 0)
 
 
+def test_pop():
+    var counter = Counter[String]()
+    counter["a"] = 1
+    counter["b"] = 2
+
+    var a = counter.pop("a")
+    var b = counter.pop("b")
+    var c = counter.pop("c", 3)
+
+    assert_equal(a, 1)
+    assert_equal(b, 2)
+    assert_equal(c, 3)
+
+
 def main():
     test_add()
+    test_bool()
+    test_clear()
     test_counter_construction()
     test_counter_getitem()
     test_counter_setitem()
@@ -273,8 +321,10 @@ def main():
     test_iter_items()
     test_iter_values()
     test_iter_values_mut()
+    test_len()
     test_lt_le_gt_and_ge()
     test_most_common()
+    test_pop()
     test_substract()
     test_total()
     test_update()
