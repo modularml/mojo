@@ -73,55 +73,45 @@ struct Bool(
     """The underlying storage of the boolean value."""
 
     @always_inline("nodebug")
-    fn __init__(*, other: Self) -> Bool:
+    fn __init__(inout self, *, other: Self):
         """Explicitly construct a deep copy of the provided value.
 
         Args:
             other: The value to copy.
-
-        Returns:
-            The constructed Bool value.
         """
-        return Self {value: other.value}
+        self.value = other.value
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.i1) -> Bool:
+    fn __init__(inout self, value: __mlir_type.i1):
         """Construct a Bool value given a __mlir_type.i1 value.
 
         Args:
             value: The initial __mlir_type.i1 value.
-
-        Returns:
-            The constructed Bool value.
         """
-        return Self {value: value}
+        self.value = value
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<bool>`) -> Bool:
+    fn __init__(inout self, value: __mlir_type.`!pop.scalar<bool>`):
         """Construct a Bool value given a `!pop.scalar<bool>` value.
 
         Args:
             value: The initial value.
-
-        Returns:
-            The constructed Bool value.
         """
-        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i1](value)
+        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i1](
+            value
+        )
 
     @always_inline("nodebug")
-    fn __init__[boolable: Boolable](value: boolable) -> Bool:
+    fn __init__[T: Boolable](inout self, value: T):
         """Implicitly convert a Boolable value to a Bool.
 
         Parameters:
-            boolable: The Boolable type.
+            T: The Boolable type.
 
         Args:
             value: The boolable value.
-
-        Returns:
-            The constructed Bool value.
         """
-        return value.__bool__()
+        self = value.__bool__()
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
