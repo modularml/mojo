@@ -10,7 +10,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Defines the `Array` type."""
+"""Defines the `Array` type.
+
+An Array allocated on the stack with a capacity known at compile
+time.
+
+It is backed by a `SIMD` vector. This struct has the same API
+as a regular `Array`.
+
+This is typically faster than Python's `Array` as it is stack-allocated
+and does not require any dynamic memory allocation and uses vectorized
+operations wherever possible.
+
+Examples:
+
+```mojo
+from collections import Array
+alias Arr = Array[DType.uint8, 3]
+var a = Arr(1, 2, 3)
+var b = Arr(1, 2, 3)
+print((a - b).sum()) # prints 0
+print(a.avg()) # prints 2
+print(a * b) # dot product: 14
+print(a.cross(b)) # cross product: Array(0, 0, 0)
+print(2 in a) # prints True
+print(a.index(2).value() if a.index(2) else -1) # prints 1
+print((Arr(2, 2, 2) % 2).sum()) # 0
+print((Arr(2, 2, 2) // 2).sum()) # 3
+print((Arr(2, 2, 2) ** 2).sum()) # 12
+```
+"""
 
 from math import sqrt, acos, sin
 from algorithm import vectorize
@@ -72,12 +101,33 @@ struct Array[T: DType, capacity: Int](CollectionElement, Sized, Boolable):
     """An Array allocated on the stack with a capacity known at compile
     time.
 
+    An Array allocated on the stack with a capacity known at compile
+    time.
+
     It is backed by a `SIMD` vector. This struct has the same API
     as a regular `Array`.
 
     This is typically faster than Python's `Array` as it is stack-allocated
     and does not require any dynamic memory allocation and uses vectorized
     operations wherever possible.
+
+    Examples:
+
+    ```mojo
+    from collections import Array
+    alias Arr = Array[DType.uint8, 3]
+    var a = Arr(1, 2, 3)
+    var b = Arr(1, 2, 3)
+    print((a - b).sum()) # prints 0
+    print(a.avg()) # prints 2
+    print(a * b) # dot product: 14
+    print(a.cross(b)) # cross product: Array(0, 0, 0)
+    print(2 in a) # prints True
+    print(a.index(2).value() if a.index(2) else -1) # prints 1
+    print((Arr(2, 2, 2) % 2).sum()) # 0
+    print((Arr(2, 2, 2) // 2).sum()) # 3
+    print((Arr(2, 2, 2) ** 2).sum()) # 12
+    ```
 
     Notes:
         Setting Array items directly doesn't update self.capacity_left,
