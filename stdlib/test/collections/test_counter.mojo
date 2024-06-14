@@ -129,12 +129,12 @@ def test_eq_and_ne():
     c2["b"] = 2
     c2["c"] = 0
 
-    assert_true(c1 == c2)
-    assert_false(c1 != c2)
+    assert_true(c1.__eq__(c2))
+    assert_false(c1.__ne__(c2))
 
     c2["b"] = 3
-    assert_false(c1 == c2)
-    assert_true(c1 != c2)
+    assert_false(c1.__eq__(c2))
+    assert_true(c1.__ne__(c2))
 
 
 def test_lt_le_gt_and_ge():
@@ -148,15 +148,17 @@ def test_lt_le_gt_and_ge():
     c2["b"] = 2
     c2["c"] = 0
 
-    assert_false(c1 < c2)
-    assert_true(c1 <= c2)
-    assert_false(c1 > c2)
+    assert_false(c1.__lt__(c2))
+    assert_true(c1.__le__(c2))
+    assert_false(c1.__gt__(c2))
+    assert_true(c1.__ge__(c2))
 
     c2["b"] = 3
-    assert_true(c1 < c2)
-    assert_true(c1 <= c2)
-    assert_false(c1 > c2)
-    assert_true(c2 > c1)
+    assert_true(c1.__lt__(c2))
+    assert_true(c1.__le__(c2))
+    assert_false(c1.__gt__(c2))
+    assert_true(c2.__gt__(c1))
+    assert_false(c1.__ge__(c2))
 
 
 def test_elements():
