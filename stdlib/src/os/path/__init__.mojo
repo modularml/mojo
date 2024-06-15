@@ -22,4 +22,5 @@ from .path import (
     dirname,
     splitroot,
     normpath,
+    abspath,
 )

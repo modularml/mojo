@@ -19,6 +19,7 @@ from os.path import isdir
 ```
 """
 
+from pathlib import cwd
 from stat import S_ISDIR, S_ISLNK, S_ISREG
 from sys import has_neon, os_is_linux, os_is_macos, os_is_windows
 
@@ -484,3 +485,35 @@ fn normpath[PathLike: os.PathLike, //](path: PathLike) raises -> String:
         The normalized path.
     """
     return normpath(path.__fspath__())
+
+
+# ===----------------------------------------------------------------------=== #
+# abspath
+# ===----------------------------------------------------------------------=== #
+
+
+fn abspath(path: String) raises -> String:
+    """Return an absolute path.
+
+    Args:
+        path: The path to file or directory.
+
+    Returns:
+        The absolute path.
+    """
+    return normpath(join(cwd().__fspath__(), path))
+
+
+fn abspath[PathLike: os.PathLike, //](path: PathLike) raises -> String:
+    """Return an absolute path.
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path to file or directory.
+
+    Returns:
+        The absolute path.
+    """
+    return abspath(path.__fspath__())
