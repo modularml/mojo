@@ -522,21 +522,14 @@ struct VariadicPack[
         # Immutable variadics never own the memory underlying them,
         # microoptimize out a check of _is_owned.
         @parameter
-        if not Bool(elt_is_mutable):
-            return
-        else:
+        if Bool(elt_is_mutable):
             # If the elements are unowned, just return.
             if not self._is_owned:
                 return
 
-            alias len = Self.__len__()
-
             @parameter
-            fn destroy_elt[i: Int]():
-                # destroy the elements in reverse order.
-                UnsafePointer.address_of(self[len - i - 1]).destroy_pointee()
-
-            unroll[destroy_elt, len]()
+            for i in reversed(range(Self.__len__())):
+                UnsafePointer.address_of(self[i]).destroy_pointee()
 
     @always_inline
     @staticmethod
@@ -602,10 +595,8 @@ struct VariadicPack[
         """
 
         @parameter
-        fn unrolled[i: Int]():
+        for i in range(Self.__len__()):
             func(self[i])
-
-        unroll[unrolled, Self.__len__()]()
 
     @always_inline
     fn each_idx[
@@ -621,7 +612,5 @@ struct VariadicPack[
         """
 
         @parameter
-        fn unrolled[i: Int]():
-            func[i, element_types[i.value]](self[i])
-
-        unroll[unrolled, Self.__len__()]()
+        for i in range(Self.__len__()):
+            func[i](self[i])
