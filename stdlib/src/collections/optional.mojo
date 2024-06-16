@@ -164,6 +164,60 @@ struct Optional[T: CollectionElement](
         """
         return not self
 
+    fn __str__[
+        U: RepresentableCollectionElement, //
+    ](self: Optional[U]) -> String:
+        """Return the string representation of the value of the Optional.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Returns:
+            A string represenation of the Optional.
+        """
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output
+
+    # TODO: Include the Parameter type in the string as well.
+    fn __repr__[
+        U: RepresentableCollectionElement, //
+    ](self: Optional[U]) -> String:
+        """Returns the verbose string representation of the Optional.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Returns:
+            A verbose string representation of the Optional.
+        """
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        writer.write("Optional(")
+        self.format_to(writer)
+        writer.write(")")
+        return output
+
+    fn format_to[
+        U: RepresentableCollectionElement, //
+    ](self: Optional[U], inout writer: Formatter):
+        """Write Optional string representation to a `Formatter`.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        if self:
+            writer.write(repr(self.value()))
+        else:
+            writer.write("None")
+
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
