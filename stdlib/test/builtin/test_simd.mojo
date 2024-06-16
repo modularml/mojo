@@ -1480,6 +1480,25 @@ def test_pow():
     assert_equal(simd_val_int.__pow__(2), I(0, 1, 4, 9))
 
 
+def test_powf():
+    assert_almost_equal(Float32(2.0) ** Float32(0.5), 1.4142135)
+    assert_almost_equal(Float32(2.0) ** Float32(-0.5), 0.707107)
+    assert_almost_equal(Float32(50.0) ** Float32(2.5), 17677.6695297)
+    assert_almost_equal(Float32(12.0) ** Float32(0.4), 2.70192)
+    assert_almost_equal(Float32(-1.0) ** Float32(-1), -1)
+    assert_almost_equal(Float32(0.001) ** Float32(0.001), 0.99311605)
+
+    assert_almost_equal(Float64(0.001) ** Float64(0.001), 0.99311605)
+
+    assert_almost_equal(Float32(-4) ** Float32(-3), -0.015625)
+
+    assert_almost_equal(
+        SIMD[DType.float64, 8](1.0, -1.0, 2.0, -2.0, 4.0, -4.0, -2.0, 3.0)
+        ** SIMD[DType.float64, 8](1, 2, 3, 4, 5, 6, 2, 1),
+        SIMD[DType.float64, 8](1, 1, 8, 16, 1024, 4096, 4, 3),
+    )
+
+
 def test_modf():
     var f32 = _modf(Float32(123.5))
     assert_almost_equal(f32[0], 123)
@@ -1535,6 +1554,7 @@ def main():
     test_mod()
     test_mul_with_overflow()
     test_pow()
+    test_powf()
     test_radd()
     test_reduce()
     test_reduce_bit_count()

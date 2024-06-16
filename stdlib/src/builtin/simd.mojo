@@ -50,6 +50,7 @@ from .dtype import (
 )
 from .io import _snprintf_scalar, _printf, _print_fmt
 from .string import _calc_initial_buffer_size, _calc_format_buffer_size
+import math
 
 # ===----------------------------------------------------------------------=== #
 # Type Aliases
@@ -2812,36 +2813,37 @@ fn _pow[
 
 
 @always_inline
+fn _powf_scalar(base: Scalar, exponent: Scalar) -> __type_of(base):
+    constrained[
+        exponent.type.is_floating_point(), "exponent must be floating point"
+    ]()
+
+    var integral: __type_of(exponent)
+    var fractional: __type_of(exponent)
+    integral, fractional = _modf_scalar(exponent)
+
+    if integral == exponent:
+        return _powi(base, integral.cast[DType.int32]())
+
+    if fractional and base < 0:
+        return _nan[base.type]()
+
+    return math.exp(exponent.cast[base.type]() * math.log(base))
+
+
+@always_inline
 fn _powf[
-    BaseTy: DType, simd_width: Int, ExpTy: DType
-](base: SIMD[BaseTy, simd_width], exp: SIMD[ExpTy, simd_width]) -> __type_of(
-    base
-):
-    constrained[ExpTy.is_floating_point(), "exponent must be floating point"]()
-
-    var integral: SIMD[ExpTy, simd_width]
-    var fractional: SIMD[ExpTy, simd_width]
-    integral, fractional = _modf(exp)
-
-    if all((exp >= 0) & (integral == exp)):
-        return _pow(base, integral.cast[_integral_type_of[ExpTy]()]())
+    simd_width: Int
+](base: SIMD[_, simd_width], exp: SIMD[_, simd_width]) -> __type_of(base):
+    constrained[
+        exp.type.is_floating_point(), "exponent must be floating point"
+    ]()
 
     var result = __type_of(base)()
 
     @parameter
-    if triple_is_nvidia_cuda():
-        _print_fmt(
-            "ABORT: pow with two floating point operands is not supported"
-            " on GPU"
-        )
-        abort()
-    else:
-
-        @parameter
-        for i in range(simd_width):
-            result[i] = llvm_intrinsic[
-                "llvm.pow", Scalar[BaseTy], has_side_effect=False
-            ](base[i], exp[i])
+    for i in range(simd_width):
+        result[i] = _powf_scalar(base[i], exp[i])
 
     return result
 
