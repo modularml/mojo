@@ -683,6 +683,11 @@ Big themes for this release:
     will likely shuffle around as we're reworking our built-in `sort()` function
     and optimizing it.
 
+- `infinity` and `NaN` are now correctly handled in
+  [`testing.assert_almost_equal()`](/mojo/stdlib/testing/testing/assert_almost_equal)
+  and  an `inf` function  has been added to `utils/numerics.mojo`.
+  ([PR #2375](https://github.com/modularml/mojo/pull/2375))
+
 ### Tooling changes
 
 - Invoking `mojo package my-package -o my-dir` on the command line, where
@@ -825,7 +830,8 @@ Special thanks to our community contributors:
 [@martinvuyk](https://github.com/martinvuyk),
 [@ChristopherLR](https://github.com/ChristopherLR),
 [@mzaks](https://github.com/mzaks), [@bgreni](https://github.com/bgreni),
-[@Brian-M-J](https://github.com/Brian-M-J)
+[@Brian-M-J](https://github.com/Brian-M-J),
+[@leandrolcampos](https://github.com/leandrolcampos)
 
 ## v24.3 (2024-05-02)
 
