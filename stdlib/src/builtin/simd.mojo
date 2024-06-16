@@ -2792,28 +2792,7 @@ fn _pow[
 
     @parameter
     if ExpTy.is_floating_point() and BaseTy == ExpTy:
-        var rhs_quotient = exp.__floor__()
-        if all((exp >= 0) & (rhs_quotient == exp)):
-            return _pow(base, rhs_quotient.cast[_integral_type_of[ExpTy]()]())
-
-        var result = __type_of(base)()
-
-        @parameter
-        if triple_is_nvidia_cuda():
-            _print_fmt(
-                "ABORT: pow with two floating point operands is not supported"
-                " on GPU"
-            )
-            abort()
-        else:
-
-            @parameter
-            for i in range(simd_width):
-                result[i] = llvm_intrinsic[
-                    "llvm.pow", Scalar[BaseTy], has_side_effect=False
-                ](base[i], exp[i])
-
-        return result
+        return _powf(base, exp)
     elif ExpTy.is_integral():
         # Common cases
         if all(exp == 2):
@@ -2830,6 +2809,41 @@ fn _pow[
     else:
         constrained[False, "unsupported type combination"]()
         return __type_of(base)()
+
+
+@always_inline
+fn _powf[
+    BaseTy: DType, simd_width: Int, ExpTy: DType
+](base: SIMD[BaseTy, simd_width], exp: SIMD[ExpTy, simd_width]) -> __type_of(
+    base
+):
+    constrained[ExpTy.is_floating_point(), "exponent must be floating point"]()
+
+    var integral: SIMD[ExpTy, simd_width]
+    var fractional: SIMD[ExpTy, simd_width]
+    integral, fractional = _modf(exp)
+
+    if all((exp >= 0) & (integral == exp)):
+        return _pow(base, integral.cast[_integral_type_of[ExpTy]()]())
+
+    var result = __type_of(base)()
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        _print_fmt(
+            "ABORT: pow with two floating point operands is not supported"
+            " on GPU"
+        )
+        abort()
+    else:
+
+        @parameter
+        for i in range(simd_width):
+            result[i] = llvm_intrinsic[
+                "llvm.pow", Scalar[BaseTy], has_side_effect=False
+            ](base[i], exp[i])
+
+    return result
 
 
 @always_inline
