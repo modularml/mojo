@@ -15,7 +15,7 @@
 # This sample prints the current host system information using APIs from the
 # sys module.
 from sys.info import (
-    _current_cpu,
+    _current_arch,
     _current_target,
     _triple_attr,
 )
@@ -48,7 +48,7 @@ def main():
         os = "macOS"
     else:
         os = "windows"
-    var cpu = String(_current_cpu())
+    var cpu = String(_current_arch())
     var arch = String(_triple_attr())
     var cpu_features = String("")
     if has_sse4():
