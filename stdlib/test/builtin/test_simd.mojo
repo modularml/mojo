@@ -1468,9 +1468,10 @@ def test_pow():
     assert_equal(simd_val.__pow__(3), F(0.0, 1.0, 8.0, 27.0))
     assert_equal(simd_val.__pow__(-1), F(inf, 1.0, 0.5, 0.3333333432674408))
 
-    # TODO: enable when math.isclose is open sourced
-    # assert_equal(simd_val.__pow__(0.5), F(0.0, 1.0, 1.41421, 1.73205))
-    # assert_equal(simd_val.__pow__(2, -0.5), F(0.70710, 0.57735, 0.5, 0.44721))
+    assert_almost_equal(simd_val.__pow__(0.5), F(0.0, 1.0, 1.41421, 1.73205))
+    assert_almost_equal(
+        (simd_val + 2).__pow__(-0.5), F(0.70710, 0.57735, 0.5, 0.44721)
+    )
 
     alias I = SIMD[DType.int32, 4]
     var simd_val_int = I(0, 1, 2, 3)
