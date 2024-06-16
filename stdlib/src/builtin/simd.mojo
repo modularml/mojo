@@ -99,11 +99,13 @@ fn _simd_construction_checks[type: DType, size: Int]():
       type: The data type of SIMD vector elements.
       size: The number of elements in the SIMD vector.
     """
-    constrained[type != DType.invalid, "simd type cannot be DType.invalid"]()
+    constrained[
+        type is not DType.invalid, "simd type cannot be DType.invalid"
+    ]()
     constrained[size > 0, "simd width must be > 0"]()
     constrained[size & (size - 1) == 0, "simd width must be power of 2"]()
     constrained[
-        type != DType.bfloat16 or not has_neon(),
+        type is not DType.bfloat16 or not has_neon(),
         "bf16 is not supported for ARM architectures",
     ]()
 
@@ -387,7 +389,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # TODO (#36686): This introduces uneeded casts here to work around
         # parameter if issues.
         @parameter
-        if type == DType.float16:
+        if type is DType.float16:
             self = SIMD[type, size](
                 __mlir_op.`pop.simd.splat`[
                     _type = __mlir_type[
@@ -407,7 +409,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                     )
                 )
             )
-        elif type == DType.bfloat16:
+        elif type is DType.bfloat16:
             self = Self(
                 __mlir_op.`pop.simd.splat`[
                     _type = __mlir_type[
@@ -427,7 +429,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                     )
                 )
             )
-        elif type == DType.float32:
+        elif type is DType.float32:
             self = Self(
                 __mlir_op.`pop.simd.splat`[
                     _type = __mlir_type[
@@ -539,7 +541,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @parameter
-        if type == DType.bool:
+        if type is DType.bool:
             return (rebind[Self._Mask](self) & rebind[Self._Mask](rhs)).cast[
                 type
             ]()
@@ -707,7 +709,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # TODO(KERN-228): support BF16 on neon systems.
         # As a workaround, we roll our own implementation
         @parameter
-        if has_neon() and type == DType.bfloat16:
+        if has_neon() and type is DType.bfloat16:
             var int_self = bitcast[_integral_type_of[type](), size](self)
             var int_rhs = bitcast[_integral_type_of[type](), size](rhs)
             return int_self == int_rhs
@@ -732,7 +734,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         # TODO(KERN-228): support BF16 on neon systems.
         # As a workaround, we roll our own implementation.
         @parameter
-        if has_neon() and type == DType.bfloat16:
+        if has_neon() and type is DType.bfloat16:
             var int_self = bitcast[_integral_type_of[type](), size](self)
             var int_rhs = bitcast[_integral_type_of[type](), size](rhs)
             return int_self != int_rhs
@@ -809,7 +811,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self & rhs`.
         """
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
         return __mlir_op.`pop.and`(self.value, rhs.value)
@@ -828,7 +830,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self ^ rhs`.
         """
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
         return __mlir_op.`pop.xor`(self.value, rhs.value)
@@ -847,7 +849,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `self | rhs`.
         """
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
         return __mlir_op.`pop.or`(self.value, rhs.value)
@@ -897,12 +899,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             The `~self` value.
         """
         constrained[
-            type.is_bool() or type.is_integral(),
+            type is DType.bool or type.is_integral(),
             "must be an bool or integral type",
         ]()
 
         @parameter
-        if type.is_bool():
+        if type is DType.bool:
             return self.select(Self(False), Self(True))
         else:
             return self ^ -1
@@ -1013,7 +1015,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             rhs: The RHS value.
         """
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
         self = self & rhs
@@ -1029,7 +1031,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             rhs: The RHS value.
         """
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
         self = self ^ rhs
@@ -1045,7 +1047,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             rhs: The RHS value.
         """
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
         self = self | rhs
@@ -1176,7 +1178,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `value & self`.
         """
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
         return value & self
@@ -1195,7 +1197,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `value ^ self`.
         """
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
         return value ^ self
@@ -1214,7 +1216,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             `value | self`.
         """
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "must be an integral or bool type",
         ]()
         return value | self
@@ -1370,7 +1372,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @parameter
-        if type.is_unsigned() or type.is_bool():
+        if type.is_unsigned() or type is DType.bool:
             return self
         elif type.is_floating_point():
             alias integral_type = FPUtils[type].integral_type
@@ -1432,15 +1434,15 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if type == target:
             return rebind[SIMD[target, size]](self)
         elif has_neon() and (
-            type == DType.bfloat16 or target == DType.bfloat16
+            type is DType.bfloat16 or target == DType.bfloat16
         ):
             # TODO(KERN-228): support BF16 on neon systems.
             return _unchecked_zero[target, size]()
-        elif type == DType.bool:
+        elif type is DType.bool:
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
         elif target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
-        elif type == DType.bfloat16:
+        elif type is DType.bfloat16:
             var cast_result = _bfloat16_to_f32(
                 rebind[SIMD[DType.bfloat16, size]](self)
             ).cast[target]()
@@ -1463,7 +1465,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 ](index_val)
             )
             return rebind[SIMD[target, size]](tmp)
-        elif (type == DType.address) and target.is_integral():
+        elif (type is DType.address) and target.is_integral():
             var index_tmp = SIMD[DType.index, size](
                 __mlir_op.`pop.pointer_to_index`[
                     _type = __mlir_type[
@@ -1603,9 +1605,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         ]()
 
         @parameter
-        if type.is_bool() or type.is_integral():
+        if type is DType.bool or type.is_integral():
             return self
-        elif has_neon() and type == DType.bfloat16:
+        elif has_neon() and type is DType.bfloat16:
             # TODO(KERN-228): support BF16 on neon systems.
             # As a workaround, we cast to float32.
             return (
@@ -2341,7 +2343,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             size_out <= size, "`size_out` must not exceed width of the vector."
         ]()
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "The element type of the vector must be integer or boolean.",
         ]()
 
@@ -2387,7 +2389,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             size_out <= size, "`size_out` must not exceed width of the vector."
         ]()
         constrained[
-            type.is_integral() or type.is_bool(),
+            type.is_integral() or type is DType.bool,
             "The element type of the vector must be integer or boolean.",
         ]()
 
@@ -2425,7 +2427,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         @parameter
-        if type.is_bool():
+        if type is DType.bool:
             return int(self.cast[DType.uint8]().reduce_add())
         else:
             constrained[
@@ -2463,7 +2465,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             A new vector of the form
             `[true_case[i] if elem else false_case[i] for i, elem in enumerate(self)]`.
         """
-        constrained[type.is_bool(), "the simd dtype must be bool"]()
+        constrained[type is DType.bool, "the simd dtype must be bool"]()
         return __mlir_op.`pop.simd.select`(
             rebind[Self._Mask](self).value,
             true_case.value,

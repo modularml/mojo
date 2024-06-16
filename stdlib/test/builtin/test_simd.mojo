@@ -1342,7 +1342,7 @@ def test_reduce():
             assert_equal(X2(6, -3).reduce_max(), 6)
 
         @parameter
-        if type.is_bool():
+        if type is DType.bool:
             # reduce_and
             x8 = X8(False, False, True, True, False, True, False, True)
             x4 = X4(False, False, False, True)

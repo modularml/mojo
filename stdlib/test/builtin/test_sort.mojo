@@ -29,16 +29,16 @@ fn random_numbers[
 
         @parameter
         if (
-            dtype == DType.int8
-            or dtype == DType.int16
-            or dtype == DType.int32
-            or dtype == DType.int64
+            dtype is DType.int8
+            or dtype is DType.int16
+            or dtype is DType.int32
+            or dtype is DType.int64
         ):
             result.append(random_si64(0, max).cast[dtype]())
         elif (
-            dtype == DType.float16
-            or dtype == DType.float32
-            or dtype == DType.float64
+            dtype is DType.float16
+            or dtype is DType.float32
+            or dtype is DType.float64
         ):
             result.append(random_float64(0, max).cast[dtype]())
         else:
