@@ -14,10 +14,17 @@
 
 from sys import has_neon
 
-from testing import assert_equal, assert_false, assert_not_equal, assert_true
+from testing import (
+    assert_equal,
+    assert_false,
+    assert_not_equal,
+    assert_true,
+    assert_almost_equal,
+)
 
 from utils.numerics import isfinite, isinf, isnan, nan
 from utils.static_tuple import StaticTuple
+from builtin.simd import _modf
 
 
 def test_cast():
@@ -1472,6 +1479,32 @@ def test_pow():
     assert_equal(simd_val_int.__pow__(2), I(0, 1, 4, 9))
 
 
+def test_modf():
+    var f32 = _modf(Float32(123.5))
+    assert_almost_equal(f32[0], 123)
+    assert_almost_equal(f32[1], 0.5)
+
+    var f64 = _modf(Float64(123.5))
+    assert_almost_equal(f64[0], 123)
+    assert_almost_equal(f64[1], 0.5)
+
+    f64 = _modf(Float64(0))
+    assert_almost_equal(f64[0], 0)
+    assert_almost_equal(f64[1], 0)
+
+    f64 = _modf(Float64(0.5))
+    assert_almost_equal(f64[0], 0)
+    assert_almost_equal(f64[1], 0.5)
+
+    f64 = _modf(Float64(-0.5))
+    assert_almost_equal(f64[0], -0)
+    assert_almost_equal(f64[1], -0.5)
+
+    f64 = _modf(Float64(-1.5))
+    assert_almost_equal(f64[0], -1)
+    assert_almost_equal(f64[1], -0.5)
+
+
 def main():
     test_abs()
     test_add()
@@ -1517,4 +1550,5 @@ def main():
     test_sub_with_overflow()
     test_trunc()
     test_truthy()
+    test_modf()
     # TODO: add tests for __and__, __or__, anc comparison operators

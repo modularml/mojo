@@ -3046,3 +3046,49 @@ fn _format_scalar[
     )
 
     writer.write_str(str_slice)
+
+
+# ===----------------------------------------------------------------------=== #
+# modf
+# ===----------------------------------------------------------------------=== #
+
+
+fn _modf_scalar(x: Scalar) -> Tuple[__type_of(x), __type_of(x)]:
+    constrained[x.type.is_floating_point(), "the type must be floating point"]()
+    if x < 1:
+        if x < 0:
+            var res = _modf_scalar(-x)
+            return (-res[0], -res[1])
+        if x == 0:
+            return (x, x)
+        return (Scalar[x.type](0), x)
+
+    alias integral_type = FPUtils[x.type].integral_type
+    alias bitwidth = bitwidthof[x.type]()
+    alias exponent_width = FPUtils[x.type].exponent_width()
+    alias mantissa_width = FPUtils[x.type].mantissa_width()
+    alias mask = (1 << exponent_width) - 1
+    alias bias = FPUtils[x.type].exponent_bias()
+
+    var bits = bitcast[integral_type](x)
+    var e = (int(bits >> mantissa_width) & mask) - bias
+    if e < (bitwidth - exponent_width - 1):
+        var upper_mask = (1 << (bitwidth - exponent_width - 1 - e)) - 1
+        bits &= ~upper_mask
+    var r = bitcast[x.type](bits)
+    return (r, x - r)
+
+
+fn _modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
+    constrained[x.type.is_floating_point(), "the type must be floating point"]()
+
+    var result_int = __type_of(x)()
+    var result_frac = __type_of(x)()
+
+    @parameter
+    for i in range(x.size):
+        var tup = _modf_scalar(x[i])
+        result_int[i] = tup[0]
+        result_frac[i] = tup[1]
+
+    return (result_int, result_frac)
