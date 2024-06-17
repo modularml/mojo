@@ -2067,6 +2067,26 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     alias _SIMDHalfType = SIMD[type, size // 2]
 
     @always_inline("nodebug")
+    fn split(
+        self,
+    ) -> Tuple[Self._SIMDHalfType, Self._SIMDHalfType]:
+        """Splits the SIMD vector into 2 subvectors.
+
+        Returns:
+            A new vector `self_0:N/2, self_N/2:N`.
+        """
+
+        constrained[size > 1, "the simd width must be at least 2"]()
+
+        alias half_size = size // 2
+        var lhs = rebind[Self._SIMDHalfType](self.slice[half_size, offset=0]())
+        var rhs = rebind[Self._SIMDHalfType](
+            self.slice[half_size, offset=half_size]()
+        )
+
+        return (lhs, rhs)
+
+    @always_inline("nodebug")
     fn deinterleave(
         self,
     ) -> (Self._SIMDHalfType, Self._SIMDHalfType):
@@ -2157,10 +2177,10 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if size == size_out:
             return rebind[SIMD[type, size_out]](self)
         else:
-            alias half_size = size // 2
-            var lhs = self.slice[half_size, offset=0]()
-            var rhs = self.slice[half_size, offset=half_size]()
-            return func[type, half_size](lhs, rhs).reduce[func, size_out]()
+            var lhs: Self._SIMDHalfType
+            var rhs: Self._SIMDHalfType
+            lhs, rhs = self.split()
+            return func(lhs, rhs).reduce[func, size_out]()
 
     @always_inline("nodebug")
     fn reduce_max[size_out: Int = 1](self) -> SIMD[type, size_out]:
