@@ -10,16 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+# RUN: %mojo %s
 
-from .path import (
-    exists,
-    isdir,
-    isfile,
-    islink,
-    lexists,
-    getsize,
-    join,
-    dirname,
-    split,
-    basename,
-)
+from os.path import basename
+from testing import assert_equal
+
+
+def main():
+    assert_equal(basename("a/path/to/file.txt"), "file.txt")
+    assert_equal(basename("a/path/to/"), "")
+    assert_equal(basename("a/path/to"), "to")
+    assert_equal(basename("a/path/to"), "to")
+    assert_equal(basename(""), "")
+    assert_equal(basename("/"), "")
