@@ -271,30 +271,30 @@ struct _DictIndex:
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return int(Scalar.load(data, slot % reserved))
+            return int(Scalar.load(data, slot & (reserved - 1)))
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return int(Scalar.load(data, slot % reserved))
+            return int(Scalar.load(data, slot & (reserved - 1)))
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return int(Scalar.load(data, slot % reserved))
+            return int(Scalar.load(data, slot & (reserved - 1)))
         else:
             var data = self.data.bitcast[DType.int64]()
-            return int(Scalar.load(data, slot % reserved))
+            return int(Scalar.load(data, slot & (reserved - 1)))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return Scalar.store(data, slot % reserved, value)
+            return Scalar.store(data, slot & (reserved - 1), value)
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return Scalar.store(data, slot % reserved, value)
+            return Scalar.store(data, slot & (reserved - 1), value)
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return Scalar.store(data, slot % reserved, value)
+            return Scalar.store(data, slot & (reserved - 1), value)
         else:
             var data = self.data.bitcast[DType.int64]()
-            return Scalar.store(data, slot % reserved, value)
+            return Scalar.store(data, slot & (reserved - 1), value)
 
     fn __del__(owned self):
         self.data.free()
