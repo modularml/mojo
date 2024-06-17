@@ -1940,6 +1940,50 @@ fn lcm(*values: Int) -> Int:
 
 
 # ===----------------------------------------------------------------------=== #
+# ulp
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn ulp[
+    type: DType, simd_width: Int
+](x: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    """Computes the ULP (units of last place) or (units of least precision) of
+    the number.
+
+    Constraints:
+        The element type of the inpiut must be a floating-point type.
+
+    Parameters:
+        type: The `dtype` of the input and output SIMD vector.
+        simd_width: The width of the input and output SIMD vector.
+
+    Args:
+        x: SIMD vector input.
+
+    Returns:
+        The ULP of x.
+    """
+
+    constrained[type.is_floating_point(), "the type must be floating point"]()
+
+    var nan_mask = isnan(x)
+    var xabs = abs(x)
+    var inf_mask = isinf(xabs)
+    alias inf_val = SIMD[type, simd_width](inf[type]())
+    var x2 = nextafter(xabs, inf_val)
+    var x2_inf_mask = isinf(x2)
+
+    return nan_mask.select(
+        x,
+        inf_mask.select(
+            xabs,
+            x2_inf_mask.select(xabs - nextafter(xabs, -inf_val), x2 - xabs),
+        ),
+    )
+
+
+# ===----------------------------------------------------------------------=== #
 # factorial
 # ===----------------------------------------------------------------------=== #
 
