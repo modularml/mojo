@@ -3099,20 +3099,8 @@ fn _modf_scalar(x: Scalar) -> Tuple[__type_of(x), __type_of(x)]:
             return (x, x)
         return (Scalar[x.type](0), x)
 
-    alias integral_type = FPUtils[x.type].integral_type
-    alias bitwidth = bitwidthof[x.type]()
-    alias exponent_width = FPUtils[x.type].exponent_width()
-    alias mantissa_width = FPUtils[x.type].mantissa_width()
-    alias mask = (1 << exponent_width) - 1
-    alias bias = FPUtils[x.type].exponent_bias()
-
-    var bits = bitcast[integral_type](x)
-    var e = (int(bits >> mantissa_width) & mask) - bias
-    if e < (bitwidth - exponent_width - 1):
-        var upper_mask = (1 << (bitwidth - exponent_width - 1 - e)) - 1
-        bits &= ~upper_mask
-    var r = bitcast[x.type](bits)
-    return (r, x - r)
+    var f = _floor(x)
+    return (f, x - f)
 
 
 fn _modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
@@ -3128,3 +3116,30 @@ fn _modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
         result_frac[i] = tup[1]
 
     return (result_int, result_frac)
+
+
+# ===----------------------------------------------------------------------=== #
+# floor
+# ===----------------------------------------------------------------------=== #
+
+
+fn _floor(x: SIMD) -> __type_of(x):
+    @parameter
+    if x.type.is_integral():
+        return x
+
+    alias integral_type = FPUtils[x.type].integral_type
+    alias bitwidth = bitwidthof[x.type]()
+    alias exponent_width = FPUtils[x.type].exponent_width()
+    alias mantissa_width = FPUtils[x.type].mantissa_width()
+    alias mask = (1 << exponent_width) - 1
+    alias bias = FPUtils[x.type].exponent_bias()
+    alias shift_factor = bitwidth - exponent_width - 1
+
+    var bits = bitcast[integral_type, x.size](x)
+    var e = ((bits >> mantissa_width) & mask) - bias
+    bits = (e < shift_factor).select(
+        bits & ~((1 << (shift_factor - e)) - 1),
+        bits,
+    )
+    return bitcast[x.type, x.size](bits)
