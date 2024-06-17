@@ -62,11 +62,12 @@ fn _horner_evaluate[
 ](x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
     """Evaluates the polynomial using the passed in value and the specified
     coefficients using the Horner scheme. The Horner scheme evaluates the
-    polynomial as `horner(val, coeffs)` where val is a scalar and coeffs is a
-    list of coefficients [c0, c1, c2, ..., cn] by:
+    polynomial at point x as `horner(x, coeffs)` where x is a scalar and coeffs
+    is a list of coefficients [c0, c1, c2, ..., cn] by:
     ```
-    horner(val, coeffs) = c0 + val * (c1 + val * (c2 + val * (... + val * cn)))
-                = fma(val, horner(val, coeffs[1:]), c0)
+    horner(x, coeffs)
+        = c0 + x * (c1 + x * (c2 + x * (... + x * cn)))
+        = fma(x, horner(x, coeffs[1:]), coeffs[0])
     ```
 
     Parameters:
@@ -78,17 +79,12 @@ fn _horner_evaluate[
         x: The value to compute the polynomial with.
 
     Returns:
-        The polynomial evaluation results using the specified value and the
-        constant coefficients.
+        The polynomial specified by the coefficients evaluated at value x.
     """
-    alias num_coefficients = len(coefficients)
-    alias c_last = coefficients[num_coefficients - 1]
-    alias c_second_from_last = coefficients[num_coefficients - 2]
-
-    var result = x.fma(c_last, c_second_from_last)
+    var result = x.fma(coefficients[-1], coefficients[-2])
 
     @parameter
-    for i in reversed(range(num_coefficients - 2)):
+    for i in reversed(range(len(coefficients) - 2)):
         alias c = coefficients[i]
         result = result.fma(x, c)
 
