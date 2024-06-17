@@ -1525,6 +1525,12 @@ def test_modf():
     assert_almost_equal(f64[1], -0.5)
 
 
+def test_split():
+    var tup = SIMD[DType.index, 8](1, 2, 3, 4, 5, 6, 7, 8).split()
+    assert_equal(tup[0], SIMD[DType.index, 4](1, 2, 3, 4))
+    assert_equal(tup[1], SIMD[DType.index, 4](5, 6, 7, 8))
+
+
 def main():
     test_abs()
     test_add()
@@ -1572,4 +1578,5 @@ def main():
     test_trunc()
     test_truthy()
     test_modf()
+    test_split()
     # TODO: add tests for __and__, __or__, anc comparison operators
