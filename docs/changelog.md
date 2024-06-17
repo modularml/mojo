@@ -162,6 +162,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
   - `mojo run /tmp/main.mojo` can access `/tmp/mymodule.py`
   - `mojo build main.mojo -o ~/myexe && ~/myexe` can access `~/mymodule.py`
 
+- The rank argument for `algorihtm.elementwise` is no longer required and is
+  only inferred.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
