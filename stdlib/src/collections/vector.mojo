@@ -19,6 +19,7 @@ from collections.vector import InlinedFixedVector
 ```
 """
 
+from collections._index_normalization import normalize_index
 from memory import UnsafePointer, Reference
 from utils import StaticTuple
 
@@ -191,14 +192,7 @@ struct InlinedFixedVector[
         Returns:
             The element at the given index.
         """
-        var normalized_idx = idx
-        debug_assert(
-            -self.current_size <= normalized_idx < self.current_size,
-            "index must be within bounds",
-        )
-
-        if normalized_idx < 0:
-            normalized_idx += len(self)
+        var normalized_idx = normalize_index["InlinedFixedVector"](idx, self)
 
         if normalized_idx < Self.static_size:
             return self.static_data[normalized_idx]
@@ -213,13 +207,7 @@ struct InlinedFixedVector[
             idx: The index of the element.
             value: The value to assign.
         """
-        var normalized_idx = idx
-        debug_assert(
-            -self.current_size <= normalized_idx < self.current_size,
-            "index must be within bounds",
-        )
-        if normalized_idx < 0:
-            normalized_idx += len(self)
+        var normalized_idx = normalize_index["InlinedFixedVector"](idx, self)
 
         if normalized_idx < Self.static_size:
             self.static_data[normalized_idx] = value
