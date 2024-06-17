@@ -3102,7 +3102,11 @@ fn _modf_scalar(x: Scalar) -> Tuple[__type_of(x), __type_of(x)]:
 
 
 fn _modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
-    constrained[x.type.is_floating_point(), "the type must be floating point"]()
+    constrained[x.type.is_numeric(), "the type must be numeric"]()
+
+    @parameter
+    if x.type.is_integral():
+        return (x, __type_of(x)(0))
 
     var result_int = __type_of(x)()
     var result_frac = __type_of(x)()

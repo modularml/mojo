@@ -27,7 +27,7 @@ from sys.info import bitwidthof, has_avx512f, simdwidthof, triple_is_nvidia_cuda
 
 from builtin._math import *
 from builtin.dtype import _integral_type_of
-from builtin.simd import _simd_apply
+from builtin.simd import _simd_apply, _modf
 
 from utils.index import StaticIntTuple
 from utils.numerics import FPUtils, isnan, nan
@@ -1937,6 +1937,23 @@ fn lcm(*values: Int) -> Int:
     for i in range(1, len(values)):
         result = lcm(result, values[i])
     return result
+
+
+# ===----------------------------------------------------------------------=== #
+# modf
+# ===----------------------------------------------------------------------=== #
+
+
+fn modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
+    """Computes the integral and fractional part of the value.
+
+    Args:
+        x: The input value.
+
+    Returns:
+        A tuple containing the integral and fractional part of the value.
+    """
+    return _modf(x)
 
 
 # ===----------------------------------------------------------------------=== #

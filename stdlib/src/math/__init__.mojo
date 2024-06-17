@@ -16,7 +16,7 @@
 from utils.numerics import inf, isfinite, isinf, isnan, nan, nextafter, ulp
 
 # These are not part of Python's `math` module, but we define them here.
-from .math import (  # comb,  # TODO: implement this; degrees,  # TODO:  implement this; dist,  # TODO:  implement this; e,  # TODO:  implement this; fabs,  # TODO:  implement this; fmod,  # TODO:  implement this; fsum,  # TODO:  implement this; isqrt,  # TODO:  implement this; modf,  # TODO:  implement this; perm,  # TODO:  implement this; pi,  # TODO:  implement this; pow,  # TODO:  implement this. Note that it's different from the builtin.; prod,  # TODO:  implement this; radians,  # TODO:  implement this; tau,  # TODO:  implement this
+from .math import (
     Ceilable,
     CeilDivable,
     CeilDivableRaising,
@@ -56,10 +56,11 @@ from .math import (  # comb,  # TODO: implement this; degrees,  # TODO:  impleme
     ldexp,
     lgamma,
     log,
+    log10,
     log1p,
     log2,
-    log10,
     logb,
+    modf,
     remainder,
     rsqrt,
     scalb,
