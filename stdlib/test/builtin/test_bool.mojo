@@ -34,12 +34,15 @@ struct MyTrue:
     fn __bool__(self) -> Bool:
         return True
 
+    fn __as_bool__(self) -> Bool:
+        return self.__bool__()
+
 
 fn takes_bool(cond: Bool) -> Bool:
     return cond
 
 
-def test_convert_from_boolable():
+def test_convert_from_implicitly_boolable():
     assert_true(takes_bool(MyTrue()))
     assert_true(bool(MyTrue()))
 
@@ -145,7 +148,7 @@ def test_comparisons():
 def main():
     test_bool_cast_to_int()
     test_bool_none()
-    test_convert_from_boolable()
+    test_convert_from_implicitly_boolable()
     test_bool_to_string()
     test_bool_representation()
     test_bitwise()
