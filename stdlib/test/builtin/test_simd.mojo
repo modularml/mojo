@@ -14,17 +14,17 @@
 
 from sys import has_neon
 
+from builtin.simd import _modf
 from testing import (
+    assert_almost_equal,
     assert_equal,
     assert_false,
     assert_not_equal,
     assert_true,
-    assert_almost_equal,
 )
 
 from utils.numerics import isfinite, isinf, isnan, nan
 from utils.static_tuple import StaticTuple
-from builtin.simd import _modf
 
 
 def test_cast():

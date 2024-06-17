@@ -20,9 +20,9 @@ from utils import Span
 ```
 """
 
-from . import InlineArray
-
 from sys.intrinsics import _type_is_eq
+
+from . import InlineArray
 
 
 @value

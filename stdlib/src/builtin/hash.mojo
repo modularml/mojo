@@ -25,15 +25,14 @@ There are a few main tools in this module:
     These are useful helpers to specialize for the general bytes implementation.
 """
 
-from builtin.dtype import _uint_type_of_width
 import random
 from sys.ffi import _get_global
 
+from builtin.dtype import _uint_type_of_width
 from memory import memcpy, memset_zero, stack_allocation
 
 # TODO remove this import onece InlineArray is moved to collections
 from utils import InlineArray
-
 
 # ===----------------------------------------------------------------------=== #
 # Implementation

@@ -16,10 +16,9 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
-from python import PythonObject
-
 # FIXME(MOCO-658): Explicit conformance to these traits shouldn't be needed.
 from builtin._stubs import _IntIterable, _StridedIterable
+from python import PythonObject
 
 # ===----------------------------------------------------------------------=== #
 # Utilities

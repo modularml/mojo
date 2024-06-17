@@ -19,7 +19,7 @@ from sys import is_x86
 ```
 """
 
-from .ffi import external_call, _external_call_const
+from .ffi import _external_call_const, external_call
 
 
 @always_inline("nodebug")

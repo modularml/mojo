@@ -15,15 +15,15 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import countl_zero
-from collections import List, KeyElement
+from collections import KeyElement, List
 from collections._index_normalization import normalize_index
-from sys import llvm_intrinsic, bitwidthof
+from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
+from bit import countl_zero
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, Span, StringSlice
+from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 # ===----------------------------------------------------------------------=== #

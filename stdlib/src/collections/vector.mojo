@@ -19,7 +19,8 @@ from collections.vector import InlinedFixedVector
 ```
 """
 
-from memory import UnsafePointer, Reference
+from memory import Reference, UnsafePointer
+
 from utils import StaticTuple
 
 # ===----------------------------------------------------------------------===#
