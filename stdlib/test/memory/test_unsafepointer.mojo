@@ -14,7 +14,7 @@
 
 from memory import UnsafePointer
 from test_utils import ExplicitCopyOnly, MoveCounter
-from testing import assert_equal, assert_not_equal, assert_true, assert_false
+from testing import assert_equal, assert_not_equal, assert_true
 
 
 struct MoveOnlyType(Movable):
@@ -192,18 +192,6 @@ def test_indexing():
     assert_equal(ptr[3], 3)
 
 
-def test_bool():
-    var nullptr = UnsafePointer[Int]()
-    var ptr = UnsafePointer[Int].alloc(1)
-
-    assert_true(ptr.__bool__())
-    assert_false(nullptr.__bool__())
-    assert_true(ptr.__as_bool__())
-    assert_false(nullptr.__as_bool__())
-
-    ptr.free()
-
-
 def main():
     test_address_of()
 
@@ -221,4 +209,3 @@ def main():
 
     test_unsafepointer_address_space()
     test_indexing()
-    test_bool()

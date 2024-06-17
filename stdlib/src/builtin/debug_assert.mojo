@@ -25,8 +25,8 @@ from builtin._location import __call_location, _SourceLocation
 
 @always_inline
 fn debug_assert[
-    CondType: Boolable, *stringable: Stringable
-](cond: CondType, *message_parts: *stringable):
+    *stringable: Stringable
+](cond: Bool, *message_parts: *stringable):
     """Asserts that the condition is true.
 
     The `debug_assert` is similar to `assert` in C++. It is a no-op in release
@@ -37,7 +37,6 @@ fn debug_assert[
     for enabling assertions in the library.
 
     Parameters:
-        CondType: The type of condition.
         stringable: The type of the message parts.
 
     Args:
