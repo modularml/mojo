@@ -20,6 +20,7 @@ from collections import List
 """
 
 
+from collections._index_normalization import normalize_index
 from memory import UnsafePointer, Reference
 from sys.intrinsics import _type_is_eq
 from .optional import Optional
@@ -761,10 +762,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             An immutable reference to the element at the given index.
         """
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += self.size
-
+        var normalized_idx = normalize_index["List"](i, self)
         return self.unsafe_get(normalized_idx)
 
     @always_inline
