@@ -11,6 +11,8 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
+from builtin.range import _ZeroStartingRange, _SequentialRange, _StridedRange
+
 """Implements higher-order functions.
 
 You can import these APIs from the `utils.loop` module. For example:
@@ -19,47 +21,6 @@ You can import these APIs from the `utils.loop` module. For example:
 from utils import unroll
 ```
 """
-
-
-# ===----------------------------------------------------------------------===#
-# unroll
-# ===----------------------------------------------------------------------===#
-
-
-@always_inline
-fn unroll[
-    func: fn[idx: Int] () capturing -> None,
-    count: Int,
-]():
-    """Repeatedly evaluates a function `count` times.
-
-    Parameters:
-        func: The function to evaluate. The function should take a single `Int`
-          argument, which is the loop index value.
-        count: A number of repetitions.
-    """
-
-    @parameter
-    for i in range(count):
-        func[i]()
-
-
-@always_inline
-fn unroll[
-    func: fn[idx: Int] () raises capturing -> None,
-    count: Int,
-]() raises:
-    """Repeatedly evaluates a function `count` times.
-
-    Parameters:
-        func: The function to evaluate. The function should take a single `Int`
-          argument, which is the loop index value.
-        count: A number of repetitions.
-    """
-
-    @parameter
-    for i in range(count):
-        func[i]()
 
 
 # ===----------------------------------------------------------------------===#
@@ -121,3 +82,122 @@ fn unroll[
             @parameter
             for k in range(dim2):
                 func[i, j, k]()
+
+
+# ===----------------------------------------------------------------------===#
+# unroll _ZeroStartingRange
+# ===----------------------------------------------------------------------===#
+
+
+@always_inline
+fn unroll[
+    func: fn[idx: Int] () capturing -> None,
+    zeroStartingRange: _ZeroStartingRange,
+]():
+    """Repeatedly evaluates a function `range` times.
+
+    Parameters:
+        func: The function to evaluate. The function should take a single `Int`
+          argument, which is the loop index value.
+        zeroStartingRange: A range representing the number of single step repetitions starting from zero.
+    """
+
+    @parameter
+    for i in zeroStartingRange:
+        func[i]()
+
+
+@always_inline
+fn unroll[
+    func: fn[idx: Int] () raises capturing -> None,
+    zeroStartingRange: _ZeroStartingRange,
+]() raises:
+    """Repeatedly evaluates a function `range` times.
+
+    Parameters:
+        func: The function to evaluate. The function should take a single `Int`
+          argument, which is the loop index value.
+        zeroStartingRange: A range representing the number of single step repetitions starting from zero.
+    """
+
+    @parameter
+    for i in zeroStartingRange:
+        func[i]()
+
+
+# ===----------------------------------------------------------------------===#
+# unroll _SequentialRange
+# ===----------------------------------------------------------------------===#
+@always_inline
+fn unroll[
+    func: fn[idx: Int] () capturing -> None,
+    sequentialRange: _SequentialRange,
+]():
+    """Repeatedly evaluates a function `range` times.
+
+    Parameters:
+        func: The function to evaluate. The function should take a single `Int`
+          argument, which is the loop index value.
+        sequentialRange: A range representing the number of single step repetitions from [start; end).
+    """
+
+    @parameter
+    for i in sequentialRange:
+        func[i]()
+
+
+@always_inline
+fn unroll[
+    func: fn[idx: Int] () raises capturing -> None,
+    sequentialRange: _SequentialRange,
+]() raises:
+    """Repeatedly evaluates a function `range` times.
+
+    Parameters:
+        func: The function to evaluate. The function should take a single `Int`
+          argument, which is the loop index value.
+        sequentialRange: A range representing the number of single step repetitions from [start; end).
+    """
+
+    @parameter
+    for i in sequentialRange:
+        func[i]()
+
+
+# ===----------------------------------------------------------------------===#
+# unroll _StridedRange
+# ===----------------------------------------------------------------------===#
+@always_inline
+fn unroll[
+    func: fn[idx: Int] () capturing -> None,
+    stridedRange: _StridedRange,
+]():
+    """Repeatedly evaluates a function `range` times.
+
+    Parameters:
+        func: The function to evaluate. The function should take a single `Int`
+          argument, which is the loop index value.
+        stridedRange: A range representing the number of strided repetitions from [start; end).
+    """
+
+    @parameter
+    for i in stridedRange:
+        func[i]()
+
+
+@always_inline
+fn unroll[
+    func: fn[idx: Int] () raises capturing -> None,
+    stridedRange: _StridedRange,
+]() raises:
+    """Repeatedly evaluates a function `range` times.
+
+    Parameters:
+        func: The function to evaluate. The function should take a single `Int`
+          argument, which is the loop index value.
+        stridedRange: A range representing the number of strided repetitions from [start; end).
+    """
+
+    @parameter
+    for i in stridedRange:
+        func[i]()
