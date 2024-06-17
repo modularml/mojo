@@ -92,36 +92,36 @@ fn unroll[
 @always_inline
 fn unroll[
     func: fn[idx: Int] () capturing -> None,
-    zeroStartingRange: _ZeroStartingRange,
+    zero_starting_range: _ZeroStartingRange,
 ]():
     """Repeatedly evaluates a function `range` times.
 
     Parameters:
         func: The function to evaluate. The function should take a single `Int`
           argument, which is the loop index value.
-        zeroStartingRange: A range representing the number of single step repetitions starting from zero.
+        zero_starting_range: A range representing the number of single step repetitions starting from zero.
     """
 
     @parameter
-    for i in zeroStartingRange:
+    for i in zero_starting_range:
         func[i]()
 
 
 @always_inline
 fn unroll[
     func: fn[idx: Int] () raises capturing -> None,
-    zeroStartingRange: _ZeroStartingRange,
+    zero_starting_range: _ZeroStartingRange,
 ]() raises:
     """Repeatedly evaluates a function `range` times.
 
     Parameters:
         func: The function to evaluate. The function should take a single `Int`
           argument, which is the loop index value.
-        zeroStartingRange: A range representing the number of single step repetitions starting from zero.
+        zero_starting_range: A range representing the number of single step repetitions starting from zero.
     """
 
     @parameter
-    for i in zeroStartingRange:
+    for i in zero_starting_range:
         func[i]()
 
 
@@ -131,36 +131,36 @@ fn unroll[
 @always_inline
 fn unroll[
     func: fn[idx: Int] () capturing -> None,
-    sequentialRange: _SequentialRange,
+    sequential_range: _SequentialRange,
 ]():
     """Repeatedly evaluates a function `range` times.
 
     Parameters:
         func: The function to evaluate. The function should take a single `Int`
           argument, which is the loop index value.
-        sequentialRange: A range representing the number of single step repetitions from [start; end).
+        sequential_range: A range representing the number of single step repetitions from [start; end).
     """
 
     @parameter
-    for i in sequentialRange:
+    for i in sequential_range:
         func[i]()
 
 
 @always_inline
 fn unroll[
     func: fn[idx: Int] () raises capturing -> None,
-    sequentialRange: _SequentialRange,
+    sequential_range: _SequentialRange,
 ]() raises:
     """Repeatedly evaluates a function `range` times.
 
     Parameters:
         func: The function to evaluate. The function should take a single `Int`
           argument, which is the loop index value.
-        sequentialRange: A range representing the number of single step repetitions from [start; end).
+        sequential_range: A range representing the number of single step repetitions from [start; end).
     """
 
     @parameter
-    for i in sequentialRange:
+    for i in sequential_range:
         func[i]()
 
 
@@ -170,34 +170,34 @@ fn unroll[
 @always_inline
 fn unroll[
     func: fn[idx: Int] () capturing -> None,
-    stridedRange: _StridedRange,
+    strided_range: _StridedRange,
 ]():
     """Repeatedly evaluates a function `range` times.
 
     Parameters:
         func: The function to evaluate. The function should take a single `Int`
           argument, which is the loop index value.
-        stridedRange: A range representing the number of strided repetitions from [start; end).
+        strided_range: A range representing the number of strided repetitions from [start; end).
     """
 
     @parameter
-    for i in stridedRange:
+    for i in strided_range:
         func[i]()
 
 
 @always_inline
 fn unroll[
     func: fn[idx: Int] () raises capturing -> None,
-    stridedRange: _StridedRange,
+    strided_range: _StridedRange,
 ]() raises:
     """Repeatedly evaluates a function `range` times.
 
     Parameters:
         func: The function to evaluate. The function should take a single `Int`
           argument, which is the loop index value.
-        stridedRange: A range representing the number of strided repetitions from [start; end).
+        strided_range: A range representing the number of strided repetitions from [start; end).
     """
 
     @parameter
-    for i in stridedRange:
+    for i in strided_range:
         func[i]()
