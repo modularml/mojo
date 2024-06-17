@@ -155,12 +155,6 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     var step: Int
 
     @always_inline("nodebug")
-    fn __init__(inout self, end: Int):
-        self.start = 0
-        self.end = end
-        self.step = 1
-
-    @always_inline("nodebug")
     fn __init__(inout self, start: Int, end: Int):
         self.start = start
         self.end = end
