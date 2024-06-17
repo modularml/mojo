@@ -92,7 +92,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         Returns:
             `False` if the Counter is empty, `True` if there is at least one element.
         """
-        return len(self).__bool__()
+        return bool(len(self))
 
     fn __eq__(self, other: Self) -> Bool:
         """Check if all counts agree. Missing counts are treated as zero.
