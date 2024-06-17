@@ -22,3 +22,4 @@ from .vector import (
     CollectionElement,
     InlinedFixedVector,
 )
+from .array import Array
