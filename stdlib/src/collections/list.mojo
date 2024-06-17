@@ -20,6 +20,7 @@ from collections import List
 """
 
 
+from collections._index_normalization import normalize_index
 from memory import UnsafePointer, Reference
 from sys.intrinsics import _type_is_eq
 from .optional import Optional
@@ -519,12 +520,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             The popped value.
         """
-        debug_assert(-len(self) <= i < len(self), "pop index out of range")
-
-        var normalized_idx = i
-        if i < 0:
-            normalized_idx += len(self)
-
+        var normalized_idx = normalize_index["List"](i, self)
         var ret_val = (self.data + normalized_idx).take_pointee()
         for j in range(normalized_idx + 1, self.size):
             (self.data + j).move_pointee_into(self.data + j - 1)
