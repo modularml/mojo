@@ -888,10 +888,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn _next_index_slot(self, inout slot: Int, inout perturb: UInt64):
         alias PERTURB_SHIFT = 5
         perturb >>= PERTURB_SHIFT
-        slot = ((5 * slot) + int(perturb + 1)) % self._reserved()
+        slot = ((5 * slot) + int(perturb + 1)) & (self._reserved() - 1)
 
     fn _find_empty_index(self, hash: Int) -> Int:
-        var slot = hash % self._reserved()
+        var slot = hash & (self._reserved() - 1)
         var perturb = bitcast[DType.uint64](Int64(hash))
         while True:
             var index = self._get_index(slot)
@@ -901,7 +901,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
         # Return (found, slot, index)
-        var slot = hash % self._reserved()
+        var slot = hash & (self._reserved() - 1)
         var perturb = bitcast[DType.uint64](Int64(hash))
         while True:
             var index = self._get_index(slot)
