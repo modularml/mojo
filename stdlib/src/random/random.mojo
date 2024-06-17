@@ -19,7 +19,7 @@ from random import seed
 ```
 """
 
-from sys import external_call, bitwidthof
+from sys import bitwidthof, external_call
 from time import now
 
 from memory import DTypePointer

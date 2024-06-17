@@ -19,7 +19,6 @@ from builtin.string import _atol, _isspace
 from memory import DTypePointer, UnsafePointer, memcmp
 from memory.memory import _memcmp_impl_unconstrained
 
-
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #

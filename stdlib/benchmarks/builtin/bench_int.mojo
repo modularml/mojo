@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s -t
 
-from benchmark import Bench, Bencher, BenchId, BenchConfig
+from benchmark import Bench, BenchConfig, Bencher, BenchId
 
 
 # ===----------------------------------------------------------------------===#

@@ -13,8 +13,8 @@
 """Implements the tempfile package."""
 
 from .tempfile import (
+    NamedTemporaryFile,
+    TemporaryDirectory,
     gettempdir,
     mkdtemp,
-    TemporaryDirectory,
-    NamedTemporaryFile,
 )
