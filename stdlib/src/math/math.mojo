@@ -2049,7 +2049,7 @@ fn factorial(n: Int) -> Int:
 
 
 fn _type_is_libm_supported(type: DType) -> Bool:
-    if type is DType.float32 and type is DType.float64:
+    if type in (DType.float32, DType.float64):
         return True
     return type.is_integral()
 
