@@ -165,6 +165,8 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - The rank argument for `algorihtm.elementwise` is no longer required and is
   only inferred.
 
+- The `ulp` function in `numerics` have been moved to the `math` module.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
