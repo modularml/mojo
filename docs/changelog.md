@@ -81,6 +81,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Added `NamedTemporaryFile` in module `tempfile`.
   ([PR 2762](https://github.com/modularml/mojo/pull/2762) by [@artemiogr97](https://github.com/artemiogr97))
 
+- Added `oct(..)` function for formatting an integer in octal.
+  ([PR #2914](https://github.com/modularml/mojo/pull/2914) by [@bgreni](https://github.com/bgreni))
+
 - Added `String.format` method.
   ([PR #2771](https://github.com/modularml/mojo/pull/2771) by [@rd4com](https://github.com/rd4com))
 
