@@ -343,7 +343,7 @@ struct UnsafePointer[
     @always_inline
     fn initialize_pointee_explicit_copy[
         T2: ExplicitlyCopyable
-    ](inout self: UnsafePointer[T, address_space], value: T2):
+    ](self: UnsafePointer[T, address_space], value: T2):
         """Emplace a copy of `value` into this pointer location.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -363,7 +363,7 @@ struct UnsafePointer[
         """
 
         constrained[
-            address_space == AddressSpace.GENERIC,
+            address_space is AddressSpace.GENERIC,
             "can not initialize pointer in non-GENERIC address space",
         ]()
 
