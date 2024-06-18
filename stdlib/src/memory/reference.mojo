@@ -72,7 +72,7 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are equal and False otherwise.
         """
-        return self.value() == other.value()
+        return self is other
 
     @always_inline("nodebug")
     fn __eq__(self, other: AddressSpace) -> Bool:
@@ -81,7 +81,7 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are equal and False otherwise.
         """
-        return self.value() == other.value()
+        return self is other
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -93,7 +93,7 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are inequal and False otherwise.
         """
-        return not self == other
+        return self is not other
 
     @always_inline("nodebug")
     fn __ne__(self, other: AddressSpace) -> Bool:
@@ -105,7 +105,55 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are inequal and False otherwise.
         """
-        return not self == other
+        return self is not other
+
+    @always_inline("nodebug")
+    fn __is__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __is__(self, other: AddressSpace) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __isnot__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() != other.value()
+
+    @always_inline("nodebug")
+    fn __isnot__(self, other: AddressSpace) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() != other.value()
 
 
 @value
@@ -173,7 +221,7 @@ struct AddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are equal and False otherwise.
         """
-        return self.value() == other.value()
+        return self is other
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -185,7 +233,31 @@ struct AddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are inequal and False otherwise.
         """
-        return not self == other
+        return self is not other
+
+    @always_inline("nodebug")
+    fn __is__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __isnot__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() != other.value()
 
 
 # ===----------------------------------------------------------------------===#
