@@ -90,8 +90,152 @@ def test_inequality():
     )
 
 
+def test_properties():
+    assert_equal(UInt.MIN, UInt(0))
+    if bitwidthof[DType.index]() == 32:
+        assert_equal(UInt.MAX, (2**32) - 1)
+    else:
+        assert_equal(UInt.MAX, (2**64) - 1)
+
+
+def test_add():
+    assert_equal(UInt.__add__(UInt(3), UInt(3)), UInt(6))
+    assert_equal(UInt.__add__(UInt(-2), UInt(3)), UInt(1))
+    assert_equal(UInt.__add__(UInt(2), UInt(-3)), UInt(-1))
+    assert_equal(UInt.__add__(UInt(5), UInt(-5)), UInt(0))
+    assert_equal(UInt.__add__(UInt(-5), UInt(-4)), UInt(-9))
+
+
+def test_sub():
+    assert_equal(UInt.__sub__(UInt(3), UInt(3)), UInt(0))
+    assert_equal(UInt.__sub__(UInt(-2), UInt(3)), UInt(-5))
+    assert_equal(UInt.__sub__(UInt(2), UInt(-3)), UInt(5))
+    assert_equal(UInt.__sub__(UInt(5), UInt(4)), UInt(1))
+    assert_equal(UInt.__sub__(UInt(4), UInt(5)), UInt(-1))
+
+
+def test_div():
+    var n = UInt(5)
+    var d = UInt(2)
+    assert_equal(2.5, UInt.__truediv__(n, d))
+    UInt.__itruediv__(n, d)
+    assert_equal(UInt(2), n)
+
+
+def test_pow():
+    assert_equal(UInt(1), UInt.__pow__(UInt(3), UInt(0)))
+    assert_equal(UInt(27), UInt.__pow__(UInt(3), UInt(3)))
+    assert_equal(UInt(81), UInt.__pow__(UInt(3), UInt(4)))
+
+
+def test_ceil():
+    assert_equal(UInt.__ceil__(UInt(5)), UInt(5))
+    assert_equal(UInt.__ceil__(UInt(0)), UInt(0))
+    assert_equal(UInt.__ceil__(UInt(-5)), UInt(-5))
+
+
+def test_floor():
+    assert_equal(UInt.__floor__(UInt(5)), UInt(5))
+    assert_equal(UInt.__floor__(UInt(0)), UInt(0))
+    assert_equal(UInt.__floor__(UInt(-5)), UInt(-5))
+
+
+def test_round():
+    assert_equal(UInt.__round__(UInt(5)), UInt(5))
+    assert_equal(UInt.__round__(UInt(0)), UInt(0))
+    assert_equal(UInt.__round__(UInt(-5)), UInt(-5))
+    assert_equal(UInt.__round__(UInt(5), UInt(1)), UInt(5))
+    assert_equal(UInt.__round__(UInt(0), UInt(1)), UInt(0))
+    assert_equal(UInt.__round__(UInt(-5), UInt(1)), UInt(-5))
+    assert_equal(UInt.__round__(UInt(100), UInt(-2)), UInt(100))
+
+
+def test_trunc():
+    assert_equal(UInt.__trunc__(UInt(5)), UInt(5))
+    assert_equal(UInt.__trunc__(UInt(0)), UInt(0))
+
+
+def test_floordiv():
+    assert_equal(UInt(1), UInt.__floordiv__(UInt(2), UInt(2)))
+    assert_equal(UInt(0), UInt.__floordiv__(UInt(2), UInt(3)))
+    assert_equal(UInt(2), UInt.__floordiv__(UInt(100), UInt(50)))
+    assert_equal(UInt(0), UInt.__floordiv__(UInt(2), UInt(-2)))
+    assert_equal(UInt(0), UInt.__floordiv__(UInt(99), UInt(-2)))
+
+
+def test_mod():
+    assert_equal(UInt(0), UInt.__mod__(UInt(99), UInt(1)))
+    assert_equal(UInt(0), UInt.__mod__(UInt(99), UInt(3)))
+    assert_equal(UInt(99), UInt.__mod__(UInt(99), UInt(-2)))
+    assert_equal(UInt(3), UInt.__mod__(UInt(99), UInt(8)))
+    assert_equal(UInt(99), UInt.__mod__(UInt(99), UInt(-8)))
+    assert_equal(UInt(2), UInt.__mod__(UInt(2), UInt(-1)))
+    assert_equal(UInt(2), UInt.__mod__(UInt(2), UInt(-2)))
+    assert_equal(UInt(3), UInt.__mod__(UInt(3), UInt(-2)))
+    assert_equal(UInt(1), UInt.__mod__(UInt(-3), UInt(2)))
+
+
+def test_divmod():
+    var a: UInt
+    var b: UInt
+    a, b = divmod(UInt(7), UInt(3))
+    assert_equal(a, UInt(2))
+    assert_equal(b, UInt(1))
+
+    a, b = divmod(UInt(0), UInt(5))
+    assert_equal(a, UInt(0))
+    assert_equal(b, UInt(0))
+
+    a, b = divmod(UInt(5), UInt(0))
+    assert_equal(a, UInt(0))
+    assert_equal(b, UInt(0))
+
+
+def test_abs():
+    assert_equal(UInt(-5).__abs__(), UInt(18446744073709551611))
+    assert_equal(UInt(2).__abs__(), UInt(2))
+    assert_equal(UInt(0).__abs__(), UInt(0))
+
+
+def test_string_conversion():
+    assert_equal(UInt(3).__str__(), "3")
+    assert_equal(UInt(-3).__str__(), "18446744073709551613")
+    assert_equal(UInt(0).__str__(), "0")
+    assert_equal(UInt(100).__str__(), "100")
+    assert_equal(UInt(-100).__str__(), "18446744073709551516")
+
+
+def test_int_representation():
+    assert_equal(UInt(3).__repr__(), "UInt(3)")
+    assert_equal(UInt(-3).__repr__(), "UInt(18446744073709551613)")
+    assert_equal(UInt(0).__repr__(), "UInt(0)")
+    assert_equal(UInt(100).__repr__(), "UInt(100)")
+    assert_equal(UInt(-100).__repr__(), "UInt(18446744073709551516)")
+
+
+def test_indexer():
+    assert_equal(UInt(5), UInt(5).__index__())
+    assert_equal(UInt(987), UInt(987).__index__())
+
+
 def main():
     test_simple_uint()
     test_uint_representation()
     test_equality()
     test_inequality()
+    test_properties()
+    test_add()
+    test_sub()
+    test_div()
+    test_pow()
+    test_ceil()
+    test_floor()
+    test_round()
+    test_trunc()
+    test_floordiv()
+    test_mod()
+    test_divmod()
+    test_abs()
+    test_string_conversion()
+    test_int_representation()
+    test_indexer()
