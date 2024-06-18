@@ -78,8 +78,7 @@ struct Error(Stringable, Boolable, Representable):
         var dest = UnsafePointer[UInt8].alloc(length + 1)
         memcpy(
             dest=dest,
-            # TODO: Remove cast once string UInt8 transition is complete.
-            src=src.unsafe_ptr().bitcast[UInt8](),
+            src=src.unsafe_ptr(),
             count=length,
         )
         dest[length] = 0
