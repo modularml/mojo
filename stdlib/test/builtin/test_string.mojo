@@ -202,6 +202,32 @@ fn test_string_join() raises:
 
     assert_equal(sep.join(1, "abc", 3), "1,abc,3")
 
+    var s2 = String(",").join(List[UInt8](1, 2, 3))
+    assert_equal(s2, "1,2,3")
+
+    var s3 = String(",").join(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9))
+    assert_equal(s3, "1,2,3,4,5,6,7,8,9")
+
+    var s4 = String(",").join(List[UInt8]())
+    assert_equal(s4, "")
+
+    var s5 = String(",").join(List[UInt8](1))
+    assert_equal(s5, "1")
+
+
+fn test_string_literal_join() raises:
+    var s2 = ",".join(List[UInt8](1, 2, 3))
+    assert_equal(s2, "1,2,3")
+
+    var s3 = ",".join(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9))
+    assert_equal(s3, "1,2,3,4,5,6,7,8,9")
+
+    var s4 = ",".join(List[UInt8]())
+    assert_equal(s4, "")
+
+    var s5 = ",".join(List[UInt8](1))
+    assert_equal(s5, "1")
+
 
 fn test_stringref() raises:
     var a = StringRef("AAA")
@@ -698,6 +724,29 @@ fn test_split() raises:
     assert_equal(len(res4), 2)
     assert_equal(res4[0], "he")
     assert_equal(res4[1], "o")
+
+    # related to #2879
+    # TODO: replace string comparison when __eq__ is implemented for List
+    assert_equal(
+        String("abbaaaabbba").split("a").__str__(),
+        "['', 'bb', '', '', '', 'bbb', '']",
+    )
+    assert_equal(
+        String("abbaaaabbba").split("a", 8).__str__(),
+        "['', 'bb', '', '', '', 'bbb', '']",
+    )
+    assert_equal(
+        String("abbaaaabbba").split("a", 5).__str__(),
+        "['', 'bb', '', '', '', 'bbba']",
+    )
+    assert_equal(String("aaa").split("a", 0).__str__(), "['aaa']")
+    assert_equal(String("a").split("a").__str__(), "['', '']")
+    assert_equal(String("1,2,3").split("3", 0).__str__(), "['1,2,3']")
+    assert_equal(String("1,2,3").split("3", 1).__str__(), "['1,2,', '']")
+    assert_equal(String("1,2,3,3").split("3", 2).__str__(), "['1,2,', ',', '']")
+    assert_equal(
+        String("1,2,3,3,3").split("3", 2).__str__(), "['1,2,', ',', ',3']"
+    )
 
 
 fn test_splitlines() raises:
@@ -1308,6 +1357,18 @@ def test_format_args():
     )
 
 
+def test_isdigit():
+    assert_true(isdigit(ord("1")))
+    assert_true(isdigit("1"))
+    # TODO: What to do with multi-character strings?
+    # assert_false(isdigit("1gt"))
+    assert_false(isdigit(ord("g")))
+    assert_false(isdigit("g"))
+    assert_true(String("123").isdigit())
+    assert_false(String("asdg").isdigit())
+    assert_false(String("123asdg").isdigit())
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1317,6 +1378,7 @@ def main():
     test_stringable()
     test_repr()
     test_string_join()
+    test_string_literal_join()
     test_stringref()
     test_stringref_from_dtypepointer()
     test_stringref_strip()
@@ -1354,3 +1416,4 @@ def main():
     test_indexing()
     test_string_iter()
     test_format_args()
+    test_isdigit()

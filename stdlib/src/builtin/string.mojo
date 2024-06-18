@@ -510,6 +510,18 @@ fn isdigit(c: UInt8) -> Bool:
     return ord_0 <= int(c) <= ord_9
 
 
+fn isdigit(c: String) -> Bool:
+    """Determines whether the given character is a digit [0-9].
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is a digit.
+    """
+    return isdigit(ord(c))
+
+
 # ===----------------------------------------------------------------------=== #
 # isupper
 # ===----------------------------------------------------------------------=== #
@@ -1350,6 +1362,30 @@ struct String(
         elems.each[add_elt]()
         return result
 
+    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var result: String = ""
+        var is_first = True
+
+        for e in elems:
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(e[])
+
+        return result
+
     fn _strref_dangerous(self) -> StringRef:
         """
         Returns an inner pointer to the string as a StringRef.
@@ -1632,7 +1668,7 @@ struct String(
             output.append(self[lhs:rhs])
             lhs = rhs + sep_len
 
-        if self.endswith(sep):
+        if self.endswith(sep) and (len(output) <= maxsplit or maxsplit == -1):
             output.append("")
         return output
 
@@ -2134,6 +2170,17 @@ struct String(
             res += self[pos_in_self : len(self)]
 
         return res^
+
+    fn isdigit(self) -> Bool:
+        """Returns True if all characters in the string are digits.
+
+        Returns:
+            True if all characters are digits else False.
+        """
+        for c in self:
+            if not isdigit(c):
+                return False
+        return True
 
 
 # ===----------------------------------------------------------------------=== #
