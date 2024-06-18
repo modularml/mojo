@@ -14,10 +14,17 @@
 
 from sys import has_neon
 
-from testing import assert_equal, assert_false, assert_not_equal, assert_true
+from testing import (
+    assert_equal,
+    assert_false,
+    assert_not_equal,
+    assert_true,
+    assert_almost_equal,
+)
 
 from utils.numerics import isfinite, isinf, isnan, nan
 from utils.static_tuple import StaticTuple
+from builtin.simd import _modf
 
 
 def test_cast():
@@ -1342,7 +1349,7 @@ def test_reduce():
             assert_equal(X2(6, -3).reduce_max(), 6)
 
         @parameter
-        if type.is_bool():
+        if type is DType.bool:
             # reduce_and
             x8 = X8(False, False, True, True, False, True, False, True)
             x4 = X4(False, False, False, True)
@@ -1461,15 +1468,67 @@ def test_pow():
     assert_equal(simd_val.__pow__(3), F(0.0, 1.0, 8.0, 27.0))
     assert_equal(simd_val.__pow__(-1), F(inf, 1.0, 0.5, 0.3333333432674408))
 
-    # TODO: enable when math.isclose is open sourced
-    # assert_equal(simd_val.__pow__(0.5), F(0.0, 1.0, 1.41421, 1.73205))
-    # assert_equal(simd_val.__pow__(2, -0.5), F(0.70710, 0.57735, 0.5, 0.44721))
+    assert_almost_equal(simd_val.__pow__(0.5), F(0.0, 1.0, 1.41421, 1.73205))
+    assert_almost_equal(
+        (simd_val + 2).__pow__(-0.5), F(0.70710, 0.57735, 0.5, 0.44721)
+    )
 
     alias I = SIMD[DType.int32, 4]
     var simd_val_int = I(0, 1, 2, 3)
 
     # TODO: extend/improve these tests
     assert_equal(simd_val_int.__pow__(2), I(0, 1, 4, 9))
+
+
+def test_powf():
+    assert_almost_equal(Float32(2.0) ** Float32(0.5), 1.4142135)
+    assert_almost_equal(Float32(2.0) ** Float32(-0.5), 0.707107)
+    assert_almost_equal(Float32(50.0) ** Float32(2.5), 17677.6695297)
+    assert_almost_equal(Float32(12.0) ** Float32(0.4), 2.70192)
+    assert_almost_equal(Float32(-1.0) ** Float32(-1), -1)
+    assert_almost_equal(Float32(0.001) ** Float32(0.001), 0.99311605)
+
+    assert_almost_equal(Float64(0.001) ** Float64(0.001), 0.99311605)
+
+    assert_almost_equal(Float32(-4) ** Float32(-3), -0.015625)
+
+    assert_almost_equal(
+        SIMD[DType.float64, 8](1.0, -1.0, 2.0, -2.0, 4.0, -4.0, -2.0, 3.0)
+        ** SIMD[DType.float64, 8](1, 2, 3, 4, 5, 6, 2, 1),
+        SIMD[DType.float64, 8](1, 1, 8, 16, 1024, 4096, 4, 3),
+    )
+
+
+def test_modf():
+    var f32 = _modf(Float32(123.5))
+    assert_almost_equal(f32[0], 123)
+    assert_almost_equal(f32[1], 0.5)
+
+    var f64 = _modf(Float64(123.5))
+    assert_almost_equal(f64[0], 123)
+    assert_almost_equal(f64[1], 0.5)
+
+    f64 = _modf(Float64(0))
+    assert_almost_equal(f64[0], 0)
+    assert_almost_equal(f64[1], 0)
+
+    f64 = _modf(Float64(0.5))
+    assert_almost_equal(f64[0], 0)
+    assert_almost_equal(f64[1], 0.5)
+
+    f64 = _modf(Float64(-0.5))
+    assert_almost_equal(f64[0], -0)
+    assert_almost_equal(f64[1], -0.5)
+
+    f64 = _modf(Float64(-1.5))
+    assert_almost_equal(f64[0], -1)
+    assert_almost_equal(f64[1], -0.5)
+
+
+def test_split():
+    var tup = SIMD[DType.index, 8](1, 2, 3, 4, 5, 6, 7, 8).split()
+    assert_equal(tup[0], SIMD[DType.index, 4](1, 2, 3, 4))
+    assert_equal(tup[1], SIMD[DType.index, 4](5, 6, 7, 8))
 
 
 def main():
@@ -1501,6 +1560,7 @@ def main():
     test_mod()
     test_mul_with_overflow()
     test_pow()
+    test_powf()
     test_radd()
     test_reduce()
     test_reduce_bit_count()
@@ -1517,4 +1577,6 @@ def main():
     test_sub_with_overflow()
     test_trunc()
     test_truthy()
+    test_modf()
+    test_split()
     # TODO: add tests for __and__, __or__, anc comparison operators
