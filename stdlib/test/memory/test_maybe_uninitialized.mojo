@@ -14,25 +14,18 @@
 
 from memory.unsafe import UnsafeMaybeUninitialized
 from testing import assert_equal
-from test_utils import MoveCounter, CopyCounter
-
-
-@value
-struct ValueToCountDestructor(CollectionElement):
-    var value: Int
-    var destructor_counter: UnsafePointer[List[Int]]
-
-    fn __del__(owned self):
-        self.destructor_counter[].append(self.value)
+from test_utils import MoveCounter, CopyCounter, ValueDestructorRecorder
 
 
 def test_maybe_uninitialized():
     # Every time an Int is destroyed, it's going to be reccorded here.
     var destructor_counter = List[Int]()
 
-    var a = UnsafeMaybeUninitialized[ValueToCountDestructor]()
+    var a = UnsafeMaybeUninitialized[ValueDestructorRecorder]()
     a.write(
-        ValueToCountDestructor(42, UnsafePointer.address_of(destructor_counter))
+        ValueDestructorRecorder(
+            42, UnsafePointer.address_of(destructor_counter)
+        )
     )
 
     assert_equal(a.assume_initialized().value, 42)
@@ -52,7 +45,7 @@ def test_maybe_uninitialized():
 
 
 @value
-struct ImpossibleToDestroy(CollectionElement):
+struct ImpossibleToDestroy:
     var value: Int
 
     fn __del__(owned self):
@@ -84,6 +77,19 @@ def test_maybe_uninitialized_move():
     b.assume_initialized_destroy()
 
 
+def test_maybe_uninitialized_move_from_pointer():
+    var a = MoveCounter[Int](10)
+    assert_equal(a.move_count, 0)
+
+    var b = UnsafeMaybeUninitialized[MoveCounter[Int]]()
+    # b is uninitialized here.
+    b.move_from(UnsafePointer.address_of(a))
+
+    # a is uninitialized now. Thankfully, we're working with trivial types
+    assert_equal(b.assume_initialized().move_count, 1)
+    b.assume_initialized_destroy()
+
+
 def test_maybe_uninitialized_copy():
     var a = UnsafeMaybeUninitialized[CopyCounter]()
     a.write(CopyCounter())
@@ -104,4 +110,5 @@ def main():
     test_maybe_uninitialized()
     test_write_does_not_trigger_destructor()
     test_maybe_uninitialized_move()
+    test_maybe_uninitialized_move_from_pointer()
     test_maybe_uninitialized_copy()

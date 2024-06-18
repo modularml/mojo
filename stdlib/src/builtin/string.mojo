@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from bit import countl_zero
 from collections import List, KeyElement
+from collections._index_normalization import normalize_index
 from sys import llvm_intrinsic, bitwidthof
 from sys.ffi import C_char
 
@@ -507,6 +508,18 @@ fn isdigit(c: UInt8) -> Bool:
     alias ord_0 = ord("0")
     alias ord_9 = ord("9")
     return ord_0 <= int(c) <= ord_9
+
+
+fn isdigit(c: String) -> Bool:
+    """Determines whether the given character is a digit [0-9].
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is a digit.
+    """
+    return isdigit(ord(c))
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1011,8 +1024,11 @@ struct String(
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __getitem__(self, idx: Int) -> String:
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
         """Gets the character at the specified position.
+
+        Parameters:
+            IndexerType: The inferred type of an indexer argument.
 
         Args:
             idx: The index value.
@@ -1020,12 +1036,9 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
-        if idx < 0:
-            return self.__getitem__(len(self) + idx)
-
-        debug_assert(0 <= idx < len(self), "index must be in range")
+        var normalized_idx = normalize_index["String"](idx, self)
         var buf = Self._buffer_type(capacity=1)
-        buf.append(self._buffer[idx])
+        buf.append(self._buffer[normalized_idx])
         buf.append(0)
         return String(buf^)
 
@@ -1349,6 +1362,30 @@ struct String(
         elems.each[add_elt]()
         return result
 
+    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var result: String = ""
+        var is_first = True
+
+        for e in elems:
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(e[])
+
+        return result
+
     fn _strref_dangerous(self) -> StringRef:
         """
         Returns an inner pointer to the string as a StringRef.
@@ -1631,7 +1668,7 @@ struct String(
             output.append(self[lhs:rhs])
             lhs = rhs + sep_len
 
-        if self.endswith(sep):
+        if self.endswith(sep) and (len(output) <= maxsplit or maxsplit == -1):
             output.append("")
         return output
 
@@ -2133,6 +2170,17 @@ struct String(
             res += self[pos_in_self : len(self)]
 
         return res^
+
+    fn isdigit(self) -> Bool:
+        """Returns True if all characters in the string are digits.
+
+        Returns:
+            True if all characters are digits else False.
+        """
+        for c in self:
+            if not isdigit(c):
+                return False
+        return True
 
 
 # ===----------------------------------------------------------------------=== #

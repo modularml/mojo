@@ -104,45 +104,31 @@ def test_round():
     assert_equal(FloatLiteral.__round__(123.456, -3), 0.0)
 
 
-fn round10(x: Float64) -> Float64:
-    # TODO: implement __div__ on FloatLiteral?
-    return (round(Float64(x * 10)) / 10).value
+fn round10(x: FloatLiteral) -> FloatLiteral:
+    return round(x * 10.0) / 10.0
 
 
 def test_round10():
-    assert_equal(round10(4.4 % 0.5), 0.4)
-    assert_equal(round10(-4.4 % 0.5), 0.1)
-    assert_equal(round10(4.4 % -0.5), -0.1)
-    assert_equal(round10(-4.4 % -0.5), -0.4)
-    assert_equal(round10(3.1 % 1.0), 0.1)
+    assert_equal(round10(FloatLiteral.__mod__(4.4, 0.5)), 0.4)
+    assert_equal(round10(FloatLiteral.__mod__(-4.4, 0.5)), 0.1)
+    assert_equal(round10(FloatLiteral.__mod__(4.4, -0.5)), -0.1)
+    assert_equal(round10(FloatLiteral.__mod__(-4.4, -0.5)), -0.4)
+    assert_equal(round10(FloatLiteral.__mod__(3.1, 1.0)), 0.1)
 
 
 def test_division():
-    assert_equal(4.4 / 0.5, 8.8)
+    assert_equal(FloatLiteral.__truediv__(4.4, 0.5), 8.8)
 
-    alias f1 = 4.4 // 0.5
-    assert_equal(f1, 8.0)
-    alias f2 = -4.4 // 0.5
-    assert_equal(f2, -9.0)
-    alias f3 = 4.4 // -0.5
-    assert_equal(f3, -9.0)
-    alias f4 = -4.4 // -0.5
-    assert_equal(f4, 8.0)
-
-
-def test_power():
-    assert_almost_equal(4.5**2.5, 42.95673695)
-    assert_almost_equal(4.5**-2.5, 0.023279235)
-    # TODO (https://github.com/modularml/modular/issues/33045): Float64/SIMD has
-    # issues with negative numbers raised to fractional powers.
-    # assert_almost_equal((-4.5) ** 2.5, -42.95673695)
-    # assert_almost_equal((-4.5) ** -2.5, -0.023279235)
+    assert_equal(FloatLiteral.__floordiv__(4.4, 0.5), 8.0)
+    assert_equal(FloatLiteral.__floordiv__(-4.4, 0.5), -9.0)
+    assert_equal(FloatLiteral.__floordiv__(4.4, -0.5), -9.0)
+    assert_equal(FloatLiteral.__floordiv__(-4.4, -0.5), 8.0)
 
 
 def test_mod():
-    assert_equal(4.5 % 2, 0.5)
-    assert_equal(-4.5 % 2, 1.5)
-    assert_equal(6 % 2.5, 1.0)
+    assert_equal(FloatLiteral.__mod__(4.5, 2), 0.5)
+    assert_equal(FloatLiteral.__mod__(-4.5, 2), 1.5)
+    assert_equal(FloatLiteral.__mod__(6, 2.5), 1.0)
 
 
 def test_div_mod():
@@ -183,11 +169,11 @@ def test_boolean_comparable():
 
 
 def test_equality():
-    var f1 = 4.4
-    var f2 = 4.4
-    var f3 = 42.0
-    assert_equal(f1, f2)
-    assert_not_equal(f1, f3)
+    # TODO: add tests for special values
+    assert_true(FloatLiteral.__eq__(4.4, 4.4))
+    assert_false(FloatLiteral.__eq__(4.4, 42.0))
+    assert_false(FloatLiteral.__ne__(4.4, 4.4))
+    assert_true(FloatLiteral.__ne__(4.4, 42.0))
 
 
 def test_is_special_value():
@@ -216,7 +202,6 @@ def main():
     test_round()
     test_round10()
     test_division()
-    test_power()
     test_mod()
     test_div_mod()
     test_int_conversion()

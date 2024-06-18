@@ -41,7 +41,7 @@ struct Error(Stringable, Boolable, Representable):
     """
 
     @always_inline("nodebug")
-    fn __init__() -> Error:
+    fn __init__() -> Self:
         """Default constructor.
 
         Returns:
@@ -50,7 +50,7 @@ struct Error(Stringable, Boolable, Representable):
         return Error {data: UnsafePointer[UInt8](), loaded_length: 0}
 
     @always_inline("nodebug")
-    fn __init__(value: StringLiteral) -> Error:
+    fn __init__(value: StringLiteral) -> Self:
         """Construct an Error object with a given string literal.
 
         Args:
@@ -65,7 +65,7 @@ struct Error(Stringable, Boolable, Representable):
         }
 
     @always_inline("nodebug")
-    fn __init__(src: String) -> Error:
+    fn __init__(src: String) -> Self:
         """Construct an Error object with a given string.
 
         Args:
@@ -86,7 +86,7 @@ struct Error(Stringable, Boolable, Representable):
         return Error {data: dest, loaded_length: -length}
 
     @always_inline("nodebug")
-    fn __init__(src: StringRef) -> Error:
+    fn __init__(src: StringRef) -> Self:
         """Construct an Error object with a given string ref.
 
         Args:

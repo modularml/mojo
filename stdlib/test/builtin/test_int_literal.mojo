@@ -15,11 +15,20 @@
 from testing import assert_equal
 
 
-def test_int():
-    assert_equal(3, 3)
-    assert_equal(3 + 3, 6)
-    assert_equal(4 - 1, 3)
-    assert_equal(6 - 1, 5)
+def test_add():
+    assert_equal(IntLiteral.__add__(3, 3), 6)
+    assert_equal(IntLiteral.__add__(-2, 3), 1)
+    assert_equal(IntLiteral.__add__(2, -3), -1)
+    assert_equal(IntLiteral.__add__(5, -5), 0)
+    assert_equal(IntLiteral.__add__(-5, -4), -9)
+
+
+def test_sub():
+    assert_equal(IntLiteral.__sub__(3, 3), 0)
+    assert_equal(IntLiteral.__sub__(-2, 3), -5)
+    assert_equal(IntLiteral.__sub__(2, -3), 5)
+    assert_equal(IntLiteral.__sub__(5, 4), 1)
+    assert_equal(IntLiteral.__sub__(4, 5), -1)
 
 
 def test_ceil():
@@ -51,22 +60,22 @@ def test_trunc():
 
 
 def test_floordiv():
-    assert_equal(2 // 2, 1)
-    assert_equal(2 // 3, 0)
-    assert_equal(2 // -2, -1)
-    assert_equal(99 // -2, -50)
+    assert_equal(IntLiteral.__floordiv__(2, 2), 1)
+    assert_equal(IntLiteral.__floordiv__(2, 3), 0)
+    assert_equal(IntLiteral.__floordiv__(2, -2), -1)
+    assert_equal(IntLiteral.__floordiv__(99, -2), -50)
 
 
 def test_mod():
-    assert_equal(99 % 1, 0)
-    assert_equal(99 % 3, 0)
-    assert_equal(99 % -2, -1)
-    assert_equal(99 % 8, 3)
-    assert_equal(99 % -8, -5)
-    assert_equal(2 % -1, 0)
-    assert_equal(2 % -2, 0)
-    assert_equal(3 % -2, -1)
-    assert_equal(-3 % 2, 1)
+    assert_equal(IntLiteral.__mod__(99, 1), 0)
+    assert_equal(IntLiteral.__mod__(99, 3), 0)
+    assert_equal(IntLiteral.__mod__(99, -2), -1)
+    assert_equal(IntLiteral.__mod__(99, 8), 3)
+    assert_equal(IntLiteral.__mod__(99, -8), -5)
+    assert_equal(IntLiteral.__mod__(2, -1), 0)
+    assert_equal(IntLiteral.__mod__(2, -2), 0)
+    assert_equal(IntLiteral.__mod__(3, -2), -1)
+    assert_equal(IntLiteral.__mod__(-3, 2), 1)
 
 
 def test_bit_width():
@@ -77,9 +86,9 @@ def test_bit_width():
 
 
 def test_abs():
-    assert_equal(abs(-5), 5)
-    assert_equal(abs(2), 2)
-    assert_equal(abs(0), 0)
+    assert_equal(IntLiteral.__abs__(-5), 5)
+    assert_equal(IntLiteral.__abs__(2), 2)
+    assert_equal(IntLiteral.__abs__(0), 0)
 
 
 def test_indexer():
@@ -100,7 +109,8 @@ def test_divmod():
 
 
 def main():
-    test_int()
+    test_add()
+    test_sub()
     test_ceil()
     test_floor()
     test_round()
