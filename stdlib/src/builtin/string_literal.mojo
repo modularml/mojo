@@ -361,3 +361,27 @@ struct StringLiteral(
           The offset of `substr` relative to the beginning of the string.
         """
         return StringRef(self).rfind(substr, start=start)
+
+    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var result: String = ""
+        var is_first = True
+
+        for e in elems:
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(e[])
+
+        return result
