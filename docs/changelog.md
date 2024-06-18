@@ -75,6 +75,11 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Added `C_char` type alias in `sys.ffi`.
 
+- Added `StringSlice(..)` initializer from a `StringLiteral`.
+
+- Added new `StaticString` type alias. This can be used in place of
+  `StringLiteral` for runtime string arguments.
+
 - Added `TemporaryDirectory` in module `tempfile`.
   ([PR 2743](https://github.com/modularml/mojo/pull/2743) by [@artemiogr97](https://github.com/artemiogr97))
 

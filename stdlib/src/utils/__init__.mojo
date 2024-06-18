@@ -17,6 +17,6 @@ from .inline_string import InlineString
 from .loop import unroll
 from .span import Span
 from .static_tuple import InlineArray, StaticTuple
-from .string_slice import StringSlice
 from .stringref import StringRef
+from .string_slice import StaticString, StringSlice
 from .variant import Variant
