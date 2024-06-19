@@ -13,11 +13,11 @@
 
 # RUN: %mojo %s -t
 
-from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
-from utils.stringref import _memmem, _memchr, _align_down
-
+from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from bit import countr_zero
 from builtin.dtype import _uint_type_of_width
+
+from utils.stringref import _align_down, _memchr, _memmem
 
 # ===----------------------------------------------------------------------===#
 # Benchmark Data

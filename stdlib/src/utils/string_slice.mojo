@@ -23,11 +23,14 @@ from utils import StringSlice
 from utils import Span
 from builtin.string import _isspace
 
+alias StaticString = StringSlice[ImmutableStaticLifetime]
+"""An immutable static string slice."""
+
 
 struct StringSlice[
     is_mutable: Bool, //,
     lifetime: AnyLifetime[is_mutable].type,
-](Stringable):
+](Stringable, Sized, Formattable):
     """
     A non-owning view to encoded string data.
 
@@ -44,6 +47,31 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
     # Initializers
     # ===------------------------------------------------------------------===#
+
+    fn __init__(inout self, literal: StringLiteral):
+        """Construct a new string slice from a string literal.
+
+        Args:
+            literal: The literal to construct this string slice from.
+        """
+
+        # Its not legal to try to mutate a StringLiteral. String literals are
+        # static data.
+        constrained[
+            not is_mutable, "cannot create mutable StringSlice of StringLiteral"
+        ]()
+
+        # Since a StringLiteral has static lifetime, it will outlive
+        # whatever arbitrary `lifetime` the user has specified they need this
+        # slice to live for.
+        # SAFETY:
+        #   StringLiteral is guaranteed to use UTF-8 encoding.
+        # FIXME(MSTDL-160):
+        #   Ensure StringLiteral _actually_ always uses UTF-8 encoding.
+        self = StringSlice[lifetime](
+            unsafe_from_utf8_ptr=literal.unsafe_ptr(),
+            len=literal._byte_length(),
+        )
 
     @always_inline
     fn __init__(inout self, *, owned unsafe_from_utf8: Span[UInt8, lifetime]):
@@ -118,13 +146,23 @@ struct StringSlice[
         return String(str_slice=self)
 
     fn __len__(self) -> Int:
-        """Returns the StringSlice byte length.
+        """Nominally returns the _length in Unicode codepoints_ (not bytes!).
 
         Returns:
-            The StringSlice byte length.
+            The length in Unicode codepoints.
         """
+        # FIXME(MSTDL-160):
+        #   Actually perform UTF-8 decoding here to count the codepoints.
+        return len(self._slice)
 
-        return self._byte_length()
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this string slice to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        writer.write_str(str_slice=self)
 
     # ===------------------------------------------------------------------===#
     # Methods

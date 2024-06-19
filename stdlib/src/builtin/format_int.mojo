@@ -17,6 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Optional
+
 from utils import InlineArray
 
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -389,8 +390,7 @@ fn _try_write_int[
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
     var str_slice = StringSlice[__lifetime_of(buf)](
-        # TODO: Remove cast after transition to UInt8 strings is complete.
-        unsafe_from_utf8_ptr=buf_ptr.bitcast[UInt8](),
+        unsafe_from_utf8_ptr=buf_ptr,
         len=len,
     )
 

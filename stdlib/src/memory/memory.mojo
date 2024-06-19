@@ -21,9 +21,10 @@ from memory import memcmp
 
 
 from sys import llvm_intrinsic, sizeof, triple_is_nvidia_cuda
-from builtin.dtype import _integral_type_of
 
+from builtin.dtype import _integral_type_of
 from memory.reference import AddressSpace, _GPUAddressSpace
+
 from .unsafe import DTypePointer, LegacyPointer
 
 # ===----------------------------------------------------------------------=== #
@@ -573,7 +574,7 @@ fn _malloc[
     @parameter
     if triple_is_nvidia_cuda():
         constrained[
-            address_space == AddressSpace.GENERIC,
+            address_space is AddressSpace.GENERIC,
             "address space must be generic",
         ]()
         return external_call["malloc", Pointer[NoneType, address_space]](
@@ -595,7 +596,7 @@ fn _free(ptr: UnsafePointer):
     @parameter
     if triple_is_nvidia_cuda():
         constrained[
-            ptr.address_space == AddressSpace.GENERIC,
+            ptr.address_space is AddressSpace.GENERIC,
             "address space must be generic",
         ]()
         external_call["free", NoneType](ptr.bitcast[NoneType]())

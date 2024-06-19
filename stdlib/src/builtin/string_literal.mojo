@@ -15,13 +15,13 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from sys.ffi import C_char
+
 from memory import DTypePointer
 
 from utils import StringRef
-from utils._visualizers import lldb_formatter_wrapping_type
 from utils._format import Formattable, Formatter
-
-from sys.ffi import C_char
+from utils._visualizers import lldb_formatter_wrapping_type
 
 from .string import _atol
 
@@ -361,3 +361,27 @@ struct StringLiteral(
           The offset of `substr` relative to the beginning of the string.
         """
         return StringRef(self).rfind(substr, start=start)
+
+    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var result: String = ""
+        var is_first = True
+
+        for e in elems:
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(e[])
+
+        return result

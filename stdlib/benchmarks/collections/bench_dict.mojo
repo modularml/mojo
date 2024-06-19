@@ -12,9 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s -t
 
-from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
-from stdlib.collections import Dict
 from random import *
+
+from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
+from stdlib.collections import Dict
 
 
 # ===----------------------------------------------------------------------===#

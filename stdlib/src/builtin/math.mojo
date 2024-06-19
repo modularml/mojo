@@ -117,6 +117,25 @@ fn divmod(numerator: Int, denominator: Int) -> Tuple[Int, Int]:
     return numerator.__divmod__(denominator)
 
 
+fn divmod(numerator: UInt, denominator: UInt) -> Tuple[UInt, UInt]:
+    """Performs integer division and returns the quotient and the remainder.
+
+    Currently supported only for integers. Support for more standard library
+    types like Int8, Int16... is planned.
+
+    This method calls `a.__divmod__(b)`, thus, the actual implementation of
+    divmod should go in the `__divmod__` method of the struct of `a`.
+
+    Args:
+        numerator: The dividend.
+        denominator: The divisor.
+
+    Returns:
+        A `Tuple` containing the quotient and the remainder.
+    """
+    return numerator.__divmod__(denominator)
+
+
 # ===----------------------------------------------------------------------=== #
 # max
 # ===----------------------------------------------------------------------=== #
@@ -299,33 +318,62 @@ trait Roundable:
 
 
 @always_inline
-fn round[T: Roundable](value: T) -> T:
+fn round[T: Roundable, //](number: T) -> T:
     """Get the rounded value of the given object.
 
     Parameters:
         T: The type conforming to Roundable.
 
     Args:
-        value: The object to get the rounded value of.
+        number: The object to get the rounded value of.
 
     Returns:
         The rounded value of the object.
     """
-    return value.__round__()
+    return number.__round__()
+
+
+# TODO: remove this when conformance issue for FloatLiteral is fixed.
+@always_inline
+fn round(number: FloatLiteral) -> FloatLiteral:
+    """Get the rounded value of the given FloatLiteral.
+
+    Args:
+        number: The FloatLiteral to get the rounded value of.
+
+    Returns:
+        The rounded value of the object.
+    """
+    return number.__round__()
 
 
 @always_inline
-fn round[T: Roundable](value: T, ndigits: Int) -> T:
+fn round[T: Roundable, //](number: T, ndigits: Int) -> T:
     """Get the rounded value of the given object.
 
     Parameters:
         T: The type conforming to Roundable.
 
     Args:
-        value: The object to get the rounded value of.
+        number: The object to get the rounded value of.
         ndigits: The number of digits to round to.
 
     Returns:
         The rounded value of the object.
     """
-    return value.__round__(ndigits)
+    return number.__round__(ndigits)
+
+
+# TODO: remove this when conformance issue for FloatLiteral is fixed.
+@always_inline
+fn round(number: FloatLiteral, ndigits: Int) -> FloatLiteral:
+    """Get the rounded value of the given FloatLiteral.
+
+    Args:
+        number: The FloatLiteral to get the rounded value of.
+        ndigits: The number of digits to round to.
+
+    Returns:
+        The rounded value of the object.
+    """
+    return number.__round__(ndigits)

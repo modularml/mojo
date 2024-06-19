@@ -19,10 +19,12 @@ from python import Python
 ```
 """
 
+from os.env import getenv
 from sys import external_call, sizeof
 from sys.ffi import _get_global
-from os.env import getenv
+
 from memory import UnsafePointer
+
 from utils import StringRef
 
 from ._cpython import CPython, Py_eval_input, Py_file_input

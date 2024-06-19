@@ -20,10 +20,13 @@ from collections import List
 """
 
 
-from memory import UnsafePointer, Reference
 from sys.intrinsics import _type_is_eq
-from .optional import Optional
+
+from memory import Reference, UnsafePointer
+
 from utils import Span
+
+from .optional import Optional
 
 # ===----------------------------------------------------------------------===#
 # List
@@ -770,7 +773,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     @always_inline
     fn unsafe_get(
         ref [_]self: Self, idx: Int
-    ) -> Reference[Self.T, __lifetime_of(self)]:
+    ) -> ref [__lifetime_of(self)] Self.T:
         """Get a reference to an element of self without checking index bounds.
 
         Users should consider using `__getitem__` instead of this method as it

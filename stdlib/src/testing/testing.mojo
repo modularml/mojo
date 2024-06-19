@@ -19,8 +19,10 @@ from testing import assert_true
 ```
 """
 from collections import Optional
-from utils.numerics import isfinite, isnan
+
 from builtin._location import __call_location, _SourceLocation
+
+from utils.numerics import isfinite, isnan
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -37,12 +39,14 @@ fn _isclose(
     equal_nan: Bool,
 ) -> SIMD[DType.bool, a.size]:
     constrained[
-        a.type.is_bool() or a.type.is_integral() or a.type.is_floating_point(),
+        a.type is DType.bool
+        or a.type.is_integral()
+        or a.type.is_floating_point(),
         "input type must be boolean, integral, or floating-point",
     ]()
 
     @parameter
-    if a.type.is_bool() or a.type.is_integral():
+    if a.type is DType.bool or a.type.is_integral():
         return a == b
     else:
         var both_nan = isnan(a) & isnan(b)
@@ -279,7 +283,7 @@ fn assert_almost_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     constrained[
-        type.is_bool() or type.is_integral() or type.is_floating_point(),
+        type is DType.bool or type.is_integral() or type.is_floating_point(),
         "type must be boolean, integral, or floating-point",
     ]()
 

@@ -15,14 +15,15 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import countl_zero
-from collections import List, KeyElement
-from sys import llvm_intrinsic, bitwidthof
+from collections import KeyElement, List
+from collections._index_normalization import normalize_index
+from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
+from bit import countl_zero
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, Span, StringSlice
+from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 # ===----------------------------------------------------------------------=== #
@@ -507,6 +508,18 @@ fn isdigit(c: UInt8) -> Bool:
     alias ord_0 = ord("0")
     alias ord_9 = ord("9")
     return ord_0 <= int(c) <= ord_9
+
+
+fn isdigit(c: String) -> Bool:
+    """Determines whether the given character is a digit [0-9].
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is a digit.
+    """
+    return isdigit(ord(c))
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1011,8 +1024,11 @@ struct String(
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __getitem__(self, idx: Int) -> String:
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
         """Gets the character at the specified position.
+
+        Parameters:
+            IndexerType: The inferred type of an indexer argument.
 
         Args:
             idx: The index value.
@@ -1020,12 +1036,9 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
-        if idx < 0:
-            return self.__getitem__(len(self) + idx)
-
-        debug_assert(0 <= idx < len(self), "index must be in range")
+        var normalized_idx = normalize_index["String"](idx, self)
         var buf = Self._buffer_type(capacity=1)
-        buf.append(self._buffer[idx])
+        buf.append(self._buffer[normalized_idx])
         buf.append(0)
         return String(buf^)
 
@@ -1364,6 +1377,30 @@ struct String(
         elems.each[add_elt]()
         return result
 
+    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var result: String = ""
+        var is_first = True
+
+        for e in elems:
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(e[])
+
+        return result
+
     fn _strref_dangerous(self) -> StringRef:
         """
         Returns an inner pointer to the string as a StringRef.
@@ -1420,7 +1457,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1437,7 +1474,7 @@ struct String(
         )
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
+    fn as_string_slice(ref [_]self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
@@ -1446,9 +1483,7 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice[__lifetime_of(self)](
-            unsafe_from_utf8=self.as_bytes_slice()
-        )
+        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
 
     fn _byte_length(self) -> Int:
         """Get the string length in bytes.
@@ -1456,7 +1491,7 @@ struct String(
         This does not include the trailing null terminator in the count.
 
         Returns:
-            The length of this StringLiteral in bytes, excluding null terminator.
+            The length of this string in bytes, excluding null terminator.
         """
 
         var buffer_len = len(self._buffer)
@@ -1619,7 +1654,7 @@ struct String(
             output.append(self[lhs:rhs])
             lhs = rhs + sep_len
 
-        if self.endswith(sep):
+        if self.endswith(sep) and (len(output) <= maxsplit or maxsplit == -1):
             output.append("")
         return output
 
@@ -1836,7 +1871,7 @@ struct String(
         #     if not s.isspace():
         #         break
         #     r_idx -= 1
-        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)[]):
+        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)):
             r_idx -= 1
         return self[:r_idx]
 
@@ -1868,7 +1903,7 @@ struct String(
         #     if not s.isspace():
         #         break
         #     l_idx += 1
-        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)[]):
+        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)):
             l_idx += 1
         return self[l_idx:]
 
@@ -2126,6 +2161,17 @@ struct String(
             res += self[pos_in_self : len(self)]
 
         return res^
+
+    fn isdigit(self) -> Bool:
+        """Returns True if all characters in the string are digits.
+
+        Returns:
+            True if all characters are digits else False.
+        """
+        for c in self:
+            if not isdigit(c):
+                return False
+        return True
 
 
 # ===----------------------------------------------------------------------=== #

@@ -15,6 +15,7 @@
 
 
 from os.path import dirname
+
 from testing import assert_equal
 
 

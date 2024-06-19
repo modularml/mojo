@@ -72,7 +72,7 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are equal and False otherwise.
         """
-        return self.value() == other.value()
+        return self is other
 
     @always_inline("nodebug")
     fn __eq__(self, other: AddressSpace) -> Bool:
@@ -81,7 +81,7 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are equal and False otherwise.
         """
-        return self.value() == other.value()
+        return self is other
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -93,7 +93,7 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are inequal and False otherwise.
         """
-        return not self == other
+        return self is not other
 
     @always_inline("nodebug")
     fn __ne__(self, other: AddressSpace) -> Bool:
@@ -105,7 +105,55 @@ struct _GPUAddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are inequal and False otherwise.
         """
-        return not self == other
+        return self is not other
+
+    @always_inline("nodebug")
+    fn __is__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __is__(self, other: AddressSpace) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __isnot__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() != other.value()
+
+    @always_inline("nodebug")
+    fn __isnot__(self, other: AddressSpace) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() != other.value()
 
 
 @value
@@ -173,7 +221,7 @@ struct AddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are equal and False otherwise.
         """
-        return self.value() == other.value()
+        return self is other
 
     @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
@@ -185,7 +233,31 @@ struct AddressSpace(EqualityComparable):
         Returns:
           True if the two address spaces are inequal and False otherwise.
         """
-        return not self == other
+        return self is not other
+
+    @always_inline("nodebug")
+    fn __is__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() == other.value()
+
+    @always_inline("nodebug")
+    fn __isnot__(self, other: Self) -> Bool:
+        """True if the two address spaces are equal and False otherwise.
+
+        Args:
+          other: The other address space value.
+
+        Returns:
+          True if the two address spaces are equal and False otherwise.
+        """
+        return self.value() != other.value()
 
 
 # ===----------------------------------------------------------------------===#
@@ -200,7 +272,7 @@ struct Reference[
     type: AnyType,
     lifetime: AnyLifetime[is_mutable].type,
     address_space: AddressSpace = AddressSpace.GENERIC,
-]:
+](CollectionElementNew):
     """Defines a non-nullable safe reference.
 
     Parameters:
@@ -237,6 +309,16 @@ struct Reference[
             value: The value reference.
         """
         self.value = __get_mvalue_as_litref(value)
+
+    fn __init__(inout self, *, other: Self):
+        """Constructs a copy from another Reference.
+
+        Note that this does **not** copy the underlying data.
+
+        Args:
+            other: The `Reference` to copy.
+        """
+        self.value = other.value
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
