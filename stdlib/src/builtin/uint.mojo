@@ -131,3 +131,50 @@ struct UInt(Stringable, Representable):
                 pred = __mlir_attr.`#index<cmp_predicate ne>`
             ](self.value, rhs.value)
         )
+
+    @always_inline("nodebug")
+    fn __add__(self, rhs: Self) -> Self:
+        """Return `self + rhs`.
+
+        Args:
+            rhs: The value to add.
+
+        Returns:
+            `self + rhs` value.
+        """
+        return __mlir_op.`index.add`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __sub__(self, rhs: Self) -> Self:
+        """Return `self - rhs`.
+
+        Args:
+            rhs: The value to subtract.
+
+        Returns:
+            `self - rhs` value.
+        """
+        return __mlir_op.`index.sub`(self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __mul__(self, rhs: Self) -> Self:
+        """Return `self * rhs`.
+
+        Args:
+            rhs: The value to multiply with.
+
+        Returns:
+            `self * rhs` value. An `UInt` value.
+        """
+        return __mlir_op.`index.mul`(self.value, rhs.value)
+
+    fn __truediv__(self, rhs: Self) -> Float64:
+        """Return the floating point division of `self` and `rhs`.
+
+        Args:
+            rhs: The value to divide on.
+
+        Returns:
+            `float(self)/float(rhs)` value. A `Float64` value.
+        """
+        return Float64(self) / Float64(rhs)
