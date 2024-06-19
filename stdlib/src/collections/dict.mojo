@@ -203,6 +203,15 @@ struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
         self.key = key^
         self.value = value^
 
+    fn reap_value(owned self) -> V:
+        """Take the value from an owned entry.
+
+        Returns:
+            The value of the entry.
+        """
+        __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(self))
+        return self.value^
+
 
 alias _EMPTY = -1
 alias _REMOVED = -2
@@ -772,7 +781,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             var entry_value = entry[].unsafe_take()
             entry[] = None
             self.size -= 1
-            return entry_value.value^
+            return entry_value^.reap_value()
         elif default:
             return default.value()
         raise "KeyError"
