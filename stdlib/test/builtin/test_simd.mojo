@@ -24,7 +24,6 @@ from testing import (
 )
 
 from utils.numerics import isfinite, isinf, isnan, nan
-from utils.static_tuple import StaticTuple
 
 
 def test_cast():
@@ -167,7 +166,7 @@ def test_issue_30237():
     alias dtype = DType.float32
     alias simd_width = 1
     alias coefficients_len = 7
-    alias coefficients = StaticTuple[SIMD[dtype, simd_width], coefficients_len](
+    alias coefficients = InlineArray[SIMD[dtype, simd_width], coefficients_len](
         4.89352455891786e-03,
         6.37261928875436e-04,
         1.48572235717979e-05,
