@@ -131,6 +131,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
   `MOJO_PYTHON_LIBRARY` still exists for environments with a dynamic libpython,
   but no Python executable.
 
+- The `math` package now includes the `pi`, `e`, and `tau` constants (Closes
+  Issue [#2135](https://github.com/modularml/mojo/issues/2135)).
+
 ### 🦋 Changed
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that
