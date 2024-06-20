@@ -363,7 +363,7 @@ struct UnsafePointer[
         """
 
         constrained[
-            address_space == AddressSpace.GENERIC,
+            address_space is AddressSpace.GENERIC,
             "can not initialize pointer in non-GENERIC address space",
         ]()
 

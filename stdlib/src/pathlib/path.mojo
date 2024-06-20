@@ -16,13 +16,12 @@
 import os
 from os import PathLike, listdir, stat_result
 from sys import os_is_windows
-from builtin._location import __call_location
+from sys.ffi import C_char
 
+from builtin._location import __call_location
 from memory import stack_allocation
 
 from utils import StringRef
-
-from sys.ffi import C_char
 
 alias DIR_SEPARATOR = "\\" if os_is_windows() else "/"
 

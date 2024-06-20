@@ -18,15 +18,15 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
-from builtin.hash import _hash_simd
-from builtin.string import _calc_initial_buffer_size
-from builtin.io import _snprintf
 from builtin.format_int import _try_write_int
+from builtin.hash import _hash_simd
+from builtin.io import _snprintf
 from builtin.simd import _format_scalar
+from builtin.string import _calc_initial_buffer_size
 
-from utils._visualizers import lldb_formatter_wrapping_type
-from utils._format import Formattable, Formatter
 from utils import InlineArray
+from utils._format import Formattable, Formatter
+from utils._visualizers import lldb_formatter_wrapping_type
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer

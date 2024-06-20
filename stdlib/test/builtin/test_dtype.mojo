@@ -17,6 +17,11 @@ from collections import Set
 from testing import assert_equal, assert_false, assert_true
 
 
+fn test_equality() raises:
+    assert_true(DType.float32 is DType.float32)
+    assert_true(DType.float32 is not DType.int32)
+
+
 fn test_stringable() raises:
     assert_equal("float32", str(DType.float32))
     assert_equal("int64", str(DType.int64))
@@ -40,6 +45,7 @@ fn test_key_element() raises:
 
 
 fn main() raises:
+    test_equality()
     test_stringable()
     test_representable()
     test_key_element()

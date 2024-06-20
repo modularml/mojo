@@ -78,8 +78,7 @@ fn b64encode(str: String) -> String:
     @parameter
     @always_inline
     fn s(idx: Int) -> Int:
-        # TODO: Remove cast once transition to UInt8 string types is complete.
-        return int(str.unsafe_ptr().bitcast[UInt8]()[idx])
+        return int(str.unsafe_ptr()[idx])
 
     # This algorithm is based on https://arxiv.org/abs/1704.00605
     var end = length - (length % 3)

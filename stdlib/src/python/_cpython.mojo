@@ -12,15 +12,15 @@
 # ===----------------------------------------------------------------------=== #
 
 from os import getenv, setenv
-from pathlib import Path
 from os.path import dirname
+from pathlib import Path
 from sys import external_call
 from sys.arg import argv
 from sys.ffi import DLHandle
 
 from memory import DTypePointer, UnsafePointer
 
-from utils import StringRef, InlineArray
+from utils import InlineArray, StringRef
 
 # https://github.com/python/cpython/blob/d45225bd66a8123e4a30314c627f2586293ba532/Include/compile.h#L7
 alias Py_single_input = 256

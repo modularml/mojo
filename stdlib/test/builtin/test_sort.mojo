@@ -13,9 +13,8 @@
 # RUN: %mojo %s
 
 from pathlib import Path, _dir_of_current_file
-from sys import os_is_windows, env_get_string
-
-from random import random_si64, random_ui64, random_float64, seed
+from random import random_float64, random_si64, random_ui64, seed
+from sys import env_get_string, os_is_windows
 
 from builtin.sort import _quicksort, _small_sort
 from testing import assert_equal, assert_false, assert_true
@@ -29,16 +28,16 @@ fn random_numbers[
 
         @parameter
         if (
-            dtype == DType.int8
-            or dtype == DType.int16
-            or dtype == DType.int32
-            or dtype == DType.int64
+            dtype is DType.int8
+            or dtype is DType.int16
+            or dtype is DType.int32
+            or dtype is DType.int64
         ):
             result.append(random_si64(0, max).cast[dtype]())
         elif (
-            dtype == DType.float16
-            or dtype == DType.float32
-            or dtype == DType.float64
+            dtype is DType.float16
+            or dtype is DType.float32
+            or dtype is DType.float64
         ):
             result.append(random_float64(0, max).cast[dtype]())
         else:

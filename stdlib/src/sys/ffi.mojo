@@ -66,9 +66,15 @@ struct DLHandle(CollectionElement, Boolable):
 
         @parameter
         if not os_is_windows():
-            self.handle = external_call["dlopen", DTypePointer[DType.int8]](
+            var handle = external_call["dlopen", DTypePointer[DType.int8]](
                 path.unsafe_ptr(), flags
             )
+            if handle == DTypePointer[DType.int8]():
+                var error_message = external_call[
+                    "dlerror", UnsafePointer[UInt8]
+                ]()
+                abort("dlopen failed: " + String(error_message))
+            self.handle = handle
         else:
             self.handle = DTypePointer[DType.int8]()
 

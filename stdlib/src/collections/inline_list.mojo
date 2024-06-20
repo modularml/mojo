@@ -19,8 +19,9 @@ from collections import InlineList
 ```
 """
 
-from utils import InlineArray
 from sys.intrinsics import _type_is_eq
+
+from utils import InlineArray
 
 
 # ===----------------------------------------------------------------------===#

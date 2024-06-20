@@ -17,20 +17,19 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import (
     bitwidthof,
-    os_is_windows,
-    triple_is_nvidia_cuda,
     external_call,
+    os_is_windows,
     stdout,
+    triple_is_nvidia_cuda,
 )
 
-from builtin.dtype import _get_dtype_printf_format
 from builtin.builtin_list import _LITRefPackHelper
+from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
 from utils import StringRef, unroll
 from utils._format import Formattable, Formatter, write_to
-
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle
@@ -181,19 +180,19 @@ fn _snprintf_scalar[
     float_format: StringLiteral = "%.17g",
 ](buffer: UnsafePointer[UInt8], size: Int, x: Scalar[type]) -> Int:
     @parameter
-    if type == DType.bool:
+    if type is DType.bool:
         if x:
             return _snprintf["True"](buffer, size)
         else:
             return _snprintf["False"](buffer, size)
-    elif type.is_integral() or type == DType.address:
+    elif type.is_integral() or type is DType.address:
         return _snprintf[_get_dtype_printf_format[type]()](buffer, size, x)
     elif (
-        type == DType.float16 or type == DType.bfloat16 or type == DType.float32
+        type is DType.float16 or type is DType.bfloat16 or type is DType.float32
     ):
         # We need to cast the value to float64 to print it.
         return _float_repr[float_format](buffer, size, x.cast[DType.float64]())
-    elif type == DType.float64:
+    elif type is DType.float64:
         return _float_repr[float_format](buffer, size, rebind[Float64](x))
     return 0
 
@@ -262,9 +261,9 @@ fn _put_simd_scalar[type: DType](x: Scalar[type]):
     alias format = _get_dtype_printf_format[type]()
 
     @parameter
-    if type == DType.bool:
+    if type is DType.bool:
         _put["True"]() if x else _put["False"]()
-    elif type.is_integral() or type == DType.address:
+    elif type.is_integral() or type is DType.address:
         _printf[format](x)
     elif type.is_floating_point():
 

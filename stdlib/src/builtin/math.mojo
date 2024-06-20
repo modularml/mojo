@@ -117,6 +117,25 @@ fn divmod(numerator: Int, denominator: Int) -> Tuple[Int, Int]:
     return numerator.__divmod__(denominator)
 
 
+fn divmod(numerator: UInt, denominator: UInt) -> Tuple[UInt, UInt]:
+    """Performs integer division and returns the quotient and the remainder.
+
+    Currently supported only for integers. Support for more standard library
+    types like Int8, Int16... is planned.
+
+    This method calls `a.__divmod__(b)`, thus, the actual implementation of
+    divmod should go in the `__divmod__` method of the struct of `a`.
+
+    Args:
+        numerator: The dividend.
+        denominator: The divisor.
+
+    Returns:
+        A `Tuple` containing the quotient and the remainder.
+    """
+    return numerator.__divmod__(denominator)
+
+
 # ===----------------------------------------------------------------------=== #
 # max
 # ===----------------------------------------------------------------------=== #

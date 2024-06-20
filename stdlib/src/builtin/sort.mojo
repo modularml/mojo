@@ -15,10 +15,11 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import countl_zero
 from collections import List
-from memory import Pointer, UnsafePointer
 from sys import bitwidthof
+
+from bit import countl_zero
+from memory import Pointer, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # sort
