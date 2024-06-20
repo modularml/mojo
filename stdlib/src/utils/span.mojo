@@ -224,3 +224,20 @@ struct Span[
         """
 
         return self._data
+
+    @always_inline
+    fn copy_from[
+        lifetime: MutableLifetime, //
+    ](ref [_]self: Span[T, lifetime], ref [_]other: Span[T, _]):
+        """
+        Performs an element wise copy from all elements of `other` into all elements of `self`.
+
+        Parameters:
+            lifetime: The inferred mutable lifetime of the data within the Span.
+
+        Args:
+            other: The Span to copy all elements from.
+        """
+        debug_assert(len(self) == len(other), "Spans must be of equal length")
+        for i in range(len(self)):
+            self[i] = other[i]
