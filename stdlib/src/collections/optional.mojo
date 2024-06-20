@@ -238,7 +238,8 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         return self._value.unsafe_replace[_NoneType, T](_NoneType())
 
     fn or_else(self, default: T) -> T:
-        """Return the underlying value contained in the Optional or a default value if the Optional's underlying value is not present.
+        """Return the underlying value contained in the Optional or a default
+        value if the Optional's underlying value is not present.
 
         Args:
             default: The new value to use if no value was present.
@@ -353,3 +354,17 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
             The contained value.
         """
         return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
+
+    fn or_else(self, default: T) -> T:
+        """Return the underlying value contained in the Optional or a default
+        value if the Optional's underlying value is not present.
+
+        Args:
+            default: The new value to use if no value was present.
+
+        Returns:
+            The underlying value contained in the Optional or a default value.
+        """
+        if self.__bool__():
+            return self.value()
+        return default
