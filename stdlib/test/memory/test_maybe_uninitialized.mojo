@@ -13,8 +13,8 @@
 # RUN: %mojo %s
 
 from memory.unsafe import UnsafeMaybeUninitialized
+from test_utils import CopyCounter, MoveCounter, ValueDestructorRecorder
 from testing import assert_equal
-from test_utils import MoveCounter, CopyCounter, ValueDestructorRecorder
 
 
 def test_maybe_uninitialized():

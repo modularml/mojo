@@ -102,6 +102,7 @@ struct Formatter:
         alias slc = literal.as_string_slice()
         self.write_str(slc)
 
+    # TODO: Constrain to only require an immutable StringSlice[..]`
     @always_inline
     fn write_str(inout self, str_slice: StringSlice[_]):
         """

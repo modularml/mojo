@@ -20,20 +20,14 @@ from memory import Pointer
 """
 
 
-from sys import (
-    alignof,
-    bitwidthof,
-    simdwidthof,
-    sizeof,
-    triple_is_nvidia_cuda,
-)
+from sys import alignof, bitwidthof, simdwidthof, sizeof, triple_is_nvidia_cuda
 from sys.intrinsics import gather, scatter, strided_load, strided_store
+
 from bit import is_power_of_two
 
+from .maybe_uninitialized import UnsafeMaybeUninitialized
 from .memory import _free, _malloc
 from .reference import AddressSpace
-from .maybe_uninitialized import UnsafeMaybeUninitialized
-
 
 # ===----------------------------------------------------------------------===#
 # bitcast

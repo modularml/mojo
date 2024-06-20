@@ -12,9 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s -t
 
-from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
-from random import *
 from math import *
+from random import *
+
+from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 
 # ===----------------------------------------------------------------------===#
 # Benchmark Data

@@ -15,8 +15,8 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from sys.intrinsics import _mlirtype_is_eq
 from collections import OptionalReg
+from sys.intrinsics import _mlirtype_is_eq
 
 
 @always_inline("nodebug")

@@ -19,10 +19,11 @@ from utils import StaticTuple
 ```
 """
 from collections._index_normalization import normalize_index
+from sys.intrinsics import _type_is_eq
+
 from memory import Pointer
 
 from utils import unroll
-from sys.intrinsics import _type_is_eq
 
 # ===----------------------------------------------------------------------===#
 # Utilities

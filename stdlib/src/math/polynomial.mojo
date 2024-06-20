@@ -90,11 +90,8 @@ fn _horner_evaluate[
     var result = x.fma(c_last, c_second_from_last)
 
     @parameter
-    @always_inline
-    fn iter[idx: Int]():
-        alias c = coefficients[num_coefficients - 3 - idx]
+    for i in reversed(range(num_coefficients - 2)):
+        alias c = coefficients[i]
         result = result.fma(x, c)
-
-    unroll[iter, num_coefficients - 2]()
 
     return result
