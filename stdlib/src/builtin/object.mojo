@@ -763,8 +763,7 @@ struct object(IntableRaising, Boolable, Stringable):
         self._value = _RefCountedListRef()
 
         @parameter
-        @always_inline
-        fn append[i: Int]():
+        for i in range(len(VariadicList(Ts))):
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
             alias T = Ts[i]
@@ -784,8 +783,6 @@ struct object(IntableRaising, Boolable, Stringable):
                 constrained[
                     False, "cannot convert nested list element to object"
                 ]()
-
-        unroll[append, len(VariadicList(Ts))]()
 
     @always_inline
     fn __init__(inout self, func: Self.nullary_function):

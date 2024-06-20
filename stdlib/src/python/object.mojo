@@ -228,7 +228,7 @@ struct PythonObject(
         self.py_object = cpython.PyList_New(len(value))
 
         @parameter
-        fn fill[i: Int]():
+        for i in range(len(VariadicList(Ts))):
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
             alias T = Ts[i]
@@ -254,8 +254,6 @@ struct PythonObject(
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyList_SetItem(self.py_object, i, obj.py_object)
 
-        unroll[fill, len(VariadicList(Ts))]()
-
     fn __init__[*Ts: Movable](inout self, value: Tuple[Ts]):
         """Initialize the object from a tuple literal.
 
@@ -270,7 +268,7 @@ struct PythonObject(
         self.py_object = cpython.PyTuple_New(length)
 
         @parameter
-        fn fill[i: Int]():
+        for i in range(length):
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
             alias T = Ts[i]
@@ -295,8 +293,6 @@ struct PythonObject(
                 ]()
             cpython.Py_IncRef(obj.py_object)
             _ = cpython.PyTuple_SetItem(self.py_object, i, obj.py_object)
-
-        unroll[fill, length]()
 
     fn __init__(inout self, value: Dict[Self, Self]):
         """Initialize the object from a dictionary of PythonObjects.
