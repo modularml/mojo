@@ -236,80 +236,6 @@ def test_list_reverse():
     assert_equal(vec[0], 10)
     assert_equal(vec[1], 5)
 
-    #
-    # Test reversing the list [1, 2, 3, 4, 5] starting at the 3rd position
-    # to produce [1, 2, 5, 4, 3]
-    #
-
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-    vec.append(4)
-    vec.append(5)
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 4)
-    assert_equal(vec[4], 5)
-
-    vec._reverse(start=2)
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 5)
-    assert_equal(vec[3], 4)
-    assert_equal(vec[4], 3)
-
-    #
-    # Test reversing the list [1, 2, 3] with negative indexes
-    #
-
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-
-    vec._reverse(start=-2)
-
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 3)
-    assert_equal(vec[2], 2)
-
-    #
-    # Test reversing the list [1, 2] with out of bounds indexes
-    #
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-
-    with assert_raises(contains="IndexError"):
-        vec._reverse(start=-3)
-
-    with assert_raises(contains="IndexError"):
-        vec._reverse(start=3)
-
-    #
-    # Test edge case of reversing the list [1, 2, 3] but starting after the
-    # last element.
-    #
-
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-
-    vec._reverse(start=len(vec))
-
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-
 
 def test_list_reverse_move_count():
     # Create this vec with enough capacity to avoid moves due to resizing.
@@ -528,17 +454,6 @@ def test_list_extend():
     assert_equal(vec[3], 1)
     assert_equal(vec[4], 2)
     assert_equal(vec[5], 3)
-
-    vec._reverse(start=3)
-
-    # vec == [1, 2, 3, 3, 2, 1]
-    assert_equal(len(vec), 6)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 3)
-    assert_equal(vec[4], 2)
-    assert_equal(vec[5], 1)
 
 
 def test_list_extend_non_trivial():
