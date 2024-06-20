@@ -19,14 +19,13 @@ from utils.numerics import FPUtils
 ```
 """
 
-from sys import llvm_intrinsic, bitwidthof, has_neon, has_sse4
-from sys.ffi import _external_call_const
+from sys import bitwidthof, has_neon, has_sse4, llvm_intrinsic
 from sys._assembly import inlined_assembly
+from sys.ffi import _external_call_const
 
 from builtin.dtype import _integral_type_of
 from builtin.simd import _simd_apply
 from memory import UnsafePointer, bitcast
-
 
 # ===----------------------------------------------------------------------=== #
 # FPUtils

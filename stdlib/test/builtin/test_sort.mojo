@@ -13,9 +13,8 @@
 # RUN: %mojo %s
 
 from pathlib import Path, _dir_of_current_file
-from sys import os_is_windows, env_get_string
-
-from random import random_si64, random_ui64, random_float64, seed
+from random import random_float64, random_si64, random_ui64, seed
+from sys import env_get_string, os_is_windows
 
 from builtin.sort import _quicksort, _small_sort
 from testing import assert_equal, assert_false, assert_true

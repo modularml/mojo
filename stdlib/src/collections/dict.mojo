@@ -271,30 +271,30 @@ struct _DictIndex:
     fn get_index(self, reserved: Int, slot: Int) -> Int:
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return int(Scalar.load(data, slot % reserved))
+            return int(Scalar.load(data, slot & (reserved - 1)))
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return int(Scalar.load(data, slot % reserved))
+            return int(Scalar.load(data, slot & (reserved - 1)))
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return int(Scalar.load(data, slot % reserved))
+            return int(Scalar.load(data, slot & (reserved - 1)))
         else:
             var data = self.data.bitcast[DType.int64]()
-            return int(Scalar.load(data, slot % reserved))
+            return int(Scalar.load(data, slot & (reserved - 1)))
 
     fn set_index(inout self, reserved: Int, slot: Int, value: Int):
         if reserved <= 128:
             var data = self.data.bitcast[DType.int8]()
-            return Scalar.store(data, slot % reserved, value)
+            return Scalar.store(data, slot & (reserved - 1), value)
         elif reserved <= 2**16 - 2:
             var data = self.data.bitcast[DType.int16]()
-            return Scalar.store(data, slot % reserved, value)
+            return Scalar.store(data, slot & (reserved - 1), value)
         elif reserved <= 2**32 - 2:
             var data = self.data.bitcast[DType.int32]()
-            return Scalar.store(data, slot % reserved, value)
+            return Scalar.store(data, slot & (reserved - 1), value)
         else:
             var data = self.data.bitcast[DType.int64]()
-            return Scalar.store(data, slot % reserved, value)
+            return Scalar.store(data, slot & (reserved - 1), value)
 
     fn __del__(owned self):
         self.data.free()
@@ -888,10 +888,10 @@ struct Dict[K: KeyElement, V: CollectionElement](
     fn _next_index_slot(self, inout slot: Int, inout perturb: UInt64):
         alias PERTURB_SHIFT = 5
         perturb >>= PERTURB_SHIFT
-        slot = ((5 * slot) + int(perturb + 1)) % self._reserved()
+        slot = ((5 * slot) + int(perturb + 1)) & (self._reserved() - 1)
 
     fn _find_empty_index(self, hash: Int) -> Int:
-        var slot = hash % self._reserved()
+        var slot = hash & (self._reserved() - 1)
         var perturb = bitcast[DType.uint64](Int64(hash))
         while True:
             var index = self._get_index(slot)
@@ -901,7 +901,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     fn _find_index(self, hash: Int, key: K) -> (Bool, Int, Int):
         # Return (found, slot, index)
-        var slot = hash % self._reserved()
+        var slot = hash & (self._reserved() - 1)
         var perturb = bitcast[DType.uint64](Int64(hash))
         while True:
             var index = self._get_index(slot)

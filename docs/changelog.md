@@ -75,11 +75,19 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Added `C_char` type alias in `sys.ffi`.
 
+- Added `StringSlice(..)` initializer from a `StringLiteral`.
+
+- Added new `StaticString` type alias. This can be used in place of
+  `StringLiteral` for runtime string arguments.
+
 - Added `TemporaryDirectory` in module `tempfile`.
   ([PR 2743](https://github.com/modularml/mojo/pull/2743) by [@artemiogr97](https://github.com/artemiogr97))
 
 - Added `NamedTemporaryFile` in module `tempfile`.
   ([PR 2762](https://github.com/modularml/mojo/pull/2762) by [@artemiogr97](https://github.com/artemiogr97))
+
+- Added `oct(..)` function for formatting an integer in octal.
+  ([PR #2914](https://github.com/modularml/mojo/pull/2914) by [@bgreni](https://github.com/bgreni))
 
 - Added `String.format` method.
   ([PR #2771](https://github.com/modularml/mojo/pull/2771) by [@rd4com](https://github.com/rd4com))
@@ -161,6 +169,11 @@ by [@jayzhan211](https://github.com/jayzhan211))
   same folder as the target file:
   - `mojo run /tmp/main.mojo` can access `/tmp/mymodule.py`
   - `mojo build main.mojo -o ~/myexe && ~/myexe` can access `~/mymodule.py`
+
+- The rank argument for `algorihtm.elementwise` is no longer required and is
+  only inferred.
+
+- The `ulp` function in `numerics` have been moved to the `math` module.
 
 ### ❌ Removed
 

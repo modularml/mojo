@@ -12,6 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the math package."""
 
+# In Python, these are in the math module, so we also expose them here.
+from utils.numerics import inf, isfinite, isinf, isnan, nan, nextafter, ulp
+
+# These are not part of Python's `math` module, but we define them here.
 from .math import (
     Ceilable,
     CeilDivable,
@@ -19,6 +23,8 @@ from .math import (
     Floorable,
     acos,
     acosh,
+    align_down,
+    align_up,
     asin,
     asinh,
     atan,
@@ -26,29 +32,26 @@ from .math import (
     atanh,
     cbrt,
     ceil,
-    # comb,  # TODO: implement this
+    ceildiv,
     copysign,
     cos,
     cosh,
-    # degrees,  # TODO:  implement this
-    # dist,  # TODO:  implement this
-    # e,  # TODO:  implement this
     erf,
     erfc,
     exp,
     exp2,
     expm1,
-    # fabs,  # TODO:  implement this
     factorial,
     floor,
-    # fmod,  # TODO:  implement this
+    fma,
     frexp,
-    # fsum,  # TODO:  implement this
     gamma,
     gcd,
     hypot,
+    iota,
     isclose,
-    # isqrt,  # TODO:  implement this
+    j0,
+    j1,
     lcm,
     ldexp,
     lgamma,
@@ -56,38 +59,17 @@ from .math import (
     log10,
     log1p,
     log2,
-    # modf,  # TODO:  implement this
-    # perm,  # TODO:  implement this
-    # pi,  # TODO:  implement this
-    # pow,  # TODO:  implement this. Note that it's different from the builtin.
-    # prod,  # TODO:  implement this
-    # radians,  # TODO:  implement this
+    logb,
+    modf,
     remainder,
+    rsqrt,
+    scalb,
     sin,
     sinh,
     sqrt,
     tan,
     tanh,
-    # tau,  # TODO:  implement this
     trunc,
-)
-
-# These are not part of Python's `math` module, but we define them here.
-from .math import (
-    align_down,
-    align_up,
-    ceildiv,
-    fma,
-    iota,
-    j0,
-    j1,
-    logb,
-    rsqrt,
-    scalb,
     y0,
     y1,
 )
-
-
-# In Python, these are in the math module, so we also expose them here.
-from utils.numerics import inf, isfinite, isinf, isnan, nan, nextafter, ulp

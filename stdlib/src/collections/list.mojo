@@ -20,10 +20,13 @@ from collections import List
 """
 
 
-from memory import UnsafePointer, Reference
 from sys.intrinsics import _type_is_eq
-from .optional import Optional
+
+from memory import Reference, UnsafePointer
+
 from utils import Span
+
+from .optional import Optional
 
 # ===----------------------------------------------------------------------===#
 # List

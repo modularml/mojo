@@ -27,7 +27,7 @@ from sys.info import bitwidthof, has_avx512f, simdwidthof, triple_is_nvidia_cuda
 
 from builtin._math import *
 from builtin.dtype import _integral_type_of
-from builtin.simd import _simd_apply
+from builtin.simd import _simd_apply, _modf
 
 from utils.index import StaticIntTuple
 from utils.numerics import FPUtils, isnan, nan
@@ -1940,6 +1940,67 @@ fn lcm(*values: Int) -> Int:
 
 
 # ===----------------------------------------------------------------------=== #
+# modf
+# ===----------------------------------------------------------------------=== #
+
+
+fn modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
+    """Computes the integral and fractional part of the value.
+
+    Args:
+        x: The input value.
+
+    Returns:
+        A tuple containing the integral and fractional part of the value.
+    """
+    return _modf(x)
+
+
+# ===----------------------------------------------------------------------=== #
+# ulp
+# ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn ulp[
+    type: DType, simd_width: Int
+](x: SIMD[type, simd_width]) -> SIMD[type, simd_width]:
+    """Computes the ULP (units of last place) or (units of least precision) of
+    the number.
+
+    Constraints:
+        The element type of the inpiut must be a floating-point type.
+
+    Parameters:
+        type: The `dtype` of the input and output SIMD vector.
+        simd_width: The width of the input and output SIMD vector.
+
+    Args:
+        x: SIMD vector input.
+
+    Returns:
+        The ULP of x.
+    """
+
+    constrained[type.is_floating_point(), "the type must be floating point"]()
+
+    var nan_mask = isnan(x)
+    var xabs = abs(x)
+    var inf_mask = isinf(xabs)
+    alias inf_val = SIMD[type, simd_width](inf[type]())
+    var x2 = nextafter(xabs, inf_val)
+    var x2_inf_mask = isinf(x2)
+
+    return nan_mask.select(
+        x,
+        inf_mask.select(
+            xabs,
+            x2_inf_mask.select(xabs - nextafter(xabs, -inf_val), x2 - xabs),
+        ),
+    )
+
+
+# ===----------------------------------------------------------------------=== #
 # factorial
 # ===----------------------------------------------------------------------=== #
 
@@ -1988,7 +2049,7 @@ fn factorial(n: Int) -> Int:
 
 
 fn _type_is_libm_supported(type: DType) -> Bool:
-    if type is DType.float32 and type is DType.float64:
+    if type in (DType.float32, DType.float64):
         return True
     return type.is_integral()
 

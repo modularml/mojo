@@ -17,20 +17,19 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import (
     bitwidthof,
-    os_is_windows,
-    triple_is_nvidia_cuda,
     external_call,
+    os_is_windows,
     stdout,
+    triple_is_nvidia_cuda,
 )
 
-from builtin.dtype import _get_dtype_printf_format
 from builtin.builtin_list import _LITRefPackHelper
+from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
 from utils import StringRef, unroll
 from utils._format import Formattable, Formatter, write_to
-
 
 # ===----------------------------------------------------------------------=== #
 #  _file_handle

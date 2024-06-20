@@ -15,15 +15,15 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import countl_zero
-from collections import List, KeyElement
+from collections import KeyElement, List
 from collections._index_normalization import normalize_index
-from sys import llvm_intrinsic, bitwidthof
+from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
+from bit import countl_zero
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, Span, StringSlice
+from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 # ===----------------------------------------------------------------------=== #
@@ -1442,7 +1442,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1459,7 +1459,7 @@ struct String(
         )
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
+    fn as_string_slice(ref [_]self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
@@ -1468,9 +1468,7 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice[__lifetime_of(self)](
-            unsafe_from_utf8=self.as_bytes_slice()
-        )
+        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
 
     fn _byte_length(self) -> Int:
         """Get the string length in bytes.
@@ -1478,7 +1476,7 @@ struct String(
         This does not include the trailing null terminator in the count.
 
         Returns:
-            The length of this StringLiteral in bytes, excluding null terminator.
+            The length of this string in bytes, excluding null terminator.
         """
 
         var buffer_len = len(self._buffer)
