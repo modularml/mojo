@@ -593,29 +593,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.size = new_size
         self.reserve(new_size)
 
+    @always_inline
     fn reverse(inout self):
         """Reverses the elements of the list."""
-        try:
-            self._reverse()
-        except:
-            abort("unreachable: default _reverse start unexpectedly fails")
 
-    # This method is private to avoid exposing the non-Pythonic `start` argument.
-    @always_inline
-    fn _reverse(inout self, start: Int = 0) raises:
-        """Reverses the elements of the list at positions after `start`.
-
-        Args:
-            start: An integer indicating the position after which to reverse elements.
-        """
-        var start_idx = start if start >= 0 else len(self) + start
-        if start_idx < 0 or start_idx > len(self):
-            raise "IndexError: start index out of range."
-
-        var earlier_idx = start_idx
+        var earlier_idx = 0
         var later_idx = len(self) - 1
 
-        var effective_len = len(self) - start_idx
+        var effective_len = len(self)
         var half_len = effective_len // 2
 
         for _ in range(half_len):
