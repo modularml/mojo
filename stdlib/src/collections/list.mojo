@@ -25,6 +25,7 @@ from sys.intrinsics import _type_is_eq
 from memory import Reference, UnsafePointer
 
 from utils import Span
+from utils._format import write_to
 
 from .optional import Optional
 
@@ -351,23 +352,28 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A string representation of the list.
         """
-        # we do a rough estimation of the number of chars that we'll see
-        # in the final string, we assume that str(x) will be at least one char.
-        var minimum_capacity = (
-            2  # '[' and ']'
-            + len(self) * 3  # str(x) and ", "
-            - 2  # remove the last ", "
-        )
-        var string_buffer = List[UInt8](capacity=minimum_capacity)
-        string_buffer.append(0)  # Null terminator
-        var result = String(string_buffer^)
-        result += "["
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output^
+
+    fn format_to[
+        U: RepresentableCollectionElement
+    ](self: List[U], inout writer: Formatter):
+        """Write `my_list.__str__()` to a `Formatter`.
+
+        Parameters:
+            U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        writer.write("[")
         for i in range(len(self)):
-            result += repr(self[i])
+            writer.write(repr(self[i]))
             if i < len(self) - 1:
-                result += ", "
-        result += "]"
-        return result
+                writer.write(", ")
+        writer.write("]")
 
     fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
