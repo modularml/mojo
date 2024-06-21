@@ -143,6 +143,17 @@ def test_span_slice():
     # assert_equal(res[1], 1)
 
 
+def test_copy_from():
+    var a = List[Int](0, 1, 2, 3)
+    var b = List[Int](4, 5, 6, 7, 8, 9, 10)
+    var s = Span(a)
+    var s2 = Span(b)
+    s.copy_from(s2[: len(a)])
+    for i in range(len(a)):
+        assert_equal(a[i], b[i])
+        assert_equal(s[i], s2[i])
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
