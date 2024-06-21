@@ -549,6 +549,21 @@ fn isupper(c: UInt8) -> Bool:
     return _is_ascii_uppercase(c)
 
 
+fn isupper(c: String) -> Bool:
+    """Determines whether the given character is an uppercase character.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is uppercase.
+    """
+    return _is_ascii_uppercase(ord(c))
+
+
 fn _is_ascii_uppercase(c: UInt8) -> Bool:
     alias ord_a = ord("A")
     alias ord_z = ord("Z")
@@ -573,6 +588,21 @@ fn islower(c: UInt8) -> Bool:
         True if the character is lowercase.
     """
     return _is_ascii_lowercase(c)
+
+
+fn islower(c: String) -> Bool:
+    """Determines whether the given character is an lowercase character.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "abcdefghijklmnopqrstuvwxyz".
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is lowercase.
+    """
+    return _is_ascii_lowercase(ord(c))
 
 
 fn _is_ascii_lowercase(c: UInt8) -> Bool:
@@ -2185,6 +2215,28 @@ struct String(
         """
         for c in self:
             if not isdigit(c):
+                return False
+        return True
+
+    fn islower(self) -> Bool:
+        """Returns True if all characters in the string are lowercase.
+
+        Returns:
+            True if all characters are lowercase else False.
+        """
+        for c in self:
+            if not islower(c):
+                return False
+        return True
+
+    fn isupper(self) -> Bool:
+        """Returns True if all characters in the string are uppercase.
+
+        Returns:
+            True if all characters are uppercase else False.
+        """
+        for c in self:
+            if not isupper(c):
                 return False
         return True
 

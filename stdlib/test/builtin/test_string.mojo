@@ -833,28 +833,52 @@ fn test_splitlines() raises:
 
 fn test_isupper() raises:
     assert_true(isupper(ord("A")))
+    assert_true(isupper("A"))
     assert_true(isupper(ord("B")))
+    assert_true(isupper("B"))
     assert_true(isupper(ord("Y")))
+    assert_true(isupper("Y"))
     assert_true(isupper(ord("Z")))
+    assert_true(isupper("Z"))
 
     assert_false(isupper(ord("A") - 1))
+    assert_false(isupper("a"))
     assert_false(isupper(ord("Z") + 1))
+    assert_false(isupper("z"))
 
     assert_false(isupper(ord("!")))
+    assert_false(isupper("!"))
     assert_false(isupper(ord("0")))
+    assert_false(isupper("0"))
+
+    assert_true(String("ABC").isupper())
+    assert_false(String("abc").isupper())
+    assert_false(String("ABC123").isupper())
 
 
 fn test_islower() raises:
     assert_true(islower(ord("a")))
+    assert_true(islower("a"))
     assert_true(islower(ord("b")))
+    assert_true(islower("b"))
     assert_true(islower(ord("y")))
+    assert_true(islower("y"))
     assert_true(islower(ord("z")))
+    assert_true(islower("z"))
 
     assert_false(islower(ord("a") - 1))
+    assert_false(islower("A"))
     assert_false(islower(ord("z") + 1))
+    assert_false(islower("Z"))
 
     assert_false(islower(ord("!")))
+    assert_false(islower("!"))
     assert_false(islower(ord("0")))
+    assert_false(islower("0"))
+
+    assert_true(String("abc").islower())
+    assert_false(String("ABC").islower())
+    assert_false(String("abc123").islower())
 
 
 fn test_lower() raises:
