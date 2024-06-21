@@ -65,6 +65,13 @@ what we publish.
   This supports work to transition the standard library collection types away
   from implicit copyability, which can lead to unintended expensive copies.
 
+- Added `Identifiable` trait, used to describe types that implement the `__is__`
+  and `__isnot__` trait methods.
+  ([PR #2807](https://github.com/modularml/mojo/pull/2807))
+
+  - Also added new `assert_is()` and `assert_is_not()` test utilities to the
+    `testing` module.
+
 - `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
 ([PR #2701](https://github.com/modularml/mojo/pull/2701)
 by [@jayzhan211](https://github.com/jayzhan211))
@@ -123,6 +130,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
   `MOJO_PYTHON_LIBRARY` still exists for environments with a dynamic libpython,
   but no Python executable.
+
+- The `math` package now includes the `pi`, `e`, and `tau` constants (Closes
+  Issue [#2135](https://github.com/modularml/mojo/issues/2135)).
 
 ### 🦋 Changed
 

@@ -56,11 +56,18 @@ fn ord(s: String) -> Int:
         return int(b1)
     var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    debug_assert(
+        1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
+    )
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
     var result = int(b1 & b1_mask) << shift
-    for _ in range(1, num_bytes):
+    for i in range(1, num_bytes):
         p += 1
+        debug_assert(
+            p[] >> 6 == 0b00000010,
+            "invalid UTF-8 byte " + str(b1) + " at index " + str(i),
+        )
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
     return result
@@ -771,6 +778,7 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
+    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
