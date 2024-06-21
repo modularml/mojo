@@ -24,9 +24,9 @@ from collections import Result
 var a = Result(1)
 var b = Result[Int]()
 if a:
-    print(a.value()[])  # prints 1
+    print(a.value())  # prints 1
 if b:  # bool(b) is False, so no print
-    print(b.value()[])
+    print(b.value())
 var c = a.or_else(2)
 var d = b.or_else(2)
 print(c)  # prints 1
@@ -50,9 +50,9 @@ if c.err:
     print("c had an error")
 
 # TODO: pattern matching
-if d.err == "error 1":
+if str(d.err) == "error 1":
     print("d had error 1")
-elif d.err == "error 2":
+elif str(d.err) == "error 2":
     print("d had error 2")
 ```
 
@@ -78,12 +78,6 @@ fn return_early_if_err[T: CollectionElement, A: CollectionElement]() -> Result[T
 """
 
 from utils import Variant
-
-
-# TODO(27780): NoneType can't currently conform to traits
-@value
-struct _NoneType(CollectionElement):
-    pass
 
 
 # ===----------------------------------------------------------------------===#
@@ -113,9 +107,9 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     var a = Result(1)
     var b = Result[Int]()
     if a:
-        print(a.value()[])  # prints 1
+        print(a.value())  # prints 1
     if b:  # bool(b) is False, so no print
-        print(b.value()[])
+        print(b.value())
     var c = a.or_else(2)
     var d = b.or_else(2)
     print(c)  # prints 1
@@ -139,9 +133,9 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         print("c had an error")
 
     # TODO: pattern matching
-    if d.err == "error 1":
+    if str(d.err) == "error 1":
         print("d had error 1")
-    elif d.err == "error 2":
+    elif str(d.err) == "error 2":
         print("d had error 2")
     ```
 
@@ -149,7 +143,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
 
     ```mojo
     fn func_that_can_err[A: CollectionElement]() -> Result[A]:
-        ...
+        return Error("failed")
 
     fn return_early_if_err[T: CollectionElement, A: CollectionElement]() -> Result[T]:
         var result: Result[A] = func_that_can_err[A]()
@@ -166,9 +160,9 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     .
     """
 
-    # _NoneType comes first so its index is 0.
+    # NoneType comes first so its index is 0.
     # This means that Results that are 0-initialized will be None.
-    alias _type = Variant[_NoneType, T]
+    alias _type = Variant[NoneType, T]
     var _value: Self._type
     var err: Error
     """The Error inside the `Result`."""
@@ -229,13 +223,11 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         Args:
             err: Must be an `Error`.
         """
-        self._value = Self._type(_NoneType())
+        self._value = Self._type(None)
         self.err = err
 
     @always_inline
-    fn value(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+    fn value(ref [_]self) -> ref [__lifetime_of(self)] T:
         """Retrieve a reference to the value of the `Result`.
 
         This check to see if the `Result` contains a value.
@@ -246,15 +238,15 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         Returns:
             A reference to the contained data of the `Result` as a Reference[T].
         """
-        if not self[]:
+        if not self:
             abort(".value() on empty `Result`")
 
-        return self[].unsafe_value()
+        return self.unsafe_value()
 
     @always_inline
     fn unsafe_value(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+        ref [_]self,
+    ) -> ref [__lifetime_of(self)] T:
         """Unsafely retrieve a reference to the value of the `Result`.
 
         This doesn't check to see if the `Result` contains a value.
@@ -265,8 +257,8 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         Returns:
             A reference to the contained data of the `Result` as a Reference[T].
         """
-        debug_assert(self[], ".value() on empty Result")
-        return self[]._value[T]
+        debug_assert(self, ".value() on empty Result")
+        return self._value[T]
 
     @always_inline
     fn _value_copy(self) -> T:
@@ -364,7 +356,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
         Returns:
             True if the `Result` has a value and False otherwise.
         """
-        return not self._value.isa[_NoneType]()
+        return not self._value.isa[NoneType]()
 
     @always_inline("nodebug")
     fn __invert__(self) -> Bool:
@@ -374,136 +366,3 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
             False if the `Result` has a value and True otherwise.
         """
         return not self
-
-
-# ===----------------------------------------------------------------------===#
-# ResultReg
-# ===----------------------------------------------------------------------===#
-
-
-@register_passable("trivial")
-struct ResultReg[T: AnyRegType](Boolable):
-    """A register-passable `ResultReg` type.
-
-    This struct `ResultReg` contains a value. It only works with trivial register
-    passable types at the moment.
-
-    Parameters:
-        T: The type of value stored in the `ResultReg`.
-    """
-
-    alias _mlir_type = __mlir_type[`!kgen.variant<`, T, `, i1>`]
-    var _value: Self._mlir_type
-    var err: ErrorReg
-    """The Error inside the `ResultReg`."""
-
-    @always_inline("nodebug")
-    fn __init__(
-        inout self,
-        value: NoneType = None,
-        err: ErrorReg = ErrorReg("Result value was not set"),
-        /,
-    ):
-        """Create a `ResultReg` without a value from a None literal
-        and an `ErrorReg`.
-
-        Args:
-            value: The `None` value.
-            err: The `ErrorReg`.
-        """
-        self = Self(err=err)
-
-    @always_inline("nodebug")
-    fn __init__(inout self, value: Tuple[NoneType, ErrorReg], /):
-        """Create a `ResultReg` without a value from a None literal
-        and an `ErrorReg`.
-
-        Args:
-            value: The (`None`, `ErrorReg`) value.
-        """
-        if len(value) < 2:
-            self = Self()
-        else:
-            self = Self(err=value[1])
-
-    @always_inline("nodebug")
-    fn __init__[A: CollectionElement](inout self, owned other: ResultReg[A]):
-        """Create a `ResultReg` by transferring another `ResultReg`'s Error.
-
-        Parameters:
-            A: The type of the value contained in other.
-
-        Args:
-            other: The other `ResultReg`.
-        """
-        self = Self(err=other.err)
-
-    @always_inline("nodebug")
-    fn __init__(inout self, value: T):
-        """Create a `ResultReg` with a value.
-
-        Args:
-            value: The value.
-        """
-        self._value = __mlir_op.`kgen.variant.create`[
-            _type = Self._mlir_type, index = Int(0).value
-        ](value)
-        self.err = ErrorReg()
-
-    @always_inline("nodebug")
-    fn __init__(inout self, *, err: ErrorReg):
-        """Create a `ResultReg` without a value from an `ErrorReg`.
-
-        Args:
-            err: The `ErrorReg`.
-        """
-        self._value = __mlir_op.`kgen.variant.create`[
-            _type = Self._mlir_type, index = Int(1).value
-        ](__mlir_attr.false)
-        self.err = err
-
-    @always_inline
-    fn value(self) -> T:
-        """Get the `Result` value.
-
-        Returns:
-            The contained value.
-        """
-        return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
-
-    @always_inline("nodebug")
-    fn __is__(self, other: NoneType) -> Bool:
-        """Return `True` if the `Result` has no value.
-
-        It allows you to use the following syntax: `if my_result is None:`
-
-        Args:
-            other: The value to compare to (None).
-
-        Returns:
-            True if the `ResultReg` has no value and False otherwise.
-        """
-        return not self
-
-    @always_inline("nodebug")
-    fn __isnot__(self, other: NoneType) -> Bool:
-        """Return `True` if the `ResultReg` has a value.
-
-        It allows you to use the following syntax: `if my_result is not None:`
-
-        Args:
-            other: The value to compare to (None).
-
-        Returns:
-            True if the Result has a value and False otherwise.
-        """
-        return self
-
-    @always_inline("nodebug")
-    fn __bool__(self) -> Bool:
-        """Return true if the `ResultReg` has a value.
-
-        Returns:
-            True if the `ResultReg` has a value and False otherwise.
-        """
-        return __mlir_op.`kgen.variant.is`[index = Int(0).value](self._value)
