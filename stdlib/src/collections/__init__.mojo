@@ -17,6 +17,5 @@ from .dict import Dict, KeyElement
 from .inline_list import InlineList
 from .list import List
 from .optional import Optional, OptionalReg
-from .result import Result
 from .set import Set
 from .vector import CollectionElement, InlinedFixedVector
