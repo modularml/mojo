@@ -105,11 +105,11 @@ def test_returning_err():
     assert_true(not item_oi and item_oi.err and str(item_oi.err) == "something")
     var item_os = _returning_err(Result[String]())
     assert_true(not item_os and item_os.err and str(item_os.err) == "something")
-    var item_oi64 = _returning_err(ResultReg[UInt64]())
+    var item_oi64 = _returning_err(Result[UInt64]())
     assert_true(
         not item_oi64 and item_oi64.err and str(item_oi64.err) == "something"
     )
-    var item_osl = _returning_err(ResultReg[StringLiteral]())
+    var item_osl = _returning_err(Result[StringLiteral]())
     assert_true(
         not item_osl and item_osl.err and str(item_osl.err) == "something"
     )
@@ -147,9 +147,9 @@ def test_returning_ok():
     assert_true(item_oi and not item_oi.err and str(item_oi.err) == "")
     var item_os = _returning_ok(Result[String]())
     assert_true(item_os and not item_os.err and str(item_os.err) == "")
-    var item_oi64 = _returning_ok(ResultReg[UInt64]())
+    var item_oi64 = _returning_ok(Result[UInt64]())
     assert_true(item_oi64 and not item_oi64.err and str(item_oi64.err) == "")
-    var item_osl = _returning_ok(ResultReg[StringLiteral]())
+    var item_osl = _returning_ok(Result[StringLiteral]())
     assert_true(item_osl and not item_osl.err and str(item_osl.err) == "")
 
 
