@@ -20,7 +20,7 @@ and explicitly extract the value to get it out.
 Examples:
 
 ```mojo
-from collections import Result
+from experimental.result import Result
 var a = Result(1)
 var b = Result[Int]()
 if a:
@@ -36,7 +36,7 @@ print(d)  # prints 2
 And if more information about the returned Error is wanted it is available.
 
 ```mojo
-from collections import Result
+from experimental.result import Result
 var a = Result(1)
 var b = Result[Int](err=Error("something went wrong"))
 var c = Result[Int](None, Error("error 1"))
@@ -103,7 +103,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     Examples:
 
     ```mojo
-    from collections import Result
+    from experimental.result import Result
     var a = Result(1)
     var b = Result[Int]()
     if a:
@@ -119,7 +119,7 @@ struct Result[T: CollectionElement](CollectionElement, Boolable):
     And if more information about the returned Error is wanted it is available.
 
     ```mojo
-    from collections import Result
+    from experimental.result import Result
     var a = Result(1)
     var b = Result[Int](err=Error("something went wrong"))
     var c = Result[Int](None, Error("error 1"))

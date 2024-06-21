@@ -14,7 +14,7 @@
 
 
 from testing import assert_true, assert_false, assert_equal
-from collections import Result
+from experimental.result import Result
 
 
 fn _returning_err[T: CollectionElement](value: T) raises -> Result[T]:
