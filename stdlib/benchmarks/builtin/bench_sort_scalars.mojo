@@ -32,7 +32,7 @@ alias dtypes = List(
 fn random_scalar_list[
     dt: DType
 ](size: Int, max: Scalar[dt] = Scalar[dt].MAX) -> List[Scalar[dt]]:
-    var result = List[SIMD[dt, 1]](size)
+    var result = List[Scalar[dt]](size)
     for _ in range(size):
 
         @parameter
