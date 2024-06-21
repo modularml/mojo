@@ -13,17 +13,18 @@
 """Implements the os package."""
 
 from .atomic import Atomic
-from .env import setenv, getenv
+from .env import getenv, setenv
 from .fstat import lstat, stat, stat_result
 from .os import (
-    abort,
-    listdir,
-    remove,
-    unlink,
-    SEEK_SET,
     SEEK_CUR,
     SEEK_END,
+    SEEK_SET,
+    abort,
+    listdir,
     mkdir,
+    remove,
     rmdir,
+    sep,
+    unlink,
 )
 from .pathlike import PathLike

@@ -13,8 +13,9 @@
 # RUN: %mojo %s
 
 from collections import InlineList, Set
-from testing import assert_equal, assert_false, assert_true, assert_raises
+
 from test_utils import MoveCounter
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_list():
@@ -58,9 +59,18 @@ def test_append_triggers_a_move():
 
 
 @value
-struct ValueToCountDestructor(CollectionElement):
+struct ValueToCountDestructor(CollectionElementNew):
     var value: Int
     var destructor_counter: UnsafePointer[List[Int]]
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.value = other.value
+        self.destructor_counter = other.destructor_counter
 
     fn __del__(owned self):
         self.destructor_counter[].append(self.value)
@@ -74,7 +84,9 @@ def test_destructor():
 
     for index in range(capacity):
         inline_list.append(
-            ValueToCountDestructor(index, UnsafePointer(destructor_counter))
+            ValueToCountDestructor(
+                index, UnsafePointer.address_of(destructor_counter)
+            )
         )
 
     # Private api use here:
@@ -138,6 +150,32 @@ def test_list_variadic_constructor():
     assert_equal(8, l[3])
 
 
+def test_list_count():
+    var list = InlineList[Int](1, 2, 3, 2, 5, 6, 7, 8, 9, 10)
+    assert_equal(1, list.count(1))
+    assert_equal(2, list.count(2))
+    assert_equal(0, list.count(4))
+
+    var list2 = InlineList[Int]()
+    assert_equal(0, list2.count(1))
+
+
+def test_list_boolable():
+    assert_true(InlineList[Int](1))
+    assert_false(InlineList[Int]())
+
+
+def test_indexing():
+    var list = InlineList[Int]()
+
+    for i in range(5):
+        list.append(i)
+
+    assert_equal(list[True], 1)
+    assert_equal(list[int(4)], 4)
+    assert_equal(list[0], 0)
+
+
 def main():
     test_list()
     test_append_triggers_a_move()
@@ -146,3 +184,6 @@ def main():
     test_list_iter_mutable()
     test_list_contains()
     test_list_variadic_constructor()
+    test_list_count()
+    test_list_boolable()
+    test_indexing()

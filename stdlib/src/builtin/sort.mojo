@@ -15,20 +15,22 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import countl_zero
 from collections import List
-from memory import Pointer, UnsafePointer
 from sys import bitwidthof
+
+from bit import countl_zero
+from memory import Pointer, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # sort
 # ===----------------------------------------------------------------------===#
 
-alias _cmp_fn_type = fn[type: AnyRegType] (type, type) capturing -> Bool
+alias _cmp_fn_type = fn[type: AnyTrivialRegType] (type, type) capturing -> Bool
 
 
+@always_inline
 fn _insertion_sort[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], start: Int, end: Int):
     """Sort the array[start:end] slice"""
 
@@ -46,6 +48,7 @@ fn _insertion_sort[
         array[j] = value
 
 
+@always_inline
 fn _insertion_sort[
     type: CollectionElement, cmp_fn: fn (type, type) capturing -> Bool
 ](array: UnsafePointer[type], start: Int, end: Int):
@@ -67,7 +70,7 @@ fn _insertion_sort[
 
 @always_inline
 fn _partition[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], start: Int, end: Int) -> Int:
     if start == end:
         return end
@@ -125,14 +128,16 @@ fn _partition[
     return right
 
 
+@always_inline
 fn _estimate_initial_height(size: Int) -> Int:
     # Compute the log2 of the size rounded upward.
     var log2 = int((bitwidthof[DType.index]() - 1) ^ countl_zero(size | 1))
     return max(2, log2)
 
 
+@always_inline
 fn _quicksort[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], size: Int):
     if size == 0:
         return
@@ -177,6 +182,7 @@ fn _quicksort[
         stack.append(pivot)
 
 
+@always_inline
 fn _quicksort[
     type: CollectionElement, cmp_fn: fn (type, type) capturing -> Bool
 ](array: UnsafePointer[type], size: Int):
@@ -211,14 +217,14 @@ fn _quicksort[
 # partition
 # ===----------------------------------------------------------------------===#
 fn partition[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](buff: Pointer[type], k: Int, size: Int):
-    """Partition the input vector inplace such that first k elements are the
+    """Partition the input buffer inplace such that first k elements are the
     largest (or smallest if cmp_fn is <= operator) elements.
     The ordering of the first k elements is undefined.
 
     Parameters:
-        type: DType of the underlying data.
+        type: Trivial reg type of the underlying data.
         cmp_fn: Comparison functor of type, type) capturing -> Bool type.
 
     Args:
@@ -249,8 +255,8 @@ fn partition[
 
 
 fn sort(inout buff: Pointer[Int], len: Int):
-    """Sort the vector inplace.
-    The function doesn't return anything, the vector is updated inplace.
+    """Sort the buffer inplace.
+    The function doesn't return anything, the buffer is updated inplace.
 
     Args:
         buff: Input buffer.
@@ -258,15 +264,15 @@ fn sort(inout buff: Pointer[Int], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[type: AnyRegType](lhs: type, rhs: type) -> Bool:
+    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) <= rebind[Int](rhs)
 
     _quicksort[Int, _less_than_equal](buff, len)
 
 
 fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
-    """Sort the vector inplace.
-    The function doesn't return anything, the vector is updated inplace.
+    """Sort the buffer inplace.
+    The function doesn't return anything, the buffer is updated inplace.
 
     Parameters:
         type: DType of the underlying data.
@@ -277,55 +283,72 @@ fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[ty: AnyRegType](lhs: ty, rhs: ty) -> Bool:
+    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
         return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
 
     _quicksort[Scalar[type], _less_than_equal](buff, len)
 
 
-fn sort(inout v: List[Int]):
-    """Sort the vector inplace.
-    The function doesn't return anything, the vector is updated inplace.
+fn sort(inout list: List[Int]):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
 
     Args:
-        v: Input integer vector to sort.
+        list: Input integer list to sort.
     """
     # Downcast any pointer to register-passable pointer.
-    var ptr = rebind[Pointer[Int]](v.data)
-    sort(ptr, len(v))
+    var ptr = rebind[Pointer[Int]](list.data)
+    sort(ptr, len(list))
 
 
-fn sort[type: DType](inout v: List[Scalar[type]]):
-    """Sort the vector inplace.
-    The function doesn't return anything, the vector is updated inplace.
+fn sort[type: DType](inout list: List[Scalar[type]]):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
 
     Parameters:
         type: DType of the underlying data.
 
     Args:
-        v: Input vector to sort.
+        list: Input vector to sort.
     """
 
-    var ptr = rebind[Pointer[Scalar[type]]](v.data)
-    sort[type](ptr, len(v))
+    var ptr = rebind[Pointer[Scalar[type]]](list.data)
+    sort[type](ptr, len(list))
 
 
 fn sort[
     type: CollectionElement,
     cmp_fn: fn (type, type) capturing -> Bool,
-](inout v: List[type]):
-    """Sort the vector inplace.
-    The function doesn't return anything, the vector is updated inplace.
+](inout list: List[type]):
+    """Sort the list inplace.
+    The function doesn't return anything, the list is updated inplace.
 
     Parameters:
-        type: DType of the underlying data.
+        type: CollectionElement type of the underlying data.
         cmp_fn: The comparison function.
 
     Args:
-        v: Input vector to sort.
+        list: Input list to sort.
     """
 
-    _quicksort[type, cmp_fn](v.data, len(v))
+    _quicksort[type, cmp_fn](list.data, len(list))
+
+
+fn sort[type: ComparableCollectionElement](inout list: List[type]):
+    """Sort list of the order comparable elements in-place.
+
+    Parameters:
+        type: The order comparable collection element type.
+
+    Args:
+        list: The list of the scalars which will be sorted in-place.
+    """
+
+    @parameter
+    fn _less_than_equal(a: type, b: type) -> Bool:
+        return a <= b
+
+    _quicksort[type, _less_than_equal](list.data, len(list))
 
 
 # ===----------------------------------------------------------------------===#
@@ -335,7 +358,7 @@ fn sort[
 
 @always_inline
 fn _sort2[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], offset0: Int, offset1: Int):
     var a = array[offset0]
     var b = array[offset1]
@@ -346,7 +369,7 @@ fn _sort2[
 
 @always_inline
 fn _sort_partial_3[
-    type: AnyRegType, cmp_fn: _cmp_fn_type
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], offset0: Int, offset1: Int, offset2: Int):
     var a = array[offset0]
     var b = array[offset1]
@@ -364,7 +387,7 @@ fn _sort_partial_3[
 
 @always_inline
 fn _small_sort[
-    n: Int, type: AnyRegType, cmp_fn: _cmp_fn_type
+    n: Int, type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type]):
     @parameter
     if n == 2:

@@ -99,6 +99,61 @@ trait Copyable:
         ...
 
 
+trait ExplicitlyCopyable:
+    """The ExplicitlyCopyable trait denotes a type whose value can be copied
+    explicitly.
+
+    Unlike `Copyable`, which denotes types that are _implicitly_ copyable, an
+    explicitly copyable type can only be copied when the explicit copy
+    initializer is called intentionally by the programmer.
+
+    An explicit copy initializer is just a normal `__init__` method that takes
+    a `borrowed` argument of `Self`.
+
+    Example implementing the `ExplicitlyCopyable` trait on `Foo` which requires
+    the `__init__(.., Self)` method:
+
+    ```mojo
+    struct Foo(ExplicitlyCopyable):
+        var s: String
+
+        fn __init__(inout self, s: String):
+            self.s = s
+
+        fn __init__(inout self, copy: Self):
+            print("explicitly copying value")
+            self.s = copy.s
+    ```
+
+    You can now copy objects inside a generic function:
+
+    ```mojo
+    fn copy_return[T: ExplicitlyCopyable](foo: T) -> T:
+        var copy = T(foo)
+        return copy
+
+    var foo = Foo("test")
+    var res = copy_return(foo)
+    ```
+
+    ```plaintext
+    explicitly copying value
+    ```
+    """
+
+    # Note:
+    #   `other` is a required named argument for the time being to minimize
+    #   implicit conversion overload ambiguity errors, particularly
+    #   with SIMD and Int.
+    fn __init__(inout self, *, other: Self):
+        """Explicitly construct a deep copy of the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        ...
+
+
 trait Defaultable:
     """The `Defaultable` trait describes a type with a default constructor.
 
@@ -145,6 +200,15 @@ trait CollectionElement(Copyable, Movable):
     pass
 
 
+trait CollectionElementNew(ExplicitlyCopyable, Movable):
+    """A temporary explicitly-copyable alternative to `CollectionElement`.
+
+    This trait will eventually replace `CollectionElement`.
+    """
+
+    pass
+
+
 trait StringableCollectionElement(CollectionElement, Stringable):
     """The StringableCollectionElement trait denotes a trait composition
     of the `CollectionElement` and `Stringable` traits.
@@ -157,7 +221,7 @@ trait StringableCollectionElement(CollectionElement, Stringable):
     pass
 
 
-trait ComparableCollectionElement(CollectionElement, EqualityComparable):
+trait ComparableCollectionElement(CollectionElement, Comparable):
     """
     This trait is a temporary solution to enable comparison of
     collection elements as utilized in the `index` and `count` methods of

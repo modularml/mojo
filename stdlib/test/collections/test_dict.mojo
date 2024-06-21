@@ -15,7 +15,6 @@
 from collections import Dict, KeyElement, Optional
 from collections.dict import OwnedKwargsDict
 
-
 from test_utils import CopyCounter
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
@@ -25,7 +24,49 @@ def test_dict_construction():
     _ = Dict[String, Int]()
 
 
+def test_dict_fromkeys():
+    alias keys = List[String]("a", "b")
+    var expected_dict = Dict[String, Int]()
+    expected_dict["a"] = 1
+    expected_dict["b"] = 1
+    var dict = Dict.fromkeys(keys, 1)
+
+    assert_equal(len(dict), len(expected_dict))
+
+    for k_v in expected_dict.items():
+        var k = k_v[].key
+        var v = k_v[].value
+        assert_true(k in dict)
+        assert_equal(dict[k], v)
+
+
+def test_dict_fromkeys_optional():
+    alias keys = List[String]("a", "b", "c")
+    var expected_dict = Dict[String, Optional[Int]]()
+    expected_dict["a"] = None
+    expected_dict["b"] = None
+    expected_dict["c"] = None
+    var dict = Dict[_, Int].fromkeys(keys)
+
+    assert_equal(len(dict), len(expected_dict))
+
+    for k_v in expected_dict.items():
+        var k = k_v[].key
+        var v = k_v[].value
+        assert_true(k in dict)
+        assert_false(v)
+
+
 def test_basic():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    assert_equal(1, dict["a"])
+    assert_equal(2, dict["b"])
+
+
+def test_basic_no_copies():
     var dict = Dict[String, Int]()
     dict["a"] = 1
     dict["b"] = 2
@@ -242,8 +283,8 @@ def test_dict_copy_calls_copy_constructor():
     # are coming from :)
     assert_equal(1, orig["a"].copy_count)
     assert_equal(2, copy["a"].copy_count)
-    assert_equal(0, orig.__get_ref("a")[].copy_count)
-    assert_equal(1, copy.__get_ref("a")[].copy_count)
+    assert_equal(0, orig.__get_ref("a").copy_count)
+    assert_equal(1, copy.__get_ref("a").copy_count)
 
 
 def test_dict_update_nominal():
@@ -419,6 +460,7 @@ def test_dict():
     test["test_dict_update_empty_new", test_dict_update_empty_new]()
     test["test_mojo_issue_1729", test_mojo_issue_1729]()
     test["test dict or", test_dict_or]()
+    test["test dict popitem", test_dict_popitem]()
 
 
 def test_taking_owned_kwargs_dict(owned kwargs: OwnedKwargsDict[Int]):
@@ -473,16 +515,46 @@ def test_owned_kwargs_dict():
 def test_find_get():
     var some_dict = Dict[String, Int]()
     some_dict["key"] = 1
-    assert_equal(some_dict.find("key").value()[], 1)
-    assert_equal(some_dict.get("key").value()[], 1)
+    assert_equal(some_dict.find("key").value(), 1)
+    assert_equal(some_dict.get("key").value(), 1)
     assert_equal(some_dict.find("not_key").or_else(0), 0)
     assert_equal(some_dict.get("not_key", 0), 0)
 
 
+def test_dict_popitem():
+    var dict = Dict[String, Int]()
+    dict["a"] = 1
+    dict["b"] = 2
+
+    var item = dict.popitem()
+    assert_equal(item.key, "b")
+    assert_equal(item.value, 2)
+    item = dict.popitem()
+    assert_equal(item.key, "a")
+    assert_equal(item.value, 1)
+    with assert_raises(contains="KeyError"):
+        _ = dict.popitem()
+
+
+fn test_clear() raises:
+    var some_dict = Dict[String, Int]()
+    some_dict["key"] = 1
+    some_dict.clear()
+    assert_equal(len(some_dict), 0)
+    assert_false(some_dict.get("key"))
+
+    some_dict = Dict[String, Int]()
+    some_dict.clear()
+    assert_equal(len(some_dict), 0)
+
+
 def main():
     test_dict()
+    test_dict_fromkeys()
+    test_dict_fromkeys_optional()
     test_dict_string_representation_string_int()
     test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
     test_bool_conversion()
     test_find_get()
+    test_clear()

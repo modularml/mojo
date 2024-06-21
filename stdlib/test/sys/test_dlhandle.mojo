@@ -10,16 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# REQUIRES: has_not
+# RUN: not --crash mojo %s 2>&1
 
-from sys.ffi import DLHandle
-from testing import assert_false
+from sys import DLHandle
 
 
 def check_invalid_dlhandle():
-    assert_false(
-        DLHandle("/an/invalid/library"), "the library is not valid location"
-    )
+    _ = DLHandle("/an/invalid/library")
 
 
 def main():

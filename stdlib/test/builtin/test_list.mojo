@@ -25,6 +25,7 @@ fn test_variadic_list() raises:
         assert_equal(nums[0], 5)
         assert_equal(nums[1], 8)
         assert_equal(nums[2], 6)
+        assert_equal(nums[True], 8)
 
         assert_equal(len(nums), 3)
 
@@ -33,9 +34,9 @@ fn test_variadic_list() raises:
 
 fn test_repr_list() raises:
     var l = List(1, 2, 3)
-    assert_equal(__type_of(l).__repr__(l), "[1, 2, 3]")
+    assert_equal(l.__repr__(), "[1, 2, 3]")
     var empty = List[Int]()
-    assert_equal(__type_of(empty).__repr__(empty), "[]")
+    assert_equal(empty.__repr__(), "[]")
 
 
 def main():

@@ -16,7 +16,7 @@
 from random import rand
 
 
-fn sort_test[D: DType](size: Int, max: Int, name: StringLiteral) raises:
+fn sort_test[D: DType, name: StringLiteral](size: Int, max: Int) raises:
     var p = Pointer[SIMD[D, 1]].alloc(size)
     rand[D](p, size)
     sort[D](p, size)
@@ -37,9 +37,9 @@ fn sort_test[D: DType](size: Int, max: Int, name: StringLiteral) raises:
 
 fn main():
     try:
-        sort_test[DType.int8](300, 3_000, "int8")
-        sort_test[DType.float32](3_000, 3_000, "float32")
-        sort_test[DType.float64](300_000, 3_000_000_000, "float64")
+        sort_test[DType.int8, "int8"](300, 3_000)
+        sort_test[DType.float32, "float32"](3_000, 3_000)
+        sort_test[DType.float64, "float64"](300_000, 3_000_000_000)
         # CHECK: Success
         print("Success")
     except e:

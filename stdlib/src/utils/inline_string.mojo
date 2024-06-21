@@ -15,23 +15,21 @@
    avoids heap allocations for short strings.
 """
 
+from collections import Optional
 from sys import sizeof
 
-from memory import memcpy, LegacyPointer, UnsafePointer
+from memory import LegacyPointer, UnsafePointer, memcpy
 
-from collections import Optional
-
-from utils import InlineArray, Variant
+from utils import InlineArray, StringSlice, Variant
 from utils._format import ToFormatter
 
-
 # ===----------------------------------------------------------------------===#
-# InlinedString
+# InlineString
 # ===----------------------------------------------------------------------===#
 
 
 @value
-struct InlinedString(Sized, Stringable, CollectionElement):
+struct InlineString(Sized, Stringable, CollectionElement):
     """A string that performs small-string optimization to avoid heap allocations for short strings.
     """
 
@@ -44,12 +42,13 @@ struct InlinedString(Sized, Stringable, CollectionElement):
     layout of this string, even if the given string would fit within the
     small-string capacity of this type."""
 
+    # Fields
     alias Layout = Variant[String, _FixedString[Self.SMALL_CAP]]
 
     var _storage: Self.Layout
 
     # ===------------------------------------------------------------------===#
-    # Constructors
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     fn __init__(inout self):
@@ -58,7 +57,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         self._storage = Self.Layout(fixed^)
 
     fn __init__(inout self, literal: StringLiteral):
-        """Constructs a InlinedString value given a string literal.
+        """Constructs a InlineString value given a string literal.
 
         Args:
             literal: The input constant string.
@@ -91,24 +90,8 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         self._storage = Self.Layout(heap_string^)
 
     # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
+    # Operator dunders
     # ===------------------------------------------------------------------=== #
-
-    fn __len__(self) -> Int:
-        if self._is_small():
-            return len(self._storage[_FixedString[Self.SMALL_CAP]])
-        else:
-            debug_assert(
-                self._storage.isa[String](),
-                "expected non-small string variant to be String",
-            )
-            return len(self._storage[String])
-
-    fn __str__(self) -> String:
-        if self._is_small():
-            return str(self._storage[_FixedString[Self.SMALL_CAP]])
-        else:
-            return self._storage[String]
 
     fn __iadd__(inout self, literal: StringLiteral):
         """Appends another string to this string.
@@ -124,27 +107,27 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         Args:
             string: The string to append.
         """
-        self.__iadd__(string._strref_dangerous())
+        self.__iadd__(string.as_string_slice())
 
-    fn __iadd__(inout self, strref: StringRef):
+    fn __iadd__(inout self, str_slice: StringSlice[_]):
         """Appends another string to this string.
 
         Args:
-            strref: The string to append.
+            str_slice: The string to append.
         """
-        var total_len = len(self) + len(strref)
+        var total_len = len(self) + str_slice._byte_length()
 
         # NOTE: Not guaranteed that we're in the small layout even if our
         #       length is shorter than the small capacity.
 
         if not self._is_small():
-            self._storage[String] += strref
+            self._storage[String] += str_slice
         elif total_len < Self.SMALL_CAP:
             try:
-                self._storage[_FixedString[Self.SMALL_CAP]] += strref
+                self._storage[_FixedString[Self.SMALL_CAP]] += str_slice
             except e:
                 abort(
-                    "unreachable: InlinedString append to FixedString failed: "
+                    "unreachable: InlineString append to FixedString failed: "
                     + str(e),
                 )
         else:
@@ -165,8 +148,8 @@ struct InlinedString(Sized, Stringable, CollectionElement):
             # Copy the bytes from the additional string.
             memcpy(
                 dest=buffer.unsafe_ptr() + len(self),
-                src=strref.unsafe_ptr(),
-                count=len(strref),
+                src=str_slice.unsafe_ptr(),
+                count=str_slice._byte_length(),
             )
 
             # Record that we've initialized `total_len` count of elements
@@ -203,10 +186,10 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         """
 
         var string = self
-        string += other._strref_dangerous()
+        string += other.as_string_slice()
         return string
 
-    fn __add__(self, other: InlinedString) -> Self:
+    fn __add__(self, other: InlineString) -> Self:
         """Construct a string by appending another string at the end of this string.
 
         Args:
@@ -217,8 +200,28 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         """
 
         var string = self
-        string += other._strref_dangerous()
+        string += other.as_string_slice()
         return string
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    fn __len__(self) -> Int:
+        if self._is_small():
+            return len(self._storage[_FixedString[Self.SMALL_CAP]])
+        else:
+            debug_assert(
+                self._storage.isa[String](),
+                "expected non-small string variant to be String",
+            )
+            return len(self._storage[String])
+
+    fn __str__(self) -> String:
+        if self._is_small():
+            return str(self._storage[_FixedString[Self.SMALL_CAP]])
+        else:
+            return self._storage[String]
 
     # ===------------------------------------------------------------------=== #
     # Methods
@@ -231,7 +234,7 @@ struct InlinedString(Sized, Stringable, CollectionElement):
 
         return res
 
-    fn as_uint8_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Returns a pointer to the bytes of string data.
 
         Returns:
@@ -241,24 +244,37 @@ struct InlinedString(Sized, Stringable, CollectionElement):
         if self._is_small():
             return self._storage[_FixedString[Self.SMALL_CAP]].unsafe_ptr()
         else:
-            return self._storage[String].unsafe_uint8_ptr()
+            return self._storage[String].unsafe_ptr()
 
-    fn _strref_dangerous(self) -> StringRef:
-        """
-        Returns an inner pointer to the string as a StringRef.
-        This functionality is extremely dangerous because Mojo eagerly releases
-        strings.  Using this requires the use of the _strref_keepalive() method
-        to keep the underlying string alive long enough.
-        """
-        return StringRef {data: self.as_uint8_ptr(), length: len(self)}
+    @always_inline
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
+        """Returns a string slice of the data owned by this inline string.
 
-    fn _strref_keepalive(self):
+        Returns:
+            A string slice pointing to the data owned by this inline string.
         """
-        A noop that keeps `self` alive through the call.  This
-        can be carefully used with `_strref_dangerous()` to wield inner pointers
-        without the string getting deallocated early.
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in _FixedString so this is actually
+        #   guaranteed to be valid.
+        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
+
+    @always_inline
+    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
-        pass
+        Returns a contiguous slice of the bytes owned by this string.
+
+        This does not include the trailing null terminator.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        return Span[UInt8, __lifetime_of(self)](
+            unsafe_ptr=self.unsafe_ptr(),
+            # Does NOT include the NUL terminator.
+            len=len(self),
+        )
 
 
 # ===----------------------------------------------------------------------===#
@@ -278,13 +294,14 @@ struct _FixedString[CAP: Int](
         CAP: The fixed-size count of bytes of string storage capacity available.
     """
 
+    # Fields
     var buffer: InlineArray[UInt8, CAP]
     """The underlying storage for the fixed string."""
     var size: Int
     """The number of elements in the vector."""
 
     # ===------------------------------------------------------------------===#
-    # Constructors
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     fn __init__(inout self):
@@ -311,99 +328,10 @@ struct _FixedString[CAP: Int](
         self.buffer = InlineArray[UInt8, CAP]()
         self.size = len(literal)
 
-        memcpy(self.buffer.unsafe_ptr(), literal.as_uint8_ptr(), len(literal))
+        memcpy(self.buffer.unsafe_ptr(), literal.unsafe_ptr(), len(literal))
 
     # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
-    # ===------------------------------------------------------------------=== #
-
-    @always_inline
-    fn __str__(self) -> String:
-        return String(self._strref_dangerous())
-
-    fn __len__(self) -> Int:
-        return self.size
-
-    fn __iadd__(inout self, literal: StringLiteral) raises:
-        """Appends another string to this string.
-
-        Args:
-            literal: The string to append.
-        """
-        self.__iadd__(StringRef(literal))
-
-    fn __iadd__(inout self, string: String) raises:
-        """Appends another string to this string.
-
-        Args:
-            string: The string to append.
-        """
-        self.__iadd__(string._strref_dangerous())
-
-    @always_inline
-    fn __iadd__(inout self, strref: StringRef) raises:
-        """Appends another string to this string.
-
-        Args:
-            strref: The string to append.
-        """
-        var err = self._iadd_non_raising(strref)
-        if err:
-            raise err.value()[]
-
-    fn _iadd_non_raising(inout self, strref: StringRef) -> Optional[Error]:
-        var total_len = len(self) + len(strref)
-
-        # Ensure there is sufficient capacity to append `strref`
-        if total_len > CAP:
-            return Optional(
-                Error(
-                    "Insufficient capacity to append len="
-                    + str(len(strref))
-                    + " string to len="
-                    + str(len(self))
-                    + " FixedString with capacity="
-                    + str(CAP),
-                )
-            )
-
-        # Append the bytes from `strref` at the end of the current string
-        memcpy(
-            DTypePointer(self.buffer.unsafe_ptr().bitcast[UInt8]() + len(self)),
-            strref.data,
-            len(strref),
-        )
-
-        self.size = total_len
-
-        return None
-
-    fn format_to(self, inout writer: Formatter):
-        writer.write_str(self._strref_dangerous())
-
-    fn _unsafe_to_formatter(inout self) -> Formatter:
-        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
-            var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
-
-            # FIXME(#37990):
-            #   Use `ptr[] += strref` and remove _iadd_non_raising after
-            #   "failed to fold operation lit.try" is fixed.
-            # try:
-            #     ptr[] += strref
-            # except e:
-            #     abort("error formatting to FixedString: " + str(e))
-            var err = ptr[]._iadd_non_raising(strref)
-            if err:
-                abort("error formatting to FixedString: " + str(err.value()[]))
-
-        return Formatter(
-            write_to_string,
-            # Arg data
-            UnsafePointer.address_of(self).bitcast[NoneType](),
-        )
-
-    # ===------------------------------------------------------------------=== #
-    # Methods
+    # Factory methods
     # ===------------------------------------------------------------------=== #
 
     @staticmethod
@@ -433,6 +361,110 @@ struct _FixedString[CAP: Int](
 
         return output^
 
+    # ===------------------------------------------------------------------=== #
+    # Operator dunders
+    # ===------------------------------------------------------------------=== #
+
+    fn __iadd__(inout self, literal: StringLiteral) raises:
+        """Appends another string to this string.
+
+        Args:
+            literal: The string to append.
+        """
+        self.__iadd__(literal.as_string_slice())
+
+    fn __iadd__(inout self, string: String) raises:
+        """Appends another string to this string.
+
+        Args:
+            string: The string to append.
+        """
+        self.__iadd__(string.as_string_slice())
+
+    @always_inline
+    fn __iadd__(inout self, str_slice: StringSlice[_]) raises:
+        """Appends another string to this string.
+
+        Args:
+            str_slice: The string to append.
+        """
+        var err = self._iadd_non_raising(str_slice)
+        if err:
+            raise err.value()
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline
+    fn __str__(self) -> String:
+        return String(self.as_string_slice())
+
+    fn __len__(self) -> Int:
+        return self.size
+
+    # ===------------------------------------------------------------------=== #
+    # Methods
+    # ===------------------------------------------------------------------=== #
+
+    fn _iadd_non_raising(
+        inout self,
+        str_slice: StringSlice[_],
+    ) -> Optional[Error]:
+        var total_len = len(self) + str_slice._byte_length()
+
+        # Ensure there is sufficient capacity to append `str_slice`
+        if total_len > CAP:
+            return Optional(
+                Error(
+                    "Insufficient capacity to append len="
+                    + str(str_slice._byte_length())
+                    + " string to len="
+                    + str(len(self))
+                    + " FixedString with capacity="
+                    + str(CAP),
+                )
+            )
+
+        # Append the bytes from `str_slice` at the end of the current string
+        memcpy(
+            dest=self.buffer.unsafe_ptr() + len(self),
+            src=str_slice.unsafe_ptr(),
+            count=str_slice._byte_length(),
+        )
+
+        self.size = total_len
+
+        return None
+
+    fn format_to(self, inout writer: Formatter):
+        writer.write_str(self.as_string_slice())
+
+    fn _unsafe_to_formatter(inout self) -> Formatter:
+        fn write_to_string(ptr0: UnsafePointer[NoneType], strref: StringRef):
+            var ptr: UnsafePointer[Self] = ptr0.bitcast[Self]()
+
+            var str_slice = StringSlice[ImmutableStaticLifetime](
+                unsafe_from_utf8_strref=strref
+            )
+
+            # FIXME(#37990):
+            #   Use `ptr[] += str_slice` and remove _iadd_non_raising after
+            #   "failed to fold operation lit.try" is fixed.
+            # try:
+            #     ptr[] += str_slice
+            # except e:
+            #     abort("error formatting to FixedString: " + str(e))
+            var err = ptr[]._iadd_non_raising(str_slice)
+            if err:
+                abort("error formatting to FixedString: " + str(err.value()))
+
+        return Formatter(
+            write_to_string,
+            # Arg data
+            UnsafePointer.address_of(self).bitcast[NoneType](),
+        )
+
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
@@ -441,19 +473,32 @@ struct _FixedString[CAP: Int](
         """
         return self.buffer.unsafe_ptr()
 
-    fn _strref_dangerous(self) -> StringRef:
-        """
-        Returns an inner pointer to the string as a StringRef.
-        This functionality is extremely dangerous because Mojo eagerly releases
-        strings.  Using this requires the use of the _strref_keepalive() method
-        to keep the underlying string alive long enough.
-        """
-        return StringRef {data: self.unsafe_ptr(), length: len(self)}
+    @always_inline
+    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
+        """Returns a string slice of the data owned by this fixed string.
 
-    fn _strref_keepalive(self):
+        Returns:
+            A string slice pointing to the data owned by this fixed string.
         """
-        A noop that keeps `self` alive through the call.  This
-        can be carefully used with `_strref_dangerous()` to wield inner pointers
-        without the string getting deallocated early.
+
+        # FIXME(MSTDL-160):
+        #   Enforce UTF-8 encoding in _FixedString so this is actually
+        #   guaranteed to be valid.
+        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
+
+    @always_inline
+    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
         """
-        pass
+        Returns a contiguous slice of the bytes owned by this string.
+
+        This does not include the trailing null terminator.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by this string.
+        """
+
+        return Span[UInt8, __lifetime_of(self)](
+            unsafe_ptr=self.unsafe_ptr(),
+            # Does NOT include the NUL terminator.
+            len=self.size,
+        )

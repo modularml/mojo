@@ -12,29 +12,45 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
+from sys.ffi import C_char
+
 from testing import (
     assert_equal,
-    assert_not_equal,
-    assert_true,
     assert_false,
+    assert_not_equal,
     assert_raises,
+    assert_true,
 )
 
 
-def test_basics():
-    assert_equal(4, len("four"))
-    assert_equal("fivesix", "five" + "six")
-    assert_not_equal("five", "six")
-    assert_equal("five", "five")
+def test_add():
+    assert_equal("five", StringLiteral.__add__("five", ""))
+    assert_equal("six", StringLiteral.__add__("", "six"))
+    assert_equal("fivesix", StringLiteral.__add__("five", "six"))
 
-    assert_true("not_empty")
-    assert_false("")
+
+def test_equality():
+    assert_false(StringLiteral.__eq__("five", "six"))
+    assert_true(StringLiteral.__eq__("six", "six"))
+
+    assert_true(StringLiteral.__ne__("five", "six"))
+    assert_false(StringLiteral.__ne__("six", "six"))
+
+
+def test_len():
+    assert_equal(0, StringLiteral.__len__(""))
+    assert_equal(4, StringLiteral.__len__("four"))
+
+
+def test_bool():
+    assert_true(StringLiteral.__bool__("not_empty"))
+    assert_false(StringLiteral.__bool__(""))
 
 
 def test_contains():
-    assert_true("abc" in "abcde")
-    assert_true("bc" in "abcde")
-    assert_true("xy" not in "abcde")
+    assert_true(StringLiteral.__contains__("abcde", "abc"))
+    assert_true(StringLiteral.__contains__("abcde", "bc"))
+    assert_false(StringLiteral.__contains__("abcde", "xy"))
 
 
 def test_find():
@@ -78,7 +94,7 @@ def test_rfind():
     assert_equal(-1, "abc".rfind("abcd"))
 
 
-fn test_comparison_operators() raises:
+def test_comparison_operators():
     # Test less than and greater than
     assert_true(StringLiteral.__lt__("abc", "def"))
     assert_false(StringLiteral.__lt__("def", "abc"))
@@ -109,20 +125,38 @@ fn test_comparison_operators() raises:
 def test_hash():
     # Test a couple basic hash behaviors.
     # `test_hash.test_hash_bytes` has more comprehensive tests.
-    assert_not_equal(0, hash("test"))
-    assert_not_equal(hash("a"), hash("b"))
-    assert_equal(hash("a"), hash("a"))
-    assert_equal(hash("b"), hash("b"))
+    assert_not_equal(0, StringLiteral.__hash__("test"))
+    assert_not_equal(StringLiteral.__hash__("a"), StringLiteral.__hash__("b"))
+    assert_equal(StringLiteral.__hash__("a"), StringLiteral.__hash__("a"))
+    assert_equal(StringLiteral.__hash__("b"), StringLiteral.__hash__("b"))
 
 
 def test_intable():
-    assert_equal(int("123"), 123)
+    assert_equal(StringLiteral.__int__("123"), 123)
 
     with assert_raises():
-        _ = int("hi")
+        _ = StringLiteral.__int__("hi")
 
 
-fn test_repr() raises:
+def test_layout():
+    # Test empty StringLiteral contents
+    var empty = "".unsafe_ptr()
+    # An empty string literal is stored as just the NUL terminator.
+    assert_true(int(empty) != 0)
+    # TODO(MSTDL-596): This seems to hang?
+    # assert_equal(empty[0], 0)
+
+    # Test non-empty StringLiteral C string
+    var ptr: UnsafePointer[C_char] = "hello".unsafe_cstr_ptr()
+    assert_equal(ptr[0], ord("h"))
+    assert_equal(ptr[1], ord("e"))
+    assert_equal(ptr[2], ord("l"))
+    assert_equal(ptr[3], ord("l"))
+    assert_equal(ptr[4], ord("o"))
+    assert_equal(ptr[5], 0)  # Verify NUL terminated
+
+
+def test_repr():
     # Usual cases
     assert_equal(StringLiteral.__repr__("hello"), "'hello'")
 
@@ -143,11 +177,15 @@ fn test_repr() raises:
 
 
 def main():
-    test_basics()
+    test_add()
+    test_equality()
+    test_len()
+    test_bool()
     test_contains()
     test_find()
     test_rfind()
     test_comparison_operators()
     test_hash()
     test_intable()
+    test_layout()
     test_repr()

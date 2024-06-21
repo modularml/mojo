@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_true, assert_false
 from collections.set import Set
+
+from testing import assert_false, assert_true
 
 
 def test_list_any():

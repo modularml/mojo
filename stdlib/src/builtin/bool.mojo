@@ -15,10 +15,9 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from utils._visualizers import lldb_formatter_wrapping_type
-
 from collections import Set
 
+from utils._visualizers import lldb_formatter_wrapping_type
 
 # ===----------------------------------------------------------------------=== #
 #  Boolable
@@ -60,11 +59,12 @@ trait Boolable:
 @register_passable("trivial")
 struct Bool(
     Stringable,
-    CollectionElement,
+    ComparableCollectionElement,
     Boolable,
-    EqualityComparable,
     Intable,
     Indexer,
+    CollectionElementNew,
+    Representable,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
@@ -72,43 +72,45 @@ struct Bool(
     """The underlying storage of the boolean value."""
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.i1) -> Bool:
+    fn __init__(inout self, *, other: Self):
+        """Explicitly construct a deep copy of the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.value = other.value
+
+    @always_inline("nodebug")
+    fn __init__(inout self, value: __mlir_type.i1):
         """Construct a Bool value given a __mlir_type.i1 value.
 
         Args:
             value: The initial __mlir_type.i1 value.
-
-        Returns:
-            The constructed Bool value.
         """
-        return Self {value: value}
+        self.value = value
 
     @always_inline("nodebug")
-    fn __init__(value: __mlir_type.`!pop.scalar<bool>`) -> Bool:
+    fn __init__(inout self, value: __mlir_type.`!pop.scalar<bool>`):
         """Construct a Bool value given a `!pop.scalar<bool>` value.
 
         Args:
             value: The initial value.
-
-        Returns:
-            The constructed Bool value.
         """
-        return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i1](value)
+        self.value = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i1](
+            value
+        )
 
     @always_inline("nodebug")
-    fn __init__[boolable: Boolable](value: boolable) -> Bool:
+    fn __init__[T: Boolable](inout self, value: T):
         """Implicitly convert a Boolable value to a Bool.
 
         Parameters:
-            boolable: The Boolable type.
+            T: The Boolable type.
 
         Args:
             value: The boolable value.
-
-        Returns:
-            The constructed Bool value.
         """
-        return value.__bool__()
+        self = value.__bool__()
 
     @always_inline("nodebug")
     fn __bool__(self) -> Bool:
@@ -142,10 +144,22 @@ struct Bool(
     fn __str__(self) -> String:
         """Get the bool as a string.
 
+        Returns `"True"` or `"False"`.
+
         Returns:
             A string representation.
         """
         return "True" if self else "False"
+
+    fn __repr__(self) -> String:
+        """Get the bool as a string.
+
+        Returns `"True"` or `"False"`.
+
+        Returns:
+            A string representation.
+        """
+        return str(self)
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -197,6 +211,66 @@ struct Bool(
             False if the two values do match and True otherwise.
         """
         return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ne>`](
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
+
+    @always_inline("nodebug")
+    fn __lt__(self, rhs: Self) -> Bool:
+        """Compare this Bool to RHS using less-than comparison.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if self is False and rhs is True.
+        """
+
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred lt>`](
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
+
+    @always_inline("nodebug")
+    fn __le__(self, rhs: Self) -> Bool:
+        """Compare this Bool to RHS using less-than-or-equal comparison.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if self is False and rhs is True or False.
+        """
+
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred le>`](
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
+
+    @always_inline("nodebug")
+    fn __gt__(self, rhs: Self) -> Bool:
+        """Compare this Bool to RHS using greater-than comparison.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if self is True and rhs is False.
+        """
+
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred gt>`](
+            self._as_scalar_bool(), rhs._as_scalar_bool()
+        )
+
+    @always_inline("nodebug")
+    fn __ge__(self, rhs: Self) -> Bool:
+        """Compare this Bool to RHS using greater-than-or-equal comparison.
+
+        Args:
+            rhs: The rhs of the operation.
+
+        Returns:
+            True if self is True and rhs is True or False.
+        """
+
+        return __mlir_op.`pop.cmp`[pred = __mlir_attr.`#pop<cmp_pred ge>`](
             self._as_scalar_bool(), rhs._as_scalar_bool()
         )
 
@@ -382,7 +456,7 @@ fn bool[T: Boolable](value: T) -> Bool:
 
 
 fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
-    """Checks if **any** elements in the list are truthy.
+    """Checks if **any** element in the list is truthy.
 
     Parameters:
         T: The type of elements to check.
@@ -391,7 +465,7 @@ fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
         list: The list to check.
 
     Returns:
-        Returns `True` if **any** elements in the list are truthy, `False` otherwise.
+        `True` if **any** element in the list is truthy, `False` otherwise.
     """
     for item in list:
         if item[]:
@@ -400,7 +474,7 @@ fn any[T: BoolableCollectionElement](list: List[T]) -> Bool:
 
 
 fn any[T: BoolableKeyElement](set: Set[T]) -> Bool:
-    """Checks if **any** elements in the set are truthy.
+    """Checks if **any** element in the set is truthy.
 
     Parameters:
         T: The type of elements to check.
@@ -409,7 +483,7 @@ fn any[T: BoolableKeyElement](set: Set[T]) -> Bool:
         set: The set to check.
 
     Returns:
-        Returns `True` if **any** elements in the set are truthy, `False` otherwise.
+        `True` if **any** element in the set is truthy, `False` otherwise.
     """
     for item in set:
         if item[]:
@@ -418,15 +492,16 @@ fn any[T: BoolableKeyElement](set: Set[T]) -> Bool:
 
 
 fn any(value: SIMD) -> Bool:
-    """Checks if **any** elements in the simd vector are truthy.
+    """Checks if **any** element in the simd vector is truthy.
 
     Args:
         value: The simd vector to check.
 
     Returns:
-        Returns `True` if **any** elements in the simd vector are truthy, `False` otherwise.
+        `True` if **any** element in the simd vector is truthy, `False`
+        otherwise.
     """
-    return value._reduce_any()
+    return value.cast[DType.bool]().reduce_or()
 
 
 # ===----------------------------------------------------------------------=== #
@@ -447,7 +522,7 @@ fn all[T: BoolableCollectionElement](list: List[T]) -> Bool:
         list: The list to check.
 
     Returns:
-        Returns `True` if **all** elements in the list are truthy, `False` otherwise.
+        `True` if **all** elements in the list are truthy, `False` otherwise.
     """
     for item in list:
         if not item[]:
@@ -465,7 +540,7 @@ fn all[T: BoolableKeyElement](set: Set[T]) -> Bool:
         set: The set to check.
 
     Returns:
-        Returns `True` if **all** elements in the set are truthy, `False` otherwise.
+        `True` if **all** elements in the set are truthy, `False` otherwise.
     """
     for item in set:
         if not item[]:
@@ -480,6 +555,7 @@ fn all(value: SIMD) -> Bool:
         value: The simd vector to check.
 
     Returns:
-        Returns `True` if **all** elements in the simd vector are truthy, `False` otherwise.
+        `True` if **all** elements in the simd vector are truthy, `False`
+        otherwise.
     """
-    return value._reduce_all()
+    return value.cast[DType.bool]().reduce_and()

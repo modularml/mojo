@@ -39,11 +39,11 @@ from memory import AddressSpace, DTypePointer, Pointer
 
 @register_passable
 struct _OwnedStringRef(Boolable):
-    var data: DTypePointer[DType.int8]
+    var data: UnsafePointer[UInt8]
     var length: Int
 
     fn __init__() -> _OwnedStringRef:
-        return Self {data: DTypePointer[DType.int8](), length: 0}
+        return Self {data: UnsafePointer[UInt8](), length: 0}
 
     fn __del__(owned self):
         if self.data:
@@ -51,15 +51,13 @@ struct _OwnedStringRef(Boolable):
 
     fn consume_as_error(owned self) -> Error:
         var data = self.data
+
         # Don't free self.data in our dtor.
-        self.data = DTypePointer[DType.int8]()
-        var length = self.length
+        self.data = UnsafePointer[UInt8]()
+
         return Error {
-            data: UnsafePointer[UInt8]._from_dtype_ptr(
-                # TODO: Remove cast once string UInt8 transition is complete.
-                data.bitcast[DType.uint8]()
-            ),
-            loaded_length: -length,
+            data: data,
+            loaded_length: -self.length,
         }
 
     fn __bool__(self) -> Bool:
@@ -81,7 +79,7 @@ struct FileHandle:
 
         Args:
           path: The file path.
-          mode: The mode to open the file in (the mode can be "r" or "w").
+          mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
         """
         self.__init__(path._strref_dangerous(), mode._strref_dangerous())
 
@@ -93,7 +91,7 @@ struct FileHandle:
 
         Args:
           path: The file path.
-          mode: The mode to open the file in (the mode can be "r" or "w").
+          mode: The mode to open the file in (the mode can be "r" or "w" or "rw").
         """
         var err_msg = _OwnedStringRef()
         var handle = external_call[
@@ -406,16 +404,16 @@ struct FileHandle:
 
         return pos
 
-    fn write(self, data: StringLiteral) raises:
+    fn write(self, data: String) raises:
         """Write the data to the file.
 
         Args:
           data: The data to write to the file.
         """
-        self.write(StringRef(data))
+        self._write(data.unsafe_ptr(), len(data))
 
-    fn write(self, data: String) raises:
-        """Write the data to the file.
+    fn write(self, data: Span[UInt8, _]) raises:
+        """Write a borrowed sequence of data to the file.
 
         Args:
           data: The data to write to the file.
@@ -429,13 +427,12 @@ struct FileHandle:
         Args:
           data: The data to write to the file.
         """
-        # TODO: Remove cast when transition to UInt8 strings is complete.
-        self._write(data.unsafe_ptr().bitcast[Int8](), len(data))
+        self._write(data.unsafe_ptr(), len(data))
 
     @always_inline
     fn _write[
         address_space: AddressSpace
-    ](self, ptr: DTypePointer[DType.int8, address_space], len: Int) raises:
+    ](self, ptr: UnsafePointer[UInt8, address_space], len: Int) raises:
         """Write the data to the file.
 
         Params:
@@ -462,6 +459,13 @@ struct FileHandle:
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
         return self^
+
+    fn _get_raw_fd(self) -> Int:
+        var i64_res = external_call[
+            "KGEN_CompilerRT_IO_GetFD",
+            Int64,
+        ](self.handle)
+        return Int(i64_res.value)
 
 
 fn open(path: String, mode: String) raises -> FileHandle:

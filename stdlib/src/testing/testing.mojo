@@ -19,8 +19,10 @@ from testing import assert_true
 ```
 """
 from collections import Optional
-from utils.numerics import isfinite, isnan
+
 from builtin._location import __call_location, _SourceLocation
+
+from utils.numerics import isfinite, isnan
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -37,16 +39,18 @@ fn _isclose(
     equal_nan: Bool,
 ) -> SIMD[DType.bool, a.size]:
     constrained[
-        a.type.is_bool() or a.type.is_integral() or a.type.is_floating_point(),
+        a.type is DType.bool
+        or a.type.is_integral()
+        or a.type.is_floating_point(),
         "input type must be boolean, integral, or floating-point",
     ]()
 
     @parameter
-    if a.type.is_bool() or a.type.is_integral():
+    if a.type is DType.bool or a.type.is_integral():
         return a == b
     else:
         var both_nan = isnan(a) & isnan(b)
-        if equal_nan and both_nan.reduce_and():
+        if equal_nan and all(both_nan):
             return True
 
         var res = (a == b)
@@ -171,9 +175,7 @@ fn assert_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    # `if lhs != rhs:` is not enough. `reduce_or()` must be used here,
-    # otherwise, if any of the elements are equal, the error is not triggered.
-    if (lhs != rhs).reduce_or():
+    if any(lhs != rhs):
         raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
 
 
@@ -235,7 +237,7 @@ fn assert_not_equal[
     Raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
-    if (lhs == rhs).reduce_and():
+    if all(lhs == rhs):
         raise _assert_not_equal_error(
             str(lhs), str(rhs), msg, __call_location()
         )
@@ -281,7 +283,7 @@ fn assert_almost_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     constrained[
-        type.is_bool() or type.is_integral() or type.is_floating_point(),
+        type is DType.bool or type.is_integral() or type.is_floating_point(),
         "type must be boolean, integral, or floating-point",
     ]()
 
@@ -289,7 +291,7 @@ fn assert_almost_equal[
         lhs, rhs, atol=atol, rtol=rtol, equal_nan=equal_nan
     )
 
-    if not almost_equal.reduce_and():
+    if not all(almost_equal):
         var err = str(lhs) + " is not close to " + str(rhs)
 
         @parameter
@@ -401,5 +403,5 @@ struct assert_raises:
             Error: If the error raised doesn't match the expected error to raise.
         """
         if self.message_contains:
-            return self.message_contains.value()[] in str(error)
+            return self.message_contains.value() in str(error)
         return True

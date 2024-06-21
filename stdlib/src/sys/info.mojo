@@ -19,7 +19,7 @@ from sys import is_x86
 ```
 """
 
-from .ffi import external_call, _external_call_const
+from .ffi import _external_call_const, external_call
 
 
 @always_inline("nodebug")
@@ -28,7 +28,7 @@ fn _current_target() -> __mlir_type.`!kgen.target`:
 
 
 @always_inline("nodebug")
-fn _current_cpu() -> __mlir_type.`!kgen.string`:
+fn _current_arch() -> __mlir_type.`!kgen.string`:
     return __mlir_attr[
         `#kgen.param.expr<target_get_field,`,
         _current_target(),
@@ -202,7 +202,7 @@ fn is_apple_m1() -> Bool:
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        _current_cpu(),
+        _current_arch(),
         `, "apple-m1" : !kgen.string`,
         `> : i1`,
     ]
@@ -219,7 +219,7 @@ fn is_apple_m2() -> Bool:
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        _current_cpu(),
+        _current_arch(),
         `, "apple-m2" : !kgen.string`,
         `> : i1`,
     ]
@@ -236,7 +236,7 @@ fn is_apple_m3() -> Bool:
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        _current_cpu(),
+        _current_arch(),
         `, "apple-m3" : !kgen.string`,
         `> : i1`,
     ]
@@ -264,7 +264,7 @@ fn is_neoverse_n1() -> Bool:
     """
     return __mlir_attr[
         `#kgen.param.expr<eq,`,
-        _current_cpu(),
+        _current_arch(),
         `, "neoverse-n1" : !kgen.string`,
         `> : i1`,
     ]
@@ -510,7 +510,7 @@ fn simdbytewidth[
 
 @always_inline("nodebug")
 fn sizeof[
-    type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
+    type: AnyType, target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
     """Returns the size of (in bytes) of the type.
 
@@ -521,9 +521,16 @@ fn sizeof[
     Returns:
         The size of the type in bytes.
     """
-    return __mlir_attr[
-        `#kgen.param.expr<get_sizeof, #kgen.parameterizedtype.constant<`,
+    alias mlir_type = __mlir_attr[
+        `#kgen.param.expr<rebind, #kgen.type<!kgen.paramref<`,
         type,
+        `>> : `,
+        AnyType,
+        `> : !kgen.type`,
+    ]
+    return __mlir_attr[
+        `#kgen.param.expr<get_sizeof, #kgen.type<`,
+        mlir_type,
         `> : !kgen.type,`,
         target,
         `> : !kgen.int_literal`,
@@ -544,7 +551,7 @@ fn sizeof[
         The size of the dtype in bytes.
     """
     return __mlir_attr[
-        `#kgen.param.expr<get_sizeof, #kgen.parameterizedtype.constant<`,
+        `#kgen.param.expr<get_sizeof, #kgen.type<`,
         `!pop.scalar<`,
         type.value,
         `>`,
@@ -556,7 +563,7 @@ fn sizeof[
 
 @always_inline("nodebug")
 fn alignof[
-    type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
+    type: AnyType, target: __mlir_type.`!kgen.target` = _current_target()
 ]() -> IntLiteral:
     """Returns the align of (in bytes) of the type.
 
@@ -567,9 +574,16 @@ fn alignof[
     Returns:
         The alignment of the type in bytes.
     """
-    return __mlir_attr[
-        `#kgen.param.expr<get_alignof, #kgen.parameterizedtype.constant<`,
+    alias mlir_type = __mlir_attr[
+        `#kgen.param.expr<rebind, #kgen.type<!kgen.paramref<`,
         type,
+        `>> : `,
+        AnyType,
+        `> : !kgen.type`,
+    ]
+    return __mlir_attr[
+        `#kgen.param.expr<get_alignof, #kgen.type<`,
+        +mlir_type,
         `> : !kgen.type,`,
         target,
         `> : !kgen.int_literal`,
@@ -590,7 +604,7 @@ fn alignof[
         The alignment of the dtype in bytes.
     """
     return __mlir_attr[
-        `#kgen.param.expr<get_alignof, #kgen.parameterizedtype.constant<`,
+        `#kgen.param.expr<get_alignof, #kgen.type<`,
         `!pop.scalar<`,
         type.value,
         `>`,
@@ -602,7 +616,8 @@ fn alignof[
 
 @always_inline("nodebug")
 fn bitwidthof[
-    type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
+    type: AnyTrivialRegType,
+    target: __mlir_type.`!kgen.target` = _current_target(),
 ]() -> IntLiteral:
     """Returns the size of (in bits) of the type.
 
@@ -637,7 +652,8 @@ fn bitwidthof[
 
 @always_inline("nodebug")
 fn simdwidthof[
-    type: AnyRegType, target: __mlir_type.`!kgen.target` = _current_target()
+    type: AnyTrivialRegType,
+    target: __mlir_type.`!kgen.target` = _current_target(),
 ]() -> IntLiteral:
     """Returns the vector size of the type on the host system.
 
@@ -716,7 +732,7 @@ fn _macos_version() raises -> Tuple[Int, Int, Int]:
     var buf_len = Int(INITIAL_CAPACITY)
 
     var err = external_call["sysctlbyname", Int32](
-        "kern.osproductversion".unsafe_ptr(),
+        "kern.osproductversion".unsafe_cstr_ptr(),
         buf.data,
         UnsafePointer.address_of(buf_len),
         UnsafePointer[NoneType](),

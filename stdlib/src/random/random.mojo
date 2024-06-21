@@ -19,7 +19,7 @@ from random import seed
 ```
 """
 
-from sys import external_call, bitwidthof
+from sys import bitwidthof, external_call
 from time import now
 
 from memory import DTypePointer
@@ -140,7 +140,7 @@ fn rand[type: DType](ptr: DTypePointer[type], size: Int):
         return
 
     @parameter
-    if type == DType.bool:
+    if type is DType.bool:
         for i in range(size):
             ptr[i] = random_ui64(0, 1).cast[type]()
         return

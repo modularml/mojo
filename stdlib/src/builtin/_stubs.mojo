@@ -19,7 +19,7 @@ from builtin.range import _StridedRangeIterator
 
 
 @register_passable("trivial")
-struct __MLIRType[T: AnyRegType](Movable, Copyable):
+struct __MLIRType[T: AnyTrivialRegType](Movable, Copyable):
     var value: T
 
 
@@ -48,40 +48,44 @@ trait _StridedIterable(_IntIter):
         ...
 
 
-@value
-struct _NextEval[T: _IntNext]:
-    var iter: T
-    var i: Int
+struct _ParamForIterator[IteratorT: Copyable]:
+    var next_it: IteratorT
+    var value: Int
+    var stop: Bool
+
+    fn __init__(inout self, next_it: IteratorT, value: Int, stop: Bool):
+        self.next_it = next_it
+        self.value = value
+        self.stop = stop
 
 
-fn _next_eval[T: _IntNext](iter: T) -> _NextEval[T]:
-    var copy = iter
-    var next = copy.__next__()
-    return _NextEval(copy, next)
+fn declval[T: AnyType]() -> T:
+    constrained[False, "should only be used inside __type_of"]()
+    while True:
+        pass
 
 
-@always_inline
-fn _gen_next[
-    inferred T: _IntIter, iter: T, f: fn[i: Int] () capturing -> None
-]():
-    @parameter
-    if iter.__len__() == 0:
-        return
-    else:
-        alias next = _next_eval(iter)
-        f[next.i]()
-        _gen_next[next.iter, f]()
+fn parameter_for_generator[
+    T: _IntIterable,
+](range: T) -> _ParamForIterator[__type_of(declval[T]().__iter__())]:
+    return _generator(range.__iter__())
 
 
-@always_inline
-fn parameter_for[
-    inferred T: _IntIterable, iter: T, f: fn[i: Int] () capturing -> None
-]():
-    _gen_next[iter.__iter__(), f]()
+fn parameter_for_generator[
+    T: _StridedIterable,
+](range: T) -> _ParamForIterator[__type_of(declval[T]().__iter__())]:
+    return _generator(range.__iter__())
 
 
-@always_inline
-fn parameter_for[
-    inferred T: _StridedIterable, iter: T, f: fn[i: Int] () capturing -> None
-]():
-    _gen_next[iter.__iter__(), f]()
+fn _generator[
+    IteratorT: _IntIter
+](it: IteratorT) -> _ParamForIterator[IteratorT]:
+    if it.__len__() == 0:
+        return _ParamForIterator[IteratorT](
+            __mlir_attr[`#kgen.unknown : !kgen.paramref<`, IteratorT, `>`],
+            0,
+            True,
+        )
+    var next_it = it
+    var value = next_it.__next__()
+    return _ParamForIterator(next_it, value, False)

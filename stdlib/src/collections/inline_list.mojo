@@ -19,8 +19,9 @@ from collections import InlineList
 ```
 """
 
-from utils import InlineArray
 from sys.intrinsics import _type_is_eq
+
+from utils import InlineArray
 
 
 # ===----------------------------------------------------------------------===#
@@ -28,18 +29,18 @@ from sys.intrinsics import _type_is_eq
 # ===----------------------------------------------------------------------===#
 @value
 struct _InlineListIter[
-    T: CollectionElement,
+    list_mutability: Bool, //,
+    T: CollectionElementNew,
     capacity: Int,
-    list_mutability: Bool,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for InlineList.
 
     Parameters:
+        list_mutability: Whether the reference to the list is mutable.
         T: The type of the elements in the list.
         capacity: The maximum number of elements that the list can hold.
-        list_mutability: Whether the reference to the list is mutable.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
@@ -47,21 +48,21 @@ struct _InlineListIter[
     alias list_type = InlineList[T, capacity]
 
     var index: Int
-    var src: Reference[Self.list_type, list_mutability, list_lifetime]
+    var src: Reference[Self.list_type, list_lifetime]
 
     fn __iter__(self) -> Self:
         return self
 
     fn __next__(
         inout self,
-    ) -> Reference[T, list_mutability, list_lifetime]:
+    ) -> Reference[T, list_lifetime]:
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__refitem__(self.index - 1)
+            return self.src[][self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__refitem__(self.index)
+            return self.src[][self.index]
 
     fn __len__(self) -> Int:
         @parameter
@@ -72,7 +73,7 @@ struct _InlineListIter[
 
 
 # TODO: Provide a smarter default for the capacity.
-struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
+struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     """A list allocated on the stack with a maximum size known at compile time.
 
     It is backed by an `InlineArray` and an `Int` to represent the size.
@@ -87,8 +88,13 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         capacity: The maximum number of elements that the list can hold.
     """
 
+    # Fields
     var _array: InlineArray[ElementType, capacity]
     var _size: Int
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __init__(inout self):
@@ -106,10 +112,45 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         Args:
             values: The values to populate the list with.
         """
-        debug_assert(len(values) < capacity, "List is full.")
+        debug_assert(len(values) <= capacity, "List is full.")
         self = Self()
         for value in values:
-            self.append(value[])
+            self.append(ElementType(other=value[]))
+
+    @always_inline
+    fn __del__(owned self):
+        """Destroy all the elements in the list and free the memory."""
+        for i in range(self._size):
+            UnsafePointer.address_of(self._array[i]).destroy_pointee()
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn __getitem__(
+        ref [_]self: Self, owned idx: Int
+    ) -> ref [__lifetime_of(self)] Self.ElementType:
+        """Get a `Reference` to the element at the given index.
+
+        Args:
+            idx: The index of the item.
+
+        Returns:
+            A reference to the item at the given index.
+        """
+        debug_assert(
+            -self._size <= idx < self._size, "Index must be within bounds."
+        )
+
+        if idx < 0:
+            idx += len(self)
+
+        return self._array[idx]
+
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
 
     @always_inline
     fn __len__(self) -> Int:
@@ -117,49 +158,17 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         return self._size
 
     @always_inline
-    fn append(inout self, owned value: ElementType):
-        """Appends a value to the list.
-
-        Args:
-            value: The value to append.
-        """
-        debug_assert(self._size < capacity, "List is full.")
-        self._array[self._size] = value^
-        self._size += 1
-
-    @always_inline
-    fn __refitem__[
-        IntableType: Intable,
-    ](self: Reference[Self, _, _], index: IntableType) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
-        """Get a `Reference` to the element at the given index.
-
-        Args:
-            index: The index of the item.
+    fn __bool__(self) -> Bool:
+        """Checks whether the list has any elements or not.
 
         Returns:
-            A reference to the item at the given index.
+            `False` if the list is empty, `True` if there is at least one element.
         """
-        var i = int(index)
-        debug_assert(
-            -self[]._size <= i < self[]._size, "Index must be within bounds."
-        )
-
-        if i < 0:
-            i += len(self[])
-
-        return self[]._array[i]
-
-    @always_inline
-    fn __del__(owned self):
-        """Destroy all the elements in the list and free the memory."""
-        for i in range(self._size):
-            destroy_pointee(UnsafePointer(self._array[i]))
+        return len(self) > 0
 
     fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _InlineListIter[ElementType, capacity, self.is_mutable, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _InlineListIter[ElementType, capacity, __lifetime_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -179,7 +188,7 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
         ```
         Parameters:
             C: The type of the elements in the list. Must implement the
-              traits `EqualityComparable` and `CollectionElement`.
+              traits `EqualityComparable` and `CollectionElementNew`.
 
         Args:
             value: The value to find.
@@ -192,6 +201,49 @@ struct InlineList[ElementType: CollectionElement, capacity: Int = 16](Sized):
             _type_is_eq[ElementType, C](), "value type is not self.ElementType"
         ]()
         for i in self:
-            if value == rebind[C](i[]):
+            if value == rebind[Reference[C, __lifetime_of(self)]](i)[]:
                 return True
         return False
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    @always_inline
+    fn count[C: ComparableCollectionElement](self: Self, value: C) -> Int:
+        """Counts the number of occurrences of a value in the list.
+
+        ```mojo
+        var my_list = InlineList[Int](1, 2, 3)
+        print(my_list.count(1))
+        ```
+        Parameters:
+            C: The type of the elements in the list. Must implement the
+              traits `EqualityComparable` and `CollectionElementNew`.
+
+        Args:
+            value: The value to count.
+
+        Returns:
+            The number of occurrences of the value in the list.
+        """
+        constrained[
+            _type_is_eq[ElementType, C](), "value type is not self.ElementType"
+        ]()
+
+        var count = 0
+        for elem in self:
+            if value == rebind[Reference[C, __lifetime_of(self)]](elem)[]:
+                count += 1
+        return count
+
+    @always_inline
+    fn append(inout self, owned value: ElementType):
+        """Appends a value to the list.
+
+        Args:
+            value: The value to append.
+        """
+        debug_assert(self._size < capacity, "List is full.")
+        self._array[self._size] = value^
+        self._size += 1

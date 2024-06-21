@@ -91,6 +91,10 @@ under the Apache License v2.0 with LLVM Exceptions
 
 ## Contributing
 
-Thanks for your interest in contributing to this repository!  
-We are not accepting pull requests at this time, but are actively  
-working on a process to accept contributions. Please stay tuned.
+As a contributor, your efforts and expertise are invaluable in driving the
+evolution of the Mojo programming language. The [Mojo contributor
+guide](../CONTRIBUTING.md) provides all the information necessary to make
+meaningful contributions—from understanding the submission process to
+adhering to best practices:
+
+- [Mojo contributor guide](../CONTRIBUTING.md)

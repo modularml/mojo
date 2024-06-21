@@ -18,6 +18,8 @@ You can import these APIs from the `utils` package. For example:
 from utils import StaticTuple
 ```
 """
+from collections._index_normalization import normalize_index
+from sys.intrinsics import _type_is_eq
 
 from memory import Pointer
 
@@ -32,14 +34,10 @@ from utils import unroll
 fn _set_array_elem[
     index: Int,
     size: Int,
-    type: AnyRegType,
+    type: AnyTrivialRegType,
 ](
     val: type,
-    array: Reference[
-        __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
-        __mlir_attr.`1 : i1`,
-        _,
-    ],
+    ref [_]array: __mlir_type[`!pop.array<`, size.value, `, `, type, `>`],
 ):
     """Sets the array element at position `index` with the value `val`.
 
@@ -53,14 +51,14 @@ fn _set_array_elem[
         array: the array which is captured by reference.
     """
     var ptr = __mlir_op.`pop.array.gep`(
-        UnsafePointer(array).address, index.value
+        UnsafePointer.address_of(array).address, index.value
     )
     UnsafePointer(ptr)[] = val
 
 
 @always_inline
 fn _create_array[
-    size: Int, type: AnyRegType
+    size: Int, type: AnyTrivialRegType
 ](lst: VariadicList[type]) -> __mlir_type[
     `!pop.array<`, size.value, `, `, type, `>`
 ]:
@@ -88,12 +86,10 @@ fn _create_array[
             _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
         ]()
 
-        @always_inline
         @parameter
-        fn fill[idx: Int]():
+        for idx in range(size):
             _set_array_elem[idx, size, type](lst[idx], array)
 
-        unroll[fill, size]()
         return array
 
 
@@ -115,7 +111,7 @@ fn _static_tuple_construction_checks[size: Int]():
 
 @value
 @register_passable("trivial")
-struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
+struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
     """A statically sized tuple type which contains elements of homogeneous types.
 
     Parameters:
@@ -248,7 +244,10 @@ struct StaticTuple[element_type: AnyRegType, size: Int](Sized):
 
 
 @value
-struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
+struct InlineArray[
+    ElementType: CollectionElementNew,
+    size: Int,
+](Sized, Movable, Copyable, ExplicitlyCopyable):
     """A fixed-size sequence of size homogeneous elements where size is a constant expression.
 
     Parameters:
@@ -256,6 +255,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         size: The size of the array.
     """
 
+    # Fields
     alias type = __mlir_type[
         `!pop.array<`, size.value, `, `, Self.ElementType, `>`
     ]
@@ -263,7 +263,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
     """The underlying storage for the array."""
 
     # ===------------------------------------------------------------------===#
-    # Initializers
+    # Life cycle methods
     # ===------------------------------------------------------------------===#
 
     @always_inline
@@ -301,6 +301,7 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
             unsafe_uninitialized: A boolean to indicate if the array should be initialized.
                 Always set to `True` (it's not actually used inside the constructor).
         """
+        _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
     @always_inline
@@ -315,89 +316,85 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
 
         @parameter
         for i in range(size):
-            var ptr = self._get_reference_unsafe(i)
-            initialize_pointee_copy(UnsafePointer[Self.ElementType](ptr), fill)
+            var ptr = UnsafePointer.address_of(self._get_reference_unsafe(i)[])
+            ptr.initialize_pointee_explicit_copy(fill)
 
     @always_inline
-    fn __init__(inout self, *elems: Self.ElementType):
+    fn __init__(inout self, owned *elems: Self.ElementType):
         """Constructs an array given a set of arguments.
 
         Args:
             elems: The element types.
         """
-        debug_assert(len(elems) == size, "Elements must be of length size")
+
+        self = Self(storage=elems^)
+
+    @always_inline("nodebug")
+    fn __init__(
+        inout self,
+        *,
+        owned storage: VariadicListMem[Self.ElementType, _, _],
+    ):
+        """Construct an array from a low-level internal representation.
+
+        Args:
+            storage: The variadic list storage to construct from.
+        """
+
+        debug_assert(len(storage) == size, "Elements must be of length size")
         _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
+        # Move each element into the array storage.
         @parameter
         for i in range(size):
-            var ref = self._get_reference_unsafe(i)
-            initialize_pointee_move(
-                UnsafePointer[Self.ElementType](ref), elems[i]
+            var eltref = self._get_reference_unsafe(i)
+            UnsafePointer.address_of(storage[i]).move_pointee_into(
+                UnsafePointer[Self.ElementType].address_of(eltref[])
             )
 
-    # ===------------------------------------------------------------------=== #
-    # Trait Interfaces
-    # ===------------------------------------------------------------------=== #
+        # Mark the elements as already destroyed.
+        storage._is_owned = False
 
-    @always_inline("nodebug")
-    fn __len__(self) -> Int:
-        """Returns the length of the array. This is a known constant value.
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
 
-        Returns:
-            The size of the array.
+        Args:
+            other: The value to copy.
         """
-        return size
 
-    @always_inline("nodebug")
-    fn _get_reference_unsafe(
-        self: Reference[Self, _, _], index: Int
-    ) -> Reference[Self.ElementType, self.is_mutable, self.lifetime]:
-        """Get a reference to an element of self without checking index bounds.
+        self = Self(unsafe_uninitialized=True)
 
-        Users should opt for `__refitem__` instead of this method.
-        """
-        var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(self[]._array).address,
-            index.value,
-        )
-        return UnsafePointer(ptr)[]
+        for idx in range(size):
+            var ptr = self.unsafe_ptr() + idx
+
+            ptr.initialize_pointee_explicit_copy(other[idx])
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn __refitem__[
-        IntableType: Intable,
-    ](self: Reference[Self, _, _], index: IntableType) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
+    fn __getitem__(
+        ref [_]self: Self, idx: Int
+    ) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
-        Parameters:
-            IntableType: The inferred type of an intable argument.
-
         Args:
-            index: The index of the item.
+            idx: The index of the item.
 
         Returns:
             A reference to the item at the given index.
         """
-        debug_assert(-size <= int(index) < size, "Index must be within bounds.")
-        var normalized_idx = int(index)
-        if normalized_idx < 0:
-            normalized_idx += size
+        var normalized_index = normalize_index["InlineArray"](idx, self)
 
-        return self[]._get_reference_unsafe(normalized_idx)
+        return self._get_reference_unsafe(normalized_index)[]
 
     @always_inline("nodebug")
-    fn __refitem__[
+    fn __getitem__[
         IntableType: Intable,
         index: IntableType,
-    ](self: Reference[Self, _, _]) -> Reference[
-        Self.ElementType, self.is_mutable, self.lifetime
-    ]:
+    ](ref [_]self: Self) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
@@ -416,7 +413,56 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         if i < 0:
             normalized_idx += size
 
-        return self[]._get_reference_unsafe(normalized_idx)
+        return self._get_reference_unsafe(normalized_idx)[]
+
+    # ===------------------------------------------------------------------=== #
+    # Trait implementations
+    # ===------------------------------------------------------------------=== #
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        """Returns the length of the array. This is a known constant value.
+
+        Returns:
+            The size of the array.
+        """
+        return size
+
+    # ===------------------------------------------------------------------===#
+    # Methods
+    # ===------------------------------------------------------------------===#
+
+    @always_inline("nodebug")
+    fn _get_reference_unsafe(
+        ref [_]self: Self, idx: Int
+    ) -> Reference[Self.ElementType, __lifetime_of(self)]:
+        """Get a reference to an element of self without checking index bounds.
+
+        Users should opt for `__getitem__` instead of this method as it is
+        unsafe.
+
+        Note that there is no wraparound for negative indices. Using negative
+        indices is considered undefined behavior.
+
+        Args:
+            idx: The index of the element to get.
+
+        Returns:
+            A reference to the element at the given index.
+        """
+        var idx_as_int = index(idx)
+        debug_assert(
+            0 <= idx_as_int < size,
+            (
+                "Index must be within bounds when using"
+                " `InlineArray.unsafe_get()`."
+            ),
+        )
+        var ptr = __mlir_op.`pop.array.gep`(
+            UnsafePointer.address_of(self._array).address,
+            idx_as_int.value,
+        )
+        return UnsafePointer(ptr)[]
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[Self.ElementType]:
@@ -431,4 +477,38 @@ struct InlineArray[ElementType: CollectionElement, size: Int](Sized):
         Returns:
             An `UnsafePointer` to the underlying array.
         """
-        return UnsafePointer(self._array).bitcast[Self.ElementType]()
+        return UnsafePointer.address_of(self._array).bitcast[Self.ElementType]()
+
+    @always_inline
+    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
+        """Verify if a given value is present in the array.
+
+        ```mojo
+        from utils import InlineArray
+        var x = InlineArray[Int, 3](1,2,3)
+        if 3 in x: print("x contains 3")
+        ```
+
+        Parameters:
+            T: The type of the elements in the array. Must implement the
+              traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            value: The value to find.
+
+        Returns:
+            True if the value is contained in the array, False otherwise.
+        """
+        constrained[
+            _type_is_eq[T, Self.ElementType](),
+            "T must be equal to Self.ElementType",
+        ]()
+
+        # TODO: use @parameter for soon once it stabilizes a bit
+        for i in range(size):
+            if (
+                rebind[Reference[T, __lifetime_of(self)]](Reference(self[i]))[]
+                == value
+            ):
+                return True
+        return False

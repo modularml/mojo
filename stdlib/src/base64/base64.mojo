@@ -70,7 +70,7 @@ fn b64encode(str: String) -> String:
       Base64 encoding of the input string.
     """
     alias lookup = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    var b64chars = lookup.as_uint8_ptr()
+    var b64chars = lookup.unsafe_ptr()
 
     var length = len(str)
     var out = String._buffer_type(capacity=length + 1)
@@ -78,8 +78,7 @@ fn b64encode(str: String) -> String:
     @parameter
     @always_inline
     fn s(idx: Int) -> Int:
-        # TODO: Remove cast once transition to UInt8 string types is complete.
-        return int(str.unsafe_ptr().bitcast[UInt8]()[idx])
+        return int(str.unsafe_ptr()[idx])
 
     # This algorithm is based on https://arxiv.org/abs/1704.00605
     var end = length - (length % 3)
@@ -169,7 +168,7 @@ fn b16encode(str: String) -> String:
       Base16 encoding of the input string.
     """
     alias lookup = "0123456789ABCDEF"
-    var b16chars = lookup.as_uint8_ptr()
+    var b16chars = lookup.unsafe_ptr()
 
     var length = len(str)
     var out = List[UInt8](capacity=length * 2 + 1)
@@ -183,8 +182,8 @@ fn b16encode(str: String) -> String:
         var str_byte = str_bytes(i)
         var hi = str_byte >> 4
         var lo = str_byte & 0b1111
-        out.append(b16chars[hi])
-        out.append(b16chars[lo])
+        out.append(b16chars[int(hi)])
+        out.append(b16chars[int(lo)])
 
     out.append(0)
 

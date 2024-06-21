@@ -22,13 +22,13 @@ your issues resolved.
 
 ## Standard library code
 
-### 1. Why do we have both `AnyRegType` and `AnyType`?
+### 1. Why do we have both `AnyTrivialRegType` and `AnyType`?
 
-This is largely a historical thing as the library only worked on `AnyRegType`
+This is largely a historical thing as the library only worked on `AnyTrivialRegType`
 when it was first written. As we introduced the notion of memory-only types and
 traits, `AnyType` was born. Over time, we expect to rewrite nearly
 the entire library to have everything work on `AnyType` and be generalized to
-not just work on `AnyRegType`. Several things need to happen in tandem with
+not just work on `AnyTrivialRegType`. Several things need to happen in tandem with
 the compiler team to make this possible.
 
 ### 2. Are the MLIR dialects private?

@@ -15,8 +15,8 @@
 
 from testing import assert_equal, assert_true
 
-from utils.inlined_string import _FixedString
-from utils import InlinedString
+from utils import InlineString
+from utils.inline_string import _FixedString
 
 
 def main():
@@ -86,8 +86,8 @@ def test_small_string_construction():
     # Test construction from StringLiteral
     # ==================================
 
-    var s1 = InlinedString("hello world")
-    var s2 = InlinedString("the quick brown fox jumped over the lazy dog")
+    var s1 = InlineString("hello world")
+    var s2 = InlineString("the quick brown fox jumped over the lazy dog")
 
     assert_true(s1._is_small())
     assert_true(not s2._is_small())
@@ -102,9 +102,9 @@ def test_small_string_construction():
     var heap_s1 = String("hello")
     var heap_s1_addr = int(heap_s1.unsafe_ptr())
 
-    var s3 = InlinedString(heap_s1^)
+    var s3 = InlineString(heap_s1^)
 
-    # Test that a InlinedString constructed from a String uses the same
+    # Test that a InlineString constructed from a String uses the same
     # allocation as the original String (even if the String size is small
     # enough to fit inline).
     assert_equal(int(s3.unsafe_ptr()), heap_s1_addr)
@@ -112,10 +112,10 @@ def test_small_string_construction():
 
 def test_small_string_iadd():
     # ==================================
-    # Test appending StringLiteral to InlinedString
+    # Test appending StringLiteral to InlineString
     # ==================================
 
-    var s1 = InlinedString("")
+    var s1 = InlineString("")
 
     assert_equal(len(s1), 0)
     assert_true(s1._is_small())
@@ -150,10 +150,10 @@ def test_small_string_iadd():
     assert_equal(str(s1), "Hello world, how's it going? The End.")
 
     # ==================================
-    # Test appending String to InlinedString
+    # Test appending String to InlineString
     # ==================================
 
-    var s2 = InlinedString("")
+    var s2 = InlineString("")
     s2 += String("Hello, World!")
 
     assert_equal(str(s2), "Hello, World!")
@@ -162,28 +162,28 @@ def test_small_string_iadd():
 
 def test_small_string_add():
     #
-    # Test InlinedString + StringLiteral
+    # Test InlineString + StringLiteral
     #
 
-    var s1: InlinedString = InlinedString("hello") + " world"
+    var s1: InlineString = InlineString("hello") + " world"
 
     assert_equal(str(s1), "hello world")
     assert_equal(len(s1), "11")
 
     #
-    # Test InlinedString + InlinedString
+    # Test InlineString + InlineString
     #
 
-    var s2: InlinedString = InlinedString("hello") + InlinedString(" world")
+    var s2: InlineString = InlineString("hello") + InlineString(" world")
 
     assert_equal(str(s2), "hello world")
     assert_equal(len(s2), "11")
 
     #
-    # Test InlinedString + String
+    # Test InlineString + String
     #
 
-    var s3: InlinedString = InlinedString("hello") + String(" world")
+    var s3: InlineString = InlineString("hello") + String(" world")
 
     assert_equal(str(s3), "hello world")
     assert_equal(len(s3), "11")

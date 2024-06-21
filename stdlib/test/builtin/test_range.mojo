@@ -14,8 +14,6 @@
 
 from testing import assert_equal
 
-from testing import assert_equal
-
 
 def test_range_len():
     # Usual cases
@@ -32,11 +30,11 @@ def test_range_len():
     assert_equal(range(0, 0).__len__(), 0, "len(range(0, 0))")
     assert_equal(range(10, 0).__len__(), 0, "len(range(10, 0))")
     assert_equal(range(0, 0, 1).__len__(), 0, "len(range(0, 0, 1))")
-    # FIXME(#38392)
-    # assert_equal(range(5, 10, -1).__len__(), 0, "len(range(5, 10, -1))")
-    # assert_equal(range(10, 5, 1).__len__(), 0, "len(range(10, 5, 1))")
-    # assert_equal(range(5, 10, -10).__len__(), 0, "len(range(5, 10, -10))")
-    # assert_equal(range(10, 5, 10).__len__(), 0, "len(range(10, 5, 10))")
+
+    assert_equal(range(5, 10, -1).__len__(), 0, "len(range(5, 10, -1))")
+    assert_equal(range(10, 5, 1).__len__(), 0, "len(range(10, 5, 1))")
+    assert_equal(range(5, 10, -10).__len__(), 0, "len(range(5, 10, -10))")
+    assert_equal(range(10, 5, 10).__len__(), 0, "len(range(10, 5, 10))")
     assert_equal(range(5, 10, 20).__len__(), 1, "len(range(5, 10, 20))")
     assert_equal(range(10, 5, -20).__len__(), 1, "len(range(10, 5, -20))")
 
@@ -115,7 +113,15 @@ def test_range_reversed():
         test_sum_reversed(20, end, -3)
 
 
+def test_indexing():
+    var r = range(10)
+    assert_equal(r[True], 1)
+    assert_equal(r[int(4)], 4)
+    assert_equal(r[3], 3)
+
+
 def main():
     test_range_len()
     test_range_getitem()
     test_range_reversed()
+    test_indexing()
