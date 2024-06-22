@@ -39,11 +39,11 @@ from memory import AddressSpace, DTypePointer, Pointer
 
 @register_passable
 struct _OwnedStringRef(Boolable):
-    var data: DTypePointer[DType.int8]
+    var data: UnsafePointer[UInt8]
     var length: Int
 
     fn __init__() -> _OwnedStringRef:
-        return Self {data: DTypePointer[DType.int8](), length: 0}
+        return Self {data: UnsafePointer[UInt8](), length: 0}
 
     fn __del__(owned self):
         if self.data:
@@ -51,15 +51,13 @@ struct _OwnedStringRef(Boolable):
 
     fn consume_as_error(owned self) -> Error:
         var data = self.data
+
         # Don't free self.data in our dtor.
-        self.data = DTypePointer[DType.int8]()
-        var length = self.length
+        self.data = UnsafePointer[UInt8]()
+
         return Error {
-            data: UnsafePointer[UInt8]._from_dtype_ptr(
-                # TODO: Remove cast once string UInt8 transition is complete.
-                data.bitcast[DType.uint8]()
-            ),
-            loaded_length: -length,
+            data: data,
+            loaded_length: -self.length,
         }
 
     fn __bool__(self) -> Bool:

@@ -17,8 +17,9 @@ These are Mojo built-ins, so you don't need to import them.
 
 
 from os import abort
+from sys import is_defined, triple_is_nvidia_cuda
 from sys._build import is_kernels_debug_build
-from sys import triple_is_nvidia_cuda, is_defined
+
 from builtin._location import __call_location, _SourceLocation
 
 

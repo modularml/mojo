@@ -257,16 +257,6 @@ def test_nextafter():
     )
 
 
-def test_ulp():
-    assert_true(isnan(ulp(nan[DType.float32]())))
-    assert_true(isinf(ulp(inf[DType.float32]())))
-    assert_true(isinf(ulp(-inf[DType.float32]())))
-    assert_almost_equal(ulp(Float64(0)), 5e-324)
-    assert_equal(ulp(max_finite[DType.float64]()), 1.99584030953472e292)
-    assert_equal(ulp(Float64(5)), 8.881784197001252e-16)
-    assert_equal(ulp(Float64(-5)), 8.881784197001252e-16)
-
-
 def main():
     test_FPUtils()
     test_get_accum_type()
@@ -279,4 +269,3 @@ def main():
     test_min_or_neg_inf()
     test_neg_inf()
     test_nextafter()
-    test_ulp()

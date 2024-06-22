@@ -14,17 +14,16 @@
 
 from sys import has_neon
 
+from builtin.simd import _modf
 from testing import (
+    assert_almost_equal,
     assert_equal,
     assert_false,
     assert_not_equal,
     assert_true,
-    assert_almost_equal,
 )
 
 from utils.numerics import isfinite, isinf, isnan, nan
-from utils.static_tuple import StaticTuple
-from builtin.simd import _modf
 
 
 def test_cast():
@@ -167,7 +166,7 @@ def test_issue_30237():
     alias dtype = DType.float32
     alias simd_width = 1
     alias coefficients_len = 7
-    alias coefficients = StaticTuple[SIMD[dtype, simd_width], coefficients_len](
+    alias coefficients = InlineArray[SIMD[dtype, simd_width], coefficients_len](
         4.89352455891786e-03,
         6.37261928875436e-04,
         1.48572235717979e-05,

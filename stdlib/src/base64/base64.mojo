@@ -78,8 +78,7 @@ fn b64encode(str: String) -> String:
     @parameter
     @always_inline
     fn s(idx: Int) -> Int:
-        # TODO: Remove cast once transition to UInt8 string types is complete.
-        return int(str.unsafe_ptr().bitcast[UInt8]()[idx])
+        return int(str.unsafe_ptr()[idx])
 
     # This algorithm is based on https://arxiv.org/abs/1704.00605
     var end = length - (length % 3)
@@ -225,7 +224,7 @@ fn b16decode(str: String) -> String:
     var n = len(str)
     debug_assert(n % 2 == 0, "Input length must be divisible by 2")
 
-    var p = List[UInt8](capacity=int(n / 2) + 1)
+    var p = List[UInt8](capacity=n // 2 + 1)
 
     for i in range(0, n, 2):
         var hi = str[i]

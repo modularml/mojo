@@ -102,6 +102,7 @@ struct Formatter:
         alias slc = literal.as_string_slice()
         self.write_str(slc)
 
+    # TODO: Constrain to only require an immutable StringSlice[..]`
     @always_inline
     fn write_str(inout self, str_slice: StringSlice[_]):
         """
@@ -118,6 +119,16 @@ struct Formatter:
         var strref: StringRef = str_slice._strref_dangerous()
 
         self._write_func(self._write_func_arg, strref)
+
+    fn write[*Ts: Formattable](inout self: Formatter, *args: *Ts):
+        """Write a sequence of formattable arguments to the provided formatter.
+        """
+
+        @parameter
+        fn write_arg[T: Formattable](arg: T):
+            arg.format_to(self)
+
+        args.each[write_arg]()
 
     # ===------------------------------------------------------------------=== #
     # Factory methods
@@ -137,6 +148,7 @@ struct Formatter:
         return Formatter(write_to_stdout, UnsafePointer[NoneType]())
 
 
+# TODO: Use Formatter.write instead.
 fn write_to[*Ts: Formattable](inout writer: Formatter, *args: *Ts):
     """
     Write a sequence of formattable arguments to the provided formatter.

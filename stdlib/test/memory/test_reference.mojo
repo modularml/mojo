@@ -10,6 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the time package."""
+# RUN: %mojo %s
+from testing import assert_equal
 
-from .time import now, sleep, time_function
+
+def test_copy_reference_explicitly():
+    var a = List[Int](1, 2, 3)
+
+    var b = Reference(a)
+
+    var c = Reference(other=b)
+
+    c[][0] = 4
+    assert_equal(a[0], 4)
+    assert_equal(b[][0], 4)
+    assert_equal(c[][0], 4)
+
+
+def main():
+    test_copy_reference_explicitly()

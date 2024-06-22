@@ -19,8 +19,10 @@ from testing import assert_true
 ```
 """
 from collections import Optional
-from utils.numerics import isfinite, isnan
+
 from builtin._location import __call_location, _SourceLocation
+
+from utils.numerics import isfinite, isnan
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -133,7 +135,9 @@ fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
+        raise _assert_cmp_error["`left == right` comparison"](
+            str(lhs), str(rhs), msg, __call_location()
+        )
 
 
 # TODO: Remove the String and SIMD overloads once we have more powerful traits.
@@ -151,7 +155,9 @@ fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(lhs, rhs, msg, __call_location())
+        raise _assert_cmp_error["`left == right` comparison"](
+            lhs, rhs, msg, __call_location()
+        )
 
 
 @always_inline
@@ -174,7 +180,9 @@ fn assert_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if any(lhs != rhs):
-        raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
+        raise _assert_cmp_error["`left == right` comparison"](
+            str(lhs), str(rhs), msg, __call_location()
+        )
 
 
 @always_inline
@@ -194,7 +202,7 @@ fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise _assert_not_equal_error(
+        raise _assert_cmp_error["`left != right` comparison"](
             str(lhs), str(rhs), msg, __call_location()
         )
 
@@ -213,7 +221,9 @@ fn assert_not_equal(lhs: String, rhs: String, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise _assert_not_equal_error(lhs, rhs, msg, __call_location())
+        raise _assert_cmp_error["`left != right` comparison"](
+            lhs, rhs, msg, __call_location()
+        )
 
 
 @always_inline
@@ -236,7 +246,7 @@ fn assert_not_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if all(lhs == rhs):
-        raise _assert_not_equal_error(
+        raise _assert_cmp_error["`left != right` comparison"](
             str(lhs), str(rhs), msg, __call_location()
         )
 
@@ -302,29 +312,64 @@ fn assert_almost_equal[
         raise _assert_error(err, __call_location())
 
 
-fn _assert_equal_error(
-    lhs: String, rhs: String, msg: String, loc: _SourceLocation
-) -> String:
-    var err = (
-        "`left == right` comparison failed:\n   left: "
-        + lhs
-        + "\n  right: "
-        + rhs
-    )
-    if msg:
-        err += "\n  reason: " + msg
-    return _assert_error(err, loc)
+@always_inline
+fn assert_is[
+    T: StringableIdentifiable
+](lhs: T, rhs: T, msg: String = "") raises:
+    """Asserts that the input values have the same identity. If they do not
+    then an Error is raised.
+
+    Parameters:
+        T: A StringableIdentifiable type.
+
+    Args:
+        lhs: The lhs of the `is` statement.
+        rhs: The rhs of the `is` statement.
+        msg: The message to be printed if the assertion fails.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
+    if lhs is not rhs:
+        raise _assert_cmp_error["`left is right` identification"](
+            str(lhs),
+            str(rhs),
+            msg,
+            __call_location(),
+        )
 
 
-fn _assert_not_equal_error(
-    lhs: String, rhs: String, msg: String, loc: _SourceLocation
-) -> String:
-    var err = (
-        "`left != right` comparison failed:\n   left: "
-        + lhs
-        + "\n  right: "
-        + rhs
-    )
+@always_inline
+fn assert_is_not[
+    T: StringableIdentifiable
+](lhs: T, rhs: T, msg: String = "") raises:
+    """Asserts that the input values have different identities. If they do not
+    then an Error is raised.
+
+    Parameters:
+        T: A StringableIdentifiable type.
+
+    Args:
+        lhs: The lhs of the `is not` statement.
+        rhs: The rhs of the `is not` statement.
+        msg: The message to be printed if the assertion fails.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
+    if lhs is rhs:
+        raise _assert_cmp_error["`left is not right` identification"](
+            str(lhs),
+            str(rhs),
+            msg,
+            __call_location(),
+        )
+
+
+fn _assert_cmp_error[
+    cmp: String
+](lhs: String, rhs: String, msg: String, loc: _SourceLocation) -> String:
+    var err = (cmp + " failed:\n   left: " + lhs + "\n  right: " + rhs)
     if msg:
         err += "\n  reason: " + msg
     return _assert_error(err, loc)

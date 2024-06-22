@@ -13,12 +13,12 @@
 """Implements the random package."""
 
 from .random import (
-    seed,
+    rand,
+    randint,
+    randn,
+    randn_float64,
     random_float64,
     random_si64,
     random_ui64,
-    randint,
-    rand,
-    randn_float64,
-    randn,
+    seed,
 )

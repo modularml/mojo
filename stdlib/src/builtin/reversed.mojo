@@ -15,11 +15,10 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from .range import _StridedRange
-
+from collections.dict import _DictEntryIter, _DictKeyIter, _DictValueIter
 from collections.list import _ListIter
 
-from collections.dict import _DictKeyIter, _DictValueIter, _DictEntryIter
+from .range import _StridedRange
 
 # ===----------------------------------------------------------------------=== #
 #  Reversible

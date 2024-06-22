@@ -65,6 +65,13 @@ what we publish.
   This supports work to transition the standard library collection types away
   from implicit copyability, which can lead to unintended expensive copies.
 
+- Added `Identifiable` trait, used to describe types that implement the `__is__`
+  and `__isnot__` trait methods.
+  ([PR #2807](https://github.com/modularml/mojo/pull/2807))
+
+  - Also added new `assert_is()` and `assert_is_not()` test utilities to the
+    `testing` module.
+
 - `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
 ([PR #2701](https://github.com/modularml/mojo/pull/2701)
 by [@jayzhan211](https://github.com/jayzhan211))
@@ -74,6 +81,11 @@ by [@jayzhan211](https://github.com/jayzhan211))
   APIs.
 
 - Added `C_char` type alias in `sys.ffi`.
+
+- Added `StringSlice(..)` initializer from a `StringLiteral`.
+
+- Added new `StaticString` type alias. This can be used in place of
+  `StringLiteral` for runtime string arguments.
 
 - Added `TemporaryDirectory` in module `tempfile`.
   ([PR 2743](https://github.com/modularml/mojo/pull/2743) by [@artemiogr97](https://github.com/artemiogr97))
@@ -92,6 +104,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
   var y = List(4,5,6)
   print(x.__ne__(y)) #True
   ```
+
+- Added `oct(..)` function for formatting an integer in octal.
+  ([PR #2914](https://github.com/modularml/mojo/pull/2914) by [@bgreni](https://github.com/bgreni))
 
 - Added `String.format` method.
   ([PR #2771](https://github.com/modularml/mojo/pull/2771) by [@rd4com](https://github.com/rd4com))
@@ -127,6 +142,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
   `MOJO_PYTHON_LIBRARY` still exists for environments with a dynamic libpython,
   but no Python executable.
+
+- The `math` package now includes the `pi`, `e`, and `tau` constants (Closes
+  Issue [#2135](https://github.com/modularml/mojo/issues/2135)).
 
 ### 🦋 Changed
 
@@ -173,6 +191,11 @@ by [@jayzhan211](https://github.com/jayzhan211))
   same folder as the target file:
   - `mojo run /tmp/main.mojo` can access `/tmp/mymodule.py`
   - `mojo build main.mojo -o ~/myexe && ~/myexe` can access `~/mymodule.py`
+
+- The rank argument for `algorihtm.elementwise` is no longer required and is
+  only inferred.
+
+- The `ulp` function in `numerics` have been moved to the `math` module.
 
 ### ❌ Removed
 

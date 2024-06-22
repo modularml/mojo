@@ -60,7 +60,7 @@ feedback](/mojo/community).
 
 - **Python**
 
-  - [Python integration](/mojo/manual/python/index)
+  - [Python integration](/mojo/manual/python/)
   - [Python types](/mojo/manual/python/types)
 
 - **Tools**
