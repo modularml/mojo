@@ -36,7 +36,12 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         V: The value type to be counted. Currently must be KeyElement.
     """
 
+    # Fields
     var _data: Dict[V, Int]
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     def __init__(inout self):
         """Create a new, empty Counter object."""
@@ -53,6 +58,10 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         for item_ref in items:
             var item = item_ref[]
             self._data[item] = self._data.get(item, 0) + 1
+
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     def __getitem__(self, key: V) -> Int:
         """Get the count of a key.
@@ -82,6 +91,10 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.__iter__()
 
+    # ===-------------------------------------------------------------------===#
+    # Trait implementations
+    # ===-------------------------------------------------------------------===#
+
     fn __len__(self) -> Int:
         """The number of elements currently stored in the Counter."""
         return len(self._data)
@@ -93,6 +106,10 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             `False` if the Counter is empty, `True` if there is at least one element.
         """
         return bool(len(self))
+
+    # ===-------------------------------------------------------------------===#
+    # Comparison operators
+    # ===-------------------------------------------------------------------===#
 
     fn __eq__(self, other: Self) -> Bool:
         """Check if all counts agree. Missing counts are treated as zero.
@@ -180,6 +197,10 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return other <= self
 
+    # ===-------------------------------------------------------------------===#
+    # Binary operators
+    # ===-------------------------------------------------------------------===#
+
     fn __add__(self, other: Self) raises -> Self:
         """Add counts from two Counters.
 
@@ -209,6 +230,10 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             var key = key_ref[]
             if self[key] <= 0:
                 _ = self.pop(key)
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
 
     fn get(self, value: V) -> Optional[Int]:
         """Get a value from the counter.
@@ -360,10 +385,15 @@ struct CountTuple[V: KeyElement](
         V: The value in the Counter.
     """
 
+    # Fields
     var _value: V
     """ The value in the Counter."""
     var _count: Int
     """ The count of the value in the Counter."""
+
+    # ===-------------------------------------------------------------------===#
+    # Life cycle methods
+    # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self, value: V, count: Int):
         """Create a new CountTuple.
@@ -393,24 +423,9 @@ struct CountTuple[V: KeyElement](
         self._value = other._value^
         self._count = other._count
 
-    @always_inline("nodebug")
-    fn __getitem__(self, idx: Int) -> Variant[V, Int]:
-        """Get an element in the tuple.
-
-        Args:
-            idx: The element to return.
-
-        Returns:
-            The value if idx is 0 and the count if idx is 1.
-        """
-        debug_assert(
-            0 <= idx <= 1,
-            "index must be within bounds",
-        )
-        if idx == 0:
-            return self._value
-        else:
-            return self._count
+    # ===-------------------------------------------------------------------===#
+    # Operator dunders
+    # ===-------------------------------------------------------------------===#
 
     fn __lt__(self, other: Self) -> Bool:
         """Compare two CountTuples by count, then by value.
@@ -433,3 +448,22 @@ struct CountTuple[V: KeyElement](
             True if the two CountTuples are equal, False otherwise.
         """
         return self._count == other._count
+
+    @always_inline("nodebug")
+    fn __getitem__(self, idx: Int) -> Variant[V, Int]:
+        """Get an element in the tuple.
+
+        Args:
+            idx: The element to return.
+
+        Returns:
+            The value if idx is 0 and the count if idx is 1.
+        """
+        debug_assert(
+            0 <= idx <= 1,
+            "index must be within bounds",
+        )
+        if idx == 0:
+            return self._value
+        else:
+            return self._count
