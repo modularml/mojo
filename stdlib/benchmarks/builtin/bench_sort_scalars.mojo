@@ -156,7 +156,7 @@ fn bench_tiny_list_sort(inout m: Bench) raises:
                     + str(dt)
                 )
             )
-
+            _ = list^
 
 # ===----------------------------------------------------------------------===#
 # Benchmark sort functions with a small list size
