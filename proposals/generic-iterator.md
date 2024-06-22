@@ -8,22 +8,21 @@ independently if a function wants to take iterable arguments.
 ## What is proposed?
 
 ```mojo
-
 trait HasNext[T: CollectionElement]:
     fn __next__(self) -> T:
         ...
-    
+
 
 trait HasNextLen[T: CollectionElement]:
     fn __next__(self) -> T:
         ...
-    
+
     fn __len__(self) -> Int:
         ...
 
 
 trait HasNextRaising[T: CollectionElement]:
-    fn __next__(self) raising -> T:
+    fn __next__(self) raises -> T:
         ...
 
 
@@ -34,22 +33,14 @@ trait HasOptionalNext[T: CollectionElement]:
 
 struct StaticSizedIterator[size: Int, T: CollectionElement, A: HasNext[T]]:
     var _has_next: A
-    var idx: UInt
 
     fn __init__(inout self, has_next: A):
         self._has_next = has_next
-        self.idx = 0
 
     fn __iter__(self) -> Iterator[T]:
         return Iterator(self)
 
-    fn __next__(self) -> Optional[T]:
-        if self.idx == size:
-            return None
-        self.idx += 1
-        return next(self._has_next)
-
-    fn __next__[bypass: Bool](self) -> T:
+    fn __next__(self) -> T:
         return next(self._has_next)
 
 
@@ -62,12 +53,7 @@ struct SizedIterator[T: CollectionElement, A: HasNextLen[T]]:
     fn __iter__(self) -> Iterator[T]:
         return Iterator(self)
 
-    fn __next__(self) -> Optional[T]:
-        if len(self._has_next) == 0:
-            return None
-        return next(self._has_next)
-
-    fn __next__[bypass: Bool](self) -> T:
+    fn __next__(self) -> T:
         return next(self._has_next)
 
     fn __len__(self) -> Int:
@@ -80,32 +66,63 @@ struct RaisingIterator[T: CollectionElement, A: HasNextRaising[T]]:
     fn __init__(inout self, has_next: A):
         self._has_next = has_next
 
-    fn __iter__(self) -> Iterator[T]:
+    fn __iter__(self) -> Iterator[T, A]:
         return Iterator(self)
 
-    fn __next__(self) -> Optional[T]:
+    fn __next__(self) raises -> T:
+        return next(self._has_next)
+
+
+@value
+struct Iterator[
+    T: CollectionElement,
+    A: Variant[
+        HasOptionalNext[T],
+        RaisingIterator[T],
+        SizedIterator[T],
+        StaticSizedIterator[T],
+    ],
+]:
+    var _has_next: A
+    var _idx: UInt
+
+    fn __init__(inout self, has_next: A):
+        self._has_next = has_next
+        self._idx = 0
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__[I: HasOptionalNext[T]](self: Iterator[T, N]) -> Optional[T]:
+        return next(self._has_next)
+
+    fn __next__[
+        N: HasNextRaising[T], I: RaisingIterator[T, N]
+    ](self: Iterator[T, N]) -> Optional[T]:
         try:
             return next(self._has_next)
         except:
             return None
 
-    fn __next__[bypass: Bool](self) raising -> T:
+    fn __next__[
+        N: HasNextLen[T], I: SizedIterator[T, N]
+    ](self: Iterator[T, N]) -> Optional[T]:
+        if len(self._has_next) == 0:
+            return None
         return next(self._has_next)
 
-
-struct Iterator[T: CollectionElement, A: HasOptionalNext[T]]:
-    var _has_next: A
-
-    fn __init__(inout self, has_next: A):
-        self._has_next = has_next
-
-    fn __iter__(self) -> Iterator[T]:
-        return self
-
-    fn __next__(self) -> Optional[T]:
+    fn __next__[
+        size: Int, N: HasNext[T], I: StaticSizedIterator[size, T, N]
+    ](self: Iterator[T, N]) -> Optional[T]:
+        # FIXME: the state of _idx should be contained here and not in a struct
+        # attr. Once we have generators ?
+        if self._idx == size:
+            return None
+        self._idx += 1
         return next(self._has_next)
-    
+
     ...
+
 
 trait HasIter[T: CollectionElement]:
     fn __iter__(self) -> Iterator[T]:
@@ -114,8 +131,8 @@ trait HasIter[T: CollectionElement]:
 
 ## What would be needed?
 
-The for loop codegen implementation would need to check for None and break so that
-pythonic syntax is preserved
+The for loop codegen implementation would need to check for None and break so
+that pythonic syntax is preserved
 ```mojo
 for i in List("something", "something"):
     print(i)
@@ -125,14 +142,15 @@ for i in List("something", "something"):
 
 ## Other details
 
-To allow for functional patterns, the Iterator struct could have wrappers for itertools
+To allow for functional patterns, the Iterator struct could have wrappers for
+itertools
 ```mojo
 struct Iterator[T: CollectionElement, A: Nextable[T]]:
     ...
     fn map(owned self, func: fn(value: T) -> T) -> Self:
         return map(func, self)
 
-    fn filter(owned self, func: fn(value: T) -> Optional[T]) -> Self:
+    fn filter(owned self, func: fn(value: T) -> Bool) -> Self:
         return filter(func, self)
     
     fn batched(owned self, amnt: Int) -> Self:
