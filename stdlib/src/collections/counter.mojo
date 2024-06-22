@@ -43,12 +43,12 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    def __init__(inout self):
+    fn __init__(inout self):
         """Create a new, empty Counter object."""
         self._data = Dict[V, Int]()
 
     # TODO: Change List to Iterable when it is supported in Mojo
-    def __init__(inout self, items: List[V]):
+    fn __init__(inout self, items: List[V]):
         """Create a from an input iterable.
 
         Args:
@@ -259,9 +259,21 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.get(value, default)
 
-    fn pop(
-        inout self, value: V, owned default: Optional[Int] = None
-    ) raises -> Int:
+    fn pop(inout self, value: V) raises -> Int:
+        """Remove a value from the Counter by value.
+
+        Args:
+            value: The value to remove from the Counter.
+
+        Returns:
+            The value associated with the key, if it was in the Counter.
+
+        Raises:
+            "KeyError" if the key was not present in the Counter.
+        """
+        return self._data.pop(value)
+
+    fn pop(inout self, value: V, owned default: Int) raises -> Int:
         """Remove a value from the Counter by value.
 
         Args:
