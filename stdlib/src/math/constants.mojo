@@ -10,16 +10,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
+"""Defines math utilities.
 
-"""Implements the testing package."""
+You can import these APIs from the `math` package. For example:
 
-from .testing import (
-    assert_almost_equal,
-    assert_equal,
-    assert_false,
-    assert_not_equal,
-    assert_raises,
-    assert_true,
-    assert_is,
-    assert_is_not,
-)
+```mojo
+from math import pi
+```
+"""
+
+
+alias pi = 3.1415926535897932384626433832795028841971693993751058209749445923
+"""The mathematical constant π = 3.141592..."""
+
+alias e = 2.7182818284590452353602874713526624977572470936999595749669676277
+"""The euler constant e = 2.718281..."""
+
+alias tau = 2 * pi
+"""The mathematical constant τ = 6.283185.... Tau is a circumference of a circle (2π)."""

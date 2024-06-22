@@ -336,7 +336,7 @@ fn _try_write_int[
 
     # Stack allocate enough bytes to store any formatted 64-bit integer
     # TODO: use a dynamic size when #2194 is resolved
-    alias CAPACITY: Int = 64
+    alias CAPACITY: Int = 64 + 1  # +1 for storing NUL terminator.
 
     var buf = InlineArray[UInt8, CAPACITY](unsafe_uninitialized=True)
 
@@ -344,6 +344,12 @@ fn _try_write_int[
     # digits later in the buffer, and then decrement the pointer to move
     # earlier in the buffer as we write the more-significant digits.
     var offset = CAPACITY - 1
+
+    buf[offset] = 0  # Write NUL terminator at the end
+
+    # Position the offset to write the least-significant digit just before the
+    # NUL terminator.
+    offset -= 1
 
     # Write the digits of the number
     var remaining_int = value
@@ -385,7 +391,7 @@ fn _try_write_int[
 
     # Calculate the length of the buffer we've filled. This is the number of
     # bytes from our final `buf_ptr` to the end of the buffer.
-    var len = CAPACITY - offset
+    var len = (CAPACITY - offset) - 1  # -1 because NUL terminator
 
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
