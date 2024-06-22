@@ -99,23 +99,28 @@ struct Iterator[
     fn __next__(self) -> Optional[T]:
         @parameter
         if A.isa[HasOptionalNext]():
-            return next(self._has_next)
+            alias iterator = A.get[HasOptionalNext]()
+            return next(iterator)
         elif A.isa[RaisingIterator]():
+            alias iterator = A.get[RaisingIterator]()
             try:
-                return next(self._has_next)
+                return next(iterator)
             except:
                 return None
         elif A.isa[SizedIterator]():
-            if len(self._has_next) == 0:
+            alias iterator = A.get[SizedIterator]()
+            if len(iterator) == 0:
                 return None
-            return next(self._has_next)
+            return next(iterator)
         elif A.isa[StaticSizedIterator]():
+            alias iterator = A.get[StaticSizedIterator]()
             # FIXME: the state of _idx should be contained here and not in a
-            # struct attr. Once we have generators ?
+            # struct attr. Once we have generators ? or have _idx only exist
+            # if A.isa[StaticSizedIterator] ?
             if self._idx == size:
                 return None
             self._idx += 1
-            return next(self._has_next)
+            return next(iterator)
         else:
             constrained[False, "no such iterator"]()
             return None
