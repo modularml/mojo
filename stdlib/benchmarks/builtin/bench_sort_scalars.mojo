@@ -223,7 +223,7 @@ fn bench_small_list_sort(inout m: Bench) raises:
                     + str(dt)
                 )
             )
-
+            _ = list^
 
 # ===----------------------------------------------------------------------===#
 # Benchmark Main
