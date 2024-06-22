@@ -7,6 +7,9 @@ independently if a function wants to take iterable arguments.
 
 ## What is proposed?
 
+Have iterators that return `Optional[T]` be "first class citizens" compared to
+other iterators, but still provide adapters for interop.
+
 ```mojo
 trait HasNext[T: CollectionElement]:
     fn __next__(self) -> T:
@@ -93,33 +96,29 @@ struct Iterator[
     fn __iter__(self) -> Self:
         return self
 
-    fn __next__[I: HasOptionalNext[T]](self: Iterator[T, N]) -> Optional[T]:
-        return next(self._has_next)
-
-    fn __next__[
-        N: HasNextRaising[T], I: RaisingIterator[T, N]
-    ](self: Iterator[T, N]) -> Optional[T]:
-        try:
+    fn __next__(self) -> Optional[T]:
+        @parameter
+        if A.isa[HasOptionalNext]():
             return next(self._has_next)
-        except:
+        elif A.isa[RaisingIterator]():
+            try:
+                return next(self._has_next)
+            except:
+                return None
+        elif A.isa[SizedIterator]():
+            if len(self._has_next) == 0:
+                return None
+            return next(self._has_next)
+        elif A.isa[StaticSizedIterator]():
+            # FIXME: the state of _idx should be contained here and not in a
+            # struct attr. Once we have generators ?
+            if self._idx == size:
+                return None
+            self._idx += 1
+            return next(self._has_next)
+        else:
+            constrained[False, "no such iterator"]()
             return None
-
-    fn __next__[
-        N: HasNextLen[T], I: SizedIterator[T, N]
-    ](self: Iterator[T, N]) -> Optional[T]:
-        if len(self._has_next) == 0:
-            return None
-        return next(self._has_next)
-
-    fn __next__[
-        size: Int, N: HasNext[T], I: StaticSizedIterator[size, T, N]
-    ](self: Iterator[T, N]) -> Optional[T]:
-        # FIXME: the state of _idx should be contained here and not in a struct
-        # attr. Once we have generators ?
-        if self._idx == size:
-            return None
-        self._idx += 1
-        return next(self._has_next)
 
     ...
 
