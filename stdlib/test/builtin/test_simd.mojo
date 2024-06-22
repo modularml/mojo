@@ -1533,12 +1533,10 @@ def test_split():
 def test_contains():
     var x = SIMD[DType.int8, 4](1, 2, 3, 4)
     assert_true(1 in x and 2 in x and 3 in x and 4 in x)
-    assert_false(0 in x)
-    assert_false(5 in x)
+    assert_false(0 in x or 5 in x)
     var y = SIMD[DType.float16, 4](1, 2, 3, 4)
     assert_true(1 in y and 2 in y and 3 in y and 4 in y)
-    assert_false(0 in y)
-    assert_false(5 in y)
+    assert_false(0 in y or 5 in y)
 
 
 def main():
