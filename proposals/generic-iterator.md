@@ -40,7 +40,7 @@ struct StaticSizedIterator[size: Int, T: CollectionElement, A: HasNext[T]]:
     fn __init__(inout self, has_next: A):
         self._has_next = has_next
 
-    fn __iter__(self) -> Iterator[T]:
+    fn __iter__(self) -> Iterator[T, A]:
         return Iterator(self)
 
     fn __next__(self) -> T:
@@ -53,7 +53,7 @@ struct SizedIterator[T: CollectionElement, A: HasNextLen[T]]:
     fn __init__(inout self, has_next: A):
         self._has_next = has_next
 
-    fn __iter__(self) -> Iterator[T]:
+    fn __iter__(self) -> Iterator[T, A]:
         return Iterator(self)
 
     fn __next__(self) -> T:
