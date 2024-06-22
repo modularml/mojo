@@ -113,6 +113,7 @@ fn _printf[
         _ = external_call["vprintf", Int32](
             fmt.unsafe_cstr_ptr(), UnsafePointer.address_of(loaded_pack)
         )
+        _ = loaded_pack
     else:
         with _fdopen(file) as fd:
             _ = __mlir_op.`pop.external_call`[
@@ -342,6 +343,7 @@ fn _put(x: StringSlice, file: FileDescriptor = stdout):
         _ = external_call["vprintf", Int32](
             x.unsafe_ptr(), arg_ptr.bitcast[UnsafePointer[NoneType]]()
         )
+        _ = tmp
     else:
         alias MAX_STR_LEN = 0x1000_0000
 
