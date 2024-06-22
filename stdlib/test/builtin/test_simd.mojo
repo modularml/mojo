@@ -1530,6 +1530,17 @@ def test_split():
     assert_equal(tup[1], SIMD[DType.index, 4](5, 6, 7, 8))
 
 
+def test_contains():
+    var x = SIMD[DType.int8, 4](1, 2, 3, 4)
+    assert_true(1 in x and 2 in x and 3 in x and 4 in x)
+    assert_false(0 in x)
+    assert_false(5 in x)
+    var y = SIMD[DType.float16, 4](1, 2, 3, 4)
+    assert_true(1 in y and 2 in y and 3 in y and 4 in y)
+    assert_false(0 in y)
+    assert_false(5 in y)
+
+
 def main():
     test_abs()
     test_add()
@@ -1578,4 +1589,5 @@ def main():
     test_truthy()
     test_modf()
     test_split()
+    test_contains()
     # TODO: add tests for __and__, __or__, anc comparison operators
