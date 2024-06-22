@@ -93,7 +93,7 @@ fn main() raises:
 
     @parameter
     fn bench_parallel():
-        parallelize[worker](rows, rows)
+        parallelize[worker](rows, cols)
 
     print("Number of physical cores:", num_physical_cores())
 
