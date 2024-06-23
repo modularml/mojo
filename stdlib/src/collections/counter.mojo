@@ -201,7 +201,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     # Binary operators
     # ===-------------------------------------------------------------------===#
 
-    fn __add__(self, other: Self) raises -> Self:
+    fn __add__(self, other: Self) -> Self:
         """Add counts from two Counters.
 
         Args:
