@@ -384,6 +384,9 @@ fn _try_write_int[
 
         process_digits[neg_digit_value]()
 
+    _ = remaining_int
+    _ = digit_chars_array
+
     # Re-add +1 byte since the loop ended so we didn't write another char.
     offset += 1
 
@@ -401,5 +404,6 @@ fn _try_write_int[
     )
 
     fmt.write_str(str_slice)
+    _ = buf^
 
     return None
