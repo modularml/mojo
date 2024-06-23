@@ -37,6 +37,16 @@ def test_clear():
     assert_false(c)
 
 
+def test_contains():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    assert_true("a" in c)
+    assert_true("b" in c)
+    assert_false("c" in c)
+
+
 def test_counter_construction():
     _ = Counter[Int]()
     _ = Counter[Int](List[Int]())
@@ -317,6 +327,7 @@ def main():
     test_add()
     test_bool()
     test_clear()
+    test_contains()
     test_counter_construction()
     test_counter_getitem()
     test_counter_setitem()

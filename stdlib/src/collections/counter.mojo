@@ -91,6 +91,17 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.__iter__()
 
+    fn __contains__(self, key: V) -> Bool:
+        """Check if a given key is in the dictionary or not.
+
+        Args:
+            key: The key to check.
+
+        Returns:
+            True if there key exists in the dictionary, False otherwise.
+        """
+        return key in self._data
+
     # ===-------------------------------------------------------------------===#
     # Trait implementations
     # ===-------------------------------------------------------------------===#
