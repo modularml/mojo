@@ -245,18 +245,25 @@ def test_update():
 
 def test_add():
     var c1 = Counter[String]()
-    c1["a"] = 1
+    c1["a"] = 3
     c1["b"] = 2
+    c1["d"] = -1  # should be ignored
 
     var c2 = Counter[String]()
+    c2["a"] = -2
     c2["b"] = 3
     c2["c"] = 4
+    c2["e"] = 0  # should be ignored
 
     var c3 = c1 + c2
 
     assert_equal(c3["a"], 1)
     assert_equal(c3["b"], 5)
     assert_equal(c3["c"], 4)
+    # Check that the original counters are not modified
+    assert_equal(c1["a"], 3)
+    assert_equal(c1["b"], 2)
+    assert_equal(c1["d"], -1)
 
     c2 += c1
 

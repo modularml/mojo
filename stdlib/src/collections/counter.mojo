@@ -211,9 +211,11 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             A new Counter with the counts from both Counters added together.
         """
         var result = Counter[V]()
+
         result.update(self)
         result.update(other)
-        return result
+
+        return +result^  # Remove zero and negative counts
 
     fn __iadd__(inout self, other: Self) raises:
         """Add counts from another Counter to this Counter.
@@ -230,6 +232,23 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             var key = key_ref[]
             if self[key] <= 0:
                 _ = self.pop(key)
+
+    # ===-------------------------------------------------------------------===#
+    # Unary operators
+    # ===-------------------------------------------------------------------===#
+
+    fn __pos__(self) -> Self:
+        """Return a shallow copy of the Counter.
+
+        Returns:
+            A shallow copy of the Counter.
+        """
+        var result = Counter[V]()
+        for item_ref in self.items():
+            var item = item_ref[]
+            if item.value > 0:
+                result[item.key] = item.value
+        return result^
 
     # ===-------------------------------------------------------------------===#
     # Methods
