@@ -83,7 +83,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         self._data[value] = count
 
-    fn __iter__(ref [_]self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self)]:
+    fn __iter__(self: Self) -> _DictKeyIter[V, Int, __lifetime_of(self)]:
         """Iterate over the keyword dict's keys as immutable references.
 
         Returns:
@@ -337,7 +337,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return self._data.values()
 
-    fn items(ref [_]self: Self) -> _DictEntryIter[V, Int, __lifetime_of(self)]:
+    fn items(self: Self) -> _DictEntryIter[V, Int, __lifetime_of(self)]:
         """Iterate over the dict's entries as immutable references.
 
         Returns:
