@@ -241,3 +241,17 @@ struct Span[
         debug_assert(len(self) == len(other), "Spans must be of equal length")
         for i in range(len(self)):
             self[i] = other[i]
+
+    @always_inline
+    fn fill[lifetime: MutableLifetime](self: Span[T, lifetime], value: T):
+        """
+        Fill the memory that a span references with a given value.
+
+        Parameters:
+            lifetime: The inferred mutable lifetime of the data within the Span.
+
+        Args:
+            value: The value to assign to each element.
+        """
+        for element in self:
+            element[] = value
