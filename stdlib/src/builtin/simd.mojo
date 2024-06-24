@@ -469,7 +469,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
                 )
             )
 
-    fn __init__[start: Int, end: Int, step: Int](inout self):
+    @staticmethod
+    fn from_range[start: Int, end: Int, step: Int = 1]() -> Self:
         """Construct from a compile time range using the index as value.
 
         Parameters:
@@ -482,23 +483,24 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
         Examples:
         ```mojo
-        print(SIMD[DType.uint8, 4][0, 4]()) # [0, 1, 2, 3]
-        print(SIMD[DType.uint8, 4][0, 4, -1]()) # [3, 2, 1, 0]
+        print(SIMD[DType.uint8, 4].from_range[0, 4]()) # [0, 1, 2, 3]
+        print(SIMD[DType.uint8, 4].from_range[0, 4, -1]()) # [3, 2, 1, 0]
         ```
         .
         """
 
         constrained[
-            abs(start - end) <= size,
+            abs((start - end) // step) <= size,
             "The range must be equal to or less than SIMD size.",
         ]()
-        self = Self()
+        var vec = Self()
         var idx = 0
 
         @parameter
         for i in range(start, end, step):
-            self[idx] = i
+            vec[idx] = i
             idx += 1
+        return vec
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders

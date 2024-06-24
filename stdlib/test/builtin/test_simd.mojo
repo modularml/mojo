@@ -1533,11 +1533,11 @@ def test_split():
 
 def test_range_constructor():
     alias INum = SIMD[DType.uint8, 4]
-    assert_equal(INum[0, 4](), INum(0, 1, 2, 3))
-    assert_equal(INum[0, 4, -1](), INum(3, 2, 1, 0))
-    alias FNum = SIMD[DType.uint8, 4]
-    assert_equal(FNum[0, 4](), FNum(0, 1, 2, 3))
-    assert_equal(FNum[0, 4, -1](), FNum(3, 2, 1, 0))
+    assert_equal(INum.from_range[0, 4](), INum(0, 1, 2, 3))
+    assert_equal(INum.from_range[3, -1, -1](), INum(3, 2, 1, 0))
+    alias FNum = SIMD[DType.float16, 4]
+    assert_equal(FNum.from_range[0, 4](), FNum(0, 1, 2, 3))
+    assert_equal(FNum.from_range[3, -1, -1](), FNum(3, 2, 1, 0))
 
 
 def main():
@@ -1588,4 +1588,5 @@ def main():
     test_truthy()
     test_modf()
     test_split()
+    test_range_constructor()
     # TODO: add tests for __and__, __or__, anc comparison operators
