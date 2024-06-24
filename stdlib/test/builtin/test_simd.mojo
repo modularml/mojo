@@ -1530,6 +1530,15 @@ def test_split():
     assert_equal(tup[1], SIMD[DType.index, 4](5, 6, 7, 8))
 
 
+def test_range_constructor():
+    alias INum = SIMD[DType.uint8, 4]
+    assert_equal(INum[0, 4](), INum(0, 1, 2, 3))
+    assert_equal(INum[0, 4, -1](), INum(3, 2, 1, 0))
+    alias FNum = SIMD[DType.uint8, 4]
+    assert_equal(FNum[0, 4](), FNum(0, 1, 2, 3))
+    assert_equal(FNum[0, 4, -1](), FNum(3, 2, 1, 0))
+
+
 def main():
     test_abs()
     test_add()
