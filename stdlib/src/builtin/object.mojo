@@ -1733,14 +1733,16 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
         """
         if self._value.is_obj():
             return object(self._value.get_obj_attr("__getitem__"))(self, i)
+
         if not self._value.is_str() and not self._value.is_list():
             raise Error("TypeError: can only index into lists and strings")
+
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
+            # Construct a new single-character string.
             var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
-            impl.data.init_pointee_copy(
-                (self._value.get_as_string().data + index).take_pointee(),
-            )
+            var char = self._value.get_as_string().data[index]
+            impl.data.init_pointee_move(char^)
             return _ObjectImpl(impl)
         return self._value.get_list_element(i._value.get_as_int().value)
 
