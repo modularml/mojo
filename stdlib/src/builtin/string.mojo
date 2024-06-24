@@ -994,6 +994,7 @@ struct String(
             arg.format_to(writer)
 
         args.each[write_arg]()
+        _ = writer^
 
         return output^
 
