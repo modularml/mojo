@@ -105,6 +105,7 @@ struct Bool(
     Intable,
     Representable,
     Stringable,
+    Formattable,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
@@ -198,7 +199,17 @@ struct Bool(
         Returns:
             A string representation.
         """
-        return "True" if self else "False"
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this boolean to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        writer.write("True" if self else "False")
 
     fn __repr__(self) -> String:
         """Get the bool as a string.
