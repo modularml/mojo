@@ -482,7 +482,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             The new SIMD vector.
 
         Constraints:
-            The range must be equal to or less than SIMD size.
+            The range length must be equal to SIMD size.
 
         Examples:
         ```mojo
@@ -493,8 +493,8 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         """
 
         constrained[
-            abs((start - end) // step) <= size,
-            "The range must be equal to or less than SIMD size.",
+            len(range(start, end, step)) == size,
+            "The range length must be equal to SIMD size.",
         ]()
         var vec = Self()
         var idx = 0
