@@ -182,8 +182,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
   The default store size is the size of the `SIMD` value to be stored.
 
 - `Slice` now uses `OptionalReg[Int]` for `start` and `end` and implements
-  a constructor which accepts optional values. `Slice._has_end()` has also been removed
-  since a Slice with no end is now represented by an empty `Slice.end` option.
+  a constructor which accepts optional values. `Slice._has_end()` has also been
+  removed since a Slice with no end is now represented by an empty `Slice.end`
+  option.
   ([PR #2495](https://github.com/modularml/mojo/pull/2495) by [@bgreni](https://github.com/bgreni))
 
   ```mojo
@@ -202,6 +203,10 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - The `ulp` function in `numerics` have been moved to the `math` module.
 
+- Types conforming to `Boolable` (i.e. those implementing `__bool__`) no longer
+  implicitly convert to `Bool`. A new `ImplicitlyBoolable` trait is introduced
+  for types where this behavior is desired.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
@@ -216,6 +221,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Removed `UnsafePointer.offset(offset:Int)`.
 
-- Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD instead.
+- Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD
+  instead.
 
 ### 🛠️ Fixed
