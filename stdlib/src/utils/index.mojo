@@ -167,7 +167,12 @@ fn _bool_tuple_reduce[
 
 @value
 @register_passable("trivial")
-struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
+struct StaticIntTuple[size: Int](
+    Sized,
+    Stringable,
+    Formattable,
+    Comparable,
+):
     """A base struct that implements size agnostic index functions.
 
     Parameters:
@@ -655,6 +660,17 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         buf.size += 1  # for the null terminator.
         return buf^
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this int tuple to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Optimize this to avoid the intermediate String allocation.
+        writer.write(str(self))
 
 
 # ===----------------------------------------------------------------------===#
