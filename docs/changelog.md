@@ -56,6 +56,23 @@ what we publish.
   Note that `async` functions do not yet support indirect calls, `ref` results,
   and constructors.
 
+- As a specific form of "conditional conformances", initializers in a struct
+  may indicate specific parameter bindings to use in the type of their `self`
+  argument.  For example:
+
+  ```mojo
+  @value
+  struct MyStruct[size: Int]:
+      fn __init__(inout self: MyStruct[0]): pass
+      fn __init__(inout self: MyStruct[1], a: Int): pass
+      fn __init__(inout self: MyStruct[2], a: Int, b: Int): pass
+  
+  def test(x: Int):
+      a = MyStruct()      # Infers size=0 from 'self' type.
+      b = MyStruct(x)     # Infers size=1 from 'self' type.
+      c = MyStruct(x, x)  # Infers size=2 from 'self' type.
+  ```
+
 - The `Reference` type (and many iterators) now use "inferred" parameters to
   represent the mutability of their lifetime, simplifying the interface.
 
