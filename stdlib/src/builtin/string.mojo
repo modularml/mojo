@@ -170,7 +170,10 @@ fn _repr_ascii(c: UInt8) -> String:
         return r"\r"
     else:
         var uc = c.cast[DType.uint8]()
-        return hex[r"\x0"](uc) if uc < 16 else hex[r"\x"](uc)
+        if uc < 16:
+            return hex(uc, prefix=r"\x0")
+        else:
+            return hex(uc, prefix=r"\x")
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
