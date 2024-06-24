@@ -35,6 +35,7 @@ fn bench_formatter_int[n: Int](inout b: Bencher) raises:
         var s1 = String()
         var s1_fmt = Formatter(s1)
         Int(n).format_to(s1_fmt)
+        _ = s1^
 
     b.iter[call_fn]()
 
@@ -47,6 +48,7 @@ fn bench_formatter_simd[n: Int](inout b: Bencher) raises:
         var s1 = String()
         var s1_fmt = Formatter(s1)
         SIMD[DType.int32](n).format_to(s1_fmt)
+        _ = s1^
 
     b.iter[call_fn]()
 
