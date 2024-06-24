@@ -1533,11 +1533,15 @@ def test_split():
 
 def test_range_constructor():
     alias INum = SIMD[DType.uint8, 4]
-    assert_equal(INum.from_range[0, 4](), INum(0, 1, 2, 3))
-    assert_equal(INum.from_range[3, -1, -1](), INum(3, 2, 1, 0))
+    alias inum0 = INum.from_range[0, 4]()
+    alias inum1 = INum.from_range[3, -1, -1]()
+    assert_equal(inum0, INum(0, 1, 2, 3))
+    assert_equal(inum1, INum(3, 2, 1, 0))
     alias FNum = SIMD[DType.float16, 4]
-    assert_equal(FNum.from_range[0, 4](), FNum(0, 1, 2, 3))
-    assert_equal(FNum.from_range[3, -1, -1](), FNum(3, 2, 1, 0))
+    alias fnum0 = FNum.from_range[0, 4]()
+    alias fnum1 = FNum.from_range[3, -1, -1]()
+    assert_equal(fnum0, FNum(0, 1, 2, 3))
+    assert_equal(fnum1, FNum(3, 2, 1, 0))
 
 
 def main():
