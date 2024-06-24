@@ -24,6 +24,40 @@ from builtin._location import __call_location, _SourceLocation
 
 
 @always_inline
+fn debug_assert[CondType: Boolable, //](cond: CondType, message: String):
+    """Asserts that the condition is true.
+
+    The `debug_assert` is similar to `assert` in C++. It is a no-op in release
+    builds unless MOJO_ENABLE_ASSERTIONS is defined.
+
+    Right now, users of the mojo-sdk must explicitly specify
+    `-D MOJO_ENABLE_ASSERTIONS` to enable assertions. It is not sufficient to
+    compile programs with `-debug-level full` for enabling assertions in the
+    library.
+
+    Parameters:
+        CondType: The type of condition.
+
+    Args:
+        cond: The bool value to assert.
+        message: The message to print on failure.
+    """
+
+    # Print an error and fail.
+    alias err = is_kernels_debug_build() or is_defined[
+        "MOJO_ENABLE_ASSERTIONS"
+    ]()
+
+    # Print a warning, but do not fail (useful for testing assert behavior).
+    alias warn = is_defined["ASSERT_WARNING"]()
+
+    @parameter
+    if err or warn:
+        if not cond:
+            _debug_assert_msg[err](message, __call_location())
+
+
+@always_inline
 fn debug_assert[
     *stringable: Stringable
 ](cond: Bool, *message_parts: *stringable):
