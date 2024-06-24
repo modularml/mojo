@@ -161,9 +161,11 @@ struct DLHandle(CollectionElement, Boolable):
             var opaque_function_ptr = external_call[
                 "dlsym", DTypePointer[DType.int8]
             ](self.handle.address, name)
-            return UnsafePointer.address_of(opaque_function_ptr).bitcast[
+            var result = UnsafePointer.address_of(opaque_function_ptr).bitcast[
                 result_type
             ]()[]
+            _ = opaque_function_ptr
+            return result
         else:
             return abort[result_type]("get_function isn't supported on windows")
 
@@ -246,7 +248,9 @@ fn _get_dylib_function[
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
-        return UnsafePointer.address_of(func_ptr).bitcast[result_type]()[]
+        var result = UnsafePointer.address_of(func_ptr).bitcast[result_type]()[]
+        _ = func_ptr
+        return result
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
     var new_func = dylib._get_function[func_name, result_type]()

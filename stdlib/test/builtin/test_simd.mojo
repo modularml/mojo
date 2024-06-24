@@ -200,7 +200,8 @@ def test_issue_30237():
         var result = x.fma(c_last, c_second_from_last)
 
         for idx in range(coefficients_len - 2):
-            var c = coefficients[coefficients_len - 3 - idx]
+            var coefs = coefficients
+            var c = coefs[coefficients_len - 3 - idx]
             result = x.fma(result, c)
 
         return result
