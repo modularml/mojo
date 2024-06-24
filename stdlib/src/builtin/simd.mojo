@@ -484,7 +484,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         Examples:
         ```mojo
         print(SIMD[DType.uint8, 4].from_range[0, 4]()) # [0, 1, 2, 3]
-        print(SIMD[DType.uint8, 4].from_range[0, 4, -1]()) # [3, 2, 1, 0]
+        print(SIMD[DType.uint8, 4].from_range[3, -1, -1]()) # [3, 2, 1, 0]
         ```
         .
         """
