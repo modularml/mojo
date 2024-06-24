@@ -478,6 +478,9 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             end: The end of the range.
             step: The step of the range.
 
+        Returns:
+            The new SIMD vector.
+
         Constraints:
             The range must be equal to or less than SIMD size.
 
