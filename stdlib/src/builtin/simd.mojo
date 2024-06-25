@@ -135,7 +135,6 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 @register_passable("trivial")
 struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Absable,
-    Boolable,
     Ceilable,
     CeilDivable,
     CollectionElement,
@@ -143,6 +142,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Floorable,
     Hashable,
     Intable,
+    ImplicitlyBoolable,
     Powable,
     Roundable,
     Sized,
@@ -1285,6 +1285,18 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             ),
         ]()
         return rebind[Scalar[DType.bool]](self.cast[DType.bool]()).value
+
+    @always_inline("nodebug")
+    fn __as_bool__(self) -> Bool:
+        """Converts the SIMD scalar into a boolean value.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
+
+        Returns:
+            True if the SIMD scalar is non-zero and False otherwise.
+        """
+        return self.__bool__()
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
@@ -3081,6 +3093,7 @@ fn _format_scalar[
     )
 
     writer.write_str(str_slice)
+    _ = buf^
 
 
 # ===----------------------------------------------------------------------=== #

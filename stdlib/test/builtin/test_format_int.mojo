@@ -135,21 +135,21 @@ def test_indexer():
 
 
 def test_different_prefix():
-    assert_equal(bin["binary"](Int8(1)), "binary1")
-    assert_equal(hex["hexidecimal"](Int8(1)), "hexidecimal1")
-    assert_equal(oct["octal"](Int8(1)), "octal1")
+    assert_equal(bin(Int8(1), prefix="binary"), "binary1")
+    assert_equal(hex(Int8(1), prefix="hexidecimal"), "hexidecimal1")
+    assert_equal(oct(Int8(1), prefix="octal"), "octal1")
 
-    assert_equal(bin["binary"](0), "binary0")
-    assert_equal(hex["hexidecimal"](0), "hexidecimal0")
-    assert_equal(oct["octal"](0), "octal0")
+    assert_equal(bin(0, prefix="binary"), "binary0")
+    assert_equal(hex(0, prefix="hexidecimal"), "hexidecimal0")
+    assert_equal(oct(0, prefix="octal"), "octal0")
 
-    assert_equal(bin["I'mAnIndexer!"](Ind()), "I'mAnIndexer!1")
-    assert_equal(hex["I'mAnIndexer!"](Ind()), "I'mAnIndexer!1")
-    assert_equal(oct["I'mAnIndexer!"](Ind()), "I'mAnIndexer!1")
+    assert_equal(bin(Ind(), prefix="I'mAnIndexer!"), "I'mAnIndexer!1")
+    assert_equal(hex(Ind(), prefix="I'mAnIndexer!"), "I'mAnIndexer!1")
+    assert_equal(oct(Ind(), prefix="I'mAnIndexer!"), "I'mAnIndexer!1")
 
-    assert_equal(bin["test"](Scalar[DType.bool](True)), "test1")
-    assert_equal(hex["test"](Scalar[DType.bool](True)), "test1")
-    assert_equal(oct["test"](Scalar[DType.bool](True)), "test1")
+    assert_equal(bin(Scalar[DType.bool](True), prefix="test"), "test1")
+    assert_equal(hex(Scalar[DType.bool](True), prefix="test"), "test1")
+    assert_equal(oct(Scalar[DType.bool](True), prefix="test"), "test1")
 
 
 def main():
