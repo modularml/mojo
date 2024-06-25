@@ -61,6 +61,23 @@ what we publish.
   Note that `async` functions do not yet support indirect calls, `ref` results,
   and constructors.
 
+- As a specific form of "conditional conformances", initializers in a struct
+  may indicate specific parameter bindings to use in the type of their `self`
+  argument.  For example:
+
+  ```mojo
+  @value
+  struct MyStruct[size: Int]:
+      fn __init__(inout self: MyStruct[0]): pass
+      fn __init__(inout self: MyStruct[1], a: Int): pass
+      fn __init__(inout self: MyStruct[2], a: Int, b: Int): pass
+  
+  def test(x: Int):
+      a = MyStruct()      # Infers size=0 from 'self' type.
+      b = MyStruct(x)     # Infers size=1 from 'self' type.
+      c = MyStruct(x, x)  # Infers size=2 from 'self' type.
+  ```
+
 - The `Reference` type (and many iterators) now use "inferred" parameters to
   represent the mutability of their lifetime, simplifying the interface.
 
@@ -69,6 +86,13 @@ what we publish.
 
   This supports work to transition the standard library collection types away
   from implicit copyability, which can lead to unintended expensive copies.
+
+- Added `Identifiable` trait, used to describe types that implement the `__is__`
+  and `__isnot__` trait methods.
+  ([PR #2807](https://github.com/modularml/mojo/pull/2807))
+
+  - Also added new `assert_is()` and `assert_is_not()` test utilities to the
+    `testing` module.
 
 - `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
 ([PR #2701](https://github.com/modularml/mojo/pull/2701)
@@ -129,6 +153,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
   `MOJO_PYTHON_LIBRARY` still exists for environments with a dynamic libpython,
   but no Python executable.
 
+- The `math` package now includes the `pi`, `e`, and `tau` constants (Closes
+  Issue [#2135](https://github.com/modularml/mojo/issues/2135)).
+
 ### 🦋 Changed
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that
@@ -160,8 +187,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
   The default store size is the size of the `SIMD` value to be stored.
 
 - `Slice` now uses `OptionalReg[Int]` for `start` and `end` and implements
-  a constructor which accepts optional values. `Slice._has_end()` has also been removed
-  since a Slice with no end is now represented by an empty `Slice.end` option.
+  a constructor which accepts optional values. `Slice._has_end()` has also been
+  removed since a Slice with no end is now represented by an empty `Slice.end`
+  option.
   ([PR #2495](https://github.com/modularml/mojo/pull/2495) by [@bgreni](https://github.com/bgreni))
 
   ```mojo
@@ -180,6 +208,10 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - The `ulp` function in `numerics` have been moved to the `math` module.
 
+- Types conforming to `Boolable` (i.e. those implementing `__bool__`) no longer
+  implicitly convert to `Bool`. A new `ImplicitlyBoolable` trait is introduced
+  for types where this behavior is desired.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
@@ -194,6 +226,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Removed `UnsafePointer.offset(offset:Int)`.
 
-- Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD instead.
+- Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD
+  instead.
 
 ### 🛠️ Fixed

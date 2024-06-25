@@ -43,6 +43,7 @@ fn bench_elementwise[n: Int](inout b: Bencher) raises:
         )
 
     b.iter[call_fn]()
+    _ = vector
 
 
 fn main() raises:

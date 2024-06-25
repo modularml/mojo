@@ -200,7 +200,8 @@ def test_issue_30237():
         var result = x.fma(c_last, c_second_from_last)
 
         for idx in range(coefficients_len - 2):
-            var c = coefficients[coefficients_len - 3 - idx]
+            var coefs = coefficients
+            var c = coefs[coefficients_len - 3 - idx]
             result = x.fma(result, c)
 
         return result
@@ -211,6 +212,22 @@ def test_issue_30237():
     var result2 = eval2(x2)
 
     assert_equal(result1, result2)
+
+
+def test_bool():
+    assert_true(Scalar[DType.bool](True).__bool__())
+    assert_false(Scalar[DType.bool](False).__bool__())
+    assert_true(Scalar[DType.int32](5).__bool__())
+    assert_false(Scalar[DType.int32](0).__bool__())
+    assert_true(Scalar[DType.float32](5.0).__bool__())
+    assert_false(Scalar[DType.float32](0.0).__bool__())
+
+    assert_true(Scalar[DType.bool](True).__as_bool__())
+    assert_false(Scalar[DType.bool](False).__as_bool__())
+    assert_true(Scalar[DType.int32](5).__as_bool__())
+    assert_false(Scalar[DType.int32](0).__as_bool__())
+    assert_true(Scalar[DType.float32](5.0).__as_bool__())
+    assert_false(Scalar[DType.float32](0.0).__as_bool__())
 
 
 def test_truthy():
@@ -1575,6 +1592,7 @@ def main():
     test_sub()
     test_sub_with_overflow()
     test_trunc()
+    test_bool()
     test_truthy()
     test_modf()
     test_split()

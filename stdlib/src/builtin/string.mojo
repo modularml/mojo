@@ -56,11 +56,18 @@ fn ord(s: String) -> Int:
         return int(b1)
     var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    debug_assert(
+        1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
+    )
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
     var result = int(b1 & b1_mask) << shift
-    for _ in range(1, num_bytes):
+    for i in range(1, num_bytes):
         p += 1
+        debug_assert(
+            p[] >> 6 == 0b00000010,
+            "invalid UTF-8 byte " + str(b1) + " at index " + str(i),
+        )
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
     return result
@@ -163,7 +170,10 @@ fn _repr_ascii(c: UInt8) -> String:
         return r"\r"
     else:
         var uc = c.cast[DType.uint8]()
-        return hex[r"\x0"](uc) if uc < 16 else hex[r"\x"](uc)
+        if uc < 16:
+            return hex(uc, prefix=r"\x0")
+        else:
+            return hex(uc, prefix=r"\x")
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
@@ -771,6 +781,7 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
+    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
@@ -986,6 +997,7 @@ struct String(
             arg.format_to(writer)
 
         args.each[write_arg]()
+        _ = writer^
 
         return output^
 
@@ -1360,6 +1372,7 @@ struct String(
             result += str(a)
 
         elems.each[add_elt]()
+        _ = is_first
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:

@@ -32,7 +32,7 @@ from memory.memory import _free, _malloc
 struct UnsafePointer[
     T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC
 ](
-    Boolable,
+    ImplicitlyBoolable,
     CollectionElement,
     Stringable,
     Intable,
@@ -129,8 +129,11 @@ struct UnsafePointer[
 
     @staticmethod
     @always_inline
-    fn alloc(count: Int) -> Self:
-        """Allocate an array with default alignment.
+    fn alloc[alignment: Int = alignof[T]()](count: Int) -> Self:
+        """Allocate an array with specified or default alignment.
+
+        Parameters:
+            alignment: The alignment in bytes of the allocated memory.
 
         Args:
             count: The number of elements in the array.
@@ -139,18 +142,17 @@ struct UnsafePointer[
             The pointer to the newly allocated array.
         """
         alias sizeof_t = sizeof[T]()
-        alias alignof_t = alignof[T]()
 
         constrained[sizeof_t > 0, "size must be greater than zero"]()
-        constrained[alignof_t > 0, "alignment must be greater than zero"]()
+        constrained[alignment > 0, "alignment must be greater than zero"]()
         constrained[
-            sizeof_t % alignof_t == 0, "size must be a multiple of alignment"
+            sizeof_t % alignment == 0, "size must be a multiple of alignment"
         ]()
 
         return Self(
             address=int(
                 _malloc[Int8, address_space=address_space](
-                    sizeof_t * count, alignment=alignof_t
+                    sizeof_t * count, alignment=alignment
                 )
             )
         )
@@ -321,6 +323,15 @@ struct UnsafePointer[
             Whether the pointer is null.
         """
         return int(self) != 0
+
+    @always_inline
+    fn __as_bool__(self) -> Bool:
+        """Return true if the pointer is non-null.
+
+        Returns:
+            Whether the pointer is null.
+        """
+        return self.__bool__()
 
     @always_inline
     fn __int__(self) -> Int:

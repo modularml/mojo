@@ -744,21 +744,35 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return self.find(key).or_else(default)
 
-    fn pop(inout self, key: K, owned default: Optional[V] = None) raises -> V:
+    fn pop(inout self, key: K, owned default: V) -> V:
         """Remove a value from the dictionary by key.
 
         Args:
             key: The key to remove from the dictionary.
-            default: Optionally provide a default value to return if the key
+            default: A default value to return if the key
                 was not found instead of raising.
 
         Returns:
             The value associated with the key, if it was in the dictionary.
             If it wasn't, return the provided default value instead.
+        """
+        try:
+            return self.pop(key)
+        except:
+            return default
+
+    fn pop(inout self, key: K) raises -> V:
+        """Remove a value from the dictionary by key.
+
+        Args:
+            key: The key to remove from the dictionary.
+
+        Returns:
+            The value associated with the key, if it was in the dictionary.
+            Raises otherwise.
 
         Raises:
-            "KeyError" if the key was not present in the dictionary and no
-            default value was provided.
+            "KeyError" if the key was not present in the dictionary.
         """
         var hash = hash(key)
         var found: Bool
@@ -773,8 +787,6 @@ struct Dict[K: KeyElement, V: CollectionElement](
             entry[] = None
             self.size -= 1
             return entry_value.value^
-        elif default:
-            return default.value()
         raise "KeyError"
 
     fn popitem(inout self) raises -> DictEntry[K, V]:
@@ -1085,25 +1097,35 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         return self._dict.find(key)
 
     @always_inline("nodebug")
-    fn pop(
-        inout self, key: self.key_type, owned default: Optional[V] = None
-    ) raises -> V:
-        """Remove a value from the keyword dictionary by key.
+    fn pop(inout self, key: self.key_type, owned default: V) -> V:
+        """Remove a value from the dictionary by key.
 
         Args:
             key: The key to remove from the dictionary.
-            default: Optionally provide a default value to return if the key
+            default: A default value to return if the key
                 was not found instead of raising.
 
         Returns:
             The value associated with the key, if it was in the dictionary.
             If it wasn't, return the provided default value instead.
-
-        Raises:
-            "KeyError" if the key was not present in the dictionary and no
-            default value was provided.
         """
         return self._dict.pop(key, default^)
+
+    @always_inline("nodebug")
+    fn pop(inout self, key: self.key_type) raises -> V:
+        """Remove a value from the dictionary by key.
+
+        Args:
+            key: The key to remove from the dictionary.
+
+        Returns:
+            The value associated with the key, if it was in the dictionary.
+            Raises otherwise.
+
+        Raises:
+            "KeyError" if the key was not present in the dictionary.
+        """
+        return self._dict.pop(key)
 
     fn __iter__(
         ref [_]self: Self,
