@@ -44,7 +44,7 @@ it’s missing. We are guided more by pragmatism than novelty, but Mojo’s use 
 and domains in a way that other languages haven’t demonstrated (for an example
 of Mojo talking directly to MLIR, see our [low-level IR in Mojo
 notebook](/mojo/notebooks/BoolMLIR)). It also
-includes autotuning, and has caching and distributed compilation built into its
+has caching and distributed compilation built into its
 core. We also believe Mojo has a good chance of unifying hybrid packages in the
 broader Python community.
 
@@ -209,12 +209,6 @@ uses other MLIR-based code-generation backends where applicable. This also
 means that Mojo is easily extensible to any hardware backend. For more
 information, read about our vision for [pluggable
 hardware](https://www.modular.com/hardware).
-
-### How does Mojo autotuning work?
-
-For details about what autotuning capabilities we support so far, check out
-the Mojo Manual section on [metaprogramming](/mojo/manual/parameters/).
-But stay tuned for more details!
 
 ### Who writes the software to add more hardware support for Mojo?
 

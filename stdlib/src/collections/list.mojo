@@ -197,24 +197,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __setitem__(inout self, idx: Int, owned value: T):
-        """Sets a list element at the given index.
-
-        Args:
-            idx: The index of the element.
-            value: The value to assign.
-        """
-        var normalized_idx = idx
-        debug_assert(
-            -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
-        )
-
-        if normalized_idx < 0:
-            normalized_idx += len(self)
-
-        self.unsafe_set(normalized_idx, value^)
-
     @always_inline
     fn __contains__[
         T2: ComparableCollectionElement
@@ -722,16 +704,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return res^
 
     @always_inline
-    fn __getitem__(self, idx: Int) -> T:
-        """Gets a copy of the list element at the given index.
-
-        FIXME(lifetimes): This should return a reference, not a copy!
+    fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
+        """Gets the list element at the given index.
 
         Args:
             idx: The index of the element.
 
         Returns:
-            A copy of the element at the given index.
+            A reference to the element at the given index.
         """
         var normalized_idx = idx
         debug_assert(

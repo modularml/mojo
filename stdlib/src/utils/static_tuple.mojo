@@ -24,6 +24,7 @@ from sys.intrinsics import _type_is_eq
 from memory import Pointer
 
 from utils import unroll
+from memory.unsafe import UnsafeMaybeUninitialized
 
 # ===----------------------------------------------------------------------===#
 # Utilities
@@ -213,7 +214,9 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         var ptr = __mlir_op.`pop.array.gep`(
             Pointer.address_of(arrayCopy).address, offset.value
         )
-        return Pointer(ptr).load()
+        var result = Pointer(ptr).load()
+        _ = arrayCopy
+        return result
 
     @always_inline("nodebug")
     fn __setitem__[
@@ -243,7 +246,6 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
 # ===----------------------------------------------------------------------===#
 
 
-@value
 struct InlineArray[
     ElementType: CollectionElementNew,
     size: Int,
@@ -257,7 +259,11 @@ struct InlineArray[
 
     # Fields
     alias type = __mlir_type[
-        `!pop.array<`, size.value, `, `, Self.ElementType, `>`
+        `!pop.array<`,
+        size.value,
+        `, `,
+        UnsafeMaybeUninitialized[Self.ElementType],
+        `>`,
     ]
     var _array: Self.type
     """The underlying storage for the array."""
@@ -275,8 +281,8 @@ struct InlineArray[
             False,
             (
                 "Initialize with either a variadic list of arguments, a default"
-                " fill element or pass the keyword argument"
-                " 'unsafe_uninitialized'."
+                " fill element or use the type"
+                " 'UnsafeMaybeUninitialized'."
             ),
         ]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
@@ -285,18 +291,28 @@ struct InlineArray[
     fn __init__(inout self, *, unsafe_uninitialized: Bool):
         """Create an InlineArray with uninitialized memory.
 
-        Note that this is highly unsafe and should be used with caution.
+        Note that this is highly unsafe and should be used with extreme caution.
+        It's very difficult to get it right.
 
         We recommend to use the `InlineList` instead if all the objects
-        are not available when creating the array.
+        are not available when creating the array. That works well for the
+        general case.
+
+        If you do not want to pay the small performance overhead of `InlineList` and
+        still want raw uninitalized memory, then make sure to understand the
+        following:
+
+        Never use this with types that do not have a trivial destructor.
+        If you want to use an uninitialized array with a type with
+        a non-trivial destructor,
+        then use `InlineArray[UnsafeMaybeUninitialized[MyType]]`, but you'll have
+        to manually call the destructors yourself.
 
         If despite those workarounds, one still needs an uninitialized array,
         it is possible with:
-
         ```mojo
         var uninitialized_array = InlineArray[Int, 10](unsafe_uninitialized=True)
         ```
-
         Args:
             unsafe_uninitialized: A boolean to indicate if the array should be initialized.
                 Always set to `True` (it's not actually used inside the constructor).
@@ -316,8 +332,9 @@ struct InlineArray[
 
         @parameter
         for i in range(size):
-            var ptr = UnsafePointer.address_of(self._get_reference_unsafe(i)[])
-            ptr.initialize_pointee_explicit_copy(fill)
+            self._get_maybe_uninitialized(i)[].write(
+                Self.ElementType(other=fill)
+            )
 
     @always_inline
     fn __init__(inout self, owned *elems: Self.ElementType):
@@ -348,9 +365,8 @@ struct InlineArray[
         # Move each element into the array storage.
         @parameter
         for i in range(size):
-            var eltref = self._get_reference_unsafe(i)
-            UnsafePointer.address_of(storage[i]).move_pointee_into(
-                UnsafePointer[Self.ElementType].address_of(eltref[])
+            self._get_maybe_uninitialized(i)[].move_from(
+                UnsafePointer.address_of(storage[i])
             )
 
         # Mark the elements as already destroyed.
@@ -363,12 +379,37 @@ struct InlineArray[
             other: The value to copy.
         """
 
-        self = Self(unsafe_uninitialized=True)
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
         for idx in range(size):
-            var ptr = self.unsafe_ptr() + idx
+            self._get_maybe_uninitialized(idx)[].copy_from(other[idx])
 
-            ptr.initialize_pointee_explicit_copy(other[idx])
+    fn __del__(owned self):
+        """Runs the destructor for all elements of the array."""
+        for i in range(len(self)):
+            self._get_maybe_uninitialized(i)[].assume_initialized_destroy()
+
+    fn __copyinit__(inout self, other: Self):
+        """Copy construct the array.
+
+        Args:
+            other: The value to copy from.
+        """
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        for idx in range(size):
+            self._get_maybe_uninitialized(idx)[].copy_from(other[idx])
+
+    fn __moveinit__(inout self, owned other: Self):
+        """Move construct the array.
+
+        Args:
+            other: The value to move from.
+        """
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+        for idx in range(size):
+            self._get_maybe_uninitialized(idx)[].move_from(
+                other._get_maybe_uninitialized(idx)[]
+            )
 
     # ===------------------------------------------------------------------===#
     # Operator dunders
@@ -450,9 +491,16 @@ struct InlineArray[
         Returns:
             A reference to the element at the given index.
         """
-        var idx_as_int = index(idx)
+        return self._get_maybe_uninitialized(idx)[].assume_initialized()
+
+    @always_inline
+    fn _get_maybe_uninitialized(
+        ref [_]self: Self, idx: Int
+    ) -> Reference[
+        UnsafeMaybeUninitialized[Self.ElementType], __lifetime_of(self)
+    ]:
         debug_assert(
-            0 <= idx_as_int < size,
+            0 <= idx < size,
             (
                 "Index must be within bounds when using"
                 " `InlineArray.unsafe_get()`."
@@ -460,7 +508,7 @@ struct InlineArray[
         )
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self._array).address,
-            idx_as_int.value,
+            idx.value,
         )
         return UnsafePointer(ptr)[]
 
