@@ -64,10 +64,10 @@ struct _ListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__get_ref(self.index - 1)[]
+            return self.src[][self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__get_ref(self.index)[]
+            return self.src[][self.index]
 
     fn __len__(self) -> Int:
         @parameter
