@@ -853,7 +853,9 @@ fn test_isupper() raises:
 
     assert_true(String("ABC").isupper())
     assert_false(String("abc").isupper())
-    assert_false(String("ABC123").isupper())
+    assert_false(String("AbC").isupper())
+    assert_true(String("ABC123").isupper())
+    assert_false(String("1!").islower())
 
 
 fn test_islower() raises:
@@ -878,7 +880,9 @@ fn test_islower() raises:
 
     assert_true(String("abc").islower())
     assert_false(String("ABC").islower())
-    assert_false(String("abc123").islower())
+    assert_false(String("aBc").islower())
+    assert_true(String("abc123").islower())
+    assert_false(String("1!").islower())
 
 
 fn test_lower() raises:

@@ -1990,6 +1990,7 @@ struct String(
         # TODO(#26444):
         # Support the Unicode standard casing behavior to handle cased letters
         # outside of the standard ASCII letters.
+        # Also add tests for unicode handling, to include islower().
         return self._toggle_ascii_case[_is_ascii_uppercase]()
 
     fn upper(self) -> String:
@@ -2003,6 +2004,7 @@ struct String(
         # TODO(#26444):
         # Support the Unicode standard casing behavior to handle cased letters
         # outside of the standard ASCII letters.
+        # Also add tests for unicode handling, to include isupper().
         return self._toggle_ascii_case[_is_ascii_lowercase]()
 
     @always_inline
@@ -2224,26 +2226,34 @@ struct String(
         return True
 
     fn islower(self) -> Bool:
-        """Returns True if all characters in the string are lowercase.
+        """Returns True if the string contains at least one alphabetic character
+        and all alphabetic characters in the string are lowercase.
 
         Returns:
-            True if all characters are lowercase else False.
+            True if the string contains at least one alphabetic character
+            and all alphabetic characters are lowercase, else False.
         """
+        var has_lower: Bool = False
         for c in self:
-            if not islower(c):
-                return False
-        return True
+            if islower(c):
+                has_lower = True
+                break
+        return has_lower and self == self.lower()
 
     fn isupper(self) -> Bool:
-        """Returns True if all characters in the string are uppercase.
+        """Returns True if the string contains at least one alphabetic character
+        and all alphabetic characters in the string are uppercase.
 
         Returns:
-            True if all characters are uppercase else False.
+            True if the string contains at least one alphabetic character
+            and all alphabetic characters are uppercase, else False.
         """
+        var has_upper: Bool = False
         for c in self:
-            if not isupper(c):
-                return False
-        return True
+            if isupper(c):
+                has_upper = True
+                break
+        return has_upper and self == self.upper()
 
 
 # ===----------------------------------------------------------------------=== #
