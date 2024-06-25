@@ -1742,7 +1742,7 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
             # Construct a new single-character string.
             var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
             var char = self._value.get_as_string().data[index]
-            impl.data.init_pointee_move(char^)
+            impl.data.init_pointee_move(char)
             return _ObjectImpl(impl)
         return self._value.get_list_element(i._value.get_as_int().value)
 
