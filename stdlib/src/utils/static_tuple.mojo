@@ -298,16 +298,8 @@ struct InlineArray[
 
         Calling this function assumes that all elements in the input array are initialized.
 
-        It means that when copying, moving and destroying the new `InlineArray`, the copy constructor,
-        move constructor and destructor of the elements will be called.
-
-        If the elements of the input array are not initialized, the behavior is undefined.
-
-        There is only one situation when it is somewhat correct to use this constructor and the input array
-        do not have initialized elements. This is when the input array elements' type
-        has trivial copy constructor, move constructor and destructor (like integers or floats).
-        In this case, the values in the array will be random (since it's uninitialized memory)
-        and it's up to the user to handle them accordingly.
+        If the elements of the input array are not initialized, the behavior is undefined,
+        even  if `ElementType` is valid *for every possible bit pattern* (e.g. `Int` or `Float`).
 
         Args:
             unsafe_assume_initialized: The array of `UnsafeMaybeUninitialized` elements.

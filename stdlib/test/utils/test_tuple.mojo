@@ -219,40 +219,6 @@ def test_array_unsafe_assume_initialized_constructor_string():
     # might want to add a test for that in the future.
 
 
-def test_array_unsafe_assume_initialized_constructor_int():
-    # For simple types, like integers, we can assume the array
-    # is initialized, when it's actually not. It's just that the values inside
-    # are random and this should be taken into account.
-    var maybe_uninitialized_arr = InlineArray[UnsafeMaybeUninitialized[Int], 3](
-        unsafe_uninitialized=True
-    )
-    var initialized_arr = InlineArray(
-        unsafe_assume_initialized=maybe_uninitialized_arr^
-    )
-
-    # Reading some values and copying them, it should be fine.
-    var some_value = initialized_arr[0]
-    var other_value = initialized_arr[1]
-
-    # we initialize only one element
-    initialized_arr[0] = 42
-
-    # We can move and copy the array, the first element will always be 42,
-    # the other elements are random
-
-    # trigger a move
-    var initialized_arr2 = initialized_arr^
-
-    assert_equal(initialized_arr2[0], 42)
-
-    # trigger a copy
-    var initialized_arr3 = InlineArray(other=initialized_arr2)
-
-    assert_equal(initialized_arr3[0], 42)
-
-    # There is no destructor for Int, so we don't need to test that.
-
-
 def test_array_int_pointer():
     var arr = InlineArray[Int, 3](0, 10, 20)
 
