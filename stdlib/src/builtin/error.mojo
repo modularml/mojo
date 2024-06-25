@@ -26,7 +26,7 @@ from memory.memory import _free
 
 
 @register_passable
-struct Error(Stringable, Boolable, Representable):
+struct Error(Stringable, Boolable, Representable, Formattable):
     """This type represents an Error."""
 
     var data: UnsafePointer[UInt8]
@@ -141,7 +141,18 @@ struct Error(Stringable, Boolable, Representable):
         Returns:
             A String of the error message.
         """
-        return self._message()
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this error to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Avoid this unnecessary intermediate String allocation.
+        writer.write(self._message())
 
     fn __repr__(self) -> String:
         """Converts the Error to printable representation.

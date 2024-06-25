@@ -101,13 +101,14 @@ struct _PyIter(Sized):
 
 @register_passable
 struct PythonObject(
-    Boolable,
     CollectionElement,
+    ImplicitlyBoolable,
     Indexer,
     Intable,
     KeyElement,
     SizedRaising,
     Stringable,
+    Formattable,
 ):
     """A Python object."""
 
@@ -385,6 +386,15 @@ struct PythonObject(
         """
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyObject_IsTrue(self.py_object) == 1
+
+    @always_inline
+    fn __as_bool__(self) -> Bool:
+        """Evaluate the boolean value of the object.
+
+        Returns:
+            Whether the object evaluates as true.
+        """
+        return self.__bool__()
 
     fn __is__(self, other: PythonObject) -> Bool:
         """Test if the PythonObject is the `other` PythonObject, the same as `x is y` in
@@ -1163,3 +1173,14 @@ struct PythonObject(
         # keep python object alive so the copy can occur
         _ = python_str
         return mojo_str
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this Python object to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Avoid this intermediate String allocation, if possible.
+        writer.write(str(self))

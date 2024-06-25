@@ -49,3 +49,7 @@ fn __closure_wrapper_noop_copy(
     owned other: __mlir_type.`!kgen.pointer<none>`, /
 ) -> __mlir_type.`!kgen.pointer<none>`:
     return other
+
+
+fn __ownership_keepalive[*Ts: AnyType](*args: *Ts):
+    pass
