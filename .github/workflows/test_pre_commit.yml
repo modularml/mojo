@@ -42,9 +42,8 @@ jobs:
 
       - name: Install nightly Mojo compiler
         run: |
-          # The <auth_token> of "examples" is arbitrary but something
-          # needs to be provided.
-          modular auth examples
+          export MODULAR_ACCESS_TOKEN=${{ secrets.CI_MODULAR_ACCESS_TOKEN_AUTOMATION }}
+          modular auth
           modular install nightly/mojo
 
           # Put Mojo on the PATH
