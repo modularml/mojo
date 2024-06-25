@@ -21,9 +21,9 @@ from collections import Optional
 var a = Optional(1)
 var b = Optional[Int](None)
 if a:
-    print(a.value()[])  # prints 1
+    print(a.value())  # prints 1
 if b:  # bool(b) is False, so no print
-    print(b.value()[])
+    print(b.value())
 var c = a.or_else(2)
 var d = b.or_else(2)
 print(c)  # prints 1
@@ -46,7 +46,9 @@ struct _NoneType(CollectionElement):
 
 
 @value
-struct Optional[T: CollectionElement](CollectionElement, Boolable):
+struct Optional[T: CollectionElement](
+    CollectionElement, CollectionElementNew, Boolable
+):
     """A type modeling a value which may or may not be present.
 
     Optional values can be thought of as a type-safe nullable pattern.
@@ -61,9 +63,9 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     var a = Optional(1)
     var b = Optional[Int](None)
     if a:
-        print(a.value()[])  # prints 1
+        print(a.value())  # prints 1
     if b:  # bool(b) is False, so no print
-        print(b.value()[])
+        print(b.value())
     var c = a.or_else(2)
     var d = b.or_else(2)
     print(c)  # prints 1
@@ -103,6 +105,14 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
             value: Must be exactly `None`.
         """
         self = Self()
+
+    fn __init__(inout self, *, other: Self):
+        """Copy construct an Optional.
+
+        Args:
+            other: The Optional to copy.
+        """
+        self.__copyinit__(other)
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -159,9 +169,7 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn value(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+    fn value(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
         """Retrieve a reference to the value of the Optional.
 
         This check to see if the optional contains a value.
@@ -172,15 +180,13 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """
-        if not self[].__bool__():
+        if not self.__bool__():
             abort(".value() on empty Optional")
 
-        return self[].unsafe_value()
+        return self.unsafe_value()
 
     @always_inline
-    fn unsafe_value(
-        self: Reference[Self, _, _]
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+    fn unsafe_value(ref [_]self: Self) -> ref [__lifetime_of(self)] T:
         """Unsafely retrieve a reference to the value of the Optional.
 
         This doesn't check to see if the optional contains a value.
@@ -191,8 +197,8 @@ struct Optional[T: CollectionElement](CollectionElement, Boolable):
         Returns:
             A reference to the contained data of the option as a Reference[T].
         """
-        debug_assert(self[].__bool__(), ".value() on empty Optional")
-        return self[]._value[T]
+        debug_assert(self.__bool__(), ".value() on empty Optional")
+        return self._value[T]
 
     @always_inline
     fn _value_copy(self) -> T:

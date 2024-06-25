@@ -19,7 +19,10 @@ from testing import (
     assert_not_equal,
     assert_raises,
     assert_true,
+    assert_is,
+    assert_is_not,
 )
+
 from utils.numerics import inf, nan
 
 
@@ -62,22 +65,22 @@ def test_assert_messages():
     try:
         assert_true(False)
     except e:
-        assert_true("test_assertion.mojo:63:20: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:66:20: AssertionError:" in str(e))
 
     try:
         assert_false(True)
     except e:
-        assert_true("test_assertion.mojo:68:21: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:71:21: AssertionError:" in str(e))
 
     try:
         assert_equal(1, 0)
     except e:
-        assert_true("test_assertion.mojo:73:21: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:76:21: AssertionError:" in str(e))
 
     try:
         assert_not_equal(0, 0)
     except e:
-        assert_true("test_assertion.mojo:78:25: AssertionError:" in str(e))
+        assert_true("test_assertion.mojo:81:25: AssertionError:" in str(e))
 
 
 def test_assert_almost_equal():
@@ -180,9 +183,23 @@ def test_assert_almost_equal():
     )
 
 
+def test_assert_is():
+    var a = PythonObject("mojo")
+    var b = a
+    assert_is(a, b)
+
+
+def test_assert_is_not():
+    var a = PythonObject("mojo")
+    var b = PythonObject("mojo")
+    assert_is_not(a, b)
+
+
 def main():
     test_assert_equal_is_generic()
     test_assert_not_equal_is_generic()
     test_assert_equal_with_simd()
     test_assert_messages()
     test_assert_almost_equal()
+    test_assert_is()
+    test_assert_is_not()

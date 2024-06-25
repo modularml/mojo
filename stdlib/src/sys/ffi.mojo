@@ -19,6 +19,9 @@ from utils import StringRef
 from .info import os_is_linux, os_is_windows
 from .intrinsics import _mlirtype_is_eq
 
+alias C_char = Int8
+"""C `char` type."""
+
 
 struct RTLD:
     """Enumeration of the RTLD flags used during dynamic library loading."""
@@ -63,11 +66,39 @@ struct DLHandle(CollectionElement, Boolable):
 
         @parameter
         if not os_is_windows():
-            self.handle = external_call["dlopen", DTypePointer[DType.int8]](
+            var handle = external_call["dlopen", DTypePointer[DType.int8]](
                 path.unsafe_ptr(), flags
             )
+            if handle == DTypePointer[DType.int8]():
+                var error_message = external_call[
+                    "dlerror", UnsafePointer[UInt8]
+                ]()
+                abort("dlopen failed: " + String(error_message))
+            self.handle = handle
         else:
             self.handle = DTypePointer[DType.int8]()
+
+    fn check_symbol(self, name: String) -> Bool:
+        """Check that the symbol exists in the dynamic library.
+
+        Args:
+            name: The symbol to check.
+
+        Returns:
+            `True` if the symbol exists.
+        """
+        constrained[
+            not os_is_windows(),
+            "Checking dynamic library symbol is not supported on Windows",
+        ]()
+
+        var opaque_function_ptr = external_call[
+            "dlsym", DTypePointer[DType.int8]
+        ](self.handle.address, name.unsafe_ptr())
+        if opaque_function_ptr:
+            return True
+
+        return False
 
     # TODO(#15590): Implement support for windows and remove the always_inline.
     @always_inline
@@ -78,7 +109,7 @@ struct DLHandle(CollectionElement, Boolable):
         @parameter
         if not os_is_windows():
             _ = external_call["dlclose", Int](self.handle)
-            self.handle = DTypePointer[DType.int8].get_null()
+            self.handle = DTypePointer[DType.int8]()
 
     fn __bool__(self) -> Bool:
         """Checks if the handle is valid.
@@ -106,12 +137,12 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](name.unsafe_ptr())
+        return self._get_function[result_type](name.unsafe_cstr_ptr())
 
     @always_inline
     fn _get_function[
         result_type: AnyTrivialRegType
-    ](self, name: DTypePointer[DType.int8]) -> result_type:
+    ](self, name: UnsafePointer[C_char]) -> result_type:
         """Returns a handle to the function with the given name in the dynamic
         library.
 
@@ -130,7 +161,11 @@ struct DLHandle(CollectionElement, Boolable):
             var opaque_function_ptr = external_call[
                 "dlsym", DTypePointer[DType.int8]
             ](self.handle.address, name)
-            return UnsafePointer(opaque_function_ptr).bitcast[result_type]()[]
+            var result = UnsafePointer.address_of(opaque_function_ptr).bitcast[
+                result_type
+            ]()[]
+            _ = opaque_function_ptr
+            return result
         else:
             return abort[result_type]("get_function isn't supported on windows")
 
@@ -149,7 +184,7 @@ struct DLHandle(CollectionElement, Boolable):
             A handle to the function.
         """
 
-        return self._get_function[result_type](func_name.unsafe_ptr())
+        return self._get_function[result_type](func_name.unsafe_cstr_ptr())
 
 
 # ===----------------------------------------------------------------------===#
@@ -213,13 +248,15 @@ fn _get_dylib_function[
     alias func_cache_name = name + "/" + func_name
     var func_ptr = _get_global_or_null[func_cache_name]()
     if func_ptr:
-        return UnsafePointer(func_ptr).bitcast[result_type]()[]
+        var result = UnsafePointer.address_of(func_ptr).bitcast[result_type]()[]
+        _ = func_ptr
+        return result
 
     var dylib = _get_dylib[name, init_fn, destroy_fn](payload)
     var new_func = dylib._get_function[func_name, result_type]()
     external_call["KGEN_CompilerRT_InsertGlobal", NoneType](
         StringRef(func_cache_name),
-        UnsafePointer(new_func).bitcast[Pointer[NoneType]]()[],
+        UnsafePointer.address_of(new_func).bitcast[Pointer[NoneType]]()[],
     )
 
     return new_func

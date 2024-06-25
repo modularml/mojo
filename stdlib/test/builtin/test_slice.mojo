@@ -17,8 +17,8 @@ from testing import assert_equal, assert_false, assert_true
 
 def test_none_end_folds():
     alias all_def_slice = slice(0, None, 1)
-    assert_equal(all_def_slice.start, 0)
-    assert_equal(all_def_slice.end, int(Int32.MAX))
+    assert_equal(all_def_slice.start.value(), 0)
+    assert_true(all_def_slice.end is None)
     assert_equal(all_def_slice.step, 1)
 
 
@@ -62,11 +62,6 @@ def test_slicable():
     assert_equal(boring_slice.c, "foo")
 
 
-def test_has_end():
-    alias is_end = Slice(None, None, None)._has_end()
-    assert_false(is_end)
-
-
 struct SliceStringable:
     fn __init__(inout self):
         pass
@@ -79,7 +74,60 @@ def test_slice_stringable():
     var s = SliceStringable()
     assert_equal(s[2::-1], "2::-1")
     assert_equal(s[1:-1:2], "1:-1:2")
-    assert_equal(s[:-1], "0:-1:1")
+    assert_equal(s[:-1], ":-1:1")
+
+
+def test_slice_eq():
+    assert_equal(slice(1, 2, 3), slice(1, 2, 3))
+    assert_equal(slice(0, 1), slice(1))
+    assert_true(slice(2, 3) != slice(4, 5))
+    assert_equal(slice(1, None, 1), slice(1, None, None))
+
+
+def test_slice_adjust():
+    var start: Int
+    var end: Int
+    var step: Int
+    var s = slice(1, 10)
+    start, end, step = s.indices(9)
+    assert_equal(slice(start, end, step), slice(1, 9))
+    s = slice(1, None, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(1, 5))
+    s = slice(1, None, -1)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(1, -1, -1))
+    s = slice(-1, None, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(4, 5, 1))
+    s = slice(None, 2, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(0, 2, 1))
+    s = slice(None, 2, -1)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(4, 2, -1))
+    s = slice(0, -1, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(0, 4, 1))
+    s = slice(None, None, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(0, 5, 1))
+    s = slice(20)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(0, 5, 1))
+    s = slice(10, -10, 1)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(5, 0, 1))
+    assert_equal(len(range(start, end, step)), 0)
+    s = slice(-12, -10, -1)
+    start, end, step = s.indices(5)
+    assert_equal(slice(start, end, step), slice(-1, -1, -1))
+    assert_equal(len(range(start, end, step)), 0)
+    # TODO: Decide how to handle 0 step
+    # s = slice(-10, -2, 0)
+    # start, end, step = s.indices(5)
+    # assert_equal(slice(start, end, step), slice(-1, 3, 0))
+    # assert_equal(len(range(start, end, step)), 0)
 
 
 def test_indexing():
@@ -92,6 +140,7 @@ def test_indexing():
 def main():
     test_none_end_folds()
     test_slicable()
-    test_has_end()
     test_slice_stringable()
     test_indexing()
+    test_slice_eq()
+    test_slice_adjust()

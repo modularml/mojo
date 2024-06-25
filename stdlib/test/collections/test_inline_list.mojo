@@ -13,8 +13,9 @@
 # RUN: %mojo %s
 
 from collections import InlineList, Set
-from testing import assert_equal, assert_false, assert_true, assert_raises
-from test_utils import MoveCounter
+
+from test_utils import MoveCounter, ValueDestructorRecorder
+from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
 def test_list():
@@ -57,24 +58,17 @@ def test_append_triggers_a_move():
         assert_equal(inline_list[i].move_count, 1)
 
 
-@value
-struct ValueToCountDestructor(CollectionElement):
-    var value: Int
-    var destructor_counter: UnsafePointer[List[Int]]
-
-    fn __del__(owned self):
-        self.destructor_counter[].append(self.value)
-
-
 def test_destructor():
     """Ensure we delete the right number of elements."""
     var destructor_counter = List[Int]()
     alias capacity = 32
-    var inline_list = InlineList[ValueToCountDestructor, capacity=capacity]()
+    var inline_list = InlineList[ValueDestructorRecorder, capacity=capacity]()
 
     for index in range(capacity):
         inline_list.append(
-            ValueToCountDestructor(index, UnsafePointer(destructor_counter))
+            ValueDestructorRecorder(
+                index, UnsafePointer.address_of(destructor_counter)
+            )
         )
 
     # Private api use here:

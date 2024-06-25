@@ -12,8 +12,9 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from utils import StaticIntTuple, unroll
 from testing import assert_equal, assert_raises
+
+from utils import StaticIntTuple, unroll
 
 
 def test_unroll():
@@ -111,8 +112,59 @@ fn test_unroll_raises() raises:
     assert_equal(len(indexes_seen), 1)
 
 
+def test_unroll_zero_starting_range():
+    var indexes_seen = List[Int]()
+
+    @parameter
+    fn func[idx: Int]():
+        indexes_seen.append(idx)
+
+    unroll[func, range(6)]()
+
+    assert_equal(indexes_seen[0], 0)
+    assert_equal(indexes_seen[1], 1)
+    assert_equal(indexes_seen[2], 2)
+    assert_equal(indexes_seen[3], 3)
+    assert_equal(indexes_seen[4], 4)
+    assert_equal(indexes_seen[5], 5)
+    assert_equal(len(indexes_seen), 6)
+
+
+def test_unroll_sequential_range():
+    var indexes_seen = List[Int]()
+
+    @parameter
+    fn func[idx: Int]():
+        indexes_seen.append(idx)
+
+    unroll[func, range(3, 6)]()
+
+    assert_equal(indexes_seen[0], 3)
+    assert_equal(indexes_seen[1], 4)
+    assert_equal(indexes_seen[2], 5)
+    assert_equal(len(indexes_seen), 3)
+
+
+def test_unroll_strided_range():
+    var indexes_seen = List[Int]()
+
+    @parameter
+    fn func[idx: Int]():
+        indexes_seen.append(idx)
+
+    unroll[func, range(0, 9, 3)]()
+
+    assert_equal(indexes_seen[0], 0)
+    assert_equal(indexes_seen[1], 3)
+    assert_equal(indexes_seen[2], 6)
+    assert_equal(len(indexes_seen), 3)
+
+
 fn main() raises:
     test_unroll()
     test_unroll2()
     test_unroll3()
     test_unroll_raises()
+    test_unroll_zero_starting_range()
+    test_unroll_sequential_range()
+    test_unroll_strided_range()

@@ -15,9 +15,10 @@
 # This sample implements the nbody benchmarking in
 # https://benchmarksgame-team.pages.debian.net/benchmarksgame/performance/nbody.html
 
-from math import sqrt
-from benchmark import run, keep
 from collections import List
+from math import sqrt
+
+from benchmark import keep, run
 from testing import assert_almost_equal
 
 alias PI = 3.141592653589793

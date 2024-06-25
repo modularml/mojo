@@ -11,8 +11,7 @@
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
 
-name: Standard Library tests and examples
-
+name: Test stdlib and examples
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -24,9 +23,12 @@ permissions:
 
 jobs:
   test-examples:
+    name: with ${{ matrix.os }} and assertions=${{ matrix.mojo-enable-assertions }}
     strategy:
+      fail-fast: false
       matrix:
         os: ["ubuntu-latest", "macos-14"]
+        mojo-enable-assertions: [0, 1]
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -40,7 +42,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Download Modular installer
         run: |
@@ -75,19 +77,7 @@ jobs:
           sudo update-alternatives --install /usr/bin/lldb lldb /usr/bin/lldb-${{env.LLVM_VERSION}} 100
           sudo update-alternatives --install /usr/bin/FileCheck FileCheck /usr/bin/FileCheck-${{env.LLVM_VERSION}} 100
 
-
           python3 -m pip install lit
-      
-      - name: Install pre-commit
-        run: |
-          pip install pre-commit
-          pre-commit install
-      
-      - name: Run pre-commit
-        # If this step ever gets too slow, we can move the 
-        # pre-commit run to a separate job so that it runs at the
-        # same time as the unit tests.
-        run: pre-commit run --all-files
 
       - name: Install build tools (macOS)
         if: ${{ matrix.os == 'macos-14' }}
@@ -99,6 +89,8 @@ jobs:
           echo $(brew --prefix llvm@15)/bin/ >> $GITHUB_PATH
 
       - name: Run standard library tests and examples
+        env:
+          MOJO_ENABLE_ASSERTIONS_IN_TESTS: ${{ matrix.mojo-enable-assertions }}
         run: |
           ./stdlib/scripts/run-tests.sh
           ./examples/run-examples.sh

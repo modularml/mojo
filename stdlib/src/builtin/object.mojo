@@ -16,14 +16,11 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict, List
-
 from sys.intrinsics import _type_is_eq
 
-from memory import memcmp, memcpy
-from memory import Arc
-from memory.unsafe_pointer import move_from_pointee
+from memory import Arc, memcmp, memcpy
 
-from utils import StringRef, unroll, Variant
+from utils import StringRef, Variant, unroll
 
 # ===----------------------------------------------------------------------=== #
 # _ObjectImpl
@@ -44,15 +41,15 @@ struct _ImmutableString:
     pointer and integer pair. Memory will be dynamically allocated.
     """
 
-    var data: UnsafePointer[Int8]
+    var data: UnsafePointer[UInt8]
     """The pointer to the beginning of the string contents. It is not
     null-terminated."""
     var length: Int
     """The length of the string."""
 
     @always_inline
-    fn __init__(inout self, data: UnsafePointer[Int8], length: Int):
-        self.data = data.address
+    fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
+        self.data = data
         self.length = length
 
     @always_inline
@@ -132,7 +129,7 @@ struct _RefCountedAttrsDict:
     fn get(self, key: StringLiteral) raises -> _ObjectImpl:
         var iter = self.impl[].find(key)
         if iter:
-            return iter.value()[]
+            return iter.value()
         raise Error(
             "AttributeError: Object does not have an attribute of name '"
             + key
@@ -332,7 +329,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
         if self.is_str():
             var str = self.get_as_string()
             var impl = _ImmutableString(
-                UnsafePointer[Int8].alloc(str.length), str.length
+                UnsafePointer[UInt8].alloc(str.length), str.length
             )
             memcpy(
                 dest=impl.data,
@@ -555,7 +552,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
                 + "'"
             )
         if self.is_func():
-            return "Function at address " + hex(self.get_as_func().value)
+            return "Function at address " + hex(int(self.get_as_func().value))
         if self.is_list():
             var res = String("[")
             for j in range(self.get_list_length()):
@@ -632,7 +629,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
 # ===----------------------------------------------------------------------=== #
 
 
-struct object(IntableRaising, Boolable, Stringable):
+struct object(IntableRaising, ImplicitlyBoolable, Stringable):
     """Represents an object without a concrete type.
 
     This is the type of arguments in `def` functions that do not have a type
@@ -744,13 +741,12 @@ struct object(IntableRaising, Boolable, Stringable):
             value: The string value.
         """
         var impl = _ImmutableString(
-            UnsafePointer[Int8].alloc(value.length), value.length
+            UnsafePointer[UInt8].alloc(value.length), value.length
         )
         memcpy(
-            impl.data,
-            # TODO: Remove bitcast once transition to UInt8 strings is complete.
-            value.unsafe_ptr().bitcast[Int8](),
-            value.length,
+            dest=impl.data,
+            src=value.unsafe_ptr(),
+            count=value.length,
         )
         self._value = impl
 
@@ -767,8 +763,7 @@ struct object(IntableRaising, Boolable, Stringable):
         self._value = _RefCountedListRef()
 
         @parameter
-        @always_inline
-        fn append[i: Int]():
+        for i in range(len(VariadicList(Ts))):
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
             alias T = Ts[i]
@@ -788,8 +783,6 @@ struct object(IntableRaising, Boolable, Stringable):
                 constrained[
                     False, "cannot convert nested list element to object"
                 ]()
-
-        unroll[append, len(VariadicList(Ts))]()
 
     @always_inline
     fn __init__(inout self, func: Self.nullary_function):
@@ -903,6 +896,16 @@ struct object(IntableRaising, Boolable, Stringable):
             return int(self._value.get_as_float())
 
         raise "object type cannot be converted to an integer"
+
+    fn __as_bool__(self) -> Bool:
+        """Performs conversion to bool according to Python semantics. Integers
+        and floats are true if they are non-zero, and strings and lists are true
+        if they are non-empty.
+
+        Returns:
+            Whether the object is considered true.
+        """
+        return self.__bool__()
 
     @always_inline
     fn __str__(self) -> String:
@@ -1240,7 +1243,7 @@ struct object(IntableRaising, Boolable, Stringable):
             var rhsStr = rhs._value.get_as_string()
             var length = lhsStr.length + rhsStr.length
             var impl = _ImmutableString(
-                UnsafePointer[Int8].alloc(length), length
+                UnsafePointer[UInt8].alloc(length), length
             )
             memcpy(impl.data, lhsStr.data, lhsStr.length)
             memcpy(impl.data + lhsStr.length, rhsStr.data, rhsStr.length)
@@ -1730,15 +1733,16 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         if self._value.is_obj():
             return object(self._value.get_obj_attr("__getitem__"))(self, i)
+
         if not self._value.is_str() and not self._value.is_list():
             raise Error("TypeError: can only index into lists and strings")
+
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
-            var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
-            initialize_pointee_copy(
-                impl.data,
-                move_from_pointee(self._value.get_as_string().data + index),
-            )
+            # Construct a new single-character string.
+            var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
+            var char = self._value.get_as_string().data[index]
+            impl.data.init_pointee_move(char)
             return _ObjectImpl(impl)
         return self._value.get_list_element(i._value.get_as_int().value)
 

@@ -12,14 +12,16 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from utils import InlineArray, Span
 from collections.list import List
+
 from testing import assert_equal
+
+from utils import InlineArray, Span
 
 
 def test_span_list_int():
     var l = List[Int](1, 2, 3, 4, 5, 6, 7)
-    var s = Span(l)
+    var s = Span(list=l)
     assert_equal(len(s), len(l))
     for i in range(len(s)):
         assert_equal(l[i], s[i])
@@ -66,7 +68,7 @@ def test_span_list_str():
 
 def test_span_array_int():
     var l = InlineArray[Int, 7](1, 2, 3, 4, 5, 6, 7)
-    var s = Span(l)
+    var s = Span[Int](array=l)
     assert_equal(len(s), len(l))
     for i in range(len(s)):
         assert_equal(l[i], s[i])
@@ -89,7 +91,7 @@ def test_span_array_int():
 
 def test_span_array_str():
     var l = InlineArray[String, 7]("a", "b", "c", "d", "e", "f", "g")
-    var s = Span(l)
+    var s = Span[String](array=l)
     assert_equal(len(s), len(l))
     for i in range(len(s)):
         assert_equal(l[i], s[i])
@@ -112,10 +114,44 @@ def test_span_array_str():
 
 def test_indexing():
     var l = InlineArray[Int, 7](1, 2, 3, 4, 5, 6, 7)
-    var s = Span(l)
+    var s = Span[Int](array=l)
     assert_equal(s[True], 2)
     assert_equal(s[int(0)], 1)
     assert_equal(s[3], 4)
+
+
+def test_span_slice():
+    def compare(s: Span[Int], l: List[Int]) -> Bool:
+        if len(s) != len(l):
+            return False
+        for i in range(len(s)):
+            if s[i] != l[i]:
+                return False
+        return True
+
+    var l = List(1, 2, 3, 4, 5)
+    var s = Span(l)
+    var res = s[1:2]
+    assert_equal(res[0], 2)
+    res = s[1:-1:1]
+    assert_equal(res[0], 2)
+    assert_equal(res[1], 3)
+    assert_equal(res[2], 4)
+    # TODO: Fix Span slicing
+    # res = s[1::-1]
+    # assert_equal(res[0], 2)
+    # assert_equal(res[1], 1)
+
+
+def test_copy_from():
+    var a = List[Int](0, 1, 2, 3)
+    var b = List[Int](4, 5, 6, 7, 8, 9, 10)
+    var s = Span(a)
+    var s2 = Span(b)
+    s.copy_from(s2[: len(a)])
+    for i in range(len(a)):
+        assert_equal(a[i], b[i])
+        assert_equal(s[i], s2[i])
 
 
 def main():
@@ -124,3 +160,4 @@ def main():
     test_span_array_int()
     test_span_array_str()
     test_indexing()
+    test_span_slice()

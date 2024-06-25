@@ -15,7 +15,8 @@
 from collections import List
 
 from test_utils import CopyCounter, MoveCounter
-from testing import assert_equal, assert_false, assert_true, assert_raises
+from testing import assert_equal, assert_false, assert_raises, assert_true
+
 from utils import Span
 
 
@@ -66,18 +67,38 @@ def test_list_unsafe_get():
         list.append(i)
 
     assert_equal(5, len(list))
-    assert_equal(0, list.unsafe_get(0)[])
-    assert_equal(1, list.unsafe_get(1)[])
-    assert_equal(2, list.unsafe_get(2)[])
-    assert_equal(3, list.unsafe_get(3)[])
-    assert_equal(4, list.unsafe_get(4)[])
+    assert_equal(0, list.unsafe_get(0))
+    assert_equal(1, list.unsafe_get(1))
+    assert_equal(2, list.unsafe_get(2))
+    assert_equal(3, list.unsafe_get(3))
+    assert_equal(4, list.unsafe_get(4))
 
     list[2] = -2
-    assert_equal(-2, list.unsafe_get(2)[])
+    assert_equal(-2, list.unsafe_get(2))
 
     list.clear()
     list.append(2)
-    assert_equal(2, list.unsafe_get(0)[])
+    assert_equal(2, list.unsafe_get(0))
+
+
+def test_list_unsafe_set():
+    var list = List[Int]()
+
+    for i in range(5):
+        list.append(i)
+
+    assert_equal(5, len(list))
+    list.unsafe_set(0, 0)
+    list.unsafe_set(1, 10)
+    list.unsafe_set(2, 20)
+    list.unsafe_set(3, 30)
+    list.unsafe_set(4, 40)
+
+    assert_equal(list[0], 0)
+    assert_equal(list[1], 10)
+    assert_equal(list[2], 20)
+    assert_equal(list[3], 30)
+    assert_equal(list[4], 40)
 
 
 def test_list_clear():
@@ -214,80 +235,6 @@ def test_list_reverse():
     assert_equal(len(vec), 2)
     assert_equal(vec[0], 10)
     assert_equal(vec[1], 5)
-
-    #
-    # Test reversing the list [1, 2, 3, 4, 5] starting at the 3rd position
-    # to produce [1, 2, 5, 4, 3]
-    #
-
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-    vec.append(4)
-    vec.append(5)
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 4)
-    assert_equal(vec[4], 5)
-
-    vec._reverse(start=2)
-
-    assert_equal(len(vec), 5)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 5)
-    assert_equal(vec[3], 4)
-    assert_equal(vec[4], 3)
-
-    #
-    # Test reversing the list [1, 2, 3] with negative indexes
-    #
-
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-
-    vec._reverse(start=-2)
-
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 3)
-    assert_equal(vec[2], 2)
-
-    #
-    # Test reversing the list [1, 2] with out of bounds indexes
-    #
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-
-    with assert_raises(contains="IndexError"):
-        vec._reverse(start=-3)
-
-    with assert_raises(contains="IndexError"):
-        vec._reverse(start=3)
-
-    #
-    # Test edge case of reversing the list [1, 2, 3] but starting after the
-    # last element.
-    #
-
-    vec = List[Int]()
-    vec.append(1)
-    vec.append(2)
-    vec.append(3)
-
-    vec._reverse(start=len(vec))
-
-    assert_equal(len(vec), 3)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
 
 
 def test_list_reverse_move_count():
@@ -508,17 +455,6 @@ def test_list_extend():
     assert_equal(vec[4], 2)
     assert_equal(vec[5], 3)
 
-    vec._reverse(start=3)
-
-    # vec == [1, 2, 3, 3, 2, 1]
-    assert_equal(len(vec), 6)
-    assert_equal(vec[0], 1)
-    assert_equal(vec[1], 2)
-    assert_equal(vec[2], 3)
-    assert_equal(vec[3], 3)
-    assert_equal(vec[4], 2)
-    assert_equal(vec[5], 1)
-
 
 def test_list_extend_non_trivial():
     # Tests three things:
@@ -671,6 +607,45 @@ def test_list_span():
     assert_equal(es[2], 3)
     assert_equal(len(es), 3)
 
+    assert_equal(vs[1:0:-1][0], 2)
+    assert_equal(vs[2:1:-1][0], 3)
+    es = vs[:0:-1]
+    assert_equal(es[0], 3)
+    assert_equal(es[1], 2)
+    assert_equal(vs[2::-1][0], 3)
+
+    assert_equal(len(vs[1:2:-1]), 0)
+
+    assert_equal(0, len(vs[:-1:-2]))
+    assert_equal(0, len(vs[-50::-1]))
+    es = vs[-50::]
+    assert_equal(3, len(es))
+    assert_equal(es[0], 1)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 3)
+    es = vs[:-50:-1]
+    assert_equal(3, len(es))
+    assert_equal(es[0], 3)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 1)
+    es = vs[:50:]
+    assert_equal(3, len(es))
+    assert_equal(es[0], 1)
+    assert_equal(es[1], 2)
+    assert_equal(es[2], 3)
+    es = vs[::50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 1)
+    es = vs[::-50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 3)
+    es = vs[50::-50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 3)
+    es = vs[-50::50]
+    assert_equal(1, len(es))
+    assert_equal(es[0], 1)
+
 
 def test_list_boolable():
     assert_true(List[Int](1))
@@ -709,6 +684,10 @@ def test_constructor_from_other_list_through_pointer():
 
 
 def test_converting_list_to_string():
+    # This is also testing the method `to_format` because
+    # essentially, `List.__str__()` just creates a String and applies `to_format` to it.
+    # If we were to write unit tests for `to_format`, we would essentially copy-paste the code
+    # of `List.__str__()`
     var my_list = List[Int](1, 2, 3)
     assert_equal(my_list.__str__(), "[1, 2, 3]")
 
@@ -811,6 +790,7 @@ def main():
     test_mojo_issue_698()
     test_list()
     test_list_unsafe_get()
+    test_list_unsafe_set()
     test_list_clear()
     test_list_to_bool_conversion()
     test_list_pop()

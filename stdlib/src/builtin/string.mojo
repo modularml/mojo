@@ -15,13 +15,15 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import countl_zero
-from collections import List, KeyElement
-from sys import llvm_intrinsic, bitwidthof
+from collections import KeyElement, List
+from collections._index_normalization import normalize_index
+from sys import bitwidthof, llvm_intrinsic
+from sys.ffi import C_char
 
+from bit import countl_zero
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, Span, StringSlice
+from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 # ===----------------------------------------------------------------------=== #
@@ -54,11 +56,18 @@ fn ord(s: String) -> Int:
         return int(b1)
     var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    debug_assert(
+        1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
+    )
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
     var result = int(b1 & b1_mask) << shift
-    for _ in range(1, num_bytes):
+    for i in range(1, num_bytes):
         p += 1
+        debug_assert(
+            p[] >> 6 == 0b00000010,
+            "invalid UTF-8 byte " + str(b1) + " at index " + str(i),
+        )
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
     return result
@@ -108,11 +117,11 @@ fn chr(c: Int) -> String:
     var shift = 6 * (num_bytes - 1)
     var mask = UInt8(0xFF) >> (num_bytes + 1)
     var num_bytes_marker = UInt8(0xFF) << (8 - num_bytes)
-    p.store(((c >> shift) & mask) | num_bytes_marker)
+    Scalar.store(p, ((c >> shift) & mask) | num_bytes_marker)
     for i in range(1, num_bytes):
         shift -= 6
-        p.store(i, ((c >> shift) & 0b00111111) | 0b10000000)
-    p.store(num_bytes, 0)
+        Scalar.store(p, i, ((c >> shift) & 0b00111111) | 0b10000000)
+    Scalar.store(p, num_bytes, 0)
     return String(p.bitcast[DType.uint8](), num_bytes + 1)
 
 
@@ -162,9 +171,9 @@ fn _repr_ascii(c: UInt8) -> String:
     else:
         var uc = c.cast[DType.uint8]()
         if uc < 16:
-            return hex(uc, r"\x0")
+            return hex(uc, prefix=r"\x0")
         else:
-            return hex(uc, r"\x")
+            return hex(uc, prefix=r"\x")
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
@@ -511,6 +520,18 @@ fn isdigit(c: UInt8) -> Bool:
     return ord_0 <= int(c) <= ord_9
 
 
+fn isdigit(c: String) -> Bool:
+    """Determines whether the given character is a digit [0-9].
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is a digit.
+    """
+    return isdigit(ord(c))
+
+
 # ===----------------------------------------------------------------------=== #
 # isupper
 # ===----------------------------------------------------------------------=== #
@@ -582,12 +603,16 @@ fn _isspace(c: UInt8) -> Bool:
         True iff the character is one of the whitespace characters listed above.
     """
 
+    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
     alias ` ` = UInt8(ord(" "))
     alias `\t` = UInt8(ord("\t"))
     alias `\n` = UInt8(ord("\n"))
     alias `\r` = UInt8(ord("\r"))
     alias `\f` = UInt8(ord("\f"))
     alias `\v` = UInt8(ord("\v"))
+    alias `\x1c` = UInt8(ord("\x1c"))
+    alias `\x1d` = UInt8(ord("\x1d"))
+    alias `\x1e` = UInt8(ord("\x1e"))
 
     # This compiles to something very clever that's even faster than a LUT.
     return (
@@ -597,6 +622,9 @@ fn _isspace(c: UInt8) -> Bool:
         or c == `\r`
         or c == `\f`
         or c == `\v`
+        or c == `\x1c`
+        or c == `\x1d`
+        or c == `\x1e`
     )
 
 
@@ -605,27 +633,34 @@ fn _isspace(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_newlines_table() -> InlineArray[UInt8, 128]:
-    var table = InlineArray[UInt8, 128](0)
-    table[ord("\n")] = 1
-    table[ord("\r")] = 1
-    table[ord("\f")] = 1
-    table[ord("\v")] = 1
-    table[ord("\x1c")] = 1
-    table[ord("\x1d")] = 1
-    table[ord("\x1e")] = 1
-    return table
+fn _isnewline(s: String) -> Bool:
+    if len(s._buffer) != 2:
+        return False
 
-
-alias _NEWLINES_TABLE = _get_newlines_table()
-
-
-fn _isnewline(c: String) -> Bool:
     # TODO: add \u2028 and \u2029 when they are properly parsed
     # FIXME: \x85 is parsed but not encoded in utf-8
-    if len(c._buffer) == 2:
-        return c == "\x85" or _NEWLINES_TABLE[ord(c)]
-    return False
+    if s == "\x85":
+        return True
+
+    # NOTE: a global LUT doesn't work at compile time so we can't use it here.
+    alias `\n` = UInt8(ord("\n"))
+    alias `\r` = UInt8(ord("\r"))
+    alias `\f` = UInt8(ord("\f"))
+    alias `\v` = UInt8(ord("\v"))
+    alias `\x1c` = UInt8(ord("\x1c"))
+    alias `\x1d` = UInt8(ord("\x1d"))
+    alias `\x1e` = UInt8(ord("\x1e"))
+
+    var c = UInt8(ord(s))
+    return (
+        c == `\n`
+        or c == `\r`
+        or c == `\f`
+        or c == `\v`
+        or c == `\x1c`
+        or c == `\x1d`
+        or c == `\x1e`
+    )
 
 
 # ===----------------------------------------------------------------------=== #
@@ -652,6 +687,90 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
+fn _utf8_byte_type(b: UInt8) -> UInt8:
+    """UTF-8 byte type.
+
+    Returns:
+        The byte type:
+            0 -> ASCII byte.
+            1 -> continuation byte.
+            2 -> start of 2 byte long sequence.
+            3 -> start of 3 byte long sequence.
+            4 -> start of 4 byte long sequence.
+    """
+    return countl_zero(~(b & 0b1111_0000))
+
+
+@value
+struct _StringIter[
+    is_mutable: Bool, //,
+    lifetime: AnyLifetime[is_mutable].type,
+    forward: Bool = True,
+]:
+    """Iterator for String.
+
+    Parameters:
+        is_mutable: Whether the slice is mutable.
+        lifetime: The lifetime of the underlying string data.
+        forward: The iteration direction. `False` is backwards.
+    """
+
+    var index: Int
+    var continuation_bytes: Int
+    var ptr: UnsafePointer[UInt8]
+    var length: Int
+
+    fn __init__(
+        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
+    ):
+        self.index = 0 if forward else length
+        self.ptr = unsafe_pointer
+        self.length = length
+        self.continuation_bytes = 0
+        for i in range(length):
+            if _utf8_byte_type(int(unsafe_pointer[i])) == 1:
+                self.continuation_bytes += 1
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(inout self) -> StringSlice[lifetime]:
+        @parameter
+        if forward:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var byte_type = _utf8_byte_type(int(self.ptr[self.index]))
+                if byte_type != 0:
+                    byte_len = int(byte_type)
+                    self.continuation_bytes -= byte_len - 1
+            self.index += byte_len
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
+                len=byte_len,
+            )
+        else:
+            var byte_len = 1
+            if self.continuation_bytes > 0:
+                var byte_type = _utf8_byte_type(int(self.ptr[self.index - 1]))
+                if byte_type != 0:
+                    while byte_type == 1:
+                        byte_len += 1
+                        var b = int(self.ptr[self.index - byte_len])
+                        byte_type = _utf8_byte_type(b)
+                    self.continuation_bytes -= byte_len - 1
+            self.index -= byte_len
+            return StringSlice[lifetime](
+                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
+            )
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return self.length - self.index - self.continuation_bytes
+        else:
+            return self.index - self.continuation_bytes
+
+
 struct String(
     Sized,
     Stringable,
@@ -662,6 +781,7 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
+    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
@@ -716,6 +836,14 @@ struct String(
     fn __init__(inout self):
         """Construct an uninitialized string."""
         self._buffer = Self._buffer_type()
+
+    fn __init__(inout self, *, other: Self):
+        """Explicitly copy the provided value.
+
+        Args:
+            other: The value to copy.
+        """
+        self.__copyinit__(other)
 
     @always_inline
     fn __init__(inout self, str: StringRef):
@@ -815,6 +943,15 @@ struct String(
         self = String(ptr.address, len)
 
     @always_inline
+    fn __init__(inout self, obj: PythonObject):
+        """Creates a string from a python object.
+
+        Args:
+            obj: A python object.
+        """
+        self = str(obj)
+
+    @always_inline
     fn __copyinit__(inout self, existing: Self):
         """Creates a deep copy of an existing string.
 
@@ -860,6 +997,7 @@ struct String(
             arg.format_to(writer)
 
         args.each[write_arg]()
+        _ = writer^
 
         return output^
 
@@ -898,8 +1036,11 @@ struct String(
     # Operator dunders
     # ===------------------------------------------------------------------=== #
 
-    fn __getitem__(self, idx: Int) -> String:
+    fn __getitem__[IndexerType: Indexer](self, idx: IndexerType) -> String:
         """Gets the character at the specified position.
+
+        Parameters:
+            IndexerType: The inferred type of an indexer argument.
 
         Args:
             idx: The index value.
@@ -907,16 +1048,12 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
-        if idx < 0:
-            return self.__getitem__(len(self) + idx)
-
-        debug_assert(0 <= idx < len(self), "index must be in range")
+        var normalized_idx = normalize_index["String"](idx, self)
         var buf = Self._buffer_type(capacity=1)
-        buf.append(self._buffer[idx])
+        buf.append(self._buffer[normalized_idx])
         buf.append(0)
         return String(buf^)
 
-    @always_inline
     fn __getitem__(self, span: Slice) -> String:
         """Gets the sequence of characters at the specified positions.
 
@@ -926,18 +1063,24 @@ struct String(
         Returns:
             A new string containing the string at the specified positions.
         """
-
-        var adjusted_span = self._adjust_span(span)
-        var adjusted_span_len = adjusted_span.unsafe_indices()
-        if adjusted_span.step == 1:
-            return StringRef(self._buffer.data + span.start, adjusted_span_len)
+        var start: Int
+        var end: Int
+        var step: Int
+        start, end, step = span.indices(len(self))
+        var r = range(start, end, step)
+        if step == 1:
+            return StringRef(
+                self._buffer.data + start,
+                len(r),
+            )
 
         var buffer = Self._buffer_type()
-        buffer.resize(adjusted_span_len + 1, 0)
-        var ptr = self.unsafe_uint8_ptr()
-        for i in range(adjusted_span_len):
-            buffer[i] = ptr[adjusted_span[i]]
-        buffer[adjusted_span_len] = 0
+        var result_len = len(r)
+        buffer.resize(result_len + 1, 0)
+        var ptr = self.unsafe_ptr()
+        for i in range(result_len):
+            buffer[i] = ptr[r[i]]
+        buffer[result_len] = 0
         return Self(buffer^)
 
     @always_inline
@@ -1033,12 +1176,12 @@ struct String(
         buffer.resize(total_len + 1, 0)
         memcpy(
             DTypePointer(buffer.data),
-            self.unsafe_uint8_ptr(),
+            self.unsafe_ptr(),
             self_len,
         )
         memcpy(
             DTypePointer(buffer.data + self_len),
-            other.unsafe_uint8_ptr(),
+            other.unsafe_ptr(),
             other_len + 1,  # Also copy the terminator
         )
         return Self(buffer^)
@@ -1078,6 +1221,26 @@ struct String(
             count=other_len + 1,
         )
 
+    fn __iter__(ref [_]self) -> _StringIter[__lifetime_of(self)]:
+        """Iterate over elements of the string, returning immutable references.
+
+        Returns:
+            An iterator of references to the string elements.
+        """
+        return _StringIter[__lifetime_of(self)](
+            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+        )
+
+    fn __reversed__(ref [_]self) -> _StringIter[__lifetime_of(self), False]:
+        """Iterate backwards over the string, returning immutable references.
+
+        Returns:
+            A reversed iterator of references to the string elements.
+        """
+        return _StringIter[__lifetime_of(self), forward=False](
+            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+        )
+
     # ===------------------------------------------------------------------=== #
     # Trait implementations
     # ===------------------------------------------------------------------=== #
@@ -1093,10 +1256,10 @@ struct String(
 
     @always_inline
     fn __len__(self) -> Int:
-        """Returns the string length.
+        """Returns the string byte length.
 
         Returns:
-            The string length.
+            The string byte length.
         """
         # Avoid returning -1 if the buffer is not initialized
         if not self.unsafe_ptr():
@@ -1133,26 +1296,6 @@ struct String(
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
-
-    @always_inline
-    fn _adjust_span(self, span: Slice) -> Slice:
-        """Adjusts the span based on the string length."""
-        var adjusted_span = span
-
-        if adjusted_span.start < 0:
-            adjusted_span.start = len(self) + adjusted_span.start
-
-        if not adjusted_span._has_end():
-            adjusted_span.end = len(self)
-        elif adjusted_span.end < 0:
-            adjusted_span.end = len(self) + adjusted_span.end
-
-        if span.step < 0:
-            var tmp = adjusted_span.end
-            adjusted_span.end = adjusted_span.start - 1
-            adjusted_span.start = tmp - 1
-
-        return adjusted_span
 
     fn format_to(self, inout writer: Formatter):
         """
@@ -1229,6 +1372,31 @@ struct String(
             result += str(a)
 
         elems.each[add_elt]()
+        _ = is_first
+        return result
+
+    fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
+        """Joins string elements using the current string as a delimiter.
+
+        Parameters:
+            T: The types of the elements.
+
+        Args:
+            elems: The input values.
+
+        Returns:
+            The joined string.
+        """
+        var result: String = ""
+        var is_first = True
+
+        for e in elems:
+            if is_first:
+                is_first = False
+            else:
+                result += self
+            result += str(e[])
+
         return result
 
     fn _strref_dangerous(self) -> StringRef:
@@ -1248,27 +1416,23 @@ struct String(
         """
         pass
 
-    # TODO: Remove this method when #2317 is done
-    fn unsafe_ptr(self) -> UnsafePointer[Int8]:
-        """Retrieves a pointer to the underlying memory.
-
-        Note that you should use `unsafe_uint8_ptr()` if you need to access the
-        pointer as we are now storing the bytes as UInt8.
-
-        See https://github.com/modularml/mojo/issues/2317 for more information.
-
-        Returns:
-            The pointer to the underlying memory.
-        """
-        return self._buffer.data.bitcast[Int8]()
-
-    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
+    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
         """Retrieves a pointer to the underlying memory.
 
         Returns:
             The pointer to the underlying memory.
         """
-        return self._buffer.data.bitcast[UInt8]()
+        return self._buffer.data
+
+    fn unsafe_cstr_ptr(self) -> UnsafePointer[C_char]:
+        """Retrieves a C-string-compatible pointer to the underlying memory.
+
+        The returned pointer is guaranteed to be null, or NUL terminated.
+
+        Returns:
+            The pointer to the underlying memory.
+        """
+        return self.unsafe_ptr().bitcast[C_char]()
 
     fn as_bytes(self) -> List[UInt8]:
         """Retrieves the underlying byte sequence encoding the characters in
@@ -1291,9 +1455,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(
-        self: Reference[Self, _, _]
-    ) -> Span[UInt8, self.is_mutable, self.lifetime]:
+    fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1303,29 +1465,23 @@ struct String(
             A contiguous slice pointing to the bytes owned by this string.
         """
 
-        return Span[UInt8, self.is_mutable, self.lifetime](
-            unsafe_ptr=self[]._buffer.unsafe_ptr(),
+        return Span[UInt8, __lifetime_of(self)](
+            unsafe_ptr=self._buffer.unsafe_ptr(),
             # Does NOT include the NUL terminator.
-            len=self[]._byte_length(),
+            len=self._byte_length(),
         )
 
     @always_inline
-    fn as_string_slice(
-        self: Reference[Self, _, _]
-    ) -> StringSlice[self.is_mutable, self.lifetime]:
+    fn as_string_slice(ref [_]self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
             A string slice pointing to the data owned by this string.
         """
-        var bytes = self[].as_bytes_slice()
-
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice[self.is_mutable, self.lifetime](
-            unsafe_from_utf8=bytes
-        )
+        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
 
     fn _byte_length(self) -> Int:
         """Get the string length in bytes.
@@ -1333,7 +1489,7 @@ struct String(
         This does not include the trailing null terminator in the count.
 
         Returns:
-            The length of this StringLiteral in bytes, excluding null terminator.
+            The length of this string in bytes, excluding null terminator.
         """
 
         var buffer_len = len(self._buffer)
@@ -1343,7 +1499,7 @@ struct String(
         else:
             return buffer_len
 
-    fn _steal_ptr(inout self) -> DTypePointer[DType.int8]:
+    fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
         The caller is responsible for freeing up the memory.
 
@@ -1437,44 +1593,43 @@ struct String(
 
         Returns:
             True if the String is one of the whitespace characters
-                listed above, otherwise False."""
+                listed above, otherwise False.
+        """
         # TODO add line and paragraph separator as stringliteral
         # once unicode escape secuences are accepted
-        # 0 is to build a String with null terminator
-        alias information_sep_four = List[UInt8](0x5C, 0x78, 0x31, 0x63, 0)
-        """TODO: \\x1c"""
-        alias information_sep_two = List[UInt8](0x5C, 0x78, 0x31, 0x65, 0)
-        """TODO: \\x1e"""
-        alias next_line = List[UInt8](0x78, 0x38, 0x35, 0)
+        var next_line = List[UInt8](0xC2, 0x85)
         """TODO: \\x85"""
-        alias unicode_line_sep = List[UInt8](
-            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x38, 0
-        )
+        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
         """TODO: \\u2028"""
-        alias unicode_paragraph_sep = List[UInt8](
-            0x20, 0x5C, 0x75, 0x32, 0x30, 0x32, 0x39, 0
-        )
+        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
         """TODO: \\u2029"""
 
         @always_inline
-        fn compare(item1: List[UInt8], item2: List[UInt8], amnt: Int) -> Bool:
-            var ptr1 = DTypePointer(item1.unsafe_ptr())
-            var ptr2 = DTypePointer(item2.unsafe_ptr())
+        fn _compare(
+            item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
+        ) -> Bool:
+            var ptr1 = DTypePointer(item1)
+            var ptr2 = DTypePointer(item2)
             return memcmp(ptr1, ptr2, amnt) == 0
 
-        if len(self) == 1:
-            return _isspace(self._buffer.unsafe_get(0)[])
-        elif len(self) == 3:
-            return compare(self._buffer, next_line, 3)
-        elif len(self) == 4:
-            return compare(self._buffer, information_sep_four, 4) or compare(
-                self._buffer, information_sep_two, 4
-            )
-        elif len(self) == 7:
-            return compare(self._buffer, unicode_line_sep, 7) or compare(
-                self._buffer, unicode_paragraph_sep, 7
-            )
-        return False
+        if len(self) == 0:
+            return False
+
+        for s in self:
+            var no_null_len = len(s)
+            var ptr = s.unsafe_ptr()
+            if no_null_len == 1 and not _isspace(ptr[0]):
+                return False
+            elif no_null_len == 2 and not _compare(
+                ptr, next_line.unsafe_ptr(), 2
+            ):
+                return False
+            elif no_null_len == 3 and not (
+                _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
+                or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
+            ):
+                return False
+        return True
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string by a separator.
@@ -1524,7 +1679,7 @@ struct String(
             output.append(self[lhs:rhs])
             lhs = rhs + sep_len
 
-        if self.endswith(sep):
+        if self.endswith(sep) and (len(output) <= maxsplit or maxsplit == -1):
             output.append("")
         return output
 
@@ -1569,7 +1724,7 @@ struct String(
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
             while lhs <= str_iter_len:
-                if not _isspace(self._buffer.unsafe_get(lhs)[]):
+                if not _isspace(self._buffer.unsafe_get(lhs)):
                     break
                 lhs += 1
             # if it went until the end of the String, then
@@ -1583,7 +1738,7 @@ struct String(
                 break
             rhs = lhs + 1
             while rhs <= str_iter_len:
-                if _isspace(self._buffer.unsafe_get(rhs)[]):
+                if _isspace(self._buffer.unsafe_get(rhs)):
                     break
                 rhs += 1
 
@@ -1655,9 +1810,9 @@ struct String(
         if occurrences == -1:
             return self
 
-        var self_start = self.unsafe_uint8_ptr()
-        var self_ptr = self.unsafe_uint8_ptr()
-        var new_ptr = new.unsafe_uint8_ptr()
+        var self_start = self.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
+        var new_ptr = new.unsafe_ptr()
 
         var self_len = len(self)
         var old_len = len(old)
@@ -1740,7 +1895,7 @@ struct String(
         """
         # TODO: should use self.__iter__ and self.isspace()
         var r_idx = len(self)
-        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)[]):
+        while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)):
             r_idx -= 1
         return self[:r_idx]
 
@@ -1768,7 +1923,7 @@ struct String(
         """
         # TODO: should use self.__iter__ and self.isspace()
         var l_idx = 0
-        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)[]):
+        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)):
             l_idx += 1
         return self[l_idx:]
 
@@ -1784,8 +1939,8 @@ struct String(
 
     fn _interleave(self, val: String) -> String:
         var res = List[UInt8]()
-        var val_ptr = val.unsafe_uint8_ptr()
-        var self_ptr = self.unsafe_uint8_ptr()
+        var val_ptr = val.unsafe_ptr()
+        var self_ptr = self.unsafe_ptr()
         res.reserve(len(val) * len(self) + 1)
         for i in range(len(self)):
             for j in range(len(val)):
@@ -1824,7 +1979,7 @@ struct String(
     fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
         var copy: String = self
 
-        var char_ptr = copy.unsafe_uint8_ptr()
+        var char_ptr = copy.unsafe_ptr()
 
         for i in range(len(self)):
             var char: UInt8 = char_ptr[i]
@@ -1952,10 +2107,91 @@ struct String(
         for i in range(n):
             memcpy(
                 dest=buf.data + len_self * i,
-                src=self.unsafe_uint8_ptr(),
+                src=self.unsafe_ptr(),
                 count=len_self,
             )
         return String(buf^)
+
+    @always_inline
+    fn format[*Ts: Stringable](self, *args: *Ts) raises -> String:
+        """Format a template with *args.
+
+        Example of manual indexing:
+
+        ```mojo
+        print(
+            String("{0} {1} {0}").format(
+                "Mojo", 1.125
+            )
+        ) #Mojo 1.125 Mojo
+        ```
+
+        Example of automatic indexing:
+
+        ```mojo
+        var x = String("{} {}").format(
+            True, "hello world"
+        )
+        print(x) #True hello world
+        ```
+
+        Args:
+            args: The substitution values.
+
+        Parameters:
+            Ts: The types of the substitution values.
+              Are required to implement `Stringable`.
+
+        Returns:
+            The template with the given values substituted.
+
+        """
+        alias num_pos_args = len(VariadicList(Ts))
+        var entries = _FormatCurlyEntry.create_entries(self, num_pos_args)
+
+        var res: String = ""
+        var pos_in_self = 0
+
+        var current_automatic_arg_index = 0
+        for e in entries:
+            debug_assert(pos_in_self < len(self), "pos_in_self >= len(self)")
+            res += self[pos_in_self : e[].first_curly]
+
+            if e[].is_escaped_brace():
+                res += "}" if e[].field[Bool] else "{"
+
+            if e[].is_manual_indexing():
+
+                @parameter
+                for i in range(num_pos_args):
+                    if i == e[].field[Int]:
+                        res += str(args[i])
+
+            if e[].is_automatic_indexing():
+
+                @parameter
+                for i in range(num_pos_args):
+                    if i == current_automatic_arg_index:
+                        res += str(args[i])
+                current_automatic_arg_index += 1
+
+            pos_in_self = e[].last_curly + 1
+
+        if pos_in_self < len(self):
+            res += self[pos_in_self : len(self)]
+
+        return res^
+
+    fn isdigit(self) -> Bool:
+        """Returns True if all characters in the string are digits.
+
+        Returns:
+            True if all characters are digits else False.
+        """
+        for c in self:
+            if not isdigit(c):
+                return False
+        return True
 
 
 # ===----------------------------------------------------------------------=== #
@@ -2087,3 +2323,167 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
         return 64 + 1
     else:
         return 128 + 1  # Add 1 for the terminator
+
+
+# ===----------------------------------------------------------------------===#
+# Format method structures
+# ===----------------------------------------------------------------------===#
+
+
+@value
+struct _FormatCurlyEntry:
+    """
+    Internally used by the `format()` method.
+
+    Specifically to structure fields.
+
+    Does not contain any substitution values.
+
+    """
+
+    var first_curly: Int
+    """The index of an opening brace around a substitution field."""
+
+    var last_curly: Int
+    """The index of an closing brace around a substitution field."""
+
+    var field: Variant[
+        String,  # kwargs indexing (`{field_name}`)
+        Int,  # args manual indexing (`{3}`)
+        NoneType,  # args automatic indexing (`{}`)
+        Bool,  # for escaped curlies ('{{')
+    ]
+    """Store the substitution field."""
+
+    fn is_escaped_brace(ref [_]self) -> Bool:
+        return self.field.isa[Bool]()
+
+    fn is_kwargs_field(ref [_]self) -> Bool:
+        return self.field.isa[String]()
+
+    fn is_automatic_indexing(ref [_]self) -> Bool:
+        return self.field.isa[NoneType]()
+
+    fn is_manual_indexing(ref [_]self) -> Bool:
+        return self.field.isa[Int]()
+
+    @staticmethod
+    fn create_entries(
+        format_src: String, len_pos_args: Int
+    ) raises -> List[Self]:
+        """Used internally by the `format()` method.
+
+        Args:
+            format_src: The "format" part provided by the user.
+            len_pos_args: The len of *args
+
+        Returns:
+            A `List` of structured field entries.
+
+        Purpose of the `Variant` `Self.field`:
+
+        - `Int` for manual indexing
+            (value field contains `0`)
+
+        - `NoneType` for automatic indexing
+            (value field contains `None`)
+
+        - `String` for **kwargs indexing
+            (value field contains `foo`)
+
+        - `Bool` for escaped curlies
+            (value field contains False for `{` or True for '}')
+        """
+        var manual_indexing_count = 0
+        var automatic_indexing_count = 0
+        var raised_manual_index = Optional[Int](None)
+        var raised_automatic_index = Optional[Int](None)
+        var raised_kwarg_field = Optional[String](None)
+
+        var entries = List[Self]()
+        var start = Optional[Int](None)
+        var skip_next = False
+        for i in range(len(format_src)):
+            if skip_next:
+                skip_next = False
+                continue
+            if format_src[i] == "{":
+                if start:
+                    # already one there.
+                    if i - start.value() == 1:
+                        # python escapes double curlies
+                        var curren_entry = Self(
+                            first_curly=start.value(), last_curly=i, field=False
+                        )
+                        entries.append(curren_entry^)
+                        start = None
+                        continue
+                    raise (
+                        "there is a single curly { left unclosed or unescaped"
+                    )
+                else:
+                    start = i
+                continue
+            if format_src[i] == "}":
+                if start:
+                    var start_value = start.value()
+                    var current_entry = Self(
+                        first_curly=start_value, last_curly=i, field=None
+                    )
+                    if i - start_value != 1:
+                        var field = format_src[start_value + 1 : i]
+                        try:
+                            # field is a number for manual indexing:
+                            var number = int(field)
+                            current_entry.field = number
+                            if number >= len_pos_args or number < 0:
+                                raised_manual_index = number
+                                break
+                            manual_indexing_count += 1
+                        except e:
+                            debug_assert(
+                                "not convertible to integer" in str(e),
+                                "Not the expected error from atol",
+                            )
+                            # field is an keyword for **kwargs:
+                            current_entry.field = field
+                            raised_kwarg_field = field
+                            break
+                    else:
+                        # automatic indexing
+                        # current_entry.field is already None
+                        if automatic_indexing_count >= len_pos_args:
+                            raised_automatic_index = automatic_indexing_count
+                            break
+                        automatic_indexing_count += 1
+                    entries.append(current_entry^)
+                    start = None
+                else:
+                    # python escapes double curlies
+                    if (i + 1) < len(format_src):
+                        if format_src[i + 1] == "}":
+                            var curren_entry = Self(
+                                first_curly=i, last_curly=i + 1, field=True
+                            )
+                            entries.append(curren_entry^)
+                            skip_next = True
+                            continue
+                    # if it is not an escaped one, it is an error
+                    raise (
+                        "there is a single curly } left unclosed or unescaped"
+                    )
+
+        if raised_automatic_index:
+            raise "Automatic indexing require more args in *args"
+        if raised_kwarg_field:
+            raise "Index " + raised_kwarg_field.value() + " not in kwargs"
+        if manual_indexing_count and automatic_indexing_count:
+            raise "Cannot both use manual and automatic indexing"
+        if raised_manual_index:
+            raise (
+                "Index " + str(raised_manual_index.value()) + " not in *args"
+            )
+        if start:
+            raise "there is a single curly { left unclosed or unescaped"
+
+        return entries^

@@ -16,10 +16,9 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 
-from python import PythonObject
-
 # FIXME(MOCO-658): Explicit conformance to these traits shouldn't be needed.
 from builtin._stubs import _IntIterable, _StridedIterable
+from python import PythonObject
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
@@ -156,12 +155,6 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
     var step: Int
 
     @always_inline("nodebug")
-    fn __init__(inout self, end: Int):
-        self.start = 0
-        self.end = end
-        self.step = 1
-
-    @always_inline("nodebug")
     fn __init__(inout self, start: Int, end: Int):
         self.start = start
         self.end = end
@@ -179,9 +172,10 @@ struct _StridedRange(Sized, ReversibleRange, _StridedIterable):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        # FIXME(#38392)
-        # if (self.step > 0) == (self.start > self.end):
-        #     return 0
+        if (self.step > 0 and self.start > self.end) or (
+            self.step < 0 and self.start < self.end
+        ):
+            return 0
         return _div_ceil_positive(abs(self.start - self.end), abs(self.step))
 
     @always_inline("nodebug")

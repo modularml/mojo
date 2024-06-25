@@ -13,9 +13,10 @@
 
 # RUN: %mojo %s | FileCheck %s
 
-import benchmark
 from math import iota
 from sys import num_physical_cores
+
+import benchmark
 from algorithm import parallelize, vectorize
 from complex import ComplexFloat64, ComplexSIMD
 
@@ -41,7 +42,7 @@ struct Matrix[type: DType, rows: Int, cols: Int]:
         self.data = DTypePointer[type].alloc(rows * cols)
 
     fn store[nelts: Int](self, row: Int, col: Int, val: SIMD[type, nelts]):
-        self.data.store[width=nelts](row * cols + col, val)
+        SIMD[size=nelts].store(self.data, row * cols + col, val)
 
 
 fn mandelbrot_kernel_SIMD[
