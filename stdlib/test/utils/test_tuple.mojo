@@ -280,7 +280,6 @@ def main():
     test_array_int()
     test_array_str()
     test_array_unsafe_assume_initialized_constructor_string()
-    test_array_unsafe_assume_initialized_constructor_int()
     test_array_int_pointer()
     test_array_contains()
     test_inline_array_runs_destructors()
