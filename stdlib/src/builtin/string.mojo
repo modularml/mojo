@@ -2229,6 +2229,8 @@ struct String(
         """Returns True if the string contains at least one alphabetic character
         and all alphabetic characters in the string are lowercase.
 
+        Note: This method only checks ASCII characters.
+
         Returns:
             True if the string contains at least one alphabetic character
             and all alphabetic characters are lowercase, else False.
@@ -2243,6 +2245,8 @@ struct String(
     fn isupper(self) -> Bool:
         """Returns True if the string contains at least one alphabetic character
         and all alphabetic characters in the string are uppercase.
+
+        Note: This method only checks ASCII characters.
 
         Returns:
             True if the string contains at least one alphabetic character
