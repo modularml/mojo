@@ -18,15 +18,15 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import KeyElement
 
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
-from builtin.hash import _hash_simd
-from builtin.string import _calc_initial_buffer_size
-from builtin.io import _snprintf
 from builtin.format_int import _try_write_int
+from builtin.hash import _hash_simd
+from builtin.io import _snprintf
 from builtin.simd import _format_scalar
+from builtin.string import _calc_initial_buffer_size
 
-from utils._visualizers import lldb_formatter_wrapping_type
-from utils._format import Formattable, Formatter
 from utils import InlineArray
+from utils._format import Formattable, Formatter
+from utils._visualizers import lldb_formatter_wrapping_type
 
 # ===----------------------------------------------------------------------=== #
 #  Indexer
@@ -243,7 +243,6 @@ fn int(value: String, base: Int = 10) raises -> Int:
 @register_passable("trivial")
 struct Int(
     Absable,
-    Boolable,
     Ceilable,
     CeilDivable,
     Comparable,
@@ -251,6 +250,7 @@ struct Int(
     Formattable,
     Indexer,
     Intable,
+    ImplicitlyBoolable,
     KeyElement,
     Powable,
     Roundable,
@@ -951,6 +951,15 @@ struct Int(
             False Bool value if the value is equal to 0 and True otherwise.
         """
         return self != 0
+
+    @always_inline("nodebug")
+    fn __as_bool__(self) -> Bool:
+        """Convert this Int to Bool.
+
+        Returns:
+            False Bool value if the value is equal to 0 and True otherwise.
+        """
+        return self.__bool__()
 
     @always_inline("nodebug")
     fn __index__(self) -> Int:

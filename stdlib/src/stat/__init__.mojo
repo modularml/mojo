@@ -13,19 +13,19 @@
 """Implements the stat package."""
 
 from .stat import (
-    S_IFMT,
-    S_IFDIR,
-    S_IFCHR,
     S_IFBLK,
-    S_IFREG,
+    S_IFCHR,
+    S_IFDIR,
     S_IFIFO,
     S_IFLNK,
+    S_IFMT,
+    S_IFREG,
     S_IFSOCK,
+    S_ISBLK,
+    S_ISCHR,
+    S_ISDIR,
+    S_ISFIFO,
     S_ISLNK,
     S_ISREG,
-    S_ISDIR,
-    S_ISCHR,
-    S_ISBLK,
-    S_ISFIFO,
     S_ISSOCK,
 )

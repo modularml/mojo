@@ -19,7 +19,6 @@ from builtin.string import _atol, _isspace
 from memory import DTypePointer, UnsafePointer, memcmp
 from memory.memory import _memcmp_impl_unconstrained
 
-
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
@@ -42,6 +41,7 @@ struct StringRef(
     IntableRaising,
     CollectionElement,
     Stringable,
+    Formattable,
     Hashable,
     Boolable,
     Comparable,
@@ -402,7 +402,23 @@ struct StringRef(
         Returns:
             A new string.
         """
-        return self
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this StringRef to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # SAFETY:
+        #   Safe because our use of this StringSlice does not outlive `self`.
+        var str_slice = StringSlice[ImmutableStaticLifetime](
+            unsafe_from_utf8_strref=self
+        )
+
+        writer.write_str(str_slice)
 
     # ===-------------------------------------------------------------------===#
     # Methods

@@ -17,8 +17,8 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import alignof, sizeof
 
+from memory import UnsafePointer, memcmp, memcpy
 from memory.memory import _free
-from memory import memcmp, memcpy, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # Error
@@ -26,7 +26,7 @@ from memory import memcmp, memcpy, UnsafePointer
 
 
 @register_passable
-struct Error(Stringable, Boolable, Representable):
+struct Error(Stringable, Boolable, Representable, Formattable):
     """This type represents an Error."""
 
     var data: UnsafePointer[UInt8]
@@ -78,8 +78,7 @@ struct Error(Stringable, Boolable, Representable):
         var dest = UnsafePointer[UInt8].alloc(length + 1)
         memcpy(
             dest=dest,
-            # TODO: Remove cast once string UInt8 transition is complete.
-            src=src.unsafe_ptr().bitcast[UInt8](),
+            src=src.unsafe_ptr(),
             count=length,
         )
         dest[length] = 0
@@ -142,7 +141,18 @@ struct Error(Stringable, Boolable, Representable):
         Returns:
             A String of the error message.
         """
-        return self._message()
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this error to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Avoid this unnecessary intermediate String allocation.
+        writer.write(self._message())
 
     fn __repr__(self) -> String:
         """Converts the Error to printable representation.

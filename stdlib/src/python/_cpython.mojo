@@ -12,15 +12,15 @@
 # ===----------------------------------------------------------------------=== #
 
 from os import getenv, setenv
-from pathlib import Path
 from os.path import dirname
+from pathlib import Path
 from sys import external_call
 from sys.arg import argv
 from sys.ffi import DLHandle
 
 from memory import DTypePointer, UnsafePointer
 
-from utils import StringRef, InlineArray
+from utils import InlineArray, StringRef
 
 # https://github.com/python/cpython/blob/d45225bd66a8123e4a30314c627f2586293ba532/Include/compile.h#L7
 alias Py_single_input = 256
@@ -720,6 +720,9 @@ struct CPython:
                 self._Py_REFCNT(r),
             )
         self._inc_total_rc()
+        _ = type
+        _ = value
+        _ = traceback
         return r
 
     fn Py_Is(
@@ -851,6 +854,7 @@ struct CPython:
                 "refcnt(value)",
                 self._Py_REFCNT(value),
             )
+        _ = v
         return PyKeyValuePair {
             key: key,
             value: value,

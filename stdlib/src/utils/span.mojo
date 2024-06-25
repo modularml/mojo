@@ -20,9 +20,9 @@ from utils import Span
 ```
 """
 
-from . import InlineArray
-
 from sys.intrinsics import _type_is_eq
+
+from . import InlineArray
 
 
 @value
@@ -224,3 +224,20 @@ struct Span[
         """
 
         return self._data
+
+    @always_inline
+    fn copy_from[
+        lifetime: MutableLifetime,
+    ](self: Span[T, lifetime], other: Span[T, _]):
+        """
+        Performs an element wise copy from all elements of `other` into all elements of `self`.
+
+        Parameters:
+            lifetime: The inferred mutable lifetime of the data within the Span.
+
+        Args:
+            other: The Span to copy all elements from.
+        """
+        debug_assert(len(self) == len(other), "Spans must be of equal length")
+        for i in range(len(self)):
+            self[i] = other[i]

@@ -13,9 +13,10 @@
 
 # RUN: %mojo %s | FileCheck %s
 
-import benchmark
 from math import iota
 from sys import num_physical_cores
+
+import benchmark
 from algorithm import parallelize, vectorize
 from complex import ComplexFloat64, ComplexSIMD
 

@@ -13,8 +13,8 @@
 # RUN: %mojo %s
 
 from memory.unsafe import UnsafeMaybeUninitialized
+from test_utils import CopyCounter, MoveCounter, ValueDestructorRecorder
 from testing import assert_equal
-from test_utils import MoveCounter, CopyCounter, ValueDestructorRecorder
 
 
 def test_maybe_uninitialized():
@@ -84,6 +84,7 @@ def test_maybe_uninitialized_move_from_pointer():
     var b = UnsafeMaybeUninitialized[MoveCounter[Int]]()
     # b is uninitialized here.
     b.move_from(UnsafePointer.address_of(a))
+    _ = a^
 
     # a is uninitialized now. Thankfully, we're working with trivial types
     assert_equal(b.assume_initialized().move_count, 1)

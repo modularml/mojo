@@ -14,8 +14,8 @@
 
 
 from pathlib import Path, _dir_of_current_file
-from tempfile import gettempdir
 from sys import os_is_windows
+from tempfile import gettempdir
 
 from testing import assert_equal, assert_true
 
@@ -100,6 +100,39 @@ def test_file_read_context():
                 "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
             )
         )
+
+
+def test_file_read_to_address():
+    with open(
+        _dir_of_current_file() / "test_file_dummy_input.txt",
+        "r",
+    ) as f:
+        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        assert_equal(f.read(ptr), 954)
+        assert_equal(Scalar.load(ptr, 0), 76)  # L
+        assert_equal(Scalar.load(ptr, 1), 111)  # o
+        assert_equal(Scalar.load(ptr, 2), 114)  # r
+        assert_equal(Scalar.load(ptr, 3), 101)  # e
+        assert_equal(Scalar.load(ptr, 4), 109)  # m
+        assert_equal(Scalar.load(ptr, 5), 32)  # <space>
+        assert_equal(Scalar.load(ptr, 56), 10)  # <LF>
+
+    with open(
+        _dir_of_current_file() / "test_file_dummy_input.txt",
+        "r",
+    ) as f:
+        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        assert_equal(f.read(ptr, 1000), 954)
+
+    with open(
+        _dir_of_current_file() / "test_file_dummy_input.txt",
+        "r",
+    ) as f:
+        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        assert_equal(f.read(ptr, 30), 30)
+        assert_equal(f.read(ptr, 1), 1)
+        assert_equal(f.read(ptr, 2), 2)
+        assert_equal(f.read(ptr, 100), 100)
 
 
 def test_file_seek():

@@ -15,42 +15,40 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import pop_count
+import math
 from sys import (
-    llvm_intrinsic,
+    PrefetchOptions,
+    _RegisterPackType,
     has_neon,
     is_x86,
-    triple_is_nvidia_cuda,
-    simdwidthof,
-    _RegisterPackType,
-    PrefetchOptions,
+    llvm_intrinsic,
     prefetch,
+    simdwidthof,
+    triple_is_nvidia_cuda,
 )
 
+from bit import pop_count
 from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 from builtin.hash import _hash_simd
 from memory import bitcast
 
-from utils.numerics import (
-    FPUtils,
-    isnan as _isnan,
-    nan as _nan,
-    max_finite as _max_finite,
-    min_finite as _min_finite,
-    max_or_inf as _max_or_inf,
-    min_or_neg_inf as _min_or_neg_inf,
-)
-from utils._visualizers import lldb_formatter_wrapping_type
 from utils import InlineArray, StringSlice
+from utils._visualizers import lldb_formatter_wrapping_type
+from utils.numerics import FPUtils
+from utils.numerics import isnan as _isnan
+from utils.numerics import max_finite as _max_finite
+from utils.numerics import max_or_inf as _max_or_inf
+from utils.numerics import min_finite as _min_finite
+from utils.numerics import min_or_neg_inf as _min_or_neg_inf
+from utils.numerics import nan as _nan
 
 from .dtype import (
-    _integral_type_of,
     _get_dtype_printf_format,
+    _integral_type_of,
     _scientific_notation_digits,
 )
-from .io import _snprintf_scalar, _printf, _print_fmt
-from .string import _calc_initial_buffer_size, _calc_format_buffer_size
-import math
+from .io import _print_fmt, _printf, _snprintf_scalar
+from .string import _calc_format_buffer_size, _calc_initial_buffer_size
 
 # ===----------------------------------------------------------------------=== #
 # Type Aliases
@@ -137,7 +135,6 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 @register_passable("trivial")
 struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Absable,
-    Boolable,
     Ceilable,
     CeilDivable,
     CollectionElement,
@@ -145,6 +142,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Floorable,
     Hashable,
     Intable,
+    ImplicitlyBoolable,
     Powable,
     Roundable,
     Sized,
@@ -1289,6 +1287,18 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return rebind[Scalar[DType.bool]](self.cast[DType.bool]()).value
 
     @always_inline("nodebug")
+    fn __as_bool__(self) -> Bool:
+        """Converts the SIMD scalar into a boolean value.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
+
+        Returns:
+            True if the SIMD scalar is non-zero and False otherwise.
+        """
+        return self.__bool__()
+
+    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Casts to the value to an Int. If there is a fractional component,
         then the fractional part is truncated.
@@ -1332,6 +1342,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         if size > 1:
             # TODO: Fix when slice indexing is implemented on StringSlice
             values = StringSlice(unsafe_from_utf8=output.as_bytes_slice()[1:-1])
+
         return (
             "SIMD[" + type.__repr__() + ", " + str(size) + "](" + values + ")"
         )
@@ -3082,6 +3093,7 @@ fn _format_scalar[
     )
 
     writer.write_str(str_slice)
+    _ = buf^
 
 
 # ===----------------------------------------------------------------------=== #
@@ -3104,7 +3116,11 @@ fn _modf_scalar(x: Scalar) -> Tuple[__type_of(x), __type_of(x)]:
 
 
 fn _modf(x: SIMD) -> Tuple[__type_of(x), __type_of(x)]:
-    constrained[x.type.is_floating_point(), "the type must be floating point"]()
+    constrained[x.type.is_numeric(), "the type must be numeric"]()
+
+    @parameter
+    if x.type.is_integral():
+        return (x, __type_of(x)(0))
 
     var result_int = __type_of(x)()
     var result_frac = __type_of(x)()
