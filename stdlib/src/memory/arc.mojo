@@ -45,8 +45,9 @@ print(Arc(String("ok"))[])
 """
 
 from os.atomic import Atomic
-from memory import UnsafePointer, stack_allocation
+
 from builtin.builtin_list import _lit_mut_cast
+from memory import UnsafePointer, stack_allocation
 
 
 struct _ArcInner[T: Movable]:

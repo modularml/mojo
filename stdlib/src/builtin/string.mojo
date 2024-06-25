@@ -15,15 +15,15 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import countl_zero
-from collections import List, KeyElement
+from collections import KeyElement, List
 from collections._index_normalization import normalize_index
-from sys import llvm_intrinsic, bitwidthof
+from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
+from bit import countl_zero
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
-from utils import StringRef, StaticIntTuple, Span, StringSlice
+from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
 # ===----------------------------------------------------------------------=== #
@@ -56,11 +56,18 @@ fn ord(s: String) -> Int:
         return int(b1)
     var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    debug_assert(
+        1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
+    )
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
     var result = int(b1 & b1_mask) << shift
-    for _ in range(1, num_bytes):
+    for i in range(1, num_bytes):
         p += 1
+        debug_assert(
+            p[] >> 6 == 0b00000010,
+            "invalid UTF-8 byte " + str(b1) + " at index " + str(i),
+        )
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
     return result
@@ -163,7 +170,10 @@ fn _repr_ascii(c: UInt8) -> String:
         return r"\r"
     else:
         var uc = c.cast[DType.uint8]()
-        return hex[r"\x0"](uc) if uc < 16 else hex[r"\x"](uc)
+        if uc < 16:
+            return hex(uc, prefix=r"\x0")
+        else:
+            return hex(uc, prefix=r"\x")
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
@@ -771,6 +781,7 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
+    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
@@ -986,6 +997,7 @@ struct String(
             arg.format_to(writer)
 
         args.each[write_arg]()
+        _ = writer^
 
         return output^
 
@@ -1360,6 +1372,7 @@ struct String(
             result += str(a)
 
         elems.each[add_elt]()
+        _ = is_first
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
@@ -1442,7 +1455,7 @@ struct String(
         return copy
 
     @always_inline
-    fn as_bytes_slice(ref [_]self: Self) -> Span[UInt8, __lifetime_of(self)]:
+    fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """
         Returns a contiguous slice of the bytes owned by this string.
 
@@ -1459,7 +1472,7 @@ struct String(
         )
 
     @always_inline
-    fn as_string_slice(ref [_]self: Self) -> StringSlice[__lifetime_of(self)]:
+    fn as_string_slice(ref [_]self) -> StringSlice[__lifetime_of(self)]:
         """Returns a string slice of the data owned by this string.
 
         Returns:
@@ -1468,9 +1481,7 @@ struct String(
         # FIXME(MSTDL-160):
         #   Enforce UTF-8 encoding in String so this is actually
         #   guaranteed to be valid.
-        return StringSlice[__lifetime_of(self)](
-            unsafe_from_utf8=self.as_bytes_slice()
-        )
+        return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
 
     fn _byte_length(self) -> Int:
         """Get the string length in bytes.
@@ -1478,7 +1489,7 @@ struct String(
         This does not include the trailing null terminator in the count.
 
         Returns:
-            The length of this StringLiteral in bytes, excluding null terminator.
+            The length of this string in bytes, excluding null terminator.
         """
 
         var buffer_len = len(self._buffer)

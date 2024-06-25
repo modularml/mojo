@@ -15,10 +15,11 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from bit import countl_zero
 from collections import List
-from memory import Pointer, UnsafePointer
 from sys import bitwidthof
+
+from bit import countl_zero
+from memory import Pointer, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # sort
@@ -255,6 +256,7 @@ fn partition[
 
 fn sort(inout buff: Pointer[Int], len: Int):
     """Sort the buffer inplace.
+
     The function doesn't return anything, the buffer is updated inplace.
 
     Args:
@@ -271,6 +273,7 @@ fn sort(inout buff: Pointer[Int], len: Int):
 
 fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
     """Sort the buffer inplace.
+
     The function doesn't return anything, the buffer is updated inplace.
 
     Parameters:

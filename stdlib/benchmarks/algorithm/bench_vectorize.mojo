@@ -20,21 +20,21 @@
 # CHECK: Benchmark results
 
 from random import rand
-from algorithm import vectorize
 
-from benchmark import Unit, run
+from algorithm import vectorize
 from benchmark import (
     Bench,
     Bencher,
     BenchId,
     BenchMetric,
     ThroughputMeasure,
+    Unit,
     keep,
+    run,
 )
-
-from memory.unsafe import DTypePointer
-from memory import memcmp
 from buffer import Buffer
+from memory import memcmp
+from memory.unsafe import DTypePointer
 
 
 @value

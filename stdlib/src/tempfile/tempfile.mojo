@@ -19,11 +19,10 @@ from tempfile import gettempdir
 ```
 """
 
-from collections import Optional
 import os
 import sys
+from collections import Optional
 from pathlib import Path
-
 
 alias TMP_MAX = 10_000
 

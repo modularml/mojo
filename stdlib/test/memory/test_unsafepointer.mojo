@@ -14,7 +14,7 @@
 
 from memory import UnsafePointer
 from test_utils import ExplicitCopyOnly, MoveCounter
-from testing import assert_equal, assert_not_equal, assert_true
+from testing import assert_equal, assert_not_equal, assert_true, assert_false
 
 
 struct MoveOnlyType(Movable):
@@ -112,6 +112,7 @@ def test_refitem_offset():
 def test_address_of():
     var local = 1
     assert_not_equal(0, int(UnsafePointer[Int].address_of(local)))
+    _ = local
 
 
 def test_bitcast():
@@ -122,6 +123,7 @@ def test_bitcast():
     assert_equal(int(ptr), int(ptr.bitcast[Int]()))
 
     assert_equal(int(ptr), int(aliased_ptr))
+    _ = local
 
 
 def test_unsafepointer_string():
@@ -146,6 +148,8 @@ def test_eq():
 
     var p4 = UnsafePointer[Int].address_of(local)
     assert_equal(p1, p4)
+    _ = local
+    _ = other_local
 
 
 def test_comparisons():
@@ -167,6 +171,26 @@ def test_unsafepointer_address_space():
 
     var p2 = UnsafePointer[Int, AddressSpace.GENERIC].alloc(1)
     p2.free()
+
+
+def test_unsafepointer_aligned_alloc():
+    alias alignment_1 = 32
+    var ptr = UnsafePointer[UInt8].alloc[alignment=alignment_1](1)
+    var ptr_uint64 = UInt64(int(ptr))
+    ptr.free()
+    assert_equal(ptr_uint64 % alignment_1, 0)
+
+    alias alignment_2 = 64
+    var ptr_2 = UnsafePointer[UInt8].alloc[alignment=alignment_2](1)
+    var ptr_uint64_2 = UInt64(int(ptr_2))
+    ptr_2.free()
+    assert_equal(ptr_uint64_2 % alignment_2, 0)
+
+    alias alignment_3 = 128
+    var ptr_3 = UnsafePointer[UInt8].alloc[alignment=alignment_3](1)
+    var ptr_uint64_3 = UInt64(int(ptr_3))
+    ptr_3.free()
+    assert_equal(ptr_uint64_3 % alignment_3, 0)
 
 
 # NOTE: Tests fails due to a `UnsafePointer` size
@@ -192,6 +216,18 @@ def test_indexing():
     assert_equal(ptr[3], 3)
 
 
+def test_bool():
+    var nullptr = UnsafePointer[Int]()
+    var ptr = UnsafePointer[Int].alloc(1)
+
+    assert_true(ptr.__bool__())
+    assert_false(nullptr.__bool__())
+    assert_true(ptr.__as_bool__())
+    assert_false(nullptr.__as_bool__())
+
+    ptr.free()
+
+
 def main():
     test_address_of()
 
@@ -209,3 +245,4 @@ def main():
 
     test_unsafepointer_address_space()
     test_indexing()
+    test_bool()

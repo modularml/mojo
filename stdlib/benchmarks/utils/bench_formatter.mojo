@@ -13,11 +13,11 @@
 
 # RUN: %mojo %s -t
 
-from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
-from utils.stringref import _memmem, _memchr, _align_down
-
+from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from bit import countr_zero
 from builtin.dtype import _uint_type_of_width
+
+from utils.stringref import _align_down, _memchr, _memmem
 
 # ===----------------------------------------------------------------------===#
 # Benchmark Data
@@ -35,6 +35,7 @@ fn bench_formatter_int[n: Int](inout b: Bencher) raises:
         var s1 = String()
         var s1_fmt = Formatter(s1)
         Int(n).format_to(s1_fmt)
+        _ = s1^
 
     b.iter[call_fn]()
 
@@ -47,6 +48,7 @@ fn bench_formatter_simd[n: Int](inout b: Bencher) raises:
         var s1 = String()
         var s1_fmt = Formatter(s1)
         SIMD[DType.int32](n).format_to(s1_fmt)
+        _ = s1^
 
     b.iter[call_fn]()
 

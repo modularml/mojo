@@ -14,7 +14,7 @@
 
 from collections import InlineList, Set
 
-from test_utils import MoveCounter
+from test_utils import MoveCounter, ValueDestructorRecorder
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
@@ -58,33 +58,15 @@ def test_append_triggers_a_move():
         assert_equal(inline_list[i].move_count, 1)
 
 
-@value
-struct ValueToCountDestructor(CollectionElementNew):
-    var value: Int
-    var destructor_counter: UnsafePointer[List[Int]]
-
-    fn __init__(inout self, *, other: Self):
-        """Explicitly copy the provided value.
-
-        Args:
-            other: The value to copy.
-        """
-        self.value = other.value
-        self.destructor_counter = other.destructor_counter
-
-    fn __del__(owned self):
-        self.destructor_counter[].append(self.value)
-
-
 def test_destructor():
     """Ensure we delete the right number of elements."""
     var destructor_counter = List[Int]()
     alias capacity = 32
-    var inline_list = InlineList[ValueToCountDestructor, capacity=capacity]()
+    var inline_list = InlineList[ValueDestructorRecorder, capacity=capacity]()
 
     for index in range(capacity):
         inline_list.append(
-            ValueToCountDestructor(
+            ValueDestructorRecorder(
                 index, UnsafePointer.address_of(destructor_counter)
             )
         )

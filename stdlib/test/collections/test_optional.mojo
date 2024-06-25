@@ -120,6 +120,20 @@ def test_optional_take_mutates():
     assert_false(opt1)
 
 
+def test_optional_explicit_copy():
+    var v1 = Optional[String](String("test"))
+
+    var v2 = Optional(other=v1)
+
+    assert_equal(v1.value(), "test")
+    assert_equal(v2.value(), "test")
+
+    v2.value() += "ing"
+
+    assert_equal(v1.value(), "test")
+    assert_equal(v2.value(), "testing")
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
@@ -128,3 +142,4 @@ def main():
     test_optional_reg_is()
     test_optional_reg_isnot()
     test_optional_take_mutates()
+    test_optional_explicit_copy()

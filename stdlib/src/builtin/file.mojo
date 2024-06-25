@@ -39,11 +39,11 @@ from memory import AddressSpace, DTypePointer, Pointer
 
 @register_passable
 struct _OwnedStringRef(Boolable):
-    var data: DTypePointer[DType.int8]
+    var data: UnsafePointer[UInt8]
     var length: Int
 
     fn __init__() -> _OwnedStringRef:
-        return Self {data: DTypePointer[DType.int8](), length: 0}
+        return Self {data: UnsafePointer[UInt8](), length: 0}
 
     fn __del__(owned self):
         if self.data:
@@ -51,15 +51,13 @@ struct _OwnedStringRef(Boolable):
 
     fn consume_as_error(owned self) -> Error:
         var data = self.data
+
         # Don't free self.data in our dtor.
-        self.data = DTypePointer[DType.int8]()
-        var length = self.length
+        self.data = UnsafePointer[UInt8]()
+
         return Error {
-            data: UnsafePointer[UInt8]._from_dtype_ptr(
-                # TODO: Remove cast once string UInt8 transition is complete.
-                data.bitcast[DType.uint8]()
-            ),
-            loaded_length: -length,
+            data: data,
+            loaded_length: -self.length,
         }
 
     fn __bool__(self) -> Bool:
@@ -268,19 +266,21 @@ struct FileHandle:
         if not self.handle:
             raise Error("invalid file handle")
 
-        var size_copy = size * sizeof[type]()
         var err_msg = _OwnedStringRef()
 
-        external_call["KGEN_CompilerRT_IO_FileReadToAddress", NoneType](
+        var bytes_read = external_call[
+            "KGEN_CompilerRT_IO_FileReadToAddress", Int64
+        ](
             self.handle,
             ptr,
-            UnsafePointer.address_of(size_copy),
+            size * sizeof[type](),
             UnsafePointer.address_of(err_msg),
         )
 
         if err_msg:
             raise (err_msg^).consume_as_error()
-        return size_copy
+
+        return bytes_read
 
     fn read_bytes(self, size: Int64 = -1) raises -> List[UInt8]:
         """Reads data from a file and sets the file handle seek position. If

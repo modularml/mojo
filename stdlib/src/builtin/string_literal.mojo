@@ -15,13 +15,13 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from sys.ffi import C_char
+
 from memory import DTypePointer
 
 from utils import StringRef
-from utils._visualizers import lldb_formatter_wrapping_type
 from utils._format import Formattable, Formatter
-
-from sys.ffi import C_char
+from utils._visualizers import lldb_formatter_wrapping_type
 
 from .string import _atol
 
@@ -33,14 +33,14 @@ from .string import _atol
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct StringLiteral(
-    Sized,
-    IntableRaising,
-    Stringable,
-    Representable,
-    KeyElement,
     Boolable,
-    Formattable,
     Comparable,
+    Formattable,
+    IntableRaising,
+    KeyElement,
+    Representable,
+    Sized,
+    Stringable,
 ):
     """This type represents a string literal.
 

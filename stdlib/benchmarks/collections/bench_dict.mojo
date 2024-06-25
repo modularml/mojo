@@ -12,9 +12,10 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s -t
 
-from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
-from stdlib.collections import Dict
 from random import *
+
+from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
+from stdlib.collections import Dict
 
 
 # ===----------------------------------------------------------------------===#
@@ -61,7 +62,7 @@ fn bench_dict_small_insert(inout b: Bencher) raises:
             small[key] = random.random_si64(0, small_n).value
 
     b.iter[call_fn]()
-    keep(small)
+    keep(bool(small))
 
 
 # ===----------------------------------------------------------------------===#
@@ -76,7 +77,7 @@ fn bench_dict_large_insert(inout b: Bencher) raises:
             large[key] = random.random_si64(0, large_n).value
 
     b.iter[call_fn]()
-    keep(large)
+    keep(bool(large))
 
 
 # ===----------------------------------------------------------------------===#
@@ -91,7 +92,7 @@ fn bench_dict_small_lookup(inout b: Bencher) raises:
             _ = small[key]
 
     b.iter[call_fn]()
-    keep(small)
+    keep(bool(small))
 
 
 # ===----------------------------------------------------------------------===#
@@ -106,7 +107,7 @@ fn bench_dict_large_lookup(inout b: Bencher) raises:
             _ = large[key]
 
     b.iter[call_fn]()
-    keep(large)
+    keep(bool(large))
 
 
 # ===----------------------------------------------------------------------===#
