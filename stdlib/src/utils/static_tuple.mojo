@@ -304,9 +304,9 @@ struct InlineArray[
         If the elements of the input array are not initialized, the behavior is undefined.
 
         There is only one situation when it is somewhat correct to use this constructor and the input array
-        do not have initialized elements. This is when the input array has types that
-        have trivial copy constructors, move constructors and destructors (like integers or floats).
-        The values in the array will be random (since it's uninitialized memory)
+        do not have initialized elements. This is when the input array elements' type
+        has trivial copy constructor, move constructor and destructor (like integers or floats).
+        In this case, the values in the array will be random (since it's uninitialized memory)
         and it's up to the user to handle them accordingly.
 
         Args:
