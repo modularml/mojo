@@ -14,6 +14,7 @@
 
 from testing import assert_equal, assert_false, assert_true
 
+from memory.maybe_uninitialized import UnsafeMaybeUninitialized
 from utils import InlineArray, StaticIntTuple, StaticTuple
 from test_utils import ValueDestructorRecorder
 
@@ -184,6 +185,74 @@ def test_array_str():
     assert_equal(arr3[0], "hi")
 
 
+def test_array_unsafe_assume_initialized_constructor_string():
+    var maybe_uninitialized_arr = InlineArray[
+        UnsafeMaybeUninitialized[String], 3
+    ](unsafe_uninitialized=True)
+    maybe_uninitialized_arr[0].write("hello")
+    maybe_uninitialized_arr[1].write("mojo")
+    maybe_uninitialized_arr[2].write("world")
+
+    var initialized_arr = InlineArray(
+        unsafe_assume_initialized=maybe_uninitialized_arr^
+    )
+
+    assert_equal(initialized_arr[0], "hello")
+    assert_equal(initialized_arr[1], "mojo")
+    assert_equal(initialized_arr[2], "world")
+
+    # trigger a move
+    var initialized_arr2 = initialized_arr^
+
+    assert_equal(initialized_arr2[0], "hello")
+    assert_equal(initialized_arr2[1], "mojo")
+    assert_equal(initialized_arr2[2], "world")
+
+    # trigger a copy
+    var initialized_arr3 = InlineArray(other=initialized_arr2)
+
+    assert_equal(initialized_arr3[0], "hello")
+    assert_equal(initialized_arr3[1], "mojo")
+    assert_equal(initialized_arr3[2], "world")
+
+    # We assume the destructor was called correctly, but one
+    # might want to add a test for that in the future.
+
+
+def test_array_unsafe_assume_initialized_constructor_int():
+    # For simple types, like integers, we can assume the array
+    # is initialized, when it's actually not. It's just that the values inside
+    # are random and this should be taken into account.
+    var maybe_uninitialized_arr = InlineArray[UnsafeMaybeUninitialized[Int], 3](
+        unsafe_uninitialized=True
+    )
+    var initialized_arr = InlineArray(
+        unsafe_assume_initialized=maybe_uninitialized_arr^
+    )
+
+    # Reading some values and copying them, it should be fine.
+    var some_value = initialized_arr[0]
+    var other_value = initialized_arr[1]
+
+    # we initialize only one element
+    initialized_arr[0] = 42
+
+    # We can move and copy the array, the first element will always be 42,
+    # the other elements are random
+
+    # trigger a move
+    var initialized_arr2 = initialized_arr^
+
+    assert_equal(initialized_arr2[0], 42)
+
+    # trigger a copy
+    var initialized_arr3 = InlineArray(other=initialized_arr2)
+
+    assert_equal(initialized_arr3[0], 42)
+
+    # There is no destructor for Int, so we don't need to test that.
+
+
 def test_array_int_pointer():
     var arr = InlineArray[Int, 3](0, 10, 20)
 
@@ -244,6 +313,8 @@ def main():
     test_array_get_reference_unsafe()
     test_array_int()
     test_array_str()
+    test_array_unsafe_assume_initialized_constructor_string()
+    test_array_unsafe_assume_initialized_constructor_int()
     test_array_int_pointer()
     test_array_contains()
     test_inline_array_runs_destructors()

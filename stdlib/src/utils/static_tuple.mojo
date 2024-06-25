@@ -287,6 +287,39 @@ struct InlineArray[
         ]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
+    fn __init__(
+        inout self,
+        *,
+        owned unsafe_assume_initialized: InlineArray[
+            UnsafeMaybeUninitialized[Self.ElementType], Self.size
+        ],
+    ):
+        """Constructs an `InlineArray` from an `InlineArray` of `UnsafeMaybeUninitialized`.
+
+        Calling this function assumes that all elements in the input array are initialized.
+
+        It means that when copying, moving and destroying the new `InlineArray`, the copy constructor,
+        move constructor and destructor of the elements will be called.
+
+        If the elements of the input array are not initialized, the behavior is undefined.
+
+        There is only one situation when it is somewhat correct to use this constructor and the input array
+        do not have initialized elements. This is when the input array has types that
+        have trivial copy constructors, move constructors and destructors (like integers or floats).
+        The values in the array will be random (since it's uninitialized memory)
+        and it's up to the user to handle them accordingly.
+
+        Args:
+            unsafe_assume_initialized: The array of `UnsafeMaybeUninitialized` elements.
+        """
+
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+        for i in range(Self.size):
+            self._get_maybe_uninitialized(i)[].move_from(
+                unsafe_assume_initialized[i]
+            )
+
     @always_inline
     fn __init__(inout self, *, unsafe_uninitialized: Bool):
         """Create an InlineArray with uninitialized memory.
