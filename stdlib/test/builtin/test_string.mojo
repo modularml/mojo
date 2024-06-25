@@ -1121,6 +1121,7 @@ fn test_endswith() raises:
 
 
 def test_removeprefix():
+    assert_equal(String("hello world").removeprefix(""), String("hello world"))
     assert_equal(String("hello world").removeprefix("hello"), " world")
     assert_equal(String("hello world").removeprefix("world"), "hello world")
     assert_equal(String("hello world").removeprefix("hello world"), "")
@@ -1128,6 +1129,7 @@ def test_removeprefix():
 
 
 def test_removesuffix():
+    assert_equal(String("hello world").removesuffix(""), String("hello world"))
     assert_equal(String("hello world").removesuffix("world"), "hello ")
     assert_equal(String("hello world").removesuffix("hello"), "hello world")
     assert_equal(String("hello world").removesuffix("hello world"), "")
