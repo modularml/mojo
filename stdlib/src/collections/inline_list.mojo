@@ -100,9 +100,7 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
     @always_inline
     fn __init__(inout self):
         """This constructor creates an empty InlineList."""
-        self._array = InlineArray[
-            UnsafeMaybeUninitialized[ElementType], capacity
-        ](unsafe_uninitialized=True)
+        self._array = InlineArray[ElementType, capacity].unsafe_uninitialized()
         self._size = 0
 
     # TODO: Avoid copying elements in once owned varargs

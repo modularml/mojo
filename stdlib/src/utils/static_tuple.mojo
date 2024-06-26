@@ -277,6 +277,8 @@ struct InlineArray[
         """This constructor will always cause a compile time error if used.
         It is used to steer users away from uninitialized memory.
         """
+        # TODO: Allow this constructor only if the type is `UnsafeMaybeUninitialized`
+        # and remove the `InlineArray.unsafe_uninitialized()` static method.
         constrained[
             False,
             (
@@ -287,36 +289,58 @@ struct InlineArray[
         ]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
-    @always_inline
-    fn __init__(inout self, *, unsafe_uninitialized: Bool):
-        """Create an InlineArray with uninitialized memory.
+    fn __init__(
+        inout self,
+        *,
+        owned unsafe_assume_initialized: InlineArray[
+            UnsafeMaybeUninitialized[Self.ElementType], Self.size
+        ],
+    ):
+        """Constructs an `InlineArray` from an `InlineArray` of `UnsafeMaybeUninitialized`.
 
-        Note that this is highly unsafe and should be used with extreme caution.
-        It's very difficult to get it right.
+        Calling this function assumes that all elements in the input array are initialized.
 
-        We recommend to use the `InlineList` instead if all the objects
-        are not available when creating the array. That works well for the
-        general case.
+        If the elements of the input array are not initialized, the behavior is undefined,
+        even  if `ElementType` is valid *for every possible bit pattern* (e.g. `Int` or `Float`).
 
-        If you do not want to pay the small performance overhead of `InlineList` and
-        still want raw uninitalized memory, then make sure to understand the
-        following:
-
-        Never use this with types that do not have a trivial destructor.
-        If you want to use an uninitialized array with a type with
-        a non-trivial destructor,
-        then use `InlineArray[UnsafeMaybeUninitialized[MyType]]`, but you'll have
-        to manually call the destructors yourself.
-
-        If despite those workarounds, one still needs an uninitialized array,
-        it is possible with:
-        ```mojo
-        var uninitialized_array = InlineArray[Int, 10](unsafe_uninitialized=True)
-        ```
         Args:
-            unsafe_uninitialized: A boolean to indicate if the array should be initialized.
-                Always set to `True` (it's not actually used inside the constructor).
+            unsafe_assume_initialized: The array of `UnsafeMaybeUninitialized` elements.
         """
+
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+        for i in range(Self.size):
+            self._get_maybe_uninitialized(i)[].move_from(
+                unsafe_assume_initialized[i]
+            )
+
+    @staticmethod
+    fn unsafe_uninitialized() -> (
+        InlineArray[UnsafeMaybeUninitialized[Self.ElementType], Self.size]
+    ):
+        """Constructs an uninitialized array.
+
+        You can use it to construct an array without initializing its elements. It returns
+        an array of `UnsafeMaybeUninitialized` elements.
+
+        Usage:
+        ```mojo
+        var arr = InlineArray[Int, 3].unsafe_uninitialized()
+        arr[0].write(42)
+        ...
+        ```
+
+        Returns:
+            An uninitialized array.
+        """
+        # Note that we rely on return value optimization here to avoid a call to `__moveinit__`, which
+        # is not allowed for `UnsafeMaybeUninitialized`.
+        return InlineArray[
+            UnsafeMaybeUninitialized[Self.ElementType], Self.size
+        ](_unsafe_uninitialized=True)
+
+    @doc_private
+    fn __init__(inout self, *, _unsafe_uninitialized: Bool):
         _static_tuple_construction_checks[size]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 

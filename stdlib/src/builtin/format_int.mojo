@@ -338,14 +338,14 @@ fn _try_write_int[
     # TODO: use a dynamic size when #2194 is resolved
     alias CAPACITY: Int = 64 + 1  # +1 for storing NUL terminator.
 
-    var buf = InlineArray[UInt8, CAPACITY](unsafe_uninitialized=True)
+    var buf = InlineArray[UInt8, CAPACITY].unsafe_uninitialized()
 
     # Start the buf pointer at the end. We will write the least-significant
     # digits later in the buffer, and then decrement the pointer to move
     # earlier in the buffer as we write the more-significant digits.
     var offset = CAPACITY - 1
 
-    buf[offset] = 0  # Write NUL terminator at the end
+    buf[offset].write(0)  # Write NUL terminator at the end
 
     # Position the offset to write the least-significant digit just before the
     # NUL terminator.
@@ -361,7 +361,7 @@ fn _try_write_int[
 
             # Write the char representing the value of the least significant
             # digit.
-            buf[offset] = digit_chars_array[int(digit_value)]
+            buf[offset].write(digit_chars_array[int(digit_value)])
 
             # Position the offset to write the next digit.
             offset -= 1
@@ -399,7 +399,7 @@ fn _try_write_int[
     # SAFETY:
     #   Create a slice to only those bytes in `buf` that have been initialized.
     var str_slice = StringSlice[__lifetime_of(buf)](
-        unsafe_from_utf8_ptr=buf_ptr,
+        unsafe_from_utf8_ptr=buf_ptr.bitcast[UInt8](),
         len=len,
     )
 
