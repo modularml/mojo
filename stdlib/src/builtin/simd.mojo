@@ -1975,7 +1975,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
-        """Returns a the vector where the elements between `offset` and
+        """Returns a new vector where the elements between `offset` and
         `offset + input_width` have been replaced with the elements in `value`.
 
         Parameters:
