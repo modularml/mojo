@@ -155,16 +155,17 @@ fn test_slice_eq() raises:
 
     # eq
 
-    assert_true(str1.as_string_slice() == str1)
-    assert_true(str1.as_string_slice() == str2)
-    assert_true(str2.as_string_slice() == str2.as_string_slice())
-    assert_true(str1.as_string_slice() == str3)
+    assert_true(str1.as_string_slice().__eq__(str1))
+    assert_true(str1.as_string_slice().__eq__(str2))
+    assert_true(str2.as_string_slice().__eq__(str2.as_string_slice()))
+    assert_true(str1.as_string_slice().__eq__(str3))
 
     # ne
 
-    assert_true(str1.as_string_slice() != str4)
-    assert_true(str1.as_string_slice() != str5)
-    assert_true(str1.as_string_slice() != str6)
+    assert_true(str1.as_string_slice().__ne__(str4))
+    assert_true(str1.as_string_slice().__ne__(str5))
+    assert_true(str1.as_string_slice().__ne__(str5.as_string_slice()))
+    assert_true(str1.as_string_slice().__ne__(str6))
 
 
 fn test_slice_bool() raises:
