@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal, assert_true
+from testing import assert_equal, assert_true, assert_false
 
 from utils import Span
 
@@ -150,11 +150,21 @@ fn test_slice_eq() raises:
     var str2: String = "12345"
     var str3: StringLiteral = "12345"
     var str4: String = "abc"
+    var str5: String = "abcdef"
+    var str6: StringLiteral = "abcdef"
+
+    # eq
+
     assert_true(str1.as_string_slice() == str1)
     assert_true(str1.as_string_slice() == str2)
     assert_true(str2.as_string_slice() == str2.as_string_slice())
     assert_true(str1.as_string_slice() == str3)
-    assert_true(not str1.as_string_slice() == str4)
+
+    # ne
+
+    assert_true(str1.as_string_slice() != str4)
+    assert_true(str1.as_string_slice() != str5)
+    assert_true(str1.as_string_slice() != str6)
 
 
 fn test_slice_bool() raises:

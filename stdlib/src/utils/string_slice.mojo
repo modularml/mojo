@@ -218,13 +218,37 @@ struct StringSlice[
 
     @always_inline
     fn __ne__(self, rhs: StringSlice) -> Bool:
-        """Verify if span is not equal to another span.
+        """Verify if span is not equal to another string slice.
 
         Args:
-            rhs: The span to compare against.
+            rhs: The string slice to compare against.
 
         Returns:
-            True if the spans are not equal in length or contents, False otherwise.
+            True if the string slices are not equal in length or contents, False otherwise.
+        """
+        return not self == rhs
+
+    @always_inline
+    fn __ne__(self, rhs: String) -> Bool:
+        """Verify if span is not equal to another string slice.
+
+        Args:
+            rhs: The string slice to compare against.
+
+        Returns:
+            True if the string and slice are not equal in length or contents, False otherwise.
+        """
+        return not self == rhs
+
+    @always_inline
+    fn __ne__(self, rhs: StringLiteral) -> Bool:
+        """Verify if span is not equal to a literal.
+
+        Args:
+            rhs: The string literal to compare against.
+
+        Returns:
+            True if the slice is not equal to the literal in length or contents, False otherwise.
         """
         return not self == rhs
 
