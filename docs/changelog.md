@@ -16,6 +16,33 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo context managers used in regions of code that may raise no longer need to
+  define a "conditional" exit function in the form of
+  `fn __exit__(self, e: Error) -> Bool`. This function allows the context
+  manager to conditionally intercept and handle the error and allow the function
+  to continue executing. This is useful for some applications, but in many cases
+  the conditional exit would delegate to the unconditional exit function
+  `fn __exit__(self)`.
+
+  Concretely, this enables defining `with` regions that unconditionally
+  propagate inner errors, allowing code like:
+
+  ```mojo
+  def might_raise() -> Int:
+      ...
+
+  def foo() -> Int:
+      with ContextMgr():
+          return might_raise()
+      # no longer complains about missing return
+
+  def bar():
+      var x: Int
+      with ContextMgr():
+          x = might_raise()
+      print(x) # no longer complains about 'x' being uninitialized
+  ```
+
 - Now supports "conditional conformances" where some methods on a struct have
   additional trait requirements that the struct itself doesn't.  This is
   expressed through an explicitly declared `self` type:
