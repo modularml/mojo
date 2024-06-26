@@ -25,7 +25,7 @@ fn bench_stringify_small_integers(inout b: Bencher) raises:
     fn call_fn():
         for i in range(1_000):
             var a = str(i)
-            benchmark.keep(bool(a))
+            benchmark.keep(a)
 
     b.iter[call_fn]()
 

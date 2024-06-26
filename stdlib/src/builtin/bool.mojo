@@ -25,8 +25,7 @@ from utils._visualizers import lldb_formatter_wrapping_type
 
 
 trait Boolable:
-    """The `Boolable` trait describes a type that can be explicitly converted to
-    a `Bool` or evaluated as a boolean expression in `if` or `while` conditions.
+    """The `Boolable` trait describes a type that can be converted to a bool.
 
     This trait requires the type to implement the `__bool__()` method. For
     example:
@@ -51,45 +50,6 @@ trait Boolable:
 
 
 # ===----------------------------------------------------------------------=== #
-#  ImplicitlyBoolable
-# ===----------------------------------------------------------------------=== #
-
-
-trait ImplicitlyBoolable(Boolable):
-    """The `ImplicitlyBoolable` trait describes a type that can be implicitly
-    converted to a `Bool`.
-
-    Types conforming to this trait can be passed to a function that expects a
-    `Bool` without explicitly converting to it. Accordingly, most types should
-    conform to `Boolable` instead, since implicit conversions to `Bool` can have
-    unintuitive consequences.
-
-    This trait requires the type to implement the `__as_bool__()` method. For
-    example:
-
-    ```mojo
-    @value
-    struct Foo(ImplicitlyBoolable):
-        var val: Bool
-
-        fn __as_bool__(self) -> Bool:
-            return self.val
-
-        fn __bool__(self) -> Bool:
-            return self.__as_bool__()
-    ```
-    """
-
-    fn __as_bool__(self) -> Bool:
-        """Get the boolean representation of the value.
-
-        Returns:
-            The boolean representation of the value.
-        """
-        ...
-
-
-# ===----------------------------------------------------------------------=== #
 #  Bool
 # ===----------------------------------------------------------------------=== #
 
@@ -98,14 +58,14 @@ trait ImplicitlyBoolable(Boolable):
 @value
 @register_passable("trivial")
 struct Bool(
+    Boolable,
     CollectionElementNew,
     ComparableCollectionElement,
-    ImplicitlyBoolable,
     Indexer,
     Intable,
+    Formattable,
     Representable,
     Stringable,
-    Formattable,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
@@ -142,11 +102,11 @@ struct Bool(
         )
 
     @always_inline("nodebug")
-    fn __init__[T: ImplicitlyBoolable, //](inout self, value: T):
-        """Convert an ImplicitlyBoolable value to a Bool.
+    fn __init__[T: Boolable](inout self, value: T):
+        """Implicitly convert a Boolable value to a Bool.
 
         Parameters:
-            T: The ImplicitlyBoolable type.
+            T: The Boolable type.
 
         Args:
             value: The boolable value.
@@ -161,15 +121,6 @@ struct Bool(
             This value.
         """
         return self
-
-    @always_inline("nodebug")
-    fn __as_bool__(self) -> Bool:
-        """Convert to Bool.
-
-        Returns:
-            This value.
-        """
-        return self.__bool__()
 
     @always_inline("nodebug")
     fn __mlir_i1__(self) -> __mlir_type.i1:
@@ -492,7 +443,7 @@ fn bool(value: None) -> Bool:
 
 
 @always_inline
-fn bool[T: Boolable, //](value: T) -> Bool:
+fn bool[T: Boolable](value: T) -> Bool:
     """Get the bool representation of the object.
 
     Parameters:

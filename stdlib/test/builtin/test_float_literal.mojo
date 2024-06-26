@@ -157,12 +157,15 @@ def test_int_conversion():
     assert_equal(int(4.0), 4)
 
 
-def test_bool():
-    assert_false(FloatLiteral.__bool__(0.0))
-    assert_false(FloatLiteral.__as_bool__(0.0))
+def test_boolean_comparable():
+    var f1 = 0.0
+    assert_false(f1)
 
-    assert_true(FloatLiteral.__bool__(2.0))
-    assert_true(FloatLiteral.__as_bool__(2.0))
+    var f2 = 2.0
+    assert_true(f2)
+
+    var f3 = 1.0
+    assert_true(f3)
 
 
 def test_equality():
@@ -202,7 +205,7 @@ def main():
     test_mod()
     test_div_mod()
     test_int_conversion()
-    test_bool()
+    test_boolean_comparable()
     test_equality()
     test_is_special_value()
     test_abs()
