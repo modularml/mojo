@@ -35,6 +35,7 @@ struct UnsafePointer[
     Boolable,
     CollectionElement,
     Stringable,
+    Formattable,
     Intable,
     Comparable,
 ):
@@ -337,6 +338,17 @@ struct UnsafePointer[
 
     fn __str__(self) -> String:
         return hex(int(self))
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this pointer address to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Avoid intermediate String allocation.
+        writer.write(str(self))
 
     # ===-------------------------------------------------------------------===#
     # Methods

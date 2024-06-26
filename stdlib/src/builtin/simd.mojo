@@ -47,7 +47,7 @@ from .dtype import (
     _integral_type_of,
     _scientific_notation_digits,
 )
-from .io import _print_fmt, _printf, _snprintf_scalar
+from .io import _printf, _snprintf_scalar
 from .string import _calc_format_buffer_size, _calc_initial_buffer_size
 
 # ===----------------------------------------------------------------------=== #
@@ -147,6 +147,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Roundable,
     Sized,
     Stringable,
+    Formattable,
     Truncable,
     Representable,
 ):
