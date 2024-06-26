@@ -987,6 +987,17 @@ struct String(
 
         Returns:
             A string formed by formatting the argument sequence.
+
+        Examples:
+
+        Construct a String from several `Formattable` arguments:
+
+        ```mojo
+        var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
+
+        assert_equal(string, "1, 2.0, three")
+        ```
+        .
         """
 
         var output = String()
