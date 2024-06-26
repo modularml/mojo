@@ -1267,10 +1267,10 @@ struct String(
 
     @always_inline
     fn __len__(self) -> Int:
-        """Returns the string byte length.
+        """Gets the string length, in bytes.
 
         Returns:
-            The string byte length.
+            The string length, in bytes.
         """
         # Avoid returning -1 if the buffer is not initialized
         if not self.unsafe_ptr():
@@ -1281,6 +1281,14 @@ struct String(
 
     @always_inline
     fn __str__(self) -> String:
+        """Gets the string itself.
+
+        This method ensures that you can pass a `String` to a method that
+        takes a `Stringable` value.
+
+        Returns:
+            The string itself.
+        """
         return self
 
     @always_inline

@@ -459,7 +459,11 @@ struct FileHandle:
             raise (err_msg^).consume_as_error()
 
     fn __enter__(owned self) -> Self:
-        """The function to call when entering the context."""
+        """The function to call when entering the context.
+
+        Returns:
+            The file handle.
+        """
         return self^
 
     fn _get_raw_fd(self) -> Int:
