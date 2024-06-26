@@ -256,7 +256,6 @@ fn partition[
 
 fn sort(inout buff: Pointer[Int], len: Int):
     """Sort the buffer inplace.
-
     The function doesn't return anything, the buffer is updated inplace.
 
     Args:
@@ -273,7 +272,6 @@ fn sort(inout buff: Pointer[Int], len: Int):
 
 fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
     """Sort the buffer inplace.
-
     The function doesn't return anything, the buffer is updated inplace.
 
     Parameters:

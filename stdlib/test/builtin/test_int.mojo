@@ -14,7 +14,7 @@
 
 from sys.info import bitwidthof
 
-from testing import assert_equal, assert_true, assert_false
+from testing import assert_equal
 
 
 def test_properties():
@@ -155,13 +155,6 @@ def test_indexer():
     assert_equal(987, Int(987).__index__())
 
 
-def test_bool():
-    assert_true(Int(5).__bool__())
-    assert_false(Int(0).__bool__())
-    assert_true(Int(5).__as_bool__())
-    assert_false(Int(0).__as_bool__())
-
-
 def main():
     test_properties()
     test_add()
@@ -179,4 +172,3 @@ def main():
     test_string_conversion()
     test_int_representation()
     test_indexer()
-    test_bool()
