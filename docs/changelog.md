@@ -277,4 +277,8 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD instead.
 
+- The builtin `tensor` module has been removed. Identical functionality is
+  available in `max.tensor`, but it is generally recommended to use `buffer`
+  when possible instead.
+
 ### 🛠️ Fixed
