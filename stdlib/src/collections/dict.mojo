@@ -609,7 +609,11 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     fn __len__(self) -> Int:
-        """The number of elements currently stored in the dictionary."""
+        """The number of elements currently stored in the dictionary.
+
+        Returns:
+            The number of elements currently stored in the dictionary.
+        """
         return self.size
 
     fn __bool__(self) -> Bool:
@@ -1058,7 +1062,11 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        """The number of elements currently stored in the keyword dictionary."""
+        """The number of elements currently stored in the keyword dictionary.
+
+        Returns:
+            The number of elements currently stored in the keyword dictionary.
+        """
         return len(self._dict)
 
     # ===-------------------------------------------------------------------===#

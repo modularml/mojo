@@ -409,7 +409,7 @@ struct FloatLiteral(
             rhs: The value to divide on.
 
         Returns:
-            The tuple with the dividend and the remainder
+            A tuple with the dividend and the remainder.
         """
         var quotient: Self = self.__floordiv__(rhs)
         var remainder: Self = self - (quotient * rhs)

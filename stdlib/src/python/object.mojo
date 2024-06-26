@@ -1080,6 +1080,13 @@ struct PythonObject(
     ) raises -> PythonObject:
         """Call the underlying object as if it were a function.
 
+        Args:
+            args: Positional arguments to the function.
+            kwargs: Keyword arguments to the function.
+
+        Raises:
+            If the function cannot be called for any reason.
+
         Returns:
             The return value from the called object.
         """

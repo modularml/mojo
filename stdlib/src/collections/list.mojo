@@ -325,7 +325,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         When the compiler supports conditional methods, then a simple `str(my_list)` will
         be enough.
 
-        The elements' type must implement the `__repr__()` for this to work.
+        The elements' type must implement the `__repr__()` method for this to work.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
@@ -359,6 +359,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
+
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below:
 

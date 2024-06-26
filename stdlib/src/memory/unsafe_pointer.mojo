@@ -337,6 +337,11 @@ struct UnsafePointer[
         ](self.address)
 
     fn __str__(self) -> String:
+        """Gets a string representation of the pointer.
+
+        Returns:
+            The string representation of the pointer.
+        """
         return hex(int(self))
 
     fn format_to(self, inout writer: Formatter):

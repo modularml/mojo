@@ -677,10 +677,12 @@ struct UInt(Stringable, Representable):
         return self
 
     @always_inline("nodebug")
-    fn __round__(self, _ndigits: UInt) -> Self:
+    fn __round__(self, ndigits: UInt) -> Self:
         """Return the rounded value of the UInt value, which is itself.
+
         Args:
             ndigits: The number of digits to round to.
+
         Returns:
             The UInt value itself if ndigits >= 0 else the rounded value.
         """
