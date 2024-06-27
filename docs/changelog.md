@@ -311,3 +311,5 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Removed the Mojo Language Server warnings for unused function arguments.
 
 ### 🛠️ Fixed
+
+- Fixed a crash in the Mojo Language Server when importing the current file.
