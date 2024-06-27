@@ -1012,8 +1012,10 @@ struct Int(
     @always_inline("nodebug")
     fn __round__(self, ndigits: Int) -> Self:
         """Return the rounded value of the Int value, which is itself.
+
         Args:
             ndigits: The number of digits to round to.
+
         Returns:
             The Int value itself if ndigits >= 0 else the rounded value.
         """

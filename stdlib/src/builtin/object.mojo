@@ -1723,14 +1723,16 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         if self._value.is_obj():
             return object(self._value.get_obj_attr("__getitem__"))(self, i)
+
         if not self._value.is_str() and not self._value.is_list():
             raise Error("TypeError: can only index into lists and strings")
+
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
+            # Construct a new single-character string.
             var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
-            impl.data.init_pointee_copy(
-                (self._value.get_as_string().data + index).take_pointee(),
-            )
+            var char = self._value.get_as_string().data[index]
+            impl.data.init_pointee_move(char)
             return _ObjectImpl(impl)
         return self._value.get_list_element(i._value.get_as_int().value)
 
@@ -1787,6 +1789,14 @@ struct object(IntableRaising, Boolable, Stringable):
 
     @always_inline
     fn __getattr__(self, key: StringLiteral) raises -> object:
+        """Gets the named attribute.
+
+        Args:
+            key: The attribute name.
+
+        Returns:
+            The attribute value.
+        """
         if not self._value.is_obj():
             raise Error(
                 "TypeError: Type '"
@@ -1799,6 +1809,12 @@ struct object(IntableRaising, Boolable, Stringable):
 
     @always_inline
     fn __setattr__(inout self, key: StringLiteral, value: object) raises:
+        """Sets the named attribute.
+
+        Args:
+            key: The attribute name.
+            value: The attribute value.
+        """
         if not self._value.is_obj():
             raise Error(
                 "TypeError: Type '"
@@ -1811,18 +1827,40 @@ struct object(IntableRaising, Boolable, Stringable):
 
     @always_inline
     fn __call__(self) raises -> object:
+        """Calls the object as a function.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke()
 
     @always_inline
     fn __call__(self, arg0: object) raises -> object:
+        """Calls the object as a function.
+
+        Args:
+            arg0: The first function argument.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0)
 
     @always_inline
     fn __call__(self, arg0: object, arg1: object) raises -> object:
+        """Calls the object as a function.
+
+        Args:
+            arg0: The first function argument.
+            arg1: The second function argument.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1)
@@ -1831,6 +1869,16 @@ struct object(IntableRaising, Boolable, Stringable):
     fn __call__(
         self, arg0: object, arg1: object, arg2: object
     ) raises -> object:
+        """Calls the object as a function.
+
+        Args:
+            arg0: The first function argument.
+            arg1: The second function argument.
+            arg2: The third function argument.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1, arg2)

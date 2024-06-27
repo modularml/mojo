@@ -209,7 +209,6 @@ struct Atomic[type: DType]:
         var desired_integral = bitcast[integral_type](desired)
 
         var cmpxchg_res = __mlir_op.`pop.atomic.cmpxchg`[
-            bin_op = __mlir_attr.`#pop<bin_op sub>`,
             failure_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
             success_ordering = __mlir_attr.`#pop<atomic_ordering seq_cst>`,
         ](

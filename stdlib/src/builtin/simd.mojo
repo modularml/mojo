@@ -47,7 +47,7 @@ from .dtype import (
     _integral_type_of,
     _scientific_notation_digits,
 )
-from .io import _print_fmt, _printf, _snprintf_scalar
+from .io import _printf, _snprintf_scalar
 from .string import _calc_format_buffer_size, _calc_initial_buffer_size
 
 # ===----------------------------------------------------------------------=== #
@@ -147,6 +147,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Roundable,
     Sized,
     Stringable,
+    Formattable,
     Truncable,
     Representable,
 ):
@@ -1395,9 +1396,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn __round__(self, ndigits: Int) -> Self:
         """Performs elementwise rounding on the elements of a SIMD vector.
+
         This rounding goes to the nearest integer with ties away from zero.
+
         Args:
             ndigits: The number of digits to round to.
+
         Returns:
             The elementwise rounded value of this SIMD vector.
         """
@@ -1974,7 +1978,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
-        """Returns a the vector where the elements between `offset` and
+        """Returns a new vector where the elements between `offset` and
         `offset + input_width` have been replaced with the elements in `value`.
 
         Parameters:
@@ -3081,6 +3085,7 @@ fn _format_scalar[
     )
 
     writer.write_str(str_slice)
+    _ = buf^
 
 
 # ===----------------------------------------------------------------------=== #

@@ -720,6 +720,9 @@ struct CPython:
                 self._Py_REFCNT(r),
             )
         self._inc_total_rc()
+        _ = type
+        _ = value
+        _ = traceback
         return r
 
     fn Py_Is(
@@ -851,6 +854,7 @@ struct CPython:
                 "refcnt(value)",
                 self._Py_REFCNT(value),
             )
+        _ = v
         return PyKeyValuePair {
             key: key,
             value: value,

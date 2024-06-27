@@ -155,7 +155,11 @@ struct InlineList[ElementType: CollectionElementNew, capacity: Int = 16](Sized):
 
     @always_inline
     fn __len__(self) -> Int:
-        """Returns the length of the list."""
+        """Returns the length of the list.
+
+        Returns:
+            The number of elements in the list.
+        """
         return self._size
 
     @always_inline

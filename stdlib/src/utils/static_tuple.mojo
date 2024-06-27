@@ -214,7 +214,9 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         var ptr = __mlir_op.`pop.array.gep`(
             Pointer.address_of(arrayCopy).address, offset.value
         )
-        return Pointer(ptr).load()
+        var result = Pointer(ptr).load()
+        _ = arrayCopy
+        return result
 
     @always_inline("nodebug")
     fn __setitem__[

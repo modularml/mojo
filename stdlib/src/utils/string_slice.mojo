@@ -142,6 +142,11 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     fn __str__(self) -> String:
+        """Gets this slice as a standard `String`.
+
+        Returns:
+            The string representation of the slice.
+        """
         return String(str_slice=self)
 
     fn __len__(self) -> Int:

@@ -266,19 +266,21 @@ struct FileHandle:
         if not self.handle:
             raise Error("invalid file handle")
 
-        var size_copy = size * sizeof[type]()
         var err_msg = _OwnedStringRef()
 
-        external_call["KGEN_CompilerRT_IO_FileReadToAddress", NoneType](
+        var bytes_read = external_call[
+            "KGEN_CompilerRT_IO_FileReadToAddress", Int64
+        ](
             self.handle,
             ptr,
-            UnsafePointer.address_of(size_copy),
+            size * sizeof[type](),
             UnsafePointer.address_of(err_msg),
         )
 
         if err_msg:
             raise (err_msg^).consume_as_error()
-        return size_copy
+
+        return bytes_read
 
     fn read_bytes(self, size: Int64 = -1) raises -> List[UInt8]:
         """Reads data from a file and sets the file handle seek position. If
@@ -457,7 +459,11 @@ struct FileHandle:
             raise (err_msg^).consume_as_error()
 
     fn __enter__(owned self) -> Self:
-        """The function to call when entering the context."""
+        """The function to call when entering the context.
+
+        Returns:
+            The file handle.
+        """
         return self^
 
     fn _get_raw_fd(self) -> Int:

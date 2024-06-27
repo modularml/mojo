@@ -44,6 +44,11 @@ trait Absable:
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
     # associated types.
     fn __abs__(self) -> Self:
+        """Get the absolute value of this instance.
+
+        Returns:
+            The absolute value of the instance.
+        """
         ...
 
 
@@ -311,9 +316,22 @@ trait Roundable:
     # TODO(MOCO-333): Reconsider the signature when we have parametric traits or
     # associated types.
     fn __round__(self) -> Self:
+        """Get a rounded value for the type.
+
+        Returns:
+            The rounded value.
+        """
         ...
 
     fn __round__(self, ndigits: Int) -> Self:
+        """Get a rounded value for the type.
+
+        Args:
+            ndigits: Number of digits after the decimal point.
+
+        Returns:
+            The rounded value.
+        """
         ...
 
 
@@ -349,7 +367,8 @@ fn round(number: FloatLiteral) -> FloatLiteral:
 
 @always_inline
 fn round[T: Roundable, //](number: T, ndigits: Int) -> T:
-    """Get the rounded value of the given object.
+    """Get the value of this object, rounded to a specified number of
+    digits after the decimal point.
 
     Parameters:
         T: The type conforming to Roundable.
@@ -367,7 +386,8 @@ fn round[T: Roundable, //](number: T, ndigits: Int) -> T:
 # TODO: remove this when conformance issue for FloatLiteral is fixed.
 @always_inline
 fn round(number: FloatLiteral, ndigits: Int) -> FloatLiteral:
-    """Get the rounded value of the given FloatLiteral.
+    """Get the  value of this FloatLiteral, rounded to a specified number of
+    digits after the decimal point.
 
     Args:
         number: The FloatLiteral to get the rounded value of.

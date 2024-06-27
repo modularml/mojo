@@ -170,7 +170,10 @@ fn _repr_ascii(c: UInt8) -> String:
         return r"\r"
     else:
         var uc = c.cast[DType.uint8]()
-        return hex[r"\x0"](uc) if uc < 16 else hex[r"\x"](uc)
+        if uc < 16:
+            return hex(uc, prefix=r"\x0")
+        else:
+            return hex(uc, prefix=r"\x")
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
@@ -984,6 +987,17 @@ struct String(
 
         Returns:
             A string formed by formatting the argument sequence.
+
+        Examples:
+
+        Construct a String from several `Formattable` arguments:
+
+        ```mojo
+        var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
+
+        assert_equal(string, "1, 2.0, three")
+        ```
+        .
         """
 
         var output = String()
@@ -994,6 +1008,7 @@ struct String(
             arg.format_to(writer)
 
         args.each[write_arg]()
+        _ = writer^
 
         return output^
 
@@ -1252,10 +1267,10 @@ struct String(
 
     @always_inline
     fn __len__(self) -> Int:
-        """Returns the string byte length.
+        """Gets the string length, in bytes.
 
         Returns:
-            The string byte length.
+            The string length, in bytes.
         """
         # Avoid returning -1 if the buffer is not initialized
         if not self.unsafe_ptr():
@@ -1266,6 +1281,14 @@ struct String(
 
     @always_inline
     fn __str__(self) -> String:
+        """Gets the string itself.
+
+        This method ensures that you can pass a `String` to a method that
+        takes a `Stringable` value.
+
+        Returns:
+            The string itself.
+        """
         return self
 
     @always_inline
@@ -1368,6 +1391,7 @@ struct String(
             result += str(a)
 
         elems.each[add_elt]()
+        _ = is_first
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:

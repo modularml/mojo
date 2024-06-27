@@ -108,6 +108,7 @@ struct PythonObject(
     KeyElement,
     SizedRaising,
     Stringable,
+    Formattable,
 ):
     """A Python object."""
 
@@ -177,7 +178,7 @@ struct PythonObject(
             self.py_object = cpython.toPython(int_val)
         else:
             var fp_val = value.cast[DType.float64]()
-            self.py_object = cpython.PyFloat_FromDouble(fp_val.value)
+            self.py_object = cpython.PyFloat_FromDouble(fp_val)
 
     fn __init__(inout self, value: Bool):
         """Initialize the object from a bool.
@@ -1079,6 +1080,13 @@ struct PythonObject(
     ) raises -> PythonObject:
         """Call the underlying object as if it were a function.
 
+        Args:
+            args: Positional arguments to the function.
+            kwargs: Keyword arguments to the function.
+
+        Raises:
+            If the function cannot be called for any reason.
+
         Returns:
             The return value from the called object.
         """
@@ -1163,3 +1171,14 @@ struct PythonObject(
         # keep python object alive so the copy can occur
         _ = python_str
         return mojo_str
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this Python object to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Avoid this intermediate String allocation, if possible.
+        writer.write(str(self))

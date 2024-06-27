@@ -28,6 +28,12 @@ trait Formattable:
     """
 
     fn format_to(self, inout writer: Formatter):
+        """
+        Formats the string representation of this type to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
         ...
 
 
@@ -68,6 +74,22 @@ struct Formatter:
 
     fn __init__[F: ToFormatter](inout self, inout output: F):
         self = output._unsafe_to_formatter()
+
+    fn __init__(inout self, *, fd: FileDescriptor):
+        """
+        Constructs a formatter that writes to the given file descriptor.
+        """
+
+        @always_inline
+        fn write_to_fd(ptr: UnsafePointer[NoneType], strref: StringRef):
+            var fd0 = ptr.bitcast[FileDescriptor]()[].value
+
+            _put(strref, file=fd0)
+
+        self = Formatter(
+            write_to_fd,
+            UnsafePointer.address_of(fd).bitcast[NoneType](),
+        )
 
     fn __init__(
         inout self,

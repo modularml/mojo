@@ -16,6 +16,33 @@ what we publish.
 
 ### ⭐️ New
 
+- Mojo context managers used in regions of code that may raise no longer need to
+  define a "conditional" exit function in the form of
+  `fn __exit__(self, e: Error) -> Bool`. This function allows the context
+  manager to conditionally intercept and handle the error and allow the function
+  to continue executing. This is useful for some applications, but in many cases
+  the conditional exit would delegate to the unconditional exit function
+  `fn __exit__(self)`.
+
+  Concretely, this enables defining `with` regions that unconditionally
+  propagate inner errors, allowing code like:
+
+  ```mojo
+  def might_raise() -> Int:
+      ...
+
+  def foo() -> Int:
+      with ContextMgr():
+          return might_raise()
+      # no longer complains about missing return
+
+  def bar():
+      var x: Int
+      with ContextMgr():
+          x = might_raise()
+      print(x) # no longer complains about 'x' being uninitialized
+  ```
+
 - Now supports "conditional conformances" where some methods on a struct have
   additional trait requirements that the struct itself doesn't.  This is
   expressed through an explicitly declared `self` type:
@@ -55,6 +82,23 @@ what we publish.
 
   Note that `async` functions do not yet support indirect calls, `ref` results,
   and constructors.
+
+- As a specific form of "conditional conformances", initializers in a struct
+  may indicate specific parameter bindings to use in the type of their `self`
+  argument.  For example:
+
+  ```mojo
+  @value
+  struct MyStruct[size: Int]:
+      fn __init__(inout self: MyStruct[0]): pass
+      fn __init__(inout self: MyStruct[1], a: Int): pass
+      fn __init__(inout self: MyStruct[2], a: Int, b: Int): pass
+
+  def test(x: Int):
+      a = MyStruct()      # Infers size=0 from 'self' type.
+      b = MyStruct(x)     # Infers size=1 from 'self' type.
+      c = MyStruct(x, x)  # Infers size=2 from 'self' type.
+  ```
 
 - The `Reference` type (and many iterators) now use "inferred" parameters to
   represent the mutability of their lifetime, simplifying the interface.
@@ -145,6 +189,65 @@ by [@jayzhan211](https://github.com/jayzhan211))
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
 
+- `print()` now requires that its arguments conform to the `Formattable` trait.
+  This enables efficient stream-based writing by default, avoiding unnecessary
+  intermediate String heap allocations.
+
+  Previously, `print()` required types conform to `Stringable`. This meant that
+  to execute a call like `print(a, b, c)`, at least three separate String heap
+  allocations were down, to hold the formatted values of `a`, `b`, and `c`
+  respectively. The total number of allocations could be much higher if, for
+  example, `a.__str__()` was implemented to concatenate together the fields of
+  `a`, like in the following example:
+
+  ```mojo
+  struct Point(Stringable):
+      var x: Float64
+      var y: Float64
+
+      fn __str__(self) -> String:
+          # Performs 3 allocations: 1 each for str(..) of each of the fields,
+          # and then the final returned `String` allocation.
+          return "(" + str(self.x) + ", " + str(self.y) + ")"
+  ```
+
+  A type like the one above can transition to additionally implementing
+  `Formattable` with the following changes:
+
+  ```mojo
+  struct Point(Stringable, Formattable):
+      var x: Float64
+      var y: Float64
+
+      fn __str__(self) -> String:
+          return String.format_sequence(self)
+
+      fn format_to(self, inout writer: Formatter):
+          writer.write("(", self.x, ", ", self.y, ")")
+  ```
+
+  In the example above, `String.format_sequence(<arg>)` is used to construct a
+  `String` from a type that implements `Formattable`. This pattern of
+  implementing a types `Stringable` implementation in terms of its `Formattable`
+  implementation minimizes boilerplate and duplicated code, while retaining
+  backwards compatibility with the requirements of the commonly used `str(..)`
+  function.
+
+  <!-- TODO(MOCO-891): Remove this warning when error is improved. -->
+
+  > [!WARNING]
+  > The error shown when passing a type that does not implement `Formattable` to
+  > `print()` is currently not entirely descriptive of the underlying cause:
+  >
+  > ```shell
+  > error: invalid call to 'print': callee with non-empty variadic pack argument expects 0 positional operands, but 1 was specified
+  >    print(point)
+  >    ~~~~~^~~~~~~
+  > ```
+  >
+  > If the above error is seen, ensure that all argument types implement
+  > `Formattable`.
+
 - The `StringRef` constructors from `DTypePointer.int8` have been changed to
   take a `UnsafePointer[C_char]`, reflecting their use for compatibility with
   C APIs.
@@ -200,5 +303,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Removed `UnsafePointer.offset(offset:Int)`.
 
 - Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD instead.
+
+- The builtin `tensor` module has been removed. Identical functionality is
+  available in `max.tensor`, but it is generally recommended to use `buffer`
+  when possible instead.
 
 ### 🛠️ Fixed

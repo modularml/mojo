@@ -64,10 +64,10 @@ struct _ListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__get_ref(self.index - 1)[]
+            return self.src[][self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__get_ref(self.index)[]
+            return self.src[][self.index]
 
     fn __len__(self) -> Int:
         @parameter
@@ -197,24 +197,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __setitem__(inout self, idx: Int, owned value: T):
-        """Sets a list element at the given index.
-
-        Args:
-            idx: The index of the element.
-            value: The value to assign.
-        """
-        var normalized_idx = idx
-        debug_assert(
-            -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
-        )
-
-        if normalized_idx < 0:
-            normalized_idx += len(self)
-
-        self.unsafe_set(normalized_idx, value^)
-
     @always_inline
     fn __contains__[
         T2: ComparableCollectionElement
@@ -343,7 +325,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         When the compiler supports conditional methods, then a simple `str(my_list)` will
         be enough.
 
-        The elements' type must implement the `__repr__()` for this to work.
+        The elements' type must implement the `__repr__()` method for this to work.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
@@ -377,6 +359,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
+
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below:
 
@@ -722,16 +705,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return res^
 
     @always_inline
-    fn __getitem__(self, idx: Int) -> T:
-        """Gets a copy of the list element at the given index.
-
-        FIXME(lifetimes): This should return a reference, not a copy!
+    fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
+        """Gets the list element at the given index.
 
         Args:
             idx: The index of the element.
 
         Returns:
-            A copy of the element at the given index.
+            A reference to the element at the given index.
         """
         var normalized_idx = idx
         debug_assert(

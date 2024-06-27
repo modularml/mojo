@@ -58,13 +58,14 @@ trait Boolable:
 @value
 @register_passable("trivial")
 struct Bool(
-    Stringable,
-    ComparableCollectionElement,
     Boolable,
-    Intable,
-    Indexer,
     CollectionElementNew,
+    ComparableCollectionElement,
+    Indexer,
+    Intable,
+    Formattable,
     Representable,
+    Stringable,
 ):
     """The primitive Bool scalar value used in Mojo."""
 
@@ -149,7 +150,17 @@ struct Bool(
         Returns:
             A string representation.
         """
-        return "True" if self else "False"
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this boolean to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        writer.write("True" if self else "False")
 
     fn __repr__(self) -> String:
         """Get the bool as a string.
