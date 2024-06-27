@@ -138,7 +138,7 @@ fn _has_native_bf16_support() -> Bool:
 
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
-struct SIMD[type: DType, size: Int = simdwidthof[type]()](
+struct SIMD[type: DType, size: Int](
     Absable,
     Boolable,
     Ceilable,
@@ -2643,25 +2643,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return llvm_intrinsic[
             "llvm.vector.splice", Self, has_side_effect=False
         ](zero_simd, self, Int32(-shift))
-
-    @staticmethod
-    @always_inline
-    fn prefetch[
-        params: PrefetchOptions,
-        *,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space]):
-        # Prefetch at the underlying address.
-        """Prefetches memory at the underlying address.
-
-        Parameters:
-            params: Prefetch options (see `PrefetchOptions` for details).
-            address_space: The address space the pointer is in.
-
-        Args:
-            ptr: The pointer to prefetch from.
-        """
-        prefetch[params](ptr)
 
     @staticmethod
     @always_inline("nodebug")
