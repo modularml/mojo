@@ -308,4 +308,6 @@ by [@jayzhan211](https://github.com/jayzhan211))
   available in `max.tensor`, but it is generally recommended to use `buffer`
   when possible instead.
 
+- Removed the Mojo Language Server warnings for unused function arguments.
+
 ### 🛠️ Fixed
