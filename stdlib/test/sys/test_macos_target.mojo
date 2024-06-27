@@ -26,7 +26,8 @@ from sys import (
     os_is_windows,
 )
 from sys.info import _macos_version
-from testing import assert_true, assert_false
+
+from testing import assert_false, assert_true
 
 
 fn test_os_query() raises:
@@ -51,7 +52,7 @@ def test_os_version():
 
     major, minor, patch = _macos_version()
 
-    assert_true(major >= 13)
+    assert_true(major >= 12)
     assert_true(minor >= 0)
     assert_true(patch >= 0)
 

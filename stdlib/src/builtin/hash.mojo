@@ -17,32 +17,22 @@ There are a few main tools in this module:
 - `Hashable` trait for types implementing `__hash__(self) -> Int`
 - `hash[T: Hashable](hashable: T) -> Int` built-in function.
 - A `hash()` implementation for arbitrary byte strings,
-  `hash(data: DTypePointer[DType.int8], n: Int) -> Int`,
+  `hash(data: DTypePointer[DType.uint8], n: Int) -> Int`,
   is the workhorse function, which implements efficient hashing via SIMD
   vectors. See the documentation of this function for more details on the hash
   implementation.
-- `hash(SIMD)` and `hash(Int8)` implementations
+- `hash(SIMD)` and `hash(UInt8)` implementations
     These are useful helpers to specialize for the general bytes implementation.
 """
 
-from builtin.dtype import _uint_type_of_width
 import random
 from sys.ffi import _get_global
 
+from builtin.dtype import _uint_type_of_width
 from memory import memcpy, memset_zero, stack_allocation
 
 # TODO remove this import onece InlineArray is moved to collections
 from utils import InlineArray
-
-# ===----------------------------------------------------------------------=== #
-# Utilities
-# ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn _div_ceil_positive(numerator: Int, denominator: Int) -> Int:
-    return (numerator + denominator - 1)._positive_div(denominator)
-
 
 # ===----------------------------------------------------------------------=== #
 # Implementation
@@ -98,7 +88,11 @@ trait Hashable:
     """
 
     fn __hash__(self) -> Int:
-        """Return a 64-bit hash of the type's data."""
+        """Return a 64-bit hash of the type's data.
+
+        Returns:
+            A 64-bit integer hash of this instance's data.
+        """
         ...
 
 
@@ -173,7 +167,7 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     """
 
     @parameter
-    if type == DType.bool:
+    if type is DType.bool:
         return _hash_simd(data.cast[DType.int8]())
 
     var hash_data = _ankerl_init[type, size]()
@@ -183,39 +177,17 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     var final_data = bitcast[int_type, 1](hash_data[0]).cast[DType.uint64]()
 
     @parameter
-    fn hash_value[i: Int]():
+    for i in range(1, size):
         final_data = _ankerl_hash_update(
             final_data,
-            bitcast[int_type, 1](hash_data[i + 1]).cast[DType.uint64](),
+            bitcast[int_type, 1](hash_data[i]).cast[DType.uint64](),
         )
 
-    unroll[hash_value, size - 1]()
     return int(final_data)
 
 
 fn hash(bytes: DTypePointer[DType.uint8], n: Int) -> Int:
     """Hash a byte array using a SIMD-modified DJBX33A hash algorithm.
-
-    Similar to `hash(bytes: DTypePointer[DType.int8], n: Int) -> Int` but
-    takes a `DTypePointer[DType.uint8]` instead of `DTypePointer[DType.int8]`.
-    See the overload for a complete description of the algorithm.
-
-    Args:
-        bytes: The byte array to hash.
-        n: The length of the byte array.
-
-    Returns:
-        A 64-bit integer hash. This hash is _not_ suitable for
-        cryptographic purposes, but will have good low-bit
-        hash collision statistical properties for common data structures.
-    """
-    return hash(bytes.bitcast[DType.int8](), n)
-
-
-# TODO: Remove this overload once we have finished the transition to uint8
-# for bytes. See https://github.com/modularml/mojo/issues/2317
-fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
-    """Hash a byte array using a SIMD-modified hash algorithm.
 
     _This hash function is not suitable for cryptographic purposes._ The
     algorithm is easy to reverse and produce deliberate hash collisions.
@@ -250,7 +222,7 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     ```mojo
     from random import rand
     var n = 64
-    var rand_bytes = DTypePointer[DType.int8].alloc(n)
+    var rand_bytes = DTypePointer[DType.uint8].alloc(n)
     rand(rand_bytes, n)
     hash(rand_bytes, n)
     ```
@@ -282,20 +254,19 @@ fn hash(bytes: DTypePointer[DType.int8], n: Int) -> Int:
     # 2. Compute the hash, but strided across the SIMD vector width.
     var hash_data = _HASH_INIT[type, simd_width]()
     for i in range(k):
-        var update = simd_data.load[width=simd_width](i * simd_width)
+        var update = SIMD[size=simd_width].load(simd_data, i * simd_width)
         hash_data = _HASH_UPDATE(hash_data, update)
 
     # 3. Copy the tail data (smaller than the SIMD register) into
     #    a final hash state update vector that's stack-allocated.
     if r != 0:
-        var remaining = InlineArray[Int8, stride](unsafe_uninitialized=True)
-        var ptr = DTypePointer[DType.int8](
-            UnsafePointer.address_of(remaining).bitcast[Int8]()
-        )
+        var remaining = InlineArray[UInt8, stride](unsafe_uninitialized=True)
+        var ptr = DTypePointer[DType.uint8](remaining.unsafe_ptr())
         memcpy(ptr, bytes + k * stride, r)
         memset_zero(ptr + r, stride - r)  # set the rest to 0
-        var last_value = ptr.bitcast[type]().load[width=simd_width]()
+        var last_value = SIMD[size=simd_width].load(ptr.bitcast[type]())
         hash_data = _HASH_UPDATE(hash_data, last_value)
+        _ = remaining  # We make sure the array lives long enough.
 
     # Now finally, hash the final SIMD vector state.
     return _hash_simd(hash_data)

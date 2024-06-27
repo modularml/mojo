@@ -10,89 +10,79 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo -D CURRENT_DIR=%S -D TEMP_FILE_DIR=%T -debug-level full %s
+# RUN: %mojo -debug-level full %s
 
 
-from pathlib import Path
-from sys import os_is_windows, env_get_string
+from pathlib import Path, _dir_of_current_file
+from sys import os_is_windows
+from tempfile import gettempdir
 
 from testing import assert_equal, assert_true
 
-alias CURRENT_DIR = env_get_string["CURRENT_DIR"]()
-alias TEMP_FILE_DIR = env_get_string["TEMP_FILE_DIR"]()
-
 
 def test_file_read():
-    var f = open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
-        "r",
-    )
-    assert_true(
-        f.read().startswith(
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+    var path = _dir_of_current_file() / "test_file_dummy_input.txt"
+    with open(path, "r") as f:
+        assert_true(
+            f.read().startswith(
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+            )
         )
-    )
-    f.close()
 
 
 def test_file_read_multi():
-    var f = open(
-        (Path(CURRENT_DIR) / "test_file_dummy_input.txt"),
+    with open(
+        _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
-    )
-
-    assert_equal(f.read(12), "Lorem ipsum ")
-    assert_equal(f.read(6), "dolor ")
-    assert_true(f.read().startswith("sit amet, consectetur adipiscing elit."))
-
-    f.close()
+    ) as f:
+        assert_equal(f.read(12), "Lorem ipsum ")
+        assert_equal(f.read(6), "dolor ")
+        assert_true(
+            f.read().startswith("sit amet, consectetur adipiscing elit.")
+        )
 
 
 def test_file_read_bytes_multi():
-    var f = open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
+    with open(
+        _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
-    )
+    ) as f:
+        var bytes1 = f.read_bytes(12)
+        assert_equal(len(bytes1), 12, "12 bytes")
+        # we add the null terminator
+        bytes1.append(0)
+        var string1 = String(bytes1)
+        assert_equal(len(string1), 12, "12 chars")
+        assert_equal(string1, String("Lorem ipsum "))
 
-    var bytes1 = f.read_bytes(12)
-    assert_equal(len(bytes1), 12, "12 bytes")
-    # we add the null terminator
-    bytes1.append(0)
-    var string1 = String(bytes1)
-    assert_equal(len(string1), 12, "12 chars")
-    assert_equal(string1, String("Lorem ipsum "))
+        var bytes2 = f.read_bytes(6)
+        assert_equal(len(bytes2), 6, "6 bytes")
+        # we add the null terminator
+        bytes2.append(0)
+        var string2 = String(bytes2)
+        assert_equal(len(string2), 6, "6 chars")
+        assert_equal(string2, "dolor ")
 
-    var bytes2 = f.read_bytes(6)
-    assert_equal(len(bytes2), 6, "6 bytes")
-    # we add the null terminator
-    bytes2.append(0)
-    var string2 = String(bytes2)
-    assert_equal(len(string2), 6, "6 chars")
-    assert_equal(string2, "dolor ")
+        # Read where N is greater than the number of bytes in the file.
+        var s: String = f.read(1e9)
 
-    # Read where N is greater than the number of bytes in the file.
-    var s: String = f.read(1e9)
-
-    assert_equal(len(s), 936)
-    assert_true(s.startswith("sit amet, consectetur adipiscing elit."))
-
-    f.close()
+        assert_equal(len(s), 936)
+        assert_true(s.startswith("sit amet, consectetur adipiscing elit."))
 
 
 def test_file_read_path():
-    var file_path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
+    var file_path = _dir_of_current_file() / "test_file_dummy_input.txt"
 
-    var f = open(file_path, "r")
-    assert_true(
-        f.read().startswith(
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+    with open(file_path, "r") as f:
+        assert_true(
+            f.read().startswith(
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+            )
         )
-    )
-    f.close()
 
 
 def test_file_path_direct_read():
-    var file_path = Path(CURRENT_DIR) / "test_file_dummy_input.txt"
+    var file_path = _dir_of_current_file() / "test_file_dummy_input.txt"
     assert_true(
         file_path.read_text().startswith(
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
@@ -102,7 +92,7 @@ def test_file_path_direct_read():
 
 def test_file_read_context():
     with open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
+        _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
         assert_true(
@@ -112,11 +102,44 @@ def test_file_read_context():
         )
 
 
+def test_file_read_to_address():
+    with open(
+        _dir_of_current_file() / "test_file_dummy_input.txt",
+        "r",
+    ) as f:
+        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        assert_equal(f.read(ptr), 954)
+        assert_equal(Scalar.load(ptr, 0), 76)  # L
+        assert_equal(Scalar.load(ptr, 1), 111)  # o
+        assert_equal(Scalar.load(ptr, 2), 114)  # r
+        assert_equal(Scalar.load(ptr, 3), 101)  # e
+        assert_equal(Scalar.load(ptr, 4), 109)  # m
+        assert_equal(Scalar.load(ptr, 5), 32)  # <space>
+        assert_equal(Scalar.load(ptr, 56), 10)  # <LF>
+
+    with open(
+        _dir_of_current_file() / "test_file_dummy_input.txt",
+        "r",
+    ) as f:
+        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        assert_equal(f.read(ptr, 1000), 954)
+
+    with open(
+        _dir_of_current_file() / "test_file_dummy_input.txt",
+        "r",
+    ) as f:
+        var ptr = DTypePointer[DType.uint8].alloc(1000)
+        assert_equal(f.read(ptr, 30), 30)
+        assert_equal(f.read(ptr, 1), 1)
+        assert_equal(f.read(ptr, 2), 2)
+        assert_equal(f.read(ptr, 100), 100)
+
+
 def test_file_seek():
     import os
 
     with open(
-        Path(CURRENT_DIR) / "test_file_dummy_input.txt",
+        _dir_of_current_file() / "test_file_dummy_input.txt",
         "r",
     ) as f:
         var pos = f.seek(6)
@@ -150,29 +173,36 @@ def test_file_open_nodir():
 
 def test_file_write():
     var content: String = "The quick brown fox jumps over the lazy dog"
-    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write"
-    var f = open(TEMP_FILE, "w")
-    f.write(content)
-    f.close()
+    var TEMP_FILE = Path(gettempdir().value()) / "test_file_write"
+    with open(TEMP_FILE, "w") as f:
+        f.write(content)
 
-    var read_file = open(TEMP_FILE, "r")
-    assert_equal(read_file.read(), content)
-    read_file.close()
+    with open(TEMP_FILE, "r") as read_file:
+        assert_equal(read_file.read(), content)
+
+
+def test_file_write_span():
+    var content: String = "The quick brown fox jumps over the lazy dog"
+    var TEMP_FILE = Path(gettempdir().value()) / "test_file_write_span"
+    with open(TEMP_FILE, "w") as f:
+        f.write(content.as_bytes_slice())
+
+    with open(TEMP_FILE, "r") as read_file:
+        assert_equal(read_file.read(), content)
 
 
 def test_file_write_again():
     var unexpected_content: String = "foo bar baz"
     var expected_content: String = "foo bar"
-    var TEMP_FILE = Path(TEMP_FILE_DIR) / "test_file_write_again"
+    var TEMP_FILE = Path(gettempdir().value()) / "test_file_write_again"
     with open(TEMP_FILE, "w") as f:
         f.write(unexpected_content)
 
     with open(TEMP_FILE, "w") as f:
         f.write(expected_content)
 
-    var read_file = open(TEMP_FILE, "r")
-    assert_equal(read_file.read(), expected_content)
-    read_file.close()
+    with open(TEMP_FILE, "r") as read_file:
+        assert_equal(read_file.read(), expected_content)
 
 
 @value
@@ -196,27 +226,28 @@ struct Word:
 
 
 def test_file_read_to_dtype_pointer():
-    var f = open(Path(CURRENT_DIR) / "test_file_dummy_input.txt", "r")
+    with open(_dir_of_current_file() / "test_file_dummy_input.txt", "r") as f:
+        var ptr = DTypePointer[DType.int8].alloc(8)
+        var data = f.read(ptr, 8)
+        assert_equal(
+            str(SIMD[size=8].load(ptr, 0)),
+            "[76, 111, 114, 101, 109, 32, 105, 112]",
+        )
 
-    var ptr = DTypePointer[DType.int8].alloc(8)
-    var data = f.read(ptr, 8)
-    assert_equal(
-        str(ptr.load[width=8](0)), "[76, 111, 114, 101, 109, 32, 105, 112]"
-    )
-
-    var ptr2 = DTypePointer[DType.int8].alloc(8)
-    var data2 = f.read(ptr2, 8)
-    assert_equal(
-        str(ptr2.load[width=8](0)), "[115, 117, 109, 32, 100, 111, 108, 111]"
-    )
+        var ptr2 = DTypePointer[DType.int8].alloc(8)
+        var data2 = f.read(ptr2, 8)
+        assert_equal(
+            str(SIMD[size=8].load(ptr2, 0)),
+            "[115, 117, 109, 32, 100, 111, 108, 111]",
+        )
 
 
 def test_file_get_raw_fd():
     # since JIT and build give different file descriptors, we test by checking
     # if we printed to the right file.
-    var f1 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_1", "rw")
-    var f2 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_2", "rw")
-    var f3 = open(Path(TEMP_FILE_DIR) / "test_file_dummy_2", "rw")
+    var f1 = open(Path(gettempdir().value()) / "test_file_dummy_1", "rw")
+    var f2 = open(Path(gettempdir().value()) / "test_file_dummy_2", "rw")
+    var f3 = open(Path(gettempdir().value()) / "test_file_dummy_3", "rw")
 
     print(
         "test from file 1",
@@ -243,6 +274,10 @@ def test_file_get_raw_fd():
     assert_equal(f2.read(), "test from file 2")
     assert_equal(f1.read(), "test from file 1")
 
+    f1.close()
+    f2.close()
+    f3.close()
+
 
 def main():
     test_file_read()
@@ -254,6 +289,7 @@ def main():
     test_file_seek()
     test_file_open_nodir()
     test_file_write()
+    test_file_write_span()
     test_file_write_again()
     test_file_read_to_dtype_pointer()
     test_file_get_raw_fd()

@@ -16,7 +16,7 @@ from os import remove, unlink
 from os.path import exists
 from pathlib import Path
 
-from testing import assert_true, assert_false, assert_raises
+from testing import assert_false, assert_raises, assert_true
 
 
 fn create_file_and_test_delete_string[

@@ -14,7 +14,7 @@
 
 from collections import Optional, OptionalReg
 
-from testing import assert_true, assert_false, assert_equal
+from testing import assert_equal, assert_false, assert_true
 
 
 def test_basic():
@@ -37,7 +37,7 @@ def test_basic():
     assert_true(b or True)
     assert_false(b or False)
 
-    assert_equal(1, a.value()[])
+    assert_equal(1, a.value())
 
     # Test invert operator
     assert_false(~a)
@@ -56,8 +56,8 @@ def test_basic():
     # We may want to come back and add an immutable test once
     # there are the language features to do so.
     var a2 = Optional(1)
-    a2.value()[] = 2
-    assert_equal(a2.value()[], 2)
+    a2.value() = 2
+    assert_equal(a2.value(), 2)
 
 
 def test_optional_reg_basic():
@@ -120,6 +120,20 @@ def test_optional_take_mutates():
     assert_false(opt1)
 
 
+def test_optional_explicit_copy():
+    var v1 = Optional[String](String("test"))
+
+    var v2 = Optional(other=v1)
+
+    assert_equal(v1.value(), "test")
+    assert_equal(v2.value(), "test")
+
+    v2.value() += "ing"
+
+    assert_equal(v1.value(), "test")
+    assert_equal(v2.value(), "testing")
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
@@ -128,3 +142,4 @@ def main():
     test_optional_reg_is()
     test_optional_reg_isnot()
     test_optional_take_mutates()
+    test_optional_explicit_copy()

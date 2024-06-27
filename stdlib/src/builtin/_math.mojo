@@ -17,6 +17,8 @@ module should be exposed by the current `math` module. The contents of this
 module should be eventually moved to the `math` module when it's open sourced.
 """
 
+from bit import countr_zero
+
 # ===----------------------------------------------------------------------=== #
 # Ceilable
 # ===----------------------------------------------------------------------=== #

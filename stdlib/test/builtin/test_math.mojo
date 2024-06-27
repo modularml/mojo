@@ -66,13 +66,34 @@ def test_round():
     assert_equal(0, round(0.0))
     assert_equal(1, round(1.0))
     assert_equal(1, round(1.1))
+    assert_equal(1, round(1.4))
     assert_equal(2, round(1.5))
-    assert_equal(2, round(1.9))
     assert_equal(2, round(2.0))
+    assert_equal(1, round(1.4, 0))
+    # FIXME: round(2.5) is 2.0 (roundeven) but it's using roundhalfup
+    # Fix when the math libray is open sourced
+    # assert_equal(2, round(2.5))
+    # assert_equal(1.5, round(1.5, 1))
+    # assert_equal(1.61, round(1.613, 2))
 
     var lhs = SIMD[DType.float32, 4](1.1, 1.5, 1.9, 2.0)
     var expected = SIMD[DType.float32, 4](1.0, 2.0, 2.0, 2.0)
     assert_equal(expected, round(lhs))
+
+    # Ensure that round works on float literal
+    alias r1: FloatLiteral = round(2.3)
+    assert_equal(r1, 2.0)
+    alias r2: FloatLiteral = round(2.3324, 2)
+    assert_equal(r2, 2.33)
+
+
+def test_pow():
+    alias F = SIMD[DType.float32, 4]
+    var base = F(0.0, 1.0, 2.0, 3.0)
+    assert_equal(pow(base, 2.0), F(0.0, 1.0, 4.0, 9.0))
+    assert_equal(pow(base, int(2)), F(0.0, 1.0, 4.0, 9.0))
+    alias I = SIMD[DType.int32, 4]
+    assert_equal(pow(I(0, 1, 2, 3), int(2)), I(0, 1, 4, 9))
 
 
 def main():
@@ -81,3 +102,4 @@ def main():
     test_max()
     test_min()
     test_round()
+    test_pow()

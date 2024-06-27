@@ -12,61 +12,57 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the sys package."""
 
+from ._io import stderr, stdout
 from .arg import argv
 from .debug import breakpointhook
-from ._io import stderr, stdout
-from .ffi import RTLD, DEFAULT_RTLD, DLHandle, external_call
+from .ffi import DEFAULT_RTLD, RTLD, DLHandle, external_call
 from .info import (
-    is_x86,
-    has_sse4,
+    alignof,
+    bitwidthof,
     has_avx,
     has_avx2,
     has_avx512f,
-    has_vnni,
+    has_intel_amx,
     has_neon,
     has_neon_int8_dotprod,
     has_neon_int8_matmul,
+    has_sse4,
+    has_vnni,
     is_apple_m1,
     is_apple_m2,
     is_apple_m3,
     is_apple_silicon,
-    is_neoverse_n1,
-    has_intel_amx,
-    os_is_macos,
-    os_is_linux,
-    os_is_windows,
-    triple_is_nvidia_cuda,
-    is_little_endian,
     is_big_endian,
-    simdbitwidth,
-    simdbytewidth,
-    sizeof,
-    alignof,
-    bitwidthof,
-    simdwidthof,
-    num_physical_cores,
+    is_little_endian,
+    is_neoverse_n1,
+    is_x86,
     num_logical_cores,
     num_performance_cores,
+    num_physical_cores,
+    os_is_linux,
+    os_is_macos,
+    os_is_windows,
+    simdbitwidth,
+    simdbytewidth,
+    simdwidthof,
+    sizeof,
+    triple_is_nvidia_cuda,
 )
 from .intrinsics import (
-    llvm_intrinsic,
-    gather,
-    scatter,
-    PrefetchLocality,
-    PrefetchRW,
     PrefetchCache,
+    PrefetchLocality,
     PrefetchOptions,
-    prefetch,
+    PrefetchRW,
+    _RegisterPackType,
+    compressed_store,
+    gather,
+    llvm_intrinsic,
     masked_load,
     masked_store,
-    compressed_store,
+    prefetch,
+    scatter,
     strided_load,
     strided_store,
-    _RegisterPackType,
 )
-from .param_env import (
-    is_defined,
-    env_get_int,
-    env_get_string,
-)
+from .param_env import env_get_int, env_get_string, is_defined
 from .terminate import exit

@@ -14,8 +14,7 @@
 
 from sys import sizeof
 
-from memory import memcmp, memcpy, memset, memset_zero, DTypePointer, Pointer
-from utils.numerics import nan
+from memory import DTypePointer, Pointer, memcmp, memcpy, memset, memset_zero
 from testing import (
     assert_almost_equal,
     assert_equal,
@@ -24,12 +23,14 @@ from testing import (
 )
 
 from utils import Index
+from utils.numerics import nan
 
 alias void = __mlir_attr.`#kgen.dtype.constant<invalid> : !kgen.dtype`
 alias int8_pop = __mlir_type.`!pop.scalar<si8>`
 
 
 @value
+@register_passable("trivial")
 struct Pair:
     var lo: Int
     var hi: Int
@@ -85,6 +86,8 @@ def test_memcpy():
     _test_memcpy_buf[12]()
     _test_memcpy_buf[16]()
     _test_memcpy_buf[19]()
+    _ = pair1
+    _ = pair2
 
 
 def test_memcpy_dtype():
@@ -127,13 +130,15 @@ def test_memcmp():
     var errors2 = memcmp(ptr1, ptr2, 1)
 
     assert_equal(errors2, 0)
+    _ = pair1
+    _ = pair2
 
 
 def test_memcmp_overflow():
     var p1 = DTypePointer[DType.int8].alloc(1)
     var p2 = DTypePointer[DType.int8].alloc(1)
-    p1.store(-120)
-    p2.store(120)
+    Scalar.store(p1, -120)
+    Scalar.store(p2, 120)
 
     var c = memcmp(p1, p2, 1)
     assert_equal(c, -1, "-120 is smaller than 120")
@@ -149,10 +154,10 @@ def test_memcmp_simd():
     var p2 = DTypePointer[DType.int8].alloc(length)
     memset_zero(p1, length)
     memset_zero(p2, length)
-    p1.store(120)
-    p1.store(1, 100)
-    p2.store(120)
-    p2.store(1, 90)
+    Scalar.store(p1, 120)
+    Scalar.store(p1, 1, 100)
+    Scalar.store(p2, 120)
+    Scalar.store(p2, 1, 90)
 
     var c = memcmp(p1, p2, length)
     assert_equal(c, 1, "[120, 100, 0, ...] is bigger than [120, 90, 0, ...]")
@@ -163,10 +168,10 @@ def test_memcmp_simd():
     memset_zero(p1, length)
     memset_zero(p2, length)
 
-    p1.store(length - 2, 120)
-    p1.store(length - 1, 100)
-    p2.store(length - 2, 120)
-    p2.store(length - 1, 90)
+    Scalar.store(p1, length - 2, 120)
+    Scalar.store(p1, length - 1, 100)
+    Scalar.store(p2, length - 2, 120)
+    Scalar.store(p2, length - 1, 90)
 
     c = memcmp(p1, p2, length)
     assert_equal(c, 1, "[..., 0, 120, 100] is bigger than [..., 0, 120, 90]")
@@ -295,13 +300,14 @@ def test_memset():
 
     var buf0 = DTypePointer[DType.int32].alloc(2)
     memset(buf0, 1, 2)
-    assert_equal(buf0.load(0), 16843009)
+    assert_equal(Scalar.load(buf0, 0), 16843009)
     memset(buf0, -1, 2)
-    assert_equal(buf0.load(0), -1)
+    assert_equal(Scalar.load(buf0, 0), -1)
 
     var buf1 = DTypePointer[DType.int8].alloc(2)
     memset(buf1, 5, 2)
-    assert_equal(buf1.load(0), 5)
+    assert_equal(Scalar.load(buf1, 0), 5)
+    _ = pair
 
 
 def test_pointer_string():
@@ -333,7 +339,7 @@ def test_pointer_refitem():
 
 def test_pointer_refitem_string():
     alias payload = "$Modular!Mojo!HelloWorld^"
-    var ptr = Pointer[String].alloc(1)
+    var ptr = UnsafePointer[String].alloc(1)
     __get_address_as_uninit_lvalue(ptr.address) = String()
     ptr[] = payload
     assert_equal(ptr[], payload)
@@ -353,7 +359,7 @@ def test_pointer_refitem_pair():
 
 def test_dtypepointer_gather():
     var ptr = DTypePointer[DType.float32].alloc(4)
-    ptr.store(0, SIMD[ptr.type, 4](0.0, 1.0, 2.0, 3.0))
+    SIMD.store(ptr, 0, SIMD[ptr.type, 4](0.0, 1.0, 2.0, 3.0))
 
     @parameter
     def _test_gather[
@@ -398,7 +404,7 @@ def test_dtypepointer_gather():
 
 def test_dtypepointer_scatter():
     var ptr = DTypePointer[DType.float32].alloc(4)
-    ptr.store(0, SIMD[ptr.type, 4](0.0))
+    SIMD.store(ptr, 0, SIMD[ptr.type, 4](0.0))
 
     @parameter
     def _test_scatter[
@@ -409,7 +415,7 @@ def test_dtypepointer_scatter():
         desired: SIMD[ptr.type, 4],
     ):
         ptr.scatter(offset, val)
-        var actual = ptr.load[width=4](0)
+        var actual = SIMD[size=4].load(ptr, 0)
         assert_almost_equal(
             actual, desired, msg="_test_scatter", atol=0.0, rtol=0.0
         )
@@ -424,7 +430,7 @@ def test_dtypepointer_scatter():
         desired: SIMD[ptr.type, 4],
     ):
         ptr.scatter(offset, val, mask)
-        var actual = ptr.load[width=4](0)
+        var actual = SIMD[size=4].load(ptr, 0)
         assert_almost_equal(
             actual, desired, msg="_test_masked_scatter", atol=0.0, rtol=0.0
         )
@@ -441,7 +447,7 @@ def test_dtypepointer_scatter():
         SIMD[ptr.type, 4](3.0, 2.0, 1.0, 0.0),
     )
 
-    ptr.store(0, SIMD[ptr.type, 4](0.0))
+    SIMD.store(ptr, 0, SIMD[ptr.type, 4](0.0))
 
     _test_masked_scatter[1](
         Int16(2), 2.0, False, SIMD[ptr.type, 4](0.0, 0.0, 0.0, 0.0)

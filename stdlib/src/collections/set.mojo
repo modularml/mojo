@@ -12,7 +12,13 @@
 # ===----------------------------------------------------------------------=== #
 """Implements the  Set datatype."""
 
-from .dict import Dict, KeyElement, _DictEntryIter, _DictKeyIter
+from .dict import (
+    Dict,
+    KeyElement,
+    _DictEntryIter,
+    _DictKeyIter,
+    RepresentableKeyElement,
+)
 
 
 struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
@@ -45,7 +51,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     var _data: Dict[T, NoneType]
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
     fn __init__(inout self, *ts: T):
@@ -87,7 +93,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         self._data = other._data^
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Operator dunders
     # ===-------------------------------------------------------------------===#
 
     fn __contains__(self, t: T) -> Bool:
@@ -262,7 +268,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         self.symmetric_difference_update(other)
 
     # ===-------------------------------------------------------------------===#
-    # Methods
+    # Trait implementations
     # ===-------------------------------------------------------------------===#
 
     fn __bool__(self) -> Bool:
@@ -296,20 +302,65 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             hash_value ^= hash(e[])
         return hash_value
 
+    fn __str__[U: RepresentableKeyElement](self: Set[U]) -> String:
+        """Returns the string representation of the set.
+
+        Parameters:
+            U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
+
+        Returns:
+            The string representation of the set.
+        """
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output
+
+    fn __repr__[U: RepresentableKeyElement](self: Set[U]) -> String:
+        """Returns the string representation of the set.
+
+        Parameters:
+            U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
+
+        Returns:
+            The string representation of the set.
+        """
+        return self.__str__()
+
+    fn format_to[
+        U: RepresentableKeyElement,
+    ](self: Set[U], inout writer: Formatter):
+        """Write Set string representation to a `Formatter`.
+
+        Parameters:
+            U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        write_to(writer, "{")
+        var written = 0
+        for item in self:
+            write_to(writer, repr(item[]))
+            if written < len(self) - 1:
+                write_to(writer, ", ")
+            written += 1
+        write_to(writer, "}")
+
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
 
     fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _DictKeyIter[T, NoneType, self.is_mutable, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _DictKeyIter[T, NoneType, __lifetime_of(self)]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
             An iterator of immutable references to the set elements.
         """
         # here we rely on Set being a trivial wrapper of a Dict
-        return _DictKeyIter(_DictEntryIter(0, 0, self[]._data))
+        return _DictKeyIter(_DictEntryIter(0, 0, self._data))
 
     fn add(inout self, t: T):
         """Add an element to the set.

@@ -13,7 +13,9 @@
 
 
 @register_passable
-struct __ParameterClosureCaptureList[fn_type: AnyRegType, fn_ref: fn_type]:
+struct __ParameterClosureCaptureList[
+    fn_type: AnyTrivialRegType, fn_ref: fn_type
+]:
     var value: __mlir_type.`!kgen.pointer<none>`
 
     # Parameter closure invariant requires this function be marked 'capturing'.
@@ -47,3 +49,7 @@ fn __closure_wrapper_noop_copy(
     owned other: __mlir_type.`!kgen.pointer<none>`, /
 ) -> __mlir_type.`!kgen.pointer<none>`:
     return other
+
+
+fn __ownership_keepalive[*Ts: AnyType](*args: *Ts):
+    pass

@@ -13,7 +13,8 @@
 # RUN: %mojo %s
 
 from random import randn_float64, random_float64, random_si64, random_ui64, seed
-from testing import assert_true, assert_equal
+
+from testing import assert_equal, assert_true
 
 
 def test_random():

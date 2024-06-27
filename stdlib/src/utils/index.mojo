@@ -31,9 +31,6 @@ from .static_tuple import StaticTuple
 # ===----------------------------------------------------------------------===#
 
 
-alias mlir_bool = __mlir_type.`!pop.scalar<bool>`
-
-
 @always_inline
 fn _reduce_and_fn(a: Bool, b: Bool) -> Bool:
     """Performs AND operation on two boolean inputs.
@@ -83,14 +80,11 @@ fn _int_tuple_binary_apply[
 
     var c = StaticTuple[Int, size]()
 
-    @always_inline
     @parameter
-    fn do_apply[idx: Int]():
-        var a_elem: Int = a.__getitem__[idx]()
-        var b_elem: Int = b.__getitem__[idx]()
-        c.__setitem__[idx](binary_fn(a_elem, b_elem))
-
-    unroll[do_apply, size]()
+    for i in range(size):
+        var a_elem = a.__getitem__[i]()
+        var b_elem = b.__getitem__[i]()
+        c.__setitem__[i](binary_fn(a_elem, b_elem))
 
     return c
 
@@ -100,8 +94,7 @@ fn _int_tuple_compare[
     size: Int,
     comp_fn: fn (Int, Int) -> Bool,
 ](a: StaticTuple[Int, size], b: StaticTuple[Int, size]) -> StaticTuple[
-    mlir_bool,
-    size,
+    Bool, size
 ]:
     """Applies a given element compare function to each pair of corresponding
     elements in two tuples and produces a tuple of Bools containing result.
@@ -123,16 +116,13 @@ fn _int_tuple_compare[
         Tuple containing the result.
     """
 
-    var c = StaticTuple[mlir_bool, size]()
+    var c = StaticTuple[Bool, size]()
 
-    @always_inline
     @parameter
-    fn do_compare[idx: Int]():
-        var a_elem: Int = a.__getitem__[idx]()
-        var b_elem: Int = b.__getitem__[idx]()
-        c.__setitem__[idx](comp_fn(a_elem, b_elem)._as_scalar_bool())
-
-    unroll[do_compare, size]()
+    for i in range(size):
+        var a_elem: Int = a.__getitem__[i]()
+        var b_elem: Int = b.__getitem__[i]()
+        c.__setitem__[i](comp_fn(a_elem, b_elem))
 
     return c
 
@@ -141,12 +131,12 @@ fn _int_tuple_compare[
 fn _bool_tuple_reduce[
     size: Int,
     reduce_fn: fn (Bool, Bool) -> Bool,
-](a: StaticTuple[mlir_bool, size], init: Bool) -> Bool:
+](a: StaticTuple[Bool, size], init: Bool) -> Bool:
     """Reduces the tuple argument with the given reduce function and initial
     value.
 
     Example Usage:
-        var a: StaticTuple[mlir_bool, size]
+        var a: StaticTuple[Bool, size]
         var c = _bool_tuple_reduce[size, _reduce_and_fn](a, True)
 
     Parameters:
@@ -163,12 +153,9 @@ fn _bool_tuple_reduce[
 
     var c: Bool = init
 
-    @always_inline
     @parameter
-    fn do_reduce[idx: Int]():
-        c = reduce_fn(c, a.__getitem__[idx]())
-
-    unroll[do_reduce, size]()
+    for i in range(size):
+        c = reduce_fn(c, a.__getitem__[i]())
 
     return c
 
@@ -180,7 +167,12 @@ fn _bool_tuple_reduce[
 
 @value
 @register_passable("trivial")
-struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
+struct StaticIntTuple[size: Int](
+    Sized,
+    Stringable,
+    Formattable,
+    Comparable,
+):
     """A base struct that implements size agnostic index functions.
 
     Parameters:
@@ -224,7 +216,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 2]()
 
@@ -249,7 +243,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 3]()
 
@@ -274,7 +270,9 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
 
         @parameter
         fn fill[idx: Int]():
-            tup[idx] = rebind[Int](elems[idx])
+            tup[idx] = rebind[Reference[Int, __lifetime_of(elems)]](
+                Reference(elems[idx])
+            )[]
 
         unroll[fill, 4]()
 
@@ -646,25 +644,33 @@ struct StaticIntTuple[size: Int](Sized, Stringable, Comparable):
         buf.reserve(initial_buffer_size)
 
         # Print an opening `(`.
-        buf.size += _snprintf(buf.data, 2, "(")
+        buf.size += _snprintf["("](buf.data, 2)
         for i in range(size):
             # Print separators between each element.
             if i != 0:
-                buf.size += _snprintf(buf.data + buf.size, 3, ", ")
-            buf.size += _snprintf(
-                buf.data + buf.size,
-                _calc_initial_buffer_size(self[i]),
-                _get_dtype_printf_format[DType.index](),
-                self[i],
+                buf.size += _snprintf[", "](buf.data + buf.size, 3)
+            buf.size += _snprintf[_get_dtype_printf_format[DType.index]()](
+                buf.data + buf.size, _calc_initial_buffer_size(self[i]), self[i]
             )
         # Single element tuples should be printed with a trailing comma.
         if size == 1:
-            buf.size += _snprintf(buf.data + buf.size, 2, ",")
+            buf.size += _snprintf[","](buf.data + buf.size, 2)
         # Print a closing `)`.
-        buf.size += _snprintf(buf.data + buf.size, 2, ")")
+        buf.size += _snprintf[")"](buf.data + buf.size, 2)
 
         buf.size += 1  # for the null terminator.
         return buf^
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this int tuple to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Optimize this to avoid the intermediate String allocation.
+        writer.write(str(self))
 
 
 # ===----------------------------------------------------------------------===#

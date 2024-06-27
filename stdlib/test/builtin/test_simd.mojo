@@ -13,9 +13,17 @@
 # RUN: %mojo %s
 
 from sys import has_neon
-from utils.numerics import isfinite, isinf, isnan
 
-from testing import assert_equal, assert_not_equal, assert_true, assert_false
+from builtin.simd import _modf
+from testing import (
+    assert_almost_equal,
+    assert_equal,
+    assert_false,
+    assert_not_equal,
+    assert_true,
+)
+
+from utils.numerics import isfinite, isinf, isnan, nan
 
 
 def test_cast():
@@ -90,16 +98,120 @@ def test_convert_simd_to_string():
     )
 
 
+def test_simd_repr():
+    assert_equal(
+        SIMD[DType.int32, 4](1, 2, 3, 4).__repr__(),
+        "SIMD[DType.int32, 4](1, 2, 3, 4)",
+    )
+    assert_equal(
+        SIMD[DType.int32, 4](-1, 2, -3, 4).__repr__(),
+        "SIMD[DType.int32, 4](-1, 2, -3, 4)",
+    )
+    assert_equal(
+        SIMD[DType.bool, 2](True, False).__repr__(),
+        "SIMD[DType.bool, 2](True, False)",
+    )
+    assert_equal(Int32(4).__repr__(), "SIMD[DType.int32, 1](4)")
+    assert_equal(
+        Float64(235234523.3452).__repr__(),
+        "SIMD[DType.float64, 1](2.3523452334520000e+08)",
+    )
+    assert_equal(
+        Float32(2897239).__repr__(), "SIMD[DType.float32, 1](2.89723900e+06)"
+    )
+    assert_equal(Float16(324).__repr__(), "SIMD[DType.float16, 1](3.2400e+02)")
+    assert_equal(
+        SIMD[DType.float32, 4](
+            Float32.MAX, Float32.MIN, -0.0, nan[DType.float32]()
+        ).__repr__(),
+        "SIMD[DType.float32, 4](inf, -inf, -0.00000000e+00, nan)",
+    )
+
+
+def test_issue_1625():
+    var size = 16
+    alias simd_width = 8
+    var ptr = DTypePointer[DType.int64].alloc(size)
+    for i in range(size):
+        ptr[i] = i
+
+    var x = SIMD[size = 2 * simd_width].load(ptr, 0)
+    var evens_and_odds = x.deinterleave()
+
+    # FIXME (40568) should directly use the SIMD assert_equal
+    assert_equal(
+        str(evens_and_odds[0]),
+        str(SIMD[DType.int64, 8](0, 2, 4, 6, 8, 10, 12, 14)),
+    )
+    assert_equal(
+        str(evens_and_odds[1]),
+        str(SIMD[DType.int64, 8](1, 3, 5, 7, 9, 11, 13, 15)),
+    )
+    ptr.free()
+
+
 def test_issue_20421():
     var a = DTypePointer[DType.uint8]().alloc(16 * 64, alignment=64)
     for i in range(16 * 64):
         a[i] = i & 255
-    var av16 = a.offset(128 + 64 + 4).bitcast[DType.int32]().load[width=4]()
+    var av16 = SIMD[size=4].load(a.offset(128 + 64 + 4).bitcast[DType.int32]())
     assert_equal(
         av16,
         SIMD[DType.int32, 4](-943274556, -875902520, -808530484, -741158448),
     )
     a.free()
+
+
+def test_issue_30237():
+    alias dtype = DType.float32
+    alias simd_width = 1
+    alias coefficients_len = 7
+    alias coefficients = InlineArray[SIMD[dtype, simd_width], coefficients_len](
+        4.89352455891786e-03,
+        6.37261928875436e-04,
+        1.48572235717979e-05,
+        5.12229709037114e-08,
+        -8.60467152213735e-11,
+        2.00018790482477e-13,
+        -2.76076847742355e-16,
+    )
+
+    @parameter
+    @always_inline
+    fn eval1(x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
+        var c_last = coefficients[coefficients_len - 1]
+        var c_second_from_last = coefficients[coefficients_len - 2]
+
+        var result = x.fma(c_last, c_second_from_last)
+
+        @parameter
+        for idx in range(coefficients_len - 2):
+            var c = coefficients[coefficients_len - 3 - idx]
+            result = x.fma(result, c)
+
+        return result
+
+    @parameter
+    @always_inline
+    fn eval2(x: SIMD[dtype, simd_width]) -> SIMD[dtype, simd_width]:
+        var c_last = coefficients[coefficients_len - 1]
+        var c_second_from_last = coefficients[coefficients_len - 2]
+
+        var result = x.fma(c_last, c_second_from_last)
+
+        for idx in range(coefficients_len - 2):
+            var coefs = coefficients
+            var c = coefs[coefficients_len - 3 - idx]
+            result = x.fma(result, c)
+
+        return result
+
+    var x = 6.0
+    var x2 = x * x
+    var result1 = eval1(x2)
+    var result2 = eval2(x2)
+
+    assert_equal(result1, result2)
 
 
 def test_truthy():
@@ -133,9 +245,9 @@ def test_truthy():
 
     unroll[test_dtype_unrolled, dtypes.__len__()]()
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
-        # TODO bfloat16 is not supported on neon #30525
         test_dtype[DType.bfloat16]()
 
 
@@ -159,6 +271,7 @@ def test_len():
     var i6 = UI64(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     assert_equal(16, i6.__len__())
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         alias BF16 = SIMD[DType.bfloat16, 2]
@@ -299,6 +412,11 @@ def test_ceil():
     assert_equal(Float32.__ceil__(Float32(-1.5)), -1.0)
     assert_equal(Float32.__ceil__(Float32(3.0)), 3.0)
 
+    # TODO(KERN-228): support BF16 on neon systems.
+    @parameter
+    if not has_neon():
+        assert_equal(BFloat16.__ceil__(BFloat16(2.5)), 3.0)
+
     alias F = SIMD[DType.float32, 4]
     assert_equal(
         F.__ceil__(F(0.0, 1.4, -42.5, -12.6)), F(0.0, 2.0, -42.0, -12.0)
@@ -321,6 +439,11 @@ def test_floor():
     assert_equal(Float32.__floor__(Float32(1.5)), 1.0)
     assert_equal(Float32.__floor__(Float32(-1.5)), -2.0)
     assert_equal(Float32.__floor__(Float32(3.0)), 3.0)
+
+    # TODO(KERN-228): support BF16 on neon systems.
+    @parameter
+    if not has_neon():
+        assert_equal(BFloat16.__floor__(BFloat16(2.5)), 2.0)
 
     alias F = SIMD[DType.float32, 4]
     assert_equal(
@@ -738,8 +861,13 @@ def test_insert():
 
 
 def test_join():
-    vec = SIMD[DType.int32, 4](100, 101, 102, 103)
+    alias I2 = SIMD[DType.int32, 2]
+    assert_equal(Int32(3).join(Int32(4)), I2(3, 4))
 
+    alias I4 = SIMD[DType.int32, 4]
+    assert_equal(I2(5, 6).join(I2(9, 10)), I4(5, 6, 9, 10))
+
+    vec = I4(100, 101, 102, 103)
     assert_equal(
         vec.join(vec),
         SIMD[DType.int32, 8](100, 101, 102, 103, 100, 101, 102, 103),
@@ -1221,7 +1349,7 @@ def test_reduce():
             assert_equal(X2(6, -3).reduce_max(), 6)
 
         @parameter
-        if type.is_bool():
+        if type is DType.bool:
             # reduce_and
             x8 = X8(False, False, True, True, False, True, False, True)
             x4 = X4(False, False, False, True)
@@ -1306,9 +1434,101 @@ def test_reduce():
     test_dtype[DType.float64]()
     test_dtype[DType.index]()
 
+    # TODO(KERN-228): support BF16 on neon systems.
     @parameter
     if not has_neon():
         test_dtype[DType.bfloat16]()
+
+
+def test_reduce_bit_count():
+    var int_0xFFFF = Int32(0xFFFF)
+    assert_equal(int_0xFFFF.reduce_bit_count(), 16)
+
+    var int_iota8 = SIMD[DType.int32, 8](0, 1, 2, 3, 4, 5, 6, 7)
+    assert_equal(int_iota8.reduce_bit_count(), 12)
+
+    var bool_true = Scalar[DType.bool](True)
+    assert_equal(bool_true.reduce_bit_count(), 1)
+
+    var bool_false = Scalar[DType.bool](False)
+    assert_equal(bool_false.reduce_bit_count(), 0)
+
+    var bool_true16 = SIMD[DType.bool, 16](True)
+    assert_equal(bool_true16.reduce_bit_count(), 16)
+
+
+def test_pow():
+    alias inf = FloatLiteral.infinity
+    alias F = SIMD[DType.float32, 4]
+
+    var simd_val = F(0, 1, 2, 3)
+
+    assert_equal(simd_val.__pow__(2.0), F(0.0, 1.0, 4.0, 9.0))
+    assert_equal(simd_val.__pow__(2), F(0.0, 1.0, 4.0, 9.0))
+    assert_equal(simd_val.__pow__(3), F(0.0, 1.0, 8.0, 27.0))
+    assert_equal(simd_val.__pow__(-1), F(inf, 1.0, 0.5, 0.3333333432674408))
+
+    assert_almost_equal(simd_val.__pow__(0.5), F(0.0, 1.0, 1.41421, 1.73205))
+    assert_almost_equal(
+        (simd_val + 2).__pow__(-0.5), F(0.70710, 0.57735, 0.5, 0.44721)
+    )
+
+    alias I = SIMD[DType.int32, 4]
+    var simd_val_int = I(0, 1, 2, 3)
+
+    # TODO: extend/improve these tests
+    assert_equal(simd_val_int.__pow__(2), I(0, 1, 4, 9))
+
+
+def test_powf():
+    assert_almost_equal(Float32(2.0) ** Float32(0.5), 1.4142135)
+    assert_almost_equal(Float32(2.0) ** Float32(-0.5), 0.707107)
+    assert_almost_equal(Float32(50.0) ** Float32(2.5), 17677.6695297)
+    assert_almost_equal(Float32(12.0) ** Float32(0.4), 2.70192)
+    assert_almost_equal(Float32(-1.0) ** Float32(-1), -1)
+    assert_almost_equal(Float32(0.001) ** Float32(0.001), 0.99311605)
+
+    assert_almost_equal(Float64(0.001) ** Float64(0.001), 0.99311605)
+
+    assert_almost_equal(Float32(-4) ** Float32(-3), -0.015625)
+
+    assert_almost_equal(
+        SIMD[DType.float64, 8](1.0, -1.0, 2.0, -2.0, 4.0, -4.0, -2.0, 3.0)
+        ** SIMD[DType.float64, 8](1, 2, 3, 4, 5, 6, 2, 1),
+        SIMD[DType.float64, 8](1, 1, 8, 16, 1024, 4096, 4, 3),
+    )
+
+
+def test_modf():
+    var f32 = _modf(Float32(123.5))
+    assert_almost_equal(f32[0], 123)
+    assert_almost_equal(f32[1], 0.5)
+
+    var f64 = _modf(Float64(123.5))
+    assert_almost_equal(f64[0], 123)
+    assert_almost_equal(f64[1], 0.5)
+
+    f64 = _modf(Float64(0))
+    assert_almost_equal(f64[0], 0)
+    assert_almost_equal(f64[1], 0)
+
+    f64 = _modf(Float64(0.5))
+    assert_almost_equal(f64[0], 0)
+    assert_almost_equal(f64[1], 0.5)
+
+    f64 = _modf(Float64(-0.5))
+    assert_almost_equal(f64[0], -0)
+    assert_almost_equal(f64[1], -0.5)
+
+    f64 = _modf(Float64(-1.5))
+    assert_almost_equal(f64[0], -1)
+    assert_almost_equal(f64[1], -0.5)
+
+
+def test_split():
+    var tup = SIMD[DType.index, 8](1, 2, 3, 4, 5, 6, 7, 8).split()
+    assert_equal(tup[0], SIMD[DType.index, 4](1, 2, 3, 4))
+    assert_equal(tup[1], SIMD[DType.index, 4](5, 6, 7, 8))
 
 
 def main():
@@ -1319,6 +1539,7 @@ def main():
     test_cast()
     test_ceil()
     test_convert_simd_to_string()
+    test_simd_repr()
     test_deinterleave()
     test_div()
     test_extract()
@@ -1328,7 +1549,9 @@ def main():
     test_indexing()
     test_insert()
     test_interleave()
+    test_issue_1625()
     test_issue_20421()
+    test_issue_30237()
     test_isub()
     test_join()
     test_len()
@@ -1336,7 +1559,11 @@ def main():
     test_min_max_clamp()
     test_mod()
     test_mul_with_overflow()
+    test_pow()
+    test_powf()
     test_radd()
+    test_reduce()
+    test_reduce_bit_count()
     test_rfloordiv()
     test_rmod()
     test_rotate()
@@ -1350,4 +1577,6 @@ def main():
     test_sub_with_overflow()
     test_trunc()
     test_truthy()
-    test_reduce()
+    test_modf()
+    test_split()
+    # TODO: add tests for __and__, __or__, anc comparison operators

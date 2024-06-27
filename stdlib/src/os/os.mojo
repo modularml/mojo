@@ -21,16 +21,17 @@ from os import listdir
 
 from collections import List
 from sys import os_is_linux, os_is_windows, triple_is_nvidia_cuda
+from sys.ffi import C_char
 
-from memory import (
-    DTypePointer,
-)
-from memory.unsafe_pointer import move_from_pointee
+from memory import DTypePointer
 
-from utils import StringRef, InlineArray
+from utils import InlineArray, StringRef
 
 from .path import isdir
 from .pathlike import PathLike
+
+# TODO move this to a more accurate location once nt/posix like modules are in stdlib
+alias sep = "\\" if os_is_windows() else "/"
 
 
 # ===----------------------------------------------------------------------=== #
@@ -62,7 +63,7 @@ struct _dirent_linux:
     """Length of the record."""
     var d_type: Int8
     """Type of file."""
-    var name: InlineArray[Int8, Self.MAX_NAME_SIZE]
+    var name: InlineArray[C_char, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
@@ -79,15 +80,15 @@ struct _dirent_macos:
     """Length of the name."""
     var d_type: Int8
     """Type of file."""
-    var name: InlineArray[Int8, Self.MAX_NAME_SIZE]
+    var name: InlineArray[C_char, Self.MAX_NAME_SIZE]
     """Name of entry."""
 
 
-fn _strnlen(ptr: UnsafePointer[Int8], max: Int) -> Int:
-    var len = 0
-    while len < max and move_from_pointee(ptr + len):
-        len += 1
-    return len
+fn _strnlen(ptr: UnsafePointer[C_char], max: Int) -> Int:
+    var offset = 0
+    while offset < max and ptr[offset]:
+        offset += 1
+    return offset
 
 
 struct _DirHandle:
@@ -146,14 +147,15 @@ struct _DirHandle:
             )
             if not ep:
                 break
-            var name = move_from_pointee(ep).name
-            var name_ptr = UnsafePointer.address_of(name).bitcast[Int8]()
+            var name = ep.take_pointee().name
+            var name_ptr = name.unsafe_ptr()
             var name_str = StringRef(
                 name_ptr, _strnlen(name_ptr, _dirent_linux.MAX_NAME_SIZE)
             )
             if name_str == "." or name_str == "..":
                 continue
             res.append(name_str)
+            _ = name^
 
         return res
 
@@ -171,14 +173,15 @@ struct _DirHandle:
             )
             if not ep:
                 break
-            var name = move_from_pointee(ep).name
-            var name_ptr = UnsafePointer.address_of(name).bitcast[Int8]()
+            var name = ep.take_pointee().name
+            var name_ptr = name.unsafe_ptr()
             var name_str = StringRef(
                 name_ptr, _strnlen(name_ptr, _dirent_macos.MAX_NAME_SIZE)
             )
             if name_str == "." or name_str == "..":
                 continue
             res.append(name_str)
+            _ = name^
 
         return res
 
@@ -241,13 +244,13 @@ fn abort[result: AnyType = NoneType]() -> result:
 
 @always_inline("nodebug")
 fn abort[
-    result: AnyType = NoneType, *, stringable: Stringable
-](message: stringable) -> result:
+    result: AnyType = NoneType, *, formattable: Formattable
+](message: formattable) -> result:
     """Calls a target dependent trap instruction if available.
 
     Parameters:
         result: The result type.
-        stringable: The Stringable type.
+        formattable: The Formattable type.
 
     Args:
         message: The message to include when aborting.

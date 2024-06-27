@@ -16,14 +16,11 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from collections import Dict, List
-
 from sys.intrinsics import _type_is_eq
 
-from memory import memcmp, memcpy
-from memory import Arc
-from memory.unsafe_pointer import move_from_pointee
+from memory import Arc, memcmp, memcpy
 
-from utils import StringRef, unroll, Variant
+from utils import StringRef, Variant, unroll
 
 # ===----------------------------------------------------------------------=== #
 # _ObjectImpl
@@ -44,15 +41,15 @@ struct _ImmutableString:
     pointer and integer pair. Memory will be dynamically allocated.
     """
 
-    var data: UnsafePointer[Int8]
+    var data: UnsafePointer[UInt8]
     """The pointer to the beginning of the string contents. It is not
     null-terminated."""
     var length: Int
     """The length of the string."""
 
     @always_inline
-    fn __init__(inout self, data: UnsafePointer[Int8], length: Int):
-        self.data = data.address
+    fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
+        self.data = data
         self.length = length
 
     @always_inline
@@ -66,9 +63,9 @@ struct _ImmutableString:
 
 
 struct _RefCountedList:
-    """Python objects have the behaviour that bool, int, float, and str are
+    """Python objects have the behavior that bool, int, float, and str are
     passed by value but lists and dictionaries are passed by reference. In order
-    to model this behaviour, lists and dictionaries are implemented as
+    to model this behavior, lists and dictionaries are implemented as
     ref-counted data types.
     """
 
@@ -132,7 +129,7 @@ struct _RefCountedAttrsDict:
     fn get(self, key: StringLiteral) raises -> _ObjectImpl:
         var iter = self.impl[].find(key)
         if iter:
-            return iter.value()[]
+            return iter.value()
         raise Error(
             "AttributeError: Object does not have an attribute of name '"
             + key
@@ -198,7 +195,7 @@ struct _Function:
     """The function pointer."""
 
     @always_inline
-    fn __init__[FnT: AnyRegType](inout self, value: FnT):
+    fn __init__[FnT: AnyTrivialRegType](inout self, value: FnT):
         # FIXME: No "pointer bitcast" for signature function pointers.
         var f = UnsafePointer[Int16]()
         UnsafePointer.address_of(f).bitcast[FnT]()[] = value
@@ -332,7 +329,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
         if self.is_str():
             var str = self.get_as_string()
             var impl = _ImmutableString(
-                UnsafePointer[Int8].alloc(str.length), str.length
+                UnsafePointer[UInt8].alloc(str.length), str.length
             )
             memcpy(
                 dest=impl.data,
@@ -509,7 +506,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
     fn coerce_arithmetic_type(inout lhs: _ObjectImpl, inout rhs: _ObjectImpl):
         """Coerces two values of arithmetic type to the appropriate
         lowest-common denominator type for performing arithmetic operations.
-        Bools are always converted to integers, to match Python's behaviour.
+        Bools are always converted to integers, to match Python's behavior.
         """
         if lhs.is_bool():
             lhs = lhs.convert_bool_to_int()
@@ -555,7 +552,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
                 + "'"
             )
         if self.is_func():
-            return "Function at address " + hex(self.get_as_func().value)
+            return "Function at address " + hex(int(self.get_as_func().value))
         if self.is_list():
             var res = String("[")
             for j in range(self.get_list_length()):
@@ -744,13 +741,12 @@ struct object(IntableRaising, Boolable, Stringable):
             value: The string value.
         """
         var impl = _ImmutableString(
-            UnsafePointer[Int8].alloc(value.length), value.length
+            UnsafePointer[UInt8].alloc(value.length), value.length
         )
         memcpy(
-            impl.data,
-            # TODO: Remove bitcast once transition to UInt8 strings is complete.
-            value.unsafe_ptr().bitcast[Int8](),
-            value.length,
+            dest=impl.data,
+            src=value.unsafe_ptr(),
+            count=value.length,
         )
         self._value = impl
 
@@ -767,8 +763,7 @@ struct object(IntableRaising, Boolable, Stringable):
         self._value = _RefCountedListRef()
 
         @parameter
-        @always_inline
-        fn append[i: Int]():
+        for i in range(len(VariadicList(Ts))):
             # We need to rebind the element to one we know how to convert from.
             # FIXME: This doesn't handle implicit conversions or nested lists.
             alias T = Ts[i]
@@ -788,8 +783,6 @@ struct object(IntableRaising, Boolable, Stringable):
                 constrained[
                     False, "cannot convert nested list element to object"
                 ]()
-
-        unroll[append, len(VariadicList(Ts))]()
 
     @always_inline
     fn __init__(inout self, func: Self.nullary_function):
@@ -1240,7 +1233,7 @@ struct object(IntableRaising, Boolable, Stringable):
             var rhsStr = rhs._value.get_as_string()
             var length = lhsStr.length + rhsStr.length
             var impl = _ImmutableString(
-                UnsafePointer[Int8].alloc(length), length
+                UnsafePointer[UInt8].alloc(length), length
             )
             memcpy(impl.data, lhsStr.data, lhsStr.length)
             memcpy(impl.data + lhsStr.length, rhsStr.data, rhsStr.length)
@@ -1288,17 +1281,17 @@ struct object(IntableRaising, Boolable, Stringable):
         )
 
     @always_inline
-    fn __pow__(self, rhs: object) raises -> object:
+    fn __pow__(self, exp: object) raises -> object:
         """Exponentiation operator. Valid only for arithmetic types.
 
         Args:
-            rhs: Right hand value.
+            exp: Exponent value.
 
         Returns:
             The left hand value raised to the power of the right hand value.
         """
         return Self._arithmetic_binary_op[Float64.__pow__, Int64.__pow__](
-            self, rhs
+            self, exp
         )
 
     @always_inline
@@ -1730,15 +1723,16 @@ struct object(IntableRaising, Boolable, Stringable):
         """
         if self._value.is_obj():
             return object(self._value.get_obj_attr("__getitem__"))(self, i)
+
         if not self._value.is_str() and not self._value.is_list():
             raise Error("TypeError: can only index into lists and strings")
+
         var index = Self._convert_index_to_int(i)
         if self._value.is_str():
-            var impl = _ImmutableString(UnsafePointer[Int8].alloc(1), 1)
-            initialize_pointee_copy(
-                impl.data,
-                move_from_pointee(self._value.get_as_string().data + index),
-            )
+            # Construct a new single-character string.
+            var impl = _ImmutableString(UnsafePointer[UInt8].alloc(1), 1)
+            var char = self._value.get_as_string().data[index]
+            impl.data.init_pointee_move(char)
             return _ObjectImpl(impl)
         return self._value.get_list_element(i._value.get_as_int().value)
 
@@ -1795,6 +1789,14 @@ struct object(IntableRaising, Boolable, Stringable):
 
     @always_inline
     fn __getattr__(self, key: StringLiteral) raises -> object:
+        """Gets the named attribute.
+
+        Args:
+            key: The attribute name.
+
+        Returns:
+            The attribute value.
+        """
         if not self._value.is_obj():
             raise Error(
                 "TypeError: Type '"
@@ -1807,6 +1809,12 @@ struct object(IntableRaising, Boolable, Stringable):
 
     @always_inline
     fn __setattr__(inout self, key: StringLiteral, value: object) raises:
+        """Sets the named attribute.
+
+        Args:
+            key: The attribute name.
+            value: The attribute value.
+        """
         if not self._value.is_obj():
             raise Error(
                 "TypeError: Type '"
@@ -1819,18 +1827,40 @@ struct object(IntableRaising, Boolable, Stringable):
 
     @always_inline
     fn __call__(self) raises -> object:
+        """Calls the object as a function.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke()
 
     @always_inline
     fn __call__(self, arg0: object) raises -> object:
+        """Calls the object as a function.
+
+        Args:
+            arg0: The first function argument.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0)
 
     @always_inline
     fn __call__(self, arg0: object, arg1: object) raises -> object:
+        """Calls the object as a function.
+
+        Args:
+            arg0: The first function argument.
+            arg1: The second function argument.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1)
@@ -1839,6 +1869,16 @@ struct object(IntableRaising, Boolable, Stringable):
     fn __call__(
         self, arg0: object, arg1: object, arg2: object
     ) raises -> object:
+        """Calls the object as a function.
+
+        Args:
+            arg0: The first function argument.
+            arg1: The second function argument.
+            arg2: The third function argument.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1, arg2)

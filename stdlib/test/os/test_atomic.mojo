@@ -13,7 +13,8 @@
 # RUN: %mojo %s
 
 from os import Atomic
-from testing import assert_equal, assert_true, assert_false
+
+from testing import assert_equal, assert_false, assert_true
 
 
 fn test_atomic() raises:

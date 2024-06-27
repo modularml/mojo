@@ -10,12 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-# RUN: %mojo %s
+# RUN: %bare-mojo %s
 
+# TODO: Replace %bare-mojo with %mojo
+# when  https://github.com/modularml/mojo/issues/2751 is fixed.
 from builtin.string import (
     _calc_initial_buffer_size_int32,
     _calc_initial_buffer_size_int64,
+    _isspace,
 )
+from python import Python
 from testing import (
     assert_equal,
     assert_false,
@@ -88,6 +92,11 @@ fn test_constructors() raises:
     ptr[3] = 0
     var s3 = String(ptr, 4)
     assert_equal(s3, "abc")
+
+    # Construction from PythonObject
+    var py = Python.evaluate("1 + 1")
+    var s4 = String(py)
+    assert_equal(s4, "2")
 
 
 fn test_copy() raises:
@@ -193,6 +202,32 @@ fn test_string_join() raises:
 
     assert_equal(sep.join(1, "abc", 3), "1,abc,3")
 
+    var s2 = String(",").join(List[UInt8](1, 2, 3))
+    assert_equal(s2, "1,2,3")
+
+    var s3 = String(",").join(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9))
+    assert_equal(s3, "1,2,3,4,5,6,7,8,9")
+
+    var s4 = String(",").join(List[UInt8]())
+    assert_equal(s4, "")
+
+    var s5 = String(",").join(List[UInt8](1))
+    assert_equal(s5, "1")
+
+
+fn test_string_literal_join() raises:
+    var s2 = ",".join(List[UInt8](1, 2, 3))
+    assert_equal(s2, "1,2,3")
+
+    var s3 = ",".join(List[UInt8](1, 2, 3, 4, 5, 6, 7, 8, 9))
+    assert_equal(s3, "1,2,3,4,5,6,7,8,9")
+
+    var s4 = ",".join(List[UInt8]())
+    assert_equal(s4, "")
+
+    var s5 = ",".join(List[UInt8](1))
+    assert_equal(s5, "1")
+
 
 fn test_stringref() raises:
     var a = StringRef("AAA")
@@ -284,11 +319,19 @@ fn test_string_indexing() raises:
 
     assert_equal("!!ojoM olleH", str[::-1])
 
-    assert_equal("!!ojoM oll", str[2::-1])
+    assert_equal("leH", str[2::-1])
 
     assert_equal("!oo le", str[::-2])
 
-    assert_equal("!jMolH", str[:-1:-2])
+    assert_equal("", str[:-1:-2])
+    assert_equal("", str[-50::-1])
+    assert_equal("Hello Mojo!!", str[-50::])
+    assert_equal("!!ojoM olleH", str[:-50:-1])
+    assert_equal("Hello Mojo!!", str[:50:])
+    assert_equal("H", str[::50])
+    assert_equal("!", str[::-50])
+    assert_equal("!", str[50::-50])
+    assert_equal("H", str[-50::50])
 
 
 fn test_atol() raises:
@@ -306,7 +349,14 @@ fn test_atol() raises:
     assert_equal(10, atol("A", 16))
     assert_equal(15, atol("f ", 16))
     assert_equal(255, atol(" FF", 16))
+    assert_equal(255, atol(" 0xff ", 16))
+    assert_equal(255, atol(" 0Xff ", 16))
     assert_equal(18, atol("10010", 2))
+    assert_equal(18, atol("0b10010", 2))
+    assert_equal(18, atol("0B10010", 2))
+    assert_equal(10, atol("12", 8))
+    assert_equal(10, atol("0o12", 8))
+    assert_equal(10, atol("0O12", 8))
     assert_equal(35, atol("Z", 36))
 
     # Negative cases
@@ -594,11 +644,53 @@ fn test_rfind() raises:
 
 
 fn test_split() raises:
-    # Reject empty delimiters
-    with assert_raises(
-        contains="empty delimiter not allowed to be passed to split."
-    ):
-        _ = String("hello").split("")
+    # empty separators default to whitespace
+    var d = String("hello world").split()
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello")
+    assert_true(d[1] == "world")
+    d = String("hello \t\n\n\v\fworld").split("\n")
+    assert_true(len(d) == 3)
+    assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
+
+    # Should add all whitespace-like chars as one
+    alias utf8_spaces = String(" \t\n\r\v\f")
+    var s = utf8_spaces + "hello" + utf8_spaces + "world" + utf8_spaces
+    d = s.split()
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "hello" and d[1] == "world")
+
+    # should split into empty strings between separators
+    d = String("1,,,3").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "1" and d[1] == "" and d[2] == "" and d[3] == "3")
+    d = String(",,,").split(",")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "" and d[2] == "" and d[3] == "")
+    d = String(" a b ").split(" ")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "a" and d[2] == "b" and d[3] == "")
+    d = String("abababaaba").split("aba")
+    assert_true(len(d) == 4)
+    assert_true(d[0] == "" and d[1] == "b" and d[2] == "" and d[3] == "")
+
+    # should split into maxsplit + 1 items
+    d = String("1,2,3").split(",", 0)
+    assert_true(len(d) == 1)
+    assert_true(d[0] == "1,2,3")
+    d = String("1,2,3").split(",", 1)
+    assert_true(len(d) == 2)
+    assert_true(d[0] == "1" and d[1] == "2,3")
+
+    assert_true(len(String("").split()) == 0)
+    assert_true(len(String(" ").split()) == 0)
+    assert_true(len(String("").split(" ")) == 1)
+    assert_true(len(String(" ").split(" ")) == 2)
+    assert_true(len(String("  ").split(" ")) == 3)
+    assert_true(len(String("   ").split(" ")) == 4)
+
+    with assert_raises():
+        _ = String("").split("")
 
     # Split in middle
     var d1 = String("n")
@@ -632,6 +724,111 @@ fn test_split() raises:
     assert_equal(len(res4), 2)
     assert_equal(res4[0], "he")
     assert_equal(res4[1], "o")
+
+    # related to #2879
+    # TODO: replace string comparison when __eq__ is implemented for List
+    assert_equal(
+        String("abbaaaabbba").split("a").__str__(),
+        "['', 'bb', '', '', '', 'bbb', '']",
+    )
+    assert_equal(
+        String("abbaaaabbba").split("a", 8).__str__(),
+        "['', 'bb', '', '', '', 'bbb', '']",
+    )
+    assert_equal(
+        String("abbaaaabbba").split("a", 5).__str__(),
+        "['', 'bb', '', '', '', 'bbba']",
+    )
+    assert_equal(String("aaa").split("a", 0).__str__(), "['aaa']")
+    assert_equal(String("a").split("a").__str__(), "['', '']")
+    assert_equal(String("1,2,3").split("3", 0).__str__(), "['1,2,3']")
+    assert_equal(String("1,2,3").split("3", 1).__str__(), "['1,2,', '']")
+    assert_equal(String("1,2,3,3").split("3", 2).__str__(), "['1,2,', ',', '']")
+    assert_equal(
+        String("1,2,3,3,3").split("3", 2).__str__(), "['1,2,', ',', ',3']"
+    )
+
+
+fn test_splitlines() raises:
+    # Test with no line breaks
+    var in1 = String("hello world")
+    var res1 = in1.splitlines()
+    assert_equal(len(res1), 1)
+    assert_equal(res1[0], "hello world")
+
+    # Test with \n line break
+    var in2 = String("hello\nworld")
+    var res2 = in2.splitlines()
+    assert_equal(len(res2), 2)
+    assert_equal(res2[0], "hello")
+    assert_equal(res2[1], "world")
+
+    # Test with \r\n line break
+    var in3 = String("hello\r\nworld")
+    var res3 = in3.splitlines()
+    assert_equal(len(res3), 2)
+    assert_equal(res3[0], "hello")
+    assert_equal(res3[1], "world")
+
+    # Test with \r line break
+    var in4 = String("hello\rworld")
+    var res4 = in4.splitlines()
+    assert_equal(len(res4), 2)
+    assert_equal(res4[0], "hello")
+    assert_equal(res4[1], "world")
+
+    # Test with multiple different line breaks
+    var in5 = String("hello\nworld\r\nmojo\rlanguage")
+    var res5 = in5.splitlines()
+    assert_equal(len(res5), 4)
+    assert_equal(res5[0], "hello")
+    assert_equal(res5[1], "world")
+    assert_equal(res5[2], "mojo")
+    assert_equal(res5[3], "language")
+
+    # Test with keepends=True
+    var res6 = in5.splitlines(keepends=True)
+    assert_equal(len(res6), 4)
+    assert_equal(res6[0], "hello\n")
+    assert_equal(res6[1], "world\r\n")
+    assert_equal(res6[2], "mojo\r")
+    assert_equal(res6[3], "language")
+
+    # Test with an empty string
+    var in7 = String("")
+    var res7 = in7.splitlines()
+    assert_equal(len(res7), 0)
+
+    # test \v \f \x1c \x1d
+    var in8 = String("hello\vworld\fmojo\x1clanguage\x1d")
+    var res8 = in8.splitlines()
+    assert_equal(len(res8), 4)
+    assert_equal(res8[0], "hello")
+    assert_equal(res8[1], "world")
+    assert_equal(res8[2], "mojo")
+    assert_equal(res8[3], "language")
+
+    # test \x1e \x85
+    var in9 = String("hello\x1eworld\x85mojo")
+    var res9 = in9.splitlines()
+    assert_equal(len(res9), 3)
+    assert_equal(res9[0], "hello")
+    assert_equal(res9[1], "world")
+    assert_equal(res9[2], "mojo")
+
+    # test with keepends=True
+    var res10 = in8.splitlines(keepends=True)
+    assert_equal(len(res10), 4)
+    assert_equal(res10[0], "hello\v")
+    assert_equal(res10[1], "world\f")
+    assert_equal(res10[2], "mojo\x1c")
+    assert_equal(res10[3], "language\x1d")
+
+    var res11 = in9.splitlines(keepends=True)
+    assert_equal(len(res11), 3)
+    assert_equal(res11[0], "hello\x1e")
+    assert_equal(res11[1], "world\x85")
+    assert_equal(res11[2], "mojo")
 
 
 fn test_isupper() raises:
@@ -684,29 +881,64 @@ fn test_upper() raises:
 
 fn test_isspace() raises:
     # checking true cases
-    assert_true(isspace(ord(" ")))
-    assert_true(isspace(ord("\n")))
-    assert_true(isspace(ord("\t")))
-    assert_true(isspace(ord("\r")))
-    assert_true(isspace(ord("\v")))
-    assert_true(isspace(ord("\f")))
+    assert_true(_isspace(ord(" ")))
+    assert_true(_isspace(ord("\n")))
+    assert_true(_isspace(ord("\t")))
+    assert_true(_isspace(ord("\r")))
+    assert_true(_isspace(ord("\v")))
+    assert_true(_isspace(ord("\f")))
 
     # Checking false cases
-    assert_false(isspace(ord("a")))
-    assert_false(isspace(ord("u")))
-    assert_false(isspace(ord("s")))
-    assert_false(isspace(ord("t")))
-    assert_false(isspace(ord("i")))
-    assert_false(isspace(ord("n")))
-    assert_false(isspace(ord("z")))
-    assert_false(isspace(ord(".")))
+    assert_false(_isspace(ord("a")))
+    assert_false(_isspace(ord("u")))
+    assert_false(_isspace(ord("s")))
+    assert_false(_isspace(ord("t")))
+    assert_false(_isspace(ord("i")))
+    assert_false(_isspace(ord("n")))
+    assert_false(_isspace(ord("z")))
+    assert_false(_isspace(ord(".")))
+
+    # test all utf8 and unicode separators
+    # 0 is to build a String with null terminator
+    alias next_line = List[UInt8](0xC2, 0x85, 0)
+    """TODO: \\x85"""
+    alias unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
+    """TODO: \\u2028"""
+    alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
+    """TODO: \\u2029"""
+    # TODO add line and paragraph separator as stringliteral once unicode
+    # escape secuences are accepted
+    var univ_sep_var = List[String](
+        String(" "),
+        String("\t"),
+        String("\n"),
+        String("\r"),
+        String("\v"),
+        String("\f"),
+        String("\x1c"),
+        String("\x1d"),
+        String("\x1e"),
+        String(next_line),
+        String(unicode_line_sep),
+        String(unicode_paragraph_sep),
+    )
+
+    for i in univ_sep_var:
+        assert_true(i[].isspace())
+
+    for i in List[String]("not", "space", "", "s", "a", "c"):
+        assert_false(i[].isspace())
+
+    for i in range(len(univ_sep_var)):
+        var sep = String("")
+        for j in range(len(univ_sep_var)):
+            sep += univ_sep_var[i]
+            sep += univ_sep_var[j]
+        assert_true(sep.isspace())
+        _ = sep
 
 
 fn test_ascii_aliases() raises:
-    var whitespaces = String(" \n\t\r\f\v")
-    for i in range(len(whitespaces)):
-        assert_true(whitespaces[i] in String.WHITESPACE)
-
     assert_true(String("a") in String.ASCII_LOWERCASE)
     assert_true(String("b") in String.ASCII_LOWERCASE)
     assert_true(String("y") in String.ASCII_LOWERCASE)
@@ -805,27 +1037,44 @@ fn test_strip() raises:
     # with default strip chars
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
+    alias comp_empty_string_stripped = String("").strip()
+    assert_true(comp_empty_string_stripped == "")
 
     var space_string = String(" \t\n\r\v\f  ")
     assert_true(space_string.strip() == "")
+    alias comp_space_string_stripped = String(" \t\n\r\v\f  ").strip()
+    assert_true(comp_space_string_stripped == "")
 
     var str0 = String("     n ")
     assert_true(str0.strip() == "n")
+    alias comp_str0_stripped = String("     n ").strip()
+    assert_true(comp_str0_stripped == "n")
 
     var str1 = String("string")
     assert_true(str1.strip() == "string")
+    alias comp_str1_stripped = String("string").strip()
+    assert_true(comp_str1_stripped == "string")
 
     var str2 = String(" \t\n\t\v\fsomething \t\n\t\v\f")
+    alias comp_str2_stripped = String(" \t\n\t\v\fsomething \t\n\t\v\f").strip()
     assert_true(str2.strip() == "something")
+    assert_true(comp_str2_stripped == "something")
 
     # with custom strip chars
     var str3 = String("mississippi")
     assert_true(str3.strip("mips") == "")
     assert_true(str3.strip("mip") == "ssiss")
+    alias comp_str3_stripped = String("mississippi").strip("mips")
+    assert_true(comp_str3_stripped == "")
 
     var str4 = String(" \n mississippimississippi \n ")
     assert_true(str4.strip(" ") == "\n mississippimississippi \n")
     assert_true(str4.strip("\nmip ") == "ssissippimississ")
+
+    alias comp_str4_stripped = String(" \n mississippimississippi \n ").strip(
+        " "
+    )
+    assert_true(comp_str4_stripped == "\n mississippimississippi \n")
 
 
 fn test_hash() raises:
@@ -906,6 +1155,220 @@ def test_indexing():
     assert_equal(a[2], "c")
 
 
+def test_string_iter():
+    var vs = String("123")
+
+    # Borrow immutably
+    fn conc(vs: String) -> String:
+        var c = String("")
+        for v in vs:
+            c += v
+        return c
+
+    assert_equal(123, atol(conc(vs)))
+
+    concat = String("")
+    for v in vs.__reversed__():
+        concat += v
+    assert_equal(321, atol(concat))
+
+    # TODO: UnsafePointer does not have a store or __setitem__ method
+    # for v in vs:
+    #     v.unsafe_ptr().store(0, "1")
+
+    # # Borrow immutably
+    # for v in vs:
+    #     concat += v
+
+    # assert_equal(111, atol(concat))
+
+    var idx = -1
+    vs = String("mojo🔥")
+    for item in vs:
+        idx += 1
+        if idx == 0:
+            assert_equal("m", item)
+        elif idx == 1:
+            assert_equal("o", item)
+        elif idx == 2:
+            assert_equal("j", item)
+        elif idx == 3:
+            assert_equal("o", item)
+        elif idx == 4:
+            assert_equal("🔥", item)
+    assert_equal(4, idx)
+
+    var items = List[String](
+        "mojo🔥",
+        "السلام عليكم",
+        "Dobrý den",
+        "Hello",
+        "שָׁלוֹם",
+        "नमस्ते",
+        "こんにちは",
+        "안녕하세요",
+        "你好",
+        "Olá",
+        "Здравствуйте",
+    )
+    var rev = List[String](
+        "🔥ojom",
+        "مكيلع مالسلا",
+        "ned ýrboD",
+        "olleH",
+        "םֹולָׁש",
+        "ेत्समन",
+        "はちにんこ",
+        "요세하녕안",
+        "好你",
+        "álO",
+        "етйувтсвардЗ",
+    )
+    var utf8_sequence_lengths = List(5, 12, 9, 5, 7, 6, 5, 5, 2, 3, 12)
+    for item_idx in range(len(items)):
+        var item = items[item_idx]
+        var utf8_sequence_len = 0
+        var byte_idx = 0
+        for v in item:
+            var byte_len = len(v)
+            assert_equal(item[byte_idx : byte_idx + byte_len], v)
+            byte_idx += byte_len
+            utf8_sequence_len += 1
+        assert_equal(utf8_sequence_len, utf8_sequence_lengths[item_idx])
+        var concat = String("")
+        for v in item.__reversed__():
+            concat += v
+        assert_equal(rev[item_idx], concat)
+        item_idx += 1
+
+
+def test_format_args():
+    with assert_raises(contains="Index -1 not in *args"):
+        _ = String("{-1} {0}").format("First")
+
+    with assert_raises(contains="Index 1 not in *args"):
+        _ = String("A {0} B {1}").format("First")
+
+    with assert_raises(contains="Index 1 not in *args"):
+        _ = String("A {1} B {0}").format("First")
+
+    with assert_raises(contains="Index 1 not in *args"):
+        _ = String("A {1} B {0}").format()
+
+    with assert_raises(
+        contains="Automatic indexing require more args in *args"
+    ):
+        _ = String("A {} B {}").format("First")
+
+    with assert_raises(
+        contains="Cannot both use manual and automatic indexing"
+    ):
+        _ = String("A {} B {1}").format("First", "Second")
+
+    with assert_raises(contains="Index first not in kwargs"):
+        _ = String("A {first} B {second}").format(1, 2)
+
+    assert_equal(
+        String(" {} , {} {} !").format(
+            "Hello",
+            "Beautiful",
+            "World",
+        ),
+        " Hello , Beautiful World !",
+    )
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{ {}").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{ {0}").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{}{").format(1)
+
+    with assert_raises(
+        contains="there is a single curly } left unclosed or unescaped"
+    ):
+        _ = String("{}}").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{} {").format(1)
+
+    with assert_raises(
+        contains="there is a single curly { left unclosed or unescaped"
+    ):
+        _ = String("{").format(1)
+
+    with assert_raises(
+        contains="there is a single curly } left unclosed or unescaped"
+    ):
+        _ = String("}").format(1)
+
+    assert_equal(String("}}").format(), "}")
+    assert_equal(String("{{").format(), "{")
+
+    assert_equal(String("{{}}{}{{}}").format("foo"), "{}foo{}")
+
+    assert_equal(String("{{ {0}").format("foo"), "{ foo")
+    assert_equal(String("{{{0}").format("foo"), "{foo")
+    assert_equal(String("{{0}}").format("foo"), "{0}")
+    assert_equal(String("{{}}").format("foo"), "{}")
+    assert_equal(String("{{0}}").format("foo"), "{0}")
+    assert_equal(String("{{{0}}}").format("foo"), "{foo}")
+
+    var vinput = "{} {}"
+    var output = String(vinput).format("123", 456)
+    assert_equal(len(output), 7)
+
+    vinput = "{1}{0}"
+    output = String(vinput).format("123", 456)
+    assert_equal(len(output), 6)
+    assert_equal(output, "456123")
+
+    vinput = "123"
+    output = String(vinput).format()
+    assert_equal(len(output), 3)
+
+    vinput = ""
+    output = String(vinput).format()
+    assert_equal(len(output), 0)
+
+    assert_equal(
+        String("{0} {1} ❤️‍🔥 {1} {0}").format(
+            "🔥",
+            "Mojo",
+        ),
+        "🔥 Mojo ❤️‍🔥 Mojo 🔥",
+    )
+
+    assert_equal(String("{0} {1}").format(True, 1.125), "True 1.125")
+
+    assert_equal(String("{0} {1}").format("{1}", "Mojo"), "{1} Mojo")
+    assert_equal(
+        String("{0} {1} {0} {1}").format("{1}", "Mojo"), "{1} Mojo {1} Mojo"
+    )
+
+
+def test_isdigit():
+    assert_true(isdigit(ord("1")))
+    assert_true(isdigit("1"))
+    # TODO: What to do with multi-character strings?
+    # assert_false(isdigit("1gt"))
+    assert_false(isdigit(ord("g")))
+    assert_false(isdigit("g"))
+    assert_true(String("123").isdigit())
+    assert_false(String("asdg").isdigit())
+    assert_false(String("123asdg").isdigit())
+
+
 def main():
     test_constructors()
     test_copy()
@@ -915,6 +1378,7 @@ def main():
     test_stringable()
     test_repr()
     test_string_join()
+    test_string_literal_join()
     test_stringref()
     test_stringref_from_dtypepointer()
     test_stringref_strip()
@@ -932,6 +1396,7 @@ def main():
     test_replace()
     test_rfind()
     test_split()
+    test_splitlines()
     test_isupper()
     test_islower()
     test_lower()
@@ -949,3 +1414,6 @@ def main():
     test_intable()
     test_string_mul()
     test_indexing()
+    test_string_iter()
+    test_format_args()
+    test_isdigit()

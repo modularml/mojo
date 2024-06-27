@@ -23,7 +23,7 @@ alias _kCompactElemPerSide = _kCompactMaxElemsToPrint // 2
 
 
 fn _serialize_elements_compact[
-    serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
+    serialize_fn: fn[T: Formattable] (elem: T) capturing -> None,
 ](ptr: DTypePointer, len: Int):
     serialize_fn(_kStartTensorMarker)
     if len < _kCompactMaxElemsToPrint:
@@ -43,18 +43,18 @@ fn _serialize_elements_compact[
 
 
 fn _serialize_elements_complete[
-    serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
+    serialize_fn: fn[T: Formattable] (elem: T) capturing -> None,
 ](ptr: DTypePointer, len: Int):
     if len == 0:
         return
-    serialize_fn(ptr.load())
+    serialize_fn(Scalar.load(ptr))
     for i in range(1, len):
         serialize_fn(", ")
-        serialize_fn(ptr.load(i))
+        serialize_fn(Scalar.load(ptr, i))
 
 
 fn _serialize_elements[
-    serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
+    serialize_fn: fn[T: Formattable] (elem: T) capturing -> None,
     compact: Bool = False,
 ](ptr: DTypePointer, len: Int):
     @parameter
@@ -65,7 +65,7 @@ fn _serialize_elements[
 
 
 fn _serialize[
-    serialize_fn: fn[T: Stringable] (elem: T) capturing -> None,
+    serialize_fn: fn[T: Formattable] (elem: T) capturing -> None,
     serialize_dtype: Bool = True,
     serialize_shape: Bool = True,
     serialize_end_line: Bool = True,

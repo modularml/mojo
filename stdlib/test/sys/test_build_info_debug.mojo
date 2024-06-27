@@ -14,7 +14,8 @@
 # RUN: %mojo %s
 
 from sys._build import is_debug_build, is_release_build
-from testing import assert_true, assert_false
+
+from testing import assert_false, assert_true
 
 
 fn test_is_debug():
