@@ -178,7 +178,7 @@ struct PythonObject(
             self.py_object = cpython.toPython(int_val)
         else:
             var fp_val = value.cast[DType.float64]()
-            self.py_object = cpython.PyFloat_FromDouble(fp_val.value)
+            self.py_object = cpython.PyFloat_FromDouble(fp_val)
 
     fn __init__(inout self, value: Bool):
         """Initialize the object from a bool.
