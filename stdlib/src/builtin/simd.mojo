@@ -126,6 +126,11 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
     }
 
 
+@always_inline("nodebug")
+fn _has_native_bf16_support() -> Bool:
+    return triple_is_nvidia_cuda()
+
+
 # ===----------------------------------------------------------------------=== #
 # SIMD
 # ===----------------------------------------------------------------------=== #
@@ -1446,12 +1451,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
         elif target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
-        elif type is DType.bfloat16:
+        elif type is DType.bfloat16 and not _has_native_bf16_support():
             var cast_result = _bfloat16_to_f32(
                 rebind[SIMD[DType.bfloat16, size]](self)
             ).cast[target]()
             return rebind[SIMD[target, size]](cast_result)
-        elif target == DType.bfloat16:
+        elif target == DType.bfloat16 and not _has_native_bf16_support():
             return rebind[SIMD[target, size]](
                 _f32_to_bfloat16(self.cast[DType.float32]())
             )
