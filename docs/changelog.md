@@ -288,6 +288,9 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - The `ulp` function in `numerics` have been moved to the `math` module.
 
+- The Mojo Language Server no longer sets `.` as a commit character for
+  auto-completion.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
