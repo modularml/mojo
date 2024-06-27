@@ -50,7 +50,7 @@ jobs:
 
       - name: Install nightly Mojo compiler
         run: |
-          export MODULAR_ACCESS_TOKEN=${{ secrets.CI_MODULAR_ACCESS_TOKEN_AUTOMATION }}
+          export MODULAR_ACCESS_TOKEN=${{ secrets.CI_MODULAR_ACCESS_TOKEN_AUTOMATION_PUBLIC }}
           modular auth
           modular install nightly/mojo
 
