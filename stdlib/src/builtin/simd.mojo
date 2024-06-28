@@ -144,7 +144,6 @@ struct SIMD[type: DType, size: Int](
     Ceilable,
     CeilDivable,
     CollectionElement,
-    CollectionElementNew,
     Floorable,
     Hashable,
     Intable,
@@ -232,7 +231,7 @@ struct SIMD[type: DType, size: Int](
         Args:
             other: The value to copy.
         """
-        self.__copyinit__(other)
+        self = other
 
     @always_inline("nodebug")
     fn __init__(inout self, value: UInt):

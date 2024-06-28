@@ -240,7 +240,7 @@ struct Span[
         """
         debug_assert(len(self) == len(other), "Spans must be of equal length")
         for i in range(len(self)):
-            self[i] = other[i]
+            self[i] = T(other=other[i])
 
     fn __bool__(self) -> Bool:
         """Check if a span is non-empty.

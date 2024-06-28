@@ -19,19 +19,19 @@ from collections import List
 from sys import bitwidthof
 
 from bit import countl_zero
-from memory import Pointer, UnsafePointer
+from memory import UnsafePointer
 
 # ===----------------------------------------------------------------------===#
 # sort
 # ===----------------------------------------------------------------------===#
 
-alias _cmp_fn_type = fn[type: AnyTrivialRegType] (type, type) capturing -> Bool
+alias _cmp_fn_type = fn[type: CollectionElement] (type, type) capturing -> Bool
 
 
 @always_inline
 fn _insertion_sort[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], start: Int, end: Int):
+    type: CollectionElement, cmp_fn: _cmp_fn_type
+](array: UnsafePointer[type], start: Int, end: Int):
     """Sort the array[start:end] slice"""
 
     for i in range(start + 1, end):
@@ -55,17 +55,17 @@ fn _insertion_sort[
     """Sort the array[start:end] slice"""
 
     for i in range(start + 1, end):
-        var value = array[i]
+        var value = type(other=array[i])
         var j = i
 
         # Find the placement of the value in the array, shifting as we try to
         # find the position. Throughout, we assume array[start:i] has already
         # been sorted.
         while j > start and not cmp_fn(array[j - 1], value):
-            array[j] = array[j - 1]
+            array[j] = type(other=array[j - 1])
             j -= 1
 
-        array[j] = value
+        array[j] = value^
 
 
 @always_inline
@@ -107,7 +107,7 @@ fn _partition[
 
     var pivot = start + (end - start) // 2
 
-    var pivot_value = array[pivot]
+    var pivot_value = type(other=array[pivot])
 
     var left = start
     var right = end - 2
@@ -137,8 +137,8 @@ fn _estimate_initial_height(size: Int) -> Int:
 
 @always_inline
 fn _quicksort[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], size: Int):
+    type: CollectionElement, cmp_fn: _cmp_fn_type
+](array: UnsafePointer[type], size: Int):
     if size == 0:
         return
 
@@ -264,7 +264,7 @@ fn sort(inout buff: Pointer[Int], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
+    fn _less_than_equal[type: AnyType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) <= rebind[Int](rhs)
 
     _quicksort[Int, _less_than_equal](buff, len)
@@ -283,7 +283,7 @@ fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
+    fn _less_than_equal[ty: AnyType](lhs: ty, rhs: ty) -> Bool:
         return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
 
     _quicksort[Scalar[type], _less_than_equal](buff, len)

@@ -68,6 +68,10 @@ struct StringLiteral(
         """
         self.value = value
 
+    @always_inline("nodebug")
+    fn __init__(inout self, *, other: Self):
+        self = other
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#

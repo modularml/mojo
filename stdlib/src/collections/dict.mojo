@@ -177,7 +177,7 @@ struct _DictValueIter[
 
 
 @value
-struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
+struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElementNew):
     """Store a key-value pair entry inside a dictionary.
 
     Parameters:
@@ -202,6 +202,16 @@ struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
         self.hash = hash(key)
         self.key = key^
         self.value = value^
+
+    fn __init__(inout self, *, other: Self):
+        self.hash = other.hash
+        self.key = K(other=other.key)
+        self.value = V(other=other.value)
+
+    fn __copyinit__(inout self, existing: Self):
+        self.hash = existing.hash
+        self.key = K(other=existing.key)
+        self.value = V(other=existing.value)
 
 
 alias _EMPTY = -1
@@ -439,16 +449,16 @@ struct Dict[K: KeyElement, V: CollectionElement](
         return len(self._entries)
 
     @always_inline
-    fn __init__(inout self, existing: Self):
+    fn __init__(inout self, *, other: Self):
         """Copy an existing dictiontary.
 
         Args:
-            existing: The existing dict.
+            other: The existing dict.
         """
-        self.size = existing.size
-        self._n_entries = existing._n_entries
-        self._index = existing._index.copy(existing._reserved())
-        self._entries = existing._entries
+        self.size = other.size
+        self._n_entries = other._n_entries
+        self._index = other._index.copy(other._reserved())
+        self._entries = other._entries
 
     @staticmethod
     fn fromkeys(keys: List[K], value: V) -> Self:
@@ -463,12 +473,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         var dict = Dict[K, V]()
         for key in keys:
-            dict[key[]] = value
+            dict[K(other=key[])] = V(other=value)
         return dict
 
     @staticmethod
     fn fromkeys(
-        keys: List[K], value: Optional[V] = None
+        keys: List[K], value: Optional[V] = Optional[V](None)
     ) -> Dict[K, Optional[V]]:
         """Create a new dictionary with keys from list and values set to value.
 
@@ -481,7 +491,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         var dict = Dict[K, Optional[V]]()
         for key in keys:
-            dict[key[]] = value
+            dict[K(other=key[])] = value
         return dict
 
     fn __copyinit__(inout self, existing: Self):
@@ -522,7 +532,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Raises:
             "KeyError" if the key isn't present.
         """
-        return self._find_ref(key)
+        return V(other=self._find_ref(key))
 
     # TODO(MSTDL-452): rename to __getitem__ returning a reference
     fn __get_ref(
@@ -592,7 +602,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Returns:
             The result of the merge.
         """
-        var result = Dict(self)
+        var result = Dict(other=self)
         result.update(other)
         return result^
 
@@ -696,7 +706,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             otherwise an empty Optional.
         """
         try:  # TODO(MOCO-604): push usage through
-            return self._find_ref(key)
+            return V(other=self._find_ref(key))
         except:
             return None
 
@@ -763,7 +773,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         try:
             return self.pop(key)
         except:
-            return default
+            return default^
 
     fn pop(inout self, key: K) raises -> V:
         """Remove a value from the dictionary by key.
@@ -811,13 +821,13 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var val = Optional[V](None)
 
         for item in reversed(self.items()):
-            key = Optional(item[].key)
-            val = Optional(item[].value)
+            key = Optional(K(other=item[].key))
+            val = Optional(V(other=item[].value))
             break
 
         if key:
             _ = self.pop(key.value())
-            return DictEntry[K, V](key.value(), val.value())
+            return DictEntry[K, V](K(other=key.value()), V(other=val.value()))
 
         raise "KeyError: popitem(): dictionary is empty"
 
@@ -861,7 +871,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             other: The dictionary to update from.
         """
         for entry in other.items():
-            self[entry[].key] = entry[].value
+            self[K(other=entry[].key)] = V(other=entry[].value)
 
     fn clear(inout self):
         """Remove all elements from the dictionary."""
@@ -997,6 +1007,14 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn __init__(inout self):
         """Initialize an empty keyword dictionary."""
         self._dict = Dict[Self.key_type, V]()
+    
+    fn __init__(inout self, *, other: Self):
+        """Copy an existing keyword dictionary.
+
+        Args:
+            other: The existing keyword dictionary.
+        """
+        self = other
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing keyword dictionary.
@@ -1034,14 +1052,14 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         return self._dict[key]
 
     @always_inline("nodebug")
-    fn __setitem__(inout self, key: Self.key_type, value: V):
+    fn __setitem__(inout self, key: Self.key_type, owned value: V):
         """Set a value in the keyword dictionary by key.
 
         Args:
             key: The key to associate with the specified value.
             value: The data to store in the dictionary.
         """
-        self._dict[key] = value
+        self._dict[key] = value^
 
     # ===-------------------------------------------------------------------===#
     # Trait implementations

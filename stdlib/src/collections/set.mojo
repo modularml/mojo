@@ -20,6 +20,7 @@ from .dict import (
     RepresentableKeyElement,
 )
 
+from .optional import _NoneType
 
 struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     """A set data type.
@@ -48,7 +49,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     """
 
     # Fields
-    var _data: Dict[T, NoneType]
+    var _data: Dict[T, _NoneType]
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -60,7 +61,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             ts: Variadic of elements to add to the set.
         """
-        self._data = Dict[T, NoneType]()
+        self._data = Dict[T, _NoneType]()
         for t in ts:
             self.add(t[])
 
@@ -353,7 +354,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _DictKeyIter[T, NoneType, __lifetime_of(self)]:
+    ) -> _DictKeyIter[T, _NoneType, __lifetime_of(self)]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
@@ -362,13 +363,13 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         # here we rely on Set being a trivial wrapper of a Dict
         return _DictKeyIter(_DictEntryIter(0, 0, self._data))
 
-    fn add(inout self, t: T):
+    fn add(inout self, owned t: T):
         """Add an element to the set.
 
         Args:
             t: The element to add to the set.
         """
-        self._data[t] = None
+        self._data[t^] = _NoneType()
 
     fn remove(inout self, t: T) raises:
         """Remove an element from the set.
@@ -397,9 +398,9 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         if not self:
             raise "Pop on empty set"
         var iter = self.__iter__()
-        var first = iter.__next__()[]
+        var first = T(other=iter.__next__()[])
         self.remove(first)
-        return first
+        return first^
 
     fn union(self, other: Self) -> Self:
         """Set union.
@@ -413,7 +414,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         """
         var result = Set(self)
         for o in other:
-            result.add(o[])
+            result.add(T(other=o[]))
 
         return result^
 
@@ -430,7 +431,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         var result = Set[T]()
         for v in self:
             if v[] in other:
-                result.add(v[])
+                result.add(T(other=v[]))
 
         return result^
 
@@ -447,7 +448,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         var result = Set[T]()
         for e in self:
             if e[] not in other:
-                result.add(e[])
+                result.add(T(other=e[]))
         return result^
 
     fn update(inout self, other: Self):
@@ -460,7 +461,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             other: Another Set instance to union with this one.
         """
         for e in other:
-            self.add(e[])
+            self.add(T(other=e[]))
 
     fn intersection_update(inout self, other: Self):
         """In-place set intersection update.
@@ -554,11 +555,11 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
 
         for element in self:
             if element[] not in other:
-                result.add(element[])
+                result.add(T(other=element[]))
 
         for element in other:
             if element[] not in self:
-                result.add(element[])
+                result.add(T(other=element[]))
 
         return result^
 

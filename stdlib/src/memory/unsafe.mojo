@@ -167,6 +167,14 @@ struct LegacyPointer[
         """
         return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
+    fn __init__(*,  other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        return other
+
     @always_inline("nodebug")
     fn __init__(address: Self._mlir_type) -> Self:
         """Constructs a LegacyPointer from the address.
@@ -568,6 +576,14 @@ struct DTypePointer[
         """Constructs a null `DTypePointer` from the given type."""
 
         self.address = Self._pointer_type()
+
+    fn __init__(inout self, *,  other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
 
     @always_inline("nodebug")
     fn __init__(

@@ -26,7 +26,7 @@ from memory.memory import _free
 
 
 @register_passable
-struct Error(Stringable, Boolable, Representable, Formattable):
+struct Error(Stringable, Boolable, Representable, Formattable, CollectionElement):
     """This type represents an Error."""
 
     var data: UnsafePointer[UInt8]
@@ -103,6 +103,14 @@ struct Error(Stringable, Boolable, Representable, Formattable):
         )
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
+    
+    fn __init__(*,  other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        return other
 
     fn __del__(owned self):
         """Releases memory if allocated."""

@@ -37,7 +37,11 @@ from utils import Variant
 # TODO(27780): NoneType can't currently conform to traits
 @value
 struct _NoneType(CollectionElement):
-    pass
+    fn __init__(inout self, *, other: Self):
+        pass
+    
+    fn __init__(inout self, value: NoneType):
+        pass
 
 
 # ===----------------------------------------------------------------------===#
@@ -47,7 +51,7 @@ struct _NoneType(CollectionElement):
 
 @value
 struct Optional[T: CollectionElement](
-    CollectionElement, CollectionElementNew, Boolable
+    CollectionElement, Boolable
 ):
     """A type modeling a value which may or may not be present.
 
@@ -210,7 +214,7 @@ struct Optional[T: CollectionElement](
         """
 
         debug_assert(self.__bool__(), ".value() on empty Optional")
-        return self._value[T]
+        return T(other=self._value[T])
 
     fn take(inout self) -> T:
         """Move the value out of the Optional.
@@ -257,8 +261,8 @@ struct Optional[T: CollectionElement](
             The underlying value contained in the Optional or a default value.
         """
         if self.__bool__():
-            return self._value[T]
-        return default
+            return T(other=self._value[T])
+        return T(other=default)
 
 
 # ===----------------------------------------------------------------------===#

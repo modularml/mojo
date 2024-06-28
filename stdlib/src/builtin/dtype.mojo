@@ -83,6 +83,10 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
     of the hardware's pointer type (32-bit on 32-bit machines and 64-bit on
     64-bit machines)."""
 
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self = other
+
     @always_inline("nodebug")
     fn __str__(self) -> String:
         """Gets the name of the DType.

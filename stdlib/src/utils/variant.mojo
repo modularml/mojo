@@ -61,7 +61,6 @@ fn _align_up(value: Int, alignment: Int) -> Int:
 
 struct Variant[*Ts: CollectionElement](
     CollectionElement,
-    ExplicitlyCopyable,
 ):
     """A runtime-variant type.
 
@@ -149,7 +148,7 @@ struct Variant[*Ts: CollectionElement](
         for i in range(len(VariadicList(Ts))):
             alias T = Ts[i]
             if self._get_state() == i:
-                self._get_ptr[T]().init_pointee_move(other._get_ptr[T]()[])
+                self._get_ptr[T]().init_pointee_move(T(other=other._get_ptr[T]()[]))
 
     fn __copyinit__(inout self, other: Self):
         """Creates a deep copy of an existing variant.
@@ -275,7 +274,7 @@ struct Variant[*Ts: CollectionElement](
     @always_inline
     fn replace[
         Tin: CollectionElement, Tout: CollectionElement
-    ](inout self, value: Tin) -> Tout:
+    ](inout self, owned value: Tin) -> Tout:
         """Replace the current value of the variant with the provided type.
 
         The caller takes ownership of the underlying value.
@@ -297,12 +296,12 @@ struct Variant[*Ts: CollectionElement](
         if not self.isa[Tout]():
             abort("taking out the wrong type!")
 
-        return self.unsafe_replace[Tin, Tout](value)
+        return self.unsafe_replace[Tin, Tout](value^)
 
     @always_inline
     fn unsafe_replace[
         Tin: CollectionElement, Tout: CollectionElement
-    ](inout self, value: Tin) -> Tout:
+    ](inout self, owned value: Tin) -> Tout:
         """Unsafely replace the current value of the variant with the provided type.
 
         The caller takes ownership of the underlying value.
@@ -325,7 +324,7 @@ struct Variant[*Ts: CollectionElement](
         debug_assert(self.isa[Tout](), "taking out the wrong type!")
 
         var x = self.unsafe_take[Tout]()
-        self.set[Tin](value)
+        self.set[Tin](value^)
         return x^
 
     fn set[T: CollectionElement](inout self, owned value: T):

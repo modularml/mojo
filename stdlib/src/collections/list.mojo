@@ -105,15 +105,15 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.size = 0
         self.capacity = 0
 
-    fn __init__(inout self, existing: Self):
+    fn __init__(inout self,*, other: Self):
         """Creates a deep copy of the given list.
 
         Args:
-            existing: The list to copy.
+            other: The list to copy.
         """
-        self.__init__(capacity=existing.capacity)
-        for e in existing:
-            self.append(e[])
+        self.__init__(capacity=other.capacity)
+        for e in other:
+            self.append(T(other=e[]))
 
     fn __init__(inout self, *, capacity: Int):
         """Constructs a list with the given capacity.
@@ -135,7 +135,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self = Self(capacity=len(values))
         for value in values:
-            self.append(value[])
+            self.append(T(other=value[]))
 
     fn __init__(inout self, span: Span[T]):
         """Constructs a list from the a Span of values.
@@ -145,7 +145,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self = Self(capacity=len(span))
         for value in span:
-            self.append(value[])
+            self.append(T(other=value[]))
 
     fn __init__(
         inout self: Self,
@@ -183,7 +183,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self = Self(capacity=existing.capacity)
         for i in range(len(existing)):
-            self.append(existing[i])
+            self.append(T(other=existing[i]))
 
     @always_inline
     fn __del__(owned self):
@@ -237,7 +237,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # avoid the copy since it would be cleared immediately anyways
         if x == 0:
             return Self()
-        var result = List(self)
+        var result = List(other=self)
         result.__mul(x)
         return result^
 
@@ -260,7 +260,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             The newly created list.
         """
-        var result = List(self)
+        var result = List(other=self)
         result.extend(other^)
         return result^
 
@@ -455,7 +455,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if x == 0:
             self.clear()
             return
-        var orig = List(self)
+        var orig = List(other=self)
         self.reserve(len(self) * x)
         for i in range(x - 1):
             self.extend(orig)
@@ -557,7 +557,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         else:
             self.reserve(new_size)
             for i in range(self.size, new_size):
-                (self.data + i).init_pointee_copy(value)
+                (self.data + i).initialize_pointee_explicit_copy(value)
             self.size = new_size
 
     @always_inline
@@ -610,7 +610,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         ref [_]self: List[C],
         value: C,
         start: Int = 0,
-        stop: Optional[Int] = None,
+        stop: Optional[Int] = Optional[Int](None),
     ) raises -> Int:
         """
         Returns the index of the first occurrence of a value in a list
@@ -700,7 +700,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         var res = Self(capacity=len(r))
         for i in r:
-            res.append(self[i])
+            res.append(T(other=self[i]))
 
         return res^
 

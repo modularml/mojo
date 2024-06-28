@@ -100,6 +100,14 @@ struct Arc[T: Movable](CollectionElement):
         __get_address_as_uninit_lvalue(self._inner.address) = Self._inner_type(
             value^
         )
+    
+    fn __init__(inout self, *,  other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self.__copyinit__(other)
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing reference. Increment the refcount to the object.
