@@ -736,3 +736,12 @@ struct UInt(Comparable, Representable, Stringable):
             The absolute value.
         """
         return self
+
+    @always_inline("nodebug")
+    fn __pos__(self) -> UInt:
+        """Return +self, which is the UInt value itself.
+
+        Returns:
+            The self value.
+        """
+        return self
