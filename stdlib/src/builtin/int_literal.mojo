@@ -20,16 +20,16 @@ from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 @register_passable("trivial")
 struct IntLiteral(
     Absable,
-    Boolable,
     Ceilable,
     CeilDivable,
     Comparable,
     Floorable,
+    ImplicitlyBoolable,
+    Indexer,
     Intable,
     Roundable,
     Stringable,
     Truncable,
-    Indexer,
 ):
     """This type represents a static integer literal value with
     infinite precision.  They can't be materialized at runtime and
@@ -580,6 +580,15 @@ struct IntLiteral(
             False Bool value if the value is equal to 0 and True otherwise.
         """
         return self != Self()
+
+    @always_inline("nodebug")
+    fn __as_bool__(self) -> Bool:
+        """Convert this IntLiteral to Bool.
+
+        Returns:
+            False Bool value if the value is equal to 0 and True otherwise.
+        """
+        return self.__bool__()
 
     @always_inline("nodebug")
     fn __index__(self) -> Int:

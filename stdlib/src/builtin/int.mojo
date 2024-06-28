@@ -243,7 +243,6 @@ fn int(value: String, base: Int = 10) raises -> Int:
 @register_passable("trivial")
 struct Int(
     Absable,
-    Boolable,
     Ceilable,
     CeilDivable,
     Comparable,
@@ -251,6 +250,7 @@ struct Int(
     Formattable,
     Indexer,
     Intable,
+    ImplicitlyBoolable,
     KeyElement,
     Powable,
     Roundable,
@@ -951,6 +951,15 @@ struct Int(
             False Bool value if the value is equal to 0 and True otherwise.
         """
         return self != 0
+
+    @always_inline("nodebug")
+    fn __as_bool__(self) -> Bool:
+        """Convert this Int to Bool.
+
+        Returns:
+            False Bool value if the value is equal to 0 and True otherwise.
+        """
+        return self.__bool__()
 
     @always_inline("nodebug")
     fn __index__(self) -> Int:

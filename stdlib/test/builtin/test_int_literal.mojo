@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal
+from testing import assert_equal, assert_true, assert_false
 
 
 def test_add():
@@ -108,6 +108,13 @@ def test_divmod():
     assert_equal(t[1], -1)
 
 
+def test_bool():
+    assert_true(IntLiteral.__bool__(5))
+    assert_false(IntLiteral.__bool__(0))
+    assert_true(IntLiteral.__as_bool__(5))
+    assert_false(IntLiteral.__as_bool__(0))
+
+
 def main():
     test_add()
     test_sub()
@@ -121,3 +128,4 @@ def main():
     test_bit_width()
     test_abs()
     test_indexer()
+    test_bool()
