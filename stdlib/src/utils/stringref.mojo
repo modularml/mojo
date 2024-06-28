@@ -40,6 +40,7 @@ struct StringRef(
     Sized,
     IntableRaising,
     CollectionElement,
+    CollectionElementNew,
     Stringable,
     Formattable,
     Hashable,

@@ -60,7 +60,14 @@ fn _dir_of_current_file() raises -> Path:
     return Path(str(file_name)[0:i])
 
 
-struct Path(Stringable, Formattable, CollectionElement, PathLike, KeyElement):
+struct Path(
+    Stringable,
+    Formattable,
+    CollectionElement,
+    CollectionElementNew,
+    PathLike,
+    KeyElement,
+):
     """The Path object."""
 
     var path: String
