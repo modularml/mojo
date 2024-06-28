@@ -19,7 +19,7 @@ These are Mojo built-ins, so you don't need to import them.
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(Stringable, Representable):
+struct UInt(Comparable, Representable, Stringable):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
@@ -589,13 +589,14 @@ struct UInt(Stringable, Representable):
 
     @always_inline("nodebug")
     fn __gt__(self, rhs: UInt) -> Bool:
-        """Compare this Int to the RHS using GT comparison.
+        """Return whether this UInt is strictly greater than another.
 
         Args:
-            rhs: The other Int to compare against.
+            rhs: The other UInt to compare against.
 
         Returns:
-            True if this Int is greater-than the RHS Int and False otherwise.
+            True if this UInt is greater than the other UInt and False
+            otherwise.
         """
         return __mlir_op.`index.cmp`[
             pred = __mlir_attr.`#index<cmp_predicate ugt>`
@@ -603,16 +604,46 @@ struct UInt(Stringable, Representable):
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: UInt) -> Bool:
-        """Compare this Int to the RHS using LT comparison.
+        """Return whether this UInt is strictly less than another.
 
         Args:
-            rhs: The other Int to compare against.
+            rhs: The other UInt to compare against.
 
         Returns:
-            True if this Int is less-than the RHS Int and False otherwise.
+            True if this UInt is less than the other UInt and False otherwise.
         """
         return __mlir_op.`index.cmp`[
             pred = __mlir_attr.`#index<cmp_predicate ult>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __ge__(self, rhs: UInt) -> Bool:
+        """Return whether this UInt is greater than or equal to another.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is greater than or equal to the other UInt and
+            False otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate uge>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __le__(self, rhs: UInt) -> Bool:
+        """Return whether this UInt is less than or equal to another.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this UInt is less than or equal to the other UInt and False
+            otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate ule>`
         ](self.value, rhs.value)
 
     @always_inline("nodebug")
