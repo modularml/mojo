@@ -178,6 +178,10 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - The `math` package now includes the `pi`, `e`, and `tau` constants (Closes
   Issue [#2135](https://github.com/modularml/mojo/issues/2135)).
 
+- Mojo now has a `UInt` type for modeling unsigned (scalar) integers with a
+  paltform-dependent width. `UInt` implements most arithmethic operations that
+  make sense for integers, with the notable exception of `__neg__`.
+
 ### 🦋 Changed
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that
