@@ -178,6 +178,17 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - The `math` package now includes the `pi`, `e`, and `tau` constants (Closes
   Issue [#2135](https://github.com/modularml/mojo/issues/2135)).
 
+- Added `PythonObject.__contains__`.
+  ([PR #3101](https://github.com/modularml/mojo/pull/3101) by [@rd4com](https://github.com/rd4com))
+
+  Example usage:
+
+  ```mojo
+  x = PythonObject([1,2,3])
+  if 1 in x: 
+     print("1 in x")
+  ```
+
 ### 🦋 Changed
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that

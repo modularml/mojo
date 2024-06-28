@@ -395,6 +395,27 @@ fn test_none() raises:
     assert_true(n is None)
 
 
+def test_contains_dunder():
+    var x = PythonObject([1.1, 2.2])
+    assert_true(1.1 in x)
+    assert_false(3.3 in x)
+
+    x = PythonObject(["Hello", "World"])
+    assert_true("World" in x)
+
+    x = PythonObject((1.5, 2))
+    assert_true(1.5 in x)
+    assert_false(3.5 in x)
+
+    var y = Dict[PythonObject, PythonObject]()
+    y["A"] = "A"
+    y["B"] = 5
+    x = PythonObject(y)
+    assert_true("A" in x)
+    assert_false("C" in x)
+    assert_true("B" in x)
+
+
 def main():
     # initializing Python instance calls init_python
     var python = Python()
@@ -408,3 +429,4 @@ def main():
     test_setitem()
     test_dict()
     test_none()
+    test_contains_dunder()

@@ -1070,6 +1070,25 @@ struct PythonObject(
         """
         return self._call_zero_arg_method("__invert__")
 
+    fn __contains__(self, rhs: PythonObject) -> Bool:
+        """Contains dunder.
+
+        Calls the underlying object's `__contains__` method.
+
+        Args:
+            rhs: Right hand value.
+
+        Returns:
+            True if rhs is in self.
+        """
+        # TODO: make this function raise when we can raise parametrically.
+        # TODO: replace/optimize with c-python function.
+        try:
+            return self._call_single_arg_method("__contains__", rhs).__bool__()
+        except e:
+            debug_assert(False, "object doesn't implement __contains__")
+            return False
+
     fn _get_ptr_as_int(self) -> Int:
         return self.py_object._get_ptr_as_int()
 
