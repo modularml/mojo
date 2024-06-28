@@ -115,6 +115,14 @@ def test_address_of():
     _ = local
 
 
+def test_explicit_copy_of_pointer_address():
+    var local = 1
+    var ptr = UnsafePointer[Int].address_of(local)
+    var copy = UnsafePointer(other=ptr)
+    assert_equal(int(ptr), int(copy))
+    _ = local
+
+
 def test_bitcast():
     var local = 1
     var ptr = UnsafePointer[Int].address_of(local)
@@ -226,6 +234,7 @@ def main():
     test_unsafepointer_move_pointee_move_count()
     test_unsafepointer_initialize_pointee_explicit_copy()
 
+    test_explicit_copy_of_pointer_address()
     test_bitcast()
     test_unsafepointer_string()
     test_eq()
