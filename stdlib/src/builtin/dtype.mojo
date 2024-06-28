@@ -27,7 +27,9 @@ alias _mIsFloat = UInt8(1 << 6)
 
 @value
 @register_passable("trivial")
-struct DType(Stringable, Formattable, Representable, KeyElement):
+struct DType(
+    Stringable, Formattable, Representable, KeyElement, CollectionElementNew
+):
     """Represents DType and provides methods for working with it."""
 
     alias type = __mlir_type.`!kgen.dtype`
@@ -82,6 +84,15 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
     """Represents a pointer type whose bitwidth is the same as the bitwidth
     of the hardware's pointer type (32-bit on 32-bit machines and 64-bit on
     64-bit machines)."""
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Copy this DType.
+
+        Args:
+            other: The DType to copy.
+        """
+        self = other
 
     @always_inline("nodebug")
     fn __str__(self) -> String:

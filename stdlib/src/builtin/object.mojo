@@ -28,10 +28,11 @@ from utils import StringRef, Variant, unroll
 
 
 @register_passable("trivial")
-struct _NoneMarker:
+struct _NoneMarker(CollectionElementNew):
     """This is a trivial class to indicate that an object is `None`."""
 
-    pass
+    fn __init__(inout self, *, other: Self):
+        pass
 
 
 @register_passable("trivial")
@@ -315,6 +316,15 @@ struct _ObjectImpl(CollectionElement, Stringable):
     @always_inline
     fn __init__(inout self, value: _RefCountedAttrsDictRef):
         self.value = Self.type(value)
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other.value
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
