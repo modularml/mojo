@@ -101,8 +101,8 @@ struct _PyIter(Sized):
 
 @register_passable
 struct PythonObject(
-    Boolable,
     CollectionElement,
+    ImplicitlyBoolable,
     Indexer,
     Intable,
     KeyElement,
@@ -386,6 +386,15 @@ struct PythonObject(
         """
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyObject_IsTrue(self.py_object) == 1
+
+    @always_inline
+    fn __as_bool__(self) -> Bool:
+        """Evaluate the boolean value of the object.
+
+        Returns:
+            Whether the object evaluates as true.
+        """
+        return self.__bool__()
 
     fn __is__(self, other: PythonObject) -> Bool:
         """Test if the PythonObject is the `other` PythonObject, the same as `x is y` in
