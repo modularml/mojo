@@ -70,7 +70,7 @@ struct _ArcInner[T: Movable]:
 
 
 @register_passable
-struct Arc[T: Movable](CollectionElement):
+struct Arc[T: Movable](CollectionElement, CollectionElementNew):
     """Atomic reference-counted pointer.
 
     This smart pointer owns an instance of `T` indirectly managed on the heap.
@@ -100,6 +100,15 @@ struct Arc[T: Movable](CollectionElement):
         __get_address_as_uninit_lvalue(self._inner.address) = Self._inner_type(
             value^
         )
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        other._inner[].add_ref()
+        self._inner = other._inner
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing reference. Increment the refcount to the object.
