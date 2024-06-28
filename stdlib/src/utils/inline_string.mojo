@@ -89,6 +89,14 @@ struct InlineString(Sized, Stringable, CollectionElement):
         """
         self._storage = Self.Layout(heap_string^)
 
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
+
     # ===------------------------------------------------------------------=== #
     # Operator dunders
     # ===------------------------------------------------------------------=== #
@@ -318,6 +326,14 @@ struct _FixedString[CAP: Int](
         """Constructs a new empty string."""
         self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
         self.size = 0
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
 
     @always_inline
     fn __init__(inout self, literal: StringLiteral) raises:

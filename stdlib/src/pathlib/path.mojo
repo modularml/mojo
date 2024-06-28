@@ -78,6 +78,14 @@ struct Path(Stringable, Formattable, CollectionElement, PathLike, KeyElement):
         """
         self.path = path
 
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self.path = String(other=other.path)
+
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing Path into a new one.
 

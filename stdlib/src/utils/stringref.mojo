@@ -71,6 +71,18 @@ struct StringRef(
         return StringRef(UnsafePointer[UInt8](), 0)
 
     @always_inline
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            Constructed `StringRef` object.
+        """
+        return Self(other.data, other.length)
+
+    @always_inline
     fn __init__(str: StringLiteral) -> Self:
         """Construct a StringRef value given a constant string.
 
