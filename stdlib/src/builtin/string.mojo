@@ -2379,19 +2379,10 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
 
 @always_inline
 fn _calc_initial_buffer_size(n0: Int) -> Int:
-    var n = abs(n0)
     var sign = 0 if n0 > 0 else 1
-    alias is_32bit_system = bitwidthof[DType.index]() == 32
 
     # Add 1 for the terminator
-    @parameter
-    if is_32bit_system:
-        return sign + _calc_initial_buffer_size_int32(n) + 1
-
-    # The value only has low-bits.
-    if n >> 32 == 0:
-        return sign + _calc_initial_buffer_size_int32(n) + 1
-    return sign + _calc_initial_buffer_size_int64(n) + 1
+    return sign + n0._decimal_digit_count() + 1
 
 
 fn _calc_initial_buffer_size(n: Float64) -> Int:
