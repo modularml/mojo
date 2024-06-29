@@ -34,6 +34,7 @@ struct UnsafePointer[
 ](
     ImplicitlyBoolable,
     CollectionElement,
+    CollectionElementNew,
     Stringable,
     Formattable,
     Intable,
@@ -99,6 +100,18 @@ struct UnsafePointer[
                 Scalar[DType.index](address).value
             )
         }
+
+    @always_inline
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            A copy of the object.
+        """
+        return Self {address: other.address}
 
     # ===-------------------------------------------------------------------===#
     # Factory methods

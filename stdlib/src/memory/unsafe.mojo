@@ -140,7 +140,14 @@ alias Pointer = LegacyPointer
 @register_passable("trivial")
 struct LegacyPointer[
     type: AnyTrivialRegType, address_space: AddressSpace = AddressSpace.GENERIC
-](Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
+](
+    Boolable,
+    CollectionElement,
+    CollectionElementNew,
+    Intable,
+    Stringable,
+    EqualityComparable,
+):
     """Defines a LegacyPointer struct that contains the address of a register passable
     type.
 
@@ -166,6 +173,17 @@ struct LegacyPointer[
             Constructed LegacyPointer object.
         """
         return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
+
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            Constructed LegacyPointer object.
+        """
+        return other
 
     @always_inline("nodebug")
     fn __init__(address: Self._mlir_type) -> Self:
@@ -568,6 +586,14 @@ struct DTypePointer[
         """Constructs a null `DTypePointer` from the given type."""
 
         self.address = Self._pointer_type()
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
 
     @always_inline("nodebug")
     fn __init__(
