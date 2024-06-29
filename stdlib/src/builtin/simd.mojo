@@ -475,6 +475,42 @@ struct SIMD[type: DType, size: Int](
                 )
             )
 
+    @staticmethod
+    fn from_range[start: Int, end: Int, step: Int = 1]() -> Self:
+        """Construct from a compile time range using the index as value.
+
+        Parameters:
+            start: The start of the range.
+            end: The end of the range.
+            step: The step of the range.
+
+        Returns:
+            The new SIMD vector.
+
+        Constraints:
+            The range length must be equal to SIMD size.
+
+        Examples:
+        ```mojo
+        print(SIMD[DType.uint8, 4].from_range[0, 4]()) # [0, 1, 2, 3]
+        print(SIMD[DType.uint8, 4].from_range[3, -1, -1]()) # [3, 2, 1, 0]
+        ```
+        .
+        """
+
+        constrained[
+            len(range(start, end, step)) == size,
+            "The range length must be equal to SIMD size.",
+        ]()
+        var vec = Self()
+        var idx = 0
+
+        @parameter
+        for i in range(start, end, step):
+            vec[idx] = i
+            idx += 1
+        return vec
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#

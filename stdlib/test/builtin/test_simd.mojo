@@ -1547,6 +1547,19 @@ def test_split():
     assert_equal(tup[1], SIMD[DType.index, 4](5, 6, 7, 8))
 
 
+def test_range_constructor():
+    alias INum = SIMD[DType.uint8, 4]
+    alias inum0 = INum.from_range[0, 4]()
+    alias inum1 = INum.from_range[3, -1, -1]()
+    assert_equal(inum0, INum(0, 1, 2, 3))
+    assert_equal(inum1, INum(3, 2, 1, 0))
+    alias FNum = SIMD[DType.float16, 4]
+    alias fnum0 = FNum.from_range[0, 4]()
+    alias fnum1 = FNum.from_range[3, -1, -1]()
+    assert_equal(fnum0, FNum(0, 1, 2, 3))
+    assert_equal(fnum1, FNum(3, 2, 1, 0))
+
+
 def main():
     test_abs()
     test_add()
@@ -1596,4 +1609,5 @@ def main():
     test_truthy()
     test_modf()
     test_split()
+    test_range_constructor()
     # TODO: add tests for __and__, __or__, anc comparison operators
