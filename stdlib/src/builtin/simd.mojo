@@ -505,6 +505,17 @@ struct SIMD[type: DType, size: Int](
             self.value, val.value, index(idx).value
         )
 
+    fn __contains__(self, value: Scalar[type]) -> Bool:
+        """Whether the vector contains the value.
+
+        Args:
+            value: The value.
+
+        Returns:
+            Whether the vector contains the value.
+        """
+        return (self == value).reduce_or()
+
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
         """Computes `self + rhs`.
