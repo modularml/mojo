@@ -44,7 +44,7 @@ alias DEFAULT_RTLD = RTLD.NOW | RTLD.GLOBAL
 
 @value
 @register_passable("trivial")
-struct DLHandle(CollectionElement, Boolable):
+struct DLHandle(CollectionElement, CollectionElementNew, Boolable):
     """Represents a dynamically linked library that can be loaded and unloaded.
 
     The library is loaded on initialization and unloaded by `close`.
@@ -77,6 +77,14 @@ struct DLHandle(CollectionElement, Boolable):
             self.handle = handle
         else:
             self.handle = DTypePointer[DType.int8]()
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
 
     fn check_symbol(self, name: String) -> Bool:
         """Check that the symbol exists in the dynamic library.

@@ -60,7 +60,14 @@ fn _dir_of_current_file() raises -> Path:
     return Path(str(file_name)[0:i])
 
 
-struct Path(Stringable, Formattable, CollectionElement, PathLike, KeyElement):
+struct Path(
+    Stringable,
+    Formattable,
+    CollectionElement,
+    CollectionElementNew,
+    PathLike,
+    KeyElement,
+):
     """The Path object."""
 
     var path: String
@@ -77,6 +84,14 @@ struct Path(Stringable, Formattable, CollectionElement, PathLike, KeyElement):
           path: The file system path.
         """
         self.path = path
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self.path = String(other=other.path)
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing Path into a new one.
