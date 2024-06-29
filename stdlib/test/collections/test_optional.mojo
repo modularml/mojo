@@ -134,6 +134,14 @@ def test_optional_explicit_copy():
     assert_equal(v2.value(), "testing")
 
 
+def test_optional_str_repr():
+    var o = Optional(10)
+    assert_equal(o.__str__(), "10")
+    assert_equal(o.__repr__(), "Optional(10)")
+    assert_equal(Optional[Int](None).__str__(), "None")
+    assert_equal(Optional[Int](None).__repr__(), "Optional(None)")
+
+
 def main():
     test_basic()
     test_optional_reg_basic()
@@ -143,3 +151,4 @@ def main():
     test_optional_reg_isnot()
     test_optional_take_mutates()
     test_optional_explicit_copy()
+    test_optional_str_repr()
