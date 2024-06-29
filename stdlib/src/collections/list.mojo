@@ -77,7 +77,9 @@ struct _ListIter[
             return self.index
 
 
-struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
+struct List[T: CollectionElement](
+    CollectionElement, CollectionElementNew, Sized, Boolable
+):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -105,14 +107,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.size = 0
         self.capacity = 0
 
-    fn __init__(inout self, existing: Self):
+    fn __init__(inout self, *, other: Self):
         """Creates a deep copy of the given list.
 
         Args:
-            existing: The list to copy.
+            other: The list to copy.
         """
-        self.__init__(capacity=existing.capacity)
-        for e in existing:
+        self.__init__(capacity=other.capacity)
+        for e in other:
             self.append(e[])
 
     fn __init__(inout self, *, capacity: Int):
@@ -237,7 +239,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # avoid the copy since it would be cleared immediately anyways
         if x == 0:
             return Self()
-        var result = List(self)
+        var result = List(other=self)
         result.__mul(x)
         return result^
 
@@ -260,7 +262,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             The newly created list.
         """
-        var result = List(self)
+        var result = List(other=self)
         result.extend(other^)
         return result^
 
@@ -455,7 +457,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if x == 0:
             self.clear()
             return
-        var orig = List(self)
+        var orig = List(other=self)
         self.reserve(len(self) * x)
         for i in range(x - 1):
             self.extend(orig)
