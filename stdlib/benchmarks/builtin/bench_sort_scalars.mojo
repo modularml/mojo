@@ -158,6 +158,7 @@ fn bench_tiny_list_sort(inout m: Bench) raises:
             )
             _ = list^
 
+
 # ===----------------------------------------------------------------------===#
 # Benchmark sort functions with a small list size
 # ===----------------------------------------------------------------------===#
@@ -224,6 +225,7 @@ fn bench_small_list_sort(inout m: Bench) raises:
                 )
             )
             _ = list^
+
 
 # ===----------------------------------------------------------------------===#
 # Benchmark Main
