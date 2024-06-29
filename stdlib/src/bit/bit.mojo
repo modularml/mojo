@@ -113,7 +113,19 @@ fn count_trailing_zeros[
 # ===----------------------------------------------------------------------===#
 # bit_reverse
 # ===----------------------------------------------------------------------===#
-# TODO: implement bit_reverse for Int type
+
+
+@always_inline("nodebug")
+fn bit_reverse(val: Int) -> Int:
+    """Reverses the bitpattern of an integer value.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The input value with its bitpattern reversed.
+    """
+    return llvm_intrinsic["llvm.bitreverse", Int, has_side_effect=False](val)
 
 
 @always_inline("nodebug")
@@ -145,7 +157,31 @@ fn bit_reverse[
 # ===----------------------------------------------------------------------===#
 # byte_swap
 # ===----------------------------------------------------------------------===#
-# TODO: implement byte_swap for Int type
+
+
+@always_inline("nodebug")
+fn byte_swap(val: Int) -> Int:
+    """Byte-swaps an integer value with an even number of bytes.
+
+    Byte swap an integer value with an even number of bytes (positive multiple
+    of 16 bits). This is equivalent to `llvm.bswap` intrinsic that has the
+    following semantics:
+
+    The `llvm.bswap.i16` intrinsic returns an i16 value that has the high and
+    low byte of the input i16 swapped. Similarly, the `llvm.bswap.i32` intrinsic
+    returns an i32 value that has the four bytes of the input i32 swapped, so
+    that if the input bytes are numbered 0, 1, 2, 3 then the returned i32 will
+    have its bytes in 3, 2, 1, 0 order. The `llvm.bswap.i48`, `llvm.bswap.i64`
+    and other intrinsics extend this concept to additional even-byte lengths (6
+    bytes, 8 bytes and more, respectively).
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The input value with its bytes swapped.
+    """
+    return llvm_intrinsic["llvm.bswap", Int, has_side_effect=False](val)
 
 
 @always_inline("nodebug")
@@ -190,7 +226,19 @@ fn byte_swap[
 # ===----------------------------------------------------------------------===#
 # pop_count
 # ===----------------------------------------------------------------------===#
-# TODO: implement pop_count for Int type
+
+
+@always_inline("nodebug")
+fn pop_count(val: Int) -> Int:
+    """Counts the number of bits set in an integer value.
+
+    Args:
+        val: The input value.
+
+    Returns:
+        The number of bits set in the input value.
+    """
+    return llvm_intrinsic["llvm.ctpop", Int, has_side_effect=False](val)
 
 
 @always_inline("nodebug")
@@ -222,7 +270,6 @@ fn pop_count[
 # ===----------------------------------------------------------------------===#
 # bit_not
 # ===----------------------------------------------------------------------===#
-# TODO: implement bit_not for Int type
 
 
 @always_inline("nodebug")
