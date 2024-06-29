@@ -54,8 +54,8 @@ struct Counter[V: KeyElement](
         """
         self._data = Dict[V, Int]()
         for item_ref in items:
-            var item = item_ref[]
-            self._data[item] = self._data.get(item, 0) + 1
+            var item = V(other=item_ref[])
+            self._data[V(other=item)] = self._data.get(item, 0) + 1
 
     def __getitem__(self, key: V) -> Int:
         """Get the count of a key.
@@ -68,11 +68,11 @@ struct Counter[V: KeyElement](
         """
         return self._data.get(key, 0)
 
-    fn __setitem__(inout self, value: V, count: Int):
+    fn __setitem__(inout self, owned value: V, count: Int):
         """Set a value in the keyword Counter by key.
 
         Args:
             value: The value to associate with the specified count.
             count: The count to store in the Counter.
         """
-        self._data[value] = count
+        self._data[value^] = count
