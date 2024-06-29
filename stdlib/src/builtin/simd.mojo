@@ -47,7 +47,7 @@ from .dtype import (
     _integral_type_of,
     _scientific_notation_digits,
 )
-from .io import _print_fmt, _printf, _snprintf_scalar
+from .io import _printf, _snprintf_scalar
 from .string import _calc_format_buffer_size, _calc_initial_buffer_size
 
 # ===----------------------------------------------------------------------=== #
@@ -126,6 +126,11 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
     }
 
 
+@always_inline("nodebug")
+fn _has_native_bf16_support() -> Bool:
+    return triple_is_nvidia_cuda()
+
+
 # ===----------------------------------------------------------------------=== #
 # SIMD
 # ===----------------------------------------------------------------------=== #
@@ -133,7 +138,7 @@ fn _unchecked_zero[type: DType, size: Int]() -> SIMD[type, size]:
 
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
-struct SIMD[type: DType, size: Int = simdwidthof[type]()](
+struct SIMD[type: DType, size: Int](
     Absable,
     Ceilable,
     CeilDivable,
@@ -147,6 +152,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     Roundable,
     Sized,
     Stringable,
+    Formattable,
     Truncable,
     Representable,
 ):
@@ -1407,9 +1413,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
     @always_inline("nodebug")
     fn __round__(self, ndigits: Int) -> Self:
         """Performs elementwise rounding on the elements of a SIMD vector.
+
         This rounding goes to the nearest integer with ties away from zero.
+
         Args:
             ndigits: The number of digits to round to.
+
         Returns:
             The elementwise rounded value of this SIMD vector.
         """
@@ -1454,12 +1463,12 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             return self.select(SIMD[target, size](1), SIMD[target, size](0))
         elif target == DType.bool:
             return rebind[SIMD[target, size]](self != 0)
-        elif type is DType.bfloat16:
+        elif type is DType.bfloat16 and not _has_native_bf16_support():
             var cast_result = _bfloat16_to_f32(
                 rebind[SIMD[DType.bfloat16, size]](self)
             ).cast[target]()
             return rebind[SIMD[target, size]](cast_result)
-        elif target == DType.bfloat16:
+        elif target == DType.bfloat16 and not _has_native_bf16_support():
             return rebind[SIMD[target, size]](
                 _f32_to_bfloat16(self.cast[DType.float32]())
             )
@@ -1550,7 +1559,14 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
             if triple_is_nvidia_cuda():
 
                 @parameter
-                if type.is_floating_point():
+                if (
+                    type is DType.float16
+                    or type is DType.bfloat16
+                    or type is DType.float32
+                ):
+                    # We need to cast the value to float64 to print it.
+                    _printf["%g"](element.cast[DType.float64]())
+                elif type.is_floating_point():
                     # get_dtype_printf_format hardcodes 17 digits of precision.
                     _printf["%g"](element)
                 else:
@@ -1986,7 +2002,7 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
 
     @always_inline("nodebug")
     fn insert[*, offset: Int = 0](self, value: SIMD[type, _]) -> Self:
-        """Returns a the vector where the elements between `offset` and
+        """Returns a new vector where the elements between `offset` and
         `offset + input_width` have been replaced with the elements in `value`.
 
         Parameters:
@@ -2646,25 +2662,6 @@ struct SIMD[type: DType, size: Int = simdwidthof[type]()](
         return llvm_intrinsic[
             "llvm.vector.splice", Self, has_side_effect=False
         ](zero_simd, self, Int32(-shift))
-
-    @staticmethod
-    @always_inline
-    fn prefetch[
-        params: PrefetchOptions,
-        *,
-        address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space]):
-        # Prefetch at the underlying address.
-        """Prefetches memory at the underlying address.
-
-        Parameters:
-            params: Prefetch options (see `PrefetchOptions` for details).
-            address_space: The address space the pointer is in.
-
-        Args:
-            ptr: The pointer to prefetch from.
-        """
-        prefetch[params](ptr)
 
     @staticmethod
     @always_inline("nodebug")

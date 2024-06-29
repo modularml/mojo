@@ -142,6 +142,11 @@ struct StringSlice[
     # ===------------------------------------------------------------------===#
 
     fn __str__(self) -> String:
+        """Gets this slice as a standard `String`.
+
+        Returns:
+            The string representation of the slice.
+        """
         return String(str_slice=self)
 
     fn __len__(self) -> Int:
@@ -162,6 +167,95 @@ struct StringSlice[
             writer: The formatter to write to.
         """
         writer.write_str(str_slice=self)
+
+    fn __bool__(self) -> Bool:
+        """Check if a string slice is non-empty.
+
+        Returns:
+           True if a string slice is non-empty, False otherwise.
+        """
+        return len(self._slice) > 0
+
+    fn __eq__(self, rhs: StringSlice) -> Bool:
+        """Verify if a string slice is equal to another string slice.
+
+        Args:
+            rhs: The string slice to compare against.
+
+        Returns:
+            True if the string slices are equal in length and contain the same elements, False otherwise.
+        """
+        if not self and not rhs:
+            return True
+        if len(self) != len(rhs):
+            return False
+        # same pointer and length, so equal
+        if self._slice.unsafe_ptr() == rhs._slice.unsafe_ptr():
+            return True
+        for i in range(len(self)):
+            if self._slice[i] != rhs._slice.unsafe_ptr()[i]:
+                return False
+        return True
+
+    @always_inline
+    fn __eq__(self, rhs: String) -> Bool:
+        """Verify if a string slice is equal to a string.
+
+        Args:
+            rhs: The string to compare against.
+
+        Returns:
+            True if the string slice is equal to the input string in length and contain the same bytes, False otherwise.
+        """
+        return self == rhs.as_string_slice()
+
+    @always_inline
+    fn __eq__(self, rhs: StringLiteral) -> Bool:
+        """Verify if a string slice is equal to a literal.
+
+        Args:
+            rhs: The literal to compare against.
+
+        Returns:
+            True if the string slice is equal to the input literal in length and contain the same bytes, False otherwise.
+        """
+        return self == rhs.as_string_slice()
+
+    @always_inline
+    fn __ne__(self, rhs: StringSlice) -> Bool:
+        """Verify if span is not equal to another string slice.
+
+        Args:
+            rhs: The string slice to compare against.
+
+        Returns:
+            True if the string slices are not equal in length or contents, False otherwise.
+        """
+        return not self == rhs
+
+    @always_inline
+    fn __ne__(self, rhs: String) -> Bool:
+        """Verify if span is not equal to another string slice.
+
+        Args:
+            rhs: The string slice to compare against.
+
+        Returns:
+            True if the string and slice are not equal in length or contents, False otherwise.
+        """
+        return not self == rhs
+
+    @always_inline
+    fn __ne__(self, rhs: StringLiteral) -> Bool:
+        """Verify if span is not equal to a literal.
+
+        Args:
+            rhs: The string literal to compare against.
+
+        Returns:
+            True if the slice is not equal to the literal in length or contents, False otherwise.
+        """
+        return not self == rhs
 
     # ===------------------------------------------------------------------===#
     # Methods

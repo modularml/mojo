@@ -843,6 +843,11 @@ fn test_isupper() raises:
     assert_false(isupper(ord("!")))
     assert_false(isupper(ord("0")))
 
+    assert_true(isupper("A"))
+    assert_false(isupper("b"))
+    assert_true(String("ASDG").isupper())
+    assert_false(String("AsDG").isupper())
+
 
 fn test_islower() raises:
     assert_true(islower(ord("a")))
@@ -855,6 +860,12 @@ fn test_islower() raises:
 
     assert_false(islower(ord("!")))
     assert_false(islower(ord("0")))
+
+    assert_false(islower("A"))
+    assert_true(islower("b"))
+
+    assert_true(String("asdfg").islower())
+    assert_false(String("asdFDg").islower())
 
 
 fn test_lower() raises:
@@ -883,6 +894,7 @@ fn test_isspace() raises:
     # checking true cases
     assert_true(_isspace(ord(" ")))
     assert_true(_isspace(ord("\n")))
+    assert_true(_isspace("\n"))
     assert_true(_isspace(ord("\t")))
     assert_true(_isspace(ord("\r")))
     assert_true(_isspace(ord("\v")))
@@ -890,6 +902,7 @@ fn test_isspace() raises:
 
     # Checking false cases
     assert_false(_isspace(ord("a")))
+    assert_false(_isspace("a"))
     assert_false(_isspace(ord("u")))
     assert_false(_isspace(ord("s")))
     assert_false(_isspace(ord("t")))
@@ -1369,6 +1382,18 @@ def test_isdigit():
     assert_false(String("123asdg").isdigit())
 
 
+def test_isprintable():
+    assert_true(isprintable(ord("a")))
+    assert_true(isprintable("a"))
+    assert_true(isprintable("J"))
+
+    assert_false(isprintable(ord("\n")))
+    assert_false(isprintable("\t"))
+
+    assert_true(String("aasdg").isprintable())
+    assert_false(String("aa\nae").isprintable())
+
+
 def main():
     test_constructors()
     test_copy()
@@ -1417,3 +1442,4 @@ def main():
     test_string_iter()
     test_format_args()
     test_isdigit()
+    test_isprintable()

@@ -446,8 +446,14 @@ struct assert_raises:
     fn __exit__(self, error: Error) raises -> Bool:
         """Exit the context manager with an error.
 
+        Args:
+            error: The error raised.
+
         Raises:
-            Error: If the error raised doesn't match the expected error to raise.
+            Error: If the error raised doesn't include the expected string.
+
+        Returns:
+            True if the error message contained the expected string.
         """
         if self.message_contains:
             return self.message_contains.value() in str(error)

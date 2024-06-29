@@ -228,6 +228,11 @@ struct DType(Stringable, Formattable, Representable, KeyElement):
         )
 
     fn __hash__(self) -> Int:
+        """Return a 64-bit hash for this `DType` value.
+
+        Returns:
+            A 64-bit integer hash of this `DType` value.
+        """
         return hash(UInt8(self._as_i8()))
 
     @always_inline("nodebug")
