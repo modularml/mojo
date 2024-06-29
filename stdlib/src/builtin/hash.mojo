@@ -88,7 +88,11 @@ trait Hashable:
     """
 
     fn __hash__(self) -> Int:
-        """Return a 64-bit hash of the type's data."""
+        """Return a 64-bit hash of the type's data.
+
+        Returns:
+            A 64-bit integer hash of this instance's data.
+        """
         ...
 
 

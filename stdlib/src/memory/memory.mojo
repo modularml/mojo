@@ -500,7 +500,7 @@ fn stack_allocation[
     count: Int,
     type: DType,
     /,
-    alignment: Int = 1,
+    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]() -> DTypePointer[type, address_space]:
     """Allocates data buffer space on the stack given a data type and number of
@@ -526,7 +526,7 @@ fn stack_allocation[
     count: Int,
     type: AnyTrivialRegType,
     /,
-    alignment: Int = 1,
+    alignment: Int = alignof[type]() if triple_is_nvidia_cuda() else 1,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ]() -> Pointer[type, address_space]:
     """Allocates data buffer space on the stack given a data type and number of

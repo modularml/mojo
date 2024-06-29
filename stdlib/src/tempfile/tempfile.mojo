@@ -214,7 +214,10 @@ struct TemporaryDirectory:
         dir: Optional[String] = None,
         ignore_cleanup_errors: Bool = False,
     ) raises:
-        """Create a temporary directory. Can be used as a context manager.
+        """Create a temporary directory.
+
+        Can be used as a context manager. When used as a context manager,
+        the directory is removed when the context manager exits.
 
         Args:
             suffix: Suffix to use for the directory name.
@@ -227,12 +230,26 @@ struct TemporaryDirectory:
         self.name = mkdtemp(suffix, prefix, dir)
 
     fn __enter__(self) -> String:
+        """The function to call when entering the context.
+
+        Returns:
+            The temporary directory name.
+        """
         return self.name
 
     fn __exit__(self) raises:
+        """Called when exiting the context with no error."""
         _rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
 
     fn __exit__(self, err: Error) -> Bool:
+        """Called when exiting the context with an error.
+
+        Args:
+            err: The error raised inside the context.
+
+        Returns:
+            True if the temporary directory was removed successfully.
+        """
         try:
             self.__exit__()
             return True
@@ -259,9 +276,13 @@ struct NamedTemporaryFile:
         dir: Optional[String] = None,
         delete: Bool = True,
     ) raises:
-        """Create a named temporary file. Can be used as a context manager.
+        """Create a named temporary file.
+
         This is a wrapper around a `FileHandle`,
-        os.remove is called in close method if `delete` is True.
+        `os.remove()` is called in the `close()` method if `delete` is True.
+
+        Can be used as a context manager. When used as a context manager, the
+        `close()` is called when the context manager exits.
 
         Args:
             mode: The mode to open the file in (the mode can be "r" or "w").
@@ -367,5 +388,8 @@ struct NamedTemporaryFile:
         self._file_handle.write(data)
 
     fn __enter__(owned self) -> Self:
-        """The function to call when entering the context."""
+        """The function to call when entering the context.
+
+        Returns:
+            The file handle."""
         return self^

@@ -116,6 +116,20 @@ fn ceildiv[T: CeilDivableRaising, //](numerator: T, denominator: T) raises -> T:
     return -(numerator // -denominator)
 
 
+@always_inline
+fn ceildiv(numerator: UInt, denominator: UInt) -> UInt:
+    """Return the rounded-up result of dividing x by y.
+
+    Args:
+        numerator: The numerator.
+        denominator: The denominator.
+
+    Returns:
+        The ceiling of dividing x by y.
+    """
+    return (numerator + denominator - 1) // denominator
+
+
 # ===----------------------------------------------------------------------=== #
 # trunc
 # ===----------------------------------------------------------------------=== #

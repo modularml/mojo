@@ -311,12 +311,12 @@ fn _put[x: StringLiteral](file: FileDescriptor = stdout):
     _put(x.as_string_slice(), file=file)
 
 
-fn _put(strref: StringRef):
+fn _put(strref: StringRef, file: FileDescriptor = stdout):
     var str_slice = StringSlice[ImmutableStaticLifetime](
         unsafe_from_utf8_strref=strref
     )
 
-    _put(str_slice)
+    _put(str_slice, file=file)
 
 
 @no_inline
@@ -368,7 +368,7 @@ fn _put(x: StringSlice, file: FileDescriptor = stdout):
 
 @no_inline
 fn print[
-    *Ts: Stringable
+    *Ts: Formattable
 ](
     *values: *Ts,
     sep: StaticString = " ",
@@ -389,84 +389,23 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
         file: The output stream.
     """
-    _print(values, sep=sep, end=end, flush=flush, file=file)
 
+    var writer = Formatter(fd=file)
 
-@no_inline
-fn _print[
-    *Ts: Stringable
-](
-    values: VariadicPack[_, _, Stringable, Ts],
-    *,
-    sep: StringSlice,
-    end: StringSlice,
-    flush: Bool,
-    file: FileDescriptor,
-):
     @parameter
-    fn print_with_separator[i: Int, T: Stringable](value: T):
-        _put(str(value).as_string_slice(), file=file)
+    fn print_with_separator[i: Int, T: Formattable](value: T):
+        writer.write(value)
 
         @parameter
         if i < values.__len__() - 1:
-            _put(sep, file=file)
+            writer.write(sep)
 
     values.each_idx[print_with_separator]()
 
-    _put(end, file=file)
-    if flush:
-        _flush(file=file)
-
-
-# ===----------------------------------------------------------------------=== #
-#  print_fmt
-# ===----------------------------------------------------------------------=== #
-
-
-# TODO:
-#   Finish transition to using non-allocating formatting abstractions by
-#   default, replace `print` with this function.
-@no_inline
-fn _print_fmt[
-    T: Formattable, *Ts: Formattable
-](
-    first: T,
-    *rest: *Ts,
-    sep: StaticString = " ",
-    end: StaticString = "\n",
-    flush: Bool = False,
-):
-    """Prints elements to the text stream. Each element is separated by `sep`
-    and followed by `end`.
-
-    This print function does not perform unnecessary intermediate String
-    allocations during formatting.
-
-    Parameters:
-        T: The first element type.
-        Ts: The remaining element types.
-
-    Args:
-        first: The first element.
-        rest: The remaining elements.
-        sep: The separator used between elements.
-        end: The String to write after printing the elements.
-        flush: If set to true, then the stream is forcibly flushed.
-    """
-    var writer = Formatter.stdout()
-
-    write_to(writer, first)
-
-    @parameter
-    fn print_elt[T: Formattable](a: T):
-        write_to(writer, sep, a)
-
-    rest.each[print_elt]()
-
-    write_to(writer, end)
+    writer.write(end)
 
     # TODO: What is a flush function that works on CUDA?
     @parameter
     if not triple_is_nvidia_cuda():
         if flush:
-            _flush()
+            _flush(file=file)

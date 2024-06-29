@@ -12,7 +12,7 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo %s
 
-from testing import assert_equal
+from testing import assert_equal, assert_true, assert_false
 
 from utils import Span
 
@@ -145,8 +145,40 @@ fn test_slice_len() raises:
     assert_equal(1, len(slice5))
 
 
+fn test_slice_eq() raises:
+    var str1: String = "12345"
+    var str2: String = "12345"
+    var str3: StringLiteral = "12345"
+    var str4: String = "abc"
+    var str5: String = "abcdef"
+    var str6: StringLiteral = "abcdef"
+
+    # eq
+
+    assert_true(str1.as_string_slice().__eq__(str1))
+    assert_true(str1.as_string_slice().__eq__(str2))
+    assert_true(str2.as_string_slice().__eq__(str2.as_string_slice()))
+    assert_true(str1.as_string_slice().__eq__(str3))
+
+    # ne
+
+    assert_true(str1.as_string_slice().__ne__(str4))
+    assert_true(str1.as_string_slice().__ne__(str5))
+    assert_true(str1.as_string_slice().__ne__(str5.as_string_slice()))
+    assert_true(str1.as_string_slice().__ne__(str6))
+
+
+fn test_slice_bool() raises:
+    var str1: String = "abc"
+    assert_true(str1.as_string_slice().__bool__())
+    var str2: String = ""
+    assert_true(not str2.as_string_slice().__bool__())
+
+
 fn main() raises:
     test_string_literal_byte_slice()
     test_string_byte_slice()
     test_heap_string_from_string_slice()
     test_slice_len()
+    test_slice_eq()
+    test_slice_bool()
