@@ -161,6 +161,20 @@ fn max(x: Int, y: Int) -> Int:
 
 
 @always_inline
+fn max(x: UInt, y: UInt) -> UInt:
+    """Gets the maximum of two integers.
+
+    Args:
+        x: Integer input to max.
+        y: Integer input to max.
+
+    Returns:
+        Maximum of x and y.
+    """
+    return __mlir_op.`index.maxu`(x.value, y.value)
+
+
+@always_inline
 fn max[
     type: DType, simd_width: Int
 ](x: SIMD[type, simd_width], y: SIMD[type, simd_width]) -> SIMD[
@@ -195,13 +209,27 @@ fn min(x: Int, y: Int) -> Int:
     """Gets the minimum of two integers.
 
     Args:
-        x: Integer input to max.
-        y: Integer input to max.
+        x: Integer input to min.
+        y: Integer input to min.
 
     Returns:
         Minimum of x and y.
     """
     return __mlir_op.`index.mins`(x.value, y.value)
+
+
+@always_inline
+fn min(x: UInt, y: UInt) -> UInt:
+    """Gets the minimum of two integers.
+
+    Args:
+        x: Integer input to min.
+        y: Integer input to min.
+
+    Returns:
+        Minimum of x and y.
+    """
+    return __mlir_op.`index.minu`(x.value, y.value)
 
 
 @always_inline
