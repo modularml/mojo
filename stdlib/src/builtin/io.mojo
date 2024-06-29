@@ -102,11 +102,7 @@ fn _printf[
     # The argument pack will contain references for each value in the pack,
     # but we want to pass their values directly into the C snprintf call. Load
     # all the members of the pack.
-    var kgen_pack = _LITRefPackHelper(arguments._value).get_as_kgen_pack()
-
-    # FIXME(37129): Cannot use get_loaded_kgen_pack because vtables on types
-    # aren't stripped off correctly.
-    var loaded_pack = __mlir_op.`kgen.pack.load`(kgen_pack)
+    var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
 
     @parameter
     if triple_is_nvidia_cuda():
