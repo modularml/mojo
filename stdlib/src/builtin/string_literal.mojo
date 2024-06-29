@@ -33,15 +33,15 @@ from .string import _atol
 @lldb_formatter_wrapping_type
 @register_passable("trivial")
 struct StringLiteral(
-    Sized,
-    IntableRaising,
-    Stringable,
-    Representable,
-    KeyElement,
     Boolable,
-    Formattable,
     Comparable,
     CollectionElementNew,
+    Formattable,
+    IntableRaising,
+    KeyElement,
+    Representable,
+    Sized,
+    Stringable,
 ):
     """This type represents a string literal.
 

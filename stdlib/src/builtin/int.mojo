@@ -22,7 +22,10 @@ from builtin.format_int import _try_write_int
 from builtin.hash import _hash_simd
 from builtin.io import _snprintf
 from builtin.simd import _format_scalar
-from builtin.string import _calc_initial_buffer_size
+from builtin.string import (
+    _calc_initial_buffer_size_int32,
+    _calc_initial_buffer_size_int64,
+)
 
 from utils import InlineArray
 from utils._format import Formattable, Formatter
@@ -243,7 +246,6 @@ fn int(value: String, base: Int = 10) raises -> Int:
 @register_passable("trivial")
 struct Int(
     Absable,
-    Boolable,
     Ceilable,
     CeilDivable,
     Comparable,
@@ -251,6 +253,7 @@ struct Int(
     Formattable,
     Indexer,
     Intable,
+    ImplicitlyBoolable,
     KeyElement,
     Powable,
     Roundable,
@@ -953,6 +956,15 @@ struct Int(
         return self != 0
 
     @always_inline("nodebug")
+    fn __as_bool__(self) -> Bool:
+        """Convert this Int to Bool.
+
+        Returns:
+            False Bool value if the value is equal to 0 and True otherwise.
+        """
+        return self.__bool__()
+
+    @always_inline("nodebug")
     fn __index__(self) -> Int:
         """Return self converted to an integer, if self is suitable for use as
         an index into a list.
@@ -1117,3 +1129,37 @@ struct Int(
             The integer modulus of `self` and `rhs` .
         """
         return __mlir_op.`index.rems`(self.value, rhs.value)
+
+    fn _decimal_digit_count(self) -> Int:
+        """
+        Returns the number of decimal digits required to display this integer.
+
+        Note that if this integer is negative, the returned count does not
+        include space to store a leading minus character.
+
+        Returns:
+            A count of the number of decimal digits required to display this integer.
+
+        Examples:
+
+        ```mojo
+        assert_equal(10._decimal_digit_count(), 2)
+
+        assert_equal(-10._decimal_digit_count(), 2)
+        ```
+        .
+        """
+
+        var n = abs(self)
+
+        alias is_32bit_system = bitwidthof[DType.index]() == 32
+
+        @parameter
+        if is_32bit_system:
+            return _calc_initial_buffer_size_int32(n)
+
+        # The value only has low-bits.
+        if n >> 32 == 0:
+            return _calc_initial_buffer_size_int32(n)
+
+        return _calc_initial_buffer_size_int64(n)

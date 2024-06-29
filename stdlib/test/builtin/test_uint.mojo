@@ -218,6 +218,29 @@ def test_indexer():
     assert_equal(UInt(987), UInt(987).__index__())
 
 
+def test_comparison():
+    assert_true(UInt.__lt__(UInt(1), UInt(7)))
+    assert_false(UInt.__lt__(UInt(7), UInt(7)))
+    assert_false(UInt.__lt__(UInt(7), UInt(2)))
+
+    assert_true(UInt.__le__(UInt(1), UInt(7)))
+    assert_true(UInt.__le__(UInt(7), UInt(7)))
+    assert_false(UInt.__le__(UInt(7), UInt(2)))
+
+    assert_false(UInt.__gt__(UInt(1), UInt(7)))
+    assert_false(UInt.__gt__(UInt(7), UInt(7)))
+    assert_true(UInt.__gt__(UInt(7), UInt(2)))
+
+    assert_false(UInt.__ge__(UInt(1), UInt(7)))
+    assert_true(UInt.__ge__(UInt(7), UInt(7)))
+    assert_true(UInt.__ge__(UInt(7), UInt(2)))
+
+
+def test_pos():
+    assert_equal(UInt(2).__pos__(), UInt(2))
+    assert_equal(UInt(0).__pos__(), UInt(0))
+
+
 def main():
     test_simple_uint()
     test_uint_representation()
@@ -239,3 +262,5 @@ def main():
     test_string_conversion()
     test_int_representation()
     test_indexer()
+    test_comparison()
+    test_pos()

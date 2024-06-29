@@ -537,6 +537,22 @@ fn isdigit(c: String) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
+fn isupper(c: String) -> Bool:
+    """Determines whether the given character is an uppercase character.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is uppercase.
+    """
+    return isupper(ord(c))
+
+
 fn isupper(c: UInt8) -> Bool:
     """Determines whether the given character is an uppercase character.
 
@@ -563,6 +579,22 @@ fn _is_ascii_uppercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
+fn islower(c: String) -> Bool:
+    """Determines whether the given character is an lowercase character.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "abcdefghijklmnopqrstuvwxyz".
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is lowercase.
+    """
+    return islower(ord(c))
+
+
 fn islower(c: UInt8) -> Bool:
     """Determines whether the given character is an lowercase character.
 
@@ -587,6 +619,23 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # _isspace
 # ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _isspace(c: String) -> Bool:
+    """Determines whether the given character is a whitespace character.
+
+    This only respects the default "C" locale, i.e. returns True only if the
+    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
+    to Python, use `String.isspace()`.
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True iff the character is one of the whitespace characters listed above.
+    """
+    return _isspace(ord(c))
 
 
 fn _isspace(c: UInt8) -> Bool:
@@ -666,6 +715,19 @@ fn _isnewline(s: String) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # isprintable
 # ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn isprintable(c: String) -> Bool:
+    """Determines whether the given character is a printable character.
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is a printable character, otherwise False.
+    """
+    return isprintable(ord(c))
 
 
 fn isprintable(c: UInt8) -> Bool:
@@ -2207,15 +2269,43 @@ struct String(
         Returns:
             True if all characters are digits else False.
         """
-        for c in self:
-            if not isdigit(c):
-                return False
-        return True
+        return _all[isdigit](self)
+
+    fn isupper(self) -> Bool:
+        """Returns True if all characters in the string are uppercase.
+
+        Returns:
+            True if all characters are uppercase else False.
+        """
+        return _all[isupper](self)
+
+    fn islower(self) -> Bool:
+        """Returns True if all characters in the string are lowercase.
+
+        Returns:
+            True if all characters are lowercase else False.
+        """
+        return _all[islower](self)
+
+    fn isprintable(self) -> Bool:
+        """Returns True if all characters in the string are printable.
+
+        Returns:
+            True if all characters are printable else False.
+        """
+        return _all[isprintable](self)
 
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
+
+
+fn _all[func: fn (String) -> Bool](s: String) -> Bool:
+    for c in s:
+        if not func(c):
+            return False
+    return True
 
 
 fn _toggle_ascii_case(char: UInt8) -> UInt8:
@@ -2289,19 +2379,10 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
 
 @always_inline
 fn _calc_initial_buffer_size(n0: Int) -> Int:
-    var n = abs(n0)
     var sign = 0 if n0 > 0 else 1
-    alias is_32bit_system = bitwidthof[DType.index]() == 32
 
     # Add 1 for the terminator
-    @parameter
-    if is_32bit_system:
-        return sign + _calc_initial_buffer_size_int32(n) + 1
-
-    # The value only has low-bits.
-    if n >> 32 == 0:
-        return sign + _calc_initial_buffer_size_int32(n) + 1
-    return sign + _calc_initial_buffer_size_int64(n) + 1
+    return sign + n0._decimal_digit_count() + 1
 
 
 fn _calc_initial_buffer_size(n: Float64) -> Int:

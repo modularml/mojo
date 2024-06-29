@@ -140,7 +140,6 @@ fn _has_native_bf16_support() -> Bool:
 @register_passable("trivial")
 struct SIMD[type: DType, size: Int](
     Absable,
-    Boolable,
     Ceilable,
     CeilDivable,
     CollectionElement,
@@ -148,6 +147,7 @@ struct SIMD[type: DType, size: Int](
     Floorable,
     Hashable,
     Intable,
+    ImplicitlyBoolable,
     Powable,
     Roundable,
     Sized,
@@ -1293,6 +1293,18 @@ struct SIMD[type: DType, size: Int](
         return rebind[Scalar[DType.bool]](self.cast[DType.bool]()).value
 
     @always_inline("nodebug")
+    fn __as_bool__(self) -> Bool:
+        """Converts the SIMD scalar into a boolean value.
+
+        Constraints:
+            The size of the SIMD vector must be 1.
+
+        Returns:
+            True if the SIMD scalar is non-zero and False otherwise.
+        """
+        return self.__bool__()
+
+    @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Casts to the value to an Int. If there is a fractional component,
         then the fractional part is truncated.
@@ -1547,7 +1559,14 @@ struct SIMD[type: DType, size: Int](
             if triple_is_nvidia_cuda():
 
                 @parameter
-                if type.is_floating_point():
+                if (
+                    type is DType.float16
+                    or type is DType.bfloat16
+                    or type is DType.float32
+                ):
+                    # We need to cast the value to float64 to print it.
+                    _printf["%g"](element.cast[DType.float64]())
+                elif type.is_floating_point():
                     # get_dtype_printf_format hardcodes 17 digits of precision.
                     _printf["%g"](element)
                 else:

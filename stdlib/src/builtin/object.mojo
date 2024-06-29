@@ -639,7 +639,7 @@ struct _ObjectImpl(CollectionElement, Stringable):
 # ===----------------------------------------------------------------------=== #
 
 
-struct object(IntableRaising, Boolable, Stringable):
+struct object(IntableRaising, ImplicitlyBoolable, Stringable):
     """Represents an object without a concrete type.
 
     This is the type of arguments in `def` functions that do not have a type
@@ -906,6 +906,16 @@ struct object(IntableRaising, Boolable, Stringable):
             return int(self._value.get_as_float())
 
         raise "object type cannot be converted to an integer"
+
+    fn __as_bool__(self) -> Bool:
+        """Performs conversion to bool according to Python semantics. Integers
+        and floats are true if they are non-zero, and strings and lists are true
+        if they are non-empty.
+
+        Returns:
+            Whether the object is considered true.
+        """
+        return self.__bool__()
 
     @always_inline
     fn __str__(self) -> String:

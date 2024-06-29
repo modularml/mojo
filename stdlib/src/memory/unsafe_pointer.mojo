@@ -32,7 +32,7 @@ from memory.memory import _free, _malloc
 struct UnsafePointer[
     T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC
 ](
-    Boolable,
+    ImplicitlyBoolable,
     CollectionElement,
     Stringable,
     Formattable,
@@ -324,6 +324,15 @@ struct UnsafePointer[
             Whether the pointer is null.
         """
         return int(self) != 0
+
+    @always_inline
+    fn __as_bool__(self) -> Bool:
+        """Return true if the pointer is non-null.
+
+        Returns:
+            Whether the pointer is null.
+        """
+        return self.__bool__()
 
     @always_inline
     fn __int__(self) -> Int:

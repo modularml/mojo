@@ -152,6 +152,22 @@ struct Formatter:
 
         args.each[write_arg]()
 
+    fn _write_int_padded(inout self, value: Int, *, width: Int):
+        var int_width = value._decimal_digit_count()
+
+        # TODO: Assumes user wants right-aligned content.
+        if int_width < width:
+            self._write_repeated(
+                " ".as_string_slice(),
+                width - int_width,
+            )
+
+        self.write(value)
+
+    fn _write_repeated(inout self, str: StringSlice, count: Int):
+        for _ in range(count):
+            self.write_str(str)
+
     # ===------------------------------------------------------------------=== #
     # Factory methods
     # ===------------------------------------------------------------------=== #

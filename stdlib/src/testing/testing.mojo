@@ -76,11 +76,13 @@ fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
 
 
 @always_inline
-fn assert_true(
-    val: Bool, msg: String = "condition was unexpectedly False"
-) raises:
-    """Asserts that the input value is True. If it is not then an
-    Error is raised.
+fn assert_true[
+    T: Boolable, //
+](val: T, msg: String = "condition was unexpectedly False") raises:
+    """Asserts that the input value is True and raises an Error if it's not.
+
+    Parameters:
+        T: The type of the value argument.
 
     Args:
         val: The value to assert to be True.
@@ -94,11 +96,13 @@ fn assert_true(
 
 
 @always_inline
-fn assert_false(
-    val: Bool, msg: String = "condition was unexpectedly True"
-) raises:
-    """Asserts that the input value is False. If it is not then an Error is
-    raised.
+fn assert_false[
+    T: Boolable, //
+](val: T, msg: String = "condition was unexpectedly True") raises:
+    """Asserts that the input value is False and raises an Error if it's not.
+
+    Parameters:
+        T: The type of the value argument.
 
     Args:
         val: The value to assert to be False.
