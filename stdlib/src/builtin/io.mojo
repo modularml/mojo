@@ -100,7 +100,7 @@ fn _printf[
     fmt: StringLiteral, *types: AnyType
 ](*arguments: *types, file: FileDescriptor = stdout):
     # The argument pack will contain references for each value in the pack,
-    # but we want to pass their values directly into the C snprintf call. Load
+    # but we want to pass their values directly into the C printf call. Load
     # all the members of the pack.
     var loaded_pack = _LITRefPackHelper(arguments._value).get_loaded_kgen_pack()
 
