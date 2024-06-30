@@ -469,7 +469,6 @@ struct _LITRefPackHelper[
 
     # This returns the stored KGEN pack after loading all of the elements.
     fn get_loaded_kgen_pack(self) -> Self.loaded_kgen_pack_type:
-        # FIXME: Remove rebind[Self.loaded_kgen_pack_type](
         return __mlir_op.`kgen.pack.load`(self.get_as_kgen_pack())
 
 
