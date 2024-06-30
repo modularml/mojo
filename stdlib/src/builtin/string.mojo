@@ -2431,7 +2431,7 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
 
 
 @value
-struct _FormatCurlyEntry:
+struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     """
     Internally used by the `format()` method.
 
@@ -2447,13 +2447,19 @@ struct _FormatCurlyEntry:
     var last_curly: Int
     """The index of an closing brace around a substitution field."""
 
-    var field: Variant[
+    alias _FieldVariantType = Variant[
         String,  # kwargs indexing (`{field_name}`)
         Int,  # args manual indexing (`{3}`)
         NoneType,  # args automatic indexing (`{}`)
         Bool,  # for escaped curlies ('{{')
     ]
+    var field: Self._FieldVariantType
     """Store the substitution field."""
+
+    fn __init__(inout self, *, other: Self):
+        self.first_curly = other.first_curly
+        self.last_curly = other.last_curly
+        self.field = Self._FieldVariantType(other=other.field)
 
     fn is_escaped_brace(ref [_]self) -> Bool:
         return self.field.isa[Bool]()
