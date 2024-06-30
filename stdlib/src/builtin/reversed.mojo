@@ -76,14 +76,18 @@ fn reversed[T: ReversibleRange](value: T) -> _StridedRange:
 
 
 fn reversed[
-    T: CollectionElement
-](ref [_]value: List[T]) -> _ListIter[T, __lifetime_of(value), False]:
+    T: CollectionElement,
+    small_buffer_size: Int,
+](ref [_]value: List[T]) -> _ListIter[
+    T, small_buffer_size, __lifetime_of(value), False
+]:
     """Get a reversed iterator of the input list.
 
     **Note**: iterators are currently non-raising.
 
     Parameters:
         T: The type of the elements in the list.
+        small_buffer_size: The size of the small buffer in the list.
 
     Args:
         value: The list to get the reversed iterator of.

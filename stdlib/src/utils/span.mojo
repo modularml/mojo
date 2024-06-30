@@ -113,8 +113,11 @@ struct Span[
         self._len = other._len
 
     @always_inline
-    fn __init__(inout self, ref [lifetime]list: List[T]):
+    fn __init__(inout self, ref [lifetime]list: List[T, _]):
         """Construct a Span from a List.
+
+        Parameters:
+            small_buffer_size: The size of the small buffer in the list.
 
         Args:
             list: The list to which the span refers.

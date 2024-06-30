@@ -38,19 +38,21 @@ from .optional import Optional
 struct _ListIter[
     list_mutability: Bool, //,
     T: CollectionElement,
+    small_buffer_size: Int,
     list_lifetime: AnyLifetime[list_mutability].type,
     forward: Bool = True,
 ]:
     """Iterator for List.
 
     Parameters:
-        list_mutability: Whether the reference to the list is mutable.
+        T: The type of the elements in the list.
+        small_buffer_size: The size of the small buffer.
         T: The type of the elements in the list.
         list_lifetime: The lifetime of the List
         forward: The iteration direction. `False` is backwards.
     """
 
-    alias list_type = List[T]
+    alias list_type = List[T, small_buffer_size]
 
     var index: Int
     var src: Reference[Self.list_type, list_lifetime]
@@ -77,7 +79,9 @@ struct _ListIter[
             return self.index
 
 
-struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
+struct List[T: CollectionElement, small_buffer_size: Int = 0](
+    CollectionElement, Sized, Boolable
+):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -85,9 +89,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     Parameters:
         T: The type of the elements.
+        small_buffer_size: Set if you need small buffer optimization.
     """
 
     # Fields
+    alias _small_buffer_type = InlineArray[T, small_buffer_size]
+    alias sbo_enabled = Self.small_buffer_size != 0
+    var _small_buffer: Self._small_buffer_type
     var data: UnsafePointer[T]
     """The underlying storage for the list."""
     var size: Int
@@ -102,10 +110,23 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     fn __init__(inout self):
         """Constructs an empty list."""
         self.data = UnsafePointer[T]()
-        self.size = 0
-        self.capacity = 0
+        self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
 
-    fn __init__(inout self, existing: Self):
+        @parameter
+        if Self.sbo_enabled:
+            self.data = self._small_buffer.unsafe_ptr()
+            self.capacity = Self.small_buffer_size
+        else:
+            # `self.data = UnsafePointer[T]()` is not there because
+            # we need to call it before calling
+            # `self.data = self._small_buffer.unsafe_ptr()`.
+            # Otherwise, we get the following compiler error:
+            # "potential indirect access to uninitialized value 'self.data'"
+            self.capacity = 0
+
+        self.size = 0
+
+    fn __init__(inout self, existing: List[T, _]):
         """Creates a deep copy of the given list.
 
         Args:
@@ -121,8 +142,19 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Args:
             capacity: The requested capacity of the list.
         """
-        self.data = UnsafePointer[T].alloc(capacity)
         self.size = 0
+        self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
+
+        @parameter
+        if Self.sbo_enabled:
+            if capacity <= Self.small_buffer_size:
+                self.capacity = Self.small_buffer_size
+                # needed to avoid "potential indirect access to uninitialized value 'self.data'"
+                self.data = UnsafePointer[T]()
+                self.data = self._small_buffer.unsafe_ptr()
+                return
+
+        self.data = UnsafePointer[T].alloc(capacity)
         self.capacity = capacity
 
     # TODO: Avoid copying elements in once owned varargs
@@ -164,6 +196,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.data = unsafe_pointer
         self.size = size
         self.capacity = capacity
+        self._small_buffer = Self._small_buffer_type(unsafe_uninitialized=True)
+
+    @always_inline
+    fn _sbo_is_in_use(self) -> Bool:
+        @parameter
+        if not Self.sbo_enabled:
+            return False
+        return self.data == self._small_buffer.unsafe_ptr()
 
     fn __moveinit__(inout self, owned existing: Self):
         """Move data of an existing list into a new one.
@@ -171,9 +211,18 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Args:
             existing: The existing list.
         """
-        self.data = existing.data
         self.size = existing.size
         self.capacity = existing.capacity
+        self._small_buffer = existing._small_buffer
+
+        @parameter
+        if Self.sbo_enabled:
+            if existing._sbo_is_in_use():
+                # Needed to avoid "potential indirect access to uninitialized value 'self.data'"
+                self.data = UnsafePointer[T]()
+                self.data = self._small_buffer.unsafe_ptr()
+                return
+        self.data = existing.data
 
     fn __copyinit__(inout self, existing: Self):
         """Creates a deepcopy of the given list.
@@ -190,7 +239,12 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             (self.data + i).destroy_pointee()
-        if self.data:
+        self._free_data_if_possible()
+
+    @always_inline
+    fn _free_data_if_possible(inout self):
+        """Free the memory of the list."""
+        if self.data and not self._sbo_is_in_use():
             self.data.free()
 
     # ===-------------------------------------------------------------------===#
@@ -200,7 +254,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     @always_inline
     fn __contains__[
         T2: ComparableCollectionElement
-    ](self: List[T], value: T2) -> Bool:
+    ](
+        self: Reference[List[T2, Self.small_buffer_size], _, _], value: T
+    ) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -219,7 +275,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
 
         constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
-        for i in self:
+        for i in self[]:
             if rebind[Reference[T2, __lifetime_of(self)]](i)[] == value:
                 return True
         return False
@@ -273,7 +329,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self.extend(other^)
 
-    fn __iter__(ref [_]self: Self) -> _ListIter[T, __lifetime_of(self)]:
+    fn __iter__(
+        ref [_]self: Self,
+    ) -> _ListIter[T, Self.small_buffer_size, __lifetime_of(self)]:
         """Iterate over elements of the list, returning immutable references.
 
         Returns:
@@ -283,7 +341,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     fn __reversed__(
         ref [_]self: Self,
-    ) -> _ListIter[T, __lifetime_of(self), False]:
+    ) -> _ListIter[T, Self.small_buffer_size, __lifetime_of(self), False]:
         """Iterate backwards over the list, returning immutable references.
 
         Returns:
@@ -311,7 +369,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         return len(self) > 0
 
-    fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
+    fn __str__[
+        U: RepresentableCollectionElement
+    ](self: Reference[List[U, Self.small_buffer_size], _, _]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -357,7 +417,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 writer.write(", ")
         writer.write("]")
 
-    fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
+    fn __repr__[
+        U: RepresentableCollectionElement
+    ](self: Reference[List[U, Self.small_buffer_size], _, _]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -365,7 +427,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         ```mojo
         var my_list = List[Int](1, 2, 3)
-        print(my_list.__repr__(my_list))
+        print(my_list.__repr__())
         ```
 
         When the compiler supports conditional methods, then a simple `repr(my_list)` will
@@ -380,7 +442,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A string representation of the list.
         """
-        return self.__str__()
+        return self[].__str__()
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -388,13 +450,42 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     @always_inline
     fn _realloc(inout self, new_capacity: Int):
+        @parameter
+        if Self.sbo_enabled:
+            self._realloc_with_sbo(new_capacity)
+        else:
+            self._realloc_without_sbo(new_capacity)
+
+    @always_inline
+    fn _realloc_with_sbo(inout self, new_capacity: Int):
+        var new_data: UnsafePointer[T]
+
+        if new_capacity <= Self.small_buffer_size:
+            # We don't need to move anything if the data is already stored in the
+            # inline buffer and the new capacity still fits in that inline buffer.
+            if self._sbo_is_in_use():
+                return
+            new_data = self._small_buffer.unsafe_ptr()
+            self.capacity = Self.small_buffer_size
+        else:
+            new_data = UnsafePointer[T].alloc(new_capacity)
+            self.capacity = new_capacity
+
+        for i in range(self.size):
+            move_pointee(src=self.data + i, dst=new_data + i)
+
+        self._free_data_if_possible()
+        self.data = new_data
+
+    @always_inline
+    fn _realloc_without_sbo(inout self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
         for i in range(self.size):
             (self.data + i).move_pointee_into(new_data + i)
 
-        if self.data:
-            self.data.free()
+        self._free_data_if_possible()
+
         self.data = new_data
         self.capacity = new_capacity
 
@@ -455,13 +546,13 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if x == 0:
             self.clear()
             return
-        var orig = List(self)
+        var orig = List[small_buffer_size = Self.small_buffer_size](self)
         self.reserve(len(self) * x)
         for i in range(x - 1):
             self.extend(orig)
 
     @always_inline
-    fn extend(inout self, owned other: List[T]):
+    fn extend(inout self, owned other: List[T, _]):
         """Extends this list by consuming the elements of `other`.
 
         Args:
@@ -672,6 +763,18 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             The underlying data.
         """
+
+        @parameter
+        if Self.sbo_enabled:
+            if self._sbo_is_in_use():
+                # We use here the fact that if we reallocate for something
+                # that doesn't fit in the small buffer, then a heap allocation
+                # must be done. We allocate more than we need and it's not great
+                # for performance.
+                # TODO: add an argument "force_alloc" to the _realloc method
+                # to force heap allocation even if the capacity is smaller than the
+                # small buffer size.
+                self._realloc(Self.small_buffer_size + 1)
         var ptr = self.data
         self.data = UnsafePointer[T]()
         self.size = 0
@@ -801,7 +904,9 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         (self.data + idx).destroy_pointee()
         (self.data + idx).init_pointee_move(value^)
 
-    fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
+    fn count[
+        U: ComparableCollectionElement
+    ](self: Reference[List[U, Self.small_buffer_size], _, _], value: U) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below.
@@ -815,7 +920,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         be enough.
 
         Parameters:
-            T: The type of the elements in the list. Must implement the
+            U: The type of the elements in the list. Must implement the
               traits `EqualityComparable` and `CollectionElement`.
 
         Args:
@@ -825,7 +930,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             The number of occurrences of the value in the list.
         """
         var count = 0
-        for elem in self:
+        for elem in self[]:
             if elem[] == value:
                 count += 1
         return count
