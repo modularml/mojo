@@ -330,6 +330,14 @@ def test_dtypepointer_string():
     ptr.free()
 
 
+def test_pointer_explicit_copy():
+    var ptr = Pointer[Int].alloc(1)
+    ptr[] = 42
+    var copy = Pointer(other=ptr)
+    assert_equal(copy[], 42)
+    ptr.free()
+
+
 def test_pointer_refitem():
     var ptr = Pointer[Int].alloc(1)
     ptr[] = 42
@@ -534,6 +542,7 @@ def main():
     test_memcpy_unsafe_pointer()
     test_memset()
 
+    test_pointer_explicit_copy()
     test_dtypepointer_string()
     test_pointer_refitem()
     test_pointer_refitem_string()
