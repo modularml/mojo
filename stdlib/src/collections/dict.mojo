@@ -986,7 +986,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._n_entries = self.size
 
 
-struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
+struct OwnedKwargsDict[V: CollectionElement](
+    Sized, CollectionElement, CollectionElementNew
+):
     """Container used to pass owned variadic keyword arguments to functions.
 
     This type mimics the interface of a dictionary with `String` keys, and
@@ -1009,6 +1011,14 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn __init__(inout self):
         """Initialize an empty keyword dictionary."""
         self._dict = Dict[Self.key_type, V]()
+
+    fn __init__(inout self, *, other: Self):
+        """Copy an existing keyword dictionary.
+
+        Args:
+            other: The existing keyword dictionary.
+        """
+        self._dict = other._dict
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing keyword dictionary.

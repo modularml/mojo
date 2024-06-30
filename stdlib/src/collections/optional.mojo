@@ -36,8 +36,9 @@ from utils import Variant
 
 # TODO(27780): NoneType can't currently conform to traits
 @value
-struct _NoneType(CollectionElement):
-    pass
+struct _NoneType(CollectionElement, CollectionElementNew):
+    fn __init__(inout self, *, other: Self):
+        pass
 
 
 # ===----------------------------------------------------------------------===#
