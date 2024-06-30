@@ -526,7 +526,7 @@ def test_2d_dynamic_list():
 def test_list_explicit_copy_using_get_ref():
     var list = List[CopyCounter]()
     list.append(CopyCounter())
-    var list_copy = List(list)
+    var list_copy = List(other=list)
     assert_equal(0, list.__get_ref(0)[].copy_count)
     assert_equal(1, list_copy.__get_ref(0)[].copy_count)
 
@@ -534,7 +534,7 @@ def test_list_explicit_copy_using_get_ref():
     for i in range(10):
         l2.append(i)
 
-    var l2_copy = List(l2)
+    var l2_copy = List(other=l2)
     assert_equal(len(l2), len(l2_copy))
     for i in range(len(l2)):
         assert_equal(l2[i], l2_copy[i])
@@ -543,7 +543,7 @@ def test_list_explicit_copy_using_get_ref():
 def test_list_explicit_copy():
     var list = List[CopyCounter]()
     list.append(CopyCounter())
-    var list_copy = List(list)
+    var list_copy = List(other=list)
     assert_equal(0, list[0].copy_count)
     assert_equal(1, list_copy[0].copy_count)
 
@@ -551,7 +551,7 @@ def test_list_explicit_copy():
     for i in range(10):
         l2.append(i)
 
-    var l2_copy = List(l2)
+    var l2_copy = List(other=l2)
     assert_equal(len(l2), len(l2_copy))
     for i in range(len(l2)):
         assert_equal(l2[i], l2_copy[i])
