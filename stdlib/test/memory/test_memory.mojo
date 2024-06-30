@@ -86,6 +86,8 @@ def test_memcpy():
     _test_memcpy_buf[12]()
     _test_memcpy_buf[16]()
     _test_memcpy_buf[19]()
+    _ = pair1
+    _ = pair2
 
 
 def test_memcpy_dtype():
@@ -128,6 +130,8 @@ def test_memcmp():
     var errors2 = memcmp(ptr1, ptr2, 1)
 
     assert_equal(errors2, 0)
+    _ = pair1
+    _ = pair2
 
 
 def test_memcmp_overflow():
@@ -303,6 +307,7 @@ def test_memset():
     var buf1 = DTypePointer[DType.int8].alloc(2)
     memset(buf1, 5, 2)
     assert_equal(Scalar.load(buf1, 0), 5)
+    _ = pair
 
 
 def test_pointer_string():

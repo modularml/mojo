@@ -15,6 +15,8 @@
 # In Python, these are in the math module, so we also expose them here.
 from utils.numerics import inf, isfinite, isinf, isnan, nan, nextafter, ulp
 
+from .constants import pi, e, tau
+
 # These are not part of Python's `math` module, but we define them here.
 from .math import (
     Ceilable,

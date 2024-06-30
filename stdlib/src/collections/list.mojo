@@ -25,6 +25,7 @@ from sys.intrinsics import _type_is_eq
 from memory import Reference, UnsafePointer
 
 from utils import Span
+from utils._format import write_to
 
 from .optional import Optional
 
@@ -63,10 +64,10 @@ struct _ListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__get_ref(self.index - 1)[]
+            return self.src[][self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__get_ref(self.index)[]
+            return self.src[][self.index]
 
     fn __len__(self) -> Int:
         @parameter
@@ -196,24 +197,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    fn __setitem__(inout self, idx: Int, owned value: T):
-        """Sets a list element at the given index.
-
-        Args:
-            idx: The index of the element.
-            value: The value to assign.
-        """
-        var normalized_idx = idx
-        debug_assert(
-            -self.size <= normalized_idx < self.size,
-            "index must be within bounds",
-        )
-
-        if normalized_idx < 0:
-            normalized_idx += len(self)
-
-        self.unsafe_set(normalized_idx, value^)
-
     @always_inline
     fn __contains__[
         T2: ComparableCollectionElement
@@ -342,7 +325,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         When the compiler supports conditional methods, then a simple `str(my_list)` will
         be enough.
 
-        The elements' type must implement the `__repr__()` for this to work.
+        The elements' type must implement the `__repr__()` method for this to work.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
@@ -351,26 +334,32 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             A string representation of the list.
         """
-        # we do a rough estimation of the number of chars that we'll see
-        # in the final string, we assume that str(x) will be at least one char.
-        var minimum_capacity = (
-            2  # '[' and ']'
-            + len(self) * 3  # str(x) and ", "
-            - 2  # remove the last ", "
-        )
-        var string_buffer = List[UInt8](capacity=minimum_capacity)
-        string_buffer.append(0)  # Null terminator
-        var result = String(string_buffer^)
-        result += "["
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output^
+
+    fn format_to[
+        U: RepresentableCollectionElement
+    ](self: List[U], inout writer: Formatter):
+        """Write `my_list.__str__()` to a `Formatter`.
+
+        Parameters:
+            U: The type of the List elements. Must have the trait `RepresentableCollectionElement`.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        writer.write("[")
         for i in range(len(self)):
-            result += repr(self[i])
+            writer.write(repr(self[i]))
             if i < len(self) - 1:
-                result += ", "
-        result += "]"
-        return result
+                writer.write(", ")
+        writer.write("]")
 
     fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
+
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below:
 
@@ -593,29 +582,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.size = new_size
         self.reserve(new_size)
 
+    @always_inline
     fn reverse(inout self):
         """Reverses the elements of the list."""
-        try:
-            self._reverse()
-        except:
-            abort("unreachable: default _reverse start unexpectedly fails")
 
-    # This method is private to avoid exposing the non-Pythonic `start` argument.
-    @always_inline
-    fn _reverse(inout self, start: Int = 0) raises:
-        """Reverses the elements of the list at positions after `start`.
-
-        Args:
-            start: An integer indicating the position after which to reverse elements.
-        """
-        var start_idx = start if start >= 0 else len(self) + start
-        if start_idx < 0 or start_idx > len(self):
-            raise "IndexError: start index out of range."
-
-        var earlier_idx = start_idx
+        var earlier_idx = 0
         var later_idx = len(self) - 1
 
-        var effective_len = len(self) - start_idx
+        var effective_len = len(self)
         var half_len = effective_len // 2
 
         for _ in range(half_len):
@@ -731,16 +705,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         return res^
 
     @always_inline
-    fn __getitem__(self, idx: Int) -> T:
-        """Gets a copy of the list element at the given index.
-
-        FIXME(lifetimes): This should return a reference, not a copy!
+    fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
+        """Gets the list element at the given index.
 
         Args:
             idx: The index of the element.
 
         Returns:
-            A copy of the element at the given index.
+            A reference to the element at the given index.
         """
         var normalized_idx = idx
         debug_assert(

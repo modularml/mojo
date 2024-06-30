@@ -28,7 +28,7 @@ from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
-from utils import StringRef, unroll
+from utils import StringRef, unroll, StaticString, StringSlice
 from utils._format import Formattable, Formatter, write_to
 
 # ===----------------------------------------------------------------------=== #
@@ -113,6 +113,7 @@ fn _printf[
         _ = external_call["vprintf", Int32](
             fmt.unsafe_cstr_ptr(), UnsafePointer.address_of(loaded_pack)
         )
+        _ = loaded_pack
     else:
         with _fdopen(file) as fd:
             _ = __mlir_op.`pop.external_call`[
@@ -271,7 +272,7 @@ fn _put_simd_scalar[type: DType](x: Scalar[type]):
         if triple_is_nvidia_cuda():
             _printf[format](x.cast[DType.float64]())
         else:
-            _put(str(x))
+            _put(str(x).as_string_slice())
     else:
         constrained[False, "invalid dtype"]()
 
@@ -302,55 +303,62 @@ fn _put[type: DType, simd_width: Int](x: SIMD[type, simd_width]):
                 _put[", "]()
         _put["]"]()
     else:
-        _put(str(x))
+        _put(str(x).as_string_slice())
 
 
 @no_inline
-fn _put(x: String, file: FileDescriptor = stdout):
-    # 'x' is borrowed, so we know it will outlive the call to print.
-    _put(x._strref_dangerous(), file=file)
+fn _put[x: StringLiteral](file: FileDescriptor = stdout):
+    _put(x.as_string_slice(), file=file)
+
+
+fn _put(strref: StringRef, file: FileDescriptor = stdout):
+    var str_slice = StringSlice[ImmutableStaticLifetime](
+        unsafe_from_utf8_strref=strref
+    )
+
+    _put(str_slice, file=file)
 
 
 @no_inline
-fn _put(x: StringRef, file: FileDescriptor = stdout):
+fn _put(x: DType, file: FileDescriptor = stdout):
+    _put(str(x).as_string_slice(), file=file)
+
+
+# TODO: Constrain to `StringSlice[False, _]`
+@no_inline
+fn _put(x: StringSlice, file: FileDescriptor = stdout):
     # Avoid printing "(null)" for an empty/default constructed `String`
-    var str_len = len(x)
+    var str_len = x._byte_length()
 
     if not str_len:
         return
 
     @parameter
     if triple_is_nvidia_cuda():
+        # Note:
+        #   This assumes that the `StringSlice` that was passed in is NUL
+        #   terminated.
         var tmp = 0
         var arg_ptr = UnsafePointer.address_of(tmp)
         _ = external_call["vprintf", Int32](
-            x.data, arg_ptr.bitcast[UnsafePointer[NoneType]]()
+            x.unsafe_ptr(), arg_ptr.bitcast[UnsafePointer[NoneType]]()
         )
+        _ = tmp
     else:
         alias MAX_STR_LEN = 0x1000_0000
 
         # The string can be printed, so that's fine.
         if str_len < MAX_STR_LEN:
-            _printf["%.*s"](x.length, x.data, file=file)
+            _printf["%.*s"](x._byte_length(), x.unsafe_ptr(), file=file)
             return
 
         # The string is large, then we need to chunk it.
-        var p = x.data
+        var p = x.unsafe_ptr()
         while str_len:
             var ll = min(str_len, MAX_STR_LEN)
             _printf["%.*s"](ll, p, file=file)
             str_len -= ll
             p += ll
-
-
-@no_inline
-fn _put[x: StringLiteral](file: FileDescriptor = stdout):
-    _put(StringRef(x), file=file)
-
-
-@no_inline
-fn _put(x: DType, file: FileDescriptor = stdout):
-    _put(str(x), file=file)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -360,74 +368,11 @@ fn _put(x: DType, file: FileDescriptor = stdout):
 
 @no_inline
 fn print[
-    *Ts: Stringable
-](*values: *Ts, flush: Bool = False, file: FileDescriptor = stdout):
-    """Prints elements to the text stream. Each element is separated by a
-    whitespace and followed by a newline character.
-
-    Parameters:
-        Ts: The elements types.
-
-    Args:
-        values: The elements to print.
-        flush: If set to true, then the stream is forcibly flushed.
-        file: The output stream.
-    """
-    _print(values, sep=" ", end="\n", flush=flush, file=file)
-
-
-@no_inline
-fn print[
-    *Ts: Stringable, EndTy: Stringable
+    *Ts: Formattable
 ](
     *values: *Ts,
-    end: EndTy,
-    flush: Bool = False,
-    file: FileDescriptor = stdout,
-):
-    """Prints elements to the text stream. Each element is separated by a
-    whitespace and followed by `end`.
-
-    Parameters:
-        Ts: The elements types.
-        EndTy: The type of end argument.
-
-    Args:
-        values: The elements to print.
-        end: The String to write after printing the elements.
-        flush: If set to true, then the stream is forcibly flushed.
-        file: The output stream.
-    """
-    _print(values, sep=" ", end=str(end), flush=flush, file=file)
-
-
-@no_inline
-fn print[
-    SepTy: Stringable, *Ts: Stringable
-](*values: *Ts, sep: SepTy, flush: Bool = False, file: FileDescriptor = stdout):
-    """Prints elements to the text stream. Each element is separated by `sep`
-    and followed by a newline character.
-
-    Parameters:
-        SepTy: The type of separator.
-        Ts: The elements types.
-
-    Args:
-        values: The elements to print.
-        sep: The separator used between elements.
-        flush: If set to true, then the stream is forcibly flushed.
-        file: The output stream.
-    """
-    _print(values, sep=str(sep), end="\n", flush=flush, file=file)
-
-
-@no_inline
-fn print[
-    SepTy: Stringable, EndTy: Stringable, *Ts: Stringable
-](
-    *values: *Ts,
-    sep: SepTy,
-    end: EndTy,
+    sep: StaticString = " ",
+    end: StaticString = "\n",
     flush: Bool = False,
     file: FileDescriptor = stdout,
 ):
@@ -435,8 +380,6 @@ fn print[
     and followed by `end`.
 
     Parameters:
-        SepTy: The type of separator.
-        EndTy: The type of end argument.
         Ts: The elements types.
 
     Args:
@@ -446,81 +389,23 @@ fn print[
         flush: If set to true, then the stream is forcibly flushed.
         file: The output stream.
     """
-    _print(values, sep=str(sep), end=str(end), flush=flush, file=file)
 
+    var writer = Formatter(fd=file)
 
-@no_inline
-fn _print[
-    *Ts: Stringable
-](
-    values: VariadicPack[_, _, Stringable, Ts],
-    *,
-    sep: String,
-    end: String,
-    flush: Bool,
-    file: FileDescriptor,
-):
     @parameter
-    fn print_with_separator[i: Int, T: Stringable](value: T):
-        _put(str(value), file=file)
+    fn print_with_separator[i: Int, T: Formattable](value: T):
+        writer.write(value)
 
         @parameter
         if i < values.__len__() - 1:
-            _put(sep, file=file)
+            writer.write(sep)
 
     values.each_idx[print_with_separator]()
 
-    _put(end, file=file)
-    if flush:
-        _flush(file=file)
-
-
-# ===----------------------------------------------------------------------=== #
-#  print_fmt
-# ===----------------------------------------------------------------------=== #
-
-
-# TODO:
-#   Finish transition to using non-allocating formatting abstractions by
-#   default, replace `print` with this function.
-@no_inline
-fn _print_fmt[
-    T: Formattable,
-    *Ts: Formattable,
-    sep: StringLiteral = " ",
-    end: StringLiteral = "\n",
-](first: T, *rest: *Ts, flush: Bool = False):
-    """Prints elements to the text stream. Each element is separated by `sep`
-    and followed by `end`.
-
-    This print function does not perform unnecessary intermediate String
-    allocations during formatting.
-
-    Parameters:
-        T: The first element type.
-        Ts: The remaining element types.
-        sep: The separator used between elements.
-        end: The String to write after printing the elements.
-
-    Args:
-        first: The first element.
-        rest: The remaining elements.
-        flush: If set to true, then the stream is forcibly flushed.
-    """
-    var writer = Formatter.stdout()
-
-    write_to(writer, first)
-
-    @parameter
-    fn print_elt[T: Formattable](a: T):
-        write_to(writer, sep, a)
-
-    rest.each[print_elt]()
-
-    write_to(writer, end)
+    writer.write(end)
 
     # TODO: What is a flush function that works on CUDA?
     @parameter
     if not triple_is_nvidia_cuda():
         if flush:
-            _flush()
+            _flush(file=file)

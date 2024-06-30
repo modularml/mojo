@@ -60,7 +60,7 @@ fn _dir_of_current_file() raises -> Path:
     return Path(str(file_name)[0:i])
 
 
-struct Path(Stringable, CollectionElement, PathLike, KeyElement):
+struct Path(Stringable, Formattable, CollectionElement, PathLike, KeyElement):
     """The Path object."""
 
     var path: String
@@ -137,7 +137,17 @@ struct Path(Stringable, CollectionElement, PathLike, KeyElement):
         Returns:
           A string representation of the path.
         """
-        return self.path
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this path to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        writer.write(self.path)
 
     @always_inline
     fn __fspath__(self) -> String:

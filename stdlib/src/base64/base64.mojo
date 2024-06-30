@@ -224,7 +224,7 @@ fn b16decode(str: String) -> String:
     var n = len(str)
     debug_assert(n % 2 == 0, "Input length must be divisible by 2")
 
-    var p = List[UInt8](capacity=int(n / 2) + 1)
+    var p = List[UInt8](capacity=n // 2 + 1)
 
     for i in range(0, n, 2):
         var hi = str[i]

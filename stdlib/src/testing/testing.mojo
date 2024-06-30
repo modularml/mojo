@@ -76,11 +76,13 @@ fn _assert_error[T: Stringable](msg: T, loc: _SourceLocation) -> String:
 
 
 @always_inline
-fn assert_true(
-    val: Bool, msg: String = "condition was unexpectedly False"
-) raises:
-    """Asserts that the input value is True. If it is not then an
-    Error is raised.
+fn assert_true[
+    T: Boolable, //
+](val: T, msg: String = "condition was unexpectedly False") raises:
+    """Asserts that the input value is True and raises an Error if it's not.
+
+    Parameters:
+        T: The type of the value argument.
 
     Args:
         val: The value to assert to be True.
@@ -94,11 +96,13 @@ fn assert_true(
 
 
 @always_inline
-fn assert_false(
-    val: Bool, msg: String = "condition was unexpectedly True"
-) raises:
-    """Asserts that the input value is False. If it is not then an Error is
-    raised.
+fn assert_false[
+    T: Boolable, //
+](val: T, msg: String = "condition was unexpectedly True") raises:
+    """Asserts that the input value is False and raises an Error if it's not.
+
+    Parameters:
+        T: The type of the value argument.
 
     Args:
         val: The value to assert to be False.
@@ -135,7 +139,9 @@ fn assert_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
+        raise _assert_cmp_error["`left == right` comparison"](
+            str(lhs), str(rhs), msg, __call_location()
+        )
 
 
 # TODO: Remove the String and SIMD overloads once we have more powerful traits.
@@ -153,7 +159,9 @@ fn assert_equal(lhs: String, rhs: String, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs != rhs:
-        raise _assert_equal_error(lhs, rhs, msg, __call_location())
+        raise _assert_cmp_error["`left == right` comparison"](
+            lhs, rhs, msg, __call_location()
+        )
 
 
 @always_inline
@@ -176,7 +184,9 @@ fn assert_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if any(lhs != rhs):
-        raise _assert_equal_error(str(lhs), str(rhs), msg, __call_location())
+        raise _assert_cmp_error["`left == right` comparison"](
+            str(lhs), str(rhs), msg, __call_location()
+        )
 
 
 @always_inline
@@ -196,7 +206,7 @@ fn assert_not_equal[T: Testable](lhs: T, rhs: T, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise _assert_not_equal_error(
+        raise _assert_cmp_error["`left != right` comparison"](
             str(lhs), str(rhs), msg, __call_location()
         )
 
@@ -215,7 +225,9 @@ fn assert_not_equal(lhs: String, rhs: String, msg: String = "") raises:
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if lhs == rhs:
-        raise _assert_not_equal_error(lhs, rhs, msg, __call_location())
+        raise _assert_cmp_error["`left != right` comparison"](
+            lhs, rhs, msg, __call_location()
+        )
 
 
 @always_inline
@@ -238,7 +250,7 @@ fn assert_not_equal[
         An Error with the provided message if assert fails and `None` otherwise.
     """
     if all(lhs == rhs):
-        raise _assert_not_equal_error(
+        raise _assert_cmp_error["`left != right` comparison"](
             str(lhs), str(rhs), msg, __call_location()
         )
 
@@ -304,29 +316,64 @@ fn assert_almost_equal[
         raise _assert_error(err, __call_location())
 
 
-fn _assert_equal_error(
-    lhs: String, rhs: String, msg: String, loc: _SourceLocation
-) -> String:
-    var err = (
-        "`left == right` comparison failed:\n   left: "
-        + lhs
-        + "\n  right: "
-        + rhs
-    )
-    if msg:
-        err += "\n  reason: " + msg
-    return _assert_error(err, loc)
+@always_inline
+fn assert_is[
+    T: StringableIdentifiable
+](lhs: T, rhs: T, msg: String = "") raises:
+    """Asserts that the input values have the same identity. If they do not
+    then an Error is raised.
+
+    Parameters:
+        T: A StringableIdentifiable type.
+
+    Args:
+        lhs: The lhs of the `is` statement.
+        rhs: The rhs of the `is` statement.
+        msg: The message to be printed if the assertion fails.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
+    if lhs is not rhs:
+        raise _assert_cmp_error["`left is right` identification"](
+            str(lhs),
+            str(rhs),
+            msg,
+            __call_location(),
+        )
 
 
-fn _assert_not_equal_error(
-    lhs: String, rhs: String, msg: String, loc: _SourceLocation
-) -> String:
-    var err = (
-        "`left != right` comparison failed:\n   left: "
-        + lhs
-        + "\n  right: "
-        + rhs
-    )
+@always_inline
+fn assert_is_not[
+    T: StringableIdentifiable
+](lhs: T, rhs: T, msg: String = "") raises:
+    """Asserts that the input values have different identities. If they do not
+    then an Error is raised.
+
+    Parameters:
+        T: A StringableIdentifiable type.
+
+    Args:
+        lhs: The lhs of the `is not` statement.
+        rhs: The rhs of the `is not` statement.
+        msg: The message to be printed if the assertion fails.
+
+    Raises:
+        An Error with the provided message if assert fails and `None` otherwise.
+    """
+    if lhs is rhs:
+        raise _assert_cmp_error["`left is not right` identification"](
+            str(lhs),
+            str(rhs),
+            msg,
+            __call_location(),
+        )
+
+
+fn _assert_cmp_error[
+    cmp: String
+](lhs: String, rhs: String, msg: String, loc: _SourceLocation) -> String:
+    var err = (cmp + " failed:\n   left: " + lhs + "\n  right: " + rhs)
     if msg:
         err += "\n  reason: " + msg
     return _assert_error(err, loc)
@@ -399,8 +446,14 @@ struct assert_raises:
     fn __exit__(self, error: Error) raises -> Bool:
         """Exit the context manager with an error.
 
+        Args:
+            error: The error raised.
+
         Raises:
-            Error: If the error raised doesn't match the expected error to raise.
+            Error: If the error raised doesn't include the expected string.
+
+        Returns:
+            True if the error message contained the expected string.
         """
         if self.message_contains:
             return self.message_contains.value() in str(error)

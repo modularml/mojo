@@ -13,8 +13,7 @@
 # RUN: %mojo %s
 
 from collections.list import List
-
-from testing import assert_equal
+from testing import assert_equal, assert_true
 
 from utils import InlineArray, Span
 
@@ -143,6 +142,40 @@ def test_span_slice():
     # assert_equal(res[1], 1)
 
 
+def test_copy_from():
+    var a = List[Int](0, 1, 2, 3)
+    var b = List[Int](4, 5, 6, 7, 8, 9, 10)
+    var s = Span(a)
+    var s2 = Span(b)
+    s.copy_from(s2[: len(a)])
+    for i in range(len(a)):
+        assert_equal(a[i], b[i])
+        assert_equal(s[i], s2[i])
+
+
+def test_bool():
+    var l = InlineArray[String, 7]("a", "b", "c", "d", "e", "f", "g")
+    var s = Span[String](l)
+    assert_true(s)
+    assert_true(not s[0:0])
+
+
+def test_equality():
+    var l = InlineArray[String, 7]("a", "b", "c", "d", "e", "f", "g")
+    var l2 = List[String]("a", "b", "c", "d", "e", "f", "g")
+    var sp = Span[String](l)
+    var sp2 = Span[String](l)
+    var sp3 = Span(l2)
+    # same pointer
+    assert_true(sp == sp2)
+    # different pointer
+    assert_true(sp == sp3)
+    # different length
+    assert_true(sp != sp3[:-1])
+    # empty
+    assert_true(sp[0:0] == sp3[0:0])
+
+
 def main():
     test_span_list_int()
     test_span_list_str()
@@ -150,3 +183,5 @@ def main():
     test_span_array_str()
     test_indexing()
     test_span_slice()
+    test_equality()
+    test_bool()

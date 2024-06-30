@@ -27,11 +27,11 @@ from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 @register_passable("trivial")
 struct FloatLiteral(
     Absable,
-    Boolable,
     Ceilable,
     CeilDivable,
     Comparable,
     Floorable,
+    ImplicitlyBoolable,
     Intable,
     Roundable,
     Stringable,
@@ -160,6 +160,15 @@ struct FloatLiteral(
             True if non-zero.
         """
         return self != 0.0
+
+    @always_inline("nodebug")
+    fn __as_bool__(self) -> Bool:
+        """A FloatLiteral value is true if it is non-zero.
+
+        Returns:
+            True if non-zero.
+        """
+        return self.__bool__()
 
     @always_inline("nodebug")
     fn __neg__(self) -> FloatLiteral:
@@ -409,7 +418,7 @@ struct FloatLiteral(
             rhs: The value to divide on.
 
         Returns:
-            The tuple with the dividend and the remainder
+            A tuple with the dividend and the remainder.
         """
         var quotient: Self = self.__floordiv__(rhs)
         var remainder: Self = self - (quotient * rhs)

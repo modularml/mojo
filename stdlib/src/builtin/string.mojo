@@ -56,11 +56,18 @@ fn ord(s: String) -> Int:
         return int(b1)
     var num_bytes = countl_zero(~b1)
     debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    debug_assert(
+        1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
+    )
     var shift = int((6 * (num_bytes - 1)))
     var b1_mask = 0b11111111 >> (num_bytes + 1)
     var result = int(b1 & b1_mask) << shift
-    for _ in range(1, num_bytes):
+    for i in range(1, num_bytes):
         p += 1
+        debug_assert(
+            p[] >> 6 == 0b00000010,
+            "invalid UTF-8 byte " + str(b1) + " at index " + str(i),
+        )
         shift -= 6
         result |= int(p[] & 0b00111111) << shift
     return result
@@ -163,7 +170,10 @@ fn _repr_ascii(c: UInt8) -> String:
         return r"\r"
     else:
         var uc = c.cast[DType.uint8]()
-        return hex[r"\x0"](uc) if uc < 16 else hex[r"\x"](uc)
+        if uc < 16:
+            return hex(uc, prefix=r"\x0")
+        else:
+            return hex(uc, prefix=r"\x")
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
@@ -527,6 +537,22 @@ fn isdigit(c: String) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
+fn isupper(c: String) -> Bool:
+    """Determines whether the given character is an uppercase character.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is uppercase.
+    """
+    return isupper(ord(c))
+
+
 fn isupper(c: UInt8) -> Bool:
     """Determines whether the given character is an uppercase character.
 
@@ -553,6 +579,22 @@ fn _is_ascii_uppercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
+fn islower(c: String) -> Bool:
+    """Determines whether the given character is an lowercase character.
+
+    This currently only respects the default "C" locale, i.e. returns True iff
+    the character specified is one of "abcdefghijklmnopqrstuvwxyz".
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is lowercase.
+    """
+    return islower(ord(c))
+
+
 fn islower(c: UInt8) -> Bool:
     """Determines whether the given character is an lowercase character.
 
@@ -577,6 +619,23 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # _isspace
 # ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn _isspace(c: String) -> Bool:
+    """Determines whether the given character is a whitespace character.
+
+    This only respects the default "C" locale, i.e. returns True only if the
+    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
+    to Python, use `String.isspace()`.
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True iff the character is one of the whitespace characters listed above.
+    """
+    return _isspace(ord(c))
 
 
 fn _isspace(c: UInt8) -> Bool:
@@ -656,6 +715,19 @@ fn _isnewline(s: String) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # isprintable
 # ===----------------------------------------------------------------------=== #
+
+
+@always_inline
+fn isprintable(c: String) -> Bool:
+    """Determines whether the given character is a printable character.
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True if the character is a printable character, otherwise False.
+    """
+    return isprintable(ord(c))
 
 
 fn isprintable(c: UInt8) -> Bool:
@@ -771,6 +843,7 @@ struct String(
     Boolable,
     Formattable,
     ToFormatter,
+    CollectionElementNew,
 ):
     """Represents a mutable string."""
 
@@ -976,6 +1049,17 @@ struct String(
 
         Returns:
             A string formed by formatting the argument sequence.
+
+        Examples:
+
+        Construct a String from several `Formattable` arguments:
+
+        ```mojo
+        var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
+
+        assert_equal(string, "1, 2.0, three")
+        ```
+        .
         """
 
         var output = String()
@@ -986,6 +1070,7 @@ struct String(
             arg.format_to(writer)
 
         args.each[write_arg]()
+        _ = writer^
 
         return output^
 
@@ -1244,10 +1329,10 @@ struct String(
 
     @always_inline
     fn __len__(self) -> Int:
-        """Returns the string byte length.
+        """Gets the string length, in bytes.
 
         Returns:
-            The string byte length.
+            The string length, in bytes.
         """
         var unicode_length = self.byte_length()
 
@@ -1260,6 +1345,14 @@ struct String(
 
     @always_inline
     fn __str__(self) -> String:
+        """Gets the string itself.
+
+        This method ensures that you can pass a `String` to a method that
+        takes a `Stringable` value.
+
+        Returns:
+            The string itself.
+        """
         return self
 
     @always_inline
@@ -1375,6 +1468,7 @@ struct String(
             result += str(a)
 
         elems.each[add_elt]()
+        _ = is_first
         return result
 
     fn join[T: StringableCollectionElement](self, elems: List[T]) -> String:
@@ -2168,15 +2262,43 @@ struct String(
         Returns:
             True if all characters are digits else False.
         """
-        for c in self:
-            if not isdigit(c):
-                return False
-        return True
+        return _all[isdigit](self)
+
+    fn isupper(self) -> Bool:
+        """Returns True if all characters in the string are uppercase.
+
+        Returns:
+            True if all characters are uppercase else False.
+        """
+        return _all[isupper](self)
+
+    fn islower(self) -> Bool:
+        """Returns True if all characters in the string are lowercase.
+
+        Returns:
+            True if all characters are lowercase else False.
+        """
+        return _all[islower](self)
+
+    fn isprintable(self) -> Bool:
+        """Returns True if all characters in the string are printable.
+
+        Returns:
+            True if all characters are printable else False.
+        """
+        return _all[isprintable](self)
 
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
+
+
+fn _all[func: fn (String) -> Bool](s: String) -> Bool:
+    for c in s:
+        if not func(c):
+            return False
+    return True
 
 
 fn _toggle_ascii_case(char: UInt8) -> UInt8:
@@ -2250,19 +2372,10 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
 
 @always_inline
 fn _calc_initial_buffer_size(n0: Int) -> Int:
-    var n = abs(n0)
     var sign = 0 if n0 > 0 else 1
-    alias is_32bit_system = bitwidthof[DType.index]() == 32
 
     # Add 1 for the terminator
-    @parameter
-    if is_32bit_system:
-        return sign + _calc_initial_buffer_size_int32(n) + 1
-
-    # The value only has low-bits.
-    if n >> 32 == 0:
-        return sign + _calc_initial_buffer_size_int32(n) + 1
-    return sign + _calc_initial_buffer_size_int64(n) + 1
+    return sign + n0._decimal_digit_count() + 1
 
 
 fn _calc_initial_buffer_size(n: Float64) -> Int:

@@ -88,7 +88,11 @@ trait Hashable:
     """
 
     fn __hash__(self) -> Int:
-        """Return a 64-bit hash of the type's data."""
+        """Return a 64-bit hash of the type's data.
+
+        Returns:
+            A 64-bit integer hash of this instance's data.
+        """
         ...
 
 
@@ -173,13 +177,12 @@ fn _hash_simd[type: DType, size: Int](data: SIMD[type, size]) -> Int:
     var final_data = bitcast[int_type, 1](hash_data[0]).cast[DType.uint64]()
 
     @parameter
-    fn hash_value[i: Int]():
+    for i in range(1, size):
         final_data = _ankerl_hash_update(
             final_data,
-            bitcast[int_type, 1](hash_data[i + 1]).cast[DType.uint64](),
+            bitcast[int_type, 1](hash_data[i]).cast[DType.uint64](),
         )
 
-    unroll[hash_value, size - 1]()
     return int(final_data)
 
 

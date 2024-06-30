@@ -39,20 +39,20 @@ feedback](/mojo/community).
 
 - **Value ownership**
 
-  - [Intro to value ownership](/mojo/manual/values/index)
+  - [Intro to value ownership](/mojo/manual/values/)
   - [Value semantics](/mojo/manual/values/value-semantics)
   - [Ownership and borrowing](/mojo/manual/values/ownership)
 
 - **Value lifecycle**
 
-  - [Intro to value lifecycle](/mojo/manual/lifecycle/index)
+  - [Intro to value lifecycle](/mojo/manual/lifecycle/)
   - [Life of a value](/mojo/manual/lifecycle/life)
   - [Death of a value](/mojo/manual/lifecycle/death)
 
 - **Traits and parameters**
 
   - [Traits](/mojo/manual/traits)
-  - [Parameterization: compile-time metaprogramming](/mojo/manual/parameters/index)
+  - [Parameterization: compile-time metaprogramming](/mojo/manual/parameters/)
 
 - **Pointers**
 
@@ -60,7 +60,7 @@ feedback](/mojo/community).
 
 - **Python**
 
-  - [Python integration](/mojo/manual/python/index)
+  - [Python integration](/mojo/manual/python/)
   - [Python types](/mojo/manual/python/types)
 
 - **Tools**

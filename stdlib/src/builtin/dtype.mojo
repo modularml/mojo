@@ -27,7 +27,7 @@ alias _mIsFloat = UInt8(1 << 6)
 
 @value
 @register_passable("trivial")
-struct DType(Stringable, Representable, KeyElement):
+struct DType(Stringable, Formattable, Representable, KeyElement):
     """Represents DType and provides methods for working with it."""
 
     alias type = __mlir_type.`!kgen.dtype`
@@ -90,41 +90,53 @@ struct DType(Stringable, Representable, KeyElement):
         Returns:
             The name of the dtype.
         """
+
+        return String.format_sequence(self)
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this dtype to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
         if self == DType.bool:
-            return "bool"
+            return writer.write_str["bool"]()
         if self == DType.int8:
-            return "int8"
+            return writer.write_str["int8"]()
         if self == DType.uint8:
-            return "uint8"
+            return writer.write_str["uint8"]()
         if self == DType.int16:
-            return "int16"
+            return writer.write_str["int16"]()
         if self == DType.uint16:
-            return "uint16"
+            return writer.write_str["uint16"]()
         if self == DType.int32:
-            return "int32"
+            return writer.write_str["int32"]()
         if self == DType.uint32:
-            return "uint32"
+            return writer.write_str["uint32"]()
         if self == DType.int64:
-            return "int64"
+            return writer.write_str["int64"]()
         if self == DType.uint64:
-            return "uint64"
+            return writer.write_str["uint64"]()
         if self == DType.index:
-            return "index"
+            return writer.write_str["index"]()
         if self == DType.bfloat16:
-            return "bfloat16"
+            return writer.write_str["bfloat16"]()
         if self == DType.float16:
-            return "float16"
+            return writer.write_str["float16"]()
         if self == DType.float32:
-            return "float32"
+            return writer.write_str["float32"]()
         if self == DType.tensor_float32:
-            return "tensor_float32"
+            return writer.write_str["tensor_float32"]()
         if self == DType.float64:
-            return "float64"
+            return writer.write_str["float64"]()
         if self == DType.invalid:
-            return "invalid"
+            return writer.write_str["invalid"]()
         if self == DType.address:
-            return "address"
-        return "<<unknown>>"
+            return writer.write_str["address"]()
+
+        return writer.write_str["<<unknown>>"]()
 
     @always_inline("nodebug")
     fn __repr__(self) -> String:
@@ -216,6 +228,11 @@ struct DType(Stringable, Representable, KeyElement):
         )
 
     fn __hash__(self) -> Int:
+        """Return a 64-bit hash for this `DType` value.
+
+        Returns:
+            A 64-bit integer hash of this `DType` value.
+        """
         return hash(UInt8(self._as_i8()))
 
     @always_inline("nodebug")
