@@ -612,7 +612,7 @@ struct List[T: CollectionElement](
         ref [_]self: List[C],
         value: C,
         start: Int = 0,
-        stop: Optional[Int] = None,
+        stop: Optional[Int] = Optional[Int](),
     ) raises -> Int:
         """
         Returns the index of the first occurrence of a value in a list

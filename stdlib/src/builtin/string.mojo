@@ -26,6 +26,8 @@ from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
 
+from collections.optional import _NoneType
+
 # ===----------------------------------------------------------------------=== #
 # ord
 # ===----------------------------------------------------------------------=== #
@@ -2450,7 +2452,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     alias _FieldVariantType = Variant[
         String,  # kwargs indexing (`{field_name}`)
         Int,  # args manual indexing (`{3}`)
-        NoneType,  # args automatic indexing (`{}`)
+        _NoneType,  # args automatic indexing (`{}`)
         Bool,  # for escaped curlies ('{{')
     ]
     var field: Self._FieldVariantType
@@ -2468,7 +2470,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         return self.field.isa[String]()
 
     fn is_automatic_indexing(ref [_]self) -> Bool:
-        return self.field.isa[NoneType]()
+        return self.field.isa[_NoneType]()
 
     fn is_manual_indexing(ref [_]self) -> Bool:
         return self.field.isa[Int]()
@@ -2502,12 +2504,12 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         """
         var manual_indexing_count = 0
         var automatic_indexing_count = 0
-        var raised_manual_index = Optional[Int](None)
-        var raised_automatic_index = Optional[Int](None)
-        var raised_kwarg_field = Optional[String](None)
+        var raised_manual_index = Optional[Int](_NoneType())
+        var raised_automatic_index = Optional[Int](_NoneType())
+        var raised_kwarg_field = Optional[String](_NoneType())
 
         var entries = List[Self]()
-        var start = Optional[Int](None)
+        var start = Optional[Int](_NoneType())
         var skip_next = False
         for i in range(len(format_src)):
             if skip_next:
@@ -2522,7 +2524,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                             first_curly=start.value(), last_curly=i, field=False
                         )
                         entries.append(curren_entry^)
-                        start = None
+                        start = _NoneType()
                         continue
                     raise (
                         "there is a single curly { left unclosed or unescaped"
@@ -2534,7 +2536,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                 if start:
                     var start_value = start.value()
                     var current_entry = Self(
-                        first_curly=start_value, last_curly=i, field=None
+                        first_curly=start_value, last_curly=i, field=_NoneType()
                     )
                     if i - start_value != 1:
                         var field = format_src[start_value + 1 : i]
@@ -2563,7 +2565,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                             break
                         automatic_indexing_count += 1
                     entries.append(current_entry^)
-                    start = None
+                    start = _NoneType()
                 else:
                     # python escapes double curlies
                     if (i + 1) < len(format_src):

@@ -188,7 +188,7 @@ trait Defaultable:
         ...
 
 
-trait CollectionElement(Copyable, Movable):
+trait CollectionElement(Copyable, Movable, ExplicitlyCopyable):
     """The CollectionElement trait denotes a trait composition
     of the `Copyable` and `Movable` traits.
 

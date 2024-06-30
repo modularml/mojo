@@ -415,7 +415,7 @@ struct assert_raises:
     @always_inline
     fn __init__(inout self):
         """Construct a context manager with no message pattern."""
-        self.message_contains = None
+        self.message_contains = Optional[String]()
         self.call_location = __call_location()
 
     @always_inline
