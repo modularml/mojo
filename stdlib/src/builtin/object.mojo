@@ -36,7 +36,7 @@ struct _NoneMarker(CollectionElementNew):
 
 
 @register_passable("trivial")
-struct _ImmutableString:
+struct _ImmutableString(CollectionElement, CollectionElementNew):
     """Python strings are immutable. This class is marked as trivially register
     passable because its memory will be managed by `_ObjectImpl`. It is a
     pointer and integer pair. Memory will be dynamically allocated.
@@ -52,6 +52,10 @@ struct _ImmutableString:
     fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
         self.data = data
         self.length = length
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self = other
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
@@ -234,7 +238,7 @@ struct _Function:
         )
 
 
-struct _ObjectImpl(CollectionElement, Stringable):
+struct _ObjectImpl(CollectionElement, CollectionElementNew, Stringable):
     """This class is the underlying implementation of the value of an `object`.
     It is a variant of primitive types and pointers to implementations of more
     complex types.
