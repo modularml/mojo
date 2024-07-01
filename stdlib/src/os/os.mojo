@@ -244,13 +244,13 @@ fn abort[result: AnyType = NoneType]() -> result:
 
 @always_inline("nodebug")
 fn abort[
-    result: AnyType = NoneType, *, stringable: Stringable
-](message: stringable) -> result:
+    result: AnyType = NoneType, *, formattable: Formattable
+](message: formattable) -> result:
     """Calls a target dependent trap instruction if available.
 
     Parameters:
         result: The result type.
-        stringable: The Stringable type.
+        formattable: The Formattable type.
 
     Args:
         message: The message to include when aborting.

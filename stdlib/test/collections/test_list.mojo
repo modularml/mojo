@@ -522,7 +522,8 @@ def test_2d_dynamic_list():
     assert_equal(2, list.capacity)
 
 
-def test_list_explicit_copy():
+# TODO(30737): remove this test along with other __get_ref() uses.
+def test_list_explicit_copy_using_get_ref():
     var list = List[CopyCounter]()
     list.append(CopyCounter())
     var list_copy = List(list)
@@ -537,6 +538,51 @@ def test_list_explicit_copy():
     assert_equal(len(l2), len(l2_copy))
     for i in range(len(l2)):
         assert_equal(l2[i], l2_copy[i])
+
+
+def test_list_explicit_copy():
+    var list = List[CopyCounter]()
+    list.append(CopyCounter())
+    var list_copy = List(list)
+    assert_equal(0, list[0].copy_count)
+    assert_equal(1, list_copy[0].copy_count)
+
+    var l2 = List[Int]()
+    for i in range(10):
+        l2.append(i)
+
+    var l2_copy = List(l2)
+    assert_equal(len(l2), len(l2_copy))
+    for i in range(len(l2)):
+        assert_equal(l2[i], l2_copy[i])
+
+
+@value
+struct CopyCountedStruct(CollectionElement):
+    var counter: CopyCounter
+    var value: String
+
+    fn __init__(inout self, value: String):
+        self.counter = CopyCounter()
+        self.value = value
+
+
+def test_no_extra_copies_with_sugared_set_by_field():
+    var list = List[List[CopyCountedStruct]](capacity=1)
+    var child_list = List[CopyCountedStruct](capacity=2)
+    child_list.append(CopyCountedStruct("Hello"))
+    child_list.append(CopyCountedStruct("World"))
+
+    # No copies here.  Contructing with List[CopyCountedStruct](CopyCountedStruct("Hello")) is a copy.
+    assert_equal(0, child_list[0].counter.copy_count)
+    assert_equal(0, child_list[1].counter.copy_count)
+    list.append(child_list^)
+
+    list[0][1].value = "Mojo"
+    assert_equal("Mojo", list[0][1].value)
+
+    assert_equal(0, list[0][0].counter.copy_count)
+    assert_equal(0, list[0][1].counter.copy_count)
 
 
 # Ensure correct behavior of __copyinit__
@@ -802,7 +848,9 @@ def main():
     test_list_index()
     test_list_extend()
     test_list_extend_non_trivial()
+    test_list_explicit_copy_using_get_ref()
     test_list_explicit_copy()
+    test_no_extra_copies_with_sugared_set_by_field()
     test_list_copy_constructor()
     test_2d_dynamic_list()
     test_list_iter()

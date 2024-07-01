@@ -208,6 +208,11 @@ struct InlineString(Sized, Stringable, CollectionElement):
     # ===------------------------------------------------------------------=== #
 
     fn __len__(self) -> Int:
+        """Gets the string length, in bytes.
+
+        Returns:
+            The string length, in bytes.
+        """
         if self._is_small():
             return len(self._storage[_FixedString[Self.SMALL_CAP]])
         else:
@@ -218,6 +223,11 @@ struct InlineString(Sized, Stringable, CollectionElement):
             return len(self._storage[String])
 
     fn __str__(self) -> String:
+        """Gets this string as a standard `String`.
+
+        Returns:
+            The string representation of the type.
+        """
         if self._is_small():
             return str(self._storage[_FixedString[Self.SMALL_CAP]])
         else:
