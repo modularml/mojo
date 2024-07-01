@@ -124,7 +124,7 @@ struct PythonObject(
         Args:
             other: The value to copy.
         """
-        self.py_object = other.py_object
+        self = other
 
     fn __init__(inout self, ptr: PyObjectPtr):
         """Initialize the object with a `PyObjectPtr` value.

@@ -2156,7 +2156,7 @@ struct String(
             `string[:-len(suffix)]` if the string ends with the suffix string,
             or a copy of the original string otherwise.
         """
-        if self.endswith(suffix):
+        if suffix and self.endswith(suffix):
             return self[: -len(suffix)]
         return self
 
