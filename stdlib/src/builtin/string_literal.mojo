@@ -42,7 +42,6 @@ struct StringLiteral(
     Representable,
     Sized,
     Stringable,
-    CollectionElementNew,
 ):
     """This type represents a string literal.
 
