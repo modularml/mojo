@@ -473,50 +473,6 @@ fn external_call[
         )
 
 
-@always_inline("nodebug")
-fn external_call[
-    callee: StringLiteral,
-    type: AnyTrivialRegType,
-    T0: AnyTrivialRegType,
-    T1: AnyTrivialRegType,
-    T2: AnyTrivialRegType,
-    T3: AnyTrivialRegType,
-    T4: AnyTrivialRegType,
-](arg0: T0, arg1: T1, arg2: T2, arg3: T3, arg4: T4) -> type:
-    """Calls an external function.
-
-    Parameters:
-      callee: The name of the external function.
-      type: The return type.
-      T0: The first argument type.
-      T1: The second argument type.
-      T2: The third argument type.
-      T3: The fourth argument type.
-      T4: The fifth argument type.
-
-    Args:
-      arg0: The first argument.
-      arg1: The second argument.
-      arg2: The third argument.
-      arg3: The fourth argument.
-      arg4: The fifth argument.
-
-    Returns:
-      The external call result.
-    """
-
-    @parameter
-    if _mlirtype_is_eq[type, NoneType]():
-        __mlir_op.`pop.external_call`[func = callee.value, _type=None](
-            arg0, arg1, arg2, arg3, arg4
-        )
-        return rebind[type](None)
-    else:
-        return __mlir_op.`pop.external_call`[func = callee.value, _type=type](
-            arg0, arg1, arg2, arg3, arg4
-        )
-
-
 # ===----------------------------------------------------------------------===#
 # _external_call_const
 # ===----------------------------------------------------------------------===#
