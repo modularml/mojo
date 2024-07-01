@@ -82,7 +82,7 @@ struct _RefCountedList:
 
 
 @register_passable("trivial")
-struct _RefCountedListRef:
+struct _RefCountedListRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     var lst: UnsafePointer[NoneType]
     """The reference to the list."""
@@ -92,6 +92,10 @@ struct _RefCountedListRef:
         var ptr = UnsafePointer[_RefCountedList].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         self.lst = ptr.bitcast[NoneType]()
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self.lst = other.lst
 
     @always_inline
     fn copy(self) -> Self:
@@ -166,7 +170,7 @@ struct Attr:
 
 
 @register_passable("trivial")
-struct _RefCountedAttrsDictRef:
+struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     # FIXME(#12604): Distinguish this type from _RefCountedListRef.
     var attrs: UnsafePointer[Int8]
@@ -183,6 +187,10 @@ struct _RefCountedAttrsDictRef:
         self.attrs = ptr.bitcast[Int8]()
 
     @always_inline
+    fn __init__(inout self, *, other: Self):
+        self = other
+
+    @always_inline
     fn copy(self) -> Self:
         _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
         return Self {attrs: self.attrs}
@@ -192,7 +200,7 @@ struct _RefCountedAttrsDictRef:
 
 
 @register_passable("trivial")
-struct _Function:
+struct _Function(CollectionElement, CollectionElementNew):
     # The MLIR function type has two arguments:
     # 1. The self value, or the single argument.
     # 2. None, or an additional argument.
@@ -205,6 +213,10 @@ struct _Function:
         var f = UnsafePointer[Int16]()
         UnsafePointer.address_of(f).bitcast[FnT]()[] = value
         self.value = f
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self.value = other.value
 
     alias fn0 = fn () raises -> object
     """Nullary function type."""
