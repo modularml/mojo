@@ -187,6 +187,13 @@ def test_repr():
     assert_equal(StringLiteral.__repr__("\x7f"), r"'\x7f'")
 
 
+def test_float_conversion():
+    assert_equal(("4.5").__float__(), 4.5)
+    assert_equal(float("4.5"), 4.5)
+    with assert_raises():
+        _ = ("not a float").__float__()
+
+
 def main():
     test_add()
     test_equality()
@@ -201,3 +208,4 @@ def main():
     test_intable()
     test_layout()
     test_repr()
+    test_float_conversion()

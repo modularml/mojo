@@ -391,6 +391,19 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   var dictionary = Dict[Int,Int](power_of_two_initial_capacity = 1024)
   # Insert (2/3 of 1024) entries
   ```
+  
+- Add the `Floatable` and `FloatableRaising` traits to denote types that can
+  be converted to a `Float64` value using the builtin `float` function.
+  - Make `SIMD` and `FloatLiteral` conform to the `Floatable` trait.
+
+  ```mojo
+  fn foo[F: Floatable](v: F):
+    ...
+
+  var f = float(Int32(45))
+  ```
+  
+  ([PR #3163](https://github.com/modularml/mojo/pull/3163) by [@bgreni](https://github.com/bgreni))
 
 - `ListLiteral` now supports `__contains__`.
   ([PR #3251](https://github.com/modularml/mojo/pull/3251) by

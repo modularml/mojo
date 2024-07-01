@@ -278,6 +278,11 @@ def test_comparison():
     assert_false(FloatLiteral.__ge__(nan, neg_zero))
 
 
+def test_float_conversion():
+    assert_equal((4.5).__float__(), 4.5)
+    assert_equal((0.0).__float__(), 0.0)
+
+
 def main():
     test_ceil()
     test_floor()
@@ -292,3 +297,4 @@ def main():
     test_is_special_value()
     test_abs()
     test_comparison()
+    test_float_conversion()
