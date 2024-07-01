@@ -99,6 +99,8 @@ struct Optional[T: CollectionElement](
         """
         self._value = Self._type(value^)
 
+    # TODO: Make this constructor work again
+    # for the moment you can only use Optional[T]() which is equivalent.
     fn __init__(inout self, value: NoneType):
         """Construct an empty Optional.
 

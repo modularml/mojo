@@ -123,11 +123,13 @@ fn gettempdir() -> Optional[String]:
     try:
         return _get_default_tempdir()
     except:
-        return None
+        return Optional[String]()
 
 
 fn mkdtemp(
-    suffix: String = "", prefix: String = "tmp", dir: Optional[String] = None
+    suffix: String = "",
+    prefix: String = "tmp",
+    dir: Optional[String] = Optional[String](),
 ) raises -> String:
     """Create a temporary directory.
     Caller is responsible for deleting the directory when done with it.
@@ -211,7 +213,7 @@ struct TemporaryDirectory:
         inout self,
         suffix: String = "",
         prefix: String = "tmp",
-        dir: Optional[String] = None,
+        dir: Optional[String] = Optional[String](),
         ignore_cleanup_errors: Bool = False,
     ) raises:
         """Create a temporary directory.
@@ -270,10 +272,10 @@ struct NamedTemporaryFile:
     fn __init__(
         inout self,
         mode: String = "w",
-        name: Optional[String] = None,
+        name: Optional[String] = Optional[String](),
         suffix: String = "",
         prefix: String = "tmp",
-        dir: Optional[String] = None,
+        dir: Optional[String] = Optional[String](),
         delete: Bool = True,
     ) raises:
         """Create a named temporary file.

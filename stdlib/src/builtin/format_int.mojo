@@ -19,6 +19,8 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import List, Optional
 from utils import InlineArray, StringSlice, StaticString
 
+from collections.optional import _NoneType
+
 alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 
@@ -330,7 +332,7 @@ fn _try_write_int[
             len=1,
         )
         fmt.write_str(zero)
-        return
+        return Optional[Error]()
 
     # Create a buffer to store the formatted value
 
@@ -406,4 +408,4 @@ fn _try_write_int[
     fmt.write_str(str_slice)
     _ = buf^
 
-    return None
+    return Optional[Error]()

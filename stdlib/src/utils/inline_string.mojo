@@ -466,7 +466,7 @@ struct _FixedString[CAP: Int](
 
         self.size = total_len
 
-        return None
+        return Optional[Error]()
 
     fn format_to(self, inout writer: Formatter):
         writer.write_str(self.as_string_slice())

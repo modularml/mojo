@@ -19,6 +19,7 @@ from .dict import (
     _DictKeyIter,
     RepresentableKeyElement,
 )
+from .optional import _NoneType
 
 
 struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
@@ -48,7 +49,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
     """
 
     # Fields
-    var _data: Dict[T, NoneType]
+    var _data: Dict[T, _NoneType]
 
     # ===-------------------------------------------------------------------===#
     # Life cycle methods
@@ -60,7 +61,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             ts: Variadic of elements to add to the set.
         """
-        self._data = Dict[T, NoneType]()
+        self._data = Dict[T, _NoneType]()
         for t in ts:
             self.add(t[])
 
@@ -353,7 +354,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
 
     fn __iter__(
         ref [_]self: Self,
-    ) -> _DictKeyIter[T, NoneType, __lifetime_of(self)]:
+    ) -> _DictKeyIter[T, _NoneType, __lifetime_of(self)]:
         """Iterate over elements of the set, returning immutable references.
 
         Returns:
@@ -368,7 +369,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Args:
             t: The element to add to the set.
         """
-        self._data[t] = None
+        self._data[t] = _NoneType()
 
     fn remove(inout self, t: T) raises:
         """Remove an element from the set.
@@ -379,7 +380,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         Raises:
             If the element isn't in the set to remove.
         """
-        self._data.pop(t)
+        _ = self._data.pop(t)
 
     fn pop(inout self) raises -> T:
         """Remove any one item from the set, and return it.
@@ -577,7 +578,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
             value: The element to remove from the set.
         """
         try:
-            self._data.pop(value)
+            _ = self._data.pop(value)
         except:
             pass
 
@@ -588,7 +589,7 @@ struct Set[T: KeyElement](Sized, Comparable, Hashable, Boolable):
         After calling this method, the set will be empty.
         """
         for _ in range(len(self)):
-            var a = self.pop()
+            _ = self.pop()
 
         #! This code below (without using range function) won't pass tests
         #! It leaves set with one remaining item. Is this a bug?

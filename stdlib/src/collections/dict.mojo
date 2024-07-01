@@ -480,7 +480,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     @staticmethod
     fn fromkeys(
-        keys: List[K], value: Optional[V] = None
+        keys: List[K], value: Optional[V] = Optional[V]()
     ) -> Dict[K, Optional[V]]:
         """Create a new dictionary with keys from list and values set to value.
 
@@ -710,7 +710,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         try:  # TODO(MOCO-604): push usage through
             return self._find_ref(key)
         except:
-            return None
+            return Optional[V]()
 
     # TODO(MOCO-604): Return Optional[Reference] instead of raising
     fn _find_ref(
@@ -800,7 +800,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             var entry = self._entries.__get_ref(index)
             debug_assert(entry[].__bool__(), "entry in index must be full")
             var entry_value = entry[].unsafe_take()
-            entry[] = None
+            entry[] = Optional[DictEntry[K, V]]()
             self.size -= 1
             return entry_value.value^
         raise "KeyError"
@@ -819,12 +819,12 @@ struct Dict[K: KeyElement, V: CollectionElement](
             "KeyError" if the dictionary is empty.
         """
 
-        var key = Optional[K](None)
-        var val = Optional[V](None)
+        var key = Optional[K]()
+        var val = Optional[V]()
 
         for item in reversed(self.items()):
-            key = Optional(item[].key)
-            val = Optional(item[].value)
+            key = Optional[K](item[].key)
+            val = Optional[V](item[].value)
             break
 
         if key:
@@ -888,7 +888,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         var entries = List[Optional[DictEntry[K, V]]](capacity=reserve_at_least)
         # We have memory available, we'll use everything.
         for i in range(entries.capacity):
-            entries.append(None)
+            entries.append(Optional[DictEntry[K, V]]())
         return entries
 
     fn _insert(inout self, owned key: K, owned value: V):
@@ -980,7 +980,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             self._set_index(slot, left)
             if left != right:
                 self._entries[left] = entry[].unsafe_take()
-                entry[] = None
+                entry[] = Optional[DictEntry[K, V]]()
             right += 1
 
         self._n_entries = self.size
