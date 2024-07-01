@@ -1031,6 +1031,23 @@ fn align_down(value: Int, alignment: Int) -> Int:
     return (value // alignment) * alignment
 
 
+@always_inline
+fn align_down(value: UInt, alignment: UInt) -> UInt:
+    """Returns the closest multiple of alignment that is less than or equal to
+    value.
+
+    Args:
+        value: The value to align.
+        alignment: Value to align to.
+
+    Returns:
+        Closest multiple of the alignment that is less than or equal to the
+        input value. In other words, floor(value / alignment) * alignment.
+    """
+    debug_assert(alignment != 0, "zero alignment")
+    return (value // alignment) * alignment
+
+
 # ===----------------------------------------------------------------------=== #
 # align_up
 # ===----------------------------------------------------------------------=== #
@@ -1038,6 +1055,23 @@ fn align_down(value: Int, alignment: Int) -> Int:
 
 @always_inline
 fn align_up(value: Int, alignment: Int) -> Int:
+    """Returns the closest multiple of alignment that is greater than or equal
+    to value.
+
+    Args:
+        value: The value to align.
+        alignment: Value to align to.
+
+    Returns:
+        Closest multiple of the alignment that is greater than or equal to the
+        input value. In other words, ceiling(value / alignment) * alignment.
+    """
+    debug_assert(alignment != 0, "zero alignment")
+    return ceildiv(value, alignment) * alignment
+
+
+@always_inline
+fn align_up(value: UInt, alignment: UInt) -> UInt:
     """Returns the closest multiple of alignment that is greater than or equal
     to value.
 
