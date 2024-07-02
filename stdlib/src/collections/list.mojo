@@ -841,6 +841,51 @@ struct List[T: CollectionElement](
         """
         return self.data
 
+    @always_inline
+    fn __eq__[
+        ElementType: EqualityCollectionElement, //
+    ](self: List[ElementType], rhs: List[ElementType]) -> Bool:
+        """Compare this List to the RHS using EQ comparison.
+
+        Note that it is not yet possible to compare lists of lists.
+
+        Args:
+            rhs: The other List to compare against.
+
+        Parameters:
+            ElementType: The inferred type of rhs.T.
+
+        Returns:
+            True if this List is equal to the RHS List and False otherwise.
+        """
+        if len(self) != len(rhs):
+            return False
+
+        for i in range(len(self)):
+            if self.unsafe_get(i) != rhs.unsafe_get(i):
+                return False
+        return True
+
+    @always_inline
+    fn __ne__[
+        ElementType: EqualityCollectionElement, //
+    ](self: List[ElementType], rhs: List[ElementType]) -> Bool:
+        """Compare this List to the RHS using NE comparison.
+
+        Note that it is not yet possible to compare lists of lists.
+
+        Args:
+            rhs: The other List to compare against.
+
+        Parameters:
+            ElementType: The inferred type of rhs.T.
+
+        Returns:
+            True if this List is non-equal to the RHS List and False otherwise.
+        """
+
+        return not self.__eq__(rhs)
+
 
 fn _clip(value: Int, start: Int, end: Int) -> Int:
     return max(start, min(value, end))

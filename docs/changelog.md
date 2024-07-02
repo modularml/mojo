@@ -137,6 +137,18 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Added `NamedTemporaryFile` in module `tempfile`.
   ([PR 2762](https://github.com/modularml/mojo/pull/2762) by [@artemiogr97](https://github.com/artemiogr97))
 
+- `List` support `__eq__` and `__ne__` when its elements have the trait `EqualityCollectionElement`
+  ([PR #3016](https://github.com/modularml/mojo/pull/3016) by [@rd4com](https://github.com/rd4com)
+  and [@gabrieldemarmiesse](https://github.com/gabrieldemarmiesse))
+
+  For example:
+
+  ```mojo
+  var x = List(1,2,3)
+  var y = List(4,5,6)
+  print(x.__ne__(y)) #True
+  ```
+
 - Added `oct(..)` function for formatting an integer in octal.
   ([PR #2914](https://github.com/modularml/mojo/pull/2914) by [@bgreni](https://github.com/bgreni))
 
