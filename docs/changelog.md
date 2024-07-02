@@ -16,6 +16,12 @@ what we publish.
 
 ### ⭐️ New
 
+- The pointer variants (`DTypePointer`, `UnsafePointer`, etc.) now have a new
+  `exclusive: Bool = False` parameter. Setting this parameter to true tells the
+  compiler that the user knows this pointer and all those derived from it have
+  exclusive access to the underlying memory allocation. The compiler is not
+  guaranteed to do anything with this information.
+
 - Added a new [`Counter`](/mojo/stdlib/collections/counter/Counter)
   dictionary-like type, matching most of the features of the Python one.
   ([PR 2910#](https://github.com/modularml/mojo/pull/2910) by

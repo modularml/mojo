@@ -139,7 +139,9 @@ alias Pointer = LegacyPointer
 @value
 @register_passable("trivial")
 struct LegacyPointer[
-    type: AnyTrivialRegType, address_space: AddressSpace = AddressSpace.GENERIC
+    type: AnyTrivialRegType,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+    exclusive: Bool = False,
 ](
     Boolable,
     CollectionElement,
@@ -154,10 +156,17 @@ struct LegacyPointer[
     Parameters:
         type: Type of the underlying data.
         address_space: The address space the pointer is in.
+        exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
     """
 
     alias _mlir_type = __mlir_type[
-        `!kgen.pointer<`, type, `,`, address_space._value.value, `>`
+        `!kgen.pointer<`,
+        type,
+        `, `,
+        address_space._value.value,
+        ` exclusive(`,
+        exclusive.value,
+        `)>`,
     ]
 
     var address: Self._mlir_type
@@ -173,6 +182,22 @@ struct LegacyPointer[
             Constructed LegacyPointer object.
         """
         return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
+
+    @always_inline
+    fn __init__(other: LegacyPointer[type, address_space, _]) -> Self:
+        """Exclusivity parameter cast a pointer.
+
+        Args:
+            other: Pointer to cast.
+
+        Returns:
+            Constructed LegacyPointer object.
+        """
+        return Self {
+            address: __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
+                other.address
+            )
+        }
 
     fn __init__(*, other: Self) -> Self:
         """Copy the object.
@@ -271,7 +296,7 @@ struct LegacyPointer[
         """
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = Self._ref_type._mlir_type](
-                self.address
+                LegacyPointer[type, address_space, False](self).address
             )
         )
 
@@ -561,7 +586,9 @@ struct LegacyPointer[
 @value
 @register_passable("trivial")
 struct DTypePointer[
-    type: DType, address_space: AddressSpace = AddressSpace.GENERIC
+    type: DType,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+    exclusive: Bool = False,
 ](Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
     """Defines a `DTypePointer` struct that contains an address of the given
     dtype.
@@ -569,11 +596,12 @@ struct DTypePointer[
     Parameters:
         type: DType of the underlying data.
         address_space: The address space the pointer is in.
+        exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
     """
 
     # Fields
     alias element_type = Scalar[type]
-    alias _pointer_type = Pointer[Scalar[type], address_space]
+    alias _pointer_type = Pointer[Scalar[type], address_space, exclusive]
     var address: Self._pointer_type
     """The pointed-to address."""
 
@@ -603,7 +631,9 @@ struct DTypePointer[
             type.value,
             `>,`,
             address_space._value.value,
-            `>`,
+            ` exclusive(`,
+            exclusive.value,
+            `)>`,
         ],
     ):
         """Constructs a `DTypePointer` from a scalar pointer of the same type.
@@ -615,8 +645,21 @@ struct DTypePointer[
             __mlir_type[`!pop.scalar<`, type.value, `>`], address_space
         ](value).bitcast[Scalar[type]]()
 
+    @always_inline
+    fn __init__(inout self, other: DTypePointer[type, address_space, _]):
+        """Exclusivity parameter cast a pointer.
+
+        Args:
+            other: Pointer to cast.
+        """
+        self.address = __mlir_op.`pop.pointer.bitcast`[
+            _type = Self._pointer_type._mlir_type
+        ](other.address.address)
+
     @always_inline("nodebug")
-    fn __init__(inout self, value: Pointer[Scalar[type], address_space]):
+    fn __init__(
+        inout self, value: Pointer[Scalar[type], address_space, exclusive]
+    ):
         """Constructs a `DTypePointer` from a scalar pointer of the same type.
 
         Args:
