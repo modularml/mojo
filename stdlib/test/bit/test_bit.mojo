@@ -104,6 +104,16 @@ def test_countr_zero_simd():
     assert_equal(countr_zero(var7), SIMD[int64_t, simd_width](62, 64, 0, 62))
 
 
+def test_bit_reverse():
+    assert_equal(bit_reverse(-(2**32)), 4294967295)
+    assert_equal(bit_reverse(-1), -1)
+    assert_equal(bit_reverse(0), 0)
+    assert_equal(bit_reverse(1), -9223372036854775808)
+    assert_equal(bit_reverse(2), 4611686018427387904)
+    assert_equal(bit_reverse(3), -4611686018427387904)
+    assert_equal(bit_reverse(2**63), 1)
+
+
 def test_bit_reverse_simd():
     alias simd_width = 4
     alias int8_t = DType.int8
@@ -132,6 +142,16 @@ def test_bit_reverse_simd():
             -1, 0, -9223372036854775808, 4611686018427387904
         ),
     )
+
+
+def test_byte_swap():
+    assert_equal(byte_swap(0x0000), 0x0000000000000000)
+    assert_equal(byte_swap(0x0102), 0x0201000000000000)
+    assert_equal(byte_swap(0x0201), 0x0102000000000000)
+    assert_equal(byte_swap(-0x0123456789ABCDEF), 0x1132547698BADCFE)
+    assert_equal(byte_swap(0x0000000001234567), 0x6745230100000000)
+    assert_equal(byte_swap(0x56789ABCDEF01234), 0x3412F0DEBC9A7856)
+    assert_equal(byte_swap(0x23456789ABCDEF01), 0x01EFCDAB89674523)
 
 
 def test_byte_swap_simd():
@@ -171,6 +191,17 @@ def test_byte_swap_simd():
             0x01EFCDAB89674523,
         ),
     )
+
+
+def test_pop_count():
+    assert_equal(pop_count(-111444444), 51)
+    assert_equal(pop_count(0), 0)
+    assert_equal(pop_count(1), 1)
+    assert_equal(pop_count(2), 1)
+    assert_equal(pop_count(3), 2)
+    assert_equal(pop_count(4), 1)
+    assert_equal(pop_count(5), 2)
+    assert_equal(pop_count(3000000), 10)
 
 
 def test_pop_count_simd():
@@ -457,7 +488,10 @@ def main():
     test_countl_zero_simd()
     test_countr_zero()
     test_countr_zero_simd()
+    test_bit_reverse()
     test_bit_reverse_simd()
+    test_byte_swap()
     test_byte_swap_simd()
+    test_pop_count()
     test_pop_count_simd()
     test_bit_not_simd()
