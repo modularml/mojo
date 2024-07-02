@@ -15,11 +15,14 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
+from builtin.format_int import _try_write_int
+from builtin.simd import _format_scalar
+
 
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(Comparable, Representable, Stringable):
+struct UInt(Comparable, Formattable, Representable, Stringable):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
@@ -90,7 +93,7 @@ struct UInt(Comparable, Representable, Stringable):
         Returns:
             The string representation of this UInt.
         """
-        return str(UInt64(self))
+        return String.format_sequence(self)
 
     @always_inline("nodebug")
     fn __repr__(self) -> String:
@@ -745,3 +748,21 @@ struct UInt(Comparable, Representable, Stringable):
             The self value.
         """
         return self
+
+    fn format_to(self, inout writer: Formatter):
+        """Formats this integer to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        @parameter
+        if triple_is_nvidia_cuda():
+            var err = _try_write_int(writer, UInt64(self))
+            if err:
+                abort(
+                    "unreachable: unexpected write Uint failure condition: "
+                    + str(err.value())
+                )
+        else:
+            _format_scalar(writer, UInt64(self))
