@@ -31,6 +31,7 @@ from .._macos import _lstat as _lstat_macos
 from .._macos import _stat as _stat_macos
 from ..fstat import stat
 from ..os import sep
+from ..env import getenv
 
 
 # ===----------------------------------------------------------------------=== #
@@ -62,6 +63,64 @@ fn _get_lstat_st_mode(path: String) raises -> Int:
         return int(_lstat_linux_arm(path).st_mode)
     else:
         return int(_lstat_linux_x86(path).st_mode)
+
+
+# ===----------------------------------------------------------------------=== #
+# expanduser
+# ===----------------------------------------------------------------------=== #
+
+
+fn _get_home_path() -> String:
+    @parameter
+    if os_is_windows():
+        return getenv("USERPROFILE")
+    return getenv("HOME")
+
+
+# TODO: When `pwd` module is implemented for POSIX, fallback to:
+# pwd.getpwuid(os.getuid()).pw_dir if $HOME is not set, and allow for `~user`.
+fn expanduser(path: String) raises -> String:
+    """Expands a prefixed `~` with $HOME on posix or $USERPROFILE on windows. If
+    environment variables are not set or the `path` is not prefixed with `~`,
+    returns the `path` unmodified.
+
+    Args:
+        path: The path that is being expanded.
+
+    Returns:
+        The expanded path.
+    """
+    if not path.startswith("~"):
+        return path
+    var userhome = _get_home_path()
+    if not userhome:
+        return path
+    # If there is more than a single `~` without correct separator, raise error.
+    if len(path) > 1 and path[1] != os.sep:
+        raise "malformed path, could not determine home directory."
+    var path_split = path.split(os.sep, 1)
+    # If there is a properly formatted seperator, return expanded path.
+    if len(path_split) == 2:
+        return os.path.join(userhome, path_split[1])
+    # Path was a single `~` character, return home path
+    return userhome
+
+
+fn expanduser[PathLike: os.PathLike, //](path: PathLike) raises -> String:
+    """Expands a prefixed `~` with $HOME on posix or $USERPROFILE on windows. If
+    environment variables are not set or the `path` is not prefixed with `~`,
+    returns the `path` unmodified.
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path that is being expanded.
+
+    Returns:
+        The expanded path.
+    """
+    return expanduser(path.__fspath__())
 
 
 # ===----------------------------------------------------------------------=== #
