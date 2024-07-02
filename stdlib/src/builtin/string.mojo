@@ -31,7 +31,6 @@ from utils._format import Formattable, Formatter, ToFormatter
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
 fn ord(s: String) -> Int:
     """Returns an integer that represents the given one-character string.
 
@@ -149,7 +148,6 @@ fn chr(c: Int) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
 fn _chr_ascii(c: UInt8) -> String:
     """Returns a string based on the given ASCII code point.
 
@@ -162,7 +160,6 @@ fn _chr_ascii(c: UInt8) -> String:
     return String(String._buffer_type(c, 0))
 
 
-@always_inline("nodebug")
 fn _repr_ascii(c: UInt8) -> String:
     """Returns a printable representation of the given ASCII code point.
 
@@ -196,7 +193,7 @@ fn _repr_ascii(c: UInt8) -> String:
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
-@always_inline("nodebug")
+@always_inline
 fn ascii(value: String) -> String:
     """Get the ASCII representation of the object.
 
@@ -214,7 +211,6 @@ fn ascii(value: String) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
 fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     """Implementation of `atol` for StringRef inputs.
 
@@ -406,7 +402,6 @@ fn _atof_error(str_ref: StringRef) -> Error:
     return Error("String is not convertible to float: '" + str(str_ref) + "'")
 
 
-@always_inline
 fn _atof(str_ref: StringRef) raises -> Float64:
     """Implementation of `atof` for StringRef inputs.
 
@@ -869,7 +864,6 @@ struct String(
         """
         self.__copyinit__(other)
 
-    @always_inline
     fn __init__(inout self, str: StringRef):
         """Construct a string from a StringRef object.
 
@@ -883,7 +877,6 @@ struct String(
         memcpy(dest=buffer.data, src=str.data, count=length)
         self = Self(buffer^)
 
-    @always_inline
     fn __init__(inout self, str_slice: StringSlice):
         """Construct a string from a string slice.
 
@@ -966,7 +959,6 @@ struct String(
         """
         self = String(ptr.address, len)
 
-    @always_inline
     fn __init__(inout self, obj: PythonObject):
         """Creates a string from a python object.
 
@@ -1193,7 +1185,6 @@ struct String(
         """
         return not (self < rhs)
 
-    @always_inline
     fn __add__(self, other: String) -> String:
         """Creates a string by appending another string at the end.
 
@@ -1236,7 +1227,6 @@ struct String(
         """
         return other + self
 
-    @always_inline
     fn __iadd__(inout self, other: String):
         """Appends another string to this string.
 
@@ -1318,7 +1308,6 @@ struct String(
         """
         return self
 
-    @always_inline
     fn __repr__(self) -> String:
         """Return a Mojo-compatible representation of the `String` instance.
 
@@ -2021,7 +2010,6 @@ struct String(
         # outside of the standard ASCII letters.
         return self._toggle_ascii_case[_is_ascii_lowercase]()
 
-    @always_inline
     fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
         var copy: String = self
 
@@ -2158,7 +2146,6 @@ struct String(
             )
         return String(buf^)
 
-    @always_inline
     fn format[*Ts: Stringable](self, *args: *Ts) raises -> String:
         """Format a template with *args.
 
@@ -2241,7 +2228,6 @@ struct String(
                 return False
         return True
 
-    @always_inline
     fn _isupper_islower[*, upper: Bool](self) -> Bool:
         fn is_ascii_cased(c: UInt8) -> Bool:
             return _is_ascii_uppercase(c) or _is_ascii_lowercase(c)
