@@ -203,11 +203,11 @@ fn listdir(path: String = "") raises -> List[String]:
     return dir.list()
 
 
-fn listdir[pathlike: os.PathLike](path: pathlike) raises -> List[String]:
+fn listdir[PathLike: os.PathLike](path: PathLike) raises -> List[String]:
     """Gets the list of entries contained in the path provided.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -288,13 +288,13 @@ fn remove(path: String) raises:
         raise Error("Can not remove file: " + path)
 
 
-fn remove[pathlike: os.PathLike](path: pathlike) raises:
+fn remove[PathLike: os.PathLike](path: PathLike) raises:
     """Removes the specified file.
     If the path is a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file.
@@ -315,13 +315,13 @@ fn unlink(path: String) raises:
     remove(path)
 
 
-fn unlink[pathlike: os.PathLike](path: pathlike) raises:
+fn unlink[PathLike: os.PathLike](path: PathLike) raises:
     """Removes the specified file.
     If the path is a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file.
@@ -350,13 +350,13 @@ fn mkdir(path: String, mode: Int = 0o777) raises:
         raise Error("Can not create directory: " + path)
 
 
-fn mkdir[pathlike: os.PathLike](path: pathlike, mode: Int = 0o777) raises:
+fn mkdir[PathLike: os.PathLike](path: PathLike, mode: Int = 0o777) raises:
     """Creates a directory at the specified path.
     If the directory can not be created an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -399,13 +399,13 @@ def makedirs(path: String, mode: Int = 0o777, exist_ok: Bool = False) -> None:
 
 
 def makedirs[
-    pathlike: os.PathLike
-](path: pathlike, mode: Int = 0o777, exist_ok: Bool = False) -> None:
+    PathLike: os.PathLike
+](path: PathLike, mode: Int = 0o777, exist_ok: Bool = False) -> None:
     """Creates a specified leaf directory along with any necessary intermediate
     directories that don't already exist.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -428,13 +428,13 @@ fn rmdir(path: String) raises:
         raise Error("Can not remove directory: " + path)
 
 
-fn rmdir[pathlike: os.PathLike](path: pathlike) raises:
+fn rmdir[PathLike: os.PathLike](path: PathLike) raises:
     """Removes the specified directory.
     If the path is not a directory or it can not be deleted, an error is raised.
     Absolute and relative paths are allowed, relative paths are resolved from cwd.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -463,14 +463,14 @@ def removedirs(path: String) -> None:
         head, tail = os.path.split(head)
 
 
-def removedirs[pathlike: os.PathLike](path: pathlike) -> None:
+def removedirs[PathLike: os.PathLike](path: PathLike) -> None:
     """Remove a leaf directory and all empty intermediate ones. Directories
     corresponding to rightmost path segments will be pruned away until either
     the whole path is consumed or an error occurs.  Errors during this latter
     phase are ignored, which occur when a directory was not empty.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.

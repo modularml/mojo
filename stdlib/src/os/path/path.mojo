@@ -463,14 +463,14 @@ def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
 
 
 # TODO uncomment this when unpacking is supported
-# fn join[pathlike: os.PathLike](path: pathlike, *paths: pathlike) -> String:
+# fn join[PathLike: os.PathLike](path: PathLike, *paths: PathLike) -> String:
 #     """Join two or more pathname components, inserting '/' as needed.
 #     If any component is an absolute path, all previous path components
 #     will be discarded.  An empty last part will result in a path that
 #     ends with a separator.
 
 #     Parameters:
-#       pathlike: The type conforming to the os.PathLike trait.
+#       PathLike: The type conforming to the os.PathLike trait.
 
 #     Args:
 #       path: The path to join.

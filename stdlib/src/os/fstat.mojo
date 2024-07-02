@@ -206,11 +206,11 @@ fn stat(path: String) raises -> stat_result:
         return _stat_linux_x86(path)._to_stat_result()
 
 
-fn stat[pathlike: os.PathLike](path: pathlike) raises -> stat_result:
+fn stat[PathLike: os.PathLike](path: PathLike) raises -> stat_result:
     """Get the status of a file or a file descriptor.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
@@ -245,12 +245,12 @@ fn lstat(path: String) raises -> stat_result:
         return _lstat_linux_x86(path)._to_stat_result()
 
 
-fn lstat[pathlike: os.PathLike](path: pathlike) raises -> stat_result:
+fn lstat[PathLike: os.PathLike](path: PathLike) raises -> stat_result:
     """Get the status of a file or a file descriptor (similar to stat, but does
     not follow symlinks).
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the directory.
