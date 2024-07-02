@@ -98,7 +98,10 @@ def _set_up_gettempdir_test(
         os.mkdir(dir_without_writing_access, mode=0o100)
     except:
         os.rmdir(dir_with_writing_access)
-        raise Error("Failed to setup test")
+        raise Error(
+            "Failed to setup test, couldn't create "
+            + str(dir_without_writing_access)
+        )
 
 
 def test_gettempdir():
