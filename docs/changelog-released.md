@@ -2358,7 +2358,7 @@ experience without dedicated sugar.
 ### ⭐️ New
 
 - A new Mojo-native dictionary type,
-  [`Dict`](/mojo/stdlib/collections/dict.html) for storing key-value pairs.
+  [`Dict`](/mojo/stdlib/collections/dict) for storing key-value pairs.
   `Dict` stores values that conform to the
   [`CollectionElement`](/mojo/stdlib/builtin/value/CollectionElement)
   trait. Keys need to conform to the new
@@ -2843,7 +2843,7 @@ experience without dedicated sugar.
   a given trait.
 
   The following section gives a brief overview of traits—see the
-  [Mojo Manual](/mojo/manual/traits.html) and this
+  [Mojo Manual](/mojo/manual/traits) and this
   [traits blog post](https://modul.ar/traits-blog) for more details!
 
   Traits are declared with the `trait` keyword. The bodies of traits should
@@ -2906,7 +2906,7 @@ experience without dedicated sugar.
       the_parents(x)
   ```
 
-  For more information, see the [Traits page](/mojo/manual/traits.html)
+  For more information, see the [Traits page](/mojo/manual/traits)
   in the Mojo Manual.
 
 - A fundamental `Destructable` trait has been added to the language. This is a
@@ -2959,8 +2959,8 @@ experience without dedicated sugar.
 
 - The [Mojo Manual](/mojo/manual/) is an all-new, complete Mojo user guide.
   It doesn't include _everything_ about Mojo yet, but it includes a lot,
-  and more than the original [programming
-  manual](/mojo/programming-manual.html) (now deprecated).
+  and more than the original programming
+  manual (now deprecated).
 
   Plus, the entire Mojo Manual and other Mojo docs are now [open-sourced on
   GitHub](https://github.com/modularml/mojo/tree/main/docs), and we'd love
@@ -3091,7 +3091,7 @@ the previous "read to EOF" behavior when size is negative.
   let data = binary_path.read_bytes()
   ```
 
-- [`Tensor`](/mojo/stdlib/tensor/tensor.html) has new `save()` and `load()`
+- [`Tensor`](/mojo/stdlib/tensor/tensor) has new `save()` and `load()`
   methods to save and load to file. These
   methods preserve shape and datatype information. For example:
 
@@ -3165,15 +3165,15 @@ the previous "read to EOF" behavior when size is negative.
       print(len(nums))
   ```
 
-- The assert functions in the [`testing`](/mojo/stdlib/testing/testing.html)
+- The assert functions in the [`testing`](/mojo/stdlib/testing/testing)
   package now raise an `Error` when the assertion fails instead of returning a
   `Bool` for whether the assertion succeeded or not.
 
-- Parameters of [`AnyType`](/mojo/stdlib/builtin/type_aliases.html) type are no
+- Parameters of [`AnyType`](/mojo/stdlib/builtin/type_aliases) type are no
   longer (implicitly) assumed to be register-passable. A new `AnyRegType` type
   is used to represent generic types that are register passable.
 
-- Changing the units in a [`benchmark`](/mojo/stdlib/benchmark/benchmark.html)
+- Changing the units in a [`benchmark`](/mojo/stdlib/benchmark/benchmark)
   report is now an argument instead of a parameter:
 
   ```mojo
@@ -3269,8 +3269,8 @@ the previous "read to EOF" behavior when size is negative.
       KwParamStruct[msg="hello", a=42]()  # prints 'hello 42'
   ```
 
-  For more detail, see the [programming
-  manual](/mojo/manual/parameters/index.html#optional-parameters-and-keyword-parameters).
+  For more detail, see the [Mojo
+  Manual](/mojo/manual/parameters/#optional-parameters-and-keyword-parameters).
 
   For the time being, the following notable limitations apply:
 
@@ -3348,7 +3348,7 @@ the previous "read to EOF" behavior when size is negative.
       pass
   ```
 
-- The [`benchmark`](/mojo/stdlib/benchmark/benchmark.html) module has been
+- The [`benchmark`](/mojo/stdlib/benchmark/benchmark) module has been
   simplified and improved so you can now run:
 
   ```mojo
@@ -3415,14 +3415,14 @@ the previous "read to EOF" behavior when size is negative.
       CtadStructWithDefault[b=7].foo(Thing[6]())  # prints '🔥 6 7 8'
   ```
 
-- [`Tensor`](/mojo/stdlib/tensor/tensor.html) has new `fromfile()` and
+- [`Tensor`](/mojo/stdlib/tensor/tensor) has new `fromfile()` and
   `tofile()` methods to save and load as bytes from a file.
 
 - The built-in `print()` function now works on the
-  [`Tensor`](/mojo/stdlib/tensor/tensor.html) type.
+  [`Tensor`](/mojo/stdlib/tensor/tensor) type.
 
-- [`TensorShape`](/mojo/stdlib/tensor/tensor_shape.html) and
-  [`TensorSpec`](/mojo/stdlib/tensor/tensor_shape.html) now have constructors
+- [`TensorShape`](/mojo/stdlib/tensor/tensor_shape) and
+  [`TensorSpec`](/mojo/stdlib/tensor/tensor_shape) now have constructors
   that take [`DynamicVector[Int]`](/mojo/stdlib/collections/list/List)
   and [`StaticIntTuple`](/mojo/stdlib/utils/index_/StaticIntTuple) to
   initialize shapes.
@@ -3556,7 +3556,7 @@ the previous "read to EOF" behavior when size is negative.
       print(DefaultParams["meow"]().message)  # prints 'meow'
   ```
 
-- The new [`file`](/mojo/stdlib/builtin/file.html) module adds basic file I/O
+- The new [`file`](/mojo/stdlib/builtin/file) module adds basic file I/O
   support. You can now write:
 
   ```mojo
@@ -3856,7 +3856,7 @@ Code](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vsco
   value from one location to another.
 
   For more information, see the Mojo Manual section on
-  [move constructors](/mojo/manual/lifecycle/life.html#move-constructors).
+  [move constructors](/mojo/manual/lifecycle/life#move-constructors).
 
 - The Error type in Mojo has changed. Instead of extracting the error message
   using `error.value` you will now extract the error message using
@@ -3911,23 +3911,23 @@ All earlier releases were considered version 0.1.
 ### ⭐️ New
 
 - A new `clobber_memory` function has been added to the
-  [`benchmark`](/mojo/stdlib/benchmark/benchmark.html) module.
+  [`benchmark`](/mojo/stdlib/benchmark/benchmark) module.
   The clobber memory function tells the system to flush all memory operations
   at the specified program point. This allows you to benchmark operations
   without the compiler reordering memory operations.
 
 - A new `keep` function has been added to the
-  [`benchmark`](/mojo/stdlib/benchmark/benchmark.html) module. The `keep`
+  [`benchmark`](/mojo/stdlib/benchmark/benchmark) module. The `keep`
   function tries to tell the compiler not to optimize the variable away
   if not used. This allows you to avoid compiler's dead code elimination
   mechanism, with a low footprint side effect.
 
 - New `shift_right` and `shift_left` functions have been added to the
-  [`simd`](/mojo/stdlib/builtin/simd.html) module. They shift the elements in
+  [`simd`](/mojo/stdlib/builtin/simd) module. They shift the elements in
   a SIMD vector right/left, filling elements with zeros as needed.
 
 - A new `cumsum` function has been added to the
-  [`reduction`](/mojo/stdlib/algorithm/reduction.html) module that computes
+  [`reduction`](/mojo/stdlib/algorithm/reduction) module that computes
   the cumulative sum (also known as scan) of input elements.
 
 - Mojo Jupyter kernel now supports code completion.
@@ -4235,7 +4235,7 @@ All earlier releases were considered version 0.1.
   dependencies between global variables, and their destructors are called in the
   reverse order.
 
-- The [Mojo programming manual](/mojo/programming-manual.html) is now written
+- The Mojo programming manual is now written
   as a Jupyter notebook, and available in its entirety in the Mojo Playground
   (`programming-manual.ipynb`). (Previously, `HelloMojo.ipynb` included most of
   the same material, but it was not up-to-date.)
@@ -4359,7 +4359,7 @@ possible to write the following:
   ```
 
   For details on the overload resolution logic, see the Mojo Manual section on
-  [parameters](/mojo/manual/parameters/index.html#overloading-on-parameters).
+  [parameters](/mojo/manual/parameters/#overloading-on-parameters).
 
 - A new `cost_of()` function has been added to `Autotune`. This meta-function
   must be invoked at compile time, and it returns the number of MLIR operations
@@ -4491,7 +4491,7 @@ only in declared parameter names, e.g. the following now works correctly:
   ```
 
   When `takeValueAsOwned()` takes its argument as an
-  [`owned`](/mojo/manual/values/ownership.html#transfer-arguments-owned-and)
+  [`owned`](/mojo/manual/values/ownership#transfer-arguments-owned-and)
   value (this is
   common in initializers for example), it is allowed to do whatever it wants
   with the value and destroy it when it is finished. In order to support this,
@@ -4649,7 +4649,7 @@ only in declared parameter names, e.g. the following now works correctly:
   optimized Matmul implementation is 3x faster.
 
 - Renamed the [`^` postfix
-operator](/mojo/manual/values/ownership.html#transfer-arguments-owned-and)
+operator](/mojo/manual/values/ownership#transfer-arguments-owned-and)
 from "consume" to "transfer."
 
 #### 🛠️ Fixed
