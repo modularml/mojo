@@ -44,7 +44,7 @@ what we publish.
   ```
 
 - Now supports "conditional conformances" where some methods on a struct have
-  additional trait requirements that the struct itself doesn't.  This is
+  additional trait requirements that the struct itself doesn't. This is
   expressed through an explicitly declared `self` type:
 
   ```mojo
@@ -85,7 +85,7 @@ what we publish.
 
 - As a specific form of "conditional conformances", initializers in a struct
   may indicate specific parameter bindings to use in the type of their `self`
-  argument.  For example:
+  argument. For example:
 
   ```mojo
   @value
@@ -117,8 +117,8 @@ what we publish.
     `testing` module.
 
 - `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
-([PR #2701](https://github.com/modularml/mojo/pull/2701)
-by [@jayzhan211](https://github.com/jayzhan211))
+  ([PR #2701](https://github.com/modularml/mojo/pull/2701)
+  by [@jayzhan211](https://github.com/jayzhan211))
 
 - Added `unsafe_cstr_ptr()` method to `String` and `StringLiteral`, that
   returns an `UnsafePointer[C_char]` for convenient interoperability with C
@@ -184,12 +184,25 @@ by [@jayzhan211](https://github.com/jayzhan211))
   functions such as `min`/`max`, as well as `math` functions like `ceildiv`,
   `align_down`, and `align_up` are also implemented for `UInt`.
 
+- `os.path.expanduser()` and `pathlib.Path.exapanduser()` have been added to
+  allow expanding a prefixed `~` in a `String` or `Path` with the users home
+  path:
+
+  ```mojo
+  import os
+  print(os.path.expanduser("~/.modular"))
+  # /home/username/.modular
+  ```
+
+- `Path.home()` has been added to return a path of the users home directory.
+
 ### 🦋 Changed
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that
   coroutines can only be awaited once.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
+
   - `String.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
@@ -287,6 +300,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Accessing local Python modules with `Python.add_to_path(".")` is no longer
   required, it now behaves the same as Python, you can access modules in the
   same folder as the target file:
+
   - `mojo run /tmp/main.mojo` can access `/tmp/mymodule.py`
   - `mojo build main.mojo -o ~/myexe && ~/myexe` can access `~/mymodule.py`
 
@@ -305,7 +319,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
-  to `UnsafePointer`.  Instead of `UnsafePointer(someRef)` please use the
+  to `UnsafePointer`. Instead of `UnsafePointer(someRef)` please use the
   `UnsafePointer.address_of(someRef[])` which makes the code explicit that the
   `UnsafePointer` gets the address of what the reference points to.
 
@@ -316,7 +330,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Removed `UnsafePointer.offset(offset:Int)`.
 
-- Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD
+- Removed `SIMD.splat(value: Scalar[type])`. Use the constructor for SIMD
   instead.
 
 - The builtin `tensor` module has been removed. Identical functionality is

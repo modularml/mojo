@@ -192,6 +192,17 @@ struct Path(
         """
         return str(self) == str(other)
 
+    fn __eq__(self, other: String) -> Bool:
+        """Returns True if the two paths are equal.
+
+        Args:
+          other: The other path to compare against.
+
+        Returns:
+          True if the String and Path are equal, and False otherwise.
+        """
+        return self.path == other
+
     fn __ne__(self, other: Self) -> Bool:
         """Returns True if the two paths are not equal.
 
@@ -238,6 +249,26 @@ struct Path(
           True if the path exists on disk and False otherwise.
         """
         return os.path.exists(self)
+
+    fn expanduser(self) raises -> Path:
+        """Expands a prefixed `~` with $HOME on posix or $USERPROFILE on
+        windows. If environment variables are not set or the `path` is not
+        prefixed with `~`, returns the `path` unmodified.
+
+        Returns:
+            The expanded path.
+        """
+        return os.path.expanduser(self)
+
+    @staticmethod
+    fn home() raises -> Path:
+        """Returns $HOME on posix or $USERPROFILE on windows. If environment
+        variables are not set it returns `~`.
+
+        Returns:
+            Path to user home directory.
+        """
+        return os.path._get_home_path()
 
     fn is_dir(self) -> Bool:
         """Returns True if the path is a directory and False otherwise.
