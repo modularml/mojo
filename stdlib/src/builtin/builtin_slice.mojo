@@ -46,7 +46,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
     """The starting index of the slice."""
     var end: OptionalReg[Int]
     """The end index of the slice."""
-    var step: Int
+    var step: OptionalReg[Int]
     """The step increment value of the slice."""
 
     @always_inline("nodebug")
@@ -59,7 +59,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         """
         self.start = start
         self.end = end
-        self.step = 1
+        self.step = None
 
     @always_inline("nodebug")
     fn __init__(
@@ -77,7 +77,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         """
         self.start = start
         self.end = end
-        self.step = step.value() if step else 1
+        self.step = step
 
     fn __str__(self) -> String:
         """Gets the string representation of the span.
@@ -117,7 +117,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         writer.write(", ")
         write_optional(self.end)
         writer.write(", ")
-        writer.write(repr(self.step))
+        write_optional(self.step)
         writer.write(")")
 
     @always_inline("nodebug")
@@ -134,7 +134,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         return (
             _compare_optional(self.start, other.start)
             and _compare_optional(self.end, other.end)
-            and self.step == other.step
+            and _compare_optional(self.step, other.step)
         )
 
     @always_inline("nodebug")
@@ -160,7 +160,9 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
             The length of the slice.
         """
 
-        return len(range(self.start.value(), self.end.value(), self.step))
+        return len(
+            range(self.start.value(), self.end.value(), self.step.value())
+        )
 
     fn indices(self, length: Int) -> (Int, Int, Int):
         """Returns a tuple of 3 intergers representing the start, end, and step
@@ -194,7 +196,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         Returns:
             A tuple containing three integers for start, end, and step.
         """
-        var step = self.step
+        var step = self.step.value() if self.step else 1
 
         var start = self.start
         var end = self.end
