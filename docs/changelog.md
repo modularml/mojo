@@ -207,6 +207,15 @@ what we publish.
   # tail: tail
   ```
 
+- `os.path.makedirs()` and `os.path.removedirs()` have been added for creating
+  and removing nested directories:
+
+  ```mojo
+  path = os.path.join("dir1", "dir2", "dir3")
+  os.path.makedirs(path, exist_ok=True)
+  os.path.removedirs(path)
+  ```
+
 ### 🦋 Changed
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that
