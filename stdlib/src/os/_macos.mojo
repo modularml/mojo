@@ -113,9 +113,7 @@ struct _c_stat(Stringable):
 @always_inline
 fn _stat(path: String) raises -> _c_stat:
     var stat = _c_stat()
-    var err = external_call["stat", Int32](
-        path.unsafe_ptr(), UnsafePointer.address_of(stat)
-    )
+    var err = external_call["stat", Int32](path.unsafe_ptr(), Reference(stat))
     if err == -1:
         raise "unable to stat '" + path + "'"
     return stat
@@ -124,9 +122,7 @@ fn _stat(path: String) raises -> _c_stat:
 @always_inline
 fn _lstat(path: String) raises -> _c_stat:
     var stat = _c_stat()
-    var err = external_call["lstat", Int32](
-        path.unsafe_ptr(), UnsafePointer.address_of(stat)
-    )
+    var err = external_call["lstat", Int32](path.unsafe_ptr(), Reference(stat))
     if err == -1:
         raise "unable to lstat '" + path + "'"
     return stat

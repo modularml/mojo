@@ -231,7 +231,7 @@ fn _get_global[
 fn _get_global_or_null[name: StringLiteral]() -> UnsafePointer[NoneType]:
     return external_call[
         "KGEN_CompilerRT_GetGlobalOrNull", UnsafePointer[NoneType]
-    ](StringRef(name))
+    ](name.unsafe_ptr(), name._byte_length())
 
 
 @always_inline

@@ -38,7 +38,7 @@ fn cwd() raises -> Path:
     var buf = UnsafePointer[C_char]._from_dtype_ptr(buf0)
 
     var res = external_call["getcwd", UnsafePointer[C_char]](
-        buf, MAX_CWD_BUFFER_SIZE
+        buf, Int(MAX_CWD_BUFFER_SIZE)
     )
 
     # If we get a nullptr, then we raise an error.
