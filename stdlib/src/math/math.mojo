@@ -133,20 +133,6 @@ fn ceildiv(numerator: IntLiteral, denominator: IntLiteral) -> IntLiteral:
 
 
 @always_inline("nodebug")
-fn ceildiv(numerator: Int, denominator: Int) -> Int:
-    """Return the rounded-up result of dividing x by y.
-
-    Args:
-        numerator: The numerator.
-        denominator: The denominator.
-
-    Returns:
-        The ceiling of dividing x by y.
-    """
-    return __mlir_op.`index.ceildivs`(numerator.value, denominator.value)
-
-
-@always_inline("nodebug")
 fn ceildiv(numerator: UInt, denominator: UInt) -> UInt:
     """Return the rounded-up result of dividing x by y.
 
