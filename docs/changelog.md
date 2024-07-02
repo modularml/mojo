@@ -16,6 +16,11 @@ what we publish.
 
 ### ⭐️ New
 
+- Added a new [`Counter`](/mojo/stdlib/collections/counter/Counter)
+  dictionary-like type, matching most of the features of the Python one.
+  ([PR 2910#](https://github.com/modularml/mojo/pull/2910) by
+  [@msaelices](https://github.com/msaelices))
+
 - Mojo context managers used in regions of code that may raise no longer need to
   define a "conditional" exit function in the form of
   `fn __exit__(self, e: Error) -> Bool`. This function allows the context
