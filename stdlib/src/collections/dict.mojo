@@ -931,12 +931,16 @@ struct Dict[K: KeyElement, V: CollectionElement](
         # Return (found, slot, index)
         var slot = hash & (self._reserved() - 1)
         var perturb = bitcast[DType.uint64](Int64(hash))
+        var removed_slot = OptionalReg[Int](None)
         while True:
             var index = self._get_index(slot)
             if index == Self.EMPTY:
+                if removed_slot:
+                    return (False, removed_slot.value(), self._n_entries)
                 return (False, slot, self._n_entries)
             elif index == Self.REMOVED:
-                pass
+                if not removed_slot:
+                    removed_slot = slot
             else:
                 var entry = self._entries.__get_ref(index)
                 debug_assert(entry[].__bool__(), "entry in index must be full")
@@ -974,7 +978,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
             while not self._entries.__get_ref(right)[]:
                 right += 1
                 debug_assert(right < self._reserved(), "Invalid dict state")
-            var entry = self._entries.__get_ref(right)
+            var entry = Reference(self._entries[right])
             debug_assert(entry[].__bool__(), "Logic error")
             var slot = self._find_empty_index(entry[].value().hash)
             self._set_index(slot, left)
