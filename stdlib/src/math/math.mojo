@@ -116,7 +116,37 @@ fn ceildiv[T: CeilDivableRaising, //](numerator: T, denominator: T) raises -> T:
     return -(numerator // -denominator)
 
 
+# NOTE: this overload is needed because of overload precedence; without it the
+# Int overload would be preferred, and ceildiv wouldn't work on IntLiteral.
 @always_inline
+fn ceildiv(numerator: IntLiteral, denominator: IntLiteral) -> IntLiteral:
+    """Return the rounded-up result of dividing x by y.
+
+    Args:
+        numerator: The numerator.
+        denominator: The denominator.
+
+    Returns:
+        The ceiling of dividing x by y.
+    """
+    return -(numerator // -denominator)
+
+
+@always_inline("nodebug")
+fn ceildiv(numerator: Int, denominator: Int) -> Int:
+    """Return the rounded-up result of dividing x by y.
+
+    Args:
+        numerator: The numerator.
+        denominator: The denominator.
+
+    Returns:
+        The ceiling of dividing x by y.
+    """
+    return __mlir_op.`index.ceildivs`(numerator.value, denominator.value)
+
+
+@always_inline("nodebug")
 fn ceildiv(numerator: UInt, denominator: UInt) -> UInt:
     """Return the rounded-up result of dividing x by y.
 
@@ -127,7 +157,7 @@ fn ceildiv(numerator: UInt, denominator: UInt) -> UInt:
     Returns:
         The ceiling of dividing x by y.
     """
-    return (numerator + denominator - 1) // denominator
+    return __mlir_op.`index.ceildivu`(numerator.value, denominator.value)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -1031,6 +1061,23 @@ fn align_down(value: Int, alignment: Int) -> Int:
     return (value // alignment) * alignment
 
 
+@always_inline
+fn align_down(value: UInt, alignment: UInt) -> UInt:
+    """Returns the closest multiple of alignment that is less than or equal to
+    value.
+
+    Args:
+        value: The value to align.
+        alignment: Value to align to.
+
+    Returns:
+        Closest multiple of the alignment that is less than or equal to the
+        input value. In other words, floor(value / alignment) * alignment.
+    """
+    debug_assert(alignment != 0, "zero alignment")
+    return (value // alignment) * alignment
+
+
 # ===----------------------------------------------------------------------=== #
 # align_up
 # ===----------------------------------------------------------------------=== #
@@ -1038,6 +1085,23 @@ fn align_down(value: Int, alignment: Int) -> Int:
 
 @always_inline
 fn align_up(value: Int, alignment: Int) -> Int:
+    """Returns the closest multiple of alignment that is greater than or equal
+    to value.
+
+    Args:
+        value: The value to align.
+        alignment: Value to align to.
+
+    Returns:
+        Closest multiple of the alignment that is greater than or equal to the
+        input value. In other words, ceiling(value / alignment) * alignment.
+    """
+    debug_assert(alignment != 0, "zero alignment")
+    return ceildiv(value, alignment) * alignment
+
+
+@always_inline
+fn align_up(value: UInt, alignment: UInt) -> UInt:
     """Returns the closest multiple of alignment that is greater than or equal
     to value.
 

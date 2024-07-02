@@ -511,6 +511,17 @@ struct SIMD[type: DType, size: Int](
             self.value, val.value, index(idx).value
         )
 
+    fn __contains__(self, value: Scalar[type]) -> Bool:
+        """Whether the vector contains the value.
+
+        Args:
+            value: The value.
+
+        Returns:
+            Whether the vector contains the value.
+        """
+        return (self == value).reduce_or()
+
     @always_inline("nodebug")
     fn __add__(self, rhs: Self) -> Self:
         """Computes `self + rhs`.
@@ -2670,7 +2681,7 @@ struct SIMD[type: DType, size: Int](
         ](zero_simd, self, Int32(-shift))
 
     @staticmethod
-    @always_inline("nodebug")
+    @always_inline
     fn load[
         *,
         alignment: Int = Self._default_alignment,
@@ -2692,24 +2703,51 @@ struct SIMD[type: DType, size: Int](
             The loaded value.
         """
         return Self.load[alignment=alignment, address_space=address_space](
-            ptr, 0
+            ptr, offset=0
+        )
+
+    @staticmethod
+    @always_inline
+    fn load[
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space], offset: Scalar) -> Self:
+        """Loads the value the Pointer object points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+            The offset must be integer.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to load from.
+            offset: The offset to load from.
+
+        Returns:
+            The loaded value.
+        """
+        constrained[offset.type.is_integral(), "offset must be integer"]()
+        return Self.load[alignment=alignment, address_space=address_space](
+            ptr, offset=int(offset)
         )
 
     @staticmethod
     @always_inline("nodebug")
     fn load[
-        T: Intable,
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: T) -> Self:
+    ](ptr: DTypePointer[type, address_space], offset: Int) -> Self:
         """Loads the value the Pointer object points to with the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
 
         Parameters:
-            T: The Intable type of the offset.
             alignment: The minimal alignment of the address.
             address_space: The address space the pointer is in.
 
@@ -2732,7 +2770,7 @@ struct SIMD[type: DType, size: Int](
 
             # intentionally don't unroll, otherwise the compiler vectorizes
             for i in range(size):
-                v[i] = ptr.address.offset(int(offset) + i).load[
+                v[i] = ptr.address.offset(offset + i).load[
                     alignment=alignment
                 ]()
             return v
@@ -2744,21 +2782,19 @@ struct SIMD[type: DType, size: Int](
         )
 
     @staticmethod
-    @always_inline("nodebug")
+    @always_inline
     fn store[
-        T: Intable,
-        /,
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: T, val: Self):
+    ](ptr: DTypePointer[type, address_space], offset: Int, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
             The width and alignment must be positive integer values.
+            The offset must be integer.
 
         Parameters:
-            T: The Intable type of the offset.
             alignment: The minimal alignment of the address.
             address_space: The address space the pointer is in.
 
@@ -2769,6 +2805,32 @@ struct SIMD[type: DType, size: Int](
         """
         Self.store[alignment=alignment, address_space=address_space](
             ptr.offset(offset), val
+        )
+
+    @staticmethod
+    @always_inline
+    fn store[
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space], offset: Scalar, val: Self):
+        """Stores a single element value at the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to store to.
+            offset: The offset to store to.
+            val: The value to store.
+        """
+        constrained[offset.type.is_integral(), "offset must be integer"]()
+        Self.store[alignment=alignment, address_space=address_space](
+            ptr, int(offset), val
         )
 
     @staticmethod

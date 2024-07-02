@@ -31,7 +31,24 @@ from utils._format import Formattable, Formatter, ToFormatter
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
 fn ord(s: String) -> Int:
+    """Returns an integer that represents the given one-character string.
+
+    Given a string representing one character, return an integer
+    representing the code point of that character. For example, `ord("a")`
+    returns the integer `97`. This is the inverse of the `chr()` function.
+
+    Args:
+        s: The input string slice, which must contain only a single character.
+
+    Returns:
+        An integer representing the code point of the given character.
+    """
+    return ord(s.as_string_slice())
+
+
+fn ord(s: StringSlice) -> Int:
     """Returns an integer that represents the given one-character string.
 
     Given a string representing one character, return an integer
@@ -52,10 +69,12 @@ fn ord(s: String) -> Int:
     var p = s.unsafe_ptr().bitcast[UInt8]()
     var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
-        debug_assert(len(s) == 1, "input string length must be 1")
+        debug_assert(s._byte_length() == 1, "input string length must be 1")
         return int(b1)
     var num_bytes = countl_zero(~b1)
-    debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    debug_assert(
+        s._byte_length() == int(num_bytes), "input string must be one character"
+    )
     debug_assert(
         1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
     )
@@ -1055,6 +1074,8 @@ struct String(
         Construct a String from several `Formattable` arguments:
 
         ```mojo
+        from testing import assert_equal
+
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
 
         assert_equal(string, "1, 2.0, three")
@@ -2154,7 +2175,7 @@ struct String(
             `string[:-len(suffix)]` if the string ends with the suffix string,
             or a copy of the original string otherwise.
         """
-        if self.endswith(suffix):
+        if suffix and self.endswith(suffix):
             return self[: -len(suffix)]
         return self
 
@@ -2431,7 +2452,7 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
 
 
 @value
-struct _FormatCurlyEntry:
+struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     """
     Internally used by the `format()` method.
 
@@ -2447,13 +2468,19 @@ struct _FormatCurlyEntry:
     var last_curly: Int
     """The index of an closing brace around a substitution field."""
 
-    var field: Variant[
+    alias _FieldVariantType = Variant[
         String,  # kwargs indexing (`{field_name}`)
         Int,  # args manual indexing (`{3}`)
         NoneType,  # args automatic indexing (`{}`)
         Bool,  # for escaped curlies ('{{')
     ]
+    var field: Self._FieldVariantType
     """Store the substitution field."""
+
+    fn __init__(inout self, *, other: Self):
+        self.first_curly = other.first_curly
+        self.last_curly = other.last_curly
+        self.field = Self._FieldVariantType(other=other.field)
 
     fn is_escaped_brace(ref [_]self) -> Bool:
         return self.field.isa[Bool]()

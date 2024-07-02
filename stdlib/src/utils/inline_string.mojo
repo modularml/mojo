@@ -29,7 +29,7 @@ from utils._format import ToFormatter
 
 
 @value
-struct InlineString(Sized, Stringable, CollectionElement):
+struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
     """A string that performs small-string optimization to avoid heap allocations for short strings.
     """
 
@@ -88,6 +88,14 @@ struct InlineString(Sized, Stringable, CollectionElement):
             heap_string: The heap string to take ownership of.
         """
         self._storage = Self.Layout(heap_string^)
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
 
     # ===------------------------------------------------------------------=== #
     # Operator dunders
@@ -294,7 +302,12 @@ struct InlineString(Sized, Stringable, CollectionElement):
 
 @value
 struct _FixedString[CAP: Int](
-    Sized, Stringable, Formattable, ToFormatter, CollectionElement
+    Sized,
+    Stringable,
+    Formattable,
+    ToFormatter,
+    CollectionElement,
+    CollectionElementNew,
 ):
     """A string with a fixed available capacity.
 
@@ -318,6 +331,14 @@ struct _FixedString[CAP: Int](
         """Constructs a new empty string."""
         self.buffer = InlineArray[UInt8, CAP](unsafe_uninitialized=True)
         self.size = 0
+
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
 
     @always_inline
     fn __init__(inout self, literal: StringLiteral) raises:

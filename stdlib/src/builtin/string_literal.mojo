@@ -35,6 +35,7 @@ from .string import _atol
 struct StringLiteral(
     Boolable,
     Comparable,
+    CollectionElementNew,
     Formattable,
     IntableRaising,
     KeyElement,
@@ -67,6 +68,15 @@ struct StringLiteral(
             value: The string value.
         """
         self.value = value
+
+    @always_inline("nodebug")
+    fn __init__(inout self, *, other: Self):
+        """Copy constructor.
+
+        Args:
+            other: The string literal to copy.
+        """
+        self = other
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
