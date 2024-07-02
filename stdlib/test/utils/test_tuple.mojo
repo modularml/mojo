@@ -38,7 +38,7 @@ def test_static_tuple():
 def test_static_int_tuple():
     assert_equal(str(StaticIntTuple[1](1)), "(1,)")
 
-    assert_equal(str(StaticIntTuple[3](2)), "(2, 2, 2)")
+    assert_equal(str(StaticIntTuple[3](repeat=2)), "(2, 2, 2)")
 
     assert_equal(
         str(StaticIntTuple[3](1, 2, 3) * StaticIntTuple[3](4, 5, 6)),

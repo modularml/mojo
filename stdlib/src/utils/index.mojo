@@ -185,7 +185,7 @@ struct StaticIntTuple[size: Int](
     @always_inline
     fn __init__(inout self):
         """Constructs a static int tuple of the given size."""
-        self = 0
+        self = Self(repeat=0)
 
     @always_inline
     fn __init__(inout self, value: __mlir_type.index):
@@ -302,16 +302,16 @@ struct StaticIntTuple[size: Int](
         self = tup
 
     @always_inline
-    fn __init__(inout self, elem: Int):
+    fn __init__(inout self, *, repeat: Int):
         """Constructs a static int tuple given a set of arguments.
 
         Args:
-            elem: The elem to splat into the tuple.
+            repeat: The elem to splat into the tuple.
         """
 
         self.data = __mlir_op.`pop.array.repeat`[
             _type = __mlir_type[`!pop.array<`, size.value, `, `, Int, `>`]
-        ](elem)
+        ](repeat)
 
     @always_inline
     fn __init__(inout self, values: VariadicList[Int]):
