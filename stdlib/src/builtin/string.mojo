@@ -809,7 +809,7 @@ struct _StringIter[
         self.length = length
         self.continuation_bytes = 0
         for i in range(length):
-            if _utf8_byte_type(int(unsafe_pointer[i])) == 1:
+            if _utf8_byte_type(unsafe_pointer[i]) == 1:
                 self.continuation_bytes += 1
 
     fn __iter__(self) -> Self:
@@ -820,7 +820,7 @@ struct _StringIter[
         if forward:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(int(self.ptr[self.index]))
+                var byte_type = _utf8_byte_type(self.ptr[self.index])
                 if byte_type != 0:
                     byte_len = int(byte_type)
                     self.continuation_bytes -= byte_len - 1
@@ -832,11 +832,11 @@ struct _StringIter[
         else:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(int(self.ptr[self.index - 1]))
+                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
                 if byte_type != 0:
                     while byte_type == 1:
                         byte_len += 1
-                        var b = int(self.ptr[self.index - byte_len])
+                        var b = self.ptr[self.index - byte_len]
                         byte_type = _utf8_byte_type(b)
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len
@@ -1074,11 +1074,10 @@ struct String(
         Construct a String from several `Formattable` arguments:
 
         ```mojo
-        from testing import assert_equal
-
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
-
-        assert_equal(string, "1, 2.0, three")
+        print(string) # "1, 2.0, three"
+        %# from testing import assert_equal
+        %# assert_equal(string, "1, 2.0, three")
         ```
         .
         """
@@ -1322,7 +1321,7 @@ struct String(
             An iterator of references to the string elements.
         """
         return _StringIter[__lifetime_of(self)](
-            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     fn __reversed__(ref [_]self) -> _StringIter[__lifetime_of(self), False]:
@@ -1332,7 +1331,7 @@ struct String(
             A reversed iterator of references to the string elements.
         """
         return _StringIter[__lifetime_of(self), forward=False](
-            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     # ===------------------------------------------------------------------=== #
@@ -1346,7 +1345,7 @@ struct String(
         Returns:
             True if the string length is greater than zero, and False otherwise.
         """
-        return len(self) > 0
+        return self.byte_length() > 0
 
     @always_inline
     fn __len__(self) -> Int:
@@ -1355,12 +1354,14 @@ struct String(
         Returns:
             The string length, in bytes.
         """
-        # Avoid returning -1 if the buffer is not initialized
-        if not self.unsafe_ptr():
-            return 0
+        var unicode_length = self.byte_length()
 
-        # The negative 1 is to account for the terminator.
-        return len(self._buffer) - 1
+        # TODO: everything uses this method assuming it's byte length
+        # for i in range(unicode_length):
+        #     if _utf8_byte_type(self._buffer[i]) == 1:
+        #         unicode_length -= 1
+
+        return unicode_length
 
     @always_inline
     fn __str__(self) -> String:
@@ -1398,6 +1399,19 @@ struct String(
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
+
+    fn byte_length(self) -> Int:
+        """Returns the string byte length without null terminator.
+
+        Returns:
+            The string byte length without null terminator.
+        """
+        # Avoid returning -1 if the buffer is not initialized
+        if not self.unsafe_ptr():
+            return 0
+
+        # The negative 1 is to account for the terminator.
+        return len(self._buffer) - 1
 
     fn format_to(self, inout writer: Formatter):
         """
@@ -1687,49 +1701,22 @@ struct String(
         )
 
     fn isspace(self) -> Bool:
-        """Determines whether the given String is a python
-        whitespace String. This corresponds to Python's
+        """Determines whether every character in the given String is a
+        python whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `" \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
+        `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Returns:
-            True if the String is one of the whitespace characters
+            True if the whole String is made up of whitespace characters
                 listed above, otherwise False.
         """
-        # TODO add line and paragraph separator as stringliteral
-        # once unicode escape secuences are accepted
-        var next_line = List[UInt8](0xC2, 0x85)
-        """TODO: \\x85"""
-        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
-        """TODO: \\u2028"""
-        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
-        """TODO: \\u2029"""
 
-        @always_inline
-        fn _compare(
-            item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
-        ) -> Bool:
-            var ptr1 = DTypePointer(item1)
-            var ptr2 = DTypePointer(item2)
-            return memcmp(ptr1, ptr2, amnt) == 0
-
-        if len(self) == 0:
+        if self.byte_length() == 0:
             return False
 
         for s in self:
-            var no_null_len = len(s)
-            var ptr = s.unsafe_ptr()
-            if no_null_len == 1 and not _isspace(ptr[0]):
-                return False
-            elif no_null_len == 2 and not _compare(
-                ptr, next_line.unsafe_ptr(), 2
-            ):
-                return False
-            elif no_null_len == 3 and not (
-                _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
-                or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
-            ):
+            if not s.isspace():
                 return False
         return True
 
@@ -1758,15 +1745,15 @@ struct String(
         """
         var output = List[String]()
 
-        var str_iter_len = len(self) - 1
+        var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
         var items = 0
-        var sep_len = len(sep)
+        var sep_len = sep.byte_length()
         if sep_len == 0:
             raise Error("ValueError: empty separator")
 
-        while lhs <= str_iter_len:
+        while lhs <= str_byte_len:
             rhs = self.find(sep, lhs)
             if rhs == -1:
                 output.append(self[lhs:])
@@ -1785,12 +1772,11 @@ struct String(
             output.append("")
         return output
 
-    fn split(self, *, maxsplit: Int = -1) -> List[String]:
+    fn split(self, sep: NoneType = None, maxsplit: Int = -1) -> List[String]:
         """Split the string by every Whitespace separator.
 
-        Currently only uses C style separators.
-
         Args:
+            sep: None.
             maxsplit: The maximum amount of items to split from String. Defaults
                 to unlimited.
 
@@ -1806,43 +1792,40 @@ struct String(
 
         # Splitting a string with leading, trailing, and middle whitespaces
         _ = String("      hello    world     ").split() # ["hello", "world"]
+        # Splitting adjacent universal newlines:
+        _ = String(
+            "hello \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029world"
+        ).split()  # ["hello", "world"]
         ```
         .
         """
-        # TODO: implement and document splitting adjacent universal newlines:
-        # _ = String(
-        #     "hello \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029world"
-        # ).split()  # ["hello", "world"]
 
         var output = List[String]()
-
-        var str_iter_len = len(self) - 1
+        var str_byte_len = self.byte_length() - 1
         var lhs = 0
         var rhs = 0
         var items = 0
-        # FIXME: this should iterate and build unicode strings
-        # and use self.isspace()
-        while lhs <= str_iter_len:
+        while lhs <= str_byte_len:
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
-            while lhs <= str_iter_len:
-                if not _isspace(self._buffer.unsafe_get(lhs)):
+            for s in self[lhs:]:
+                if not s.isspace():
                     break
-                lhs += 1
+                lhs += len(s)
             # if it went until the end of the String, then
             # it should be sliced up until the original
             # start of the whitespace which was already appended
-            if lhs - 1 == str_iter_len:
+            if lhs - 1 == str_byte_len:
                 break
-            elif lhs == str_iter_len:
+            elif lhs == str_byte_len:
                 # if the last char is not whitespace
-                output.append(self[str_iter_len])
+                output.append(self[str_byte_len])
                 break
             rhs = lhs + 1
-            while rhs <= str_iter_len:
-                if _isspace(self._buffer.unsafe_get(rhs)):
+            for s in self[lhs + 1 :]:
+                if s.isspace():
                     break
-                rhs += 1
+                rhs += len(s)
 
             if maxsplit > -1:
                 if items == maxsplit:
@@ -1995,8 +1978,12 @@ struct String(
         Returns:
             A copy of the string with no trailing whitespaces.
         """
-        # TODO: should use self.__iter__ and self.isspace()
         var r_idx = len(self)
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
+        # for s in self.__reversed__():
+        #     if not s.isspace():
+        #         break
+        #     r_idx -= 1
         while r_idx > 0 and _isspace(self._buffer.unsafe_get(r_idx - 1)):
             r_idx -= 1
         return self[:r_idx]
@@ -2023,8 +2010,12 @@ struct String(
         Returns:
             A copy of the string with no leading whitespaces.
         """
-        # TODO: should use self.__iter__ and self.isspace()
         var l_idx = 0
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
+        # for s in self:
+        #     if not s.isspace():
+        #         break
+        #     l_idx += 1
         while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)):
             l_idx += 1
         return self[l_idx:]
