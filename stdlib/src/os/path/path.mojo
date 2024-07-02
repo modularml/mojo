@@ -413,6 +413,55 @@ fn join(path: String, *paths: String) -> String:
     return joined_path
 
 
+# ===----------------------------------------------------------------------=== #
+# split
+# ===----------------------------------------------------------------------=== #
+
+
+def split(path: String) -> (String, String):
+    """
+    Split a given pathname into two components: head and tail. This is useful
+    for separating the directory path from the filename. If the input path ends
+    with a seperator, the tail component will be empty. If there is no seperator
+    in the path, the head component will be empty, and the entire path will be
+    considered the tail. Trailing seperators in the head are stripped unless the
+    head is the root directory.
+
+    Args:
+        path: The path to be split.
+
+    Returns:
+        A tuple containing two strings: (head, tail).
+    """
+    i = path.rfind(os.sep) + 1
+    head, tail = path[:i], path[i:]
+    if head and head != str(os.sep) * len(head):
+        head = head.rstrip(sep)
+    return head, tail
+
+
+def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
+    """
+    Split a given pathname into two components: head and tail. This is useful
+    for separating the directory path from the filename. If the input path ends
+    with a seperator, the tail component will be empty. If there is no seperator
+    in the path, the head component will be empty, and the entire path will be
+    considered the tail. Trailing seperators in the head are stripped unless the
+    head is the root directory.
+
+    Parameters:
+        PathLike: The type conforming to the os.PathLike trait.
+
+    Args:
+        path: The path to be split.
+
+    Returns:
+        A tuple containing two strings: (head, tail).
+
+    """
+    return split(path.__fspath__())
+
+
 # TODO uncomment this when unpacking is supported
 # fn join[pathlike: os.PathLike](path: pathlike, *paths: pathlike) -> String:
 #     """Join two or more pathname components, inserting '/' as needed.
