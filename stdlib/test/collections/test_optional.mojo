@@ -75,6 +75,9 @@ def test_optional_reg_basic():
     assert_true(False or val)
     assert_true(True and val)
 
+    assert_equal(OptionalReg[Int]().or_else(33), 33)
+    assert_equal(OptionalReg[Int](42).or_else(33), 42)
+
 
 def test_optional_is():
     a = Optional(1)
