@@ -96,11 +96,11 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
         var handle = external_call[
             "KGEN_CompilerRT_IO_FileOpen", DTypePointer[DType.invalid]
-        ](path, mode, UnsafePointer.address_of(err_msg))
+        ](path, mode, Reference(err_msg))
 
         if err_msg:
             self.handle = DTypePointer[DType.invalid]()
-            raise (err_msg^).consume_as_error()
+            raise err_msg^.consume_as_error()
 
         self.handle = handle
 
@@ -119,11 +119,11 @@ struct FileHandle:
 
         var err_msg = _OwnedStringRef()
         external_call["KGEN_CompilerRT_IO_FileClose", NoneType](
-            self.handle, UnsafePointer.address_of(err_msg)
+            self.handle, Reference(err_msg)
         )
 
         if err_msg:
-            raise (err_msg^).consume_as_error()
+            raise err_msg^.consume_as_error()
 
         self.handle = DTypePointer[DType.invalid]()
 
@@ -196,12 +196,12 @@ struct FileHandle:
             "KGEN_CompilerRT_IO_FileRead", UnsafePointer[UInt8]
         ](
             self.handle,
-            UnsafePointer.address_of(size_copy),
-            UnsafePointer.address_of(err_msg),
+            Reference(size_copy),
+            Reference(err_msg),
         )
 
         if err_msg:
-            raise (err_msg^).consume_as_error()
+            raise err_msg^.consume_as_error()
 
         return String(buf, int(size_copy) + 1)
 
@@ -274,7 +274,7 @@ struct FileHandle:
             self.handle,
             ptr,
             size * sizeof[type](),
-            UnsafePointer.address_of(err_msg),
+            Reference(err_msg),
         )
 
         if err_msg:
@@ -340,8 +340,8 @@ struct FileHandle:
             "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[UInt8]
         ](
             self.handle,
-            UnsafePointer.address_of(size_copy),
-            UnsafePointer.address_of(err_msg),
+            Reference(size_copy),
+            Reference(err_msg),
         )
 
         if err_msg:
@@ -398,7 +398,7 @@ struct FileHandle:
         )
         var err_msg = _OwnedStringRef()
         var pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
-            self.handle, offset, whence, UnsafePointer.address_of(err_msg)
+            self.handle, offset, whence, Reference(err_msg)
         )
 
         if err_msg:
@@ -452,7 +452,7 @@ struct FileHandle:
             self.handle,
             ptr.address,
             len,
-            UnsafePointer.address_of(err_msg),
+            Reference(err_msg),
         )
 
         if err_msg:

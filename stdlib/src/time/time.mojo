@@ -96,9 +96,7 @@ fn _clock_gettime(clockid: Int) -> _CTimeSpec:
     var ts = _CTimeSpec()
 
     # Call libc's clock_gettime.
-    _ = external_call["clock_gettime", Int32](
-        Int32(clockid), UnsafePointer.address_of(ts)
-    )
+    _ = external_call["clock_gettime", Int32](Int32(clockid), Reference(ts))
 
     return ts
 
@@ -127,9 +125,7 @@ fn _monotonic_nanoseconds() -> Int:
     @parameter
     if os_is_windows():
         var ft = _FILETIME()
-        external_call["GetSystemTimePreciseAsFileTime", NoneType](
-            UnsafePointer.address_of(ft)
-        )
+        external_call["GetSystemTimePreciseAsFileTime", NoneType](Reference(ft))
 
         return ft.as_nanoseconds()
     else:
@@ -268,4 +264,4 @@ fn sleep(sec: Int):
         # In Windows the argument is in milliseconds.
         external_call["Sleep", NoneType](sec * 1000)
     else:
-        external_call["sleep", NoneType](sec)
+        external_call["sleep", NoneType](Int32(sec))

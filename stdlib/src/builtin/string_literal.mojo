@@ -221,17 +221,12 @@ struct StringLiteral(
             A new string.
         """
         var string = String()
-        var length: Int = __mlir_op.`pop.string.size`(self.value)
+        var length = self._byte_length()
         var buffer = String._buffer_type()
         var new_capacity = length + 1
         buffer._realloc(new_capacity)
         buffer.size = new_capacity
-        var uint8Ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
-        ](__mlir_op.`pop.string.address`(self.value))
-        var data: DTypePointer[DType.uint8] = DTypePointer[DType.uint8](
-            uint8Ptr
-        )
+        var data: DTypePointer[DType.uint8] = self.as_uint8_ptr()
         memcpy(DTypePointer(buffer.data), data, length)
         (buffer.data + length).init_pointee_move(0)
         string._buffer = buffer^

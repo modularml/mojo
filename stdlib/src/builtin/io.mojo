@@ -87,7 +87,7 @@ struct _fdopen:
 @no_inline
 fn _flush(file: FileDescriptor = stdout):
     with _fdopen(file) as fd:
-        _ = external_call["fflush", Int32](fd)
+        _ = external_call["fflush", Int32](fd.handle)
 
 
 # ===----------------------------------------------------------------------=== #
@@ -107,7 +107,7 @@ fn _printf[
     @parameter
     if triple_is_nvidia_cuda():
         _ = external_call["vprintf", Int32](
-            fmt.unsafe_cstr_ptr(), UnsafePointer.address_of(loaded_pack)
+            fmt.unsafe_cstr_ptr(), Reference(loaded_pack)
         )
         _ = loaded_pack
     else:
