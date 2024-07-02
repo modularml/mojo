@@ -539,37 +539,9 @@ fn isdigit(c: UInt8) -> Bool:
     return ord_0 <= int(c) <= ord_9
 
 
-fn isdigit(c: String) -> Bool:
-    """Determines whether the given character is a digit [0-9].
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is a digit.
-    """
-    return isdigit(ord(c))
-
-
 # ===----------------------------------------------------------------------=== #
 # isupper
 # ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn isupper(c: String) -> Bool:
-    """Determines whether the given character is an uppercase character.
-
-    This currently only respects the default "C" locale, i.e. returns True iff
-    the character specified is one of "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is uppercase.
-    """
-    return isupper(ord(c))
 
 
 fn isupper(c: UInt8) -> Bool:
@@ -596,22 +568,6 @@ fn _is_ascii_uppercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # islower
 # ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn islower(c: String) -> Bool:
-    """Determines whether the given character is an lowercase character.
-
-    This currently only respects the default "C" locale, i.e. returns True iff
-    the character specified is one of "abcdefghijklmnopqrstuvwxyz".
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is lowercase.
-    """
-    return islower(ord(c))
 
 
 fn islower(c: UInt8) -> Bool:
@@ -734,19 +690,6 @@ fn _isnewline(s: String) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # isprintable
 # ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn isprintable(c: String) -> Bool:
-    """Determines whether the given character is a printable character.
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is a printable character, otherwise False.
-    """
-    return isprintable(ord(c))
 
 
 fn isprintable(c: UInt8) -> Bool:
@@ -1209,7 +1152,8 @@ struct String(
             rhs: The other String to compare against.
 
         Returns:
-            True if this String is strictly less than the RHS String and False otherwise.
+            True if this String is strictly less than the RHS String and False
+            otherwise.
         """
         return self._strref_dangerous() < rhs._strref_dangerous()
 
@@ -2287,46 +2231,73 @@ struct String(
     fn isdigit(self) -> Bool:
         """Returns True if all characters in the string are digits.
 
+        Note that this currently only works with ASCII strings.
+
         Returns:
             True if all characters are digits else False.
         """
-        return _all[isdigit](self)
+        for c in self:
+            if not isdigit(ord(c)):
+                return False
+        return True
+
+    @always_inline
+    fn _isupper_islower[*, upper: Bool](self) -> Bool:
+        fn is_ascii_cased(c: UInt8) -> Bool:
+            return _is_ascii_uppercase(c) or _is_ascii_lowercase(c)
+
+        for c in self:
+            debug_assert(c._byte_length() == 1, "only implemented for ASCII")
+            if is_ascii_cased(ord(c)):
+
+                @parameter
+                if upper:
+                    return self == self.upper()
+                else:
+                    return self == self.lower()
+        return False
 
     fn isupper(self) -> Bool:
-        """Returns True if all characters in the string are uppercase.
+        """Returns True if all cased characters in the string are uppercase and
+        there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
 
         Returns:
-            True if all characters are uppercase else False.
+            True if all cased characters in the string are uppercase and there
+            is at least one cased character, False otherwise.
         """
-        return _all[isupper](self)
+        return self._isupper_islower[upper=True]()
 
     fn islower(self) -> Bool:
-        """Returns True if all characters in the string are lowercase.
+        """Returns True if all cased characters in the string are lowercase and
+        there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
 
         Returns:
-            True if all characters are lowercase else False.
+            True if all cased characters in the string are lowercase and there
+            is at least one cased character, False otherwise.
         """
-        return _all[islower](self)
+        return self._isupper_islower[upper=False]()
 
     fn isprintable(self) -> Bool:
-        """Returns True if all characters in the string are printable.
+        """Returns True if all characters in the string are ASCII printable.
+
+        Note that this currently only works with ASCII strings.
 
         Returns:
             True if all characters are printable else False.
         """
-        return _all[isprintable](self)
+        for c in self:
+            if not isprintable(ord(c)):
+                return False
+        return True
 
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
-
-
-fn _all[func: fn (String) -> Bool](s: String) -> Bool:
-    for c in s:
-        if not func(c):
-            return False
-    return True
 
 
 fn _toggle_ascii_case(char: UInt8) -> UInt8:

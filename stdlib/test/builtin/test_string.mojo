@@ -850,10 +850,10 @@ fn test_isupper() raises:
     assert_false(isupper(ord("!")))
     assert_false(isupper(ord("0")))
 
-    assert_true(isupper("A"))
-    assert_false(isupper("b"))
     assert_true(String("ASDG").isupper())
     assert_false(String("AsDG").isupper())
+    assert_true(String("ABC123").isupper())
+    assert_false(String("1!").isupper())
 
 
 fn test_islower() raises:
@@ -868,11 +868,10 @@ fn test_islower() raises:
     assert_false(islower(ord("!")))
     assert_false(islower(ord("0")))
 
-    assert_false(islower("A"))
-    assert_true(islower("b"))
-
     assert_true(String("asdfg").islower())
     assert_false(String("asdFDg").islower())
+    assert_true(String("abc123").islower())
+    assert_false(String("1!").islower())
 
 
 fn test_lower() raises:
@@ -1381,11 +1380,8 @@ def test_format_args():
 
 def test_isdigit():
     assert_true(isdigit(ord("1")))
-    assert_true(isdigit("1"))
-    # TODO: What to do with multi-character strings?
-    # assert_false(isdigit("1gt"))
     assert_false(isdigit(ord("g")))
-    assert_false(isdigit("g"))
+
     assert_true(String("123").isdigit())
     assert_false(String("asdg").isdigit())
     assert_false(String("123asdg").isdigit())
@@ -1393,14 +1389,12 @@ def test_isdigit():
 
 def test_isprintable():
     assert_true(isprintable(ord("a")))
-    assert_true(isprintable("a"))
-    assert_true(isprintable("J"))
-
     assert_false(isprintable(ord("\n")))
-    assert_false(isprintable("\t"))
+    assert_false(isprintable(ord("\t")))
 
     assert_true(String("aasdg").isprintable())
     assert_false(String("aa\nae").isprintable())
+    assert_false(String("aa\tae").isprintable())
 
 
 def main():
