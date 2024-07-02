@@ -19,7 +19,7 @@ These are Mojo built-ins, so you don't need to import them.
 @lldb_formatter_wrapping_type
 @value
 @register_passable("trivial")
-struct UInt(Comparable, Representable, Stringable):
+struct UInt(Comparable, Representable, Stringable, Formattable):
     """This type represents an unsigned integer.
 
     An unsigned integer is represents a positive integral number.
@@ -745,3 +745,16 @@ struct UInt(Comparable, Representable, Stringable):
             The self value.
         """
         return self
+
+    # ===-------------------------------------------------------------------===#
+    # Methods
+    # ===-------------------------------------------------------------------===#
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this unsigned integer to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        writer.write(str(self))

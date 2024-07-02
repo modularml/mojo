@@ -204,6 +204,11 @@ def test_string_conversion():
     assert_equal(UInt(100).__str__(), "100")
     assert_equal(UInt(-100).__str__(), "18446744073709551516")
 
+    var out = String()
+    var writer = out._unsafe_to_formatter()
+    UInt(32).format_to(writer)
+    assert_equal(out, "32")
+
 
 def test_int_representation():
     assert_equal(UInt(3).__repr__(), "UInt(3)")
