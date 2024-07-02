@@ -283,6 +283,31 @@ struct InlineArray[
         ]()
         self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
 
+    fn __init__(
+        inout self,
+        *,
+        owned unsafe_assume_initialized: InlineArray[
+            UnsafeMaybeUninitialized[Self.ElementType], Self.size
+        ],
+    ):
+        """Constructs an `InlineArray` from an `InlineArray` of `UnsafeMaybeUninitialized`.
+
+        Calling this function assumes that all elements in the input array are initialized.
+
+        If the elements of the input array are not initialized, the behavior is undefined,
+        even  if `ElementType` is valid *for every possible bit pattern* (e.g. `Int` or `Float`).
+
+        Args:
+            unsafe_assume_initialized: The array of `UnsafeMaybeUninitialized` elements.
+        """
+
+        self._array = __mlir_op.`kgen.undef`[_type = Self.type]()
+
+        for i in range(Self.size):
+            self._get_maybe_uninitialized(i)[].move_from(
+                unsafe_assume_initialized[i]
+            )
+
     @always_inline
     fn __init__(inout self, *, unsafe_uninitialized: Bool):
         """Create an InlineArray with uninitialized memory.
