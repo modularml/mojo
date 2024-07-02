@@ -19,7 +19,8 @@ from time import now
 ```
 """
 
-from sys import external_call, os_is_linux, os_is_windows
+from sys import external_call, os_is_linux, os_is_windows, triple_is_nvidia_cuda
+from sys._assembly import inlined_assembly
 
 from memory import UnsafePointer
 
@@ -240,6 +241,15 @@ fn sleep(sec: Float64):
     Args:
         sec: The number of seconds to sleep for.
     """
+
+    @parameter
+    if triple_is_nvidia_cuda():
+        var nsec = sec * 1.0e9
+        inlined_assembly["nanosleep.u32 $0;", NoneType, constraints="r"](
+            nsec.cast[DType.uint32]()
+        )
+        return
+
     alias NANOSECONDS_IN_SECOND = 1_000_000_000
     var total_secs = sec.__floor__()
     var tv_spec = _CTimeSpec(
