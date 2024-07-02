@@ -47,6 +47,23 @@ def test_contains():
     assert_false("c" in c)
 
 
+def test_copy():
+    var c = Counter[String]()
+    c["a"] = 1
+    c["b"] = 2
+
+    var copy = Counter[String](other=c)
+
+    assert_equal(copy["a"], 1)
+    assert_equal(copy["b"], 2)
+    assert_equal(len(copy), 2)
+
+    c["c"] = 3
+
+    assert_equal(copy["c"], 0)
+    assert_equal(len(copy), 2)
+
+
 def test_counter_construction():
     _ = Counter[Int]()
     _ = Counter[Int](List[Int]())
@@ -345,6 +362,7 @@ def main():
     test_bool()
     test_clear()
     test_contains()
+    test_copy()
     test_counter_construction()
     test_counter_getitem()
     test_counter_setitem()

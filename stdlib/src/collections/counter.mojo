@@ -59,6 +59,15 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             var item = item_ref[]
             self._data[item] = self._data.get(item, 0) + 1
 
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Create a new Counter by copying another Counter.
+
+        Args:
+            other: The Counter to copy.
+        """
+        self._data = Dict[V, Int](other=other._data)
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
