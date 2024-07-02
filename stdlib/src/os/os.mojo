@@ -27,7 +27,7 @@ from memory import DTypePointer
 
 from utils import InlineArray, StringRef
 
-from .path import isdir
+from .path import isdir, split
 from .pathlike import PathLike
 
 # TODO move this to a more accurate location once nt/posix like modules are in stdlib
@@ -366,6 +366,55 @@ fn mkdir[pathlike: os.PathLike](path: pathlike, mode: Int = 0o777) raises:
     mkdir(path.__fspath__(), mode)
 
 
+def makedirs(path: String, mode: Int = 0o777, exist_ok: Bool = False) -> None:
+    """Creates a specified leaf directory along with any necessary intermediate
+    directories that don't already exist.
+
+    Args:
+      path: The path to the directory.
+      mode: The mode to create the directory with.
+      exist_ok: Ignore error if `True` and path exists (default `False`).
+    """
+    head, tail = split(path)
+    if not tail:
+        head, tail = split(head)
+    if head and tail and not os.path.exists(head):
+        try:
+            makedirs(head, exist_ok=exist_ok)
+        except:
+            # Defeats race condition when another thread created the path
+            pass
+        # xxx/newdir/. exists if xxx/newdir exists
+        if tail == ".":
+            return None
+    try:
+        mkdir(path, mode)
+    except e:
+        if not exist_ok:
+            raise str(
+                e
+            ) + "\nset `makedirs(path, exist_ok=True)` to allow existing dirs"
+        if not os.path.isdir(path):
+            raise "path not created: " + path + "\n" + str(e)
+
+
+def makedirs[
+    pathlike: os.PathLike
+](path: pathlike, mode: Int = 0o777, exist_ok: Bool = False) -> None:
+    """Creates a specified leaf directory along with any necessary intermediate
+    directories that don't already exist.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+      mode: The mode to create the directory with.
+      exist_ok: Ignore error if `True` and path exists (default `False`).
+    """
+    makedirs(path.__fspath__(), mode, exist_ok)
+
+
 fn rmdir(path: String) raises:
     """Removes the specified directory.
     If the path is not a directory or it can not be deleted, an error is raised.
@@ -391,3 +440,39 @@ fn rmdir[pathlike: os.PathLike](path: pathlike) raises:
       path: The path to the directory.
     """
     rmdir(path.__fspath__())
+
+
+def removedirs(path: String) -> None:
+    """Remove a leaf directory and all empty intermediate ones. Directories
+    corresponding to rightmost path segments will be pruned away until either
+    the whole path is consumed or an error occurs. Errors during this latter
+    phase are ignored, which occur when a directory was not empty.
+
+    Args:
+      path: The path to the directory.
+    """
+    rmdir(path)
+    head, tail = os.path.split(path)
+    if not tail:
+        head, tail = os.path.split(head)
+    while head and tail:
+        try:
+            rmdir(head)
+        except:
+            break
+        head, tail = os.path.split(head)
+
+
+def removedirs[pathlike: os.PathLike](path: pathlike) -> None:
+    """Remove a leaf directory and all empty intermediate ones. Directories
+    corresponding to rightmost path segments will be pruned away until either
+    the whole path is consumed or an error occurs.  Errors during this latter
+    phase are ignored, which occur when a directory was not empty.
+
+    Parameters:
+      pathlike: The a type conforming to the os.PathLike trait.
+
+    Args:
+      path: The path to the directory.
+    """
+    removedirs(path.__fspath__())

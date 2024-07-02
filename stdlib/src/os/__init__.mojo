@@ -22,8 +22,10 @@ from .os import (
     abort,
     listdir,
     mkdir,
+    makedirs,
     remove,
     rmdir,
+    removedirs,
     sep,
     unlink,
 )
