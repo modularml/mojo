@@ -489,13 +489,13 @@ fn open(path: String, mode: String) raises -> FileHandle:
 
 
 fn open[
-    pathlike: os.PathLike
-](path: pathlike, mode: String) raises -> FileHandle:
+    PathLike: os.PathLike
+](path: PathLike, mode: String) raises -> FileHandle:
     """Opens the file specified by path using the mode provided, returning a
     FileHandle.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file to open.

@@ -34,7 +34,7 @@ fn create_file_and_test_delete_string[
 
 
 fn create_file_and_test_delete_path[
-    func: fn[pathlike: PathLike] (pathlike) raises -> None,
+    func: fn[PathLike: PathLike] (PathLike) raises -> None,
     name: StringLiteral,
 ](filepath: Path) raises:
     try:
