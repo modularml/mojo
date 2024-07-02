@@ -766,3 +766,16 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
                 )
         else:
             _format_scalar(writer, UInt64(self))
+
+
+fn _temp_uint_from_int(x: Int) -> UInt:
+    """Constructs a UInt from an Int.
+
+    This is intentionally not an explicit constructor of UInt for
+    greppability purposes as we intend to remove this function entirely
+    once migration is done with UInt in internal code.
+
+    Args:
+        x: The Int value to construct a UInt from.
+    """
+    return UInt(x.value)

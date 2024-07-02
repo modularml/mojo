@@ -236,6 +236,18 @@ fn int(value: String, base: Int = 10) raises -> Int:
     return atol(value, base)
 
 
+fn int(value: UInt) -> Int:
+    """Get the Int representation of the value.
+
+    Args:
+        value: The object to get the integral representation of.
+
+    Returns:
+        The integral representation of the value.
+    """
+    return value.value
+
+
 # ===----------------------------------------------------------------------=== #
 #  Int
 # ===----------------------------------------------------------------------=== #
