@@ -1981,7 +1981,7 @@ struct String(
             A copy of the string with no trailing whitespaces.
         """
         var r_idx = len(self)
-        # TODO: should use this once llvm intrinsics can be used at comp time
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
         # for s in self.__reversed__():
         #     if not s.isspace():
         #         break
@@ -2013,7 +2013,7 @@ struct String(
             A copy of the string with no leading whitespaces.
         """
         var l_idx = 0
-        # TODO: should use this once llvm intrinsics can be used at comp time
+        # TODO (#933): should use this once llvm intrinsics can be used at comp time
         # for s in self:
         #     if not s.isspace():
         #         break
