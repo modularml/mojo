@@ -187,6 +187,14 @@ def test_decimal_digit_count():
     assert_equal(Int.MIN._decimal_digit_count(), 19)
 
 
+def test_int_uint():
+    var u1 = UInt(42)
+    assert_equal(42, int(u1))
+
+    var u2 = UInt(0)
+    assert_equal(0, int(u2))
+
+
 def main():
     test_properties()
     test_add()
@@ -206,3 +214,4 @@ def main():
     test_indexer()
     test_bool()
     test_decimal_digit_count()
+    test_int_uint()
