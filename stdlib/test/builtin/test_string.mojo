@@ -37,14 +37,14 @@ struct AString(Stringable):
         return "a string"
 
 
-fn test_stringable() raises:
+def test_stringable():
     assert_equal("hello", str("hello"))
     assert_equal("0", str(0))
     assert_equal("AAA", str(StringRef("AAA")))
     assert_equal("a string", str(AString()))
 
 
-fn test_repr() raises:
+def test_repr():
     # Usual cases
     assert_equal(String.__repr__("hello"), "'hello'")
     assert_equal(String.__repr__(str(0)), "'0'")
@@ -65,7 +65,7 @@ fn test_repr() raises:
     assert_equal(String.__repr__("\x7f"), r"'\x7f'")
 
 
-fn test_constructors() raises:
+def test_constructors():
     # Default construction
     assert_equal(0, len(String()))
     assert_true(not String())
@@ -99,7 +99,7 @@ fn test_constructors() raises:
     assert_equal(s4, "2")
 
 
-fn test_copy() raises:
+def test_copy():
     var s0 = String("find")
     var s1 = str(s0)
     s1._buffer[3] = ord("e")
@@ -107,7 +107,7 @@ fn test_copy() raises:
     assert_equal("fine", s1)
 
 
-fn test_equality_operators() raises:
+def test_equality_operators():
     var s0 = String("abc")
     var s1 = String("def")
     assert_equal(s0, s0)
@@ -128,7 +128,7 @@ fn test_equality_operators() raises:
     assert_not_equal(s0, "notabc")
 
 
-fn test_comparison_operators() raises:
+def test_comparison_operators():
     var abc = String("abc")
     var de = String("de")
     var ABC = String("ABC")
@@ -168,7 +168,7 @@ fn test_comparison_operators() raises:
     assert_true(String.__ge__("", ""))
 
 
-fn test_add() raises:
+def test_add():
     var s1 = String("123")
     var s2 = String("abc")
     var s3 = s1 + s2
@@ -192,7 +192,7 @@ fn test_add() raises:
     assert_equal("abc is a string", str(s8) + str(s9))
 
 
-fn test_string_join() raises:
+def test_string_join():
     var sep = String(",")
     var s0 = String("abc")
     var s1 = sep.join(s0, s0, s0, s0)
@@ -215,7 +215,7 @@ fn test_string_join() raises:
     assert_equal(s5, "1")
 
 
-fn test_string_literal_join() raises:
+def test_string_literal_join():
     var s2 = ",".join(List[UInt8](1, 2, 3))
     assert_equal(s2, "1,2,3")
 
@@ -229,7 +229,7 @@ fn test_string_literal_join() raises:
     assert_equal(s5, "1")
 
 
-fn test_stringref() raises:
+def test_stringref():
     var a = StringRef("AAA")
     var b = StringRef("BBB")
     var c = StringRef("AAA")
@@ -250,7 +250,7 @@ fn test_stringref() raises:
     assert_equal(a, c)
 
 
-fn test_stringref_from_dtypepointer() raises:
+def test_stringref_from_dtypepointer():
     var a = StringRef("AAA")
     var b = StringRef(a.data)
     assert_equal(3, len(a))
@@ -258,7 +258,7 @@ fn test_stringref_from_dtypepointer() raises:
     assert_equal(a, b)
 
 
-fn test_stringref_strip() raises:
+def test_stringref_strip():
     var a = StringRef("  mojo rocks  ")
     var b = StringRef("mojo  ")
     var c = StringRef("  mojo")
@@ -269,7 +269,7 @@ fn test_stringref_strip() raises:
     assert_equal(d.strip(), "")
 
 
-fn test_ord() raises:
+def test_ord():
     # Regular ASCII
     assert_equal(ord("A"), 65)
     assert_equal(ord("Z"), 90)
@@ -305,7 +305,7 @@ fn test_ord() raises:
     assert_equal(ord("🔥".as_string_slice()), 128293)
 
 
-fn test_chr() raises:
+def test_chr():
     assert_equal("A", chr(65))
     assert_equal("a", chr(97))
     assert_equal("!", chr(33))
@@ -314,7 +314,7 @@ fn test_chr() raises:
     assert_equal("🔥", chr(128293))
 
 
-fn test_string_indexing() raises:
+def test_string_indexing():
     var str = String("Hello Mojo!!")
 
     assert_equal("H", str[0])
@@ -341,7 +341,7 @@ fn test_string_indexing() raises:
     assert_equal("H", str[-50::50])
 
 
-fn test_atol() raises:
+def test_atol():
     # base 10
     assert_equal(375, atol(String("375")))
     assert_equal(1, atol(String("001")))
@@ -415,7 +415,7 @@ fn test_atol() raises:
         _ = atol(String("9223372036854775832"))
 
 
-fn test_atol_base_0() raises:
+def test_atol_base_0():
     assert_equal(155, atol(" 155", base=0))
     assert_equal(155_155, atol("155_155 ", base=0))
 
@@ -469,7 +469,7 @@ fn test_atol_base_0() raises:
         _ = atol("0of_", base=0)
 
 
-fn test_atof() raises:
+def test_atof():
     assert_equal(375.0, atof(String("375.f")))
     assert_equal(1.0, atof(String("001.")))
     assert_equal(+5.0, atof(String(" +005.")))
@@ -529,7 +529,7 @@ fn test_atof() raises:
         _ = atof(String(" ++94. "))
 
 
-fn test_calc_initial_buffer_size_int32() raises:
+def test_calc_initial_buffer_size_int32():
     assert_equal(1, _calc_initial_buffer_size_int32(0))
     assert_equal(1, _calc_initial_buffer_size_int32(9))
     assert_equal(2, _calc_initial_buffer_size_int32(10))
@@ -541,7 +541,7 @@ fn test_calc_initial_buffer_size_int32() raises:
     assert_equal(10, _calc_initial_buffer_size_int32(4294967295))
 
 
-fn test_calc_initial_buffer_size_int64() raises:
+def test_calc_initial_buffer_size_int64():
     assert_equal(1, _calc_initial_buffer_size_int64(0))
     assert_equal(1, _calc_initial_buffer_size_int64(9))
     assert_equal(2, _calc_initial_buffer_size_int64(10))
@@ -553,7 +553,7 @@ fn test_calc_initial_buffer_size_int64() raises:
     assert_equal(20, _calc_initial_buffer_size_int64(18446744073709551615))
 
 
-fn test_contains() raises:
+def test_contains():
     var str = String("Hello world")
 
     assert_true(str.__contains__(""))
@@ -566,7 +566,7 @@ fn test_contains() raises:
     assert_true("bellow" not in str)
 
 
-fn test_find() raises:
+def test_find():
     var str = String("Hello world")
 
     assert_equal(0, str.find(""))
@@ -589,7 +589,7 @@ fn test_find() raises:
     assert_equal(-1, String("abc").find("abcd"))
 
 
-fn test_count() raises:
+def test_count():
     var str = String("Hello world")
 
     assert_equal(12, str.count(""))
@@ -603,7 +603,7 @@ fn test_count() raises:
     assert_equal(String("aaaaaa").count("aa"), 3)
 
 
-fn test_replace() raises:
+def test_replace():
     # Replace empty
     var s1 = String("abc")
     assert_equal("xaxbxc", s1.replace("", "x"))
@@ -623,7 +623,7 @@ fn test_replace() raises:
     assert_equal("a  complex test case with some spaces", s3.replace("  ", " "))
 
 
-fn test_rfind() raises:
+def test_rfind():
     # Basic usage.
     assert_equal(String("hello world").rfind("world"), 6)
     assert_equal(String("hello world").rfind("bye"), -1)
@@ -650,7 +650,7 @@ fn test_rfind() raises:
     # assert_equal(String("🔥🔥").rfind("🔥"), 1)
 
 
-fn test_split() raises:
+def test_split():
     # empty separators default to whitespace
     var d = String("hello world").split()
     assert_true(len(d) == 2)
@@ -756,7 +756,7 @@ fn test_split() raises:
     )
 
 
-fn test_splitlines() raises:
+def test_splitlines():
     # Test with no line breaks
     var in1 = String("hello world")
     var res1 = in1.splitlines()
@@ -838,7 +838,7 @@ fn test_splitlines() raises:
     assert_equal(res11[2], "mojo")
 
 
-fn test_isupper() raises:
+def test_isupper():
     assert_true(isupper(ord("A")))
     assert_true(isupper(ord("B")))
     assert_true(isupper(ord("Y")))
@@ -856,7 +856,7 @@ fn test_isupper() raises:
     assert_false(String("1!").isupper())
 
 
-fn test_islower() raises:
+def test_islower():
     assert_true(islower(ord("a")))
     assert_true(islower(ord("b")))
     assert_true(islower(ord("y")))
@@ -874,7 +874,7 @@ fn test_islower() raises:
     assert_false(String("1!").islower())
 
 
-fn test_lower() raises:
+def test_lower():
     assert_equal(String("HELLO").lower(), "hello")
     assert_equal(String("hello").lower(), "hello")
     assert_equal(String("FoOBaR").lower(), "foobar")
@@ -885,7 +885,7 @@ fn test_lower() raises:
     assert_equal(String("É").lower(), "É")
 
 
-fn test_upper() raises:
+def test_upper():
     assert_equal(String("hello").upper(), "HELLO")
     assert_equal(String("HELLO").upper(), "HELLO")
     assert_equal(String("FoOBaR").upper(), "FOOBAR")
@@ -896,7 +896,7 @@ fn test_upper() raises:
     assert_equal(String("É").upper(), "É")
 
 
-fn test_isspace() raises:
+def test_isspace():
     # checking true cases
     assert_true(_isspace(ord(" ")))
     assert_true(_isspace(ord("\n")))
@@ -957,7 +957,7 @@ fn test_isspace() raises:
         _ = sep
 
 
-fn test_ascii_aliases() raises:
+def test_ascii_aliases():
     assert_true(String("a") in String.ASCII_LOWERCASE)
     assert_true(String("b") in String.ASCII_LOWERCASE)
     assert_true(String("y") in String.ASCII_LOWERCASE)
@@ -1000,7 +1000,7 @@ fn test_ascii_aliases() raises:
         assert_true(text[i] in String.PRINTABLE)
 
 
-fn test_rstrip() raises:
+def test_rstrip():
     # with default rstrip chars
     var empty_string = String("")
     assert_true(empty_string.rstrip() == "")
@@ -1026,7 +1026,7 @@ fn test_rstrip() raises:
     assert_true(str4.rstrip("sip \n") == "mississippim")
 
 
-fn test_lstrip() raises:
+def test_lstrip():
     # with default lstrip chars
     var empty_string = String("")
     assert_true(empty_string.lstrip() == "")
@@ -1052,7 +1052,7 @@ fn test_lstrip() raises:
     assert_true(str4.lstrip("mis \n") == "ppimississippi")
 
 
-fn test_strip() raises:
+def test_strip():
     # with default strip chars
     var empty_string = String("")
     assert_true(empty_string.strip() == "")
@@ -1096,7 +1096,7 @@ fn test_strip() raises:
     assert_true(comp_str4_stripped == "\n mississippimississippi \n")
 
 
-fn test_hash() raises:
+def test_hash():
     fn assert_hash_equals_literal_hash[s: StringLiteral]() raises:
         assert_equal(hash(s), hash(String(s)))
 
@@ -1115,7 +1115,7 @@ Pink: No! Darkness! (Pink is floating in the air)"""
     ]()
 
 
-fn test_startswith() raises:
+def test_startswith():
     var str = String("Hello world")
 
     assert_true(str.startswith("Hello"))
@@ -1126,7 +1126,7 @@ fn test_startswith() raises:
     assert_false(str.startswith("llo", 2, 3))
 
 
-fn test_endswith() raises:
+def test_endswith():
     var str = String("Hello world")
 
     assert_true(str.endswith(""))
