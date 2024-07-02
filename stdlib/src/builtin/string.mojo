@@ -1056,8 +1056,9 @@ struct String(
 
         ```mojo
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
-
-        assert_equal(string, "1, 2.0, three")
+        print(string) # "1, 2.0, three"
+        %# from testing import assert_equal
+        %# assert_equal(string, "1, 2.0, three")
         ```
         .
         """
@@ -1780,7 +1781,6 @@ struct String(
         .
         """
 
-        _ = sep
         var output = List[String]()
         var str_byte_len = self.byte_length() - 1
         var lhs = 0
