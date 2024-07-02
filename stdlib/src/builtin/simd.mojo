@@ -216,6 +216,9 @@ struct SIMD[type: DType, size: Int](
             value: The input value.
         """
         _simd_construction_checks[type, size]()
+        constrained[
+            type.is_floating_point(), "the SIMD type must be floating point"
+        ]()
 
         var casted = __mlir_op.`pop.cast`[
             _type = __mlir_type[`!pop.simd<1,`, type.value, `>`]
@@ -390,6 +393,9 @@ struct SIMD[type: DType, size: Int](
             value: The input value.
         """
         _simd_construction_checks[type, size]()
+        constrained[
+            type.is_floating_point(), "the SIMD type must be floating point"
+        ]()
 
         # TODO (#36686): This introduces uneeded casts here to work around
         # parameter if issues.
