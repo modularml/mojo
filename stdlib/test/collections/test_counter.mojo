@@ -79,6 +79,16 @@ def test_counter_getitem():
     assert_equal(c[5], 0)
 
 
+def test_fromkeys():
+    var keys = List[String]("a", "b", "c")
+    var c = Counter[String].fromkeys(keys, 3)
+
+    assert_equal(c["a"], 3)
+    assert_equal(c["b"], 3)
+    assert_equal(c["c"], 3)
+    assert_equal(len(c), 3)
+
+
 def test_get():
     var counter = Counter[String]()
     counter["a"] = 1
@@ -368,6 +378,7 @@ def main():
     test_counter_setitem()
     test_elements()
     test_eq_and_ne()
+    test_fromkeys()
     test_get()
     test_iter()
     test_iter_keys()

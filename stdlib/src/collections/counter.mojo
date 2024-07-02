@@ -68,6 +68,23 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         self._data = Dict[V, Int](other=other._data)
 
+    @staticmethod
+    fn fromkeys(keys: List[V], value: Int) -> Self:
+        """Create a new Counter from a list of keys and a default value.
+
+        Args:
+            keys: The keys to create the Counter from.
+            value: The default value to associate with each key.
+
+        Returns:
+            A new Counter with the keys and default value.
+        """
+        var result = Counter[V]()
+        for key_ref in keys:
+            var key = key_ref[]
+            result[key] = value
+        return result
+
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
