@@ -548,10 +548,33 @@ fn test_clear() raises:
     assert_equal(len(some_dict), 0)
 
 
+fn test_dict_setdefault() raises:
+    var some_dict = Dict[String, Int]()
+    some_dict["key1"] = 1
+    some_dict["key2"] = 2
+    assert_equal(some_dict.setdefault("key1", 0)[], 1)
+    assert_equal(some_dict.setdefault("key2", 0)[], 2)
+    assert_equal(some_dict.setdefault("not_key", 0)[], 0)
+    assert_equal(some_dict["not_key"], 0)
+
+    # Check that there is no copy of the default value, so it's performant
+    var other_dict = Dict[String, CopyCounter]()
+    var a = CopyCounter()
+    var a_def = CopyCounter()
+    var b_def = CopyCounter()
+    other_dict["a"] = a^
+    assert_equal(1, other_dict["a"].copy_count)
+    _ = other_dict.setdefault("a", a_def^)
+    _ = other_dict.setdefault("b", b_def^)
+    assert_equal(1, other_dict["a"].copy_count)
+    assert_equal(1, other_dict["b"].copy_count)
+
+
 def main():
     test_dict()
     test_dict_fromkeys()
     test_dict_fromkeys_optional()
+    test_dict_setdefault()
     test_dict_string_representation_string_int()
     test_dict_string_representation_int_int()
     test_owned_kwargs_dict()
