@@ -39,6 +39,21 @@ def test_range_len():
     assert_equal(range(10, 5, -20).__len__(), 1, "len(range(10, 5, -20))")
 
 
+def test_range_len_uint():
+    assert_equal(range(UInt(10)).__len__(), 10, "len(range(10))")
+
+    # start < end
+    assert_equal(range(UInt(0), UInt(10)).__len__(), 10, "len(range(0, 10))")
+    assert_equal(range(UInt(5), UInt(10)).__len__(), 5, "len(range(5, 10))")
+    assert_equal(
+        range(UInt(0), UInt(10), UInt(2)).__len__(), 5, "len(range(0, 10, 2))"
+    )
+    # start > end
+    assert_equal(
+        range(UInt(10), UInt(0), UInt(1)).__len__(), 0, "len(range(10, 0, 1))"
+    )
+
+
 def test_range_getitem():
     # Usual cases
     assert_equal(range(10)[3], 3, "range(10)[3]")
@@ -48,6 +63,17 @@ def test_range_getitem():
     assert_equal(range(10, 0, -1)[2], 8, "range(10, 0, -1)[2]")
     assert_equal(range(0, 10, 2)[4], 8, "range(0, 10, 2)[4]")
     assert_equal(range(38, -13, -23)[1], 15, "range(38, -13, -23)[1]")
+
+
+def test_range_getitem_uint():
+    assert_equal(range(UInt(10))[3], 3, "range(10)[3]")
+
+    assert_equal(range(UInt(0), UInt(10))[3], 3, "range(0, 10)[3]")
+    assert_equal(range(UInt(5), UInt(10))[3], 8, "range(5, 10)[3]")
+    assert_equal(range(UInt(5), UInt(10))[4], 9, "range(5, 10)[4]")
+
+    # Specify the step size > 1
+    assert_equal(range(UInt(0), UInt(10), UInt(2))[4], 8, "range(0, 10, 2)[4]")
 
 
 def test_range_reversed():
@@ -122,6 +148,8 @@ def test_indexing():
 
 def main():
     test_range_len()
+    test_range_len_uint()
     test_range_getitem()
+    test_range_getitem_uint()
     test_range_reversed()
     test_indexing()
