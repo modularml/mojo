@@ -28,9 +28,13 @@ from memory.memory import _free, _malloc
 # ===----------------------------------------------------------------------=== #
 # UnsafePointer
 # ===----------------------------------------------------------------------=== #
+
+
 @register_passable("trivial")
 struct UnsafePointer[
-    T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC
+    T: AnyType,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+    exclusive: Bool = False,
 ](
     ImplicitlyBoolable,
     CollectionElement,
@@ -45,11 +49,18 @@ struct UnsafePointer[
     Parameters:
         T: The type the pointer points to.
         address_space: The address space associated with the UnsafePointer allocated memory.
+        exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
     """
 
     # Fields
     alias _mlir_type = __mlir_type[
-        `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
+        `!kgen.pointer<`,
+        T,
+        `, `,
+        address_space._value.value,
+        ` exclusive(`,
+        exclusive.value,
+        `)>`,
     ]
 
     alias type = T
@@ -84,6 +95,22 @@ struct UnsafePointer[
             The pointer.
         """
         return Self {address: value}
+
+    @always_inline
+    fn __init__(other: UnsafePointer[T, address_space, _]) -> Self:
+        """Exclusivity parameter cast a pointer.
+
+        Args:
+            other: Pointer to cast.
+
+        Returns:
+            Constructed UnsafePointer object.
+        """
+        return Self {
+            address: __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
+                other.address
+            )
+        }
 
     @always_inline
     fn __init__(*, address: Int) -> Self:
@@ -191,7 +218,7 @@ struct UnsafePointer[
         alias _ref_type = Reference[T, MutableStaticLifetime, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
-                self.address
+                UnsafePointer[T, address_space, False](self).address
             )
         )
 

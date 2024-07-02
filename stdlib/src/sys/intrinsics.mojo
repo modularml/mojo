@@ -1168,7 +1168,7 @@ struct PrefetchOptions:
 @always_inline("nodebug")
 fn prefetch[
     params: PrefetchOptions, type: DType, address_space: AddressSpace
-](addr: DTypePointer[type, address_space]):
+](addr: DTypePointer[type, address_space, _]):
     """Prefetches an instruction or data into cache before it is used.
 
     The prefetch function provides prefetching hints for the target
@@ -1329,7 +1329,7 @@ fn strided_load[
     /,
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](
-    addr: DTypePointer[type, address_space],
+    addr: DTypePointer[type, address_space, _],
     stride: Int,
     mask: SIMD[DType.bool, simd_width],
 ) -> SIMD[type, simd_width]:
@@ -1373,7 +1373,7 @@ fn strided_load[
     simd_width: Int,
     /,
     address_space: AddressSpace = AddressSpace.GENERIC,
-](addr: DTypePointer[type, address_space], stride: Int) -> SIMD[
+](addr: DTypePointer[type, address_space, _], stride: Int) -> SIMD[
     type, simd_width
 ]:
     """Loads values from addr according to a specific stride.
@@ -1411,7 +1411,7 @@ fn strided_store[
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](
     value: SIMD[type, simd_width],
-    addr: DTypePointer[type, address_space],
+    addr: DTypePointer[type, address_space, _],
     stride: Int,
     mask: SIMD[DType.bool, simd_width],
 ):
@@ -1455,7 +1455,7 @@ fn strided_store[
     address_space: AddressSpace = AddressSpace.GENERIC,
 ](
     value: SIMD[type, simd_width],
-    addr: DTypePointer[type, address_space],
+    addr: DTypePointer[type, address_space, _],
     stride: Int,
 ):
     """Loads values from addr according to a specific stride.

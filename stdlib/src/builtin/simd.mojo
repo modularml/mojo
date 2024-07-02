@@ -2680,7 +2680,7 @@ struct SIMD[type: DType, size: Int](
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space]) -> Self:
+    ](ptr: DTypePointer[type, address_space, _]) -> Self:
         """Loads the value the Pointer object points to.
 
         Constraints:
@@ -2696,9 +2696,7 @@ struct SIMD[type: DType, size: Int](
         Returns:
             The loaded value.
         """
-        return Self.load[alignment=alignment, address_space=address_space](
-            ptr, offset=0
-        )
+        return Self.load[alignment=alignment](ptr, offset=0)
 
     @staticmethod
     @always_inline
@@ -2706,7 +2704,7 @@ struct SIMD[type: DType, size: Int](
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: Scalar) -> Self:
+    ](ptr: DTypePointer[type, address_space, _], offset: Scalar) -> Self:
         """Loads the value the Pointer object points to with the given offset.
 
         Constraints:
@@ -2725,9 +2723,7 @@ struct SIMD[type: DType, size: Int](
             The loaded value.
         """
         constrained[offset.type.is_integral(), "offset must be integer"]()
-        return Self.load[alignment=alignment, address_space=address_space](
-            ptr, offset=int(offset)
-        )
+        return Self.load[alignment=alignment](ptr, offset=int(offset))
 
     @staticmethod
     @always_inline("nodebug")
@@ -2735,7 +2731,7 @@ struct SIMD[type: DType, size: Int](
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: Int) -> Self:
+    ](ptr: DTypePointer[type, address_space, _], offset: Int) -> Self:
         """Loads the value the Pointer object points to with the given offset.
 
         Constraints:
@@ -2781,7 +2777,7 @@ struct SIMD[type: DType, size: Int](
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: Int, val: Self):
+    ](ptr: DTypePointer[type, address_space, _], offset: Int, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2807,7 +2803,7 @@ struct SIMD[type: DType, size: Int](
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], offset: Scalar, val: Self):
+    ](ptr: DTypePointer[type, address_space, _], offset: Scalar, val: Self):
         """Stores a single element value at the given offset.
 
         Constraints:
@@ -2833,7 +2829,7 @@ struct SIMD[type: DType, size: Int](
         *,
         alignment: Int = Self._default_alignment,
         address_space: AddressSpace = AddressSpace.GENERIC,
-    ](ptr: DTypePointer[type, address_space], val: Self):
+    ](ptr: DTypePointer[type, address_space, _], val: Self):
         """Stores a single element value.
 
         Constraints:
