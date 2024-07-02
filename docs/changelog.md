@@ -196,6 +196,17 @@ what we publish.
 
 - `Path.home()` has been added to return a path of the users home directory.
 
+- `os.path.split()` has been added for splitting a path into `head, tail`:
+
+  ```mojo
+  import os
+  head, tail = os.path.split("/this/is/head/tail")
+  print("head:", head)
+  print("tail:", tail)
+  # head: /this/is/head
+  # tail: tail
+  ```
+
 ### 🦋 Changed
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that

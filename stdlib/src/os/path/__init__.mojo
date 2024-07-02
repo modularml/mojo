@@ -20,6 +20,7 @@ from .path import (
     isfile,
     islink,
     join,
+    split,
     lexists,
     _get_home_path,
 )
