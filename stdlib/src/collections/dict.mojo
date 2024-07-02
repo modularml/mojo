@@ -177,7 +177,9 @@ struct _DictValueIter[
 
 
 @value
-struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
+struct DictEntry[K: KeyElement, V: CollectionElement](
+    CollectionElement, CollectionElementNew
+):
     """Store a key-value pair entry inside a dictionary.
 
     Parameters:
@@ -202,6 +204,16 @@ struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
         self.hash = hash(key)
         self.key = key^
         self.value = value^
+
+    fn __init__(inout self, *, other: Self):
+        """Copy an existing entry.
+
+        Args:
+            other: The existing entry to copy.
+        """
+        self.hash = other.hash
+        self.key = other.key
+        self.value = other.value
 
 
 alias _EMPTY = -1
@@ -301,7 +313,7 @@ struct _DictIndex:
 
 
 struct Dict[K: KeyElement, V: CollectionElement](
-    Sized, CollectionElement, Boolable
+    Sized, CollectionElement, CollectionElementNew, Boolable
 ):
     """A container that stores key-value pairs.
 
@@ -439,16 +451,16 @@ struct Dict[K: KeyElement, V: CollectionElement](
         return len(self._entries)
 
     @always_inline
-    fn __init__(inout self, existing: Self):
+    fn __init__(inout self, *, other: Self):
         """Copy an existing dictiontary.
 
         Args:
-            existing: The existing dict.
+            other: The existing dict.
         """
-        self.size = existing.size
-        self._n_entries = existing._n_entries
-        self._index = existing._index.copy(existing._reserved())
-        self._entries = existing._entries
+        self.size = other.size
+        self._n_entries = other._n_entries
+        self._index = other._index.copy(other._reserved())
+        self._entries = other._entries
 
     @staticmethod
     fn fromkeys(keys: List[K], value: V) -> Self:
@@ -592,7 +604,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Returns:
             The result of the merge.
         """
-        var result = Dict(self)
+        var result = Dict(other=self)
         result.update(other)
         return result^
 
@@ -974,7 +986,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._n_entries = self.size
 
 
-struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
+struct OwnedKwargsDict[V: CollectionElement](
+    Sized, CollectionElement, CollectionElementNew
+):
     """Container used to pass owned variadic keyword arguments to functions.
 
     This type mimics the interface of a dictionary with `String` keys, and
@@ -997,6 +1011,14 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     fn __init__(inout self):
         """Initialize an empty keyword dictionary."""
         self._dict = Dict[Self.key_type, V]()
+
+    fn __init__(inout self, *, other: Self):
+        """Copy an existing keyword dictionary.
+
+        Args:
+            other: The existing keyword dictionary.
+        """
+        self._dict = other._dict
 
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing keyword dictionary.

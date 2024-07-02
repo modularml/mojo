@@ -238,7 +238,7 @@ def test_dict_copy():
     orig["a"] = 1
 
     # test values copied to new Dict
-    var copy = Dict(orig)
+    var copy = Dict(other=orig)
     assert_equal(1, copy["a"])
 
     # test there are two copies of dict and
@@ -253,7 +253,7 @@ def test_dict_copy_delete_original():
     orig["a"] = 1
 
     # test values copied to new Dict
-    var copy = Dict(orig)
+    var copy = Dict(other=orig)
     # don't access the original dict, anymore, confirm that
     # deleting the original doesn't violate the integrity of the copy
     assert_equal(1, copy["a"])
@@ -264,7 +264,7 @@ def test_dict_copy_add_new_item():
     orig["a"] = 1
 
     # test values copied to new Dict
-    var copy = Dict(orig)
+    var copy = Dict(other=orig)
     assert_equal(1, copy["a"])
 
     # test there are two copies of dict and
@@ -278,7 +278,7 @@ def test_dict_copy_calls_copy_constructor():
     orig["a"] = CopyCounter()
 
     # test values copied to new Dict
-    var copy = Dict(orig)
+    var copy = Dict(other=orig)
     # I _may_ have thoughts about where our performance issues
     # are coming from :)
     assert_equal(1, orig["a"].copy_count)

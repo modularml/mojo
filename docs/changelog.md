@@ -186,8 +186,8 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Mojo now has a `UInt` type for modeling unsigned (scalar) integers with a
   paltform-dependent width. `UInt` implements most arithmethic operations that
   make sense for integers, with the notable exception of `__neg__`. Builtin
-  functions such as `min`/`max`, as well as utilities like `math.ceildiv` are
-  also implemented for `UInt`.
+  functions such as `min`/`max`, as well as `math` functions like `ceildiv`,
+  `align_down`, and `align_up` are also implemented for `UInt`.
 
 ### 🦋 Changed
 
