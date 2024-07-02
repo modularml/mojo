@@ -299,7 +299,8 @@ struct Optional[T: CollectionElement](
         return self._value.unsafe_replace[_NoneType, T](_NoneType())
 
     fn or_else(self, default: T) -> T:
-        """Return the underlying value contained in the Optional or a default value if the Optional's underlying value is not present.
+        """Return the underlying value contained in the Optional or a default
+        value if the Optional's underlying value is not present.
 
         Args:
             default: The new value to use if no value was present.

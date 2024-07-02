@@ -31,7 +31,24 @@ from utils._format import Formattable, Formatter, ToFormatter
 # ===----------------------------------------------------------------------=== #
 
 
+@always_inline
 fn ord(s: String) -> Int:
+    """Returns an integer that represents the given one-character string.
+
+    Given a string representing one character, return an integer
+    representing the code point of that character. For example, `ord("a")`
+    returns the integer `97`. This is the inverse of the `chr()` function.
+
+    Args:
+        s: The input string slice, which must contain only a single character.
+
+    Returns:
+        An integer representing the code point of the given character.
+    """
+    return ord(s.as_string_slice())
+
+
+fn ord(s: StringSlice) -> Int:
     """Returns an integer that represents the given one-character string.
 
     Given a string representing one character, return an integer
@@ -52,10 +69,12 @@ fn ord(s: String) -> Int:
     var p = s.unsafe_ptr().bitcast[UInt8]()
     var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
-        debug_assert(len(s) == 1, "input string length must be 1")
+        debug_assert(s._byte_length() == 1, "input string length must be 1")
         return int(b1)
     var num_bytes = countl_zero(~b1)
-    debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    debug_assert(
+        s._byte_length() == int(num_bytes), "input string must be one character"
+    )
     debug_assert(
         1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
     )
@@ -1055,6 +1074,8 @@ struct String(
         Construct a String from several `Formattable` arguments:
 
         ```mojo
+        from testing import assert_equal
+
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
 
         assert_equal(string, "1, 2.0, three")
