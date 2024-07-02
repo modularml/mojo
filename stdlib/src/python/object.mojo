@@ -119,6 +119,14 @@ struct PythonObject(
         """Initialize the object with a `None` value."""
         self.__init__(None)
 
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other
+
     fn __init__(inout self, ptr: PyObjectPtr):
         """Initialize the object with a `PyObjectPtr` value.
 

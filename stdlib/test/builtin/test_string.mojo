@@ -290,12 +290,19 @@ fn test_ord() raises:
     alias single_byte2 = ord("!")
     assert_equal(single_byte2, 33)
 
+    # TODO: change these to parameter domain when it work.
     var multi_byte = ord("α")
     assert_equal(multi_byte, 945)
     var multi_byte2 = ord("➿")
     assert_equal(multi_byte2, 10175)
     var multi_byte3 = ord("🔥")
     assert_equal(multi_byte3, 128293)
+
+    # Test StringSlice overload
+    assert_equal(ord("A".as_string_slice()), 65)
+    assert_equal(ord("α".as_string_slice()), 945)
+    assert_equal(ord("➿".as_string_slice()), 10175)
+    assert_equal(ord("🔥".as_string_slice()), 128293)
 
 
 fn test_chr() raises:
@@ -1157,6 +1164,7 @@ fn test_endswith() raises:
 
 
 def test_removeprefix():
+    assert_equal(String("hello world").removeprefix(""), String("hello world"))
     assert_equal(String("hello world").removeprefix("hello"), " world")
     assert_equal(String("hello world").removeprefix("world"), "hello world")
     assert_equal(String("hello world").removeprefix("hello world"), "")
@@ -1164,6 +1172,7 @@ def test_removeprefix():
 
 
 def test_removesuffix():
+    assert_equal(String("hello world").removesuffix(""), String("hello world"))
     assert_equal(String("hello world").removesuffix("world"), "hello ")
     assert_equal(String("hello world").removesuffix("hello"), "hello world")
     assert_equal(String("hello world").removesuffix("hello world"), "")
