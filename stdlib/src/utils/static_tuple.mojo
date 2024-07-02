@@ -390,7 +390,7 @@ struct InlineArray[
         """
         var normalized_index = normalize_index["InlineArray"](idx, self)
 
-        return self._get_reference_unsafe(normalized_index)[]
+        return self.unsafe_get(normalized_index)
 
     @always_inline("nodebug")
     fn __getitem__[
@@ -415,7 +415,7 @@ struct InlineArray[
         if i < 0:
             normalized_idx += size
 
-        return self._get_reference_unsafe(normalized_idx)[]
+        return self.unsafe_get(normalized_idx)
 
     # ===------------------------------------------------------------------=== #
     # Trait implementations
@@ -435,9 +435,9 @@ struct InlineArray[
     # ===------------------------------------------------------------------===#
 
     @always_inline("nodebug")
-    fn _get_reference_unsafe(
+    fn unsafe_get(
         ref [_]self: Self, idx: Int
-    ) -> Reference[Self.ElementType, __lifetime_of(self)]:
+    ) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a reference to an element of self without checking index bounds.
 
         Users should opt for `__getitem__` instead of this method as it is
