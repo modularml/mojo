@@ -1074,8 +1074,6 @@ struct String(
         Construct a String from several `Formattable` arguments:
 
         ```mojo
-        from testing import assert_equal
-
         var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
         print(string) # "1, 2.0, three"
         %# from testing import assert_equal
