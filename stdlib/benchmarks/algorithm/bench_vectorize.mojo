@@ -54,7 +54,7 @@ struct Op(Stringable):
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
-        alias op_list = List[String](
+        var op_list = List[String](
             "add", "sub", "mul", "div", "fma", "ld", "st"
         )
         return "op." + op_list[self.op_code]
