@@ -323,6 +323,23 @@ def test_pop():
     assert_equal(c, 3)
 
 
+def test_popitem():
+    var counter = Counter[String]()
+    counter["a"] = 1
+    counter["b"] = 2
+
+    var item = counter.popitem()
+    assert_equal(item[0][String], "b")
+    assert_equal(item[1][Int], 2)
+
+    item = counter.popitem()
+    assert_equal(item[0][String], "a")
+    assert_equal(item[1][Int], 1)
+
+    with assert_raises():
+        counter.popitem()
+
+
 def main():
     test_add()
     test_bool()
@@ -343,6 +360,7 @@ def main():
     test_lt_le_gt_and_ge()
     test_most_common()
     test_pop()
+    test_popitem()
     test_substract()
     test_total()
     test_update()

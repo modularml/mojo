@@ -349,6 +349,18 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """Remove all elements from the Counter."""
         self._data.clear()
 
+    fn popitem(inout self) raises -> CountTuple[V]:
+        """Remove and return an arbitrary (key, value) pair from the Counter.
+
+        Returns:
+            A CountTuple containing the key and value of the removed item.
+
+        Raises:
+            "KeyError" if the Counter is empty.
+        """
+        var item_ref = self._data.popitem()
+        return CountTuple[V](item_ref.key, item_ref.value)
+
     # Special methods for counter
 
     fn total(self) -> Int:
