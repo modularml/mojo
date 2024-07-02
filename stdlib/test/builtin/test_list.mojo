@@ -39,7 +39,34 @@ fn test_repr_list() raises:
     assert_equal(empty.__repr__(), "[]")
 
 
+fn get_last_value(*values: Int) -> Int:
+    return values[-1]
+
+
+fn get_last_string(*values: String) -> String:
+    return values[-1]
+
+
+fn test_variadic_negative_index() raises:
+    var last_value = get_last_value(3, 4, 5)
+    # print(last_value)
+    assert_equal(5, last_value)
+
+    last_value = get_last_value(6, 7)
+    assert_equal(7, last_value)
+
+    last_value = get_last_value(8)
+    assert_equal(8, last_value)
+
+    var last_string = get_last_string("abc", "def")
+    assert_equal("def", last_string)
+
+    last_string = get_last_string("abc")
+    assert_equal("abc", last_string)
+
+
 def main():
     test_list()
     test_variadic_list()
     test_repr_list()
+    test_variadic_negative_index()

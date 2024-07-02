@@ -16,6 +16,7 @@ These are Mojo built-ins, so you don't need to import them.
 """
 
 from memory import LegacyPointer, Reference, UnsafePointer
+from collections._index_normalization import normalize_index
 
 # ===----------------------------------------------------------------------===#
 # ListLiteral
@@ -155,7 +156,8 @@ struct VariadicList[type: AnyTrivialRegType](Sized):
         Returns:
             The element on the list corresponding to the given index.
         """
-        return __mlir_op.`pop.variadic.get`(self.value, idx.value)
+        var normalized_index = normalize_index["VariadicList"](idx, self)
+        return __mlir_op.`pop.variadic.get`(self.value, normalized_index.value)
 
     @always_inline
     fn __iter__(self) -> Self.IterType:
@@ -380,8 +382,9 @@ struct VariadicListMem[
             A low-level pointer to the element on the list corresponding to the
             given index.
         """
+        var normalized_index = normalize_index["VariadicListMem"](idx, self)
         return __get_litref_as_mvalue(
-            __mlir_op.`pop.variadic.get`(self.value, idx.value)
+            __mlir_op.`pop.variadic.get`(self.value, normalized_index.value)
         )
 
     fn __iter__(
