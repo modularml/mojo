@@ -340,6 +340,7 @@ struct _FixedString[CAP: Int](
         """
         self = other
 
+    @always_inline
     fn __init__(inout self, literal: StringLiteral) raises:
         """Constructs a FixedString value given a string literal.
 

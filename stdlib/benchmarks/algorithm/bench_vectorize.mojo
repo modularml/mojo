@@ -52,7 +52,7 @@ struct Op(Stringable):
     fn __eq__(self, other: Op) -> Bool:
         return self.op_code == other.op_code
 
-    @always_inline
+    @always_inline("nodebug")
     fn __str__(self) -> String:
         var op_list = List[String](
             "add", "sub", "mul", "div", "fma", "ld", "st"

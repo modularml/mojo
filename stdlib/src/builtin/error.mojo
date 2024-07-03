@@ -47,7 +47,7 @@ struct Error(
     ownership and a free is executed in the destructor.
     """
 
-    @always_inline
+    @always_inline("nodebug")
     fn __init__() -> Self:
         """Default constructor.
 
@@ -56,7 +56,7 @@ struct Error(
         """
         return Error {data: UnsafePointer[UInt8](), loaded_length: 0}
 
-    @always_inline
+    @always_inline("nodebug")
     fn __init__(value: StringLiteral) -> Self:
         """Construct an Error object with a given string literal.
 
@@ -71,6 +71,7 @@ struct Error(
             loaded_length: len(value),
         }
 
+    @always_inline("nodebug")
     fn __init__(src: String) -> Self:
         """Construct an Error object with a given string.
 
@@ -90,6 +91,7 @@ struct Error(
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
+    @always_inline("nodebug")
     fn __init__(src: StringRef) -> Self:
         """Construct an Error object with a given string ref.
 
@@ -125,6 +127,7 @@ struct Error(
         if self.loaded_length < 0:
             self.data.free()
 
+    @always_inline("nodebug")
     fn __copyinit__(existing: Self) -> Self:
         """Creates a deep copy of an existing error.
 
@@ -177,6 +180,7 @@ struct Error(
         """
         return "Error(" + repr(self._message()) + ")"
 
+    @always_inline
     fn _message(self) -> String:
         """Converts the Error to string representation.
 
