@@ -444,6 +444,26 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._entries = Self._new_entries(Self._initial_reservation)
         self._index = _DictIndex(len(self._entries))
 
+    @always_inline
+    fn __init__(inout self, *, power_of_two_initial_capacity: Int):
+        """Initialize an empty dictiontary with a pre-reserved initial capacity.
+
+        Args:
+            power_of_two_initial_capacity: At least 8, has to be a power of two.
+
+        Example usage:
+
+        ```mojo
+        var x = Dict[Int,Int](power_of_two_initial_capacity = 1024)
+        # Insert (2/3 of 1024) entries without reallocation.
+        ```
+
+        """
+        self.size = 0
+        self._n_entries = 0
+        self._entries = Self._new_entries(power_of_two_initial_capacity)
+        self._index = _DictIndex(len(self._entries))
+
     # TODO: add @property when Mojo supports it to make
     # it possible to do `self._reserved`.
     @always_inline
