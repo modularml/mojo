@@ -357,7 +357,7 @@ fn is_power_of_two[
 # reference: https://en.cppreference.com/w/cpp/numeric/bit_ceil
 
 
-@always_inline("nodebug")
+@always_inline
 fn bit_ceil(val: Int) -> Int:
     """Computes the smallest power of 2 that is greater than or equal to the
     input value. Any integral value less than or equal to 1 will be ceiled to 1.

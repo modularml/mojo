@@ -316,7 +316,6 @@ struct NamedTemporaryFile:
         except:
             raise Error("Failed to create temporary file")
 
-    @always_inline
     fn __del__(owned self):
         """Closes the file handle."""
         try:
@@ -340,7 +339,6 @@ struct NamedTemporaryFile:
         self._delete = existing._delete
         self.name = existing.name^
 
-    @always_inline
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads the data from the file.
 
