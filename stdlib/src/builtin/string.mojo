@@ -2355,6 +2355,7 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
         result += 4
 
 
+@always_inline
 fn _calc_initial_buffer_size(n0: Int) -> Int:
     var sign = 0 if n0 > 0 else 1
 

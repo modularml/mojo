@@ -502,7 +502,7 @@ struct CountTuple[V: KeyElement](
         """
         return self._count == other._count
 
-    @always_inline
+    @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Variant[V, Int]:
         """Get an element in the tuple.
 

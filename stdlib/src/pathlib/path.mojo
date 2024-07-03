@@ -318,6 +318,7 @@ struct Path(
         with open(self, "w") as f:
             f.write(str(value))
 
+    @always_inline
     fn suffix(self) -> String:
         """The path's extension, if any.
         This includes the leading period. For example: '.txt'.
