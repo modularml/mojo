@@ -248,10 +248,6 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         Returns:
             The value of `self` raised to the power of `exp`.
         """
-        if exp < 0:
-            # Not defined for Integers, this should raise an
-            # exception.
-            return 0
         var res: UInt = 1
         var x = self
         var n = exp
@@ -272,9 +268,6 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         Returns:
             `self << rhs`.
         """
-        if rhs < 0:
-            # this should raise an exception.
-            return 0
         return __mlir_op.`index.shl`(self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -287,9 +280,6 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         Returns:
             `self >> rhs`.
         """
-        if rhs < 0:
-            # this should raise an exception.
-            return 0
         return __mlir_op.`index.shru`(self.value, rhs.value)
 
     @always_inline("nodebug")
