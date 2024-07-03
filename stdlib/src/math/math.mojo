@@ -520,7 +520,7 @@ fn exp[
     if (
         not type is DType.float64
         and type is not DType.float32
-        and type.sizeof() < DType.float32.sizeof()
+        and sizeof[type]() < sizeof[DType.float32]()
     ):
         return exp(x.cast[DType.float32]()).cast[type]()
 
