@@ -62,6 +62,7 @@ fn _dir_of_current_file() raises -> Path:
 
 struct Path(
     Stringable,
+    Boolable,
     Formattable,
     CollectionElement,
     CollectionElementNew,
@@ -153,6 +154,15 @@ struct Path(
           A string representation of the path.
         """
         return String.format_sequence(self)
+
+    @always_inline
+    fn __bool__(self) -> Bool:
+        """Checks if the path is not empty.
+
+        Returns:
+            True if the path length is greater than zero, and False otherwise.
+        """
+        return len(self.path) > 0
 
     fn format_to(self, inout writer: Formatter):
         """
