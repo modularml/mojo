@@ -224,7 +224,7 @@ fn listdir[PathLike: os.PathLike](path: PathLike) raises -> List[String]:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
+@no_inline
 fn abort[result: AnyType = NoneType]() -> result:
     """Calls a target dependent trap instruction if available.
 
@@ -242,7 +242,7 @@ fn abort[result: AnyType = NoneType]() -> result:
         pass
 
 
-@always_inline("nodebug")
+@no_inline
 fn abort[
     result: AnyType = NoneType, *, formattable: Formattable
 ](message: formattable) -> result:

@@ -104,7 +104,6 @@ struct FileHandle:
 
         self.handle = handle
 
-    @always_inline
     fn __del__(owned self):
         """Closes the file handle."""
         try:
@@ -136,7 +135,6 @@ struct FileHandle:
         self.handle = existing.handle
         existing.handle = DTypePointer[DType.invalid]()
 
-    @always_inline
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads data from a file and sets the file handle seek position. If
         size is left as the default of -1, it will read to the end of the file.
@@ -205,7 +203,6 @@ struct FileHandle:
 
         return String(buf, int(size_copy) + 1)
 
-    @always_inline
     fn read[
         type: DType
     ](self, ptr: DTypePointer[type], size: Int64 = -1) raises -> Int64:
@@ -422,7 +419,6 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
-    @always_inline
     fn write(self, data: StringRef) raises:
         """Write the data to the file.
 
@@ -431,7 +427,6 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
-    @always_inline
     fn _write[
         address_space: AddressSpace
     ](self, ptr: UnsafePointer[UInt8, address_space], len: Int) raises:
