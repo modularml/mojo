@@ -1148,14 +1148,14 @@ Special thanks to our community contributors:
   ```mojo
   var f = open("/tmp/example.txt")
   # Skip 32 bytes
-  f.seek(os.SEEK_CUR, 32)
+  f.seek(32, os.SEEK_CUR)
   ```
 
   Or `os.SEEK_END` to offset from the end of file:
 
   ```mojo
   # Start from 32 bytes before the end of the file
-  f.seek(os.SEEK_END, -32)
+  f.seek(-32, os.SEEK_END)
   ```
 
 - [`FileHandle.read()`](/mojo/stdlib/builtin/file/FileHandle#read) can now
