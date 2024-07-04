@@ -22,5 +22,4 @@ from .path import (
     join,
     split,
     lexists,
-    _get_home_path,
 )

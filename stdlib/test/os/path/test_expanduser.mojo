@@ -72,4 +72,9 @@ fn main() raises:
     # Path with multiple tildes
     assert_equal(join(user_path, "~folder"), expanduser("~/~folder"))
 
+    # Test that empty HOME returns `~`
+    set_home("")
+    assert_equal(expanduser("~/test/path"), "~/test/path")
+    assert_equal(expanduser("~"), "~")
+
     set_home(original_home)
