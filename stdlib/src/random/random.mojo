@@ -20,7 +20,7 @@ from random import seed
 """
 
 from sys import bitwidthof, external_call
-from time import now
+from time import perf_counter_ns
 
 from memory import DTypePointer
 
@@ -34,7 +34,7 @@ fn _get_random_state() -> DTypePointer[DType.invalid]:
 
 fn seed():
     """Seeds the random number generator using the current time."""
-    seed(now())
+    seed(perf_counter_ns())
 
 
 fn seed(a: Int):
