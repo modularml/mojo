@@ -341,6 +341,151 @@ def test_string_indexing():
     assert_equal("H", str[-50::50])
 
 
+def test_stol():
+    var result: Int
+    var remaining: String
+
+    # base 10
+    result, remaining = stol(String("375 ABC"))
+    assert_equal(375, result)
+    assert_equal(" ABC", remaining)
+    result, remaining = stol(String(" 005"))
+    assert_equal(5, result)
+    assert_equal("", remaining)
+    result, remaining = stol(String(" 013  "))
+    assert_equal(13, result)
+    assert_equal("  ", remaining)
+    result, remaining = stol(String("-89"))
+    assert_equal(-89, result)
+    assert_equal("", remaining)
+    result, remaining = stol(String(" -52"))
+    assert_equal(-52, result)
+    assert_equal("", remaining)
+
+    # other bases
+    result, remaining = stol(" FF", 16)
+    assert_equal(255, result)
+    assert_equal("", remaining)
+    result, remaining = stol(" 0xff ", 16)
+    assert_equal(255, result)
+    assert_equal(" ", remaining)
+    result, remaining = stol("10010eighteen18", 2)
+    assert_equal(18, result)
+    assert_equal("eighteen18", remaining)
+    result, remaining = stol("0b10010", 2)
+    assert_equal(18, result)
+    assert_equal("", remaining)
+    result, remaining = stol("0o12", 8)
+    assert_equal(10, result)
+    assert_equal("", remaining)
+    result, remaining = stol("Z", 36)
+    assert_equal(35, result)
+    assert_equal("", remaining)
+
+    # test with trailing characters
+    result, remaining = stol("123abc")
+    assert_equal(123, result)
+    assert_equal("abc", remaining)
+    result, remaining = stol("-45def")
+    assert_equal(-45, result)
+    assert_equal("def", remaining)
+    result, remaining = stol("0xffghi", 0)
+    assert_equal(255, result)
+    assert_equal("ghi", remaining)
+
+    result, remaining = stol("   ")
+    assert_equal(0, result)
+    assert_equal("   ", remaining)
+
+    result, remaining = stol("123.456", 10)
+    assert_equal(123, result)
+    assert_equal(".456", remaining)
+    result, remaining = stol("--123", 10)
+    assert_equal(0, result)
+    assert_equal("--123", remaining)
+
+    result, remaining = stol("12a34", 10)
+    assert_equal(12, result)
+    assert_equal("a34", remaining)
+    result, remaining = stol("1G5", 16)
+    assert_equal(1, result)
+    assert_equal("G5", remaining)
+
+    result, remaining = stol("-1A", 16)
+    assert_equal(-26, result)
+    assert_equal("", remaining)
+    result, remaining = stol("-110", 2)
+    assert_equal(-6, result)
+    assert_equal("", remaining)
+
+    result, remaining = stol("Mojo!")
+    assert_equal(0, result)
+    assert_equal("Mojo!", remaining)
+
+    # Negative Cases
+    with assert_raises(contains="Cannot convert empty string to integer."):
+        _ = stol("")
+
+    with assert_raises(contains="Base must be >= 2 and <= 36, or 0."):
+        _ = stol("Bad Base", 42)
+
+    with assert_raises(
+        contains="String expresses an integer too large to store in Int."
+    ):
+        _ = stol(String("9223372036854775832"), 10)
+
+
+def test_stol_base_0():
+    var result: Int
+    var remaining: String
+
+    result, remaining = stol("155_155", 0)
+    assert_equal(155155, result)
+    assert_equal("", remaining)
+    result, remaining = stol("1_2_3_4_5", 0)
+    assert_equal(12345, result)
+    assert_equal("", remaining)
+    result, remaining = stol("1_2_3_4_5_", 0)
+    assert_equal(12345, result)
+    assert_equal("_", remaining)
+    result, remaining = stol("0b1_0_1_0", 0)
+    assert_equal(10, result)
+    assert_equal("", remaining)
+    result, remaining = stol("0o1_2_3", 0)
+    assert_equal(83, result)
+    assert_equal("", remaining)
+    result, remaining = stol("0x1_A_B", 0)
+    assert_equal(427, result)
+    assert_equal("", remaining)
+    result, remaining = stol("123_", 0)
+    assert_equal(123, result)
+    assert_equal("_", remaining)
+    result, remaining = stol("_123", 0)
+    assert_equal(0, result)
+    assert_equal("_123", remaining)
+    result, remaining = stol("123__456", 0)
+    assert_equal(123, result)
+    assert_equal("__456", remaining)
+    result, remaining = stol("0x_123", 0)
+    assert_equal(0, result)
+    assert_equal("x_123", remaining)
+    result, remaining = stol("0x1_23", 0)
+    assert_equal(291, result)
+    assert_equal("", remaining)
+    result, remaining = stol("0_123", 0)
+    assert_equal(123, result)
+    assert_equal("", remaining)
+    result, remaining = stol("0z123", 0)
+    assert_equal(0, result)
+    assert_equal("z123", remaining)
+    result, remaining = stol("Mojo!", 0)
+    assert_equal(0, result)
+    assert_equal("Mojo!", remaining)
+    result, remaining = stol("0o123 octal", 0)
+    assert_equal(83, result)
+    assert_equal(" octal", remaining)
+
+
 def test_atol():
     # base 10
     assert_equal(375, atol(String("375")))
@@ -1602,6 +1747,8 @@ def main():
     test_ord()
     test_chr()
     test_string_indexing()
+    test_stol()
+    test_stol_base_0()
     test_atol()
     test_atol_base_0()
     test_atof()
