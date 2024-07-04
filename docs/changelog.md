@@ -347,6 +347,9 @@ what we publish.
   implicitly convert to `Bool`. A new `ImplicitlyBoolable` trait is introduced
   for types where this behavior is desired.
 
+- The `time.now()` function has been deprecated. Please use `time.perf_counter`
+  or `time.perf_counter_ns` instead.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
