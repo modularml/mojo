@@ -140,7 +140,8 @@ fn test_rmdir_not_empty() raises:
 def main():
     test_mkdir_and_rmdir("my_dir")
     test_mkdir_and_rmdir(Path("my_dir"))
-    test_mkdir_and_rmdir(Path.home() / "my_dir")
+    if os.env.getenv("HOME") or os.env.getenv("USERPROFILE"):
+        test_mkdir_and_rmdir(Path("~/my_dir").expanduser())
 
     test_makedirs_and_removedirs(os.path.join("dir1", "dir2", "dir3"))
     test_makedirs_and_removedirs(Path("dir1") / "dir2" / "dir3")
