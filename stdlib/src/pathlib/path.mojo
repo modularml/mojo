@@ -278,7 +278,7 @@ struct Path(
         Returns:
             Path to user home directory.
         """
-        return os.path._get_home_path()
+        return os.path.expanduser("~")
 
     fn is_dir(self) -> Bool:
         """Returns True if the path is a directory and False otherwise.

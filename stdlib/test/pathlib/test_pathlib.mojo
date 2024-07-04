@@ -124,6 +124,10 @@ def test_expand_user():
     # Original path should remain unmodified
     assert_equal(path, os.path.join("~", "test"))
 
+    # Test that empty HOME returns `~`
+    set_home(Path(""))
+    assert_equal(Path.home(), Path("~"))
+
     # Make sure this process doesn't break other tests by changing the home dir.
     set_home(original_home)
 
