@@ -33,7 +33,7 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
     `UInt8`, `UInt16`, `UInt32`, or `UInt64`.
     """
 
-    alias MAX: UInt = (UInt(2) ** bitwidthof[DType.index]()) - UInt(1)
+    alias MAX: UInt = (1 << bitwidthof[DType.index]()) - 1
     """Returns the maximum integer value."""
 
     alias MIN: UInt = 0
