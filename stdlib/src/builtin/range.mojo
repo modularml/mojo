@@ -143,9 +143,7 @@ struct _SequentialRange(Sized, ReversibleRange, _IntIterable):
 
     @always_inline("nodebug")
     fn __len__(self) -> Int:
-        # FIXME(#38392):
-        # return max(0, self.end - self.start)
-        return self.end - self.start if self.start < self.end else 0
+        return max(0, self.end - self.start)
 
     @always_inline("nodebug")
     fn __getitem__(self, idx: Int) -> Int:
