@@ -113,22 +113,6 @@ struct UnsafePointer[
         }
 
     @always_inline
-    fn __init__(*, address: Int) -> Self:
-        """Create an unsafe UnsafePointer from an address in an integer.
-
-        Args:
-            address: The address to construct the pointer with.
-
-        Returns:
-            The pointer.
-        """
-        return Self {
-            address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-                Scalar[DType.index](address).value
-            )
-        }
-
-    @always_inline
     fn __init__(*, other: Self) -> Self:
         """Copy the object.
 
@@ -163,10 +147,7 @@ struct UnsafePointer[
     ](ptr: DTypePointer[dtype, address_space]) -> UnsafePointer[
         Scalar[dtype], address_space
     ]:
-        # TODO:
-        #   Is there a better way to create an UnsafePointer from a
-        #   DTypePointer?
-        return UnsafePointer[Scalar[dtype], address_space](address=int(ptr))
+        return ptr.address.address
 
     @staticmethod
     @always_inline
@@ -190,12 +171,8 @@ struct UnsafePointer[
             sizeof_t % alignment == 0, "size must be a multiple of alignment"
         ]()
 
-        return Self(
-            address=int(
-                _malloc[Int8, address_space=address_space](
-                    sizeof_t * count, alignment=alignment
-                )
-            )
+        return _malloc[T, address_space=address_space](
+            sizeof_t * count, alignment=alignment
         )
 
     # ===-------------------------------------------------------------------===#
@@ -261,7 +238,7 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return __mlir_op.`pop.offset`(self.address, int(offset).value)
+        return self.offset(offset)
 
     @always_inline
     fn __sub__(self, offset: Int) -> Self:
@@ -282,7 +259,7 @@ struct UnsafePointer[
         Args:
             offset: The offset index.
         """
-        self = self + offset
+        self = self.offset(offset)
 
     @always_inline
     fn __isub__(inout self, offset: Int):
@@ -459,7 +436,7 @@ struct UnsafePointer[
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
-        Pointer[Int8, address_space=address_space](address=int(self)).free()
+        _free(self)
 
     @always_inline("nodebug")
     fn bitcast[

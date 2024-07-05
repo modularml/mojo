@@ -1017,9 +1017,7 @@ fn iota(v: List[Int], offset: Int = 0):
         v: The vector to fill.
         offset: The value to fill at index 0.
     """
-    var buff = DTypePointer[DType.index](
-        Scalar[DType.index](int(v.data)).cast[DType.address]()
-    )
+    var buff = DTypePointer[DType.index](v.data.bitcast[Scalar[DType.index]]())
     iota(buff, len(v), offset=offset)
 
 
