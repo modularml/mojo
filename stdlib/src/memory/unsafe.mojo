@@ -304,9 +304,7 @@ struct LegacyPointer[
         Returns:
           The address of the pointer as an Int.
         """
-        return __mlir_op.`pop.pointer_to_index`[
-            _type = __mlir_type.`!pop.scalar<index>`
-        ](self.address)
+        return __mlir_op.`pop.pointer_to_index`(self.address)
 
     # ===------------------------------------------------------------------=== #
     # Allocate/Free
