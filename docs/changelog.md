@@ -229,6 +229,24 @@ what we publish.
 
 ### 🦋 Changed
 
+- The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
+  C-like set of semantics around pointer aliasing and derivation. However, the C
+  semantics bring a lot of history and baggage that are not needed in Mojo and
+  which complexify compiler optimizations. The language overall provides a
+  stronger set of invariants around pointer aliasing with lifetimes and
+  exclusive mutable references to values, etc.
+
+  It is now forbidden to convert a non-pointer-typed value derived from a
+  Mojo-allocated pointer, such as an integer address, to a pointer-typed value.
+  "Derived" means there is overlap in the bits of the non-pointer-typed value
+  with the original pointer value.
+
+  It is still possible to make this conversion in certain cases where it is
+  absolutely necessary, such as interoperating with other languages like Python.
+  In this case, the compiler makes two assumptions: any pointer derived from a
+  non-pointer-typed value does not alias any Mojo-derived pointer and that any
+  external function calls have arbitrary memory effects.
+
 - `await` on a coroutine now consumes it. This strengthens the invariant that
   coroutines can only be awaited once.
 
