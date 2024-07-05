@@ -1546,6 +1546,46 @@ def test_contains():
     assert_false(0 in y or 5 in y)
 
 
+def test_count():
+    var A = SIMD[DType.uint8, 32](1)
+    assert_equal(A.count(1), 32)
+    A[31] = 0
+    assert_equal(A.count(1), 31)
+
+    var B = SIMD[DType.bool, 32](True)
+    assert_equal(B.count(True), 32)
+    B[0] = False
+    assert_equal(B.count(True), 31)
+
+    for i in range(32):
+        if i % 2 == 0:
+            B[i] = False
+        else:
+            B[i] = True
+
+    assert_equal(B.count(True), 16)
+    assert_equal(B.count(False), 16)
+
+    var C = B.cast[DType.uint16]()
+    assert_equal(C.count(1), 16)
+    assert_equal(C.count(0), 16)
+
+    var D = B.cast[DType.float32]()
+    assert_equal(D.count(1.0), 16)
+    assert_equal(D.count(0.0), 16)
+    assert_equal(D.count(1.5), 0)
+
+    var E = SIMD[DType.int64, 4](100, 200, 300, 100)
+    assert_equal(E.count(100), 2)
+    assert_equal(E.count(200), 1)
+    assert_equal(E.count(150), 0)
+
+    E = E * -1
+    assert_equal(E.count(-100), 2)
+    assert_equal(E.count(-200), 1)
+    assert_equal(E.count(-150), 0)
+
+
 def main():
     test_abs()
     test_add()
@@ -1595,4 +1635,5 @@ def main():
     test_modf()
     test_split()
     test_contains()
+    test_count()
     # TODO: add tests for __and__, __or__, anc comparison operators

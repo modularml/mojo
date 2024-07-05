@@ -2158,6 +2158,30 @@ struct SIMD[type: DType, size: Int](
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         return __mlir_op.`pop.max`(self.value, other.value)
 
+    fn count(self, value: Scalar[type]) -> Int:
+        """Count the occurences the value in the vector.
+
+        Example usage:
+
+        ```mojo
+        var thirty_two_uint8 = SIMD[DType.uint8, 32](1)
+        thirty_two_uint8[0] = 0
+        print(thirty_two_uint8.count(1)) # 31
+        ```
+
+        Args:
+            value: The value.
+
+        Returns:
+            The amount of time the value occurs in the vector.
+        """
+
+        @parameter
+        if self.size > 255:
+            constrained[False, "size > 255"]()
+            # adding 256 occurences of a value would wrap to 0
+        return (self == value).cast[DType.uint8]().reduce_add().__int__()
+
     # ===------------------------------------------------------------------=== #
     # Reduce operations
     # ===------------------------------------------------------------------=== #

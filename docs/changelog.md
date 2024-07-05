@@ -283,6 +283,17 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
   # pw_gecos='System Administrator', pw_dir='/var/root', pw_shell='/bin/zsh')
   ```
 
+- Added `SIMD.count` method for `Scalar` rhs.
+  ([PR #3179](https://github.com/modularml/mojo/pull/3179) by [@rd4com](https://github.com/rd4com))
+
+  Example usage:
+
+  ```mojo
+  var B = SIMD[DType.int64, 4](1)
+  B[0] = 0
+  print(B.count(1)) # 3
+  ```
+
 ### 🦋 Changed
 
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
