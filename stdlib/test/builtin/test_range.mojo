@@ -75,6 +75,11 @@ def test_range_getitem_uint():
     # Specify the step size > 1
     assert_equal(range(UInt(0), UInt(10), UInt(2))[4], 8, "range(0, 10, 2)[4]")
 
+    # start > end
+    var bad_strided_uint_range = range(UInt(10), UInt(5), UInt(1))
+    var bad_strided_uint_range_iter = bad_strided_uint_range.__iter__()
+    assert_equal(UInt(0), bad_strided_uint_range_iter.__len__())
+
 
 def test_range_reversed():
     # Zero starting

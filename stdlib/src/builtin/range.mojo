@@ -188,8 +188,6 @@ struct _UIntStridedRangeIterator(UIntSized):
     fn __len__(self) -> UInt:
         if self.start < self.end:
             return self.end - self.start
-        elif self.start > self.end:
-            return self.start - self.end
         return 0
 
     @always_inline
