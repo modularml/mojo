@@ -383,6 +383,15 @@ struct Int(
         """
         self = value.__index__()
 
+    @always_inline("nodebug")
+    fn __init__(inout self, value: UInt):
+        """Construct Int from the given UInt value.
+
+        Args:
+            value: The init value.
+        """
+        self = Self(value.value)
+
     # ===------------------------------------------------------------------=== #
     # Operator dunders
     # ===------------------------------------------------------------------=== #
