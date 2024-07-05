@@ -2749,6 +2749,10 @@ struct SIMD[type: DType, size: Int](
             The loaded value.
         """
 
+        constrained[
+            alignment > 0, "alignment must be a positive integer value"
+        ]()
+
         @parameter
         if triple_is_nvidia_cuda() and sizeof[type]() == 1 and alignment == 1:
             # LLVM lowering to PTX incorrectly vectorizes loads for 1-byte types
@@ -2760,15 +2764,13 @@ struct SIMD[type: DType, size: Int](
 
             # intentionally don't unroll, otherwise the compiler vectorizes
             for i in range(size):
-                v[i] = ptr.address.offset(offset + i).load[
-                    alignment=alignment
-                ]()
+                v[i] = __mlir_op.`pop.load`[alignment = alignment.value](
+                    ptr.address.offset(int(offset) + i).address
+                )
             return v
 
-        return (
-            ptr.address.offset(offset)
-            .bitcast[SIMD[type, size]]()
-            .load[alignment=alignment]()
+        return __mlir_op.`pop.load`[alignment = alignment.value](
+            ptr.address.offset(offset).bitcast[SIMD[type, size]]().address
         )
 
     @staticmethod
@@ -2847,7 +2849,9 @@ struct SIMD[type: DType, size: Int](
         constrained[
             alignment > 0, "alignment must be a positive integer value"
         ]()
-        ptr.address.bitcast[SIMD[type, size]]().store[alignment=alignment](val)
+        __mlir_op.`pop.store`[alignment = alignment.value](
+            val, ptr.address.bitcast[SIMD[type, size]]().address
+        )
 
 
 # ===----------------------------------------------------------------------=== #
