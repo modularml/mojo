@@ -178,7 +178,7 @@ fn _snprintf_scalar[
             return _snprintf["True"](buffer, size)
         else:
             return _snprintf["False"](buffer, size)
-    elif type.is_integral() or type is DType.address:
+    elif type.is_integral():
         return _snprintf[_get_dtype_printf_format[type]()](buffer, size, x)
     elif (
         type is DType.float16 or type is DType.bfloat16 or type is DType.float32
@@ -256,7 +256,7 @@ fn _put_simd_scalar[type: DType](x: Scalar[type]):
     @parameter
     if type is DType.bool:
         _put["True"]() if x else _put["False"]()
-    elif type.is_integral() or type is DType.address:
+    elif type.is_integral():
         _printf[format](x)
     elif type.is_floating_point():
 

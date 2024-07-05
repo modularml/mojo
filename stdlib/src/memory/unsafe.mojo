@@ -928,7 +928,7 @@ struct DTypePointer[
         ]()
 
         var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
-        return gather(base.cast[DType.address](), mask, default, alignment)
+        return gather(base, mask, default, alignment)
 
     @always_inline("nodebug")
     fn scatter[
@@ -1006,7 +1006,7 @@ struct DTypePointer[
         ]()
 
         var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
-        scatter(val, base.cast[DType.address](), mask, alignment)
+        scatter(val, base, mask, alignment)
 
     @always_inline
     fn is_aligned[alignment: Int](self) -> Bool:

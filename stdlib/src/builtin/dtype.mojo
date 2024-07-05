@@ -78,12 +78,6 @@ struct DType(
     alias index = DType(__mlir_attr.`#kgen.dtype.constant<index> : !kgen.dtype`)
     """Represents an integral type whose bitwidth is the maximum integral value
     on the system."""
-    alias address = DType(
-        __mlir_attr.`#kgen.dtype.constant<address> : !kgen.dtype`
-    )
-    """Represents a pointer type whose bitwidth is the same as the bitwidth
-    of the hardware's pointer type (32-bit on 32-bit machines and 64-bit on
-    64-bit machines)."""
 
     @always_inline
     fn __init__(inout self, *, other: Self):
@@ -144,8 +138,6 @@ struct DType(
             return writer.write_str["float64"]()
         if self == DType.invalid:
             return writer.write_str["invalid"]()
-        if self == DType.address:
-            return writer.write_str["address"]()
 
         return writer.write_str["<<unknown>>"]()
 
@@ -601,9 +593,6 @@ fn _get_dtype_printf_format[type: DType]() -> StringLiteral:
     elif type is DType.index:
         return _index_printf_format()
 
-    elif type is DType.address:
-        return "%p"
-
     elif type.is_floating_point():
         return "%.17g"
 
@@ -637,7 +626,6 @@ fn _get_runtime_dtype_size(type: DType) -> Int:
         DType.uint64,
         DType.float64,
         DType.index,
-        DType.address,
     )
 
     @parameter
