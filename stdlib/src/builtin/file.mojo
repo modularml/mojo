@@ -469,20 +469,6 @@ struct FileHandle:
         return Int(i64_res.value)
 
 
-fn open(path: String, mode: String) raises -> FileHandle:
-    """Opens the file specified by path using the mode provided, returning a
-    FileHandle.
-
-    Args:
-      path: The path to the file to open.
-      mode: The mode to open the file in.
-
-    Returns:
-      A file handle.
-    """
-    return FileHandle(path, mode)
-
-
 fn open[
     PathLike: os.PathLike
 ](path: PathLike, mode: String) raises -> FileHandle:

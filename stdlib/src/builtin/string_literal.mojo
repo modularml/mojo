@@ -178,7 +178,7 @@ struct StringLiteral(
         return substr in StringRef(self)
 
     # ===-------------------------------------------------------------------===#
-    # Trait impelemntations
+    # Trait implementations
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
@@ -251,6 +251,14 @@ struct StringLiteral(
             builtin documentation for more details.
         """
         return hash(self.unsafe_ptr(), len(self))
+
+    fn __fspath__(self) -> String:
+        """Return the file system path representation of the object.
+
+        Returns:
+          The file system path representation as a string.
+        """
+        return self.__str__()
 
     # ===-------------------------------------------------------------------===#
     # Methods

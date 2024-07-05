@@ -79,33 +79,6 @@ fn _get_home_path() -> String:
 
 # TODO: When `pwd` module is implemented for POSIX, fallback to:
 # pwd.getpwuid(os.getuid()).pw_dir if $HOME is not set, and allow for `~user`.
-fn expanduser(path: String) raises -> String:
-    """Expands a prefixed `~` with $HOME on posix or $USERPROFILE on windows. If
-    environment variables are not set or the `path` is not prefixed with `~`,
-    returns the `path` unmodified.
-
-    Args:
-        path: The path that is being expanded.
-
-    Returns:
-        The expanded path.
-    """
-    if not path.startswith("~"):
-        return path
-    var userhome = _get_home_path()
-    if not userhome:
-        return path
-    # If there is more than a single `~` without correct separator, raise error.
-    if len(path) > 1 and path[1] != os.sep:
-        raise "malformed path, could not determine home directory."
-    var path_split = path.split(os.sep, 1)
-    # If there is a properly formatted seperator, return expanded path.
-    if len(path_split) == 2:
-        return os.path.join(userhome, path_split[1])
-    # Path was a single `~` character, return home path
-    return userhome
-
-
 fn expanduser[PathLike: os.PathLike, //](path: PathLike) raises -> String:
     """Expands a prefixed `~` with $HOME on posix or $USERPROFILE on windows. If
     environment variables are not set or the `path` is not prefixed with `~`,
@@ -120,33 +93,26 @@ fn expanduser[PathLike: os.PathLike, //](path: PathLike) raises -> String:
     Returns:
         The expanded path.
     """
-    return expanduser(path.__fspath__())
+    var fspath = path.__fspath__()
+    if not fspath.startswith("~"):
+        return fspath
+    var userhome = _get_home_path()
+    if not userhome:
+        return fspath
+    # If there is more than a single `~` without correct separator, raise error.
+    if len(fspath) > 1 and fspath[1] != os.sep:
+        raise "malformed path, could not determine home directory."
+    var path_split = fspath.split(os.sep, 1)
+    # If there is a properly formatted seperator, return expanded path.
+    if len(path_split) == 2:
+        return os.path.join(userhome, path_split[1])
+    # Path was a single `~` character, return home path
+    return userhome
 
 
 # ===----------------------------------------------------------------------=== #
 # isdir
 # ===----------------------------------------------------------------------=== #
-fn isdir(path: String) -> Bool:
-    """Return True if path is an existing directory. This follows
-    symbolic links, so both islink() and isdir() can be true for the same path.
-
-    Args:
-        path: The path to the directory.
-
-    Returns:
-        True if the path is a directory or a link to a directory and
-        False otherwise.
-    """
-    _constrain_unix()
-    try:
-        var st_mode = _get_stat_st_mode(path)
-        if S_ISDIR(st_mode):
-            return True
-        return S_ISLNK(st_mode) and S_ISDIR(_get_lstat_st_mode(path))
-    except:
-        return False
-
-
 fn isdir[PathLike: os.PathLike, //](path: PathLike) -> Bool:
     """Return True if path is an existing directory. This follows
     symbolic links, so both islink() and isdir() can be true for the same path.
@@ -161,31 +127,20 @@ fn isdir[PathLike: os.PathLike, //](path: PathLike) -> Bool:
         True if the path is a directory or a link to a directory and
         False otherwise.
     """
-    return isdir(path.__fspath__())
+    _constrain_unix()
+    var fspath = path.__fspath__()
+    try:
+        var st_mode = _get_stat_st_mode(fspath)
+        if S_ISDIR(st_mode):
+            return True
+        return S_ISLNK(st_mode) and S_ISDIR(_get_lstat_st_mode(fspath))
+    except:
+        return False
 
 
 # ===----------------------------------------------------------------------=== #
 # isfile
 # ===----------------------------------------------------------------------=== #
-
-
-fn isfile(path: String) -> Bool:
-    """Test whether a path is a regular file.
-
-    Args:
-        path: The path to the directory.
-
-    Returns:
-        Returns True if the path is a regular file.
-    """
-    _constrain_unix()
-    try:
-        var st_mode = _get_stat_st_mode(path)
-        if S_ISREG(st_mode):
-            return True
-        return S_ISLNK(st_mode) and S_ISREG(_get_lstat_st_mode(path))
-    except:
-        return False
 
 
 fn isfile[PathLike: os.PathLike, //](path: PathLike) -> Bool:
@@ -200,29 +155,20 @@ fn isfile[PathLike: os.PathLike, //](path: PathLike) -> Bool:
     Returns:
         Returns True if the path is a regular file.
     """
-    return isfile(path.__fspath__())
+    _constrain_unix()
+    var fspath = path.__fspath__()
+    try:
+        var st_mode = _get_stat_st_mode(fspath)
+        if S_ISREG(st_mode):
+            return True
+        return S_ISLNK(st_mode) and S_ISREG(_get_lstat_st_mode(fspath))
+    except:
+        return False
 
 
 # ===----------------------------------------------------------------------=== #
 # islink
 # ===----------------------------------------------------------------------=== #
-fn islink(path: String) -> Bool:
-    """Return True if path refers to an existing directory entry that is a
-    symbolic link.
-
-    Args:
-        path: The path to the directory.
-
-    Returns:
-        True if the path is a link to a directory and False otherwise.
-    """
-    _constrain_unix()
-    try:
-        return S_ISLNK(_get_lstat_st_mode(path))
-    except:
-        return False
-
-
 fn islink[PathLike: os.PathLike, //](path: PathLike) -> Bool:
     """Return True if path refers to an existing directory entry that is a
     symbolic link.
@@ -236,29 +182,16 @@ fn islink[PathLike: os.PathLike, //](path: PathLike) -> Bool:
     Returns:
         True if the path is a link to a directory and False otherwise.
     """
-    return islink(path.__fspath__())
+    _constrain_unix()
+    try:
+        return S_ISLNK(_get_lstat_st_mode(path.__fspath__()))
+    except:
+        return False
 
 
 # ===----------------------------------------------------------------------=== #
 # dirname
 # ===----------------------------------------------------------------------=== #
-
-
-fn dirname(path: String) -> String:
-    """Returns the directory component of a pathname.
-
-    Args:
-        path: The path to a file.
-
-    Returns:
-        The directory component of a pathname.
-    """
-    alias sep = str(os.sep)
-    var i = path.rfind(sep) + 1
-    var head = path[:i]
-    if head and head != sep * len(head):
-        return head.rstrip(sep)
-    return head
 
 
 fn dirname[PathLike: os.PathLike, //](path: PathLike) -> String:
@@ -273,29 +206,18 @@ fn dirname[PathLike: os.PathLike, //](path: PathLike) -> String:
     Returns:
         The directory component of a pathname.
     """
-    return dirname(path.__fspath__())
+    var fspath = path.__fspath__()
+    alias sep = str(os.sep)
+    var i = fspath.rfind(sep) + 1
+    var head = fspath[:i]
+    if head and head != sep * len(head):
+        return head.rstrip(sep)
+    return head
 
 
 # ===----------------------------------------------------------------------=== #
 # exists
 # ===----------------------------------------------------------------------=== #
-
-
-fn exists(path: String) -> Bool:
-    """Return True if path exists.
-
-    Args:
-        path: The path to the directory.
-
-    Returns:
-        Returns True if the path exists and is not a broken symbolic link.
-    """
-    _constrain_unix()
-    try:
-        _ = _get_stat_st_mode(path)
-        return True
-    except:
-        return False
 
 
 fn exists[PathLike: os.PathLike, //](path: PathLike) -> Bool:
@@ -310,29 +232,17 @@ fn exists[PathLike: os.PathLike, //](path: PathLike) -> Bool:
     Returns:
         Returns True if the path exists and is not a broken symbolic link.
     """
-    return exists(path.__fspath__())
+    _constrain_unix()
+    try:
+        _ = _get_stat_st_mode(path.__fspath__())
+        return True
+    except:
+        return False
 
 
 # ===----------------------------------------------------------------------=== #
 # lexists
 # ===----------------------------------------------------------------------=== #
-
-
-fn lexists(path: String) -> Bool:
-    """Return True if path exists or is a broken symlink.
-
-    Args:
-        path: The path to the directory.
-
-    Returns:
-        Returns True if the path exists or is a broken symbolic link.
-    """
-    _constrain_unix()
-    try:
-        _ = _get_lstat_st_mode(path)
-        return True
-    except:
-        return False
 
 
 fn lexists[PathLike: os.PathLike, //](path: PathLike) -> Bool:
@@ -347,24 +257,17 @@ fn lexists[PathLike: os.PathLike, //](path: PathLike) -> Bool:
     Returns:
         Returns True if the path exists or is a broken symbolic link.
     """
-    return exists(path.__fspath__())
+    _constrain_unix()
+    try:
+        _ = _get_lstat_st_mode(path.__fspath__())
+        return True
+    except:
+        return False
 
 
 # ===----------------------------------------------------------------------=== #
 # getsize
 # ===----------------------------------------------------------------------=== #
-
-
-fn getsize(path: String) raises -> Int:
-    """Return the size, in bytes, of the specified path.
-
-    Args:
-        path: The path to the file.
-
-    Returns:
-        The size of the path in bytes.
-    """
-    return stat(path).st_size
 
 
 fn getsize[PathLike: os.PathLike, //](path: PathLike) raises -> Int:
@@ -379,7 +282,7 @@ fn getsize[PathLike: os.PathLike, //](path: PathLike) raises -> Int:
     Returns:
         The size of the path in bytes.
     """
-    return getsize(path.__fspath__())
+    return stat(path.__fspath__()).st_size
 
 
 # ===----------------------------------------------------------------------=== #
@@ -418,28 +321,6 @@ fn join(path: String, *paths: String) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-def split(path: String) -> (String, String):
-    """
-    Split a given pathname into two components: head and tail. This is useful
-    for separating the directory path from the filename. If the input path ends
-    with a seperator, the tail component will be empty. If there is no seperator
-    in the path, the head component will be empty, and the entire path will be
-    considered the tail. Trailing seperators in the head are stripped unless the
-    head is the root directory.
-
-    Args:
-        path: The path to be split.
-
-    Returns:
-        A tuple containing two strings: (head, tail).
-    """
-    i = path.rfind(os.sep) + 1
-    head, tail = path[:i], path[i:]
-    if head and head != str(os.sep) * len(head):
-        head = head.rstrip(sep)
-    return head, tail
-
-
 def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
     """
     Split a given pathname into two components: head and tail. This is useful
@@ -457,9 +338,13 @@ def split[PathLike: os.PathLike, //](path: PathLike) -> (String, String):
 
     Returns:
         A tuple containing two strings: (head, tail).
-
     """
-    return split(path.__fspath__())
+    fspath = path.__fspath__()
+    i = fspath.rfind(os.sep) + 1
+    head, tail = fspath[:i], fspath[i:]
+    if head and head != str(os.sep) * len(head):
+        head = head.rstrip(sep)
+    return head, tail
 
 
 # TODO uncomment this when unpacking is supported
