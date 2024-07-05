@@ -246,7 +246,7 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return Self(address=int(self) + offset * sizeof[T]())
+        return __mlir_op.`pop.offset`(self.address, int(offset).value)
 
     @always_inline
     fn __sub__(self, offset: Int) -> Self:
@@ -267,7 +267,7 @@ struct UnsafePointer[
         Args:
             offset: The offset index.
         """
-        self = Self(address=int(self) + offset * sizeof[T]())
+        self = self + offset
 
     @always_inline
     fn __isub__(inout self, offset: Int):
