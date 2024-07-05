@@ -368,6 +368,26 @@ what we publish.
 - The `time.now()` function has been deprecated. Please use `time.perf_counter`
   or `time.perf_counter_ns` instead.
 
+- The `pwd` module has been added for accessing user information in
+  `/etc/passwd` on POSIX systems. This follows the same logic as Python:
+
+  ```mojo
+  import pwd
+  import os
+  current_user = pwd.getpwuid(os.getuid())
+  print(current_user)
+
+  # pwd.struct_passwd(pw_name='jack', pw_passwd='********', pw_uid=501,
+  # pw_gid=20, pw_gecos='Jack Clayton', pw_dir='/Users/jack',
+  # pw_shell='/bin/zsh')
+
+  root = pwd.getpwnam("root")
+  print(root)
+
+  # pwd.struct_passwd(pw_name='root', pw_passwd='*', pw_uid=0, pw_gid=0,
+  # pw_gecos='System Administrator', pw_dir='/var/root', pw_shell='/bin/zsh')
+  ```
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
