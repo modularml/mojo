@@ -806,6 +806,15 @@ fn llvm_intrinsic[
 # ===----------------------------------------------------------------------===#
 
 
+# NOTE: Converting from a scalar to a pointer is unsafe! The resulting pointer
+# is assumed not to alias any Mojo-derived pointer. DO NOT proliferate usage of
+# this function!
+fn _unsafe_aliasing_address_to_pointer[
+    type: DType
+](owned addr: Scalar[DType.address]) -> DTypePointer[type]:
+    return UnsafePointer.address_of(addr).bitcast[DTypePointer[type]]()[]
+
+
 @always_inline("nodebug")
 fn gather[
     type: DType, size: Int
@@ -859,7 +868,7 @@ fn gather[
     @parameter
     if size == 1:
         return Scalar.load(
-            DTypePointer[type](base[0])
+            _unsafe_aliasing_address_to_pointer[type](base[0])
         ) if mask else passthrough[0]
     return llvm_intrinsic[
         "llvm.masked.gather",
@@ -936,7 +945,7 @@ fn scatter[
     @parameter
     if size == 1:
         if mask:
-            var ptr = DTypePointer[type](base[0])
+            var ptr = _unsafe_aliasing_address_to_pointer[type](base[0])
             Scalar.store(ptr, value[0])
         return
     llvm_intrinsic["llvm.masked.scatter", NoneType](

@@ -234,21 +234,6 @@ struct LegacyPointer[
         """
         return Self {address: address}
 
-    @always_inline("nodebug")
-    fn __init__(value: Scalar[DType.address]) -> Self:
-        """Constructs a LegacyPointer from the value of scalar address.
-
-        Args:
-            value: The input pointer index.
-
-        Returns:
-            Constructed LegacyPointer object.
-        """
-        var address = __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-            value.cast[DType.index]().value
-        )
-        return Self {address: address}
-
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
 
@@ -673,17 +658,6 @@ struct DTypePointer[
             other: The scalar pointer.
         """
         self.address = other.address
-
-    @always_inline
-    fn __init__(inout self, *, address: Int):
-        """Constructs a `DTypePointer` from an integer address.
-
-        Args:
-            address: The input address.
-        """
-        self.address = __mlir_op.`pop.index_to_pointer`[
-            _type = self._pointer_type._mlir_type
-        ](Scalar[DType.index](address).value)
 
     # ===------------------------------------------------------------------=== #
     # Factory methods
