@@ -249,20 +249,6 @@ struct LegacyPointer[
         )
         return Self {address: address}
 
-    @always_inline("nodebug")
-    fn __init__(*, address: Int) -> Self:
-        """Constructs a Pointer from an address in an integer.
-
-        Args:
-            address: The input address.
-
-        Returns:
-            Constructed Pointer object.
-        """
-        return __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-            Scalar[DType.index](address).value
-        )
-
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
 
@@ -688,18 +674,6 @@ struct DTypePointer[
         """
         self.address = other.address
 
-    @always_inline("nodebug")
-    fn __init__(inout self, value: Scalar[DType.address]):
-        """Constructs a `DTypePointer` from the value of scalar address.
-
-        Args:
-            value: The input pointer index.
-        """
-        var address = __mlir_op.`pop.index_to_pointer`[
-            _type = Self._pointer_type._mlir_type
-        ](value.cast[DType.index]().value)
-        self.address = address
-
     @always_inline
     fn __init__(inout self, *, address: Int):
         """Constructs a `DTypePointer` from an integer address.
@@ -707,7 +681,9 @@ struct DTypePointer[
         Args:
             address: The input address.
         """
-        self.address = Self._pointer_type(address=address)
+        self.address = __mlir_op.`pop.index_to_pointer`[
+            _type = self._pointer_type._mlir_type
+        ](Scalar[DType.index](address).value)
 
     # ===------------------------------------------------------------------=== #
     # Factory methods
@@ -917,6 +893,21 @@ struct DTypePointer[
             address, as the original `DTypePointer`.
         """
         return self.address.bitcast[SIMD[new_type, 1], address_space]()
+
+    @always_inline("nodebug")
+    fn bitcast[
+        type: AnyType
+    ](self) -> UnsafePointer[type, address_space, exclusive]:
+        """Bitcasts `DTypePointer` to a different scalar type.
+
+        Parameters:
+            type: The target scalar type.
+
+        Returns:
+            A new `UnsafePointer` object with the specified type and the same
+            address, as the original `DTypePointer`.
+        """
+        return self._as_scalar_pointer().bitcast[type]()
 
     @always_inline("nodebug")
     fn _as_scalar_pointer(self) -> UnsafePointer[Scalar[type], address_space]:
