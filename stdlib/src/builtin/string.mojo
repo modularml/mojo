@@ -1328,6 +1328,14 @@ struct String(
         else:
             return "'" + result + "'"
 
+    fn __fspath__(self) -> String:
+        """Return the file system path representation (just the string itself).
+
+        Returns:
+          The file system path representation as a string.
+        """
+        return self
+
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #

@@ -19,20 +19,6 @@ from pathlib import Path
 from testing import assert_false, assert_raises, assert_true
 
 
-fn create_file_and_test_delete_string[
-    func: fn (String) raises -> None, name: StringLiteral
-](filename: String) raises:
-    try:
-        with open(filename, "w"):
-            pass
-    except:
-        assert_true(False, "Failed to create file for test")
-
-    assert_true(exists(filename))
-    func(filename)
-    assert_false(exists(filename), "test with '" + name + "' failed")
-
-
 fn create_file_and_test_delete_path[
     func: fn[PathLike: PathLike] (PathLike) raises -> None,
     name: StringLiteral,
@@ -65,14 +51,14 @@ fn test_remove() raises:
     with assert_raises(contains="Can not remove file: "):
         remove(my_file_path)
 
-    create_file_and_test_delete_string[remove, "remove"](my_file_name)
-    create_file_and_test_delete_string[unlink, "unlink"](my_file_name)
+    create_file_and_test_delete_path[remove, "remove"](my_file_name)
+    create_file_and_test_delete_path[unlink, "unlink"](my_file_name)
     create_file_and_test_delete_path[remove, "remove"](my_file_path)
     create_file_and_test_delete_path[unlink, "unlink"](my_file_path)
 
     # test with relative path
     my_file_name = str(Path("my_relative_file.test"))
-    create_file_and_test_delete_string[remove, "remove"](my_file_name)
+    create_file_and_test_delete_path[remove, "remove"](my_file_name)
 
 
 def main():
