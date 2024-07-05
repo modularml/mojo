@@ -223,6 +223,21 @@ struct UnsafePointer[
         )
 
     @always_inline
+    fn offset[T: Intable](self, idx: T) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
+
+        Args:
+            idx: The offset of the new pointer.
+
+        Returns:
+            The new constructed DTypePointer.
+        """
+        return __mlir_op.`pop.offset`(self.address, int(idx).value)
+
+    @always_inline
     fn __getitem__(
         self, offset: Int
     ) -> ref [MutableStaticLifetime, address_space._value.value] T:
