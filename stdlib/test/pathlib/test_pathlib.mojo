@@ -124,10 +124,6 @@ def test_expand_user():
     # Original path should remain unmodified
     assert_equal(path, os.path.join("~", "test"))
 
-    # Test that empty HOME returns `~`
-    set_home(Path(""))
-    assert_equal(Path.home(), Path("~"))
-
     # Make sure this process doesn't break other tests by changing the home dir.
     set_home(original_home)
 
@@ -140,6 +136,15 @@ def test_home():
     assert_equal(user_path, Path.home())
     # Match Python behavior allowing `home()` to overwrite existing path.
     assert_equal(user_path, Path("test").home())
+    # Tests with empty "HOME" and "USERPROFILE"
+    set_home(Path(""))
+    if os_is_windows():
+        # Don't expand on windows if home isn't set
+        assert_equal(Path("~"), Path.home())
+    else:
+        # Test fallback to `/etc/passwd` works on linux
+        assert_true(len(Path.home().path) > 1)
+
     # Ensure other tests in this process aren't broken by changing the home dir.
     set_home(original_home)
 
