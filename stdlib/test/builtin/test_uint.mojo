@@ -93,9 +93,9 @@ def test_inequality():
 def test_properties():
     assert_equal(UInt.MIN, UInt(0))
     if bitwidthof[DType.index]() == 32:
-        assert_equal(UInt.MAX, UInt(((2**32) - 1).value))
+        assert_equal(UInt.MAX, (1 << 32) - 1)
     else:
-        assert_equal(UInt.MAX, UInt(((2**64) - 1).value))
+        assert_equal(UInt.MAX, (1 << 64) - 1)
 
 
 def test_add():
