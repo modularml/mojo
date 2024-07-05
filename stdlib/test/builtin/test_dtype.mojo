@@ -31,7 +31,6 @@ fn test_representable() raises:
     assert_equal(repr(DType.float32), "DType.float32")
     assert_equal(repr(DType.int64), "DType.int64")
     assert_equal(repr(DType.bool), "DType.bool")
-    assert_equal(repr(DType.address), "DType.address")
     assert_equal(repr(DType.index), "DType.index")
 
 

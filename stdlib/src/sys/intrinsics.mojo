@@ -811,7 +811,7 @@ fn llvm_intrinsic[
 # this function!
 fn _unsafe_aliasing_address_to_pointer[
     type: DType
-](owned addr: Scalar[DType.address]) -> DTypePointer[type]:
+](owned addr: Scalar[DType.index]) -> DTypePointer[type]:
     return UnsafePointer.address_of(addr).bitcast[DTypePointer[type]]()[]
 
 
@@ -819,7 +819,7 @@ fn _unsafe_aliasing_address_to_pointer[
 fn gather[
     type: DType, size: Int
 ](
-    base: SIMD[DType.address, size],
+    owned base: SIMD[DType.index, size],
     mask: SIMD[DType.bool, size],
     passthrough: SIMD[type, size],
     alignment: Int = 0,
@@ -874,7 +874,9 @@ fn gather[
         "llvm.masked.gather",
         __mlir_type[`!pop.simd<`, size.value, `, `, type.value, `>`],
     ](
-        base,
+        UnsafePointer.address_of(base).bitcast[
+            __mlir_type[`!pop.simd<`, size.value, `, address>`],
+        ]()[],
         Int32(alignment),
         mask,
         passthrough,
@@ -891,7 +893,7 @@ fn scatter[
     type: DType, size: Int
 ](
     value: SIMD[type, size],
-    base: SIMD[DType.address, size],
+    owned base: SIMD[DType.index, size],
     mask: SIMD[DType.bool, size],
     alignment: Int = 0,
 ):
@@ -950,7 +952,9 @@ fn scatter[
         return
     llvm_intrinsic["llvm.masked.scatter", NoneType](
         value,
-        base,
+        UnsafePointer.address_of(base).bitcast[
+            __mlir_type[`!pop.simd<`, size.value, `, address>`],
+        ]()[],
         Int32(alignment),
         mask,
     )
@@ -1371,9 +1375,7 @@ fn strided_load[
         sizeof[type]()
     )
     var passthrough = SIMD[type, simd_width]()
-    return gather[type, simd_width](
-        offset.cast[DType.address](), mask, passthrough
-    )
+    return gather[type, simd_width](offset, mask, passthrough)
 
 
 @always_inline("nodebug")
@@ -1453,7 +1455,7 @@ fn strided_store[
         sizeof[type]()
     )
 
-    scatter[type, simd_width](value, offset.cast[DType.address](), mask)
+    scatter[type, simd_width](value, offset, mask)
 
 
 @always_inline("nodebug")

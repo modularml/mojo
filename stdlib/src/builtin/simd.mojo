@@ -1483,41 +1483,6 @@ struct SIMD[type: DType, size: Int](
             return rebind[SIMD[target, size]](
                 _f32_to_bfloat16(self.cast[DType.float32]())
             )
-        elif target == DType.address:
-            var index_val = __mlir_op.`pop.cast`[
-                _type = __mlir_type[`!pop.simd<`, size.value, `, index>`]
-            ](self.value)
-            var tmp = SIMD[DType.address, size](
-                __mlir_op.`pop.index_to_pointer`[
-                    _type = __mlir_type[
-                        `!pop.simd<`,
-                        size.value,
-                        `, address >`,
-                    ]
-                ](index_val)
-            )
-            return rebind[SIMD[target, size]](tmp)
-        elif (type is DType.address) and target.is_integral():
-            var index_tmp = SIMD[DType.index, size](
-                __mlir_op.`pop.pointer_to_index`[
-                    _type = __mlir_type[
-                        `!pop.simd<`,
-                        size.value,
-                        `, `,
-                        DType.index.value,
-                        `>`,
-                    ]
-                ](
-                    rebind[
-                        __mlir_type[
-                            `!pop.simd<`,
-                            size.value,
-                            `, address >`,
-                        ]
-                    ](self.value)
-                )
-            )
-            return index_tmp.cast[target]()
         else:
             return __mlir_op.`pop.cast`[
                 _type = __mlir_type[
