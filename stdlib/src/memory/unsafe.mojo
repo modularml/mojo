@@ -210,6 +210,18 @@ struct LegacyPointer[
         """
         return other
 
+    @always_inline
+    fn __init__(other: UnsafePointer[type, address_space, exclusive]) -> Self:
+        """Construct a legacy pointer (deprecated) from an UnsafePointer.
+
+        Args:
+            other: The UnsafePointer.
+
+        Returns:
+            Constructed LegacyPointer object.
+        """
+        return other.address
+
     @always_inline("nodebug")
     fn __init__(address: Self._mlir_type) -> Self:
         """Constructs a LegacyPointer from the address.
@@ -907,13 +919,13 @@ struct DTypePointer[
         return self.address.bitcast[SIMD[new_type, 1], address_space]()
 
     @always_inline("nodebug")
-    fn _as_scalar_pointer(self) -> Pointer[Scalar[type], address_space]:
+    fn _as_scalar_pointer(self) -> UnsafePointer[Scalar[type], address_space]:
         """Converts the `DTypePointer` to a scalar pointer of the same dtype.
 
         Returns:
             A `Pointer` to a scalar of the same dtype.
         """
-        return self.address
+        return self.address.address
 
     alias _default_alignment = alignof[
         Scalar[type]
