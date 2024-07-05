@@ -17,7 +17,7 @@
 import os
 from os.path import expanduser, join
 from os.env import setenv, getenv
-from testing import assert_equal, assert_raises
+from testing import assert_equal, assert_raises, assert_true
 from sys.info import os_is_windows
 
 
@@ -48,6 +48,7 @@ fn main() raises:
     var original_home = get_current_home()
     set_home(user_path)
 
+    # Single `~`
     assert_equal(user_path, expanduser("~"))
 
     # Path with home directory
@@ -65,16 +66,24 @@ fn main() raises:
     # Empty string
     assert_equal("", expanduser(""))
 
-    # Malformed path should raise
-    with assert_raises():
-        _ = expanduser("~badpath/folder")
-
     # Path with multiple tildes
     assert_equal(join(user_path, "~folder"), expanduser("~/~folder"))
 
-    # Test that empty HOME returns `~`
+    # Tests with empty "HOME" and "USERPROFILE"
     set_home("")
-    assert_equal(expanduser("~/test/path"), "~/test/path")
-    assert_equal(expanduser("~"), "~")
+    if os_is_windows():
+        # Don't expand on windows if home isn't set
+        assert_equal("~/folder", expanduser("~/folder"))
+    else:
+        # Test fallback to `/etc/passwd` works on linux
+        alias folder = "~/folder"
+        assert_true(len(expanduser(folder)) > len(folder))
+
+        # Test expanding user name on Unix
+        assert_true(expanduser("~root") != "~root")
+
+        # Test path is returned unchanged on missing user
+        var missing_user = "~asdfasdzvxewr/user"
+        assert_equal(expanduser(missing_user), missing_user)
 
     set_home(original_home)

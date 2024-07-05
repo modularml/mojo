@@ -32,6 +32,7 @@ from .._macos import _stat as _stat_macos
 from ..fstat import stat
 from ..os import sep
 from ..env import getenv
+from pwd import getpwuid
 
 
 # ===----------------------------------------------------------------------=== #
@@ -70,19 +71,40 @@ fn _get_lstat_st_mode(path: String) raises -> Int:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _get_home_path() -> String:
+fn _user_home_path(path: String) -> String:
     @parameter
     if os_is_windows():
         return getenv("USERPROFILE")
-    return getenv("HOME")
+    else:
+        var user_end = path.find(sep, 1)
+        if user_end < 0:
+            user_end = len(path)
+        # Special POSIX syntax for ~[user-name]/path
+        if len(path) > 1 and user_end > 1:
+            try:
+                return pwd.getpwnam(path[1:user_end]).pw_dir
+            except:
+                return ""
+        else:
+            var user_home = getenv("HOME")
+            # Fallback to password database if `HOME` not set
+            if not user_home:
+                try:
+                    user_home = pwd.getpwuid(getuid()).pw_dir
+                except:
+                    return ""
+            return user_home
 
 
-# TODO: When `pwd` module is implemented for POSIX, fallback to:
-# pwd.getpwuid(os.getuid()).pw_dir if $HOME is not set, and allow for `~user`.
 fn expanduser[PathLike: os.PathLike, //](path: PathLike) raises -> String:
-    """Expands a prefixed `~` with $HOME on posix or $USERPROFILE on windows. If
-    environment variables are not set or the `path` is not prefixed with `~`,
-    returns the `path` unmodified.
+    """Expands a tilde "~" prefix in `path` to the user's home directory.
+
+    For example, `~/folder` becomes `/home/current_user/folder`. On macOS and
+    Linux a path starting with `~user/` will expand to the specified user's home
+    directory, so `~user/folder` becomes `/home/user/folder`.
+
+    If the home directory cannot be determined, or the `path` is not prefixed
+    with "~", the original path is returned unchanged.
 
     Parameters:
         PathLike: The type conforming to the os.PathLike trait.
@@ -96,14 +118,11 @@ fn expanduser[PathLike: os.PathLike, //](path: PathLike) raises -> String:
     var fspath = path.__fspath__()
     if not fspath.startswith("~"):
         return fspath
-    var userhome = _get_home_path()
+    var userhome = _user_home_path(fspath)
     if not userhome:
         return fspath
-    # If there is more than a single `~` without correct separator, raise error.
-    if len(fspath) > 1 and fspath[1] != os.sep:
-        raise "malformed path, could not determine home directory."
     var path_split = fspath.split(os.sep, 1)
-    # If there is a properly formatted seperator, return expanded path.
+    # If there is a properly formatted seperator, return expanded fspath.
     if len(path_split) == 2:
         return os.path.join(userhome, path_split[1])
     # Path was a single `~` character, return home path

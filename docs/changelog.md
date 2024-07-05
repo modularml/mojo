@@ -202,7 +202,10 @@ what we publish.
   ```mojo
   import os
   print(os.path.expanduser("~/.modular"))
-  # /home/username/.modular
+  # /Users/username/.modular
+  print(os.path.expanduser("~root/folder"))
+  # /var/root/folder (on macos)
+  # /root/folder     (on linux)
   ```
 
 - `Path.home()` has been added to return a path of the users home directory.
@@ -222,9 +225,34 @@ what we publish.
   and removing nested directories:
 
   ```mojo
+  import os
   path = os.path.join("dir1", "dir2", "dir3")
   os.path.makedirs(path, exist_ok=True)
   os.path.removedirs(path)
+  ```
+
+- The `pwd` module has been added for accessing user information in
+  `/etc/passwd` on POSIX systems. This follows the same logic as Python:
+
+  ```mojo
+  import pwd
+  import os
+  current_user = pwd.getpwuid(os.getuid())
+  print(current_user)
+
+  # pwd.struct_passwd(pw_name='jack', pw_passwd='********', pw_uid=501,
+  # pw_gid=20, pw_gecos='Jack Clayton', pw_dir='/Users/jack',
+  # pw_shell='/bin/zsh')
+
+  print(current_user.pw_uid)
+
+  # 501
+
+  root = pwd.getpwnam("root")
+  print(root)
+
+  # pwd.struct_passwd(pw_name='root', pw_passwd='*', pw_uid=0, pw_gid=0,
+  # pw_gecos='System Administrator', pw_dir='/var/root', pw_shell='/bin/zsh')
   ```
 
 ### 🦋 Changed
@@ -367,26 +395,6 @@ what we publish.
 
 - The `time.now()` function has been deprecated. Please use `time.perf_counter`
   or `time.perf_counter_ns` instead.
-
-- The `pwd` module has been added for accessing user information in
-  `/etc/passwd` on POSIX systems. This follows the same logic as Python:
-
-  ```mojo
-  import pwd
-  import os
-  current_user = pwd.getpwuid(os.getuid())
-  print(current_user)
-
-  # pwd.struct_passwd(pw_name='jack', pw_passwd='********', pw_uid=501,
-  # pw_gid=20, pw_gecos='Jack Clayton', pw_dir='/Users/jack',
-  # pw_shell='/bin/zsh')
-
-  root = pwd.getpwnam("root")
-  print(root)
-
-  # pwd.struct_passwd(pw_name='root', pw_passwd='*', pw_uid=0, pw_gid=0,
-  # pw_gecos='System Administrator', pw_dir='/var/root', pw_shell='/bin/zsh')
-  ```
 
 - `LegacyPointer.load/store` are now removed. It's use is replaced with
   `__getitem__` or `__setitem__`.
