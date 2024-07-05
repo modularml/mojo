@@ -2739,6 +2739,31 @@ struct SIMD[type: DType, size: Int](
         )
 
     @staticmethod
+    @always_inline("nodebug")
+    fn load[
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space], offset: UInt) -> Self:
+        """Loads the value the Pointer object points to with the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to load from.
+            offset: The offset to load from.
+
+        Returns:
+            The loaded value.
+        """
+        return Self.load(ptr, Int(offset.value))
+
+    @staticmethod
     @always_inline
     fn store[
         *,
@@ -2816,6 +2841,31 @@ struct SIMD[type: DType, size: Int](
         ]()
         __mlir_op.`pop.store`[alignment = alignment.value](
             val, ptr.address.bitcast[SIMD[type, size]]().address
+        )
+
+    @staticmethod
+    @always_inline("nodebug")
+    fn store[
+        *,
+        alignment: Int = Self._default_alignment,
+        address_space: AddressSpace = AddressSpace.GENERIC,
+    ](ptr: DTypePointer[type, address_space], offset: UInt, val: Self):
+        """Stores a single element value at the given offset.
+
+        Constraints:
+            The width and alignment must be positive integer values.
+
+        Parameters:
+            alignment: The minimal alignment of the address.
+            address_space: The address space the pointer is in.
+
+        Args:
+            ptr: The pointer to store to.
+            offset: The offset to store to.
+            val: The value to store.
+        """
+        Self.store[alignment=alignment, address_space=address_space](
+            ptr.offset(offset.value), val
         )
 
 

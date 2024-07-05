@@ -419,6 +419,19 @@ struct LegacyPointer[
         return __mlir_op.`pop.offset`(self.address, int(idx).value)
 
     @always_inline("nodebug")
+    fn offset(self, idx: UInt) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Args:
+            idx: The offset.
+
+        Returns:
+            The new LegacyPointer shifted by the offset.
+        """
+        # Returns a new pointer shifted by the specified offset.
+        return __mlir_op.`pop.offset`(self.address, idx.value)
+
+    @always_inline("nodebug")
     fn __add__[T: Intable](self, rhs: T) -> Self:
         """Returns a new pointer shifted by the specified offset.
 
@@ -432,6 +445,18 @@ struct LegacyPointer[
             The new LegacyPointer shifted by the offset.
         """
         return self.offset(rhs)
+
+    @always_inline("nodebug")
+    fn __add__(self, rhs: UInt) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Args:
+            rhs: The offset.
+
+        Returns:
+            The new LegacyPointer shifted by the offset.
+        """
+        return self.offset(rhs.value)
 
     @always_inline("nodebug")
     fn __sub__[T: Intable](self, rhs: T) -> Self:
@@ -623,6 +648,20 @@ struct DTypePointer[
             The reference for the Mojo compiler to use.
         """
         return self.address[offset]
+
+    @always_inline("nodebug")
+    fn __getitem__(
+        self, offset: UInt = 0
+    ) -> ref [MutableStaticLifetime, address_space._value.value] Scalar[type]:
+        """Enable subscript syntax `ptr[]` to access the element.
+
+        Args:
+            offset: The offset to load from.
+
+        Returns:
+            The reference for the Mojo compiler to use.
+        """
+        return self.__getitem__(Int(offset.value))
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
@@ -1028,6 +1067,18 @@ struct DTypePointer[
 
         Parameters:
             T: The Intable type of the offset.
+
+        Args:
+            idx: The offset of the new pointer.
+
+        Returns:
+            The new constructed DTypePointer.
+        """
+        return self.address.offset(idx)
+
+    @always_inline("nodebug")
+    fn offset(self, idx: UInt) -> Self:
+        """Returns a new pointer shifted by the specified offset.
 
         Args:
             idx: The offset of the new pointer.
