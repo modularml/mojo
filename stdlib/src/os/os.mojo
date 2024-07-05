@@ -187,6 +187,24 @@ struct _DirHandle:
 
 
 # ===----------------------------------------------------------------------=== #
+# getuid
+# ===----------------------------------------------------------------------=== #
+fn getuid() -> Int:
+    """Retrieve the user ID of the calling process.
+
+    Returns:
+        The user ID of the calling process.
+
+    Constraints:
+        This function is constrained to run on Linux or macOS operating systems only.
+    """
+    constrained[
+        not os_is_windows(), "operating system must be Linux or macOS"
+    ]()
+    return int(external_call["getuid", UInt32]())
+
+
+# ===----------------------------------------------------------------------=== #
 # listdir
 # ===----------------------------------------------------------------------=== #
 fn listdir(path: String = "") raises -> List[String]:
