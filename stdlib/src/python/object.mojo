@@ -1170,11 +1170,19 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyLong_AsLong(self.py_object.value)
 
-    @always_inline
-    fn _unsafe_get_as_pointer[type: DType](self) -> DTypePointer[type]:
-        # Warning: converting from an integer to a pointer is unsafe! The
-        # compiler assumes the resulting pointer DOES NOT alias any Mojo-derived
-        # pointer. This is OK because the pointer originates from Python.
+    fn unsafe_get_as_pointer[type: DType](self) -> DTypePointer[type]:
+        """Convert a Python-owned and managed pointer into a Mojo pointer.
+
+        Warning: converting from an integer to a pointer is unsafe! The
+        compiler assumes the resulting pointer DOES NOT alias any Mojo-derived
+        pointer. This is OK because the pointer originates from Python.
+
+        Parameters:
+            type: The desired DType of the pointer.
+
+        Returns:
+            A `DTypePointer` for the underlying Python data.
+        """
         var tmp = int(self)
         var result = UnsafePointer.address_of(tmp).bitcast[
             DTypePointer[type]
