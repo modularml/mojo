@@ -20,6 +20,7 @@ from .os import (
     SEEK_END,
     SEEK_SET,
     abort,
+    getuid,
     listdir,
     mkdir,
     makedirs,
