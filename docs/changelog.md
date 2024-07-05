@@ -388,6 +388,9 @@ what we publish.
   # pw_gecos='System Administrator', pw_dir='/var/root', pw_shell='/bin/zsh')
   ```
 
+- `LegacyPointer.load/store` are now removed. It's use is replaced with
+  `__getitem__` or `__setitem__`.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`

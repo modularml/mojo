@@ -213,7 +213,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(arrayCopy).address, offset.value
         )
-        var result = Pointer(ptr).load()
+        var result = Pointer(ptr)[]
         _ = arrayCopy
         return result
 
@@ -236,7 +236,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(tmp.array).address, offset.value
         )
-        Pointer(ptr).store(val)
+        Pointer(ptr)[] = val
         self = tmp
 
 
