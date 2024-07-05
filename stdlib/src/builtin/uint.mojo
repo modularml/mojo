@@ -81,6 +81,15 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         self.value = int(UInt64(value)).value
 
     @always_inline("nodebug")
+    fn __mlir_index__(self) -> __mlir_type.index:
+        """Convert to index.
+
+        Returns:
+            The corresponding __mlir_type.index value.
+        """
+        return self.value
+
+    @always_inline("nodebug")
     fn __str__(self) -> String:
         """Convert this UInt to a string.
 
