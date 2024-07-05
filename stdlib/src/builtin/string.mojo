@@ -591,7 +591,6 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
 fn _isspace(c: String) -> Bool:
     """Determines whether the given character is a whitespace character.
 
@@ -1282,7 +1281,6 @@ struct String(
         """
         return len(self) > 0
 
-    @always_inline
     fn __len__(self) -> Int:
         """Gets the string length, in bytes.
 

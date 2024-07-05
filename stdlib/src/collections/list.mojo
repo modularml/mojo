@@ -224,7 +224,6 @@ struct List[T: CollectionElement](
                 return True
         return False
 
-    @always_inline
     fn __mul__(self, x: Int) -> Self:
         """Multiplies the list by x and returns a new list.
 
@@ -241,7 +240,6 @@ struct List[T: CollectionElement](
         result.__mul(x)
         return result^
 
-    @always_inline
     fn __imul__(inout self, x: Int):
         """Multiplies the list by x in place.
 
@@ -250,7 +248,6 @@ struct List[T: CollectionElement](
         """
         self.__mul(x)
 
-    @always_inline
     fn __add__(self, owned other: Self) -> Self:
         """Concatenates self with other and returns the result as a new list.
 
@@ -264,7 +261,6 @@ struct List[T: CollectionElement](
         result.extend(other^)
         return result^
 
-    @always_inline
     fn __iadd__(inout self, owned other: Self):
         """Appends the elements of other into self.
 
@@ -397,7 +393,6 @@ struct List[T: CollectionElement](
         self.data = new_data
         self.capacity = new_capacity
 
-    @always_inline
     fn append(inout self, owned value: T):
         """Appends a value to this list.
 
@@ -521,7 +516,6 @@ struct List[T: CollectionElement](
                 self._realloc(self.capacity // 2)
         return ret_val^
 
-    @always_inline
     fn reserve(inout self, new_capacity: Int):
         """Reserves the requested capacity.
 
@@ -695,7 +689,6 @@ struct List[T: CollectionElement](
 
         return res^
 
-    @always_inline
     fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
         """Gets the list element at the given index.
 
