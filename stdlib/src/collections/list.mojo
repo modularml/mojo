@@ -756,12 +756,10 @@ struct List[T: CollectionElement](
         """
         debug_assert(
             0 <= idx < len(self),
-            "The index provided must be within the range [0,",
-            len(self),
-            "[",
-            " when using List.unsafe_get(). But you provided: ",
-            idx,
-            ".",
+            (
+                "The index provided must be within the range [0, len(List) -1]"
+                " when using List.unsafe_get()"
+            ),
         )
         return (self.data + idx)[]
 
