@@ -373,9 +373,7 @@ struct UnsafePointer[
         Returns:
           The address of the pointer as an Int.
         """
-        return __mlir_op.`pop.pointer_to_index`[
-            _type = __mlir_type.`!pop.scalar<index>`
-        ](self.address)
+        return __mlir_op.`pop.pointer_to_index`(self.address)
 
     fn __str__(self) -> String:
         """Gets a string representation of the pointer.
