@@ -65,6 +65,15 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         self.value = value
 
     @always_inline("nodebug")
+    fn __init__(inout self, value: Int):
+        """Construct UInt from the given index value.
+
+        Args:
+            value: The init value.
+        """
+        self.value = value.value
+
+    @always_inline("nodebug")
     fn __init__(inout self, value: IntLiteral):
         """Construct UInt from the given IntLiteral value.
 
@@ -618,6 +627,35 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
             pred = __mlir_attr.`#index<cmp_predicate ult>`
         ](self.value, rhs.value)
 
+    # TODO(rparolin): remove this before you submit this change
+    @always_inline("nodebug")
+    fn __lt__(self, rhs: Int) -> Bool:
+        """Compare this Int to the RHS using LT comparison.
+
+        Args:
+            rhs: The other Int to compare against.
+
+        Returns:
+            True if this Int is less-than the RHS Int and False otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate ult>`
+        ](self.value, rhs.value)
+
+    @always_inline("nodebug")
+    fn __le__(self, rhs: UInt) -> Bool:
+        """Compare this Int to the RHS using LE comparison.
+
+        Args:
+            rhs: The other UInt to compare against.
+
+        Returns:
+            True if this Int is less-than the RHS Int and False otherwise.
+        """
+        return __mlir_op.`index.cmp`[
+            pred = __mlir_attr.`#index<cmp_predicate ule>`
+        ](self.value, rhs.value)
+
     @always_inline("nodebug")
     fn __ge__(self, rhs: UInt) -> Bool:
         """Return whether this UInt is greater than or equal to another.
@@ -631,21 +669,6 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
         """
         return __mlir_op.`index.cmp`[
             pred = __mlir_attr.`#index<cmp_predicate uge>`
-        ](self.value, rhs.value)
-
-    @always_inline("nodebug")
-    fn __le__(self, rhs: UInt) -> Bool:
-        """Return whether this UInt is less than or equal to another.
-
-        Args:
-            rhs: The other UInt to compare against.
-
-        Returns:
-            True if this UInt is less than or equal to the other UInt and False
-            otherwise.
-        """
-        return __mlir_op.`index.cmp`[
-            pred = __mlir_attr.`#index<cmp_predicate ule>`
         ](self.value, rhs.value)
 
     @always_inline("nodebug")
@@ -741,15 +764,16 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
 
     @always_inline("nodebug")
     fn __pos__(self) -> UInt:
-        """Return +self, which is the UInt value itself.
+        """Return +self.
 
         Returns:
-            The self value.
+            The +self value.
         """
         return self
 
     fn format_to(self, inout writer: Formatter):
-        """Formats this integer to the provided formatter.
+        """
+        Formats this integer to the provided formatter.
 
         Args:
             writer: The formatter to write to.
@@ -760,7 +784,7 @@ struct UInt(Comparable, Formattable, Representable, Stringable):
             var err = _try_write_int(writer, UInt64(self))
             if err:
                 abort(
-                    "unreachable: unexpected write Uint failure condition: "
+                    "unreachable: unexpected write int failure condition: "
                     + str(err.value())
                 )
         else:
