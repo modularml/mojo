@@ -164,6 +164,43 @@ fn memcmp[
     return _memcmp_impl(ds1, ds2, byte_count)
 
 
+@always_inline
+fn memcmp[
+    type: AnyType, address_space: AddressSpace
+](
+    s1: UnsafePointer[type, address_space],
+    s2: UnsafePointer[type, address_space],
+    count: Int,
+) -> Int:
+    """Compares two buffers. Both strings are assumed to be of the same length.
+
+    Parameters:
+        type: The element type.
+        address_space: The address space of the pointer.
+
+    Args:
+        s1: The first buffer address.
+        s2: The second buffer address.
+        count: The number of elements in the buffers.
+
+    Returns:
+        Returns 0 if the bytes strings are identical, 1 if s1 > s2, and -1 if
+        s1 < s2. The comparison is performed by the first different byte in the
+        byte strings.
+    """
+    var byte_count = count * sizeof[type]()
+
+    @parameter
+    if sizeof[type]() >= sizeof[DType.int32]():
+        var ds1 = DTypePointer[DType.int32, address_space](s1.bitcast[Int32]())
+        var ds2 = DTypePointer[DType.int32, address_space](s2.bitcast[Int32]())
+        return _memcmp_impl(ds1, ds2, byte_count // sizeof[DType.int32]())
+
+    var ds1 = DTypePointer[DType.int8, address_space](s1.bitcast[Int8]())
+    var ds2 = DTypePointer[DType.int8, address_space](s2.bitcast[Int8]())
+    return _memcmp_impl(ds1, ds2, byte_count)
+
+
 # ===----------------------------------------------------------------------===#
 # memcpy
 # ===----------------------------------------------------------------------===#
