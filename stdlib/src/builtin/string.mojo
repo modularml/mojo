@@ -287,10 +287,8 @@ fn _stol(str_ref: StringRef, base: Int = 10) raises -> (Int, StringRef):
             ord("A") + (real_base - 11),
         )
 
-    var was_last_digit_underscore = True
-    var prev_result: Int = 0
+    var was_last_digit_underscore = True if real_base == 10 else False
     for pos in range(start, str_len):
-        prev_result = result
         var ord_current = int(buff[pos])
         if ord_current == ord_underscore and was_last_digit_underscore:
             break  # Break out as apposed to raising exception
@@ -314,7 +312,7 @@ fn _stol(str_ref: StringRef, base: Int = 10) raises -> (Int, StringRef):
             break
 
         var new_result = result * real_base + digit_value
-        if new_result < result:
+        if new_result <= result and result > 0:
             raise Error(
                 _str_to_base_error(real_base, str_ref)
                 + " String expresses an integer too large to store in Int."
@@ -339,6 +337,9 @@ fn stol(str: String, base: Int = 10) raises -> (Int, String):
     - '0o' or '0O' prefix indicates octal (base 8)
     - '0x' or '0X' prefix indicates hexadecimal (base 16)
     - Without a prefix, it's treated as decimal (base 10)
+    Notes:
+        This follows [Python's integer literals](\
+        https://docs.python.org/3/reference/lexical_analysis.html#integers)
 
     Raises:
         If the base is invalid or if the string is empty.
@@ -353,6 +354,13 @@ fn stol(str: String, base: Int = 10) raises -> (Int, String):
         - The remaining unparsed part of the string.
 
     Examples:
+    ```mojo
+    print(stol("19abc")) # (19, "abc")
+    print(stol("0xFF hello", 16)) # (255, " hello")
+    print(stol("0x123ghi", 0)) # (291, "ghi")
+    print(stol("0b1010 binary", 0)) # (10, " binary")
+    print(stol("0o123 octal", 0)) # (83, " octal")
+    ```
         >>> stol("19abc")
         (19, "abc")
         >>> stol("0xFF hello", 16)
