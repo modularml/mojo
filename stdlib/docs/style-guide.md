@@ -156,7 +156,6 @@ struct MyStruct(Sized, Stringable):
 
     fn __getitem__
     fn __getitem__
-    fn __refitem__
 
     fn __add__
     fn __iadd__
