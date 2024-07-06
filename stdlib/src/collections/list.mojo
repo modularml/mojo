@@ -191,8 +191,7 @@ struct List[T: CollectionElement](
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             (self.data + i).destroy_pointee()
-        if self.data:
-            self.data.free()
+        self.data.free()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
