@@ -79,6 +79,8 @@ what we publish.
     b.needs_move(NonMovable())
   ```
 
+  Conditional conformance works with dunder methods and other things as well.
+
 - `async` functions now support memory-only results (like `String`, `List`,
   etc.) and `raises`. Accordingly, both `Coroutine` and `RaisingCoroutine` have
   been changed to accept `AnyType` instead of `AnyTrivialRegType`. This means
