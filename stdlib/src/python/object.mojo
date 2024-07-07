@@ -482,23 +482,28 @@ struct PythonObject(
         Python.throw_python_exception_if_error_state(cpython)
         return PythonObject(result)
 
-    fn __setitem__(inout self, *args: PythonObject) raises:
+    fn __setitem__(inout self, *args: PythonObject, value: PythonObject) raises:
         """Set the value with the given key or keys.
 
         Args:
-            args: The key or keys to set on this object, followed by the value.
+            args: The key or keys to set on this object.
+            value: The value to set.
         """
         var size = len(args)
-        debug_assert(size > 0, "must provide at least a value to __setitem__")
 
         var cpython = _get_global_python_itf().cpython()
-        var tuple_obj = cpython.PyTuple_New(size)
+        var tuple_obj = cpython.PyTuple_New(size + 1)
         for i in range(size):
             var arg_value = args[i].py_object
             cpython.Py_IncRef(arg_value)
             var result = cpython.PyTuple_SetItem(tuple_obj, i, arg_value)
             if result != 0:
                 raise Error("internal error: PyTuple_SetItem failed")
+
+        cpython.Py_IncRef(value.py_object)
+        var result2 = cpython.PyTuple_SetItem(tuple_obj, size, value.py_object)
+        if result2 != 0:
+            raise Error("internal error: PyTuple_SetItem failed")
 
         var callable_obj = cpython.PyObject_GetAttrString(
             self.py_object, "__setitem__"
