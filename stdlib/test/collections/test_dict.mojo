@@ -538,6 +538,21 @@ def test_dict_popitem():
         _ = dict.popitem()
 
 
+def test_pop_string_values():
+    var dict = Dict[String, String]()
+    dict["mojo"] = "lang"
+    dict["max"] = "engine"
+    dict["a"] = ""
+    dict[""] = "a"
+
+    assert_equal(dict.pop("mojo"), "lang")
+    assert_equal(dict.pop("max"), "engine")
+    assert_equal(dict.pop("a"), "")
+    assert_equal(dict.pop(""), "a")
+    with assert_raises(contains="KeyError"):
+        _ = dict.pop("absent")
+
+
 fn test_clear() raises:
     var some_dict = Dict[String, Int]()
     some_dict["key"] = 1
@@ -594,6 +609,7 @@ def main():
     test_owned_kwargs_dict()
     test_bool_conversion()
     test_find_get()
+    test_pop_string_values()
     test_clear()
     test_init_initial_capacity()
     test_dict_setdefault()
