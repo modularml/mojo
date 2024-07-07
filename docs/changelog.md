@@ -16,6 +16,18 @@ what we publish.
 
 ### ⭐️ New
 
+- `__setitem__` now works with variadic argument lists such as:
+
+  ```mojo
+  struct YourType:
+      fn __setitem__(inout self, *indices: Int, val: Int): ...
+  ```
+
+  The Mojo compiler now always passes the "new value" being set using the last
+  keyword argument of the `__setitem__`, e.g. turning `yourType[1, 2] = 3` into
+  `yourType.__setitem__(1, 2, val=3)`.  This fixes
+  [Issue #248](https://github.com/modularml/mojo/issues/248).
+
 - The pointer variants (`DTypePointer`, `UnsafePointer`, etc.) now have a new
   `exclusive: Bool = False` parameter. Setting this parameter to true tells the
   compiler that the user knows this pointer and all those derived from it have
