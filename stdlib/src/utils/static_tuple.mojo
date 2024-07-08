@@ -193,25 +193,21 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         self = tmp
 
     @always_inline("nodebug")
-    fn __getitem__[intable: Intable](self, index: intable) -> Self.element_type:
+    fn __getitem__(self, idx: Int) -> Self.element_type:
         """Returns the value of the tuple at the given dynamic index.
 
-        Parameters:
-            intable: The intable type.
-
         Args:
-            index: The index into the tuple.
+            idx: The index into the tuple.
 
         Returns:
             The value at the specified position.
         """
-        var offset = int(index)
-        debug_assert(offset < size, "index must be within bounds")
+        debug_assert(idx < size, "index must be within bounds")
         # Copy the array so we can get its address, because we can't take the
         # address of 'self' in a non-mutating method.
         var arrayCopy = self.array
         var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(arrayCopy).address, offset.value
+            UnsafePointer.address_of(arrayCopy).address, idx.value
         )
         var result = Pointer(ptr)[]
         _ = arrayCopy
