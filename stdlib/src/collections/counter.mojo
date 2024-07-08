@@ -133,10 +133,11 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     # ===------------------------------------------------------------------=== #
 
     fn __len__(self) -> Int:
-        """The number of elements currently stored in the Counter.
+        """Returns the number of elements currently stored in the Counter.
 
         Returns:
-            The number of elements in the Counter."""
+            The number of elements in the Counter.
+        """
         return len(self._data)
 
     fn __bool__(self) -> Bool:
