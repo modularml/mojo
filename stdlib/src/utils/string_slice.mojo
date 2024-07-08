@@ -386,6 +386,17 @@ struct StringSlice[
 
         return len(self.as_bytes_slice())
 
+    @always_inline
+    @deprecated("use byte_length() instead")
+    fn _byte_length(self) -> Int:
+        """Get the length of this string slice in bytes.
+
+        Returns:
+            The length of this string slice in bytes.
+        """
+
+        return len(self.as_bytes_slice())
+
     fn _strref_dangerous(self) -> StringRef:
         """Returns an inner pointer to the string as a StringRef.
 
