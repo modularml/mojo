@@ -327,6 +327,34 @@ def test_substract():
     assert_equal(c1["c"], -3)
 
 
+def test_sub():
+    var c1 = Counter[String]()
+    c1["a"] = 4
+    c1["b"] = 2
+    c1["c"] = 0
+
+    var c2 = Counter[String]()
+    c2["a"] = 1
+    c2["b"] = -2
+    c2["c"] = 3
+
+    var c3 = c1 - c2
+
+    assert_equal(c3["a"], 3)
+    assert_equal(c3["b"], 4)
+    assert_equal(c3["c"], -3)
+    # Check that the original counters are not modified
+    assert_equal(c1["a"], 4)
+    assert_equal(c1["b"], 2)
+    assert_equal(c1["c"], 0)
+
+    c2 -= c1
+
+    assert_equal(c2["a"], -3)
+    assert_equal(c2["b"], -4)
+    assert_equal(c2["c"], 3)
+
+
 def test_counter_setitem():
     c = Counter[Int]()
     c[1] = 1

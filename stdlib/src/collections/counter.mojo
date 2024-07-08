@@ -270,6 +270,31 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         self.update(other)
         self._keep_positive()
 
+    fn __sub__(self, other: Self) -> Self:
+        """Subtract counts, but keep only results with positive counts.
+
+        Args:
+            other: The other Counter to subtract from this Counter.
+
+        Returns:
+            A new Counter with the counts from the other Counter subtracted from
+            this Counter.
+        """
+        var result = Counter[V](other=self)
+
+        result.subtract(other)
+
+        return +result^  # Remove zero and negative counts
+
+    fn __isub__(inout self, other: Self) raises:
+        """Subtract counts from another Counter from this Counter.
+
+        Args:
+            other: The other Counter to subtract from this Counter.
+        """
+        self.subtract(other)
+        self._keep_positive()
+
     fn _keep_positive(inout self) raises:
         """Remove zero and negative counts from the Counter."""
         for key_ref in self.keys():
