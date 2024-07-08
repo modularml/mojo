@@ -15,7 +15,7 @@
 
 from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
 from random import *
-from stdlib.builtin.sort import sort, _small_sort, _insertion_sort
+from stdlib.builtin.sort import sort, _small_sort, _insertion_sort, _heap_sort
 
 # ===----------------------------------------------------------------------===#
 # Benchmark Utils
@@ -224,6 +224,75 @@ fn bench_small_list_sort(inout m: Bench) raises:
 
 
 # ===----------------------------------------------------------------------===#
+# Benchmark sort functions with a large list size
+# ===----------------------------------------------------------------------===#
+
+
+@parameter
+fn bench_large_list_sort(inout m: Bench) raises:
+    alias counts = List(1 << 12, 1 << 16)
+
+    @parameter
+    for type_index in range(len(dtypes)):
+        alias dt = dtypes[type_index]
+
+        @parameter
+        for count_index in range(len(counts)):
+            alias count = counts[count_index]
+            var list = random_scalar_list[dt](count)
+
+            @parameter
+            fn bench_sort_list(inout b: Bencher) raises:
+                @always_inline
+                @parameter
+                fn call_fn():
+                    var l1 = list
+                    sort(l1)
+
+                b.iter[call_fn]()
+
+            @parameter
+            fn bench_heap_sort(inout b: Bencher) raises:
+                @always_inline
+                @parameter
+                fn call_fn():
+                    var l1 = list
+                    var ptr = rebind[Pointer[Scalar[dt]]](l1.data)
+
+                    @parameter
+                    fn _less_than_equal[
+                        ty: AnyTrivialRegType
+                    ](lhs: ty, rhs: ty) -> Bool:
+                        return rebind[Scalar[dt]](lhs) <= rebind[Scalar[dt]](
+                            rhs
+                        )
+
+                    _heap_sort[Scalar[dt], _less_than_equal](ptr, count)
+                    _ = l1
+
+                b.iter[call_fn]()
+
+            m.bench_function[bench_sort_list](
+                BenchId(
+                    "bench_std_sort_random_list_"
+                    + str(count)
+                    + "_type_"
+                    + str(dt)
+                )
+            )
+
+            m.bench_function[bench_heap_sort](
+                BenchId(
+                    "bench_heap_sort_random_list_"
+                    + str(count)
+                    + "_type_"
+                    + str(dt)
+                )
+            )
+            _ = list^
+
+
+# ===----------------------------------------------------------------------===#
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
 
@@ -234,5 +303,6 @@ def main():
 
     bench_tiny_list_sort(m)
     bench_small_list_sort(m)
+    bench_large_list_sort(m)
 
     m.dump_report()
