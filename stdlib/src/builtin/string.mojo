@@ -1006,6 +1006,17 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
+        # FIXME: this should work with unicode codepoints, but this doesn't yet
+        # work at compile time because of issue #933
+        # var i = 0
+        # var buf = Self._buffer_type(capacity=5)
+        # for s in self:
+        #     if i != idx:
+        #         continue
+        #     for j in range(s.byte_length()):
+        #         buf[j] = self._buffer[i + j]
+        # buf.append(0)
+        # buf.resize(len(buf))
         var normalized_idx = normalize_index["String"](idx, self)
         var buf = Self._buffer_type(capacity=1)
         buf.append(self._buffer[normalized_idx])
@@ -1024,13 +1035,27 @@ struct String(
         var start: Int
         var end: Int
         var step: Int
-        start, end, step = span.indices(len(self))
+        # FIXME: this should work with unicode codepoints, but this doesn't yet
+        # work at compile time because of issue #933
+        # var idx = 0
+        # var start = span.start.value() if span.start else 0
+        # var end = span.end.value() if span.end else 0
+        # var buffer = Self._buffer_type()
+        # for s in self:
+        #     var amnt_bytes = s.byte_length()
+        #     if not (start <= idx < end) or idx % span.step != 0:
+        #         idx += amnt_bytes
+        #         continue
+        #     for i in range(amnt_bytes):
+        #         buffer[idx + i] = self._buffer[idx + i]
+        # buffer.append(0)
+        # buffer.resize(len(buffer))
+        # return Self(buffer^)
+
+        start, end, step = span.indices(self.byte_length())
         var r = range(start, end, step)
         if step == 1:
-            return StringRef(
-                self._buffer.data + start,
-                len(r),
-            )
+            return StringRef(self._buffer.data + start, len(r))
 
         var buffer = Self._buffer_type()
         var result_len = len(r)
@@ -1127,8 +1152,8 @@ struct String(
             return other
         if not other:
             return self
-        var self_len = len(self)
-        var other_len = len(other)
+        var self_len = self.byte_length()
+        var other_len = other.byte_length()
         var total_len = self_len + other_len
         var buffer = Self._buffer_type()
         buffer.resize(total_len + 1, 0)
@@ -1167,8 +1192,8 @@ struct String(
             return
         if not other:
             return
-        var self_len = len(self)
-        var other_len = len(other)
+        var self_len = self.byte_length()
+        var other_len = other.byte_length()
         var total_len = self_len + other_len
         self._buffer.resize(total_len + 1, 0)
         # Copy the data alongside the terminator.
@@ -1387,7 +1412,7 @@ struct String(
         strings.  Using this requires the use of the _strref_keepalive() method
         to keep the underlying string alive long enough.
         """
-        return StringRef(self.unsafe_ptr(), len(self))
+        return StringRef(self.unsafe_ptr(), self.byte_length())
 
     fn _strref_keepalive(self):
         """
@@ -1512,7 +1537,7 @@ struct String(
                 break
             res += 1
 
-            offset = pos + len(substr)
+            offset = pos + substr.byte_length()
 
         return res
 
@@ -1700,7 +1725,7 @@ struct String(
             A List of Strings containing the input split by line boundaries.
         """
         var output = List[String]()
-        var length = len(self)
+        var length = self.byte_length()
         var current_offset = 0
 
         while current_offset < length:
@@ -1751,9 +1776,9 @@ struct String(
         var self_ptr = self.unsafe_ptr()
         var new_ptr = new.unsafe_ptr()
 
-        var self_len = len(self)
-        var old_len = len(old)
-        var new_len = len(new)
+        var self_len = self.byte_length()
+        var old_len = old.byte_length()
+        var new_len = new.byte_length()
 
         var res = List[UInt8]()
         res.reserve(self_len + (old_len - new_len) * occurrences + 1)
@@ -1818,7 +1843,7 @@ struct String(
             A copy of the string with no trailing characters.
         """
 
-        var r_idx = len(self)
+        var r_idx = self.byte_length()
         while r_idx > 0 and self[r_idx - 1] in chars:
             r_idx -= 1
 
@@ -1830,7 +1855,7 @@ struct String(
         Returns:
             A copy of the string with no trailing whitespaces.
         """
-        var r_idx = len(self)
+        var r_idx = self.byte_length()
         # TODO (#933): should use this once llvm intrinsics can be used at comp time
         # for s in self.__reversed__():
         #     if not s.isspace():
@@ -1851,7 +1876,7 @@ struct String(
         """
 
         var l_idx = 0
-        while l_idx < len(self) and self[l_idx] in chars:
+        while l_idx < self.byte_length() and self[l_idx] in chars:
             l_idx += 1
 
         return self[l_idx:]
@@ -1868,7 +1893,9 @@ struct String(
         #     if not s.isspace():
         #         break
         #     l_idx += 1
-        while l_idx < len(self) and _isspace(self._buffer.unsafe_get(l_idx)):
+        while l_idx < self.byte_length() and _isspace(
+            self._buffer.unsafe_get(l_idx)
+        ):
             l_idx += 1
         return self[l_idx:]
 
@@ -1886,9 +1913,9 @@ struct String(
         var res = List[UInt8]()
         var val_ptr = val.unsafe_ptr()
         var self_ptr = self.unsafe_ptr()
-        res.reserve(len(val) * len(self) + 1)
-        for i in range(len(self)):
-            for j in range(len(val)):
+        res.reserve(val.byte_length() * self.byte_length() + 1)
+        for i in range(self.byte_length()):
+            for j in range(val.byte_length()):
                 res.append(val_ptr[j])
             res.append(self_ptr[i])
         res.append(0)
@@ -1925,7 +1952,7 @@ struct String(
 
         var char_ptr = copy.unsafe_ptr()
 
-        for i in range(len(self)):
+        for i in range(self.byte_length()):
             var char: UInt8 = char_ptr[i]
             if check_case(char):
                 var lower = _toggle_ascii_case(char)
@@ -1947,7 +1974,7 @@ struct String(
         """
         if end == -1:
             return StringRef(
-                self.unsafe_ptr() + start, len(self) - start
+                self.unsafe_ptr() + start, self.byte_length() - start
             ).startswith(prefix._strref_dangerous())
 
         return StringRef(self.unsafe_ptr() + start, end - start).startswith(
@@ -1968,7 +1995,7 @@ struct String(
         """
         if end == -1:
             return StringRef(
-                self.unsafe_ptr() + start, len(self) - start
+                self.unsafe_ptr() + start, self.byte_length() - start
             ).endswith(suffix._strref_dangerous())
 
         return StringRef(self.unsafe_ptr() + start, end - start).endswith(
@@ -1995,7 +2022,7 @@ struct String(
             or a copy of the original string otherwise.
         """
         if self.startswith(prefix):
-            return self[len(prefix) :]
+            return self[prefix.byte_length() :]
         return self
 
     fn removesuffix(self, suffix: String, /) -> String:
@@ -2018,7 +2045,7 @@ struct String(
             or a copy of the original string otherwise.
         """
         if suffix and self.endswith(suffix):
-            return self[: -len(suffix)]
+            return self[: -suffix.byte_length()]
         return self
 
     fn __int__(self) raises -> Int:
@@ -2044,7 +2071,7 @@ struct String(
         """
         if n <= 0:
             return ""
-        var len_self = len(self)
+        var len_self = self.byte_length()
         var count = len_self * n + 1
         var buf = Self._buffer_type(capacity=count)
         buf.resize(count, 0)
@@ -2097,7 +2124,10 @@ struct String(
 
         var current_automatic_arg_index = 0
         for e in entries:
-            debug_assert(pos_in_self < len(self), "pos_in_self >= len(self)")
+            debug_assert(
+                pos_in_self < self.byte_length(),
+                "pos_in_self >= self.byte_length()",
+            )
             res += self[pos_in_self : e[].first_curly]
 
             if e[].is_escaped_brace():
@@ -2120,8 +2150,8 @@ struct String(
 
             pos_in_self = e[].last_curly + 1
 
-        if pos_in_self < len(self):
-            res += self[pos_in_self : len(self)]
+        if pos_in_self < self.byte_length():
+            res += self[pos_in_self : self.byte_length()]
 
         return res^
 
@@ -2396,7 +2426,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
         var entries = List[Self]()
         var start = Optional[Int](None)
         var skip_next = False
-        for i in range(len(format_src)):
+        for i in range(format_src.byte_length()):
             if skip_next:
                 skip_next = False
                 continue
@@ -2453,7 +2483,7 @@ struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
                     start = None
                 else:
                     # python escapes double curlies
-                    if (i + 1) < len(format_src):
+                    if (i + 1) < format_src.byte_length():
                         if format_src[i + 1] == "}":
                             var curren_entry = Self(
                                 first_curly=i, last_curly=i + 1, field=True
