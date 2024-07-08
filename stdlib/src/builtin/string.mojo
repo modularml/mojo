@@ -25,6 +25,7 @@ from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
+from utils.string_slice import _StringSliceIter
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -69,11 +70,11 @@ fn ord(s: StringSlice) -> Int:
     var p = s.unsafe_ptr().bitcast[UInt8]()
     var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
-        debug_assert(s._byte_length() == 1, "input string length must be 1")
+        debug_assert(s.byte_length() == 1, "input string length must be 1")
         return int(b1)
     var num_bytes = countl_zero(~b1)
     debug_assert(
-        s._byte_length() == int(num_bytes), "input string must be one character"
+        s.byte_length() == int(num_bytes), "input string must be one character"
     )
     debug_assert(
         1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
@@ -782,76 +783,6 @@ fn _utf8_byte_type(b: UInt8) -> UInt8:
     return countl_zero(~(b & 0b1111_0000))
 
 
-@value
-struct _StringIter[
-    is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
-    forward: Bool = True,
-]:
-    """Iterator for String.
-
-    Parameters:
-        is_mutable: Whether the slice is mutable.
-        lifetime: The lifetime of the underlying string data.
-        forward: The iteration direction. `False` is backwards.
-    """
-
-    var index: Int
-    var continuation_bytes: Int
-    var ptr: UnsafePointer[UInt8]
-    var length: Int
-
-    fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
-    ):
-        self.index = 0 if forward else length
-        self.ptr = unsafe_pointer
-        self.length = length
-        self.continuation_bytes = 0
-        for i in range(length):
-            if _utf8_byte_type(unsafe_pointer[i]) == 1:
-                self.continuation_bytes += 1
-
-    fn __iter__(self) -> Self:
-        return self
-
-    fn __next__(inout self) -> StringSlice[lifetime]:
-        @parameter
-        if forward:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index])
-                if byte_type != 0:
-                    byte_len = int(byte_type)
-                    self.continuation_bytes -= byte_len - 1
-            self.index += byte_len
-            return StringSlice[lifetime](
-                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
-                len=byte_len,
-            )
-        else:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
-                if byte_type != 0:
-                    while byte_type == 1:
-                        byte_len += 1
-                        var b = self.ptr[self.index - byte_len]
-                        byte_type = _utf8_byte_type(b)
-                    self.continuation_bytes -= byte_len - 1
-            self.index -= byte_len
-            return StringSlice[lifetime](
-                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
-            )
-
-    fn __len__(self) -> Int:
-        @parameter
-        if forward:
-            return self.length - self.index - self.continuation_bytes
-        else:
-            return self.index - self.continuation_bytes
-
-
 struct String(
     Sized,
     Stringable,
@@ -1314,23 +1245,25 @@ struct String(
             count=other_len + 1,
         )
 
-    fn __iter__(ref [_]self) -> _StringIter[__lifetime_of(self)]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
         """Iterate over elements of the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringIter[__lifetime_of(self)](
+        return _StringSliceIter[__lifetime_of(self)](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(ref [_]self) -> _StringIter[__lifetime_of(self), False]:
+    fn __reversed__(
+        ref [_]self,
+    ) -> _StringSliceIter[__lifetime_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringIter[__lifetime_of(self), forward=False](
+        return _StringSliceIter[__lifetime_of(self), forward=False](
             unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
@@ -1399,19 +1332,6 @@ struct String(
     # ===------------------------------------------------------------------=== #
     # Methods
     # ===------------------------------------------------------------------=== #
-
-    fn byte_length(self) -> Int:
-        """Returns the string byte length without null terminator.
-
-        Returns:
-            The string byte length without null terminator.
-        """
-        # Avoid returning -1 if the buffer is not initialized
-        if not self.unsafe_ptr():
-            return 0
-
-        # The negative 1 is to account for the terminator.
-        return len(self._buffer) - 1
 
     fn format_to(self, inout writer: Formatter):
         """
@@ -1572,19 +1492,17 @@ struct String(
 
     @always_inline
     fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
-        """
-        Returns a contiguous slice of the bytes owned by this string.
-
-        This does not include the trailing null terminator.
-
+        """Returns a contiguous slice of the bytes owned by this string.
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
+
+        Notes:
+            This does not include the trailing null terminator.
         """
 
+        # Does NOT include the NUL terminator.
         return Span[UInt8, __lifetime_of(self)](
-            unsafe_ptr=self._buffer.unsafe_ptr(),
-            # Does NOT include the NUL terminator.
-            len=self._byte_length(),
+            unsafe_ptr=self._buffer.unsafe_ptr(), len=self.byte_length()
         )
 
     @always_inline
@@ -1599,21 +1517,16 @@ struct String(
         #   guaranteed to be valid.
         return StringSlice(unsafe_from_utf8=self.as_bytes_slice())
 
-    fn _byte_length(self) -> Int:
+    fn byte_length(self) -> Int:
         """Get the string length in bytes.
-
-        This does not include the trailing null terminator in the count.
 
         Returns:
             The length of this string in bytes, excluding null terminator.
+
+        Notes:
+            This does not include the trailing null terminator in the count.
         """
-
-        var buffer_len = len(self._buffer)
-
-        if buffer_len > 0:
-            return buffer_len - 1
-        else:
-            return buffer_len
+        return max(len(self._buffer) - 1, 0)
 
     fn _steal_ptr(inout self) -> UnsafePointer[UInt8]:
         """Transfer ownership of pointer to the underlying memory.
@@ -1711,14 +1624,7 @@ struct String(
             True if the whole String is made up of whitespace characters
                 listed above, otherwise False.
         """
-
-        if self.byte_length() == 0:
-            return False
-
-        for s in self:
-            if not s.isspace():
-                return False
-        return True
+        return self.as_string_slice().isspace()
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string by a separator.
