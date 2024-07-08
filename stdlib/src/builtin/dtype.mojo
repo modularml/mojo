@@ -88,7 +88,7 @@ struct DType(
         """
         self = other
 
-    @always_inline("nodebug")
+    @no_inline
     fn __str__(self) -> String:
         """Gets the name of the DType.
 
@@ -98,6 +98,7 @@ struct DType(
 
         return String.format_sequence(self)
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this dtype to the provided formatter.

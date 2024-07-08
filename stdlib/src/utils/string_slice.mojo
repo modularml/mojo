@@ -141,6 +141,7 @@ struct StringSlice[
     # Trait implementations
     # ===------------------------------------------------------------------===#
 
+    @no_inline
     fn __str__(self) -> String:
         """Gets this slice as a standard `String`.
 

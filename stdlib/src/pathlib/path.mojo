@@ -146,7 +146,7 @@ struct Path(
         else:
             self.path += DIR_SEPARATOR + suffix
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Returns a string representation of the path.
 

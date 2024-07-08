@@ -23,9 +23,11 @@ struct _SourceLocation(Stringable):
     var col: Int
     var file_name: StringLiteral
 
+    @no_inline
     fn __str__(self) -> String:
         return str(self.file_name) + ":" + str(self.line) + ":" + str(self.col)
 
+    @no_inline
     fn prefix[T: Stringable](self, msg: T) -> String:
         """Return the given message prefixed with the pretty-printer location.
 

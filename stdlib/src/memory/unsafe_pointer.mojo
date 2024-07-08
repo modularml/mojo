@@ -375,6 +375,7 @@ struct UnsafePointer[
         """
         return __mlir_op.`pop.pointer_to_index`(self.address)
 
+    @no_inline
     fn __str__(self) -> String:
         """Gets a string representation of the pointer.
 
@@ -383,6 +384,7 @@ struct UnsafePointer[
         """
         return hex(int(self))
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this pointer address to the provided formatter.

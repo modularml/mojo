@@ -80,6 +80,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         self.end = end
         self.step = step.value() if step else 1
 
+    @no_inline
     fn __str__(self) -> String:
         """Gets the string representation of the span.
 
@@ -91,6 +92,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         self.format_to(writer)
         return output
 
+    @no_inline
     fn __repr__(self) -> String:
         """Gets the string representation of the span.
 
@@ -99,6 +101,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         """
         return self.__str__()
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """Write Slice string representation to a `Formatter`.
 

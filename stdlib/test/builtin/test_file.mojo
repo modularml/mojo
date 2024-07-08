@@ -214,6 +214,7 @@ struct Word:
     var fourth_letter: UInt8
     var fith_letter: UInt8
 
+    @no_inline
     fn __str__(self) -> String:
         var word = List[UInt8](capacity=6)
         word.append(self.first_letter)

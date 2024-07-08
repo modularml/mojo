@@ -33,9 +33,11 @@ struct Point(Formattable, Stringable):
     var x: Int
     var y: Int
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         write_to(writer, "Point(", self.x, ", ", self.y, ")")
 
+    @no_inline
     fn __str__(self) -> String:
         return String.format_sequence(self)
 

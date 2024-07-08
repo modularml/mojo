@@ -306,6 +306,7 @@ struct List[T: CollectionElement](
         """
         return len(self) > 0
 
+    @no_inline
     fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
@@ -334,6 +335,7 @@ struct List[T: CollectionElement](
         self.format_to(writer)
         return output^
 
+    @no_inline
     fn format_to[
         U: RepresentableCollectionElement
     ](self: List[U], inout writer: Formatter):
@@ -352,6 +354,7 @@ struct List[T: CollectionElement](
                 writer.write(", ")
         writer.write("]")
 
+    @no_inline
     fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 

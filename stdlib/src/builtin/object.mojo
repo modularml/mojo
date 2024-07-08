@@ -557,6 +557,7 @@ struct _ObjectImpl(CollectionElement, CollectionElementNew, Stringable):
         else:
             lhs = lhs.convert_bool_to_int()
 
+    @no_inline
     fn __str__(self) -> String:
         """Returns the name (in lowercase) of the specific object type."""
         if self.is_none():
@@ -933,7 +934,7 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
         """
         return self.__bool__()
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Performs conversion to string according to Python
         semantics.
