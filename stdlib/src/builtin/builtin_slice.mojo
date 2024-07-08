@@ -19,6 +19,7 @@ from collections import OptionalReg
 from sys.intrinsics import _mlirtype_is_eq
 
 
+# TODO: When Slice switches to Optional, just use == instead of this function.
 @always_inline("nodebug")
 fn _compare_optional(x: OptionalReg[Int], y: OptionalReg[Int]) -> Bool:
     if x and y:
@@ -131,6 +132,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
             True if start, end, and step values of this slice match the
             corresponding values of the other slice and False otherwise.
         """
+        # TODO: When Slice switches to Optional, just use ==.
         return (
             _compare_optional(self.start, other.start)
             and _compare_optional(self.end, other.end)
