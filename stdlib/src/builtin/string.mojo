@@ -1662,7 +1662,7 @@ struct String(
             for s in self[lhs:]:
                 if not s.isspace():
                     break
-                lhs += len(s)
+                lhs += s.byte_length()
             # if it went until the end of the String, then
             # it should be sliced up until the original
             # start of the whitespace which was already appended
@@ -1676,7 +1676,7 @@ struct String(
             for s in self[lhs + 1 :]:
                 if s.isspace():
                     break
-                rhs += len(s)
+                rhs += s.byte_length()
 
             if maxsplit > -1:
                 if items == maxsplit:

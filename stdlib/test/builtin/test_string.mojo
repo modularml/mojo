@@ -1274,7 +1274,7 @@ def test_string_iter():
         var utf8_sequence_len = 0
         var byte_idx = 0
         for v in item:
-            var byte_len = len(v)
+            var byte_len = v.byte_length()
             assert_equal(item[byte_idx : byte_idx + byte_len], v)
             byte_idx += byte_len
             utf8_sequence_len += 1
