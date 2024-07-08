@@ -17,6 +17,28 @@ from collections.counter import Counter
 from testing import assert_equal, assert_false, assert_raises, assert_true
 
 
+def test_and():
+    var c1 = Counter[String]()
+    c1["a"] = 1
+    c1["b"] = 2
+
+    var c2 = Counter[String]()
+    c2["b"] = 3
+    c2["c"] = 4
+
+    var c3 = c1 & c2
+
+    assert_equal(c3["a"], 0)
+    assert_equal(c3["b"], 2)
+    assert_equal(c3["c"], 0)
+
+    c1 &= c2
+
+    assert_equal(c1["a"], 0)
+    assert_equal(c1["b"], 2)
+    assert_equal(c1["c"], 0)
+
+
 def test_bool():
     var c = Counter[String]()
     assert_false(c)
@@ -397,6 +419,7 @@ def test_popitem():
 
 def main():
     test_add()
+    test_and()
     test_bool()
     test_clear()
     test_contains()

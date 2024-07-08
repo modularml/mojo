@@ -295,6 +295,38 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         self.subtract(other)
         self._keep_positive()
 
+    fn __and__(self, other: Self) raises -> Self:
+        """Intersection: keep common elements with the minimum count.
+
+        Args:
+            other: The other Counter to intersect with.
+
+        Returns:
+            A new Counter with the common elements and the minimum count of
+            the two Counters.
+        """
+        var result = Counter[V]()
+
+        for key_ref in self.keys():
+            var key = key_ref[]
+            if key in other:
+                result[key] = min(self[key], other[key])
+
+        return result^
+
+    fn __iand__(inout self, other: Self) raises:
+        """Intersection: keep common elements with the minimum count.
+
+        Args:
+            other: The other Counter to intersect with.
+        """
+        for key_ref in self.keys():
+            var key = key_ref[]
+            if key not in other:
+                _ = self.pop(key)
+            else:
+                self[key] = min(self[key], other[key])
+
     fn _keep_positive(inout self) raises:
         """Remove zero and negative counts from the Counter."""
         for key_ref in self.keys():
