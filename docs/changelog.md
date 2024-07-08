@@ -277,7 +277,7 @@ what we publish.
 - The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
   C-like set of semantics around pointer aliasing and derivation. However, the C
   semantics bring a lot of history and baggage that are not needed in Mojo and
-  which complexify compiler optimizations. The language overall provides a
+  which complicate compiler optimizations. The language overall provides a
   stronger set of invariants around pointer aliasing with lifetimes and
   exclusive mutable references to values, etc.
 
