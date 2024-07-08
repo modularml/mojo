@@ -69,37 +69,6 @@ fn _insertion_sort[
 
 
 @always_inline
-fn _heap_sort_fix_down[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], size: Int, idx: Int):
-    var i = idx
-    var j = i * 2 + 1
-    while j < size:  # has left child
-        # if right child exist and has higher value, swap with right
-        if i * 2 + 2 < size and cmp_fn(array[j], array[i * 2 + 2]):
-            j = i * 2 + 2
-        if not cmp_fn(array[i], array[j]):
-            return
-        swap(array[j], array[i])
-        i = j
-        j = i * 2 + 1
-
-
-@always_inline
-fn _heap_sort[
-    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], owned size: Int):
-    # heapify
-    for i in range(size // 2 - 1, -1, -1):
-        _heap_sort_fix_down[type, cmp_fn](array, size, i)
-    # sort
-    while size > 1:
-        size -= 1
-        swap(array[0], array[size])
-        _heap_sort_fix_down[type, cmp_fn](array, size, 0)
-
-
-@always_inline
 fn _partition[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], start: Int, end: Int) -> Int:
