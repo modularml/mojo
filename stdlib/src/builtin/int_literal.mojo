@@ -682,7 +682,7 @@ struct IntLiteral(
             mod -= multiplier
         return self - mod
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         """Convert from IntLiteral to String.
 

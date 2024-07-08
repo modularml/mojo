@@ -214,6 +214,7 @@ struct StringLiteral(
         """
         return _atol(self)
 
+    @no_inline
     fn __str__(self) -> String:
         """Convert the string literal to a string.
 
@@ -232,6 +233,7 @@ struct StringLiteral(
         string._buffer = buffer^
         return string
 
+    @no_inline
     fn __repr__(self) -> String:
         """Return a representation of the `StringLiteral` instance.
 

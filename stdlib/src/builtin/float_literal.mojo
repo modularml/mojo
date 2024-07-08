@@ -112,7 +112,7 @@ struct FloatLiteral(
     # Conversion Operators
     # ===------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @no_inline
     fn __str__(self) -> String:
         """Get the float as a string.
 

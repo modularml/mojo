@@ -1065,6 +1065,7 @@ struct Int(
         """
         return self
 
+    @no_inline
     fn __str__(self) -> String:
         """Get the integer as a string.
 
@@ -1074,6 +1075,7 @@ struct Int(
 
         return String.format_sequence(self)
 
+    @no_inline
     fn __repr__(self) -> String:
         """Get the integer as a string. Returns the same `String` as `__str__`.
 

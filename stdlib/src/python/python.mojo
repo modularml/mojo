@@ -224,6 +224,7 @@ struct Python:
         """
         return PythonObject([])
 
+    @no_inline
     fn __str__(inout self, str_obj: PythonObject) -> StringRef:
         """Return a string representing the given Python object.
 

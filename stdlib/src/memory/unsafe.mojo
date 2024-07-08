@@ -234,6 +234,7 @@ struct LegacyPointer[
         """
         return Self {address: address}
 
+    @no_inline
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
 
@@ -770,6 +771,7 @@ struct DTypePointer[
         """
         return int(self.address)
 
+    @no_inline
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
 

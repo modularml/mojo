@@ -989,6 +989,7 @@ struct String(
     # ===------------------------------------------------------------------=== #
 
     @staticmethod
+    @no_inline
     fn format_sequence[*Ts: Formattable](*args: *Ts) -> Self:
         """
         Construct a string by concatenating a sequence of formattable arguments.

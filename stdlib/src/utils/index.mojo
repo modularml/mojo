@@ -629,6 +629,7 @@ struct StaticIntTuple[size: Int](
             _int_tuple_compare[size, apply_fn](self.data, rhs.data), True
         )
 
+    @no_inline
     fn __str__(self) -> String:
         """Get the tuple as a string.
 
@@ -661,6 +662,7 @@ struct StaticIntTuple[size: Int](
         buf.size += 1  # for the null terminator.
         return buf^
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this int tuple to the provided formatter.

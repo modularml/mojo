@@ -230,6 +230,7 @@ struct InlineString(Sized, Stringable, CollectionElement, CollectionElementNew):
             )
             return len(self._storage[String])
 
+    @no_inline
     fn __str__(self) -> String:
         """Gets this string as a standard `String`.
 
@@ -426,7 +427,7 @@ struct _FixedString[CAP: Int](
     # Trait implementations
     # ===------------------------------------------------------------------=== #
 
-    @always_inline
+    @no_inline
     fn __str__(self) -> String:
         return String(self.as_string_slice())
 

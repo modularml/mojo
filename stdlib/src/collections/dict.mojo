@@ -636,6 +636,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         """
         return len(self).__bool__()
 
+    @no_inline
     fn __str__[
         T: RepresentableKeyElement, U: RepresentableCollectionElement
     ](self: Dict[T, U]) -> String:

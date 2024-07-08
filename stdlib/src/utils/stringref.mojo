@@ -409,6 +409,7 @@ struct StringRef(
         """
         return self.length
 
+    @no_inline
     fn __str__(self) -> String:
         """Convert the string reference to a string.
 
@@ -417,6 +418,7 @@ struct StringRef(
         """
         return String.format_sequence(self)
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this StringRef to the provided formatter.

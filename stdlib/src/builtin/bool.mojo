@@ -191,6 +191,7 @@ struct Bool(
             _type = __mlir_type.`!pop.scalar<bool>`
         ](self.value)
 
+    @no_inline
     fn __str__(self) -> String:
         """Get the bool as a string.
 
@@ -201,6 +202,7 @@ struct Bool(
         """
         return String.format_sequence(self)
 
+    @no_inline
     fn format_to(self, inout writer: Formatter):
         """
         Formats this boolean to the provided formatter.
