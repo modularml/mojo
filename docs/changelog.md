@@ -451,3 +451,8 @@ what we publish.
   ```mojo
   def foo(**kwargs): ...  # now works
   ```
+
+- [#3142](https://github.com/modularml/mojo/issues/3142) - [QoI] Confusing
+  `__setitem__` method is failing with a "must be mutable" error.
+- [#248](https://github.com/modularml/mojo/issues/248) - [Feature] Enable
+  `__setitem__` to take variadic arguments
