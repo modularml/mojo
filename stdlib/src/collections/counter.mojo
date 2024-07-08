@@ -85,7 +85,6 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             result[key] = value
         return result
 
-
     # ===------------------------------------------------------------------=== #
     # Operator dunders
     # ===------------------------------------------------------------------=== #
@@ -283,7 +282,7 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     # ===------------------------------------------------------------------=== #
 
     fn __pos__(self) -> Self:
-        """Return a shallow copy of the Counter.
+        """Return a shallow copy of the Counter, stripping non-positive counts.
 
         Returns:
             A shallow copy of the Counter.
