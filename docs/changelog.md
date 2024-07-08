@@ -444,3 +444,10 @@ what we publish.
 ### 🛠️ Fixed
 
 - Fixed a crash in the Mojo Language Server when importing the current file.
+
+- Fixed crash when specifying variadic keyword arguments without a type
+  expression in `def` functions, e.g.:
+
+  ```mojo
+  def foo(**kwargs): ...  # now works
+  ```
