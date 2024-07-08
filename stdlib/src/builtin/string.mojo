@@ -1213,6 +1213,10 @@ struct String(
         """
         return self.byte_length() > 0
 
+    @deprecated(
+        "A future version will make this method return Unicode codepoints "
+        "PREFER: String.byte_length()"
+    )
     fn __len__(self) -> Int:
         """Gets the string length, in bytes (for now) PREFER:
         String.byte_length(), a future version will make this method return
@@ -1434,6 +1438,7 @@ struct String(
     @always_inline
     fn as_bytes_slice(ref [_]self) -> Span[UInt8, __lifetime_of(self)]:
         """Returns a contiguous slice of the bytes owned by this string.
+
         Returns:
             A contiguous slice pointing to the bytes owned by this string.
 
