@@ -756,7 +756,7 @@ struct List[T: CollectionElement](
         return (self.data + idx)[]
 
     @always_inline
-    fn unsafe_set(self, idx: Int, owned value: T):
+    fn unsafe_set(inout self, idx: Int, owned value: T):
         """Write a value to a given location without checking index bounds.
 
         Users should consider using `my_list[idx] = value` instead of this method as it
