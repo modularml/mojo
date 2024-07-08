@@ -338,7 +338,7 @@ what we publish.
 
   In the example above, `String.format_sequence(<arg>)` is used to construct a
   `String` from a type that implements `Formattable`. This pattern of
-  implementing a types `Stringable` implementation in terms of its `Formattable`
+  implementing a type's `Stringable` implementation in terms of its `Formattable`
   implementation minimizes boilerplate and duplicated code, while retaining
   backwards compatibility with the requirements of the commonly used `str(..)`
   function.
@@ -398,7 +398,7 @@ what we publish.
 - The rank argument for `algorihtm.elementwise` is no longer required and is
   only inferred.
 
-- The `ulp` function in `numerics` have been moved to the `math` module.
+- The `ulp` function in `numerics` has been moved to the `math` module.
 
 - The Mojo Language Server no longer sets `.` as a commit character for
   auto-completion.
