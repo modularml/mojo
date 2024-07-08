@@ -39,9 +39,9 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
     # Fields
     var _data: Dict[V, Int]
 
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Life cycle methods
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn __init__(inout self):
         """Create a new, empty Counter object."""
@@ -85,9 +85,10 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             result[key] = value
         return result
 
-    # ===-------------------------------------------------------------------===#
+
+    # ===------------------------------------------------------------------=== #
     # Operator dunders
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     def __getitem__(self, key: V) -> Int:
         """Get the count of a key.
@@ -128,9 +129,9 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """
         return key in self._data
 
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Trait implementations
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn __len__(self) -> Int:
         """The number of elements currently stored in the Counter.
@@ -143,13 +144,13 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         """Check if the Counter is empty or not.
 
         Returns:
-            `False` if the Counter is empty, `True` if there is at least one element.
+            `False` if the Counter is empty, `True` otherwise.
         """
         return bool(len(self))
 
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Comparison operators
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn __eq__(self, other: Self) -> Bool:
         """Check if all counts agree. Missing counts are treated as zero.
@@ -190,7 +191,8 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             other: The other Counter to compare to.
 
         Returns:
-            True if all counts are less than or equal to the other Counter, False otherwise.
+            True if all counts are less than or equal to the other Counter,
+            False otherwise.
         """
 
         @parameter
@@ -211,7 +213,8 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             other: The other Counter to compare to.
 
         Returns:
-            True if all counts are less than in the other Counter, False otherwise.
+            True if all counts are less than in the other Counter, False
+            otherwise.
         """
         return self <= other and self != other
 
@@ -222,7 +225,8 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             other: The other Counter to compare to.
 
         Returns:
-            True if all counts are greater than in the other Counter, False otherwise.
+            True if all counts are greater than in the other Counter, False
+            otherwise.
         """
         return other < self
 
@@ -233,13 +237,14 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             other: The other Counter to compare to.
 
         Returns:
-            True if all counts are greater than or equal to the other Counter, False otherwise.
+            True if all counts are greater than or equal to the other Counter,
+            False otherwise.
         """
         return other <= self
 
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Binary operators
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn __add__(self, other: Self) -> Self:
         """Add counts from two Counters.
@@ -273,9 +278,9 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
             if self[key] <= 0:
                 _ = self.pop(key)
 
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Unary operators
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn __pos__(self) -> Self:
         """Return a shallow copy of the Counter.
@@ -290,9 +295,9 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
                 result[item.key] = item.value
         return result^
 
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Methods
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn get(self, value: V) -> Optional[Int]:
         """Get a value from the counter.
@@ -404,7 +409,8 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         return total
 
     fn most_common(self, n: Int) -> List[CountTuple[V]]:
-        """Return a list of the n most common elements and their counts from the most common to the least.
+        """Return a list of the `n` most common elements and their counts from
+        the most common to the least.
 
         Args:
             n: The number of most common elements to return.
@@ -426,7 +432,8 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         return items[:n]
 
     fn elements(self) -> List[V]:
-        """Return an iterator over elements repeating each as many times as its count.
+        """Return an iterator over elements repeating each as many times as its
+        count.
 
         Returns:
             An iterator over the elements in the Counter.
@@ -439,7 +446,8 @@ struct Counter[V: KeyElement](Sized, CollectionElement, Boolable):
         return elements
 
     fn update(inout self, other: Self):
-        """Update the Counter, like dict.update() but add counts instead of replacing them.
+        """Update the Counter, like `dict.update()` but add counts instead of
+        replacing them.
 
         Args:
             other: The Counter to update this Counter with.
@@ -474,9 +482,9 @@ struct CountTuple[V: KeyElement](
     var _count: Int
     """ The count of the value in the Counter."""
 
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Life cycle methods
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn __init__(inout self, value: V, count: Int):
         """Create a new CountTuple.
@@ -506,9 +514,9 @@ struct CountTuple[V: KeyElement](
         self._value = other._value^
         self._count = other._count
 
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
     # Operator dunders
-    # ===-------------------------------------------------------------------===#
+    # ===------------------------------------------------------------------=== #
 
     fn __lt__(self, other: Self) -> Bool:
         """Compare two CountTuples by count, then by value.
@@ -532,7 +540,7 @@ struct CountTuple[V: KeyElement](
         """
         return self._count == other._count
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(self, idx: Int) -> Variant[V, Int]:
         """Get an element in the tuple.
 

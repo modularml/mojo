@@ -10,6 +10,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===----------------------------------------------------------------------=== #
-"""Implements the time package."""
+"""Implements the pwd package."""
 
-from .time import now, perf_counter, perf_counter_ns, sleep, time_function
+from .pwd import getpwuid, getpwnam

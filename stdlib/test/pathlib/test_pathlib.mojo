@@ -13,6 +13,7 @@
 # REQUIRES: !windows
 # RUN: %mojo  -D TEMP_FILE=%t %s
 
+import os
 from pathlib import DIR_SEPARATOR, Path, cwd
 from sys import env_get_string
 
@@ -87,6 +88,67 @@ def test_read_write():
     assert_equal(Path(TEMP_FILE).read_text(), "hello")
 
 
+fn get_user_path() -> Path:
+    @parameter
+    if os_is_windows():
+        return Path("C:") / "Users" / "user"
+    return "/home/user"
+
+
+fn get_current_home() -> String:
+    @parameter
+    if os_is_windows():
+        return os.env.getenv("USERPROFILE")
+    return os.env.getenv("HOME")
+
+
+def set_home(path: Path):
+    path_str = str(path)
+
+    @parameter
+    if os_is_windows():
+        _ = os.env.setenv("USERPROFILE", path_str)
+    else:
+        _ = os.env.setenv("HOME", path_str)
+
+
+# More elaborate tests in `os/path/test_expanduser.mojo`
+def test_expand_user():
+    alias user_path = get_user_path()
+    var original_home = get_current_home()
+    set_home(user_path)
+
+    path = Path("~") / "test"
+    test_path = user_path / "test"
+    assert_equal(test_path, os.path.expanduser(path))
+    # Original path should remain unmodified
+    assert_equal(path, os.path.join("~", "test"))
+
+    # Make sure this process doesn't break other tests by changing the home dir.
+    set_home(original_home)
+
+
+def test_home():
+    alias user_path = get_user_path()
+    var original_home = get_current_home()
+    set_home(user_path)
+
+    assert_equal(user_path, Path.home())
+    # Match Python behavior allowing `home()` to overwrite existing path.
+    assert_equal(user_path, Path("test").home())
+    # Tests with empty "HOME" and "USERPROFILE"
+    set_home(Path(""))
+    if os_is_windows():
+        # Don't expand on windows if home isn't set
+        assert_equal(Path("~"), Path.home())
+    else:
+        # Test fallback to `/etc/passwd` works on linux
+        assert_true(len(Path.home().path) > 1)
+
+    # Ensure other tests in this process aren't broken by changing the home dir.
+    set_home(original_home)
+
+
 def main():
     test_cwd()
     test_path()
@@ -96,3 +158,5 @@ def main():
     test_suffix()
     test_joinpath()
     test_read_write()
+    test_expand_user()
+    test_home()

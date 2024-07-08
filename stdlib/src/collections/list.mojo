@@ -187,19 +187,16 @@ struct List[T: CollectionElement](
         for i in range(len(existing)):
             self.append(existing[i])
 
-    @always_inline
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             (self.data + i).destroy_pointee()
-        if self.data:
-            self.data.free()
+        self.data.free()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
     fn __contains__[
         T2: ComparableCollectionElement
     ](self: List[T], value: T2) -> Bool:
@@ -226,7 +223,6 @@ struct List[T: CollectionElement](
                 return True
         return False
 
-    @always_inline("nodebug")
     fn __mul__(self, x: Int) -> Self:
         """Multiplies the list by x and returns a new list.
 
@@ -243,7 +239,6 @@ struct List[T: CollectionElement](
         result.__mul(x)
         return result^
 
-    @always_inline("nodebug")
     fn __imul__(inout self, x: Int):
         """Multiplies the list by x in place.
 
@@ -252,7 +247,6 @@ struct List[T: CollectionElement](
         """
         self.__mul(x)
 
-    @always_inline("nodebug")
     fn __add__(self, owned other: Self) -> Self:
         """Concatenates self with other and returns the result as a new list.
 
@@ -266,7 +260,6 @@ struct List[T: CollectionElement](
         result.extend(other^)
         return result^
 
-    @always_inline("nodebug")
     fn __iadd__(inout self, owned other: Self):
         """Appends the elements of other into self.
 
@@ -388,7 +381,6 @@ struct List[T: CollectionElement](
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
     fn _realloc(inout self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
@@ -400,7 +392,6 @@ struct List[T: CollectionElement](
         self.data = new_data
         self.capacity = new_capacity
 
-    @always_inline
     fn append(inout self, owned value: T):
         """Appends a value to this list.
 
@@ -412,7 +403,6 @@ struct List[T: CollectionElement](
         (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
-    @always_inline
     fn insert(inout self, i: Int, owned value: T):
         """Inserts a value to the list at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
@@ -442,7 +432,6 @@ struct List[T: CollectionElement](
             earlier_idx -= 1
             later_idx -= 1
 
-    @always_inline
     fn __mul(inout self, x: Int):
         """Appends the original elements of this list x-1 times.
 
@@ -462,7 +451,6 @@ struct List[T: CollectionElement](
         for i in range(x - 1):
             self.extend(orig)
 
-    @always_inline
     fn extend(inout self, owned other: List[T]):
         """Extends this list by consuming the elements of `other`.
 
@@ -503,7 +491,6 @@ struct List[T: CollectionElement](
         # list.
         self.size = final_size
 
-    @always_inline
     fn pop(inout self, i: Int = -1) -> T:
         """Pops a value from the list at the given index.
 
@@ -528,7 +515,6 @@ struct List[T: CollectionElement](
                 self._realloc(self.capacity // 2)
         return ret_val^
 
-    @always_inline
     fn reserve(inout self, new_capacity: Int):
         """Reserves the requested capacity.
 
@@ -542,7 +528,6 @@ struct List[T: CollectionElement](
             return
         self._realloc(new_capacity)
 
-    @always_inline
     fn resize(inout self, new_size: Int, value: T):
         """Resizes the list to the given new size.
 
@@ -562,7 +547,6 @@ struct List[T: CollectionElement](
                 (self.data + i).init_pointee_copy(value)
             self.size = new_size
 
-    @always_inline
     fn resize(inout self, new_size: Int):
         """Resizes the list to the given new size.
 
@@ -584,7 +568,6 @@ struct List[T: CollectionElement](
         self.size = new_size
         self.reserve(new_size)
 
-    @always_inline
     fn reverse(inout self):
         """Reverses the elements of the list."""
 
@@ -680,7 +663,6 @@ struct List[T: CollectionElement](
         self.capacity = 0
         return ptr
 
-    @always_inline
     fn __getitem__(self, span: Slice) -> Self:
         """Gets the sequence of elements at the specified positions.
 
@@ -706,7 +688,6 @@ struct List[T: CollectionElement](
 
         return res^
 
-    @always_inline
     fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
         """Gets the list element at the given index.
 
@@ -767,12 +748,10 @@ struct List[T: CollectionElement](
         """
         debug_assert(
             0 <= idx < len(self),
-            "The index provided must be within the range [0,",
-            len(self),
-            "[",
-            " when using List.unsafe_get(). But you provided: ",
-            idx,
-            ".",
+            (
+                "The index provided must be within the range [0, len(List) -1]"
+                " when using List.unsafe_get()"
+            ),
         )
         return (self.data + idx)[]
 

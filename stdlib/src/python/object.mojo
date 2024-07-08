@@ -58,16 +58,16 @@ struct _PyIter(Sized):
         var maybeNextItem = cpython.PyIter_Next(self.iterator.py_object)
         if maybeNextItem.is_null():
             self.isDone = True
-            self.preparedNextItem = PyObjectPtr()
+            self.preparedNextItem = PythonObject(PyObjectPtr())
         else:
-            self.preparedNextItem = maybeNextItem
+            self.preparedNextItem = PythonObject(maybeNextItem)
             self.isDone = False
 
     fn __init__(inout self):
         """Initialize an empty iterator."""
-        self.iterator = PyObjectPtr()
+        self.iterator = PythonObject(PyObjectPtr())
         self.isDone = True
-        self.preparedNextItem = PyObjectPtr()
+        self.preparedNextItem = PythonObject(PyObjectPtr())
 
     fn __next__(inout self: _PyIter) -> PythonObject:
         """Return the next item and update to point to subsequent item.
@@ -84,7 +84,7 @@ struct _PyIter(Sized):
         if maybeNextItem.is_null():
             self.isDone = True
         else:
-            self.preparedNextItem = maybeNextItem
+            self.preparedNextItem = PythonObject(maybeNextItem)
         return current
 
     fn __len__(self) -> Int:
@@ -101,7 +101,6 @@ struct _PyIter(Sized):
 
 @register_passable
 struct PythonObject(
-    CollectionElement,
     ImplicitlyBoolable,
     Indexer,
     Intable,
@@ -246,15 +245,15 @@ struct PythonObject(
 
             @parameter
             if _type_is_eq[T, Int]():
-                obj = value.get[i, Int]()
+                obj = PythonObject(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
-                obj = value.get[i, Float64]()
+                obj = PythonObject(value.get[i, Float64]())
             elif _type_is_eq[T, Bool]():
-                obj = value.get[i, Bool]()
+                obj = PythonObject(value.get[i, Bool]())
             elif _type_is_eq[T, StringRef]():
-                obj = value.get[i, StringRef]()
+                obj = PythonObject(value.get[i, StringRef]())
             elif _type_is_eq[T, StringLiteral]():
-                obj = value.get[i, StringLiteral]()
+                obj = PythonObject(value.get[i, StringLiteral]())
             else:
                 obj = PythonObject(0)
                 constrained[
@@ -286,15 +285,15 @@ struct PythonObject(
 
             @parameter
             if _type_is_eq[T, Int]():
-                obj = value.get[i, Int]()
+                obj = PythonObject(value.get[i, Int]())
             elif _type_is_eq[T, Float64]():
-                obj = value.get[i, Float64]()
+                obj = PythonObject(value.get[i, Float64]())
             elif _type_is_eq[T, Bool]():
-                obj = value.get[i, Bool]()
+                obj = PythonObject(value.get[i, Bool]())
             elif _type_is_eq[T, StringRef]():
-                obj = value.get[i, StringRef]()
+                obj = PythonObject(value.get[i, StringRef]())
             elif _type_is_eq[T, StringLiteral]():
-                obj = value.get[i, StringLiteral]()
+                obj = PythonObject(value.get[i, StringLiteral]())
             else:
                 obj = PythonObject(0)
                 constrained[
@@ -340,7 +339,7 @@ struct PythonObject(
         var cpython = _get_global_python_itf().cpython()
         var iter = cpython.PyObject_GetIter(self.py_object)
         Python.throw_python_exception_if_error_state(cpython)
-        return _PyIter(iter)
+        return _PyIter(PythonObject(iter))
 
     fn __del__(owned self):
         """Destroy the object.
@@ -1170,6 +1169,26 @@ struct PythonObject(
         """
         var cpython = _get_global_python_itf().cpython()
         return cpython.PyLong_AsLong(self.py_object.value)
+
+    fn unsafe_get_as_pointer[type: DType](self) -> DTypePointer[type]:
+        """Convert a Python-owned and managed pointer into a Mojo pointer.
+
+        Warning: converting from an integer to a pointer is unsafe! The
+        compiler assumes the resulting pointer DOES NOT alias any Mojo-derived
+        pointer. This is OK because the pointer originates from Python.
+
+        Parameters:
+            type: The desired DType of the pointer.
+
+        Returns:
+            A `DTypePointer` for the underlying Python data.
+        """
+        var tmp = int(self)
+        var result = UnsafePointer.address_of(tmp).bitcast[
+            DTypePointer[type]
+        ]()[]
+        _ = tmp
+        return result
 
     fn __str__(self) -> String:
         """Returns a string representation of the object.

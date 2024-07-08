@@ -31,7 +31,6 @@ from utils._format import Formattable, Formatter, ToFormatter
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
 fn ord(s: String) -> Int:
     """Returns an integer that represents the given one-character string.
 
@@ -149,7 +148,6 @@ fn chr(c: Int) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
 fn _chr_ascii(c: UInt8) -> String:
     """Returns a string based on the given ASCII code point.
 
@@ -162,7 +160,6 @@ fn _chr_ascii(c: UInt8) -> String:
     return String(String._buffer_type(c, 0))
 
 
-@always_inline("nodebug")
 fn _repr_ascii(c: UInt8) -> String:
     """Returns a printable representation of the given ASCII code point.
 
@@ -196,7 +193,7 @@ fn _repr_ascii(c: UInt8) -> String:
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
-@always_inline("nodebug")
+@always_inline
 fn ascii(value: String) -> String:
     """Get the ASCII representation of the object.
 
@@ -214,7 +211,6 @@ fn ascii(value: String) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
 fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     """Implementation of `atol` for StringRef inputs.
 
@@ -406,7 +402,6 @@ fn _atof_error(str_ref: StringRef) -> Error:
     return Error("String is not convertible to float: '" + str(str_ref) + "'")
 
 
-@always_inline
 fn _atof(str_ref: StringRef) raises -> Float64:
     """Implementation of `atof` for StringRef inputs.
 
@@ -539,37 +534,9 @@ fn isdigit(c: UInt8) -> Bool:
     return ord_0 <= int(c) <= ord_9
 
 
-fn isdigit(c: String) -> Bool:
-    """Determines whether the given character is a digit [0-9].
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is a digit.
-    """
-    return isdigit(ord(c))
-
-
 # ===----------------------------------------------------------------------=== #
 # isupper
 # ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn isupper(c: String) -> Bool:
-    """Determines whether the given character is an uppercase character.
-
-    This currently only respects the default "C" locale, i.e. returns True iff
-    the character specified is one of "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is uppercase.
-    """
-    return isupper(ord(c))
 
 
 fn isupper(c: UInt8) -> Bool:
@@ -598,22 +565,6 @@ fn _is_ascii_uppercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
-fn islower(c: String) -> Bool:
-    """Determines whether the given character is an lowercase character.
-
-    This currently only respects the default "C" locale, i.e. returns True iff
-    the character specified is one of "abcdefghijklmnopqrstuvwxyz".
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is lowercase.
-    """
-    return islower(ord(c))
-
-
 fn islower(c: UInt8) -> Bool:
     """Determines whether the given character is an lowercase character.
 
@@ -640,7 +591,6 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
 fn _isspace(c: String) -> Bool:
     """Determines whether the given character is a whitespace character.
 
@@ -734,19 +684,6 @@ fn _isnewline(s: String) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # isprintable
 # ===----------------------------------------------------------------------=== #
-
-
-@always_inline
-fn isprintable(c: String) -> Bool:
-    """Determines whether the given character is a printable character.
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is a printable character, otherwise False.
-    """
-    return isprintable(ord(c))
 
 
 fn isprintable(c: UInt8) -> Bool:
@@ -926,7 +863,6 @@ struct String(
         """
         self.__copyinit__(other)
 
-    @always_inline
     fn __init__(inout self, str: StringRef):
         """Construct a string from a StringRef object.
 
@@ -940,7 +876,6 @@ struct String(
         memcpy(dest=buffer.data, src=str.data, count=length)
         self = Self(buffer^)
 
-    @always_inline
     fn __init__(inout self, str_slice: StringSlice):
         """Construct a string from a string slice.
 
@@ -1023,7 +958,6 @@ struct String(
         """
         self = String(ptr.address, len)
 
-    @always_inline
     fn __init__(inout self, obj: PythonObject):
         """Creates a string from a python object.
 
@@ -1209,7 +1143,8 @@ struct String(
             rhs: The other String to compare against.
 
         Returns:
-            True if this String is strictly less than the RHS String and False otherwise.
+            True if this String is strictly less than the RHS String and False
+            otherwise.
         """
         return self._strref_dangerous() < rhs._strref_dangerous()
 
@@ -1249,7 +1184,6 @@ struct String(
         """
         return not (self < rhs)
 
-    @always_inline
     fn __add__(self, other: String) -> String:
         """Creates a string by appending another string at the end.
 
@@ -1292,7 +1226,6 @@ struct String(
         """
         return other + self
 
-    @always_inline
     fn __iadd__(inout self, other: String):
         """Appends another string to this string.
 
@@ -1348,7 +1281,6 @@ struct String(
         """
         return len(self) > 0
 
-    @always_inline
     fn __len__(self) -> Int:
         """Gets the string length, in bytes.
 
@@ -1374,7 +1306,6 @@ struct String(
         """
         return self
 
-    @always_inline
     fn __repr__(self) -> String:
         """Return a Mojo-compatible representation of the `String` instance.
 
@@ -1394,6 +1325,14 @@ struct String(
             return '"' + result + '"'
         else:
             return "'" + result + "'"
+
+    fn __fspath__(self) -> String:
+        """Return the file system path representation (just the string itself).
+
+        Returns:
+          The file system path representation as a string.
+        """
+        return self
 
     # ===------------------------------------------------------------------=== #
     # Methods
@@ -2077,7 +2016,6 @@ struct String(
         # outside of the standard ASCII letters.
         return self._toggle_ascii_case[_is_ascii_lowercase]()
 
-    @always_inline
     fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
         var copy: String = self
 
@@ -2214,7 +2152,6 @@ struct String(
             )
         return String(buf^)
 
-    @always_inline
     fn format[*Ts: Stringable](self, *args: *Ts) raises -> String:
         """Format a template with *args.
 
@@ -2287,46 +2224,72 @@ struct String(
     fn isdigit(self) -> Bool:
         """Returns True if all characters in the string are digits.
 
+        Note that this currently only works with ASCII strings.
+
         Returns:
             True if all characters are digits else False.
         """
-        return _all[isdigit](self)
+        for c in self:
+            if not isdigit(ord(c)):
+                return False
+        return True
+
+    fn _isupper_islower[*, upper: Bool](self) -> Bool:
+        fn is_ascii_cased(c: UInt8) -> Bool:
+            return _is_ascii_uppercase(c) or _is_ascii_lowercase(c)
+
+        for c in self:
+            debug_assert(c._byte_length() == 1, "only implemented for ASCII")
+            if is_ascii_cased(ord(c)):
+
+                @parameter
+                if upper:
+                    return self == self.upper()
+                else:
+                    return self == self.lower()
+        return False
 
     fn isupper(self) -> Bool:
-        """Returns True if all characters in the string are uppercase.
+        """Returns True if all cased characters in the string are uppercase and
+        there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
 
         Returns:
-            True if all characters are uppercase else False.
+            True if all cased characters in the string are uppercase and there
+            is at least one cased character, False otherwise.
         """
-        return _all[isupper](self)
+        return self._isupper_islower[upper=True]()
 
     fn islower(self) -> Bool:
-        """Returns True if all characters in the string are lowercase.
+        """Returns True if all cased characters in the string are lowercase and
+        there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
 
         Returns:
-            True if all characters are lowercase else False.
+            True if all cased characters in the string are lowercase and there
+            is at least one cased character, False otherwise.
         """
-        return _all[islower](self)
+        return self._isupper_islower[upper=False]()
 
     fn isprintable(self) -> Bool:
-        """Returns True if all characters in the string are printable.
+        """Returns True if all characters in the string are ASCII printable.
+
+        Note that this currently only works with ASCII strings.
 
         Returns:
             True if all characters are printable else False.
         """
-        return _all[isprintable](self)
+        for c in self:
+            if not isprintable(ord(c)):
+                return False
+        return True
 
 
 # ===----------------------------------------------------------------------=== #
 # Utilities
 # ===----------------------------------------------------------------------=== #
-
-
-fn _all[func: fn (String) -> Bool](s: String) -> Bool:
-    for c in s:
-        if not func(c):
-            return False
-    return True
 
 
 fn _toggle_ascii_case(char: UInt8) -> UInt8:
@@ -2398,7 +2361,6 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
         result += 4
 
 
-@always_inline
 fn _calc_initial_buffer_size(n0: Int) -> Int:
     var sign = 0 if n0 > 0 else 1
 

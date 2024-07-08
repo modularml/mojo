@@ -121,6 +121,7 @@ struct Arc[T: Movable](CollectionElement, CollectionElementNew):
         existing._inner[].add_ref()
         self._inner = existing._inner
 
+    @no_inline
     fn __del__(owned self):
         """Delete the smart pointer reference.
 
