@@ -139,7 +139,9 @@ alias Pointer = LegacyPointer
 @value
 @register_passable("trivial")
 struct LegacyPointer[
-    type: AnyTrivialRegType, address_space: AddressSpace = AddressSpace.GENERIC
+    type: AnyTrivialRegType,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+    exclusive: Bool = False,
 ](
     Boolable,
     CollectionElement,
@@ -154,10 +156,17 @@ struct LegacyPointer[
     Parameters:
         type: Type of the underlying data.
         address_space: The address space the pointer is in.
+        exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
     """
 
     alias _mlir_type = __mlir_type[
-        `!kgen.pointer<`, type, `,`, address_space._value.value, `>`
+        `!kgen.pointer<`,
+        type,
+        `, `,
+        address_space._value.value,
+        ` exclusive(`,
+        exclusive.value,
+        `)>`,
     ]
 
     var address: Self._mlir_type
@@ -174,6 +183,22 @@ struct LegacyPointer[
         """
         return __mlir_attr[`#interp.pointer<0> : `, Self._mlir_type]
 
+    @always_inline
+    fn __init__(other: LegacyPointer[type, address_space, _]) -> Self:
+        """Exclusivity parameter cast a pointer.
+
+        Args:
+            other: Pointer to cast.
+
+        Returns:
+            Constructed LegacyPointer object.
+        """
+        return Self {
+            address: __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
+                other.address
+            )
+        }
+
     fn __init__(*, other: Self) -> Self:
         """Copy the object.
 
@@ -184,6 +209,18 @@ struct LegacyPointer[
             Constructed LegacyPointer object.
         """
         return other
+
+    @always_inline
+    fn __init__(other: UnsafePointer[type, address_space, exclusive]) -> Self:
+        """Construct a legacy pointer (deprecated) from an UnsafePointer.
+
+        Args:
+            other: The UnsafePointer.
+
+        Returns:
+            Constructed LegacyPointer object.
+        """
+        return other.address
 
     @always_inline("nodebug")
     fn __init__(address: Self._mlir_type) -> Self:
@@ -196,35 +233,6 @@ struct LegacyPointer[
             Constructed LegacyPointer object.
         """
         return Self {address: address}
-
-    @always_inline("nodebug")
-    fn __init__(value: Scalar[DType.address]) -> Self:
-        """Constructs a LegacyPointer from the value of scalar address.
-
-        Args:
-            value: The input pointer index.
-
-        Returns:
-            Constructed LegacyPointer object.
-        """
-        var address = __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-            value.cast[DType.index]().value
-        )
-        return Self {address: address}
-
-    @always_inline("nodebug")
-    fn __init__(*, address: Int) -> Self:
-        """Constructs a Pointer from an address in an integer.
-
-        Args:
-            address: The input address.
-
-        Returns:
-            Constructed Pointer object.
-        """
-        return __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-            Scalar[DType.index](address).value
-        )
 
     fn __str__(self) -> String:
         """Format this pointer as a hexadecimal string.
@@ -271,7 +279,7 @@ struct LegacyPointer[
         """
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = Self._ref_type._mlir_type](
-                self.address
+                LegacyPointer[type, address_space, False](self).address
             )
         )
 
@@ -289,92 +297,6 @@ struct LegacyPointer[
         """
         return (self + offset)[]
 
-    # ===------------------------------------------------------------------=== #
-    # Load/Store
-    # ===------------------------------------------------------------------=== #
-
-    alias _default_alignment = alignof[type]() if triple_is_nvidia_cuda() else 1
-
-    @always_inline("nodebug")
-    fn load[*, alignment: Int = Self._default_alignment](self) -> type:
-        """Loads the value the LegacyPointer object points to.
-
-        Constraints:
-            The alignment must be a positive integer value.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Returns:
-            The loaded value.
-        """
-        return self.load[alignment=alignment](0)
-
-    @always_inline("nodebug")
-    fn load[
-        T: Intable, *, alignment: Int = Self._default_alignment
-    ](self, offset: T) -> type:
-        """Loads the value the LegacyPointer object points to with the given offset.
-
-        Constraints:
-            The alignment must be a positive integer value.
-
-        Parameters:
-            T: The Intable type of the offset.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The offset to load from.
-
-        Returns:
-            The loaded value.
-        """
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-        return __mlir_op.`pop.load`[alignment = alignment.value](
-            self.offset(offset).address
-        )
-
-    @always_inline("nodebug")
-    fn store[
-        T: Intable, /, *, alignment: Int = Self._default_alignment
-    ](self, offset: T, value: type):
-        """Stores the specified value to the location the LegacyPointer object points
-        to with the given offset.
-
-        Constraints:
-            The alignment must be a positive integer value.
-
-        Parameters:
-            T: The Intable type of the offset.
-            alignment: The minimal alignment of the address.
-
-        Args:
-            offset: The offset to store to.
-            value: The value to store.
-        """
-        self.offset(offset).store[alignment=alignment](value)
-
-    @always_inline("nodebug")
-    fn store[*, alignment: Int = Self._default_alignment](self, value: type):
-        """Stores the specified value to the location the LegacyPointer object points
-        to.
-
-        Constraints:
-            The alignment value must be a positive integer.
-
-        Parameters:
-            alignment: The minimal alignment of the address.
-
-        Args:
-            value: The value to store.
-        """
-        constrained[
-            alignment > 0, "alignment must be a positive integer value"
-        ]()
-        __mlir_op.`pop.store`[alignment = alignment.value](value, self.address)
-
     @always_inline("nodebug")
     fn __int__(self) -> Int:
         """Returns the pointer address as an integer.
@@ -382,9 +304,7 @@ struct LegacyPointer[
         Returns:
           The address of the pointer as an Int.
         """
-        return __mlir_op.`pop.pointer_to_index`[
-            _type = __mlir_type.`!pop.scalar<index>`
-        ](self.address)
+        return __mlir_op.`pop.pointer_to_index`(self.address)
 
     # ===------------------------------------------------------------------=== #
     # Allocate/Free
@@ -499,6 +419,19 @@ struct LegacyPointer[
         return __mlir_op.`pop.offset`(self.address, int(idx).value)
 
     @always_inline("nodebug")
+    fn offset(self, idx: UInt) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Args:
+            idx: The offset.
+
+        Returns:
+            The new LegacyPointer shifted by the offset.
+        """
+        # Returns a new pointer shifted by the specified offset.
+        return __mlir_op.`pop.offset`(self.address, idx.value)
+
+    @always_inline("nodebug")
     fn __add__[T: Intable](self, rhs: T) -> Self:
         """Returns a new pointer shifted by the specified offset.
 
@@ -512,6 +445,18 @@ struct LegacyPointer[
             The new LegacyPointer shifted by the offset.
         """
         return self.offset(rhs)
+
+    @always_inline("nodebug")
+    fn __add__(self, rhs: UInt) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Args:
+            rhs: The offset.
+
+        Returns:
+            The new LegacyPointer shifted by the offset.
+        """
+        return self.offset(rhs.value)
 
     @always_inline("nodebug")
     fn __sub__[T: Intable](self, rhs: T) -> Self:
@@ -561,7 +506,9 @@ struct LegacyPointer[
 @value
 @register_passable("trivial")
 struct DTypePointer[
-    type: DType, address_space: AddressSpace = AddressSpace.GENERIC
+    type: DType,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+    exclusive: Bool = False,
 ](Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
     """Defines a `DTypePointer` struct that contains an address of the given
     dtype.
@@ -569,11 +516,12 @@ struct DTypePointer[
     Parameters:
         type: DType of the underlying data.
         address_space: The address space the pointer is in.
+        exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
     """
 
     # Fields
     alias element_type = Scalar[type]
-    alias _pointer_type = Pointer[Scalar[type], address_space]
+    alias _pointer_type = Pointer[Scalar[type], address_space, exclusive]
     var address: Self._pointer_type
     """The pointed-to address."""
 
@@ -603,7 +551,9 @@ struct DTypePointer[
             type.value,
             `>,`,
             address_space._value.value,
-            `>`,
+            ` exclusive(`,
+            exclusive.value,
+            `)>`,
         ],
     ):
         """Constructs a `DTypePointer` from a scalar pointer of the same type.
@@ -615,8 +565,21 @@ struct DTypePointer[
             __mlir_type[`!pop.scalar<`, type.value, `>`], address_space
         ](value).bitcast[Scalar[type]]()
 
+    @always_inline
+    fn __init__(inout self, other: DTypePointer[type, address_space, _]):
+        """Exclusivity parameter cast a pointer.
+
+        Args:
+            other: Pointer to cast.
+        """
+        self.address = __mlir_op.`pop.pointer.bitcast`[
+            _type = Self._pointer_type._mlir_type
+        ](other.address.address)
+
     @always_inline("nodebug")
-    fn __init__(inout self, value: Pointer[Scalar[type], address_space]):
+    fn __init__(
+        inout self, value: Pointer[Scalar[type], address_space, exclusive]
+    ):
         """Constructs a `DTypePointer` from a scalar pointer of the same type.
 
         Args:
@@ -632,27 +595,6 @@ struct DTypePointer[
             other: The scalar pointer.
         """
         self.address = other.address
-
-    @always_inline("nodebug")
-    fn __init__(inout self, value: Scalar[DType.address]):
-        """Constructs a `DTypePointer` from the value of scalar address.
-
-        Args:
-            value: The input pointer index.
-        """
-        var address = __mlir_op.`pop.index_to_pointer`[
-            _type = Self._pointer_type._mlir_type
-        ](value.cast[DType.index]().value)
-        self.address = address
-
-    @always_inline
-    fn __init__(inout self, *, address: Int):
-        """Constructs a `DTypePointer` from an integer address.
-
-        Args:
-            address: The input address.
-        """
-        self.address = Self._pointer_type(address=address)
 
     # ===------------------------------------------------------------------=== #
     # Factory methods
@@ -706,6 +648,20 @@ struct DTypePointer[
             The reference for the Mojo compiler to use.
         """
         return self.address[offset]
+
+    @always_inline("nodebug")
+    fn __getitem__(
+        self, offset: UInt = 0
+    ) -> ref [MutableStaticLifetime, address_space._value.value] Scalar[type]:
+        """Enable subscript syntax `ptr[]` to access the element.
+
+        Args:
+            offset: The offset to load from.
+
+        Returns:
+            The reference for the Mojo compiler to use.
+        """
+        return self.__getitem__(Int(offset.value))
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
@@ -864,13 +820,28 @@ struct DTypePointer[
         return self.address.bitcast[SIMD[new_type, 1], address_space]()
 
     @always_inline("nodebug")
-    fn _as_scalar_pointer(self) -> Pointer[Scalar[type], address_space]:
+    fn bitcast[
+        type: AnyType
+    ](self) -> UnsafePointer[type, address_space, exclusive]:
+        """Bitcasts `DTypePointer` to a different scalar type.
+
+        Parameters:
+            type: The target scalar type.
+
+        Returns:
+            A new `UnsafePointer` object with the specified type and the same
+            address, as the original `DTypePointer`.
+        """
+        return self._as_scalar_pointer().bitcast[type]()
+
+    @always_inline("nodebug")
+    fn _as_scalar_pointer(self) -> UnsafePointer[Scalar[type], address_space]:
         """Converts the `DTypePointer` to a scalar pointer of the same dtype.
 
         Returns:
             A `Pointer` to a scalar of the same dtype.
         """
-        return self.address
+        return self.address.address
 
     alias _default_alignment = alignof[
         Scalar[type]
@@ -994,7 +965,7 @@ struct DTypePointer[
         ]()
 
         var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
-        return gather(base.cast[DType.address](), mask, default, alignment)
+        return gather(base, mask, default, alignment)
 
     @always_inline("nodebug")
     fn scatter[
@@ -1072,7 +1043,7 @@ struct DTypePointer[
         ]()
 
         var base = offset.cast[DType.index]().fma(sizeof[type](), int(self))
-        scatter(val, base.cast[DType.address](), mask, alignment)
+        scatter(val, base, mask, alignment)
 
     @always_inline
     fn is_aligned[alignment: Int](self) -> Bool:
@@ -1096,6 +1067,18 @@ struct DTypePointer[
 
         Parameters:
             T: The Intable type of the offset.
+
+        Args:
+            idx: The offset of the new pointer.
+
+        Returns:
+            The new constructed DTypePointer.
+        """
+        return self.address.offset(idx)
+
+    @always_inline("nodebug")
+    fn offset(self, idx: UInt) -> Self:
+        """Returns a new pointer shifted by the specified offset.
 
         Args:
             idx: The offset of the new pointer.

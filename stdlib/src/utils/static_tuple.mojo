@@ -21,7 +21,7 @@ from utils import StaticTuple
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
 
-from memory import Pointer
+from memory import Pointer, UnsafePointer
 
 from utils import unroll
 
@@ -211,9 +211,9 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         # address of 'self' in a non-mutating method.
         var arrayCopy = self.array
         var ptr = __mlir_op.`pop.array.gep`(
-            Pointer.address_of(arrayCopy).address, offset.value
+            UnsafePointer.address_of(arrayCopy).address, offset.value
         )
-        var result = Pointer(ptr).load()
+        var result = Pointer(ptr)[]
         _ = arrayCopy
         return result
 
@@ -234,9 +234,9 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         debug_assert(offset < size, "index must be within bounds")
         var tmp = self
         var ptr = __mlir_op.`pop.array.gep`(
-            Pointer.address_of(tmp.array).address, offset.value
+            UnsafePointer.address_of(tmp.array).address, offset.value
         )
-        Pointer(ptr).store(val)
+        Pointer(ptr)[] = val
         self = tmp
 
 

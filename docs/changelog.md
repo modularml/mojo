@@ -16,6 +16,17 @@ what we publish.
 
 ### ⭐️ New
 
+- The pointer variants (`DTypePointer`, `UnsafePointer`, etc.) now have a new
+  `exclusive: Bool = False` parameter. Setting this parameter to true tells the
+  compiler that the user knows this pointer and all those derived from it have
+  exclusive access to the underlying memory allocation. The compiler is not
+  guaranteed to do anything with this information.
+
+- Added a new [`Counter`](/mojo/stdlib/collections/counter/Counter)
+  dictionary-like type, matching most of the features of the Python one.
+  ([PR 2910#](https://github.com/modularml/mojo/pull/2910) by
+  [@msaelices](https://github.com/msaelices))
+
 - Mojo context managers used in regions of code that may raise no longer need to
   define a "conditional" exit function in the form of
   `fn __exit__(self, e: Error) -> Bool`. This function allows the context
@@ -44,7 +55,7 @@ what we publish.
   ```
 
 - Now supports "conditional conformances" where some methods on a struct have
-  additional trait requirements that the struct itself doesn't.  This is
+  additional trait requirements that the struct itself doesn't. This is
   expressed through an explicitly declared `self` type:
 
   ```mojo
@@ -85,7 +96,7 @@ what we publish.
 
 - As a specific form of "conditional conformances", initializers in a struct
   may indicate specific parameter bindings to use in the type of their `self`
-  argument.  For example:
+  argument. For example:
 
   ```mojo
   @value
@@ -117,8 +128,8 @@ what we publish.
     `testing` module.
 
 - `Dict` now supports `popitem`, which removes and returns the last item in the `Dict`.
-([PR #2701](https://github.com/modularml/mojo/pull/2701)
-by [@jayzhan211](https://github.com/jayzhan211))
+  ([PR #2701](https://github.com/modularml/mojo/pull/2701)
+  by [@jayzhan211](https://github.com/jayzhan211))
 
 - Added `unsafe_cstr_ptr()` method to `String` and `StringLiteral`, that
   returns an `UnsafePointer[C_char]` for convenient interoperability with C
@@ -184,12 +195,91 @@ by [@jayzhan211](https://github.com/jayzhan211))
   functions such as `min`/`max`, as well as `math` functions like `ceildiv`,
   `align_down`, and `align_up` are also implemented for `UInt`.
 
+- `os.path.expanduser()` and `pathlib.Path.exapanduser()` have been added to
+  allow expanding a prefixed `~` in a `String` or `Path` with the users home
+  path:
+
+  ```mojo
+  import os
+  print(os.path.expanduser("~/.modular"))
+  # /Users/username/.modular
+  print(os.path.expanduser("~root/folder"))
+  # /var/root/folder (on macos)
+  # /root/folder     (on linux)
+  ```
+
+- `Path.home()` has been added to return a path of the users home directory.
+
+- `os.path.split()` has been added for splitting a path into `head, tail`:
+
+  ```mojo
+  import os
+  head, tail = os.path.split("/this/is/head/tail")
+  print("head:", head)
+  print("tail:", tail)
+  # head: /this/is/head
+  # tail: tail
+  ```
+
+- `os.path.makedirs()` and `os.path.removedirs()` have been added for creating
+  and removing nested directories:
+
+  ```mojo
+  import os
+  path = os.path.join("dir1", "dir2", "dir3")
+  os.path.makedirs(path, exist_ok=True)
+  os.path.removedirs(path)
+  ```
+
+- The `pwd` module has been added for accessing user information in
+  `/etc/passwd` on POSIX systems. This follows the same logic as Python:
+
+  ```mojo
+  import pwd
+  import os
+  current_user = pwd.getpwuid(os.getuid())
+  print(current_user)
+
+  # pwd.struct_passwd(pw_name='jack', pw_passwd='********', pw_uid=501,
+  # pw_gid=20, pw_gecos='Jack Clayton', pw_dir='/Users/jack',
+  # pw_shell='/bin/zsh')
+
+  print(current_user.pw_uid)
+
+  # 501
+
+  root = pwd.getpwnam("root")
+  print(root)
+
+  # pwd.struct_passwd(pw_name='root', pw_passwd='*', pw_uid=0, pw_gid=0,
+  # pw_gecos='System Administrator', pw_dir='/var/root', pw_shell='/bin/zsh')
+  ```
+
 ### 🦋 Changed
+
+- The pointer aliasing semantics of Mojo have changed. Initially, Mojo adopted a
+  C-like set of semantics around pointer aliasing and derivation. However, the C
+  semantics bring a lot of history and baggage that are not needed in Mojo and
+  which complexify compiler optimizations. The language overall provides a
+  stronger set of invariants around pointer aliasing with lifetimes and
+  exclusive mutable references to values, etc.
+
+  It is now forbidden to convert a non-pointer-typed value derived from a
+  Mojo-allocated pointer, such as an integer address, to a pointer-typed value.
+  "Derived" means there is overlap in the bits of the non-pointer-typed value
+  with the original pointer value.
+
+  It is still possible to make this conversion in certain cases where it is
+  absolutely necessary, such as interoperating with other languages like Python.
+  In this case, the compiler makes two assumptions: any pointer derived from a
+  non-pointer-typed value does not alias any Mojo-derived pointer and that any
+  external function calls have arbitrary memory effects.
 
 - `await` on a coroutine now consumes it. This strengthens the invariant that
   coroutines can only be awaited once.
 
 - Continued transition to `UnsafePointer` and unsigned byte type for strings:
+
   - `String.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
     (was `UnsafePointer[Int8]`)
   - `StringLiteral.unsafe_ptr()` now returns an `UnsafePointer[UInt8]`
@@ -287,6 +377,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 - Accessing local Python modules with `Python.add_to_path(".")` is no longer
   required, it now behaves the same as Python, you can access modules in the
   same folder as the target file:
+
   - `mojo run /tmp/main.mojo` can access `/tmp/mymodule.py`
   - `mojo build main.mojo -o ~/myexe && ~/myexe` can access `~/mymodule.py`
 
@@ -302,10 +393,16 @@ by [@jayzhan211](https://github.com/jayzhan211))
   implicitly convert to `Bool`. A new `ImplicitlyBoolable` trait is introduced
   for types where this behavior is desired.
 
+- The `time.now()` function has been deprecated. Please use `time.perf_counter`
+  or `time.perf_counter_ns` instead.
+
+- `LegacyPointer.load/store` are now removed. It's use is replaced with
+  `__getitem__` or `__setitem__`.
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
-  to `UnsafePointer`.  Instead of `UnsafePointer(someRef)` please use the
+  to `UnsafePointer`. Instead of `UnsafePointer(someRef)` please use the
   `UnsafePointer.address_of(someRef[])` which makes the code explicit that the
   `UnsafePointer` gets the address of what the reference points to.
 
@@ -316,7 +413,7 @@ by [@jayzhan211](https://github.com/jayzhan211))
 
 - Removed `UnsafePointer.offset(offset:Int)`.
 
-- Removed `SIMD.splat(value: Scalar[type])`.  Use the constructor for SIMD
+- Removed `SIMD.splat(value: Scalar[type])`. Use the constructor for SIMD
   instead.
 
 - The builtin `tensor` module has been removed. Identical functionality is

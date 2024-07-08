@@ -286,7 +286,7 @@ struct NamedTemporaryFile:
 
         Args:
             mode: The mode to open the file in (the mode can be "r" or "w").
-            name: The name of the temp file; if it is unspecified, then random name will be provided.
+            name: The name of the temp file. If it is unspecified, then a random name will be provided.
             suffix: Suffix to use for the file name if name is not provided.
             prefix: Prefix to use for the file name if name is not provided.
             dir: Directory in which the file will be created.
@@ -316,7 +316,6 @@ struct NamedTemporaryFile:
         except:
             raise Error("Failed to create temporary file")
 
-    @always_inline
     fn __del__(owned self):
         """Closes the file handle."""
         try:
@@ -340,7 +339,6 @@ struct NamedTemporaryFile:
         self._delete = existing._delete
         self.name = existing.name^
 
-    @always_inline
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads the data from the file.
 
@@ -364,11 +362,15 @@ struct NamedTemporaryFile:
         """
         return self._file_handle.read_bytes(size)
 
-    fn seek(self, offset: UInt64) raises -> UInt64:
+    fn seek(self, offset: UInt64, whence: UInt8 = os.SEEK_SET) raises -> UInt64:
         """Seeks to the given offset in the file.
 
         Args:
             offset: The byte offset to seek to from the start of the file.
+            whence: The reference point for the offset:
+                os.SEEK_SET = 0: start of file (Default).
+                os.SEEK_CUR = 1: current position.
+                os.SEEK_END = 2: end of file.
 
         Raises:
             An error if this file handle is invalid, or if file seek returned a
@@ -377,7 +379,7 @@ struct NamedTemporaryFile:
         Returns:
             The resulting byte offset from the start of the file.
         """
-        return self._file_handle.seek(offset)
+        return self._file_handle.seek(offset, whence)
 
     fn write(self, data: String) raises:
         """Write the data to the file.

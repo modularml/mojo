@@ -832,6 +832,55 @@ def test_indexing():
     assert_equal(l[2], 3)
 
 
+# ===-------------------------------------------------------------------===#
+# List dtor tests
+# ===-------------------------------------------------------------------===#
+var g_dtor_count: Int = 0
+
+
+struct DtorCounter(CollectionElement):
+    # NOTE: payload is required because List does not support zero sized structs.
+    var payload: Int
+
+    fn __init__(inout self):
+        self.payload = 0
+
+    fn __copyinit__(inout self, existing: Self, /):
+        self.payload = existing.payload
+
+    fn __moveinit__(inout self, owned existing: Self, /):
+        self.payload = existing.payload
+        existing.payload = 0
+
+    fn __del__(owned self):
+        g_dtor_count += 1
+
+
+def inner_test_list_dtor():
+    # explicity reset global counter
+    g_dtor_count = 0
+
+    var l = List[DtorCounter]()
+    assert_equal(g_dtor_count, 0)
+
+    l.append(DtorCounter())
+    assert_equal(g_dtor_count, 0)
+
+    l.__del__()
+    assert_equal(g_dtor_count, 1)
+
+
+def test_list_dtor():
+    # call another function to force the destruction of the list
+    inner_test_list_dtor()
+
+    # verify we still only ran the destructor once
+    assert_equal(g_dtor_count, 1)
+
+
+# ===-------------------------------------------------------------------===#
+# main
+# ===-------------------------------------------------------------------===#
 def main():
     test_mojo_issue_698()
     test_list()
@@ -865,3 +914,4 @@ def main():
     test_list_mult()
     test_list_contains()
     test_indexing()
+    test_list_dtor()

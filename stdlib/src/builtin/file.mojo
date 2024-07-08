@@ -96,15 +96,14 @@ struct FileHandle:
         var err_msg = _OwnedStringRef()
         var handle = external_call[
             "KGEN_CompilerRT_IO_FileOpen", DTypePointer[DType.invalid]
-        ](path, mode, UnsafePointer.address_of(err_msg))
+        ](path, mode, Reference(err_msg))
 
         if err_msg:
             self.handle = DTypePointer[DType.invalid]()
-            raise (err_msg^).consume_as_error()
+            raise err_msg^.consume_as_error()
 
         self.handle = handle
 
-    @always_inline
     fn __del__(owned self):
         """Closes the file handle."""
         try:
@@ -119,11 +118,11 @@ struct FileHandle:
 
         var err_msg = _OwnedStringRef()
         external_call["KGEN_CompilerRT_IO_FileClose", NoneType](
-            self.handle, UnsafePointer.address_of(err_msg)
+            self.handle, Reference(err_msg)
         )
 
         if err_msg:
-            raise (err_msg^).consume_as_error()
+            raise err_msg^.consume_as_error()
 
         self.handle = DTypePointer[DType.invalid]()
 
@@ -136,7 +135,6 @@ struct FileHandle:
         self.handle = existing.handle
         existing.handle = DTypePointer[DType.invalid]()
 
-    @always_inline
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads data from a file and sets the file handle seek position. If
         size is left as the default of -1, it will read to the end of the file.
@@ -196,16 +194,15 @@ struct FileHandle:
             "KGEN_CompilerRT_IO_FileRead", UnsafePointer[UInt8]
         ](
             self.handle,
-            UnsafePointer.address_of(size_copy),
-            UnsafePointer.address_of(err_msg),
+            Reference(size_copy),
+            Reference(err_msg),
         )
 
         if err_msg:
-            raise (err_msg^).consume_as_error()
+            raise err_msg^.consume_as_error()
 
         return String(buf, int(size_copy) + 1)
 
-    @always_inline
     fn read[
         type: DType
     ](self, ptr: DTypePointer[type], size: Int64 = -1) raises -> Int64:
@@ -274,7 +271,7 @@ struct FileHandle:
             self.handle,
             ptr,
             size * sizeof[type](),
-            UnsafePointer.address_of(err_msg),
+            Reference(err_msg),
         )
 
         if err_msg:
@@ -340,8 +337,8 @@ struct FileHandle:
             "KGEN_CompilerRT_IO_FileReadBytes", UnsafePointer[UInt8]
         ](
             self.handle,
-            UnsafePointer.address_of(size_copy),
-            UnsafePointer.address_of(err_msg),
+            Reference(size_copy),
+            Reference(err_msg),
         )
 
         if err_msg:
@@ -398,7 +395,7 @@ struct FileHandle:
         )
         var err_msg = _OwnedStringRef()
         var pos = external_call["KGEN_CompilerRT_IO_FileSeek", UInt64](
-            self.handle, offset, whence, UnsafePointer.address_of(err_msg)
+            self.handle, offset, whence, Reference(err_msg)
         )
 
         if err_msg:
@@ -422,7 +419,6 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
-    @always_inline
     fn write(self, data: StringRef) raises:
         """Write the data to the file.
 
@@ -431,7 +427,6 @@ struct FileHandle:
         """
         self._write(data.unsafe_ptr(), len(data))
 
-    @always_inline
     fn _write[
         address_space: AddressSpace
     ](self, ptr: UnsafePointer[UInt8, address_space], len: Int) raises:
@@ -452,7 +447,7 @@ struct FileHandle:
             self.handle,
             ptr.address,
             len,
-            UnsafePointer.address_of(err_msg),
+            Reference(err_msg),
         )
 
         if err_msg:
@@ -474,28 +469,14 @@ struct FileHandle:
         return Int(i64_res.value)
 
 
-fn open(path: String, mode: String) raises -> FileHandle:
-    """Opens the file specified by path using the mode provided, returning a
-    FileHandle.
-
-    Args:
-      path: The path to the file to open.
-      mode: The mode to open the file in.
-
-    Returns:
-      A file handle.
-    """
-    return FileHandle(path, mode)
-
-
 fn open[
-    pathlike: os.PathLike
-](path: pathlike, mode: String) raises -> FileHandle:
+    PathLike: os.PathLike
+](path: PathLike, mode: String) raises -> FileHandle:
     """Opens the file specified by path using the mode provided, returning a
     FileHandle.
 
     Parameters:
-      pathlike: The a type conforming to the os.PathLike trait.
+      PathLike: The a type conforming to the os.PathLike trait.
 
     Args:
       path: The path to the file to open.
