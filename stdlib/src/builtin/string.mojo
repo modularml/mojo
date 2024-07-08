@@ -1238,10 +1238,6 @@ struct String(
         """
         return self.byte_length() > 0
 
-    @deprecated(
-        "A future version will make this method return Unicode codepoints "
-        "PREFER: String.byte_length()"
-    )
     fn __len__(self) -> Int:
         """Gets the string length, in bytes (for now) PREFER:
         String.byte_length(), a future version will make this method return

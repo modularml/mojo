@@ -162,7 +162,7 @@ struct Path(
         Returns:
             True if the path length is greater than zero, and False otherwise.
         """
-        return len(self.path) > 0
+        return self.path.byte_length() > 0
 
     fn format_to(self, inout writer: Formatter):
         """
