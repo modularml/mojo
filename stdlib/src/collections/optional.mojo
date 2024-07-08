@@ -145,6 +145,46 @@ struct Optional[T: CollectionElement](
         """
         return self.__bool__()
 
+    fn __eq__[
+        T: EqualityComparableCollectionElement
+    ](self: Optional[T], rhs: Optional[T]) -> Bool:
+        """Return `True` if this is the same as another optional value, meaning
+        both are absent, or both are present and have the same underlying value.
+
+        Parameters:
+            T: The type of the elements in the list. Must implement the
+              traits `CollectionElement` and `EqualityComparable`.
+
+        Args:
+            rhs: The value to compare to.
+
+        Returns:
+            True if the values are the same.
+        """
+        if self:
+            if rhs:
+                return self.value() == rhs.value()
+            return False
+        return not rhs
+
+    fn __ne__[
+        T: EqualityComparableCollectionElement
+    ](self: Optional[T], rhs: Optional[T]) -> Bool:
+        """Return `False` if this is the same as another optional value, meaning
+        both are absent, or both are present and have the same underlying value.
+
+        Parameters:
+            T: The type of the elements in the list. Must implement the
+              traits `CollectionElement` and `EqualityComparable`.
+
+        Args:
+            rhs: The value to compare to.
+
+        Returns:
+            False if the values are the same.
+        """
+        return not (self == rhs)
+
     # ===-------------------------------------------------------------------===#
     # Trait implementations
     # ===-------------------------------------------------------------------===#

@@ -34,6 +34,9 @@ what we publish.
   exclusive access to the underlying memory allocation. The compiler is not
   guaranteed to do anything with this information.
 
+- `Optional` values are now equality comparable with `==` and `!=` when their
+  element type is equality comparable.
+
 - Added a new [`Counter`](/mojo/stdlib/collections/counter/Counter)
   dictionary-like type, matching most of the features of the Python one.
   ([PR 2910#](https://github.com/modularml/mojo/pull/2910) by
