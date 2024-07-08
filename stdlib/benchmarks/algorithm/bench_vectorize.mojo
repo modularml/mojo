@@ -33,7 +33,6 @@ from benchmark import (
     run,
 )
 from buffer import Buffer
-from memory import memcmp
 from memory.unsafe import DTypePointer
 
 
