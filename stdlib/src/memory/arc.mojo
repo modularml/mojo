@@ -25,7 +25,7 @@ print(3 == p[])
 Subscripting(`[]`) is done by `Reference`,
 in order to ensure that the underlying `Arc` outlive the operation.
 
-It is highly DISCOURAGED to manipulate an `Arc` trough `UnsafePointer`.
+It is highly DISCOURAGED to manipulate an `Arc` through `UnsafePointer`.
 Mojo's ASAP deletion policy ensure values are destroyed at last use.
 Do not unsafely dereference the `Arc` inner `UnsafePointer` field.
 See [Lifecycle](https://docs.modular.com/mojo/manual/lifecycle/).
