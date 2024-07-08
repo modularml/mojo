@@ -1213,11 +1213,17 @@ struct String(
         """
         return self.byte_length() > 0
 
+    @deprecated(
+        "string length, in bytes (for now) PREFER: String.byte_length(), a"
+        " future version will make this method return Unicode codepoints."
+    )
     fn __len__(self) -> Int:
-        """Gets the string length, in bytes.
+        """Gets the string length, in bytes (for now) PREFER:
+        String.byte_length(), a future version will make this method return
+        Unicode codepoints.
 
         Returns:
-            The string length, in bytes.
+            The string length, in bytes (for now).
         """
         var unicode_length = self.byte_length()
 
@@ -2136,7 +2142,7 @@ struct String(
             return _is_ascii_uppercase(c) or _is_ascii_lowercase(c)
 
         for c in self:
-            debug_assert(c._byte_length() == 1, "only implemented for ASCII")
+            debug_assert(c.byte_length() == 1, "only implemented for ASCII")
             if is_ascii_cased(ord(c)):
 
                 @parameter

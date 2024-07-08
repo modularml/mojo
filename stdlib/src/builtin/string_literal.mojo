@@ -221,7 +221,7 @@ struct StringLiteral(
             A new string.
         """
         var string = String()
-        var length = self._byte_length()
+        var length = self.byte_length()
         var buffer = String._buffer_type()
         var new_capacity = length + 1
         buffer._realloc(new_capacity)
