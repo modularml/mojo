@@ -198,8 +198,8 @@ struct List[T: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     fn __contains__[
-        T2: ComparableCollectionElement
-    ](self: List[T], value: T2) -> Bool:
+        U: ComparableCollectionElement
+    ](self: List[U], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
         ```mojo
@@ -207,7 +207,7 @@ struct List[T: CollectionElement](
         if 3 in x: print("x contains 3")
         ```
         Parameters:
-            T2: The type of the elements in the list. Must implement the
+            U: The type of the elements in the list. Must implement the
               traits `EqualityComparable` and `CollectionElement`.
 
         Args:
@@ -216,10 +216,8 @@ struct List[T: CollectionElement](
         Returns:
             True if the value is contained in the list, False otherwise.
         """
-
-        constrained[_type_is_eq[T, T2](), "value type is not self.T"]()
         for i in self:
-            if rebind[Reference[T2, __lifetime_of(self)]](i)[] == value:
+            if i[] == value:
                 return True
         return False
 
