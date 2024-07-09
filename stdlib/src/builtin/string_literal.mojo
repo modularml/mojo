@@ -212,7 +212,7 @@ struct StringLiteral(
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        return _atol(self.as_string_slice())
 
     @no_inline
     fn __str__(self) -> String:
