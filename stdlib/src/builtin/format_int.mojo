@@ -285,13 +285,13 @@ fn _try_write_int[
     if radix < 2:
         return Error("Unable to format integer to string with radix < 2")
 
-    if radix > len(digit_chars):
+    if radix > digit_chars.byte_length():
         return Error(
             "Unable to format integer to string when provided radix is larger "
             "than length of available digit value characters"
         )
 
-    if not len(digit_chars) >= 2:
+    if not digit_chars.byte_length() >= 2:
         return Error(
             "Unable to format integer to string when provided digit_chars"
             " mapping len is not >= 2"

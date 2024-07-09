@@ -21,6 +21,7 @@ from utils import StringSlice
 """
 
 from utils import Span
+from builtin.string import _isspace, _utf8_byte_type
 
 alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""
@@ -68,8 +69,7 @@ struct StringSlice[
         # FIXME(MSTDL-160):
         #   Ensure StringLiteral _actually_ always uses UTF-8 encoding.
         self = StringSlice[lifetime](
-            unsafe_from_utf8_ptr=literal.unsafe_ptr(),
-            len=literal._byte_length(),
+            unsafe_from_utf8_ptr=literal.unsafe_ptr(), len=literal.byte_length()
         )
 
     @always_inline
@@ -156,9 +156,13 @@ struct StringSlice[
         Returns:
             The length in Unicode codepoints.
         """
-        # FIXME(MSTDL-160):
-        #   Actually perform UTF-8 decoding here to count the codepoints.
-        return len(self._slice)
+        var unicode_length = self.byte_length()
+
+        for i in range(unicode_length):
+            if _utf8_byte_type(self._slice[i]) == 1:
+                unicode_length -= 1
+
+        return unicode_length
 
     fn format_to(self, inout writer: Formatter):
         """
@@ -264,8 +268,7 @@ struct StringSlice[
 
     @always_inline
     fn as_bytes_slice(self) -> Span[UInt8, lifetime]:
-        """
-        Get the sequence of encoded bytes as a slice of the underlying string.
+        """Get the sequence of encoded bytes as a slice of the underlying string.
 
         Returns:
             A slice containing the underlying sequence of encoded bytes.
@@ -274,8 +277,7 @@ struct StringSlice[
 
     @always_inline
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
-        """
-        Gets a pointer to the first element of this string slice.
+        """Gets a pointer to the first element of this string slice.
 
         Returns:
             A pointer pointing at the first element of this string slice.
@@ -284,9 +286,19 @@ struct StringSlice[
         return self._slice.unsafe_ptr()
 
     @always_inline
-    fn _byte_length(self) -> Int:
+    fn byte_length(self) -> Int:
+        """Get the length of this string slice in bytes.
+
+        Returns:
+            The length of this string slice in bytes.
         """
-        Get the length of this string slice in bytes.
+
+        return len(self.as_bytes_slice())
+
+    @always_inline
+    @deprecated("use byte_length() instead")
+    fn _byte_length(self) -> Int:
+        """Get the length of this string slice in bytes.
 
         Returns:
             The length of this string slice in bytes.
@@ -295,8 +307,7 @@ struct StringSlice[
         return len(self.as_bytes_slice())
 
     fn _strref_dangerous(self) -> StringRef:
-        """
-        Returns an inner pointer to the string as a StringRef.
+        """Returns an inner pointer to the string as a StringRef.
 
         Safety:
             This functionality is extremely dangerous because Mojo eagerly
@@ -304,11 +315,10 @@ struct StringSlice[
             _strref_keepalive() method to keep the underlying string alive long
             enough.
         """
-        return StringRef(self.unsafe_ptr(), self._byte_length())
+        return StringRef(self.unsafe_ptr(), self.byte_length())
 
     fn _strref_keepalive(self):
-        """
-        A no-op that keeps `self` alive through the call.  This
+        """A no-op that keeps `self` alive through the call.  This
         can be carefully used with `_strref_dangerous()` to wield inner pointers
         without the string getting deallocated early.
         """

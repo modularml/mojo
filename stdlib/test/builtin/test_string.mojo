@@ -661,8 +661,31 @@ def test_split():
     assert_true(d[0] == "hello \t" and d[1] == "" and d[2] == "\v\fworld")
 
     # Should add all whitespace-like chars as one
-    alias utf8_spaces = String(" \t\n\r\v\f")
-    var s = utf8_spaces + "hello" + utf8_spaces + "world" + utf8_spaces
+    # test all unicode separators
+    # 0 is to build a String with null terminator
+    alias next_line = List[UInt8](0xC2, 0x85, 0)
+    """TODO: \\x85"""
+    alias unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8, 0)
+    """TODO: \\u2028"""
+    alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
+    """TODO: \\u2029"""
+    # TODO add line and paragraph separator as stringliteral once unicode
+    # escape secuences are accepted
+    var univ_sep_var = (
+        String(" ")
+        + String("\t")
+        + String("\n")
+        + String("\r")
+        + String("\v")
+        + String("\f")
+        + String("\x1c")
+        + String("\x1d")
+        + String("\x1e")
+        + String(next_line)
+        + String(unicode_line_sep)
+        + String(unicode_paragraph_sep)
+    )
+    var s = univ_sep_var + "hello" + univ_sep_var + "world" + univ_sep_var
     d = s.split()
     assert_true(len(d) == 2)
     assert_true(d[0] == "hello" and d[1] == "world")
@@ -1251,7 +1274,7 @@ def test_string_iter():
         var utf8_sequence_len = 0
         var byte_idx = 0
         for v in item:
-            var byte_len = len(v)
+            var byte_len = v.byte_length()
             assert_equal(item[byte_idx : byte_idx + byte_len], v)
             byte_idx += byte_len
             utf8_sequence_len += 1
