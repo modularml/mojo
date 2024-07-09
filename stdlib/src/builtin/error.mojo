@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import alignof, sizeof
 
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcpy
 from memory.memory import _free
 
 # ===----------------------------------------------------------------------===#
