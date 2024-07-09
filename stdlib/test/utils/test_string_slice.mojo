@@ -225,7 +225,6 @@ fn test_utf8_validation() raises:
         List[UInt8](0x00, 0x00, 0xF0, 0x80, 0x80, 0x80),
     )
     for item in negative:
-        print(item[].__str__())
         assert_false(is_valid_utf8(item[].unsafe_ptr(), len(item[])))
     _ = negative
 
