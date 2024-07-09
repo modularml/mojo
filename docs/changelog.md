@@ -156,6 +156,12 @@ what we publish.
 
 - Added `StringSlice(..)` initializer from a `StringLiteral`.
 
+- Added a `byte_length()` method to `String`, `StringSlice`, and `StringLiteral`
+and deprecated their private `_byte_length()` methods. Added a warning to
+`String.__len__` method that it will return length in Unicode codepoints in the
+future and `StringSlice.__len__` now does return the Unicode codepoints length.
+([PR #2960](https://github.com/modularml/mojo/pull/2960) by [@martinvuyk](https://github.com/martinvuyk))
+
 - Added new `StaticString` type alias. This can be used in place of
   `StringLiteral` for runtime string arguments.
 

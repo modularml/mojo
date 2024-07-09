@@ -80,7 +80,7 @@ struct Error(
         Returns:
             The constructed Error object.
         """
-        var length = len(src)
+        var length = src.byte_length()
         var dest = UnsafePointer[UInt8].alloc(length + 1)
         memcpy(
             dest=dest,
