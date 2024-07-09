@@ -416,7 +416,8 @@ what we publish.
 - `LegacyPointer.load/store` are now removed. It's use is replaced with
   `__getitem__` or `__setitem__`.
 
-- `memcmp` no longer takes in `LegacyPointer`, instead, use `UnsafePointer`.
+- `memcmp`, `memset` and `memset_zero` no longer take in `LegacyPointer`,
+  instead, use `UnsafePointer`.
 
 ### ❌ Removed
 
