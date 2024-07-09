@@ -177,6 +177,37 @@ fn test_slice_bool() raises:
 
 
 fn test_utf8_validation() raises:
+    var text = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam
+    varius tellus quis tincidunt dictum. Donec eros orci, ultricies ac metus non
+    , rutrum faucibus neque. Nunc ultricies turpis ut lacus consequat dapibus.
+    Nulla nec risus a purus volutpat blandit. Donec sit amet massa velit. Aenean
+    fermentum libero eu pharetra placerat. Sed id molestie tellus. Fusce
+    sollicitudin a purus ac placerat.
+    Lorem Ipsum，也称乱数假文或者哑元文本， 是印刷及排版领域所常用的虚拟文字
+    由于曾经一台匿名的打印机刻意打乱了一盒印刷字体从而造出一本字体样品书，Lorem
+    Ipsum从西元15世纪起就被作为此领域的标准文本使用。它不仅延续了五个世纪，
+    还通过了电子排版的挑战，其雏形却依然保存至今。在1960年代，”Leatraset”公司发布了印刷着
+    Lorem Ipsum段落的纸张，从而广泛普及了它的使用。最近，计算机桌面出版软件
+    למה אנו משתמשים בזה?
+    זוהי עובדה מבוססת שדעתו של הקורא תהיה מוסחת על ידי טקטס קריא כאשר הוא יביט בפריסתו. המטרה בשימוש
+     ב- Lorem Ipsum הוא שיש לו פחות או יותר תפוצה של אותיות, בניגוד למלל ' יסוי 
+    יסוי  יסוי', ונותן חזות קריאה יותר.הרבה הוצאות מחשבים ועורכי דפי אינטרנט משתמשים כיום ב-
+    Lorem Ipsum כטקסט ברירת המחדל שלהם, וחיפוש של 'lorem ipsum' יחשוף אתרים רבים בראשית
+    דרכם.גרסאות רבות נוצרו במהלך השנים, לעתים בשגגה 
+    Lorem Ipsum е едноставен модел на текст кој се користел во печатарската 
+    индустрија.
+    Lorem Ipsum - це текст-"риба", що використовується в друкарстві та дизайні.
+    Lorem Ipsum คือ เนื้อหาจำลองแบบเรียบๆ ที่ใช้กันในธุรกิจงานพิมพ์หรืองานเรียงพิมพ์ 
+    มันได้กลายมาเป็นเนื้อหาจำลองมาตรฐานของธุรกิจดังกล่าวมาตั้งแต่ศตวรรษที่
+    Lorem ipsum" في أي محرك بحث ستظهر العديد
+     من المواقع الحديثة العهد في نتائج البحث. على مدى السنين
+     ظهرت نسخ جديدة ومختلفة من نص لوريم إيبسوم، أحياناً عن طريق
+     الصدفة، وأحياناً عن عمد كإدخال بعض العبارات الفكاهية إليها.
+    """
+    assert_true(is_valid_utf8[8](text.unsafe_ptr(), text._byte_length()))
+    assert_true(is_valid_utf8[4](text.unsafe_ptr(), text._byte_length()))
+    _ = text
+
     var positive = List[List[UInt8]](
         List[UInt8](0x0),
         List[UInt8](0x00),
@@ -195,7 +226,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0xF4, 0x8F, 0x88, 0xAA),
     )
     for item in positive:
-        assert_true(is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+        assert_true(is_valid_utf8[8](item[].unsafe_ptr(), len(item[])))
+        assert_true(is_valid_utf8[4](item[].unsafe_ptr(), len(item[])))
     _ = positive
     var negative = List[List[UInt8]](
         List[UInt8](0x80),
@@ -225,7 +257,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0x00, 0x00, 0xF0, 0x80, 0x80, 0x80),
     )
     for item in negative:
-        assert_false(is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+        assert_false(is_valid_utf8[8](item[].unsafe_ptr(), len(item[])))
+        assert_false(is_valid_utf8[4](item[].unsafe_ptr(), len(item[])))
     _ = negative
 
 

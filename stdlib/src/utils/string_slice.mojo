@@ -116,8 +116,8 @@ fn is_valid_utf8[
             return False
         elif first_byte_type == 2 and d[0] < UInt8(0b1100_0010):
             return False
-        idx += 4
-        iter_len -= 4
+        idx += int(first_byte_type)
+        iter_len -= int(first_byte_type)
 
     @parameter
     fn invalid[amnt: Int](i: Int) -> Bool:
@@ -138,12 +138,16 @@ fn is_valid_utf8[
             idx += 1
             continue
         elif byte_type == 1:
+            print("invalid byte 1")
             return False
         elif byte_type == 2 and (invalid[1](idx) or val < 0b1100_0010):
+            print("invalid byte 2")
             return False
         elif byte_type == 3 and invalid[2](idx):
+            print("invalid byte 3")
             return False
         elif byte_type == 4 and invalid[3](idx):
+            print("invalid byte 4")
             return False
         idx += int(byte_type)
     return True
