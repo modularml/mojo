@@ -1075,17 +1075,7 @@ struct String(
         Returns:
             A new string containing the character at the specified position.
         """
-        # FIXME: this should work with unicode codepoints, but this doesn't yet
-        # work at compile time because of issue #933
-        # var i = 0
-        # var buf = Self._buffer_type(capacity=5)
-        # for s in self:
-        #     if i != idx:
-        #         continue
-        #     for j in range(s.byte_length()):
-        #         buf[j] = self._buffer[i + j]
-        # buf.append(0)
-        # buf.resize(len(buf))
+        # TODO(#933): implement this for unicode when we support llvm intrinsic evaluation at compile time
         var normalized_idx = normalize_index["String"](idx, self)
         var buf = Self._buffer_type(capacity=1)
         buf.append(self._buffer[normalized_idx])
@@ -1104,22 +1094,7 @@ struct String(
         var start: Int
         var end: Int
         var step: Int
-        # FIXME: this should work with unicode codepoints, but this doesn't yet
-        # work at compile time because of issue #933
-        # var idx = 0
-        # var start = span.start.value() if span.start else 0
-        # var end = span.end.value() if span.end else 0
-        # var buffer = Self._buffer_type()
-        # for s in self:
-        #     var amnt_bytes = s.byte_length()
-        #     if not (start <= idx < end) or idx % span.step != 0:
-        #         idx += amnt_bytes
-        #         continue
-        #     for i in range(amnt_bytes):
-        #         buffer[idx + i] = self._buffer[idx + i]
-        # buffer.append(0)
-        # buffer.resize(len(buffer))
-        # return Self(buffer^)
+        # TODO(#933): implement this for unicode when we support llvm intrinsic evaluation at compile time
 
         start, end, step = span.indices(self.byte_length())
         var r = range(start, end, step)
