@@ -70,6 +70,7 @@ fn is_valid_utf8[
     # and benchmark the difference.
 
     fn invalid_special(b0: UInt8, b1: UInt8) -> Bool:
+        """Special unicode ranges."""
         if b0 == 0xE0 and not (UInt8(0xA0) <= b1 <= UInt8(0xBF)):
             return True
         elif b0 == 0xED and not (UInt8(0x80) <= b1 <= UInt8(0x9F)):
@@ -111,7 +112,6 @@ fn is_valid_utf8[
         if not (valid_n4 or valid_n3 or valid_n2):
             return False
 
-        # special unicode ranges
         if invalid_special(d[0], d[1]):
             return False
         elif first_byte_type == 2 and d[0] < UInt8(0b1100_0010):
@@ -138,16 +138,12 @@ fn is_valid_utf8[
             idx += 1
             continue
         elif byte_type == 1:
-            print("invalid byte 1")
             return False
         elif byte_type == 2 and (invalid[1](idx) or val < 0b1100_0010):
-            print("invalid byte 2")
             return False
         elif byte_type == 3 and invalid[2](idx):
-            print("invalid byte 3")
             return False
         elif byte_type == 4 and invalid[3](idx):
-            print("invalid byte 4")
             return False
         idx += int(byte_type)
     return True
