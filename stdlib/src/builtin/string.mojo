@@ -25,6 +25,7 @@ from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
+from utils.string_slice import _utf8_byte_type
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -705,20 +706,6 @@ fn isprintable(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 
 
-fn _utf8_byte_type(b: UInt8) -> UInt8:
-    """UTF-8 byte type.
-
-    Returns:
-        The byte type:
-            0 -> ASCII byte.
-            1 -> continuation byte.
-            2 -> start of 2 byte long sequence.
-            3 -> start of 3 byte long sequence.
-            4 -> start of 4 byte long sequence.
-    """
-    return countl_zero(~(b & 0b1111_0000))
-
-
 @value
 struct _StringIter[
     is_mutable: Bool, //,
@@ -746,7 +733,7 @@ struct _StringIter[
         self.length = length
         self.continuation_bytes = 0
         for i in range(length):
-            if _utf8_byte_type(int(unsafe_pointer[i])) == 1:
+            if _utf8_byte_type(unsafe_pointer[i]) == 1:
                 self.continuation_bytes += 1
 
     fn __iter__(self) -> Self:
@@ -757,7 +744,7 @@ struct _StringIter[
         if forward:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(int(self.ptr[self.index]))
+                var byte_type = _utf8_byte_type(self.ptr[self.index])
                 if byte_type != 0:
                     byte_len = int(byte_type)
                     self.continuation_bytes -= byte_len - 1
@@ -769,11 +756,11 @@ struct _StringIter[
         else:
             var byte_len = 1
             if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(int(self.ptr[self.index - 1]))
+                var byte_type = _utf8_byte_type(self.ptr[self.index - 1])
                 if byte_type != 0:
                     while byte_type == 1:
                         byte_len += 1
-                        var b = int(self.ptr[self.index - byte_len])
+                        var b = self.ptr[self.index - byte_len]
                         byte_type = _utf8_byte_type(b)
                     self.continuation_bytes -= byte_len - 1
             self.index -= byte_len

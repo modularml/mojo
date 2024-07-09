@@ -15,7 +15,7 @@
 from testing import assert_equal, assert_true, assert_false
 
 from utils import Span
-from utils.string_slice import is_valid_utf8
+from utils.string_slice import _is_valid_utf8
 
 
 fn test_string_literal_byte_slice() raises:
@@ -204,9 +204,8 @@ fn test_utf8_validation() raises:
      ظهرت نسخ جديدة ومختلفة من نص لوريم إيبسوم، أحياناً عن طريق
      الصدفة، وأحياناً عن عمد كإدخال بعض العبارات الفكاهية إليها.
     """
-    assert_true(is_valid_utf8[8](text.unsafe_ptr(), text._byte_length()))
-    assert_true(is_valid_utf8[4](text.unsafe_ptr(), text._byte_length()))
-    _ = text
+    assert_true(_is_valid_utf8(text.unsafe_ptr(), text._byte_length()))
+    assert_true(_is_valid_utf8(text.unsafe_ptr(), text._byte_length()))
 
     var positive = List[List[UInt8]](
         List[UInt8](0x0),
@@ -226,9 +225,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0xF4, 0x8F, 0x88, 0xAA),
     )
     for item in positive:
-        assert_true(is_valid_utf8[8](item[].unsafe_ptr(), len(item[])))
-        assert_true(is_valid_utf8[4](item[].unsafe_ptr(), len(item[])))
-    _ = positive
+        assert_true(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+        assert_true(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
     var negative = List[List[UInt8]](
         List[UInt8](0x80),
         List[UInt8](0xBF),
@@ -257,9 +255,8 @@ fn test_utf8_validation() raises:
         List[UInt8](0x00, 0x00, 0xF0, 0x80, 0x80, 0x80),
     )
     for item in negative:
-        assert_false(is_valid_utf8[8](item[].unsafe_ptr(), len(item[])))
-        assert_false(is_valid_utf8[4](item[].unsafe_ptr(), len(item[])))
-    _ = negative
+        assert_false(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+        assert_false(_is_valid_utf8(item[].unsafe_ptr(), len(item[])))
 
 
 fn main() raises:

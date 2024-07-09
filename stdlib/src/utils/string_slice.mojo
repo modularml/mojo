@@ -26,14 +26,104 @@ alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""
 
 
-fn is_valid_utf8[
-    width: Int = 8
-](data: UnsafePointer[UInt8], length: Int) -> Bool:
-    """Verify that the bytes are valid UTF-8.
+fn _utf8_byte_type[
+    size: Int
+](b: SIMD[DType.uint8, size]) -> SIMD[DType.uint8, size]:
+    """UTF-8 byte type.
 
-    Parameters:
-        width: The width of the SIMD vector to use for validation when length
-            fits. The rest is verified per byte.
+    Returns:
+        The byte type.
+
+    - Types:
+        - 0 -> ASCII byte.
+        - 1 -> continuation byte.
+        - 2 -> start of 2 byte long sequence.
+        - 3 -> start of 3 byte long sequence.
+        - 4 -> start of 4 byte long sequence.
+    """
+    return countl_zero(~(b & UInt8(0b1111_0000)))
+
+
+fn _validate_utf8_simd_slice[
+    width: Int, remainder: Bool = False
+](ptr: DTypePointer[DType.uint8], length: Int, owned iter_len: Int) -> Int:
+    """Internal method to validate utf8, use _is_valid_utf8."""
+    # TODO: implement a faster algorithm like https://github.com/cyb70289/utf8
+    # and benchmark the difference.
+    var idx = length - iter_len
+    while iter_len >= width or remainder:
+        var d: SIMD[DType.uint8, width]
+
+        @parameter
+        if not remainder:
+            d = ptr.offset(idx).simd_strided_load[width](1)
+        else:
+            if iter_len < 0:  # not really needed but just in case
+                return -1
+            d = SIMD[DType.uint8, width](0)
+            for i in range(iter_len):
+                d[i] = ptr[idx + i]
+
+        var comp = d < 0b1000_0000  # skip all ASCII bytes
+        if comp.reduce_and():
+
+            @parameter
+            if not remainder:
+                idx += width
+                iter_len -= width
+                continue
+            else:
+                return 0
+        var byte_types = _utf8_byte_type(d)
+        var first_byte_type = byte_types[0]
+        if first_byte_type == 0:
+            for i in range(1, width):
+                if byte_types[i] != 0:
+                    idx += i
+                    iter_len -= i
+                    break
+            continue
+
+        # byte_type has to match against the amount of continuation bytes
+        alias vec_t = SIMD[DType.uint8, 4]
+        alias n4_byte_types = vec_t(4, 1, 1, 1)
+        alias n3_byte_types = vec_t(3, 1, 1, 0)
+        alias n3_mask = vec_t(0b111, 0b111, 0b111, 0)
+        alias n2_byte_types = vec_t(2, 1, 0, 0)
+        alias n2_mask = vec_t(0b111, 0b111, 0, 0)
+        var byte_types_4 = byte_types.slice[4]()
+        var valid_n4 = (byte_types_4 == n4_byte_types).reduce_and()
+        var valid_n3 = ((byte_types_4 & n3_mask) == n3_byte_types).reduce_and()
+        var valid_n2 = ((byte_types_4 & n2_mask) == n2_byte_types).reduce_and()
+        if not (valid_n4 or valid_n3 or valid_n2):
+            return -1
+
+        # special unicode ranges
+        var b0 = d[0]
+        var b1 = d[1]
+        if first_byte_type == 2 and b0 < UInt8(0b1100_0010):
+            return -1
+        elif b0 == 0xE0 and not (UInt8(0xA0) <= b1 <= UInt8(0xBF)):
+            return -1
+        elif b0 == 0xED and not (UInt8(0x80) <= b1 <= UInt8(0x9F)):
+            return -1
+        elif b0 == 0xF0 and not (UInt8(0x90) <= b1 <= UInt8(0xBF)):
+            return -1
+        elif b0 == 0xF4 and not (UInt8(0x80) <= b1 <= UInt8(0x8F)):
+            return -1
+
+        # amount of bytes evaluated
+        idx += int(first_byte_type)
+        iter_len -= int(first_byte_type)
+
+        @parameter
+        if remainder:
+            break
+    return iter_len
+
+
+fn _is_valid_utf8(data: UnsafePointer[UInt8], length: Int) -> Bool:
+    """Verify that the bytes are valid UTF-8.
 
     Args:
         data: The pointer to the data.
@@ -63,90 +153,29 @@ fn is_valid_utf8[
     .
     """
 
-    constrained[width >= 4, "width must be >= 4."]()
     var ptr = DTypePointer(data)
     var iter_len = length
-    # TODO: implement a faster algorithm like https://github.com/cyb70289/utf8
-    # and benchmark the difference.
-
-    fn invalid_special(b0: UInt8, b1: UInt8) -> Bool:
-        """Special unicode ranges."""
-        if b0 == 0xE0 and not (UInt8(0xA0) <= b1 <= UInt8(0xBF)):
-            return True
-        elif b0 == 0xED and not (UInt8(0x80) <= b1 <= UInt8(0x9F)):
-            return True
-        elif b0 == 0xF0 and not (UInt8(0x90) <= b1 <= UInt8(0xBF)):
-            return True
-        elif b0 == 0xF4 and not (UInt8(0x80) <= b1 <= UInt8(0x8F)):
-            return True
-        return False
-
-    var idx = 0
-    while iter_len >= width:
-        var d = ptr.offset(idx).simd_strided_load[width](1)
-        var comp = d < 0b1000_0000
-        if comp.reduce_and():
-            idx += width
-            iter_len -= width
-            continue
-        var byte_types = countl_zero(~(d & UInt8(0b1111_0000)))
-        var first_byte_type = byte_types[0]
-        if first_byte_type == 0:
-            for i in range(1, width):
-                if byte_types[i] != 0:
-                    idx += i
-                    iter_len -= i
-                    break
-            continue
-
-        alias vec_t = SIMD[DType.uint8, 4]
-        alias n4 = vec_t(4, 1, 1, 1)
-        alias n3 = vec_t(3, 1, 1, 0)
-        alias n3_m = vec_t(0b111, 0b111, 0b111, 0)
-        alias n2 = vec_t(2, 1, 0, 0)
-        alias n2_m = vec_t(0b111, 0b111, 0, 0)
-        var vec = byte_types.slice[4]()
-        var valid_n4 = (vec == n4).reduce_and()
-        var valid_n3 = ((vec & n3_m) == n3).reduce_and()
-        var valid_n2 = ((vec & n2_m) == n2).reduce_and()
-        if not (valid_n4 or valid_n3 or valid_n2):
+    if iter_len >= 64 and simdwidthof[DType.uint8]() >= 64:
+        iter_len = _validate_utf8_simd_slice[64](ptr, length, iter_len)
+        if iter_len < 0:
             return False
-
-        if invalid_special(d[0], d[1]):
+    if iter_len >= 32 and simdwidthof[DType.uint8]() >= 32:
+        iter_len = _validate_utf8_simd_slice[32](ptr, length, iter_len)
+        if iter_len < 0:
             return False
-        elif first_byte_type == 2 and d[0] < UInt8(0b1100_0010):
+    if iter_len >= 16 and simdwidthof[DType.uint8]() >= 16:
+        iter_len = _validate_utf8_simd_slice[16](ptr, length, iter_len)
+        if iter_len < 0:
             return False
-        idx += int(first_byte_type)
-        iter_len -= int(first_byte_type)
-
-    @parameter
-    fn invalid[amnt: Int](i: Int) -> Bool:
-        if i + amnt > iter_len:
-            return True
-
-        @parameter
-        for j in range(1, amnt + 1):
-            if countl_zero(~(ptr[i + j] & UInt8(0b1111_0000))) != 1:
-                return True
-        return invalid_special(ptr[i], ptr[i + 1])
-
-    idx = length - iter_len
-    while idx < length:
-        var val = ptr[idx]
-        var byte_type = countl_zero(~(val & UInt8(0b1111_0000)))
-        if byte_type == 0 and val < 0b1000_0000:
-            idx += 1
-            continue
-        elif byte_type == 1:
+    if iter_len >= 8:
+        iter_len = _validate_utf8_simd_slice[8](ptr, length, iter_len)
+        if iter_len < 0:
             return False
-        elif byte_type == 2 and (invalid[1](idx) or val < 0b1100_0010):
+    if iter_len >= 4:
+        iter_len = _validate_utf8_simd_slice[4](ptr, length, iter_len)
+        if iter_len < 0:
             return False
-        elif byte_type == 3 and invalid[2](idx):
-            return False
-        elif byte_type == 4 and invalid[3](idx):
-            return False
-        idx += int(byte_type)
-    return True
+    return _validate_utf8_simd_slice[4, True](ptr, length, iter_len) == 0
 
 
 struct StringSlice[
@@ -192,7 +221,7 @@ struct StringSlice[
         #   Ensure StringLiteral _actually_ always uses UTF-8 encoding.
         # TODO(#933): use when llvm intrinsics can be used at compile time
         # debug_assert(
-        #     is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
+        #     _is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
         #     "StringLiteral doesn't have valid UTF-8 encoding",
         # )
         self = StringSlice[lifetime](
