@@ -190,12 +190,11 @@ struct StringSlice[
         #   StringLiteral is guaranteed to use UTF-8 encoding.
         # FIXME(MSTDL-160):
         #   Ensure StringLiteral _actually_ always uses UTF-8 encoding.
-        # TODO(#933): use constrained when llvm intrinsics can be used at
-        # compile time
-        debug_assert(
-            is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
-            "StringLiteral doesn't have valid UTF-8 encoding",
-        )
+        # TODO(#933): use when llvm intrinsics can be used at compile time
+        # debug_assert(
+        #     is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
+        #     "StringLiteral doesn't have valid UTF-8 encoding",
+        # )
         self = StringSlice[lifetime](
             unsafe_from_utf8_ptr=literal.unsafe_ptr(),
             len=literal._byte_length(),
