@@ -16,6 +16,18 @@ what we publish.
 
 ### ⭐️ New
 
+- `__setitem__` now works with variadic argument lists such as:
+
+  ```mojo
+  struct YourType:
+      fn __setitem__(inout self, *indices: Int, val: Int): ...
+  ```
+
+  The Mojo compiler now always passes the "new value" being set using the last
+  keyword argument of the `__setitem__`, e.g. turning `yourType[1, 2] = 3` into
+  `yourType.__setitem__(1, 2, val=3)`.  This fixes
+  [Issue #248](https://github.com/modularml/mojo/issues/248).
+
 - The pointer variants (`DTypePointer`, `UnsafePointer`, etc.) now have a new
   `exclusive: Bool = False` parameter. Setting this parameter to true tells the
   compiler that the user knows this pointer and all those derived from it have
@@ -78,6 +90,8 @@ what we publish.
       # error: argument type 'NonMovable' does not conform to trait 'Movable'
     b.needs_move(NonMovable())
   ```
+
+  Conditional conformance works with dunder methods and other things as well.
 
 - `async` functions now support memory-only results (like `String`, `List`,
   etc.) and `raises`. Accordingly, both `Coroutine` and `RaisingCoroutine` have
@@ -398,6 +412,8 @@ what we publish.
 
 - `LegacyPointer.load/store` are now removed. It's use is replaced with
   `__getitem__` or `__setitem__`.
+
+- `memcmp` no longer takes in `LegacyPointer`, instead, use `UnsafePointer`.
 
 ### ❌ Removed
 

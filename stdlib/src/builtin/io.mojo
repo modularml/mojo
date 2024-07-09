@@ -389,7 +389,7 @@ fn print[
         writer.write(value)
 
         @parameter
-        if i < values.__len__() - 1:
+        if i < len(VariadicList(Ts)) - 1:
             writer.write(sep)
 
     values.each_idx[print_with_separator]()
