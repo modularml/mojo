@@ -1689,11 +1689,11 @@ struct String(
             var ptr2 = DTypePointer(item2)
             return memcmp(ptr1, ptr2, amnt) == 0
 
-        if len(self) == 0:
+        if self.byte_length() == 0:
             return False
 
         for s in self:
-            var no_null_len = len(s)
+            var no_null_len = s.byte_length()
             var ptr = s.unsafe_ptr()
             if no_null_len == 1 and not _isspace(ptr[0]):
                 return False
