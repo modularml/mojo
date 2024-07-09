@@ -365,7 +365,7 @@ struct StringRef(
         Returns:
             An integer value that represents the string, or otherwise raises.
         """
-        return _atol(self)
+        return atol(self)
 
     @always_inline
     fn __len__(self) -> Int:
