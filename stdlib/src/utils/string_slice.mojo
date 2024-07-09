@@ -132,9 +132,6 @@ fn _is_valid_utf8(data: UnsafePointer[UInt8], length: Int) -> Bool:
     Returns:
         Whether the data is valid UTF-8.
 
-    Constraints:
-        - width must be >= 4.
-
     #### UTF-8 coding format
     [Table 3-7 page 94](http://www.unicode.org/versions/Unicode6.0.0/ch03.pdf).
     Well-Formed UTF-8 Byte Sequences
