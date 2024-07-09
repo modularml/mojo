@@ -15,6 +15,7 @@
 from testing import assert_equal, assert_true, assert_false
 
 from utils import Span
+from utils.string_slice import is_valid_utf8
 
 
 fn test_string_literal_byte_slice() raises:
@@ -175,6 +176,60 @@ fn test_slice_bool() raises:
     assert_true(not str2.as_string_slice().__bool__())
 
 
+fn test_utf8_validation() raises:
+    var positive = List[List[UInt8]](
+        List[UInt8](0x0),
+        List[UInt8](0x00),
+        List[UInt8](0x66),
+        List[UInt8](0x7F),
+        List[UInt8](0x00, 0x7F),
+        List[UInt8](0x7F, 0x00),
+        List[UInt8](0xC2, 0x80),
+        List[UInt8](0xDF, 0xBF),
+        List[UInt8](0xE0, 0xA0, 0x80),
+        List[UInt8](0xE0, 0xA0, 0xBF),
+        List[UInt8](0xED, 0x9F, 0x80),
+        List[UInt8](0xEF, 0x80, 0xBF),
+        List[UInt8](0xF0, 0x90, 0xBF, 0x80),
+        List[UInt8](0xF2, 0x81, 0xBE, 0x99),
+        List[UInt8](0xF4, 0x8F, 0x88, 0xAA),
+    )
+    for item in positive:
+        assert_true(is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+    _ = positive
+    var negative = List[List[UInt8]](
+        List[UInt8](0x80),
+        List[UInt8](0xBF),
+        List[UInt8](0xC0, 0x80),
+        List[UInt8](0xC1, 0x00),
+        List[UInt8](0xC2, 0x7F),
+        List[UInt8](0xDF, 0xC0),
+        List[UInt8](0xE0, 0x9F, 0x80),
+        List[UInt8](0xE0, 0xC2, 0x80),
+        List[UInt8](0xED, 0xA0, 0x80),
+        List[UInt8](0xED, 0x7F, 0x80),
+        List[UInt8](0xEF, 0x80, 0x00),
+        List[UInt8](0xF0, 0x8F, 0x80, 0x80),
+        List[UInt8](0xF0, 0xEE, 0x80, 0x80),
+        List[UInt8](0xF2, 0x90, 0x91, 0x7F),
+        List[UInt8](0xF4, 0x90, 0x88, 0xAA),
+        List[UInt8](0xF4, 0x00, 0xBF, 0xBF),
+        List[UInt8](
+            0xC2, 0x80, 0x00, 0x00, 0xE1, 0x80, 0x80, 0x00, 0xC2, 0xC2, 0x80
+        ),
+        List[UInt8](0x00, 0xC2, 0xC2, 0x80, 0x00, 0x00, 0xE1, 0x80, 0x80),
+        List[UInt8](0x00, 0x00, 0x00, 0xF1, 0x80),
+        List[UInt8](0x00, 0xF1),
+        List[UInt8](0x00, 0x00, 0x00, 0x00, 0xF1, 0x80, 0x80),
+        List[UInt8](0x00, 0xF1, 0x80, 0xC2, 0x80),
+        List[UInt8](0x00, 0x00, 0xF0, 0x80, 0x80, 0x80),
+    )
+    for item in negative:
+        print(item[].__str__())
+        assert_false(is_valid_utf8(item[].unsafe_ptr(), len(item[])))
+    _ = negative
+
+
 fn main() raises:
     test_string_literal_byte_slice()
     test_string_byte_slice()
@@ -182,3 +237,4 @@ fn main() raises:
     test_slice_len()
     test_slice_eq()
     test_slice_bool()
+    test_utf8_validation()

@@ -26,6 +26,123 @@ alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""
 
 
+fn is_valid_utf8[
+    width: Int = 8
+](data: UnsafePointer[UInt8], length: Int) -> Bool:
+    """Verify that the bytes are valid UTF-8.
+
+    Parameters:
+        width: The width of the SIMD vector to use for validation when length
+            fits. The rest is verified per byte.
+
+    Args:
+        data: The pointer to the data.
+        length: The length of the items pointed to.
+
+    Returns:
+        Whether the data is valid UTF-8.
+
+    #### UTF-8 coding format
+    [Table 3-7 page 94](http://www.unicode.org/versions/Unicode6.0.0/ch03.pdf).
+    Well-Formed UTF-8 Byte Sequences
+
+    Code Points        | First Byte | Second Byte | Third Byte | Fourth Byte |
+    :----------        | :--------- | :---------- | :--------- | :---------- |
+    U+0000..U+007F     | 00..7F     |             |            |             |
+    U+0080..U+07FF     | C2..DF     | 80..BF      |            |             |
+    U+0800..U+0FFF     | E0         | ***A0***..BF| 80..BF     |             |
+    U+1000..U+CFFF     | E1..EC     | 80..BF      | 80..BF     |             |
+    U+D000..U+D7FF     | ED         | 80..***9F***| 80..BF     |             |
+    U+E000..U+FFFF     | EE..EF     | 80..BF      | 80..BF     |             |
+    U+10000..U+3FFFF   | F0         | ***90***..BF| 80..BF     | 80..BF      |
+    U+40000..U+FFFFF   | F1..F3     | 80..BF      | 80..BF     | 80..BF      |
+    U+100000..U+10FFFF | F4         | 80..***8F***| 80..BF     | 80..BF      |
+    .
+    """
+    var ptr = DTypePointer(data)
+    var iter_len = length
+    var idx = 0
+    # TODO: implement a faster algorithm like https://github.com/cyb70289/utf8
+    # and benchmark the difference.
+
+    fn invalid_special(b0: UInt8, b1: UInt8) -> Bool:
+        if b0 == 0xE0 and not (UInt8(0xA0) <= b1 <= UInt8(0xBF)):
+            return True
+        elif b0 == 0xED and not (UInt8(0x80) <= b1 <= UInt8(0x9F)):
+            return True
+        elif b0 == 0xF0 and not (UInt8(0x90) <= b1 <= UInt8(0xBF)):
+            return True
+        elif b0 == 0xF4 and not (UInt8(0x80) <= b1 <= UInt8(0x8F)):
+            return True
+        return False
+
+    while iter_len >= width:
+        var d = ptr.offset(idx).simd_strided_load[width](1)
+        var comp = d < 0b1000_0000
+        if comp.reduce_and():
+            idx += width
+            iter_len -= width
+            continue
+        var byte_types = countl_zero(~(d & UInt8(0b1111_0000)))
+        var length = byte_types[0]
+        if length == 0:
+            for i in range(1, width):
+                if byte_types[i] != 0:
+                    length = byte_types[i]
+                    idx = i
+                    continue
+
+        alias vec_t = SIMD[DType.uint8, 4]
+        alias n4 = vec_t(4, 1, 1, 1)
+        alias n3 = vec_t(3, 1, 1, 0)
+        alias n3_m = vec_t(1, 1, 1, 0)
+        alias n2 = vec_t(2, 1, 0, 0)
+        alias n2_m = vec_t(1, 1, 0, 0)
+        var vec = byte_types.slice[4]()
+        var valid_n4 = (vec == n4).reduce_and()
+        var valid_n3 = ((vec & n3_m) == n3).reduce_and()
+        var valid_n2 = ((vec & n2_m) == n2).reduce_and()
+        if not (valid_n4 or valid_n3 or valid_n2):
+            return False
+
+        # special unicode ranges
+        if invalid_special(d[0], d[1]):
+            return False
+        elif vec[0] == 2 and d[0] < UInt8(0b1100_0010):
+            return False
+        idx += width
+        iter_len -= width
+
+    @parameter
+    fn invalid[amnt: Int](i: Int) -> Bool:
+        if i + amnt > iter_len:
+            return True
+
+        @parameter
+        for j in range(1, amnt + 1):
+            if countl_zero(~(ptr[i + j] & UInt8(0b1111_0000))) != 1:
+                return True
+        return invalid_special(ptr[i], ptr[i + 1])
+
+    idx = length - iter_len
+    while idx < length:
+        var val = ptr[idx]
+        var byte_type = countl_zero(~(val & UInt8(0b1111_0000)))
+        if byte_type == 0 and val < 0b1000_0000:
+            idx += 1
+            continue
+        elif byte_type == 1:
+            return False
+        elif byte_type == 2 and (invalid[1](idx) or val < 0b1100_0010):
+            return False
+        elif byte_type == 3 and invalid[2](idx):
+            return False
+        elif byte_type == 4 and invalid[3](idx):
+            return False
+        idx += int(byte_type)
+    return True
+
+
 struct StringSlice[
     is_mutable: Bool, //,
     lifetime: AnyLifetime[is_mutable].type,
@@ -67,6 +184,12 @@ struct StringSlice[
         #   StringLiteral is guaranteed to use UTF-8 encoding.
         # FIXME(MSTDL-160):
         #   Ensure StringLiteral _actually_ always uses UTF-8 encoding.
+        # TODO(#933): use constrained when llvm intrinsics can be used at
+        # compile time
+        debug_assert(
+            is_valid_utf8(literal.unsafe_ptr(), literal._byte_length()),
+            "StringLiteral doesn't have valid UTF-8 encoding",
+        )
         self = StringSlice[lifetime](
             unsafe_from_utf8_ptr=literal.unsafe_ptr(),
             len=literal._byte_length(),
