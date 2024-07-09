@@ -77,11 +77,11 @@ fn test_sort_small_3() raises:
     list.append(2)
 
     @parameter
-    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
+    fn _less_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
+        return rebind[Int](lhs) < rebind[Int](rhs)
 
     var ptr = rebind[Pointer[Int]](list.data)
-    _small_sort[length, Int, _less_than_equal](ptr)
+    _small_sort[length, Int, _less_than](ptr)
 
     var expected = List[Int](1, 2, 9)
     for i in range(length):
@@ -100,11 +100,11 @@ fn test_sort_small_5() raises:
     list.append(4)
 
     @parameter
-    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
+    fn _less_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
+        return rebind[Int](lhs) < rebind[Int](rhs)
 
     var ptr = rebind[Pointer[Int]](list.data)
-    _small_sort[length, Int, _less_than_equal](ptr)
+    _small_sort[length, Int, _less_than](ptr)
 
     var expected = List[Int](1, 2, 3, 4, 9)
     for i in range(length):
@@ -187,12 +187,7 @@ fn test_sort3_dupe_elements() raises:
     fn _lt[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
         return rebind[Int](lhs) < rebind[Int](rhs)
 
-    @parameter
-    fn _leq[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
-
     test[_lt]()
-    test[_leq]()
 
 
 fn test_sort4() raises:
@@ -432,15 +427,14 @@ fn test_partition_top_k(length: Int, k: Int) raises:
         list.append(i)
 
     @parameter
-    fn _great_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Float32](lhs) >= rebind[Float32](rhs)
+    fn _great_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
+        return rebind[Float32](lhs) > rebind[Float32](rhs)
 
     var ptr = rebind[Pointer[Float32]](list.data)
-    _ = partition[Float32, _great_than_equal](ptr, k, len(list))
+    _ = partition[Float32, _great_than](ptr, k, len(list))
 
     for i in range(0, k):
-        if list[i] < length - k:
-            assert_true(False)
+        assert_false(list[i] < length - k)
 
 
 fn test_sort_stress() raises:
@@ -487,9 +481,7 @@ fn test_sort_stress() raises:
     for i in range(len(lens)):
         var length = lens[i]
         test[_gt, _geq](length)
-        test[_geq, _geq](length)
         test[_lt, _leq](length)
-        test[_leq, _leq](length)
 
 
 @value
@@ -506,7 +498,7 @@ fn test_sort_custom() raises:
 
     @parameter
     fn compare_fn(lhs: MyStruct, rhs: MyStruct) -> Bool:
-        return lhs.val <= rhs.val
+        return lhs.val < rhs.val
 
     sort[MyStruct, compare_fn](list)
 

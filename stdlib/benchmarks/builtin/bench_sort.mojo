@@ -60,10 +60,10 @@ fn insertion_sort[type: DType](list: List[Scalar[type]]):
     var ptr = rebind[Pointer[Scalar[type]]](list.data)
 
     @parameter
-    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
+    fn _less_than[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
+        return rebind[Scalar[type]](lhs) < rebind[Scalar[type]](rhs)
 
-    _insertion_sort[Scalar[type], _less_than_equal](ptr, 0, len(list))
+    _insertion_sort[Scalar[type], _less_than](ptr, 0, len(list))
 
 
 @always_inline
@@ -71,10 +71,10 @@ fn small_sort[size: Int, type: DType](list: List[Scalar[type]]):
     var ptr = rebind[Pointer[Scalar[type]]](list.data)
 
     @parameter
-    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
+    fn _less_than[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
+        return rebind[Scalar[type]](lhs) < rebind[Scalar[type]](rhs)
 
-    _small_sort[size, Scalar[type], _less_than_equal](ptr)
+    _small_sort[size, Scalar[type], _less_than](ptr)
 
 
 # ===----------------------------------------------------------------------===#
