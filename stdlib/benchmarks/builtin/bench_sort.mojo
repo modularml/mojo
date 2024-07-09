@@ -278,6 +278,65 @@ fn bench_large_list_sort(inout m: Bench) raises:
 
 
 # ===----------------------------------------------------------------------===#
+# Benchmark sort functions with low delta lists
+# ===----------------------------------------------------------------------===#
+
+
+@parameter
+fn bench_low_cardinality_list_sort(inout m: Bench) raises:
+    alias counts = List(1 << 12, 1 << 16)
+    alias deltas = List(0, 2, 5, 20, 100)
+
+    @parameter
+    for delta_index in range(len(deltas)):
+        var delta = deltas[delta_index]
+
+        @parameter
+        for count_index in range(len(counts)):
+            alias count = counts[count_index]
+            var list = random_scalar_list[DType.uint8](count, delta)
+
+            @parameter
+            fn bench_sort_list(inout b: Bencher) raises:
+                @always_inline
+                @parameter
+                fn call_fn():
+                    var l1 = list
+                    sort(l1)
+
+                b.iter[call_fn]()
+
+            @parameter
+            fn bench_heap_sort(inout b: Bencher) raises:
+                @always_inline
+                @parameter
+                fn call_fn():
+                    var l1 = list
+                    heap_sort(l1)
+
+                b.iter[call_fn]()
+
+            m.bench_function[bench_sort_list](
+                BenchId(
+                    "bench_std_sort_low_card_list_"
+                    + str(count)
+                    + "_delta_"
+                    + str(delta)
+                )
+            )
+
+            m.bench_function[bench_heap_sort](
+                BenchId(
+                    "bench_heap_sort_low_card_list_"
+                    + str(count)
+                    + "_delta_"
+                    + str(delta)
+                )
+            )
+            _ = list^
+
+
+# ===----------------------------------------------------------------------===#
 # Benchmark Main
 # ===----------------------------------------------------------------------===#
 
@@ -289,5 +348,6 @@ def main():
     bench_tiny_list_sort(m)
     bench_small_list_sort(m)
     bench_large_list_sort(m)
+    bench_low_cardinality_list_sort(m)
 
     m.dump_report()
