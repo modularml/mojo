@@ -146,7 +146,7 @@ def test_assert_almost_equal():
 
     _should_fail[DType.bool, 1](True, False)
     _should_fail(
-        SIMD[DType.int32, 2](0, 1), SIMD[DType.int32, 2](0, -1), atol=5.0
+        SIMD[DType.int32, 2](0, 1), SIMD[DType.int32, 2](0, -1), atol=5
     )
     _should_fail(
         SIMD[float_type, 2](-_inf, 0.0),

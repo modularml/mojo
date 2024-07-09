@@ -64,7 +64,7 @@ def test_file_read_bytes_multi():
         assert_equal(string2, "dolor ")
 
         # Read where N is greater than the number of bytes in the file.
-        var s: String = f.read(1e9)
+        var s: String = f.read(1_000_000_000)
 
         assert_equal(len(s), 936)
         assert_true(s.startswith("sit amet, consectetur adipiscing elit."))
