@@ -68,6 +68,30 @@ fn _insertion_sort[
         array[j] = value
 
 
+# put everything thats "<" to the left of pivot
+@always_inline
+fn _quicksort_partition[
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
+](array: Pointer[type], start: Int, end: Int) -> Int:
+    var left = start + 1
+    var right = end - 1
+    var pivot_value = array[start]
+
+    while True:
+        # no need for left < right since quick sort pick median of 3 as pivot
+        while cmp_fn(array[left], pivot_value):
+            left += 1
+        while left < right and not cmp_fn(array[right], pivot_value):
+            right -= 1
+        if left >= right:
+            var pivot_pos = left - 1
+            swap(array[pivot_pos], array[start])
+            return pivot_pos
+        swap(array[left], array[right])
+        left += 1
+        right -= 1
+
+
 @always_inline
 fn _partition[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
@@ -167,6 +191,27 @@ fn _estimate_initial_height(size: Int) -> Int:
 
 
 @always_inline
+fn _delegate_small_sort[
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
+](array: Pointer[type], len: Int):
+    if len == 2:
+        _small_sort[2, type, cmp_fn](array)
+        return
+
+    if len == 3:
+        _small_sort[3, type, cmp_fn](array)
+        return
+
+    if len == 4:
+        _small_sort[4, type, cmp_fn](array)
+        return
+
+    if len == 5:
+        _small_sort[5, type, cmp_fn](array)
+        return
+
+
+@always_inline
 fn _quicksort[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], size: Int):
@@ -181,36 +226,26 @@ fn _quicksort[
         var start = stack.pop()
 
         var len = end - start
-        if len < 2:
-            continue
 
-        if len == 2:
-            _small_sort[2, type, cmp_fn](array + start)
-            continue
-
-        if len == 3:
-            _small_sort[3, type, cmp_fn](array + start)
-            continue
-
-        if len == 4:
-            _small_sort[4, type, cmp_fn](array + start)
-            continue
-
-        if len == 5:
-            _small_sort[5, type, cmp_fn](array + start)
+        if len <= 5:
+            _delegate_small_sort[type, cmp_fn](array + start, len)
             continue
 
         if len < 32:
             _insertion_sort[type, cmp_fn](array, start, end)
             continue
 
-        var pivot = _partition[type, cmp_fn](array, start, end)
+        # pick median of 3 as pivot
+        _sort3[type, cmp_fn](array, (start + end) >> 1, start, end - 1)
+        var pivot = _quicksort_partition[type, cmp_fn](array, start, end)
 
-        stack.append(pivot + 1)
-        stack.append(end)
+        if end > pivot + 2:
+            stack.append(pivot + 1)
+            stack.append(end)
 
-        stack.append(start)
-        stack.append(pivot)
+        if pivot > start + 1:
+            stack.append(start)
+            stack.append(pivot)
 
 
 @always_inline
@@ -251,7 +286,7 @@ fn partition[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](buff: Pointer[type], k: Int, size: Int):
     """Partition the input buffer inplace such that first k elements are the
-    largest (or smallest if cmp_fn is <= operator) elements.
+    largest (or smallest if cmp_fn is < operator) elements.
     The ordering of the first k elements is undefined.
 
     Parameters:
@@ -296,10 +331,18 @@ fn sort(inout buff: Pointer[Int], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
+    fn _less_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
+        return rebind[Int](lhs) < rebind[Int](rhs)
 
-    _quicksort[Int, _less_than_equal](buff, len)
+    if len <= 5:
+        _delegate_small_sort[Int, _less_than](buff, len)
+        return
+
+    if len < 32:
+        _insertion_sort[Int, _less_than](buff, 0, len)
+        return
+
+    _quicksort[Int, _less_than](buff, len)
 
 
 fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
@@ -316,10 +359,18 @@ fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
     """
 
     @parameter
-    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
+    fn _less_than[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
+        return rebind[Scalar[type]](lhs) < rebind[Scalar[type]](rhs)
 
-    _quicksort[Scalar[type], _less_than_equal](buff, len)
+    if len <= 5:
+        _delegate_small_sort[Scalar[type], _less_than](buff, len)
+        return
+
+    if len < 32:
+        _insertion_sort[Scalar[type], _less_than](buff, 0, len)
+        return
+
+    _quicksort[Scalar[type], _less_than](buff, len)
 
 
 fn sort(inout list: List[Int]):
@@ -378,10 +429,10 @@ fn sort[type: ComparableCollectionElement](inout list: List[type]):
     """
 
     @parameter
-    fn _less_than_equal(a: type, b: type) -> Bool:
-        return a <= b
+    fn _less_than(a: type, b: type) -> Bool:
+        return a < b
 
-    _quicksort[type, _less_than_equal](list.data, len(list))
+    _quicksort[type, _less_than](list.data, len(list))
 
 
 # ===----------------------------------------------------------------------===#
@@ -398,6 +449,15 @@ fn _sort2[
     if not cmp_fn[type](a, b):
         array[offset0] = b
         array[offset1] = a
+
+
+@always_inline
+fn _sort3[
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
+](array: Pointer[type], offset0: Int, offset1: Int, offset2: Int):
+    _sort2[type, cmp_fn](array, offset0, offset1)
+    _sort2[type, cmp_fn](array, offset1, offset2)
+    _sort2[type, cmp_fn](array, offset0, offset1)
 
 
 @always_inline
