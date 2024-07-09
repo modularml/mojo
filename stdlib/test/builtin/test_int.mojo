@@ -195,48 +195,32 @@ def test_int_uint():
     assert_equal(0, int(u2))
 
 
-def test_lt():
+def test_comparison():
     assert_true(Int(5).__lt__(Int(10)))
     assert_true(Int(-10).__lt__(Int(-5)))
     assert_false(Int(0).__lt__(Int(0)))
     assert_false(Int(10).__lt__(Int(5)))
 
-
-def test_le():
     assert_true(Int(5).__le__(Int(10)))
     assert_true(Int(-10).__le__(Int(-5)))
     assert_true(Int(0).__le__(Int(0)))
     assert_false(Int(10).__le__(Int(5)))
 
-
-def test_eq():
     assert_true(Int(5).__eq__(Int(5)))
     assert_true(Int(0).__eq__(Int(0)))
     assert_false(Int(0).__eq__(Int(1)))
     assert_false(Int(5).__eq__(Int(10)))
 
-    var a: Int = 5
-    assert_true(a.__eq__(a))
-
-
-def test_ne():
     assert_true(Int(5).__ne__(Int(10)))
     assert_true(Int(0).__ne__(Int(1)))
     assert_false(Int(5).__ne__(Int(5)))
     assert_false(Int(0).__ne__(Int(0)))
 
-    var a: Int = 5
-    assert_false(a.__ne__(a))
-
-
-def test_gt():
     assert_true(Int(10).__gt__(Int(5)))
     assert_true(Int(-5).__gt__(Int(-10)))
     assert_false(Int(0).__gt__(Int(0)))
     assert_false(Int(5).__gt__(Int(10)))
 
-
-def test_ge():
     assert_true(Int(10).__ge__(Int(5)))
     assert_true(Int(5).__ge__(Int(5)))
     assert_true(Int(-5).__ge__(Int(-10)))
@@ -262,10 +246,5 @@ def main():
     test_indexer()
     test_bool()
     test_decimal_digit_count()
-    test_lt()
-    test_le()
-    test_eq()
-    test_ne()
-    test_gt()
-    test_ge()
+    test_comparison()
     test_int_uint()
