@@ -395,7 +395,10 @@ fn memset[
         value: The value to fill with.
         count: Number of elements to fill (in elements, not bytes).
     """
-    memset(ptr.address, value, count)
+    # TODO (43028) call memset when DTypePointer's underlying data uses UnsafePointer
+    _memset_llvm(
+        ptr.address.bitcast[UInt8]().address, value, count * sizeof[type]()
+    )
 
 
 @always_inline
@@ -414,24 +417,6 @@ fn memset[
         count: Number of elements to fill (in elements, not bytes).
     """
     _memset_llvm(ptr.bitcast[UInt8](), value, count * sizeof[type]())
-
-
-@always_inline
-fn memset[
-    type: AnyTrivialRegType, address_space: AddressSpace
-](ptr: LegacyPointer[type, address_space], value: UInt8, count: Int):
-    """Fills memory with the given value.
-
-    Parameters:
-        type: The element dtype.
-        address_space: The address space of the pointer.
-
-    Args:
-        ptr: UnsafePointer to the beginning of the memory block to fill.
-        value: The value to fill with.
-        count: Number of elements to fill (in elements, not bytes).
-    """
-    _memset_llvm(ptr.bitcast[UInt8]().address, value, count * sizeof[type]())
 
 
 # ===----------------------------------------------------------------------===#
@@ -460,23 +445,6 @@ fn memset_zero[
 fn memset_zero[
     type: AnyType, address_space: AddressSpace
 ](ptr: UnsafePointer[type, address_space], count: Int):
-    """Fills memory with zeros.
-
-    Parameters:
-        type: The element type.
-        address_space: The address space of the pointer.
-
-    Args:
-        ptr: UnsafePointer to the beginning of the memory block to fill.
-        count: Number of elements to fill (in elements, not bytes).
-    """
-    memset(ptr, 0, count)
-
-
-@always_inline
-fn memset_zero[
-    type: AnyTrivialRegType, address_space: AddressSpace
-](ptr: LegacyPointer[type, address_space], count: Int):
     """Fills memory with zeros.
 
     Parameters:
