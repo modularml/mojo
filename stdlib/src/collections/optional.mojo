@@ -213,7 +213,7 @@ struct Optional[T: CollectionElement](
               traits `Representable` and `CollectionElement`.
 
         Returns:
-            A string represenation of the Optional.
+            A string representation of the Optional.
         """
         var output = String()
         var writer = output._unsafe_to_formatter()

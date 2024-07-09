@@ -136,11 +136,11 @@ def test_indexer():
 
 def test_different_prefix():
     assert_equal(bin(Int8(1), prefix="binary"), "binary1")
-    assert_equal(hex(Int8(1), prefix="hexidecimal"), "hexidecimal1")
+    assert_equal(hex(Int8(1), prefix="hexadecimal"), "hexidecimal1")
     assert_equal(oct(Int8(1), prefix="octal"), "octal1")
 
     assert_equal(bin(0, prefix="binary"), "binary0")
-    assert_equal(hex(0, prefix="hexidecimal"), "hexidecimal0")
+    assert_equal(hex(0, prefix="hexadecimal"), "hexidecimal0")
     assert_equal(oct(0, prefix="octal"), "octal0")
 
     assert_equal(bin(Ind(), prefix="I'mAnIndexer!"), "I'mAnIndexer!1")

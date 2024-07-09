@@ -124,7 +124,7 @@ def test_list_pop():
     for i in range(6):
         list.append(i)
 
-    # try poping from index 3 for 3 times
+    # try popping from index 3 for 3 times
     for i in range(3, 6):
         assert_equal(i, list.pop(3))
 
@@ -573,7 +573,7 @@ def test_no_extra_copies_with_sugared_set_by_field():
     child_list.append(CopyCountedStruct("Hello"))
     child_list.append(CopyCountedStruct("World"))
 
-    # No copies here.  Contructing with List[CopyCountedStruct](CopyCountedStruct("Hello")) is a copy.
+    # No copies here.  Constructing with List[CopyCountedStruct](CopyCountedStruct("Hello")) is a copy.
     assert_equal(0, child_list[0].counter.copy_count)
     assert_equal(0, child_list[1].counter.copy_count)
     list.append(child_list^)
@@ -592,7 +592,7 @@ def test_list_copy_constructor():
     var vec = List[Int](capacity=1)
     var vec_copy = vec
     vec_copy.append(1)  # Ensure copy constructor doesn't crash
-    _ = vec^  # To ensure previous one doesn't invoke move constuctor
+    _ = vec^  # To ensure previous one doesn't invoke move constructor
 
 
 def test_list_iter():
@@ -857,7 +857,7 @@ struct DtorCounter(CollectionElement):
 
 
 def inner_test_list_dtor():
-    # explicity reset global counter
+    # explicitly reset global counter
     g_dtor_count = 0
 
     var l = List[DtorCounter]()

@@ -45,7 +45,7 @@ fn test_remove() raises:
         "Unexpected file " + my_file_name + " it should not exist",
     )
 
-    # tyring to delete non existing file
+    # trying to delete non existing file
     with assert_raises(contains="Can not remove file: "):
         remove(my_file_name)
     with assert_raises(contains="Can not remove file: "):

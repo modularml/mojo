@@ -41,7 +41,7 @@ def main():
     assert_equal(head, "")
     assert_equal(tail, "")
 
-    # Single seperator
+    # Single separator
     head, tail = split(os.sep)
     assert_equal(head, os.sep)
     assert_equal(tail, "")

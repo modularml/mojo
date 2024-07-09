@@ -487,7 +487,7 @@ fn _atof(str_ref: StringRef) raises -> Float64:
     # NOTE: Instead of `var result *= 10.0 ** exponent`, we calculate a positive
     # integer factor as shift and multiply or divide by it based on the shift
     # direction. This allows for better precision.
-    # TODO: investigate if there is a floating point arithmethic problem.
+    # TODO: investigate if there is a floating point arithmetic problem.
     var shift: Int = 10 ** abs(exponent)
     if exponent > 0:
         result *= shift
@@ -1638,7 +1638,7 @@ struct String(
                 listed above, otherwise False.
         """
         # TODO add line and paragraph separator as stringliteral
-        # once unicode escape secuences are accepted
+        # once unicode escape sequences are accepted
         var next_line = List[UInt8](0xC2, 0x85)
         """TODO: \\x85"""
         var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)

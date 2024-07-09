@@ -53,7 +53,7 @@ __init__(inout self: Self, out_file: Optional[Path] = #kgen.none, min_runtime_se
 
 </div>
 
-Constructs and initializes Benchmark config object with default and inputed values.
+Constructs and initializes Benchmark config object with default and inputted values.
 
 **Args:**
 

@@ -391,7 +391,7 @@ struct SIMD[type: DType, size: Int](
         """
         _simd_construction_checks[type, size]()
 
-        # TODO (#36686): This introduces uneeded casts here to work around
+        # TODO (#36686): This introduces unneeded casts here to work around
         # parameter if issues.
         @parameter
         if type is DType.float16:

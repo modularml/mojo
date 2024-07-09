@@ -154,7 +154,7 @@ def test_file_seek():
 
         _ = f.read(6)
 
-        # Seek from current possition, skip the space
+        # Seek from current position, skip the space
         pos = f.seek(1, os.SEEK_CUR)
         assert_equal(pos, 945)
         assert_equal(f.read(7), "rhoncus")

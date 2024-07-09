@@ -74,7 +74,7 @@ fn index[T: Indexer](idx: T, /) -> Int:
         idx: The value.
 
     Returns:
-        An `Int` respresenting the index value.
+        An `Int` representing the index value.
     """
     return idx.__index__()
 
