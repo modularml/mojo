@@ -37,7 +37,7 @@ struct BoringSlice:
     var c: String
 
 
-struct Slicable:
+struct Sliceable:
     fn __init__(inout self):
         pass
 
@@ -49,14 +49,14 @@ struct Slicable:
 
 
 def test_slicable():
-    var slicable = Slicable()
+    var sliceable = Sliceable()
 
-    var new_slice = slicable[1:"hello":4.0]
+    var new_slice = sliceable[1:"hello":4.0]
     assert_equal(new_slice.start, 1)
     assert_equal(new_slice.upper, "hello")
     assert_equal(new_slice.stride, 4.0)
 
-    var boring_slice = slicable[1:2:"foo"]
+    var boring_slice = sliceable[1:2:"foo"]
     assert_equal(boring_slice.a, 1)
     assert_equal(boring_slice.b, 2)
     assert_equal(boring_slice.c, "foo")

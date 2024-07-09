@@ -175,7 +175,7 @@ struct CPython:
 
     fn check_init_error(self) raises:
         """Used for entry points that initialize Python on first use, will
-        raise an error if one occured when initializing the global CPython.
+        raise an error if one occurred when initializing the global CPython.
         """
         if self.init_error:
             var error: String = self.init_error

@@ -200,7 +200,7 @@ struct Python:
             The Python module.
         """
         var cpython = _get_global_python_itf().cpython()
-        # Throw error if it occured during initialization
+        # Throw error if it occurred during initialization
         cpython.check_init_error()
         var module_maybe = cpython.PyImport_ImportModule(module)
         Python.throw_python_exception_if_error_state(cpython)

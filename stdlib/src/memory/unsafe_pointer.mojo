@@ -465,7 +465,7 @@ struct UnsafePointer[
         The pointer must not be null, and the pointer memory location is assumed
         to contain a valid initialized instance of `T`.  This is equivalent to
         `_ = self.take_pointee()` but doesn't require `Movable` and is
-        more efficient becase it doesn't invoke `__moveinit__`.
+        more efficient because it doesn't invoke `__moveinit__`.
 
         """
         _ = __get_address_as_owned_value(self.address)

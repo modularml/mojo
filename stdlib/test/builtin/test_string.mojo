@@ -562,8 +562,8 @@ def test_contains():
     assert_true(str.__contains__(" "))
     assert_true(str.__contains__("ld"))
 
-    assert_false(str.__contains__("bellow"))
-    assert_true("bellow" not in str)
+    assert_false(str.__contains__("below"))
+    assert_true("below" not in str)
 
 
 def test_find():
@@ -635,7 +635,7 @@ def test_rfind():
     assert_equal(String("").rfind("ab"), -1)
     assert_equal(String("foo").rfind(""), 3)
 
-    # Test that rfind(start) returned pos is absolute, not relative to specifed
+    # Test that rfind(start) returned pos is absolute, not relative to specified
     # start. Also tests positive and negative start offsets.
     assert_equal(String("hello world").rfind("l", 5), 9)
     assert_equal(String("hello world").rfind("l", -5), 9)
@@ -926,7 +926,7 @@ def test_isspace():
     alias unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9, 0)
     """TODO: \\u2029"""
     # TODO add line and paragraph separator as stringliteral once unicode
-    # escape secuences are accepted
+    # escape sequences are accepted
     var univ_sep_var = List[String](
         String(" "),
         String("\t"),

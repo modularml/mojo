@@ -168,7 +168,7 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         return len(range(self.start.value(), self.end.value(), self.step))
 
     fn indices(self, length: Int) -> (Int, Int, Int):
-        """Returns a tuple of 3 intergers representing the start, end, and step
+        """Returns a tuple of 3 integers representing the start, end, and step
            of the slice if applied to a container of the given length.
 
         Uses the target container length to normalize negative, out of bounds,

@@ -482,7 +482,7 @@ fn exp[
     """Calculates elementwise exponential of the input vector.
 
     Given an input vector $X$ and an output vector $Y$, sets $Y_i = e^{X_i}$ for
-    each position $i$ in the input vector (where $e$ is the mathmatical constant
+    each position $i$ in the input vector (where $e$ is the mathematical constant
     $e$).
 
     Constraints:
