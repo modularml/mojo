@@ -25,7 +25,6 @@ from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
-from utils.string_slice import _StringSliceIter
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -1798,7 +1797,7 @@ struct String(
             # Python adds all "whitespace chars" as one separator
             # if no separator was specified
             for s in self[lhs:]:
-                if not s.isspace():
+                if not str(s).isspace():  # TODO: with StringSlice.isspace()
                     break
                 lhs += s.byte_length()
             # if it went until the end of the String, then
@@ -1812,7 +1811,7 @@ struct String(
                 break
             rhs = lhs + 1
             for s in self[lhs + 1 :]:
-                if s.isspace():
+                if str(s).isspace():  # TODO: with StringSlice.isspace()
                     break
                 rhs += s.byte_length()
 
