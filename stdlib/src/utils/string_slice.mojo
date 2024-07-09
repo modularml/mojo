@@ -116,8 +116,8 @@ fn is_valid_utf8[
             return False
         elif first_byte_type == 2 and d[0] < UInt8(0b1100_0010):
             return False
-        idx += width
-        iter_len -= width
+        idx += 4
+        iter_len -= 4
 
     @parameter
     fn invalid[amnt: Int](i: Int) -> Bool:
