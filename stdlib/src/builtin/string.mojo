@@ -25,6 +25,7 @@ from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
 from utils._format import Formattable, Formatter, ToFormatter
+from utils.string_slice import _StringSliceIter
 
 # ===----------------------------------------------------------------------=== #
 # ord
@@ -719,76 +720,6 @@ fn _utf8_byte_type(b: UInt8) -> UInt8:
     return countl_zero(~(b & 0b1111_0000))
 
 
-@value
-struct _StringIter[
-    is_mutable: Bool, //,
-    lifetime: AnyLifetime[is_mutable].type,
-    forward: Bool = True,
-]:
-    """Iterator for String.
-
-    Parameters:
-        is_mutable: Whether the slice is mutable.
-        lifetime: The lifetime of the underlying string data.
-        forward: The iteration direction. `False` is backwards.
-    """
-
-    var index: Int
-    var continuation_bytes: Int
-    var ptr: UnsafePointer[UInt8]
-    var length: Int
-
-    fn __init__(
-        inout self, *, unsafe_pointer: UnsafePointer[UInt8], length: Int
-    ):
-        self.index = 0 if forward else length
-        self.ptr = unsafe_pointer
-        self.length = length
-        self.continuation_bytes = 0
-        for i in range(length):
-            if _utf8_byte_type(int(unsafe_pointer[i])) == 1:
-                self.continuation_bytes += 1
-
-    fn __iter__(self) -> Self:
-        return self
-
-    fn __next__(inout self) -> StringSlice[lifetime]:
-        @parameter
-        if forward:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(int(self.ptr[self.index]))
-                if byte_type != 0:
-                    byte_len = int(byte_type)
-                    self.continuation_bytes -= byte_len - 1
-            self.index += byte_len
-            return StringSlice[lifetime](
-                unsafe_from_utf8_ptr=self.ptr + (self.index - byte_len),
-                len=byte_len,
-            )
-        else:
-            var byte_len = 1
-            if self.continuation_bytes > 0:
-                var byte_type = _utf8_byte_type(int(self.ptr[self.index - 1]))
-                if byte_type != 0:
-                    while byte_type == 1:
-                        byte_len += 1
-                        var b = int(self.ptr[self.index - byte_len])
-                        byte_type = _utf8_byte_type(b)
-                    self.continuation_bytes -= byte_len - 1
-            self.index -= byte_len
-            return StringSlice[lifetime](
-                unsafe_from_utf8_ptr=self.ptr + self.index, len=byte_len
-            )
-
-    fn __len__(self) -> Int:
-        @parameter
-        if forward:
-            return self.length - self.index - self.continuation_bytes
-        else:
-            return self.index - self.continuation_bytes
-
-
 struct String(
     Sized,
     Stringable,
@@ -1248,24 +1179,26 @@ struct String(
             count=other_len + 1,
         )
 
-    fn __iter__(ref [_]self) -> _StringIter[__lifetime_of(self)]:
+    fn __iter__(ref [_]self) -> _StringSliceIter[__lifetime_of(self)]:
         """Iterate over elements of the string, returning immutable references.
 
         Returns:
             An iterator of references to the string elements.
         """
-        return _StringIter[__lifetime_of(self)](
-            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+        return _StringSliceIter[__lifetime_of(self)](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
-    fn __reversed__(ref [_]self) -> _StringIter[__lifetime_of(self), False]:
+    fn __reversed__(
+        ref [_]self,
+    ) -> _StringSliceIter[__lifetime_of(self), False]:
         """Iterate backwards over the string, returning immutable references.
 
         Returns:
             A reversed iterator of references to the string elements.
         """
-        return _StringIter[__lifetime_of(self), forward=False](
-            unsafe_pointer=self.unsafe_ptr(), length=len(self)
+        return _StringSliceIter[__lifetime_of(self), forward=False](
+            unsafe_pointer=self.unsafe_ptr(), length=self.byte_length()
         )
 
     # ===------------------------------------------------------------------=== #
@@ -1626,51 +1559,17 @@ struct String(
         )
 
     fn isspace(self) -> Bool:
-        """Determines whether the given String is a python
-        whitespace String. This corresponds to Python's
+        """Determines whether every character in the given String is a
+        python whitespace String. This corresponds to Python's
         [universal separators](
             https://docs.python.org/3/library/stdtypes.html#str.splitlines)
-        `" \\t\\n\\r\\f\\v\\x1c\\x1e\\x85\\u2028\\u2029"`.
+        `" \\t\\n\\r\\f\\v\\x1c\\x1d\\x1e\\x85\\u2028\\u2029"`.
 
         Returns:
-            True if the String is one of the whitespace characters
+            True if the whole String is made up of whitespace characters
                 listed above, otherwise False.
         """
-        # TODO add line and paragraph separator as stringliteral
-        # once unicode escape secuences are accepted
-        var next_line = List[UInt8](0xC2, 0x85)
-        """TODO: \\x85"""
-        var unicode_line_sep = List[UInt8](0xE2, 0x80, 0xA8)
-        """TODO: \\u2028"""
-        var unicode_paragraph_sep = List[UInt8](0xE2, 0x80, 0xA9)
-        """TODO: \\u2029"""
-
-        @always_inline
-        fn _compare(
-            item1: UnsafePointer[UInt8], item2: UnsafePointer[UInt8], amnt: Int
-        ) -> Bool:
-            var ptr1 = DTypePointer(item1)
-            var ptr2 = DTypePointer(item2)
-            return memcmp(ptr1, ptr2, amnt) == 0
-
-        if len(self) == 0:
-            return False
-
-        for s in self:
-            var no_null_len = len(s)
-            var ptr = s.unsafe_ptr()
-            if no_null_len == 1 and not _isspace(ptr[0]):
-                return False
-            elif no_null_len == 2 and not _compare(
-                ptr, next_line.unsafe_ptr(), 2
-            ):
-                return False
-            elif no_null_len == 3 and not (
-                _compare(ptr, unicode_line_sep.unsafe_ptr(), 3)
-                or _compare(ptr, unicode_paragraph_sep.unsafe_ptr(), 3)
-            ):
-                return False
-        return True
+        return self.as_string_slice().isspace()
 
     fn split(self, sep: String, maxsplit: Int = -1) raises -> List[String]:
         """Split the string by a separator.
