@@ -197,6 +197,62 @@ struct List[T: CollectionElement](
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
+    fn __eq__[
+        U: EqualityComparableCollectionElement
+    ](self: List[U], other: List[U]) -> Bool:
+        """Checks if two lists are equal.
+
+        Examples:
+        ```mojo
+        var x = List[Int](1, 2, 3)
+        var y = List[Int](1, 2, 3)
+        if x == y: print("x and y are equal")
+        ```
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+               traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            other: The list to compare with.
+
+        Returns:
+            True if the lists are equal, False otherwise.
+        """
+        if len(self) != len(other):
+            return False
+        var index = 0
+        for i in self:
+            if i[] != other[index]:
+                return False
+            index += 1
+        return True
+
+    fn __ne__[
+        U: EqualityComparableCollectionElement
+    ](self: List[U], other: List[U]) -> Bool:
+        """Checks if two lists are not equal.
+
+        Examples:
+
+        ```mojo
+        var x = List[Int](1, 2, 3)
+        var y = List[Int](1, 2, 4)
+        if x != y: print("x and y are not equal")
+        ```
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+               traits `EqualityComparable` and `CollectionElement`.
+
+        Args:
+            other: The list to compare with.
+
+        Returns:
+            True if the lists are not equal, False otherwise.
+        """
+        return not (self == other)
+
     fn __contains__[
         U: ComparableCollectionElement
     ](self: List[U], value: U) -> Bool:
