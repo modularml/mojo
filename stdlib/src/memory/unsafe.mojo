@@ -612,7 +612,7 @@ struct DTypePointer[
         Returns:
             A DTypePointer struct which contains the address of the argument.
         """
-        return LegacyPointer.address_of(arg)
+        return UnsafePointer.address_of(arg)
 
     @staticmethod
     @always_inline
