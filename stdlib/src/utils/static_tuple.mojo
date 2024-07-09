@@ -21,7 +21,7 @@ from utils import StaticTuple
 from collections._index_normalization import normalize_index
 from sys.intrinsics import _type_is_eq
 
-from memory import Pointer, UnsafePointer
+from memory import UnsafePointer
 
 from utils import unroll
 
@@ -209,7 +209,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(arrayCopy).address, idx.value
         )
-        var result = Pointer(ptr)[]
+        var result = UnsafePointer(ptr)[]
         _ = arrayCopy
         return result
 
@@ -226,7 +226,7 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(tmp.array).address, idx.value
         )
-        Pointer(ptr)[] = val
+        UnsafePointer(ptr)[] = val
         self = tmp
 
 
