@@ -214,23 +214,17 @@ struct StaticTuple[element_type: AnyTrivialRegType, size: Int](Sized):
         return result
 
     @always_inline("nodebug")
-    fn __setitem__[
-        intable: Intable
-    ](inout self, index: intable, val: Self.element_type):
+    fn __setitem__(inout self, idx: Int, val: Self.element_type):
         """Stores a single value into the tuple at the specified dynamic index.
 
-        Parameters:
-            intable: The intable type.
-
         Args:
-            index: The index into the tuple.
+            idx: The index into the tuple.
             val: The value to store.
         """
-        var offset = int(index)
-        debug_assert(offset < size, "index must be within bounds")
+        debug_assert(idx < size, "index must be within bounds")
         var tmp = self
         var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(tmp.array).address, offset.value
+            UnsafePointer.address_of(tmp.array).address, idx.value
         )
         Pointer(ptr)[] = val
         self = tmp
@@ -390,25 +384,22 @@ struct InlineArray[
 
     @always_inline("nodebug")
     fn __getitem__[
-        IntableType: Intable,
-        index: IntableType,
+        idx: Int,
     ](ref [_]self: Self) -> ref [__lifetime_of(self)] Self.ElementType:
         """Get a `Reference` to the element at the given index.
 
         Parameters:
-            IntableType: The inferred type of an intable argument.
-            index: The index of the item.
+            idx: The index of the item.
 
         Returns:
             A reference to the item at the given index.
         """
-        alias i = int(index)
-        constrained[-size <= i < size, "Index must be within bounds."]()
+        constrained[-size <= idx < size, "Index must be within bounds."]()
 
-        var normalized_idx = i
+        var normalized_idx = idx
 
         @parameter
-        if i < 0:
+        if idx < 0:
             normalized_idx += size
 
         return self._get_reference_unsafe(normalized_idx)[]
