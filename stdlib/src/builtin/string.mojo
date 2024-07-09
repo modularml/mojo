@@ -39,6 +39,22 @@ fn ord(s: String) -> Int:
     returns the integer `97`. This is the inverse of the `chr()` function.
 
     Args:
+        s: The input string slice, which must contain only a single character.
+
+    Returns:
+        An integer representing the code point of the given character.
+    """
+    return ord(s.as_string_slice())
+
+
+fn ord(s: StringSlice) -> Int:
+    """Returns an integer that represents the given one-character string.
+
+    Given a string representing one character, return an integer
+    representing the code point of that character. For example, `ord("a")`
+    returns the integer `97`. This is the inverse of the `chr()` function.
+
+    Args:
         s: The input string, which must contain only a single character.
 
     Returns:
@@ -52,10 +68,12 @@ fn ord(s: String) -> Int:
     var p = s.unsafe_ptr().bitcast[UInt8]()
     var b1 = p[]
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
-        debug_assert(len(s) == 1, "input string length must be 1")
+        debug_assert(s._byte_length() == 1, "input string length must be 1")
         return int(b1)
     var num_bytes = countl_zero(~b1)
-    debug_assert(len(s) == int(num_bytes), "input string must be one character")
+    debug_assert(
+        s._byte_length() == int(num_bytes), "input string must be one character"
+    )
     debug_assert(
         1 < int(num_bytes) < 5, "invalid UTF-8 byte " + str(b1) + " at index 0"
     )
@@ -130,7 +148,6 @@ fn chr(c: Int) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline("nodebug")
 fn _chr_ascii(c: UInt8) -> String:
     """Returns a string based on the given ASCII code point.
 
@@ -143,7 +160,6 @@ fn _chr_ascii(c: UInt8) -> String:
     return String(String._buffer_type(c, 0))
 
 
-@always_inline("nodebug")
 fn _repr_ascii(c: UInt8) -> String:
     """Returns a printable representation of the given ASCII code point.
 
@@ -177,7 +193,7 @@ fn _repr_ascii(c: UInt8) -> String:
 
 
 # TODO: This is currently the same as repr, should change with unicode strings
-@always_inline("nodebug")
+@always_inline
 fn ascii(value: String) -> String:
     """Get the ASCII representation of the object.
 
@@ -195,7 +211,6 @@ fn ascii(value: String) -> String:
 # ===----------------------------------------------------------------------=== #
 
 
-@always_inline
 fn _atol(str_ref: StringRef, base: Int = 10) raises -> Int:
     """Implementation of `atol` for StringRef inputs.
 
@@ -387,7 +402,6 @@ fn _atof_error(str_ref: StringRef) -> Error:
     return Error("String is not convertible to float: '" + str(str_ref) + "'")
 
 
-@always_inline
 fn _atof(str_ref: StringRef) raises -> Float64:
     """Implementation of `atof` for StringRef inputs.
 
@@ -520,18 +534,6 @@ fn isdigit(c: UInt8) -> Bool:
     return ord_0 <= int(c) <= ord_9
 
 
-fn isdigit(c: String) -> Bool:
-    """Determines whether the given character is a digit [0-9].
-
-    Args:
-        c: The character to check.
-
-    Returns:
-        True if the character is a digit.
-    """
-    return isdigit(ord(c))
-
-
 # ===----------------------------------------------------------------------=== #
 # isupper
 # ===----------------------------------------------------------------------=== #
@@ -587,6 +589,22 @@ fn _is_ascii_lowercase(c: UInt8) -> Bool:
 # ===----------------------------------------------------------------------=== #
 # _isspace
 # ===----------------------------------------------------------------------=== #
+
+
+fn _isspace(c: String) -> Bool:
+    """Determines whether the given character is a whitespace character.
+
+    This only respects the default "C" locale, i.e. returns True only if the
+    character specified is one of " \\t\\n\\r\\f\\v". For semantics similar
+    to Python, use `String.isspace()`.
+
+    Args:
+        c: The character to check.
+
+    Returns:
+        True iff the character is one of the whitespace characters listed above.
+    """
+    return _isspace(ord(c))
 
 
 fn _isspace(c: UInt8) -> Bool:
@@ -845,7 +863,6 @@ struct String(
         """
         self.__copyinit__(other)
 
-    @always_inline
     fn __init__(inout self, str: StringRef):
         """Construct a string from a StringRef object.
 
@@ -859,7 +876,6 @@ struct String(
         memcpy(dest=buffer.data, src=str.data, count=length)
         self = Self(buffer^)
 
-    @always_inline
     fn __init__(inout self, str_slice: StringSlice):
         """Construct a string from a string slice.
 
@@ -942,7 +958,6 @@ struct String(
         """
         self = String(ptr.address, len)
 
-    @always_inline
     fn __init__(inout self, obj: PythonObject):
         """Creates a string from a python object.
 
@@ -987,6 +1002,19 @@ struct String(
 
         Returns:
             A string formed by formatting the argument sequence.
+
+        Examples:
+
+        Construct a String from several `Formattable` arguments:
+
+        ```mojo
+        from testing import assert_equal
+
+        var string = String.format_sequence(1, ", ", 2.0, ", ", "three")
+
+        assert_equal(string, "1, 2.0, three")
+        ```
+        .
         """
 
         var output = String()
@@ -1115,7 +1143,8 @@ struct String(
             rhs: The other String to compare against.
 
         Returns:
-            True if this String is strictly less than the RHS String and False otherwise.
+            True if this String is strictly less than the RHS String and False
+            otherwise.
         """
         return self._strref_dangerous() < rhs._strref_dangerous()
 
@@ -1155,7 +1184,6 @@ struct String(
         """
         return not (self < rhs)
 
-    @always_inline
     fn __add__(self, other: String) -> String:
         """Creates a string by appending another string at the end.
 
@@ -1198,7 +1226,6 @@ struct String(
         """
         return other + self
 
-    @always_inline
     fn __iadd__(inout self, other: String):
         """Appends another string to this string.
 
@@ -1254,12 +1281,11 @@ struct String(
         """
         return len(self) > 0
 
-    @always_inline
     fn __len__(self) -> Int:
-        """Returns the string byte length.
+        """Gets the string length, in bytes.
 
         Returns:
-            The string byte length.
+            The string length, in bytes.
         """
         # Avoid returning -1 if the buffer is not initialized
         if not self.unsafe_ptr():
@@ -1270,9 +1296,16 @@ struct String(
 
     @always_inline
     fn __str__(self) -> String:
+        """Gets the string itself.
+
+        This method ensures that you can pass a `String` to a method that
+        takes a `Stringable` value.
+
+        Returns:
+            The string itself.
+        """
         return self
 
-    @always_inline
     fn __repr__(self) -> String:
         """Return a Mojo-compatible representation of the `String` instance.
 
@@ -1292,6 +1325,14 @@ struct String(
             return '"' + result + '"'
         else:
             return "'" + result + "'"
+
+    fn __fspath__(self) -> String:
+        """Return the file system path representation (just the string itself).
+
+        Returns:
+          The file system path representation as a string.
+        """
+        return self
 
     # ===------------------------------------------------------------------=== #
     # Methods
@@ -1975,7 +2016,6 @@ struct String(
         # outside of the standard ASCII letters.
         return self._toggle_ascii_case[_is_ascii_lowercase]()
 
-    @always_inline
     fn _toggle_ascii_case[check_case: fn (UInt8) -> Bool](self) -> String:
         var copy: String = self
 
@@ -2073,7 +2113,7 @@ struct String(
             `string[:-len(suffix)]` if the string ends with the suffix string,
             or a copy of the original string otherwise.
         """
-        if self.endswith(suffix):
+        if suffix and self.endswith(suffix):
             return self[: -len(suffix)]
         return self
 
@@ -2112,7 +2152,6 @@ struct String(
             )
         return String(buf^)
 
-    @always_inline
     fn format[*Ts: Stringable](self, *args: *Ts) raises -> String:
         """Format a template with *args.
 
@@ -2185,11 +2224,65 @@ struct String(
     fn isdigit(self) -> Bool:
         """Returns True if all characters in the string are digits.
 
+        Note that this currently only works with ASCII strings.
+
         Returns:
             True if all characters are digits else False.
         """
         for c in self:
-            if not isdigit(c):
+            if not isdigit(ord(c)):
+                return False
+        return True
+
+    fn _isupper_islower[*, upper: Bool](self) -> Bool:
+        fn is_ascii_cased(c: UInt8) -> Bool:
+            return _is_ascii_uppercase(c) or _is_ascii_lowercase(c)
+
+        for c in self:
+            debug_assert(c._byte_length() == 1, "only implemented for ASCII")
+            if is_ascii_cased(ord(c)):
+
+                @parameter
+                if upper:
+                    return self == self.upper()
+                else:
+                    return self == self.lower()
+        return False
+
+    fn isupper(self) -> Bool:
+        """Returns True if all cased characters in the string are uppercase and
+        there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
+
+        Returns:
+            True if all cased characters in the string are uppercase and there
+            is at least one cased character, False otherwise.
+        """
+        return self._isupper_islower[upper=True]()
+
+    fn islower(self) -> Bool:
+        """Returns True if all cased characters in the string are lowercase and
+        there is at least one cased character.
+
+        Note that this currently only works with ASCII strings.
+
+        Returns:
+            True if all cased characters in the string are lowercase and there
+            is at least one cased character, False otherwise.
+        """
+        return self._isupper_islower[upper=False]()
+
+    fn isprintable(self) -> Bool:
+        """Returns True if all characters in the string are ASCII printable.
+
+        Note that this currently only works with ASCII strings.
+
+        Returns:
+            True if all characters are printable else False.
+        """
+        for c in self:
+            if not isprintable(ord(c)):
                 return False
         return True
 
@@ -2268,21 +2361,11 @@ fn _calc_initial_buffer_size_int64(n0: UInt64) -> Int:
         result += 4
 
 
-@always_inline
 fn _calc_initial_buffer_size(n0: Int) -> Int:
-    var n = abs(n0)
     var sign = 0 if n0 > 0 else 1
-    alias is_32bit_system = bitwidthof[DType.index]() == 32
 
     # Add 1 for the terminator
-    @parameter
-    if is_32bit_system:
-        return sign + _calc_initial_buffer_size_int32(n) + 1
-
-    # The value only has low-bits.
-    if n >> 32 == 0:
-        return sign + _calc_initial_buffer_size_int32(n) + 1
-    return sign + _calc_initial_buffer_size_int64(n) + 1
+    return sign + n0._decimal_digit_count() + 1
 
 
 fn _calc_initial_buffer_size(n: Float64) -> Int:
@@ -2331,7 +2414,7 @@ fn _calc_format_buffer_size[type: DType]() -> Int:
 
 
 @value
-struct _FormatCurlyEntry:
+struct _FormatCurlyEntry(CollectionElement, CollectionElementNew):
     """
     Internally used by the `format()` method.
 
@@ -2347,13 +2430,19 @@ struct _FormatCurlyEntry:
     var last_curly: Int
     """The index of an closing brace around a substitution field."""
 
-    var field: Variant[
+    alias _FieldVariantType = Variant[
         String,  # kwargs indexing (`{field_name}`)
         Int,  # args manual indexing (`{3}`)
         NoneType,  # args automatic indexing (`{}`)
         Bool,  # for escaped curlies ('{{')
     ]
+    var field: Self._FieldVariantType
     """Store the substitution field."""
+
+    fn __init__(inout self, *, other: Self):
+        self.first_curly = other.first_curly
+        self.last_curly = other.last_curly
+        self.field = Self._FieldVariantType(other=other.field)
 
     fn is_escaped_brace(ref [_]self) -> Bool:
         return self.field.isa[Bool]()

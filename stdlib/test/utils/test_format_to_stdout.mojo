@@ -12,8 +12,6 @@
 # ===----------------------------------------------------------------------=== #
 # RUN: %mojo -debug-level full %s
 
-from builtin.io import _print_fmt
-
 from utils._format import Formattable, Formatter, write_to
 
 
@@ -42,14 +40,3 @@ fn test_write_to_stdout():
     # CHECK: point = Point(1, 1)
     var point = Point(1, 1)
     write_to(stdout, "point = ", point)
-
-
-# CHECK-LABEL: test_print_fmt()
-fn test_print_fmt():
-    print("== test_print_fmt")
-
-    # CHECK: The quick brown fox...
-    _print_fmt("The quick brown fox...")
-
-    # CHECK: ...jumps over the lazy ..Point(2, 5) ???
-    _print_fmt("...jumps over the lazy ..", Point(2, 5), " ???")

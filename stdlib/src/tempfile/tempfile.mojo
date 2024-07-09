@@ -214,7 +214,10 @@ struct TemporaryDirectory:
         dir: Optional[String] = None,
         ignore_cleanup_errors: Bool = False,
     ) raises:
-        """Create a temporary directory. Can be used as a context manager.
+        """Create a temporary directory.
+
+        Can be used as a context manager. When used as a context manager,
+        the directory is removed when the context manager exits.
 
         Args:
             suffix: Suffix to use for the directory name.
@@ -227,12 +230,26 @@ struct TemporaryDirectory:
         self.name = mkdtemp(suffix, prefix, dir)
 
     fn __enter__(self) -> String:
+        """The function to call when entering the context.
+
+        Returns:
+            The temporary directory name.
+        """
         return self.name
 
     fn __exit__(self) raises:
+        """Called when exiting the context with no error."""
         _rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
 
     fn __exit__(self, err: Error) -> Bool:
+        """Called when exiting the context with an error.
+
+        Args:
+            err: The error raised inside the context.
+
+        Returns:
+            True if the temporary directory was removed successfully.
+        """
         try:
             self.__exit__()
             return True
@@ -259,13 +276,17 @@ struct NamedTemporaryFile:
         dir: Optional[String] = None,
         delete: Bool = True,
     ) raises:
-        """Create a named temporary file. Can be used as a context manager.
+        """Create a named temporary file.
+
         This is a wrapper around a `FileHandle`,
-        os.remove is called in close method if `delete` is True.
+        `os.remove()` is called in the `close()` method if `delete` is True.
+
+        Can be used as a context manager. When used as a context manager, the
+        `close()` is called when the context manager exits.
 
         Args:
             mode: The mode to open the file in (the mode can be "r" or "w").
-            name: The name of the temp file; if it is unspecified, then random name will be provided.
+            name: The name of the temp file. If it is unspecified, then a random name will be provided.
             suffix: Suffix to use for the file name if name is not provided.
             prefix: Prefix to use for the file name if name is not provided.
             dir: Directory in which the file will be created.
@@ -295,7 +316,6 @@ struct NamedTemporaryFile:
         except:
             raise Error("Failed to create temporary file")
 
-    @always_inline
     fn __del__(owned self):
         """Closes the file handle."""
         try:
@@ -319,7 +339,6 @@ struct NamedTemporaryFile:
         self._delete = existing._delete
         self.name = existing.name^
 
-    @always_inline
     fn read(self, size: Int64 = -1) raises -> String:
         """Reads the data from the file.
 
@@ -343,11 +362,15 @@ struct NamedTemporaryFile:
         """
         return self._file_handle.read_bytes(size)
 
-    fn seek(self, offset: UInt64) raises -> UInt64:
+    fn seek(self, offset: UInt64, whence: UInt8 = os.SEEK_SET) raises -> UInt64:
         """Seeks to the given offset in the file.
 
         Args:
             offset: The byte offset to seek to from the start of the file.
+            whence: The reference point for the offset:
+                os.SEEK_SET = 0: start of file (Default).
+                os.SEEK_CUR = 1: current position.
+                os.SEEK_END = 2: end of file.
 
         Raises:
             An error if this file handle is invalid, or if file seek returned a
@@ -356,7 +379,7 @@ struct NamedTemporaryFile:
         Returns:
             The resulting byte offset from the start of the file.
         """
-        return self._file_handle.seek(offset)
+        return self._file_handle.seek(offset, whence)
 
     fn write(self, data: String) raises:
         """Write the data to the file.
@@ -367,5 +390,8 @@ struct NamedTemporaryFile:
         self._file_handle.write(data)
 
     fn __enter__(owned self) -> Self:
-        """The function to call when entering the context."""
+        """The function to call when entering the context.
+
+        Returns:
+            The file handle."""
         return self^

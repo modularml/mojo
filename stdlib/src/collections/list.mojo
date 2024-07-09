@@ -64,10 +64,10 @@ struct _ListIter[
         @parameter
         if forward:
             self.index += 1
-            return self.src[].__get_ref(self.index - 1)[]
+            return self.src[][self.index - 1]
         else:
             self.index -= 1
-            return self.src[].__get_ref(self.index)[]
+            return self.src[][self.index]
 
     fn __len__(self) -> Int:
         @parameter
@@ -77,7 +77,9 @@ struct _ListIter[
             return self.index
 
 
-struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
+struct List[T: CollectionElement](
+    CollectionElement, CollectionElementNew, Sized, Boolable
+):
     """The `List` type is a dynamically-allocated list.
 
     It supports pushing and popping from the back resizing the underlying
@@ -105,14 +107,14 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.size = 0
         self.capacity = 0
 
-    fn __init__(inout self, existing: Self):
+    fn __init__(inout self, *, other: Self):
         """Creates a deep copy of the given list.
 
         Args:
-            existing: The list to copy.
+            other: The list to copy.
         """
-        self.__init__(capacity=existing.capacity)
-        for e in existing:
+        self.__init__(capacity=other.capacity)
+        for e in other:
             self.append(e[])
 
     fn __init__(inout self, *, capacity: Int):
@@ -185,19 +187,16 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         for i in range(len(existing)):
             self.append(existing[i])
 
-    @always_inline
     fn __del__(owned self):
         """Destroy all elements in the list and free its memory."""
         for i in range(self.size):
             (self.data + i).destroy_pointee()
-        if self.data:
-            self.data.free()
+        self.data.free()
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
     fn __contains__[
         T2: ComparableCollectionElement
     ](self: List[T], value: T2) -> Bool:
@@ -224,7 +223,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 return True
         return False
 
-    @always_inline("nodebug")
     fn __mul__(self, x: Int) -> Self:
         """Multiplies the list by x and returns a new list.
 
@@ -237,11 +235,10 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # avoid the copy since it would be cleared immediately anyways
         if x == 0:
             return Self()
-        var result = List(self)
+        var result = List(other=self)
         result.__mul(x)
         return result^
 
-    @always_inline("nodebug")
     fn __imul__(inout self, x: Int):
         """Multiplies the list by x in place.
 
@@ -250,7 +247,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         self.__mul(x)
 
-    @always_inline("nodebug")
     fn __add__(self, owned other: Self) -> Self:
         """Concatenates self with other and returns the result as a new list.
 
@@ -260,11 +256,10 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         Returns:
             The newly created list.
         """
-        var result = List(self)
+        var result = List(other=self)
         result.extend(other^)
         return result^
 
-    @always_inline("nodebug")
     fn __iadd__(inout self, owned other: Self):
         """Appends the elements of other into self.
 
@@ -325,7 +320,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         When the compiler supports conditional methods, then a simple `str(my_list)` will
         be enough.
 
-        The elements' type must implement the `__repr__()` for this to work.
+        The elements' type must implement the `__repr__()` method for this to work.
 
         Parameters:
             U: The type of the elements in the list. Must implement the
@@ -359,6 +354,7 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
     fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
         """Returns a string representation of a `List`.
+
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below:
 
@@ -385,7 +381,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline
     fn _realloc(inout self, new_capacity: Int):
         var new_data = UnsafePointer[T].alloc(new_capacity)
 
@@ -397,7 +392,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.data = new_data
         self.capacity = new_capacity
 
-    @always_inline
     fn append(inout self, owned value: T):
         """Appends a value to this list.
 
@@ -409,7 +403,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         (self.data + self.size).init_pointee_move(value^)
         self.size += 1
 
-    @always_inline
     fn insert(inout self, i: Int, owned value: T):
         """Inserts a value to the list at the given index.
         `a.insert(len(a), value)` is equivalent to `a.append(value)`.
@@ -439,7 +432,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             earlier_idx -= 1
             later_idx -= 1
 
-    @always_inline
     fn __mul(inout self, x: Int):
         """Appends the original elements of this list x-1 times.
 
@@ -454,12 +446,11 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         if x == 0:
             self.clear()
             return
-        var orig = List(self)
+        var orig = List(other=self)
         self.reserve(len(self) * x)
         for i in range(x - 1):
             self.extend(orig)
 
-    @always_inline
     fn extend(inout self, owned other: List[T]):
         """Extends this list by consuming the elements of `other`.
 
@@ -500,7 +491,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         # list.
         self.size = final_size
 
-    @always_inline
     fn pop(inout self, i: Int = -1) -> T:
         """Pops a value from the list at the given index.
 
@@ -525,7 +515,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
                 self._realloc(self.capacity // 2)
         return ret_val^
 
-    @always_inline
     fn reserve(inout self, new_capacity: Int):
         """Reserves the requested capacity.
 
@@ -539,7 +528,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
             return
         self._realloc(new_capacity)
 
-    @always_inline
     fn resize(inout self, new_size: Int, value: T):
         """Resizes the list to the given new size.
 
@@ -583,7 +571,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.size = new_size
         self.reserve(new_size)
 
-    @always_inline
     fn reverse(inout self):
         """Reverses the elements of the list."""
 
@@ -679,7 +666,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         self.capacity = 0
         return ptr
 
-    @always_inline
     fn __getitem__(self, span: Slice) -> Self:
         """Gets the sequence of elements at the specified positions.
 
@@ -705,7 +691,6 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
 
         return res^
 
-    @always_inline
     fn __getitem__(ref [_]self, idx: Int) -> ref [__lifetime_of(self)] T:
         """Gets the list element at the given index.
 
@@ -766,12 +751,10 @@ struct List[T: CollectionElement](CollectionElement, Sized, Boolable):
         """
         debug_assert(
             0 <= idx < len(self),
-            "The index provided must be within the range [0,",
-            len(self),
-            "[",
-            " when using List.unsafe_get(). But you provided: ",
-            idx,
-            ".",
+            (
+                "The index provided must be within the range [0, len(List) -1]"
+                " when using List.unsafe_get()"
+            ),
         )
         return (self.data + idx)[]
 

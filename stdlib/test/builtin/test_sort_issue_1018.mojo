@@ -25,10 +25,10 @@ fn sort_test[D: DType, name: StringLiteral](size: Int, max: Int) raises:
             print(name, "size:", size, "max:", max, "incorrect sort")
             print("p[", end="")
             print(i - 1, end="")
-            print("] =", p.load(i - 1))
+            print("] =", p[i - 1])
             print("p[", end="")
             print(i, end="")
-            print("] =", p.load(i))
+            print("] =", p[i])
             print()
             p.free()
             raise "Failed"

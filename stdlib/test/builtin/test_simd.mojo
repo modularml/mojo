@@ -65,8 +65,6 @@ def test_convert_simd_to_string():
     # TODO: uncomment when https://github.com/modularml/mojo/issues/2353 is fixed
     # assert_equal(str(UInt32(-1)), "4294967295")
     assert_equal(str(UInt64(-1)), "18446744073709551615")
-    assert_equal(str(Scalar[DType.address](22)), "0x16")
-    assert_equal(str(Scalar[DType.address](0xDEADBEAF)), "0xdeadbeaf")
 
     assert_equal(str((UInt16(32768))), "32768")
     assert_equal(str((UInt16(65535))), "65535")
@@ -245,7 +243,6 @@ def test_truthy():
         DType.float32,
         DType.float64,
         DType.index,
-        # DType.address  # TODO(29920)
     )
 
     @parameter
@@ -911,14 +908,6 @@ def test_deinterleave():
     assert_equal(tup4[1], SIMD[DType.index, 2](1, 3))
 
 
-def test_address():
-    assert_equal(Scalar[DType.address](1), 1)
-    assert_not_equal(Scalar[DType.address](1), 0)
-
-    assert_true(Bool(Scalar[DType.address](12) > 1))
-    assert_true(Bool(Scalar[DType.address](1) < 12))
-
-
 def test_extract():
     assert_equal(Int64(99).slice[1](), 99)
     assert_equal(Int64(99).slice[1, offset=0](), 99)
@@ -1547,11 +1536,19 @@ def test_split():
     assert_equal(tup[1], SIMD[DType.index, 4](5, 6, 7, 8))
 
 
+def test_contains():
+    var x = SIMD[DType.int8, 4](1, 2, 3, 4)
+    assert_true(1 in x and 2 in x and 3 in x and 4 in x)
+    assert_false(0 in x or 5 in x)
+    var y = SIMD[DType.float16, 4](1, 2, 3, 4)
+    assert_true(1 in y and 2 in y and 3 in y and 4 in y)
+    assert_false(0 in y or 5 in y)
+
+
 def main():
     test_abs()
     test_add()
     test_add_with_overflow()
-    test_address()
     test_cast()
     test_ceil()
     test_convert_simd_to_string()
@@ -1596,4 +1593,5 @@ def main():
     test_truthy()
     test_modf()
     test_split()
+    test_contains()
     # TODO: add tests for __and__, __or__, anc comparison operators

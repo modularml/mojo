@@ -28,13 +28,19 @@ from memory.memory import _free, _malloc
 # ===----------------------------------------------------------------------=== #
 # UnsafePointer
 # ===----------------------------------------------------------------------=== #
+
+
 @register_passable("trivial")
 struct UnsafePointer[
-    T: AnyType, address_space: AddressSpace = AddressSpace.GENERIC
+    T: AnyType,
+    address_space: AddressSpace = AddressSpace.GENERIC,
+    exclusive: Bool = False,
 ](
     ImplicitlyBoolable,
     CollectionElement,
+    CollectionElementNew,
     Stringable,
+    Formattable,
     Intable,
     Comparable,
 ):
@@ -43,11 +49,18 @@ struct UnsafePointer[
     Parameters:
         T: The type the pointer points to.
         address_space: The address space associated with the UnsafePointer allocated memory.
+        exclusive: The underlying memory allocation of the pointer is known only to be accessible through this pointer.
     """
 
     # Fields
     alias _mlir_type = __mlir_type[
-        `!kgen.pointer<`, T, `,`, address_space._value.value, `>`
+        `!kgen.pointer<`,
+        T,
+        `, `,
+        address_space._value.value,
+        ` exclusive(`,
+        exclusive.value,
+        `)>`,
     ]
 
     alias type = T
@@ -84,20 +97,32 @@ struct UnsafePointer[
         return Self {address: value}
 
     @always_inline
-    fn __init__(*, address: Int) -> Self:
-        """Create an unsafe UnsafePointer from an address in an integer.
+    fn __init__(other: UnsafePointer[T, address_space, _]) -> Self:
+        """Exclusivity parameter cast a pointer.
 
         Args:
-            address: The address to construct the pointer with.
+            other: Pointer to cast.
 
         Returns:
-            The pointer.
+            Constructed UnsafePointer object.
         """
         return Self {
-            address: __mlir_op.`pop.index_to_pointer`[_type = Self._mlir_type](
-                Scalar[DType.index](address).value
+            address: __mlir_op.`pop.pointer.bitcast`[_type = Self._mlir_type](
+                other.address
             )
         }
+
+    @always_inline
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            A copy of the object.
+        """
+        return Self {address: other.address}
 
     # ===-------------------------------------------------------------------===#
     # Factory methods
@@ -122,10 +147,7 @@ struct UnsafePointer[
     ](ptr: DTypePointer[dtype, address_space]) -> UnsafePointer[
         Scalar[dtype], address_space
     ]:
-        # TODO:
-        #   Is there a better way to create an UnsafePointer from a
-        #   DTypePointer?
-        return UnsafePointer[Scalar[dtype], address_space](address=int(ptr))
+        return ptr.address.address
 
     @staticmethod
     @always_inline
@@ -149,12 +171,8 @@ struct UnsafePointer[
             sizeof_t % alignment == 0, "size must be a multiple of alignment"
         ]()
 
-        return Self(
-            address=int(
-                _malloc[Int8, address_space=address_space](
-                    sizeof_t * count, alignment=alignment
-                )
-            )
+        return _malloc[T, address_space=address_space](
+            sizeof_t * count, alignment=alignment
         )
 
     # ===-------------------------------------------------------------------===#
@@ -177,9 +195,24 @@ struct UnsafePointer[
         alias _ref_type = Reference[T, MutableStaticLifetime, address_space]
         return __get_litref_as_mvalue(
             __mlir_op.`lit.ref.from_pointer`[_type = _ref_type._mlir_type](
-                self.address
+                UnsafePointer[T, address_space, False](self).address
             )
         )
+
+    @always_inline
+    fn offset[T: Intable](self, idx: T) -> Self:
+        """Returns a new pointer shifted by the specified offset.
+
+        Parameters:
+            T: The Intable type of the offset.
+
+        Args:
+            idx: The offset of the new pointer.
+
+        Returns:
+            The new constructed DTypePointer.
+        """
+        return __mlir_op.`pop.offset`(self.address, int(idx).value)
 
     @always_inline
     fn __getitem__(
@@ -205,7 +238,7 @@ struct UnsafePointer[
         Returns:
             An offset pointer.
         """
-        return Self(address=int(self) + offset * sizeof[T]())
+        return self.offset(offset)
 
     @always_inline
     fn __sub__(self, offset: Int) -> Self:
@@ -226,7 +259,7 @@ struct UnsafePointer[
         Args:
             offset: The offset index.
         """
-        self = Self(address=int(self) + offset * sizeof[T]())
+        self = self.offset(offset)
 
     @always_inline
     fn __isub__(inout self, offset: Int):
@@ -340,12 +373,26 @@ struct UnsafePointer[
         Returns:
           The address of the pointer as an Int.
         """
-        return __mlir_op.`pop.pointer_to_index`[
-            _type = __mlir_type.`!pop.scalar<index>`
-        ](self.address)
+        return __mlir_op.`pop.pointer_to_index`(self.address)
 
     fn __str__(self) -> String:
+        """Gets a string representation of the pointer.
+
+        Returns:
+            The string representation of the pointer.
+        """
         return hex(int(self))
+
+    fn format_to(self, inout writer: Formatter):
+        """
+        Formats this pointer address to the provided formatter.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        # TODO: Avoid intermediate String allocation.
+        writer.write(str(self))
 
     # ===-------------------------------------------------------------------===#
     # Methods
@@ -387,7 +434,7 @@ struct UnsafePointer[
     @always_inline
     fn free(self):
         """Free the memory referenced by the pointer."""
-        Pointer[Int8, address_space=address_space](address=int(self)).free()
+        _free(self)
 
     @always_inline("nodebug")
     fn bitcast[

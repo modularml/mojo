@@ -17,7 +17,7 @@ These are Mojo built-ins, so you don't need to import them.
 
 from sys import alignof, sizeof
 
-from memory import UnsafePointer, memcmp, memcpy
+from memory import UnsafePointer, memcpy
 from memory.memory import _free
 
 # ===----------------------------------------------------------------------===#
@@ -26,7 +26,14 @@ from memory.memory import _free
 
 
 @register_passable
-struct Error(Stringable, Boolable, Representable, Formattable):
+struct Error(
+    Stringable,
+    Boolable,
+    Representable,
+    Formattable,
+    CollectionElement,
+    CollectionElementNew,
+):
     """This type represents an Error."""
 
     var data: UnsafePointer[UInt8]
@@ -40,7 +47,7 @@ struct Error(Stringable, Boolable, Representable, Formattable):
     ownership and a free is executed in the destructor.
     """
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__() -> Self:
         """Default constructor.
 
@@ -49,7 +56,7 @@ struct Error(Stringable, Boolable, Representable, Formattable):
         """
         return Error {data: UnsafePointer[UInt8](), loaded_length: 0}
 
-    @always_inline("nodebug")
+    @always_inline
     fn __init__(value: StringLiteral) -> Self:
         """Construct an Error object with a given string literal.
 
@@ -64,7 +71,6 @@ struct Error(Stringable, Boolable, Representable, Formattable):
             loaded_length: len(value),
         }
 
-    @always_inline("nodebug")
     fn __init__(src: String) -> Self:
         """Construct an Error object with a given string.
 
@@ -84,7 +90,6 @@ struct Error(Stringable, Boolable, Representable, Formattable):
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
-    @always_inline("nodebug")
     fn __init__(src: StringRef) -> Self:
         """Construct an Error object with a given string ref.
 
@@ -104,12 +109,22 @@ struct Error(Stringable, Boolable, Representable, Formattable):
         dest[length] = 0
         return Error {data: dest, loaded_length: -length}
 
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            The copied `Error`.
+        """
+        return other
+
     fn __del__(owned self):
         """Releases memory if allocated."""
         if self.loaded_length < 0:
             self.data.free()
 
-    @always_inline("nodebug")
     fn __copyinit__(existing: Self) -> Self:
         """Creates a deep copy of an existing error.
 
@@ -162,7 +177,6 @@ struct Error(Stringable, Boolable, Representable, Formattable):
         """
         return "Error(" + repr(self._message()) + ")"
 
-    @always_inline
     fn _message(self) -> String:
         """Converts the Error to string representation.
 

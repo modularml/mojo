@@ -33,7 +33,6 @@ from benchmark import (
     run,
 )
 from buffer import Buffer
-from memory import memcmp
 from memory.unsafe import DTypePointer
 
 
@@ -52,9 +51,9 @@ struct Op(Stringable):
     fn __eq__(self, other: Op) -> Bool:
         return self.op_code == other.op_code
 
-    @always_inline("nodebug")
+    @always_inline
     fn __str__(self) -> String:
-        alias op_list = List[String](
+        var op_list = List[String](
             "add", "sub", "mul", "div", "fma", "ld", "st"
         )
         return "op." + op_list[self.op_code]

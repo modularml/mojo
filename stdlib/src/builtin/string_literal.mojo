@@ -35,6 +35,7 @@ from .string import _atol
 struct StringLiteral(
     Boolable,
     Comparable,
+    CollectionElementNew,
     Formattable,
     IntableRaising,
     KeyElement,
@@ -67,6 +68,15 @@ struct StringLiteral(
             value: The string value.
         """
         self.value = value
+
+    @always_inline("nodebug")
+    fn __init__(inout self, *, other: Self):
+        """Copy constructor.
+
+        Args:
+            other: The string literal to copy.
+        """
+        self = other
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -168,7 +178,7 @@ struct StringLiteral(
         return substr in StringRef(self)
 
     # ===-------------------------------------------------------------------===#
-    # Trait impelemntations
+    # Trait implementations
     # ===-------------------------------------------------------------------===#
 
     @always_inline("nodebug")
@@ -211,17 +221,12 @@ struct StringLiteral(
             A new string.
         """
         var string = String()
-        var length: Int = __mlir_op.`pop.string.size`(self.value)
+        var length = self._byte_length()
         var buffer = String._buffer_type()
         var new_capacity = length + 1
         buffer._realloc(new_capacity)
         buffer.size = new_capacity
-        var uint8Ptr = __mlir_op.`pop.pointer.bitcast`[
-            _type = __mlir_type.`!kgen.pointer<scalar<ui8>>`
-        ](__mlir_op.`pop.string.address`(self.value))
-        var data: DTypePointer[DType.uint8] = DTypePointer[DType.uint8](
-            uint8Ptr
-        )
+        var data: DTypePointer[DType.uint8] = self.as_uint8_ptr()
         memcpy(DTypePointer(buffer.data), data, length)
         (buffer.data + length).init_pointee_move(0)
         string._buffer = buffer^
@@ -246,6 +251,14 @@ struct StringLiteral(
             builtin documentation for more details.
         """
         return hash(self.unsafe_ptr(), len(self))
+
+    fn __fspath__(self) -> String:
+        """Return the file system path representation of the object.
+
+        Returns:
+          The file system path representation as a string.
+        """
+        return self.__str__()
 
     # ===-------------------------------------------------------------------===#
     # Methods

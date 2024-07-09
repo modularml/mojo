@@ -36,8 +36,9 @@ from utils import Variant
 
 # TODO(27780): NoneType can't currently conform to traits
 @value
-struct _NoneType(CollectionElement):
-    pass
+struct _NoneType(CollectionElement, CollectionElementNew):
+    fn __init__(inout self, *, other: Self):
+        pass
 
 
 # ===----------------------------------------------------------------------===#
@@ -164,6 +165,56 @@ struct Optional[T: CollectionElement](
         """
         return not self
 
+    fn __str__[U: RepresentableCollectionElement](self: Optional[U]) -> String:
+        """Return the string representation of the value of the Optional.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Returns:
+            A string represenation of the Optional.
+        """
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output
+
+    # TODO: Include the Parameter type in the string as well.
+    fn __repr__[U: RepresentableCollectionElement](self: Optional[U]) -> String:
+        """Returns the verbose string representation of the Optional.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Returns:
+            A verbose string representation of the Optional.
+        """
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        write_to(writer, "Optional(")
+        self.format_to(writer)
+        write_to(writer, ")")
+        return output
+
+    fn format_to[
+        U: RepresentableCollectionElement
+    ](self: Optional[U], inout writer: Formatter):
+        """Write Optional string representation to a `Formatter`.
+
+        Parameters:
+            U: The type of the elements in the list. Must implement the
+              traits `Representable` and `CollectionElement`.
+
+        Args:
+            writer: The formatter to write to.
+        """
+        if self:
+            write_to(writer, repr(self.value()))
+        else:
+            write_to(writer, "None")
+
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
@@ -248,7 +299,8 @@ struct Optional[T: CollectionElement](
         return self._value.unsafe_replace[_NoneType, T](_NoneType())
 
     fn or_else(self, default: T) -> T:
-        """Return the underlying value contained in the Optional or a default value if the Optional's underlying value is not present.
+        """Return the underlying value contained in the Optional or a default
+        value if the Optional's underlying value is not present.
 
         Args:
             default: The new value to use if no value was present.
@@ -363,3 +415,17 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
             The contained value.
         """
         return __mlir_op.`kgen.variant.take`[index = Int(0).value](self._value)
+
+    fn or_else(self, default: T) -> T:
+        """Return the underlying value contained in the Optional or a default
+        value if the Optional's underlying value is not present.
+
+        Args:
+            default: The new value to use if no value was present.
+
+        Returns:
+            The underlying value contained in the Optional or a default value.
+        """
+        if self:
+            return self.value()
+        return default

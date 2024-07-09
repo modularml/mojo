@@ -693,6 +693,19 @@ fn Index[T0: Intable](x: T0) -> StaticIntTuple[1]:
 
 
 @always_inline
+fn Index(x: UInt) -> StaticIntTuple[1]:
+    """Constructs a 1-D Index from the given value.
+
+    Args:
+        x: The initial value.
+
+    Returns:
+        The constructed StaticIntTuple.
+    """
+    return StaticIntTuple[1](x.value)
+
+
+@always_inline
 fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> StaticIntTuple[2]:
     """Constructs a 2-D Index from the given values.
 
@@ -708,6 +721,20 @@ fn Index[T0: Intable, T1: Intable](x: T0, y: T1) -> StaticIntTuple[2]:
         The constructed StaticIntTuple.
     """
     return StaticIntTuple[2](int(x), int(y))
+
+
+@always_inline
+fn Index(x: UInt, y: UInt) -> StaticIntTuple[2]:
+    """Constructs a 2-D Index from the given values.
+
+    Args:
+        x: The 1st initial value.
+        y: The 2nd initial value.
+
+    Returns:
+        The constructed StaticIntTuple.
+    """
+    return StaticIntTuple[2](x.value, y.value)
 
 
 @always_inline

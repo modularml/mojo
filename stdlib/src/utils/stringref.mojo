@@ -40,6 +40,7 @@ struct StringRef(
     Sized,
     IntableRaising,
     CollectionElement,
+    CollectionElementNew,
     Stringable,
     Formattable,
     Hashable,
@@ -69,6 +70,18 @@ struct StringRef(
             Constructed `StringRef` object.
         """
         return StringRef(UnsafePointer[UInt8](), 0)
+
+    @always_inline
+    fn __init__(*, other: Self) -> Self:
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+
+        Returns:
+            Constructed `StringRef` object.
+        """
+        return Self(other.data, other.length)
 
     @always_inline
     fn __init__(str: StringLiteral) -> Self:
@@ -419,6 +432,14 @@ struct StringRef(
         )
 
         writer.write_str(str_slice)
+
+    fn __fspath__(self) -> String:
+        """Return the file system path representation of the object.
+
+        Returns:
+          The file system path representation as a string.
+        """
+        return self.__str__()
 
     # ===-------------------------------------------------------------------===#
     # Methods

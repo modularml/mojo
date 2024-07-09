@@ -27,7 +27,6 @@ alias _DEFAULT_DIGIT_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline
 fn bin(num: Scalar, /, *, prefix: StaticString = "0b") -> String:
     """Return the binary string representation an integral value.
 
@@ -52,7 +51,6 @@ fn bin(num: Scalar, /, *, prefix: StaticString = "0b") -> String:
 
 # Need this until we have constraints to stop the compiler from matching this
 # directly to bin[type: DType](num: Scalar[type]).
-@always_inline("nodebug")
 fn bin(b: Scalar[DType.bool], /, *, prefix: StaticString = "0b") -> String:
     """Returns the binary representation of a scalar bool.
 
@@ -66,7 +64,6 @@ fn bin(b: Scalar[DType.bool], /, *, prefix: StaticString = "0b") -> String:
     return bin(b.cast[DType.int8](), prefix=prefix)
 
 
-@always_inline("nodebug")
 fn bin[T: Indexer, //](num: T, /, *, prefix: StaticString = "0b") -> String:
     """Returns the binary representation of an indexer type.
 
@@ -106,7 +103,6 @@ fn hex(value: Scalar, /, *, prefix: StaticString = "0x") -> String:
     return _try_format_int(value, 16, prefix=prefix)
 
 
-@always_inline
 fn hex[T: Indexer, //](value: T, /, *, prefix: StaticString = "0x") -> String:
     """Returns the hex string representation of the given integer.
 
@@ -128,7 +124,6 @@ fn hex[T: Indexer, //](value: T, /, *, prefix: StaticString = "0x") -> String:
     return hex(Scalar[DType.index](index(value)), prefix=prefix)
 
 
-@always_inline
 fn hex(value: Scalar[DType.bool], /, *, prefix: StaticString = "0x") -> String:
     """Returns the hex string representation of the given scalar bool.
 
@@ -152,7 +147,6 @@ fn hex(value: Scalar[DType.bool], /, *, prefix: StaticString = "0x") -> String:
 # ===----------------------------------------------------------------------===#
 
 
-@always_inline
 fn oct(value: Scalar, /, *, prefix: StaticString = "0o") -> String:
     """Returns the octal string representation of the given integer.
 
@@ -171,7 +165,6 @@ fn oct(value: Scalar, /, *, prefix: StaticString = "0o") -> String:
     return _try_format_int(value, 8, prefix=prefix)
 
 
-@always_inline
 fn oct[T: Indexer, //](value: T, /, *, prefix: StaticString = "0o") -> String:
     """Returns the octal string representation of the given integer.
 
@@ -193,7 +186,6 @@ fn oct[T: Indexer, //](value: T, /, *, prefix: StaticString = "0o") -> String:
     return oct(Scalar[DType.index](index(value)), prefix=prefix)
 
 
-@always_inline
 fn oct(value: Scalar[DType.bool], /, *, prefix: StaticString = "0o") -> String:
     """Returns the octal string representation of the given scalar bool.
 
@@ -252,7 +244,6 @@ fn _format_int[
     return string^
 
 
-@always_inline
 fn _write_int[
     type: DType, //,
 ](
@@ -271,7 +262,6 @@ fn _write_int[
         raise err.value()
 
 
-@always_inline
 fn _try_write_int[
     type: DType, //,
 ](

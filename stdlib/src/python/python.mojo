@@ -227,7 +227,8 @@ struct Python:
     fn __str__(inout self, str_obj: PythonObject) -> StringRef:
         """Return a string representing the given Python object.
 
-        This function allows to convert Python objects to Mojo string type.
+        Args:
+            str_obj: The Python object.
 
         Returns:
             Mojo string representing the given Python object.

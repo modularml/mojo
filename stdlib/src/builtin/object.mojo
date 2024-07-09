@@ -28,14 +28,15 @@ from utils import StringRef, Variant, unroll
 
 
 @register_passable("trivial")
-struct _NoneMarker:
+struct _NoneMarker(CollectionElementNew):
     """This is a trivial class to indicate that an object is `None`."""
 
-    pass
+    fn __init__(inout self, *, other: Self):
+        pass
 
 
 @register_passable("trivial")
-struct _ImmutableString:
+struct _ImmutableString(CollectionElement, CollectionElementNew):
     """Python strings are immutable. This class is marked as trivially register
     passable because its memory will be managed by `_ObjectImpl`. It is a
     pointer and integer pair. Memory will be dynamically allocated.
@@ -51,6 +52,10 @@ struct _ImmutableString:
     fn __init__(inout self, data: UnsafePointer[UInt8], length: Int):
         self.data = data
         self.length = length
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self = other
 
     @always_inline
     fn string_compare(self, rhs: _ImmutableString) -> Int:
@@ -77,7 +82,7 @@ struct _RefCountedList:
 
 
 @register_passable("trivial")
-struct _RefCountedListRef:
+struct _RefCountedListRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     var lst: UnsafePointer[NoneType]
     """The reference to the list."""
@@ -87,6 +92,10 @@ struct _RefCountedListRef:
         var ptr = UnsafePointer[_RefCountedList].alloc(1)
         __get_address_as_uninit_lvalue(ptr.address) = _RefCountedList()
         self.lst = ptr.bitcast[NoneType]()
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self.lst = other.lst
 
     @always_inline
     fn copy(self) -> Self:
@@ -161,7 +170,7 @@ struct Attr:
 
 
 @register_passable("trivial")
-struct _RefCountedAttrsDictRef:
+struct _RefCountedAttrsDictRef(CollectionElement, CollectionElementNew):
     # FIXME(#3335): Use indirection to avoid a recursive struct definition.
     # FIXME(#12604): Distinguish this type from _RefCountedListRef.
     var attrs: UnsafePointer[Int8]
@@ -178,6 +187,10 @@ struct _RefCountedAttrsDictRef:
         self.attrs = ptr.bitcast[Int8]()
 
     @always_inline
+    fn __init__(inout self, *, other: Self):
+        self = other
+
+    @always_inline
     fn copy(self) -> Self:
         _ = self.attrs.bitcast[_RefCountedAttrsDict]()[].impl
         return Self {attrs: self.attrs}
@@ -187,7 +200,7 @@ struct _RefCountedAttrsDictRef:
 
 
 @register_passable("trivial")
-struct _Function:
+struct _Function(CollectionElement, CollectionElementNew):
     # The MLIR function type has two arguments:
     # 1. The self value, or the single argument.
     # 2. None, or an additional argument.
@@ -200,6 +213,10 @@ struct _Function:
         var f = UnsafePointer[Int16]()
         UnsafePointer.address_of(f).bitcast[FnT]()[] = value
         self.value = f
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        self.value = other.value
 
     alias fn0 = fn () raises -> object
     """Nullary function type."""
@@ -233,7 +250,7 @@ struct _Function:
         )
 
 
-struct _ObjectImpl(CollectionElement, Stringable):
+struct _ObjectImpl(CollectionElement, CollectionElementNew, Stringable):
     """This class is the underlying implementation of the value of an `object`.
     It is a variant of primitive types and pointers to implementations of more
     complex types.
@@ -315,6 +332,15 @@ struct _ObjectImpl(CollectionElement, Stringable):
     @always_inline
     fn __init__(inout self, value: _RefCountedAttrsDictRef):
         self.value = Self.type(value)
+
+    @always_inline
+    fn __init__(inout self, *, other: Self):
+        """Copy the object.
+
+        Args:
+            other: The value to copy.
+        """
+        self = other.value
 
     @always_inline
     fn __copyinit__(inout self, existing: Self):
@@ -1799,6 +1825,14 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
 
     @always_inline
     fn __getattr__(self, key: StringLiteral) raises -> object:
+        """Gets the named attribute.
+
+        Args:
+            key: The attribute name.
+
+        Returns:
+            The attribute value.
+        """
         if not self._value.is_obj():
             raise Error(
                 "TypeError: Type '"
@@ -1811,6 +1845,12 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
 
     @always_inline
     fn __setattr__(inout self, key: StringLiteral, value: object) raises:
+        """Sets the named attribute.
+
+        Args:
+            key: The attribute name.
+            value: The attribute value.
+        """
         if not self._value.is_obj():
             raise Error(
                 "TypeError: Type '"
@@ -1823,18 +1863,40 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
 
     @always_inline
     fn __call__(self) raises -> object:
+        """Calls the object as a function.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke()
 
     @always_inline
     fn __call__(self, arg0: object) raises -> object:
+        """Calls the object as a function.
+
+        Args:
+            arg0: The first function argument.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0)
 
     @always_inline
     fn __call__(self, arg0: object, arg1: object) raises -> object:
+        """Calls the object as a function.
+
+        Args:
+            arg0: The first function argument.
+            arg1: The second function argument.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1)
@@ -1843,6 +1905,16 @@ struct object(IntableRaising, ImplicitlyBoolable, Stringable):
     fn __call__(
         self, arg0: object, arg1: object, arg2: object
     ) raises -> object:
+        """Calls the object as a function.
+
+        Args:
+            arg0: The first function argument.
+            arg1: The second function argument.
+            arg2: The third function argument.
+
+        Returns:
+            The function return value, as an object.
+        """
         if not self._value.is_func():
             raise Error("TypeError: Object is not a function")
         return self._value.get_as_func().invoke(arg0, arg1, arg2)

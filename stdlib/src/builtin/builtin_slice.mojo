@@ -27,7 +27,7 @@ fn _compare_optional(x: OptionalReg[Int], y: OptionalReg[Int]) -> Bool:
 
 
 @register_passable("trivial")
-struct Slice(Stringable, EqualityComparable):
+struct Slice(Stringable, EqualityComparable, Representable, Formattable):
     """Represents a slice expression.
 
     Objects of this type are generated when slice syntax is used within square
@@ -85,13 +85,40 @@ struct Slice(Stringable, EqualityComparable):
         Returns:
             The string representation of the span.
         """
-        var res = str(self.start.value()) if self.start else ""
-        res += ":"
-        if self.end:
-            res += str(self.end.value()) if self.end else ""
-        res += ":"
-        res += str(self.step)
-        return res
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output
+
+    fn __repr__(self) -> String:
+        """Gets the string representation of the span.
+
+        Returns:
+            The string representation of the span.
+        """
+        return self.__str__()
+
+    fn format_to(self, inout writer: Formatter):
+        """Write Slice string representation to a `Formatter`.
+
+        Args:
+            writer: The formatter to write to.
+        """
+
+        @parameter
+        fn write_optional(opt: OptionalReg[Int]):
+            if opt:
+                writer.write(repr(opt.value()))
+            else:
+                writer.write(repr(None))
+
+        writer.write("slice(")
+        write_optional(self.start)
+        writer.write(", ")
+        write_optional(self.end)
+        writer.write(", ")
+        writer.write(repr(self.step))
+        writer.write(")")
 
     @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
@@ -135,18 +162,6 @@ struct Slice(Stringable, EqualityComparable):
 
         return len(range(self.start.value(), self.end.value(), self.step))
 
-    @always_inline
-    fn __getitem__(self, idx: Int) -> Int:
-        """Get the slice index.
-
-        Args:
-            idx: The index.
-
-        Returns:
-            The slice index.
-        """
-        return self.start.value() + idx * self.step
-
     fn indices(self, length: Int) -> (Int, Int, Int):
         """Returns a tuple of 3 intergers representing the start, end, and step
            of the slice if applied to a container of the given length.
@@ -179,9 +194,11 @@ struct Slice(Stringable, EqualityComparable):
         Returns:
             A tuple containing three integers for start, end, and step.
         """
+        var step = self.step
+
         var start = self.start
         var end = self.end
-        var positive_step = self.step > 0
+        var positive_step = step > 0
 
         if not start:
             start = 0 if positive_step else length - 1
@@ -201,7 +218,7 @@ struct Slice(Stringable, EqualityComparable):
         elif end.value() >= length:
             end = length if positive_step else length - 1
 
-        return (start.value(), end.value(), self.step)
+        return (start.value(), end.value(), step)
 
 
 @always_inline("nodebug")
@@ -214,7 +231,7 @@ fn slice(end: Int) -> Slice:
     Returns:
         The constructed slice.
     """
-    return Slice(0, end)
+    return Slice(None, end, None)
 
 
 @always_inline("nodebug")

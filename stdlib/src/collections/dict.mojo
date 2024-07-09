@@ -177,7 +177,9 @@ struct _DictValueIter[
 
 
 @value
-struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
+struct DictEntry[K: KeyElement, V: CollectionElement](
+    CollectionElement, CollectionElementNew
+):
     """Store a key-value pair entry inside a dictionary.
 
     Parameters:
@@ -202,6 +204,16 @@ struct DictEntry[K: KeyElement, V: CollectionElement](CollectionElement):
         self.hash = hash(key)
         self.key = key^
         self.value = value^
+
+    fn __init__(inout self, *, other: Self):
+        """Copy an existing entry.
+
+        Args:
+            other: The existing entry to copy.
+        """
+        self.hash = other.hash
+        self.key = other.key
+        self.value = other.value
 
 
 alias _EMPTY = -1
@@ -301,7 +313,7 @@ struct _DictIndex:
 
 
 struct Dict[K: KeyElement, V: CollectionElement](
-    Sized, CollectionElement, Boolable
+    Sized, CollectionElement, CollectionElementNew, Boolable
 ):
     """A container that stores key-value pairs.
 
@@ -439,16 +451,16 @@ struct Dict[K: KeyElement, V: CollectionElement](
         return len(self._entries)
 
     @always_inline
-    fn __init__(inout self, existing: Self):
+    fn __init__(inout self, *, other: Self):
         """Copy an existing dictiontary.
 
         Args:
-            existing: The existing dict.
+            other: The existing dict.
         """
-        self.size = existing.size
-        self._n_entries = existing._n_entries
-        self._index = existing._index.copy(existing._reserved())
-        self._entries = existing._entries
+        self.size = other.size
+        self._n_entries = other._n_entries
+        self._index = other._index.copy(other._reserved())
+        self._entries = other._entries
 
     @staticmethod
     fn fromkeys(keys: List[K], value: V) -> Self:
@@ -592,7 +604,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
         Returns:
             The result of the merge.
         """
-        var result = Dict(self)
+        var result = Dict(other=self)
         result.update(other)
         return result^
 
@@ -609,7 +621,11 @@ struct Dict[K: KeyElement, V: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     fn __len__(self) -> Int:
-        """The number of elements currently stored in the dictionary."""
+        """The number of elements currently stored in the dictionary.
+
+        Returns:
+            The number of elements currently stored in the dictionary.
+        """
         return self.size
 
     fn __bool__(self) -> Bool:
@@ -970,7 +986,9 @@ struct Dict[K: KeyElement, V: CollectionElement](
         self._n_entries = self.size
 
 
-struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
+struct OwnedKwargsDict[V: CollectionElement](
+    Sized, CollectionElement, CollectionElementNew
+):
     """Container used to pass owned variadic keyword arguments to functions.
 
     This type mimics the interface of a dictionary with `String` keys, and
@@ -994,6 +1012,14 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """Initialize an empty keyword dictionary."""
         self._dict = Dict[Self.key_type, V]()
 
+    fn __init__(inout self, *, other: Self):
+        """Copy an existing keyword dictionary.
+
+        Args:
+            other: The existing keyword dictionary.
+        """
+        self._dict = other._dict
+
     fn __copyinit__(inout self, existing: Self):
         """Copy an existing keyword dictionary.
 
@@ -1014,7 +1040,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     # Operator dunders
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __getitem__(self, key: Self.key_type) raises -> V:
         """Retrieve a value out of the keyword dictionary.
 
@@ -1029,7 +1055,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         return self._dict[key]
 
-    @always_inline("nodebug")
+    @always_inline
     fn __setitem__(inout self, key: Self.key_type, value: V):
         """Set a value in the keyword dictionary by key.
 
@@ -1043,7 +1069,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
     # Trait implementations
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn __contains__(self, key: Self.key_type) -> Bool:
         """Check if a given key is in the keyword dictionary or not.
 
@@ -1056,16 +1082,20 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         return key in self._dict
 
-    @always_inline("nodebug")
+    @always_inline
     fn __len__(self) -> Int:
-        """The number of elements currently stored in the keyword dictionary."""
+        """The number of elements currently stored in the keyword dictionary.
+
+        Returns:
+            The number of elements currently stored in the keyword dictionary.
+        """
         return len(self._dict)
 
     # ===-------------------------------------------------------------------===#
     # Methods
     # ===-------------------------------------------------------------------===#
 
-    @always_inline("nodebug")
+    @always_inline
     fn find(self, key: Self.key_type) -> Optional[V]:
         """Find a value in the keyword dictionary by key.
 
@@ -1078,7 +1108,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         return self._dict.find(key)
 
-    @always_inline("nodebug")
+    @always_inline
     fn pop(inout self, key: self.key_type, owned default: V) -> V:
         """Remove a value from the dictionary by key.
 
@@ -1093,7 +1123,7 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         """
         return self._dict.pop(key, default^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn pop(inout self, key: self.key_type) raises -> V:
         """Remove a value from the dictionary by key.
 
@@ -1166,10 +1196,10 @@ struct OwnedKwargsDict[V: CollectionElement](Sized, CollectionElement):
         # return self[]._dict.items()
         return _DictEntryIter(0, 0, self._dict)
 
-    @always_inline("nodebug")
+    @always_inline
     fn _insert(inout self, owned key: Self.key_type, owned value: V):
         self._dict._insert(key^, value^)
 
-    @always_inline("nodebug")
+    @always_inline
     fn _insert(inout self, key: StringLiteral, owned value: V):
         self._insert(String(key), value^)
