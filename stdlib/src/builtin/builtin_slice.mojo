@@ -28,7 +28,13 @@ fn _compare_optional(x: OptionalReg[Int], y: OptionalReg[Int]) -> Bool:
 
 
 @register_passable("trivial")
-struct Slice(Stringable, EqualityComparable, Representable, Formattable):
+struct Slice(
+    Stringable,
+    EqualityComparable,
+    Representable,
+    Formattable,
+    CollectionElementNew,
+):
     """Represents a slice expression.
 
     Objects of this type are generated when slice syntax is used within square
@@ -79,6 +85,14 @@ struct Slice(Stringable, EqualityComparable, Representable, Formattable):
         self.start = start
         self.end = end
         self.step = step.value() if step else 1
+
+    fn __init__(inout self, *, other: Self):
+        """Creates a deep copy of the Slice.
+
+        Args:
+            other: The slice to copy.
+        """
+        self.__init__(start=other.start, end=other.end, step=other.step)
 
     @no_inline
     fn __str__(self) -> String:
