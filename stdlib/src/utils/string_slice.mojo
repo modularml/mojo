@@ -42,6 +42,9 @@ fn is_valid_utf8[
     Returns:
         Whether the data is valid UTF-8.
 
+    Constraints:
+        - width must be >= 4.
+
     #### UTF-8 coding format
     [Table 3-7 page 94](http://www.unicode.org/versions/Unicode6.0.0/ch03.pdf).
     Well-Formed UTF-8 Byte Sequences
@@ -59,9 +62,10 @@ fn is_valid_utf8[
     U+100000..U+10FFFF | F4         | 80..***8F***| 80..BF     | 80..BF      |
     .
     """
+
+    constrained[width >= 4, "width must be >= 4."]()
     var ptr = DTypePointer(data)
     var iter_len = length
-    var idx = 0
     # TODO: implement a faster algorithm like https://github.com/cyb70289/utf8
     # and benchmark the difference.
 
@@ -76,6 +80,7 @@ fn is_valid_utf8[
             return True
         return False
 
+    var idx = 0
     while iter_len >= width:
         var d = ptr.offset(idx).simd_strided_load[width](1)
         var comp = d < 0b1000_0000
@@ -88,9 +93,10 @@ fn is_valid_utf8[
         if first_byte_type == 0:
             for i in range(1, width):
                 if byte_types[i] != 0:
-                    idx = i
+                    idx += i
                     iter_len -= i
-                    continue
+                    break
+            continue
 
         alias vec_t = SIMD[DType.uint8, 4]
         alias n4 = vec_t(4, 1, 1, 1)
