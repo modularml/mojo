@@ -84,12 +84,12 @@ fn is_valid_utf8[
             iter_len -= width
             continue
         var byte_types = countl_zero(~(d & UInt8(0b1111_0000)))
-        var length = byte_types[0]
-        if length == 0:
+        var first_byte_type = byte_types[0]
+        if first_byte_type == 0:
             for i in range(1, width):
                 if byte_types[i] != 0:
-                    length = byte_types[i]
                     idx = i
+                    iter_len -= i
                     continue
 
         alias vec_t = SIMD[DType.uint8, 4]
@@ -108,7 +108,7 @@ fn is_valid_utf8[
         # special unicode ranges
         if invalid_special(d[0], d[1]):
             return False
-        elif vec[0] == 2 and d[0] < UInt8(0b1100_0010):
+        elif first_byte_type == 2 and d[0] < UInt8(0b1100_0010):
             return False
         idx += width
         iter_len -= width
