@@ -106,8 +106,8 @@ fn is_valid_utf8[
         alias n2_m = vec_t(1, 1, 0, 0)
         var vec = byte_types.slice[4]()
         var valid_n4 = (vec == n4).reduce_and()
-        var valid_n3 = ((vec & n3_m) == n3).reduce_and()
-        var valid_n2 = ((vec & n2_m) == n2).reduce_and()
+        var valid_n3 = ((vec * n3_m) == n3).reduce_and()
+        var valid_n2 = ((vec * n2_m) == n2).reduce_and()
         if not (valid_n4 or valid_n3 or valid_n2):
             return False
 
