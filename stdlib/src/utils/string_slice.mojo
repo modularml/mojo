@@ -131,7 +131,7 @@ fn is_valid_utf8[
         return invalid_special(ptr[i], ptr[i + 1])
 
     idx = length - iter_len
-    while idx <= length:
+    while idx < length:
         var val = ptr[idx]
         var byte_type = countl_zero(~(val & UInt8(0b1111_0000)))
         if byte_type == 0 and val < 0b1000_0000:
