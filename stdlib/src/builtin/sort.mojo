@@ -31,17 +31,17 @@ alias _cmp_fn_type = fn[type: AnyTrivialRegType] (type, type) capturing -> Bool
 @always_inline
 fn _insertion_sort[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], start: Int, end: Int):
+](array: Pointer[type], size: Int):
     """Sort the array[start:end] slice"""
 
-    for i in range(start + 1, end):
+    for i in range(1, size):
         var value = array[i]
         var j = i
 
         # Find the placement of the value in the array, shifting as we try to
         # find the position. Throughout, we assume array[start:i] has already
         # been sorted.
-        while j > start and not cmp_fn[type](array[j - 1], value):
+        while j > 0 and not cmp_fn[type](array[j - 1], value):
             array[j] = array[j - 1]
             j -= 1
 
@@ -51,17 +51,17 @@ fn _insertion_sort[
 @always_inline
 fn _insertion_sort[
     type: CollectionElement, cmp_fn: fn (type, type) capturing -> Bool
-](array: UnsafePointer[type], start: Int, end: Int):
+](array: UnsafePointer[type], size: Int):
     """Sort the array[start:end] slice"""
 
-    for i in range(start + 1, end):
+    for i in range(1, size):
         var value = array[i]
         var j = i
 
         # Find the placement of the value in the array, shifting as we try to
         # find the position. Throughout, we assume array[start:i] has already
         # been sorted.
-        while j > start and not cmp_fn(array[j - 1], value):
+        while j > 0 and not cmp_fn(array[j - 1], value):
             array[j] = array[j - 1]
             j -= 1
 
@@ -72,10 +72,10 @@ fn _insertion_sort[
 @always_inline
 fn _quicksort_partition_right[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], start: Int, end: Int) -> Int:
-    var left = start + 1
-    var right = end - 1
-    var pivot_value = array[start]
+](array: Pointer[type], size: Int) -> Int:
+    var left = 1
+    var right = size - 1
+    var pivot_value = array[0]
 
     while True:
         # no need for left < right since quick sort pick median of 3 as pivot
@@ -85,7 +85,7 @@ fn _quicksort_partition_right[
             right -= 1
         if left >= right:
             var pivot_pos = left - 1
-            swap(array[pivot_pos], array[start])
+            swap(array[pivot_pos], array[0])
             return pivot_pos
         swap(array[left], array[right])
         left += 1
@@ -96,10 +96,10 @@ fn _quicksort_partition_right[
 @always_inline
 fn _quicksort_partition_left[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], start: Int, end: Int) -> Int:
-    var left = start + 1
-    var right = end - 1
-    var pivot_value = array[start]
+](array: Pointer[type], size: Int) -> Int:
+    var left = 1
+    var right = size - 1
+    var pivot_value = array[0]
 
     while True:
         while left < right and not cmp_fn(pivot_value, array[left]):
@@ -108,7 +108,7 @@ fn _quicksort_partition_left[
             right -= 1
         if left >= right:
             var pivot_pos = left - 1
-            swap(array[pivot_pos], array[start])
+            swap(array[pivot_pos], array[0])
             return pivot_pos
         swap(array[left], array[right])
         left += 1
@@ -118,18 +118,18 @@ fn _quicksort_partition_left[
 @always_inline
 fn _partition[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], start: Int, end: Int) -> Int:
-    if start == end:
-        return end
+](array: Pointer[type], size: Int) -> Int:
+    if size == 0:
+        return 0
 
-    var pivot = start + (end - start) // 2
+    var pivot = size // 2
 
     var pivot_value = array[pivot]
 
-    var left = start
-    var right = end - 2
+    var left = 0
+    var right = size - 2
 
-    swap(array[pivot], array[end - 1])
+    swap(array[pivot], array[size - 1])
 
     while left < right:
         if cmp_fn[type](array[left], pivot_value):
@@ -141,25 +141,25 @@ fn _partition[
 
     if cmp_fn[type](array[right], pivot_value):
         right += 1
-    swap(array[end - 1], array[right])
+    swap(array[size - 1], array[right])
     return right
 
 
 @always_inline
 fn _partition[
     type: CollectionElement, cmp_fn: fn (type, type) capturing -> Bool
-](array: UnsafePointer[type], start: Int, end: Int) -> Int:
-    if start == end:
-        return end
+](array: UnsafePointer[type], size: Int) -> Int:
+    if size == 0:
+        return size
 
-    var pivot = start + (end - start) // 2
+    var pivot = size // 2
 
     var pivot_value = array[pivot]
 
-    var left = start
-    var right = end - 2
+    var left = 0
+    var right = size - 2
 
-    swap(array[pivot], array[end - 1])
+    swap(array[pivot], array[size - 1])
 
     while left < right:
         if cmp_fn(array[left], pivot_value):
@@ -171,7 +171,7 @@ fn _partition[
 
     if cmp_fn(array[right], pivot_value):
         right += 1
-    swap(array[end - 1], array[right])
+    swap(array[size - 1], array[right])
     return right
 
 
@@ -218,20 +218,20 @@ fn _estimate_initial_height(size: Int) -> Int:
 @always_inline
 fn _delegate_small_sort[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](array: Pointer[type], len: Int):
-    if len == 2:
+](array: Pointer[type], size: Int):
+    if size == 2:
         _small_sort[2, type, cmp_fn](array)
         return
 
-    if len == 3:
+    if size == 3:
         _small_sort[3, type, cmp_fn](array)
         return
 
-    if len == 4:
+    if size == 4:
         _small_sort[4, type, cmp_fn](array)
         return
 
-    if len == 5:
+    if size == 5:
         _small_sort[5, type, cmp_fn](array)
         return
 
@@ -257,7 +257,7 @@ fn _quicksort[
             continue
 
         if len < 32:
-            _insertion_sort[type, cmp_fn](array, start, end)
+            _insertion_sort[type, cmp_fn](array + start, len)
             continue
 
         # pick median of 3 as pivot
@@ -267,15 +267,17 @@ fn _quicksort[
         # be the same, so no need to recurse that interval
         # already have array[start - 1] <= array[start]
         if start > 0 and not cmp_fn(array[start - 1], array[start]):
-            var pivot = _quicksort_partition_left[type, cmp_fn](
-                array, start, end
+            var pivot = start + _quicksort_partition_left[type, cmp_fn](
+                array + start, len
             )
             if end > pivot + 2:
                 stack.append(pivot + 1)
                 stack.append(end)
             continue
 
-        var pivot = _quicksort_partition_right[type, cmp_fn](array, start, end)
+        var pivot = start + _quicksort_partition_right[type, cmp_fn](
+            array + start, len
+        )
 
         if end > pivot + 2:
             stack.append(pivot + 1)
@@ -305,10 +307,10 @@ fn _quicksort[
             continue
 
         if len < 8:
-            _insertion_sort[type, cmp_fn](array, start, end)
+            _insertion_sort[type, cmp_fn](array + start, len)
             continue
 
-        var pivot = _partition[type, cmp_fn](array, start, end)
+        var pivot = start + _partition[type, cmp_fn](array + start, len)
 
         stack.append(pivot + 1)
         stack.append(end)
@@ -322,7 +324,7 @@ fn _quicksort[
 # ===----------------------------------------------------------------------===#
 fn partition[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
-](buff: Pointer[type], k: Int, size: Int):
+](array: Pointer[type], k: Int, size: Int):
     """Partition the input buffer inplace such that first k elements are the
     largest (or smallest if cmp_fn is < operator) elements.
     The ordering of the first k elements is undefined.
@@ -332,7 +334,7 @@ fn partition[
         cmp_fn: Comparison functor of type, type) capturing -> Bool type.
 
     Args:
-        buff: Input buffer.
+        array: Input buffer.
         k: Index of the partition element.
         size: The length of the buffer.
     """
@@ -342,7 +344,7 @@ fn partition[
     while len(stack) > 0:
         var end = stack.pop()
         var start = stack.pop()
-        var pivot = _partition[type, cmp_fn](buff, start, end)
+        var pivot = start + _partition[type, cmp_fn](array + start, end - start)
         if pivot == k:
             break
         elif k < pivot:
@@ -377,7 +379,7 @@ fn sort(inout buff: Pointer[Int], len: Int):
         return
 
     if len < 32:
-        _insertion_sort[Int, _less_than](buff, 0, len)
+        _insertion_sort[Int, _less_than](buff, len)
         return
 
     _quicksort[Int, _less_than](buff, len)
@@ -405,7 +407,7 @@ fn sort[type: DType](inout buff: Pointer[Scalar[type]], len: Int):
         return
 
     if len < 32:
-        _insertion_sort[Scalar[type], _less_than](buff, 0, len)
+        _insertion_sort[Scalar[type], _less_than](buff, len)
         return
 
     _quicksort[Scalar[type], _less_than](buff, len)

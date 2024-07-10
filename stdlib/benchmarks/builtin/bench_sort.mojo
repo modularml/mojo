@@ -63,7 +63,7 @@ fn insertion_sort[type: DType](list: List[Scalar[type]]):
     fn _less_than[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
         return rebind[Scalar[type]](lhs) < rebind[Scalar[type]](rhs)
 
-    _insertion_sort[Scalar[type], _less_than](ptr, 0, len(list))
+    _insertion_sort[Scalar[type], _less_than](ptr, len(list))
 
 
 @always_inline
