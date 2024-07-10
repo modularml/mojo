@@ -289,7 +289,7 @@ fn bench_low_cardinality_list_sort(inout m: Bench) raises:
 
     @parameter
     for delta_index in range(len(deltas)):
-        var delta = deltas[delta_index]
+        alias delta = deltas[delta_index]
 
         @parameter
         for count_index in range(len(counts)):

@@ -70,7 +70,7 @@ fn _insertion_sort[
 
 # put everything thats "<" to the left of pivot
 @always_inline
-fn _quicksort_partition[
+fn _quicksort_partition_right[
     type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
 ](array: Pointer[type], start: Int, end: Int) -> Int:
     var left = start + 1
@@ -82,6 +82,29 @@ fn _quicksort_partition[
         while cmp_fn(array[left], pivot_value):
             left += 1
         while left < right and not cmp_fn(array[right], pivot_value):
+            right -= 1
+        if left >= right:
+            var pivot_pos = left - 1
+            swap(array[pivot_pos], array[start])
+            return pivot_pos
+        swap(array[left], array[right])
+        left += 1
+        right -= 1
+
+
+# put everything thats "<=" to the left of pivot
+@always_inline
+fn _quicksort_partition_left[
+    type: AnyTrivialRegType, cmp_fn: _cmp_fn_type
+](array: Pointer[type], start: Int, end: Int) -> Int:
+    var left = start + 1
+    var right = end - 1
+    var pivot_value = array[start]
+
+    while True:
+        while left < right and not cmp_fn(pivot_value, array[left]):
+            left += 1
+        while cmp_fn(pivot_value, array[right]):
             right -= 1
         if left >= right:
             var pivot_pos = left - 1
@@ -237,7 +260,20 @@ fn _quicksort[
 
         # pick median of 3 as pivot
         _sort3[type, cmp_fn](array, (start + end) >> 1, start, end - 1)
-        var pivot = _quicksort_partition[type, cmp_fn](array, start, end)
+
+        # if array[start - 1] == pivot_value, then everything in between will
+        # be the same, so no need to recurse that interval
+        # already have array[start - 1] <= array[start]
+        if start > 0 and not cmp_fn(array[start - 1], array[start]):
+            var pivot = _quicksort_partition_left[type, cmp_fn](
+                array, start, end
+            )
+            if end > pivot + 2:
+                stack.append(pivot + 1)
+                stack.append(end)
+            continue
+
+        var pivot = _quicksort_partition_right[type, cmp_fn](array, start, end)
 
         if end > pivot + 2:
             stack.append(pivot + 1)
