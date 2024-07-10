@@ -20,7 +20,7 @@ from collections._index_normalization import normalize_index
 from sys import bitwidthof, llvm_intrinsic
 from sys.ffi import C_char
 
-from bit import countl_zero
+from bit import count_leading_zeros
 from memory import DTypePointer, LegacyPointer, UnsafePointer, memcmp, memcpy
 
 from utils import Span, StaticIntTuple, StringRef, StringSlice
@@ -70,7 +70,7 @@ fn ord(s: StringSlice) -> Int:
     if (b1 >> 7) == 0:  # This is 1 byte ASCII char
         debug_assert(s.byte_length() == 1, "input string length must be 1")
         return int(b1)
-    var num_bytes = countl_zero(~b1)
+    var num_bytes = count_leading_zeros(~b1)
     debug_assert(
         s.byte_length() == int(num_bytes), "input string must be one character"
     )
@@ -716,7 +716,7 @@ fn _utf8_byte_type(b: UInt8) -> UInt8:
             3 -> start of 3 byte long sequence.
             4 -> start of 4 byte long sequence.
     """
-    return countl_zero(~(b & 0b1111_0000))
+    return count_leading_zeros(~(b & 0b1111_0000))
 
 
 @value
@@ -2362,7 +2362,9 @@ fn _calc_initial_buffer_size_int32(n0: Int) -> Int:
         42949672960,
     )
     var n = UInt32(n0)
-    var log2 = int((bitwidthof[DType.uint32]() - 1) ^ countl_zero(n | 1))
+    var log2 = int(
+        (bitwidthof[DType.uint32]() - 1) ^ count_leading_zeros(n | 1)
+    )
     return (n0 + lookup_table[int(log2)]) >> 32
 
 
