@@ -123,7 +123,7 @@ struct Span[
 
     @always_inline
     fn __init__[
-        T2: CollectionElementNew, size: Int
+        T2: CollectionElementNew, size: Int, //
     ](inout self, ref [lifetime]array: InlineArray[T2, size]):
         """Construct a Span from an InlineArray.
 
@@ -226,7 +226,7 @@ struct Span[
 
     @always_inline
     fn copy_from[
-        lifetime: MutableLifetime,
+        lifetime: MutableLifetime, //
     ](self: Span[T, lifetime], other: Span[T, _]):
         """
         Performs an element wise copy from all elements of `other` into all elements of `self`.
@@ -250,7 +250,7 @@ struct Span[
         return len(self) > 0
 
     fn __eq__[
-        T: EqualityComparableCollectionElement
+        T: EqualityComparableCollectionElement, //
     ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
         """Verify if span is equal to another span.
 
@@ -279,7 +279,7 @@ struct Span[
 
     @always_inline
     fn __ne__[
-        T: EqualityComparableCollectionElement
+        T: EqualityComparableCollectionElement, //
     ](ref [_]self: Span[T, lifetime], ref [_]rhs: Span[T]) -> Bool:
         """Verify if span is not equal to another span.
 
@@ -295,7 +295,7 @@ struct Span[
         """
         return not self == rhs
 
-    fn fill[lifetime: MutableLifetime](self: Span[T, lifetime], value: T):
+    fn fill[lifetime: MutableLifetime, //](self: Span[T, lifetime], value: T):
         """
         Fill the memory that a span references with a given value.
 

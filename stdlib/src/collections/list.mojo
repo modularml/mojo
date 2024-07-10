@@ -199,7 +199,7 @@ struct List[T: CollectionElement](
 
     @always_inline
     fn __eq__[
-        U: EqualityComparableCollectionElement
+        U: EqualityComparableCollectionElement, //
     ](self: List[U], other: List[U]) -> Bool:
         """Checks if two lists are equal.
 
@@ -231,7 +231,7 @@ struct List[T: CollectionElement](
 
     @always_inline
     fn __ne__[
-        U: EqualityComparableCollectionElement
+        U: EqualityComparableCollectionElement, //
     ](self: List[U], other: List[U]) -> Bool:
         """Checks if two lists are not equal.
 
@@ -256,7 +256,7 @@ struct List[T: CollectionElement](
         return not (self == other)
 
     fn __contains__[
-        U: EqualityComparableCollectionElement
+        U: EqualityComparableCollectionElement, //
     ](self: List[U], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
@@ -363,7 +363,7 @@ struct List[T: CollectionElement](
         return len(self) > 0
 
     @no_inline
-    fn __str__[U: RepresentableCollectionElement](self: List[U]) -> String:
+    fn __str__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -393,7 +393,7 @@ struct List[T: CollectionElement](
 
     @no_inline
     fn format_to[
-        U: RepresentableCollectionElement
+        U: RepresentableCollectionElement, //
     ](self: List[U], inout writer: Formatter):
         """Write `my_list.__str__()` to a `Formatter`.
 
@@ -411,7 +411,7 @@ struct List[T: CollectionElement](
         writer.write("]")
 
     @no_inline
-    fn __repr__[U: RepresentableCollectionElement](self: List[U]) -> String:
+    fn __repr__[U: RepresentableCollectionElement, //](self: List[U]) -> String:
         """Returns a string representation of a `List`.
 
         Note that since we can't condition methods on a trait yet,
@@ -649,7 +649,7 @@ struct List[T: CollectionElement](
 
     # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
-        C: EqualityComparableCollectionElement
+        C: EqualityComparableCollectionElement, //
     ](
         ref [_]self: List[C],
         value: C,
@@ -842,7 +842,7 @@ struct List[T: CollectionElement](
         (self.data + idx).init_pointee_move(value^)
 
     fn count[
-        T: EqualityComparableCollectionElement
+        T: EqualityComparableCollectionElement, //
     ](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,

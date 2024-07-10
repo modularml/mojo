@@ -638,7 +638,7 @@ struct Dict[K: KeyElement, V: CollectionElement](
 
     @no_inline
     fn __str__[
-        T: RepresentableKeyElement, U: RepresentableCollectionElement
+        T: RepresentableKeyElement, U: RepresentableCollectionElement, //
     ](self: Dict[T, U]) -> String:
         """Returns a string representation of a `Dict`.
 
