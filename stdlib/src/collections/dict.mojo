@@ -34,6 +34,7 @@ See the `Dict` docs for more details.
 from builtin.value import StringableCollectionElement
 
 from .optional import Optional
+from bit import is_power_of_two
 
 
 trait KeyElement(CollectionElement, Hashable, EqualityComparable):
@@ -459,6 +460,11 @@ struct Dict[K: KeyElement, V: CollectionElement](
         ```
 
         """
+        debug_assert(
+            bit.is_power_of_two(power_of_two_initial_capacity)
+            and power_of_two_initial_capacity >= 8,
+            "power_of_two_initial_capacity need to be >=8 and a power of two",
+        )
         self.size = 0
         self._n_entries = 0
         self._entries = Self._new_entries(power_of_two_initial_capacity)

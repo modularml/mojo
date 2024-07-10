@@ -548,6 +548,19 @@ fn test_clear() raises:
     assert_equal(len(some_dict), 0)
 
 
+def test_init_inital_capacity():
+    var initial_capacity = 16
+    var x = Dict[Int, Int](power_of_two_initial_capacity=initial_capacity)
+    assert_equal(x._reserved(), initial_capacity)
+    for i in range(initial_capacity):
+        x[i] = i
+    for i in range(initial_capacity):
+        assert_equal(i, x[i])
+
+    var y = Dict[Int, Int](power_of_two_initial_capacity=64)
+    assert_equal(y._reserved(), 64)
+
+
 def main():
     test_dict()
     test_dict_fromkeys()
@@ -558,3 +571,4 @@ def main():
     test_bool_conversion()
     test_find_get()
     test_clear()
+    test_init_inital_capacity()
