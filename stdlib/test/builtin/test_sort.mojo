@@ -16,7 +16,7 @@ from pathlib import Path, _dir_of_current_file
 from random import random_float64, random_si64, random_ui64, seed
 from sys import env_get_string, os_is_windows
 
-from builtin.sort import _quicksort, _small_sort
+from builtin.sort import _quicksort, _small_sort, _SortWrapper
 from testing import assert_equal, assert_false, assert_true
 
 
@@ -77,11 +77,10 @@ fn test_sort_small_3() raises:
     list.append(2)
 
     @parameter
-    fn _less_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) < rebind[Int](rhs)
+    fn _less_than(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data < rhs.data
 
-    var ptr = rebind[Pointer[Int]](list.data)
-    _small_sort[length, Int, _less_than](ptr)
+    _small_sort[length, Int, _less_than](list.data)
 
     var expected = List[Int](1, 2, 9)
     for i in range(length):
@@ -100,11 +99,10 @@ fn test_sort_small_5() raises:
     list.append(4)
 
     @parameter
-    fn _less_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) < rebind[Int](rhs)
+    fn _less_than(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data < rhs.data
 
-    var ptr = rebind[Pointer[Int]](list.data)
-    _small_sort[length, Int, _less_than](ptr)
+    _small_sort[length, Int, _less_than](list.data)
 
     var expected = List[Int](1, 2, 3, 4, 9)
     for i in range(length):
@@ -169,23 +167,22 @@ fn test_sort3_dupe_elements() raises:
     alias length = 3
 
     fn test[
-        cmp_fn: fn[type: AnyTrivialRegType] (type, type) capturing -> Bool,
+        cmp_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing -> Bool,
     ]() raises:
         var list = List[Int](capacity=3)
         list.append(5)
         list.append(3)
         list.append(3)
 
-        var ptr = rebind[Pointer[Int]](list.data)
-        _quicksort[Int, cmp_fn](ptr, len(list))
+        _quicksort[Int, cmp_fn](list.data, len(list))
 
         var expected = List[Int](3, 3, 5)
         for i in range(length):
             assert_equal(expected[i], list[i])
 
     @parameter
-    fn _lt[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) < rebind[Int](rhs)
+    fn _lt(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data < rhs.data
 
     test[_lt]()
 
@@ -308,7 +305,7 @@ fn test_sort_any_103() raises:
     for i in range(length):
         list.append(length - i - 1)
 
-    sort[DType.float32](list)
+    sort(list)
 
     for i in range(1, length):
         assert_false(list[i - 1] > list[i])
@@ -325,11 +322,12 @@ fn test_quick_sort_repeated_val() raises:
         list.append(i + 1)
 
     @parameter
-    fn _greater_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Float32](lhs) > rebind[Float32](rhs)
+    fn _greater_than(
+        lhs: _SortWrapper[Float32], rhs: _SortWrapper[Float32]
+    ) -> Bool:
+        return lhs.data > rhs.data
 
-    var ptr = rebind[Pointer[Float32]](list.data)
-    _quicksort[Float32, _greater_than](ptr, len(list))
+    _quicksort[Float32, _greater_than](list.data, len(list))
 
     var expected = List[Float32](
         9.0,
@@ -373,8 +371,10 @@ fn test_quick_sort_repeated_val() raises:
         assert_equal(expected[i], list[i])
 
     @parameter
-    fn _less_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Float32](lhs) < rebind[Float32](rhs)
+    fn _less_than(
+        lhs: _SortWrapper[Float32], rhs: _SortWrapper[Float32]
+    ) -> Bool:
+        return lhs.data < rhs.data
 
     expected = List[Float32](
         1.0,
@@ -414,8 +414,7 @@ fn test_quick_sort_repeated_val() raises:
         9.0,
         9.0,
     )
-    var sptr = rebind[Pointer[Float32]](list.data)
-    _quicksort[Float32, _less_than](sptr, len(list))
+    _quicksort[Float32, _less_than](list.data, len(list))
     for i in range(0, length):
         assert_equal(expected[i], list[i])
 
@@ -427,11 +426,10 @@ fn test_partition_top_k(length: Int, k: Int) raises:
         list.append(i)
 
     @parameter
-    fn _great_than[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Float32](lhs) > rebind[Float32](rhs)
+    fn _great_than(lhs: Float32, rhs: Float32) -> Bool:
+        return lhs > rhs
 
-    var ptr = rebind[Pointer[Float32]](list.data)
-    _ = partition[Float32, _great_than](ptr, k, len(list))
+    _ = partition[DType.float32, _great_than](list.data, k, len(list))
 
     for i in range(0, k):
         assert_false(list[i] < length - k)
@@ -445,38 +443,37 @@ fn test_sort_stress() raises:
     @__copy_capture(random_seed)
     @parameter
     fn test[
-        cmp_fn: fn[type: AnyTrivialRegType] (type, type) capturing -> Bool,
-        check_fn: fn[type: AnyTrivialRegType] (type, type) capturing -> Bool,
+        cmp_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing -> Bool,
+        check_fn: fn (_SortWrapper[Int], _SortWrapper[Int]) capturing -> Bool,
     ](length: Int) raises:
         var list = List[Int](capacity=length)
         for _ in range(length):
             list.append(int(random_si64(-length, length)))
 
-        var ptr = rebind[Pointer[Int]](list.data)
-        _quicksort[Int, cmp_fn](ptr, len(list))
+        _quicksort[Int, cmp_fn](list.data, len(list))
 
         for i in range(length - 1):
-            assert_true(check_fn[Int](list[i], list[i + 1]))
+            assert_true(check_fn(list[i], list[i + 1]))
 
     @parameter
     @always_inline
-    fn _gt[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) > rebind[Int](rhs)
+    fn _gt(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data > rhs.data
 
     @parameter
     @always_inline
-    fn _geq[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) >= rebind[Int](rhs)
+    fn _geq(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data >= rhs.data
 
     @parameter
     @always_inline
-    fn _lt[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) < rebind[Int](rhs)
+    fn _lt(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data < rhs.data
 
     @parameter
     @always_inline
-    fn _leq[type: AnyTrivialRegType](lhs: type, rhs: type) -> Bool:
-        return rebind[Int](lhs) <= rebind[Int](rhs)
+    fn _leq(lhs: _SortWrapper[Int], rhs: _SortWrapper[Int]) -> Bool:
+        return lhs.data <= rhs.data
 
     for i in range(len(lens)):
         var length = lens[i]

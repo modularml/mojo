@@ -435,6 +435,12 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 - `countl_zero` -> `count_leading_zeros`
 - `countr_zero` -> `count_trailing_zeros`
 
+- `sort` no longer takes `LegacyPointer`. The current API supports:
+  - `sort(list)` just plain list
+  - `sort[type, cmp_fn](list)` list with custom compare function
+  - `sort(ptr, len)` a pointer and length (can change to Span in future)
+  - `sort[type, cmp_fn](ptr, len)` above with custom compare
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`

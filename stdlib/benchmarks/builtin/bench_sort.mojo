@@ -15,7 +15,13 @@
 
 from benchmark import Bench, Bencher, BenchId, keep, BenchConfig, Unit, run
 from random import *
-from stdlib.builtin.sort import sort, _small_sort, _insertion_sort, _heap_sort
+from stdlib.builtin.sort import (
+    sort,
+    _small_sort,
+    _insertion_sort,
+    _heap_sort,
+    _SortWrapper,
+)
 
 # ===----------------------------------------------------------------------===#
 # Benchmark Utils
@@ -57,24 +63,24 @@ fn random_scalar_list[
 
 @always_inline
 fn insertion_sort[type: DType](list: List[Scalar[type]]):
-    var ptr = rebind[Pointer[Scalar[type]]](list.data)
-
     @parameter
-    fn _less_than[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) < rebind[Scalar[type]](rhs)
+    fn _less_than(
+        lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
+    ) -> Bool:
+        return lhs.data < rhs.data
 
-    _insertion_sort[Scalar[type], _less_than](ptr, len(list))
+    _insertion_sort[Scalar[type], _less_than](list.data, len(list))
 
 
 @always_inline
 fn small_sort[size: Int, type: DType](list: List[Scalar[type]]):
-    var ptr = rebind[Pointer[Scalar[type]]](list.data)
-
     @parameter
-    fn _less_than[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) < rebind[Scalar[type]](rhs)
+    fn _less_than(
+        lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
+    ) -> Bool:
+        return lhs.data < rhs.data
 
-    _small_sort[size, Scalar[type], _less_than](ptr)
+    _small_sort[size, Scalar[type], _less_than](list.data)
 
 
 # ===----------------------------------------------------------------------===#
@@ -213,13 +219,13 @@ fn bench_small_list_sort(inout m: Bench) raises:
 
 @always_inline
 fn heap_sort[type: DType](list: List[Scalar[type]]):
-    var ptr = rebind[Pointer[Scalar[type]]](list.data)
-
     @parameter
-    fn _less_than_equal[ty: AnyTrivialRegType](lhs: ty, rhs: ty) -> Bool:
-        return rebind[Scalar[type]](lhs) <= rebind[Scalar[type]](rhs)
+    fn _less_than(
+        lhs: _SortWrapper[Scalar[type]], rhs: _SortWrapper[Scalar[type]]
+    ) -> Bool:
+        return lhs.data < rhs.data
 
-    _heap_sort[Scalar[type], _less_than_equal](ptr, len(list))
+    _heap_sort[Scalar[type], _less_than](list.data, len(list))
 
 
 @parameter
