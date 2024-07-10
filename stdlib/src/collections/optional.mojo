@@ -231,7 +231,9 @@ struct Optional[T: CollectionElement](
         """
         return not self
 
-    fn __str__[U: RepresentableCollectionElement](self: Optional[U]) -> String:
+    fn __str__[
+        U: RepresentableCollectionElement, //
+    ](self: Optional[U]) -> String:
         """Return the string representation of the value of the Optional.
 
         Parameters:
@@ -247,7 +249,9 @@ struct Optional[T: CollectionElement](
         return output
 
     # TODO: Include the Parameter type in the string as well.
-    fn __repr__[U: RepresentableCollectionElement](self: Optional[U]) -> String:
+    fn __repr__[
+        U: RepresentableCollectionElement, //
+    ](self: Optional[U]) -> String:
         """Returns the verbose string representation of the Optional.
 
         Parameters:
@@ -265,7 +269,7 @@ struct Optional[T: CollectionElement](
         return output
 
     fn format_to[
-        U: RepresentableCollectionElement
+        U: RepresentableCollectionElement, //
     ](self: Optional[U], inout writer: Formatter):
         """Write Optional string representation to a `Formatter`.
 
