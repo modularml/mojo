@@ -1489,6 +1489,87 @@ struct SIMD[type: DType, size: Int](
             return rebind[SIMD[target, size]](
                 _f32_to_bfloat16(self.cast[DType.float32]())
             )
+        elif (
+            type.is_integral() and target.is_integral() and target.is_unsigned()
+        ):
+
+            @parameter
+            fn cast_unsafe[
+                new_width: Int, s: Int
+            ](val: SIMD[type, s]) -> SIMD[target, new_width]:
+                return rebind[SIMD[target, new_width]](
+                    __mlir_op.`pop.bitcast`[
+                        _type = __mlir_type[
+                            `!pop.simd<`,
+                            new_width.value,
+                            `, `,
+                            target.value,
+                            `>`,
+                        ]
+                    ](val.value)
+                )
+
+            @parameter
+            fn from_range[simd_size: Int]() -> StaticIntTuple[simd_size]:
+                var values = StaticIntTuple[simd_size]()
+                var idx = 0
+
+                @parameter
+                for i in range(simd_size - 1, -1, -1):
+                    values[idx] = i
+                    idx += 1
+
+                return values
+
+            @parameter
+            if target.bitwidth() >= type.bitwidth():
+                var zero_x1 = SIMD[type, size](0)
+                var zero_x2 = rebind[SIMD[type, 2 * size]](
+                    zero_x1.join(zero_x1)
+                )
+                var zero_x4 = rebind[SIMD[type, 4 * size]](
+                    zero_x2.join(zero_x2)
+                )
+                alias ratio = target.bitwidth() // type.bitwidth()
+                alias w: Int = ratio * size
+                alias Vec = SIMD[type, w]
+                var val: Vec
+
+                @parameter
+                if ratio == 1:
+                    return cast_unsafe[size](self)
+                elif ratio == 2:
+                    val = rebind[Vec](zero_x1.interleave(self))
+                elif ratio == 4:
+                    val = rebind[Vec](
+                        zero_x2.interleave(zero_x1.interleave(self))
+                    )
+                elif ratio == 8:
+                    val = rebind[Vec](
+                        zero_x4.interleave(
+                            rebind[SIMD[type, 4 * size]](
+                                zero_x2.interleave(zero_x1.interleave(self))
+                            )
+                        )
+                    )
+                else:
+                    constrained[False, "no UInt128 support yet"]()
+                    return SIMD[target, size](0)
+
+                @parameter
+                if info.is_little_endian():
+                    val = val.shuffle[from_range[w]()]()
+
+                return cast_unsafe[size](val)
+            else:
+                alias ratio = type.bitwidth() // target.bitwidth()
+                var val = cast_unsafe[ratio](self)
+
+                @parameter
+                if info.is_little_endian():
+                    val = val.shuffle[from_range[ratio]()]()
+
+                return val.slice[size, offset = ratio - size]()
         else:
             return __mlir_op.`pop.cast`[
                 _type = __mlir_type[
