@@ -200,11 +200,8 @@ struct UnsafePointer[
         )
 
     @always_inline
-    fn offset[T: Intable](self, idx: T) -> Self:
+    fn offset(self, idx: Int) -> Self:
         """Returns a new pointer shifted by the specified offset.
-
-        Parameters:
-            T: The Intable type of the offset.
 
         Args:
             idx: The offset of the new pointer.
@@ -212,7 +209,7 @@ struct UnsafePointer[
         Returns:
             The new constructed DTypePointer.
         """
-        return __mlir_op.`pop.offset`(self.address, int(idx).value)
+        return __mlir_op.`pop.offset`(self.address, idx.value)
 
     @always_inline
     fn __getitem__(
@@ -259,7 +256,7 @@ struct UnsafePointer[
         Args:
             offset: The offset index.
         """
-        self = self.offset(offset)
+        self = self + offset
 
     @always_inline
     fn __isub__(inout self, offset: Int):
@@ -268,7 +265,7 @@ struct UnsafePointer[
         Args:
             offset: The offset index.
         """
-        self.__iadd__(-offset)
+        self = self - offset
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
@@ -402,8 +399,8 @@ struct UnsafePointer[
 
     @always_inline
     fn initialize_pointee_explicit_copy[
-        T2: ExplicitlyCopyable
-    ](self: UnsafePointer[T, address_space], value: T2):
+        T: ExplicitlyCopyable, //
+    ](self: UnsafePointer[T], value: T):
         """Emplace a copy of `value` into this pointer location.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -415,23 +412,13 @@ struct UnsafePointer[
         the callee side when the value must be copied.
 
         Parameters:
-            T2: The type the pointer points to, which must be
+            T: The type the pointer points to, which must be
                `ExplicitlyCopyable`.
 
         Args:
             value: The value to emplace.
         """
-
-        constrained[
-            address_space is AddressSpace.GENERIC,
-            "can not initialize pointer in non-GENERIC address space",
-        ]()
-
-        constrained[_type_is_eq[T, T2](), "pointee type is not self.T"]()
-
-        var ptr = self.bitcast[T2, address_space = AddressSpace.GENERIC]()
-
-        __get_address_as_uninit_lvalue(ptr.address) = T2(other=value)
+        __get_address_as_uninit_lvalue(self.address) = T(other=value)
 
     @always_inline
     fn free(self):
@@ -440,14 +427,14 @@ struct UnsafePointer[
 
     @always_inline("nodebug")
     fn bitcast[
-        new_type: AnyType = T,
+        T: AnyType = Self.T,
         /,
         address_space: AddressSpace = Self.address_space,
-    ](self) -> UnsafePointer[new_type, address_space]:
+    ](self) -> UnsafePointer[T, address_space]:
         """Bitcasts a UnsafePointer to a different type.
 
         Parameters:
-            new_type: The target type.
+            T: The target type.
             address_space: The address space of the result.
 
         Returns:
@@ -455,11 +442,11 @@ struct UnsafePointer[
             as the original UnsafePointer.
         """
         return __mlir_op.`pop.pointer.bitcast`[
-            _type = UnsafePointer[new_type, address_space]._mlir_type,
+            _type = UnsafePointer[T, address_space]._mlir_type,
         ](self.address)
 
     @always_inline
-    fn destroy_pointee(self: UnsafePointer[_, AddressSpace.GENERIC]):
+    fn destroy_pointee(self: UnsafePointer[_]):
         """Destroy the pointed-to value.
 
         The pointer must not be null, and the pointer memory location is assumed
@@ -471,7 +458,9 @@ struct UnsafePointer[
         _ = __get_address_as_owned_value(self.address)
 
     @always_inline
-    fn take_pointee[T: Movable](self: UnsafePointer[T]) -> T:
+    fn take_pointee[
+        T: Movable, //,
+    ](self: UnsafePointer[T]) -> T:
         """Move the value at the pointer out, leaving it uninitialized.
 
         The pointer must not be null, and the pointer memory location is assumed
@@ -492,7 +481,9 @@ struct UnsafePointer[
 
     # TODO: Allow overloading on more specific traits
     @always_inline
-    fn init_pointee_move[T: Movable](self: UnsafePointer[T], owned value: T):
+    fn init_pointee_move[
+        T: Movable, //,
+    ](self: UnsafePointer[T], owned value: T):
         """Emplace a new value into the pointer location, moving from `value`.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -512,7 +503,9 @@ struct UnsafePointer[
         __get_address_as_uninit_lvalue(self.address) = value^
 
     @always_inline
-    fn init_pointee_copy[T: Copyable](self: UnsafePointer[T], value: T):
+    fn init_pointee_copy[
+        T: Copyable, //,
+    ](self: UnsafePointer[T], value: T):
         """Emplace a copy of `value` into the pointer location.
 
         The pointer memory location is assumed to contain uninitialized data,
@@ -533,7 +526,7 @@ struct UnsafePointer[
 
     @always_inline
     fn move_pointee_into[
-        T: Movable
+        T: Movable, //,
     ](self: UnsafePointer[T], dst: UnsafePointer[T]):
         """Moves the value `self` points to into the memory location pointed to by
         `dst`.
