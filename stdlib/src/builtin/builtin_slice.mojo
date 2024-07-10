@@ -75,7 +75,7 @@ struct Slice(
         """
         self.start = start
         self.end = end
-        self.step = step.value() if step else 1
+        self.step = step.or_else(1)
 
     fn __init__(inout self, *, other: Self):
         """Creates a deep copy of the Slice.
