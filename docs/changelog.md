@@ -397,6 +397,12 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
     print(s.start.value()) # must retrieve the value from the optional
   ```
 
+- `NoneType` is now a normal standard library type, and not an alias for a raw
+  MLIR type.
+
+  Function signatures spelled as `fn(...) -> NoneType` should transition to
+  being written as `fn(...) -> None`.
+
 - Accessing local Python modules with `Python.add_to_path(".")` is no longer
   required, it now behaves the same as Python, you can access modules in the
   same folder as the target file:

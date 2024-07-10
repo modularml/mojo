@@ -46,7 +46,6 @@ struct _NoneType(CollectionElement, CollectionElementNew):
 # ===----------------------------------------------------------------------===#
 
 
-@value
 struct Optional[T: CollectionElement](
     CollectionElement, CollectionElementNew, Boolable
 ):
@@ -99,6 +98,17 @@ struct Optional[T: CollectionElement](
         """
         self._value = Self._type(value^)
 
+    # TODO(MSTDL-715):
+    #   This initializer should not be necessary, we should need
+    #   only the initilaizer from a `NoneType`.
+    fn __init__(inout self, value: NoneType._mlir_type):
+        """Construct an empty Optional.
+
+        Args:
+            value: Must be exactly `None`.
+        """
+        self = Self(value=NoneType(value))
+
     fn __init__(inout self, value: NoneType):
         """Construct an empty Optional.
 
@@ -114,6 +124,22 @@ struct Optional[T: CollectionElement](
             other: The Optional to copy.
         """
         self.__copyinit__(other)
+
+    fn __copyinit__(inout self, other: Self):
+        """Copy construct an Optional.
+
+        Args:
+            other: The Optional to copy.
+        """
+        self._value = other._value
+
+    fn __moveinit__(inout self, owned other: Self):
+        """Move this `Optional`.
+
+        Args:
+            other: The `Optional` to move from.
+        """
+        self._value = other._value^
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -390,6 +416,17 @@ struct OptionalReg[T: AnyTrivialRegType](Boolable):
         self._value = __mlir_op.`kgen.variant.create`[
             _type = Self._mlir_type, index = Int(0).value
         ](value)
+
+    # TODO(MSTDL-715):
+    #   This initializer should not be necessary, we should need
+    #   only the initilaizer from a `NoneType`.
+    fn __init__(inout self, value: NoneType._mlir_type):
+        """Construct an empty Optional.
+
+        Args:
+            value: Must be exactly `None`.
+        """
+        self = Self(value=NoneType(value))
 
     fn __init__(inout self, value: NoneType):
         """Create an optional without a value from a None literal.
