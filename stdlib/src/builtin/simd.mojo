@@ -2159,7 +2159,7 @@ struct SIMD[type: DType, size: Int](
         return __mlir_op.`pop.max`(self.value, other.value)
 
     fn count(self, value: Scalar[type]) -> Int:
-        """Count the occurences the value in the vector.
+        """Counts the number of occurrences of a value in the vector.
 
         Example usage:
 
