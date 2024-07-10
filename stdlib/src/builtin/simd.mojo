@@ -25,6 +25,7 @@ from sys import (
     prefetch,
     simdwidthof,
     triple_is_nvidia_cuda,
+    info
 )
 
 from bit import pop_count
