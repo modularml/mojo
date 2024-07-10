@@ -1558,10 +1558,7 @@ def test_count():
     assert_equal(B.count(True), 31)
 
     for i in range(32):
-        if i % 2 == 0:
-            B[i] = False
-        else:
-            B[i] = True
+        B[I] = i % 2
 
     assert_equal(B.count(True), 16)
     assert_equal(B.count(False), 16)
