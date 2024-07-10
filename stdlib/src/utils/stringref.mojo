@@ -13,7 +13,7 @@
 """Implements the StringRef class.
 """
 
-from bit import countr_zero
+from bit import count_trailing_zeros
 from builtin.dtype import _uint_type_of_width
 from builtin.string import _atol, _isspace
 from memory import DTypePointer, UnsafePointer, memcmp
@@ -682,7 +682,7 @@ fn _memchr[
         ) == first_needle
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
         if mask:
-            return source + i + countr_zero(mask)
+            return source + i + count_trailing_zeros(mask)
 
     for i in range(vectorized_end, len):
         if source[i] == char:
@@ -727,7 +727,7 @@ fn _memmem[
         var mask = bitcast[_uint_type_of_width[bool_mask_width]()](bool_mask)
 
         while mask:
-            var offset = i + countr_zero(mask)
+            var offset = i + count_trailing_zeros(mask)
             if memcmp(haystack + offset + 1, needle + 1, needle_len - 1) == 0:
                 return haystack + offset
             mask = mask & (mask - 1)

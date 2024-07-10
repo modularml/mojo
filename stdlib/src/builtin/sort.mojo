@@ -18,7 +18,7 @@ These are Mojo built-ins, so you don't need to import them.
 from collections import List
 from sys import bitwidthof
 
-from bit import countl_zero
+from bit import count_leading_zeros
 from memory import Pointer, UnsafePointer
 
 # ===----------------------------------------------------------------------===#
@@ -209,7 +209,9 @@ fn _heap_sort[
 @always_inline
 fn _estimate_initial_height(size: Int) -> Int:
     # Compute the log2 of the size rounded upward.
-    var log2 = int((bitwidthof[DType.index]() - 1) ^ countl_zero(size | 1))
+    var log2 = int(
+        (bitwidthof[DType.index]() - 1) ^ count_leading_zeros(size | 1)
+    )
     return max(2, log2)
 
 

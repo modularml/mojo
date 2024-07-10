@@ -425,6 +425,10 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 - `memcmp`, `memset` and `memset_zero` no longer take in `LegacyPointer`,
   instead, use `UnsafePointer`.
 
+- A few bit functions have been renamed for clarity:
+- `countl_zero` -> `count_leading_zeros`
+- `countr_zero` -> `count_trailing_zeros`
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
