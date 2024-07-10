@@ -82,14 +82,11 @@ def test_uint_cast():
             @parameter
             for k in range(len(widths)):
                 alias T = src.get[i, DType]()
+                alias A = dst.get[i, DType]()
                 alias min_val = ~Scalar[T](0)
                 alias max_val = Scalar[T](0) << T.bitwidth() - 1
-                test[
-                    T, dst.get[i, DType](), widths.get[k, Int](), int(min_val)
-                ]()
-                test[
-                    T, dst.get[i, DType](), widths.get[k, Int](), int(max_val)
-                ]()
+                test[T, A, widths.get[k, Int](), int(min_val)]()
+                test[T, A, widths.get[k, Int](), int(max_val)]()
 
 
 def test_simd_variadic():
