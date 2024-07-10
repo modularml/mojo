@@ -48,6 +48,50 @@ def test_cast():
     )
 
 
+def test_uint_cast():
+    fn test[T: DType, A: DType, width: Int, value: Int]() raises:
+        var n0 = Scalar[A](value)
+        var n1 = Scalar[T](value)
+        assert_equal(n0, n1.cast[A]())
+        assert_equal(n0, int(n1.cast[A]()))
+        assert_equal(n0, n1.cast[A]().cast[T]().cast[A]())
+        var n2 = SIMD[A, width](value)
+        var n3 = SIMD[T, width](value)
+        assert_true((n2 == n3.cast[A]()).reduce_and())
+        assert_true((n2 == n3.cast[A]().cast[T]().cast[A]()).reduce_and())
+
+    alias src = (
+        DType.uint64,
+        DType.uint32,
+        DType.uint16,
+        DType.uint8,
+        DType.int64,
+        DType.int32,
+        DType.int16,
+        DType.int8,
+    )
+    alias dst = (DType.uint64, DType.uint32, DType.uint16, DType.uint8)
+    alias widths = (1, 2, 4, 8, 16, 32, 64, 128, 256)
+
+    @parameter
+    for i in range(len(dst)):
+
+        @parameter
+        for j in range(len(src)):
+
+            @parameter
+            for k in range(len(widths)):
+                alias T = src.get[i, DType]()
+                alias min_val = ~Scalar[T](0)
+                alias max_val = Scalar[T](0) << T.bitwidth() - 1
+                test[
+                    T, dst.get[i, DType](), widths.get[k, Int](), int(min_val)
+                ]()
+                test[
+                    T, dst.get[i, DType](), widths.get[k, Int](), int(max_val)
+                ]()
+
+
 def test_simd_variadic():
     assert_equal(str(SIMD[DType.index, 4](52, 12, 43, 5)), "[52, 12, 43, 5]")
 
@@ -1550,6 +1594,7 @@ def main():
     test_add()
     test_add_with_overflow()
     test_cast()
+    test_uint_cast()
     test_ceil()
     test_convert_simd_to_string()
     test_simd_repr()

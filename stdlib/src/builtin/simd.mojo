@@ -25,7 +25,7 @@ from sys import (
     prefetch,
     simdwidthof,
     triple_is_nvidia_cuda,
-    info
+    info,
 )
 
 from bit import pop_count
@@ -237,6 +237,15 @@ struct SIMD[type: DType, size: Int](
             other: The value to copy.
         """
         self.__copyinit__(other)
+
+    @always_inline("nodebug")
+    fn __init__[A: DType, //](inout self, other: SIMD[A, size]):
+        """Cast the other SIMD vector into self.
+
+        Args:
+            other: The value to cast into self.
+        """
+        self = other.cast[type]()
 
     @always_inline("nodebug")
     fn __init__(inout self, value: UInt):
@@ -1557,9 +1566,9 @@ struct SIMD[type: DType, size: Int](
                     constrained[False, "no UInt128 support yet"]()
                     return SIMD[target, size](0)
 
-                @parameter
-                if info.is_little_endian():
-                    val = val.shuffle[from_range[w]()]()
+                # @parameter
+                # if info.is_little_endian():
+                #     val = val.shuffle[from_range[w]()]()
 
                 return cast_unsafe[size](val)
             else:
