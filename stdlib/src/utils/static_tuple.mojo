@@ -469,7 +469,9 @@ struct InlineArray[
         return UnsafePointer.address_of(self._array).bitcast[Self.ElementType]()
 
     @always_inline
-    fn __contains__[T: ComparableCollectionElement](self, value: T) -> Bool:
+    fn __contains__[
+        T: EqualityComparableCollectionElement
+    ](self, value: T) -> Bool:
         """Verify if a given value is present in the array.
 
         ```mojo

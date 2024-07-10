@@ -198,7 +198,7 @@ struct List[T: CollectionElement](
     # ===-------------------------------------------------------------------===#
 
     fn __contains__[
-        U: ComparableCollectionElement
+        U: EqualityComparableCollectionElement
     ](self: List[U], value: U) -> Bool:
         """Verify if a given value is present in the list.
 
@@ -591,7 +591,7 @@ struct List[T: CollectionElement](
 
     # TODO: Remove explicit self type when issue 1876 is resolved.
     fn index[
-        C: ComparableCollectionElement
+        C: EqualityComparableCollectionElement
     ](
         ref [_]self: List[C],
         value: C,
@@ -616,7 +616,7 @@ struct List[T: CollectionElement](
 
         Parameters:
             C: The type of the elements in the list. Must implement the
-                `ComparableCollectionElement` trait.
+                `EqualityComparableCollectionElement` trait.
 
         Returns:
             The index of the first occurrence of the value in the list.
@@ -783,7 +783,9 @@ struct List[T: CollectionElement](
         (self.data + idx).destroy_pointee()
         (self.data + idx).init_pointee_move(value^)
 
-    fn count[T: ComparableCollectionElement](self: List[T], value: T) -> Int:
+    fn count[
+        T: EqualityComparableCollectionElement
+    ](self: List[T], value: T) -> Int:
         """Counts the number of occurrences of a value in the list.
         Note that since we can't condition methods on a trait yet,
         the way to call this method is a bit special. Here is an example below.
