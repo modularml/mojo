@@ -2173,7 +2173,7 @@ struct SIMD[type: DType, size: Int](
             value: The value.
 
         Returns:
-            The amount of time the value occurs in the vector.
+            The number of occurrences of the value in the vector.
         """
 
         @parameter
