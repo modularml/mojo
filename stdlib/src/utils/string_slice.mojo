@@ -26,15 +26,14 @@ alias StaticString = StringSlice[ImmutableStaticLifetime]
 """An immutable static string slice."""
 
 
-fn _utf8_byte_type[
-    size: Int
-](b: SIMD[DType.uint8, size]) -> SIMD[DType.uint8, size]:
+fn _utf8_byte_type(b: SIMD[DType.uint8, _], /) -> __type_of(b):
     """UTF-8 byte type.
 
     Returns:
         The byte type.
 
-    - Types:
+    Notes:
+
         - 0 -> ASCII byte.
         - 1 -> continuation byte.
         - 2 -> start of 2 byte long sequence.
@@ -47,25 +46,39 @@ fn _utf8_byte_type[
 fn _validate_utf8_simd_slice[
     width: Int, remainder: Bool = False
 ](ptr: DTypePointer[DType.uint8], length: Int, owned iter_len: Int) -> Int:
-    """Internal method to validate utf8, use _is_valid_utf8."""
+    """Internal method to validate utf8, use _is_valid_utf8.
+
+    Parameters:
+        width: The width of the SIMD vector to build for validation.
+        remainder: Whether it is computing the remainder that doesn't fit in the
+            SIMD vector.
+
+    Args:
+        ptr: Pointer to the data.
+        length: The length of the items in the pointer.
+        iter_len: The amount of items to still iterate through.
+
+    Returns:
+        The new amount of items to iterate through that don't fit in the
+            specified width of SIMD vector. If -1 then it is invalid.
+    """
     # TODO: implement a faster algorithm like https://github.com/cyb70289/utf8
     # and benchmark the difference.
     var idx = length - iter_len
     while iter_len >= width or remainder:
-        var d: SIMD[DType.uint8, width]
+        var d: SIMD[DType.uint8, width]  # use a vector of the specified width
 
         @parameter
         if not remainder:
             d = ptr.offset(idx).simd_strided_load[width](1)
         else:
-            if iter_len < 0:  # not really needed but just in case
-                return -1
+            debug_assert(iter_len > -1, "iter_len must be > -1")
             d = SIMD[DType.uint8, width](0)
             for i in range(iter_len):
                 d[i] = ptr[idx + i]
 
-        var comp = d < 0b1000_0000  # skip all ASCII bytes
-        if comp.reduce_and():
+        var is_ascii = d < 0b1000_0000
+        if is_ascii.reduce_and():  # skip all ASCII bytes
 
             @parameter
             if not remainder:
@@ -74,23 +87,25 @@ fn _validate_utf8_simd_slice[
                 continue
             else:
                 return 0
-        var byte_types = _utf8_byte_type(d)
-        var first_byte_type = byte_types[0]
-        if first_byte_type == 0:
+        elif is_ascii[0]:
             for i in range(1, width):
-                if byte_types[i] != 0:
-                    idx += i
-                    iter_len -= i
-                    break
+                if is_ascii[i]:
+                    continue
+                idx += i
+                iter_len -= i
+                break
             continue
 
+        var byte_types = _utf8_byte_type(d)
+        var first_byte_type = byte_types[0]
+
         # byte_type has to match against the amount of continuation bytes
-        alias vec_t = SIMD[DType.uint8, 4]
-        alias n4_byte_types = vec_t(4, 1, 1, 1)
-        alias n3_byte_types = vec_t(3, 1, 1, 0)
-        alias n3_mask = vec_t(0b111, 0b111, 0b111, 0)
-        alias n2_byte_types = vec_t(2, 1, 0, 0)
-        alias n2_mask = vec_t(0b111, 0b111, 0, 0)
+        alias Vec = SIMD[DType.uint8, 4]
+        alias n4_byte_types = Vec(4, 1, 1, 1)
+        alias n3_byte_types = Vec(3, 1, 1, 0)
+        alias n3_mask = Vec(0b111, 0b111, 0b111, 0)
+        alias n2_byte_types = Vec(2, 1, 0, 0)
+        alias n2_mask = Vec(0b111, 0b111, 0, 0)
         var byte_types_4 = byte_types.slice[4]()
         var valid_n4 = (byte_types_4 == n4_byte_types).reduce_and()
         var valid_n3 = ((byte_types_4 & n3_mask) == n3_byte_types).reduce_and()
