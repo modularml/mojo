@@ -15,7 +15,7 @@
 These are Mojo built-ins, so you don't need to import them.
 """
 
-from collections import OptionalReg
+from collections import Optional
 
 
 @value
