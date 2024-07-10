@@ -16,6 +16,11 @@ what we publish.
 
 ### ⭐️ New
 
+- `List[T]` values are now equality comparable with `==` and `!=` when `T` is
+  equality comparable.
+  ([PR 3195#](https://github.com/modularml/mojo/pull/3195) by
+  [@kszucs](https://github.com/kszucs))
+
 - `__setitem__` now works with variadic argument lists such as:
 
   ```mojo
