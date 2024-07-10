@@ -74,15 +74,15 @@ def test_uint_cast():
     alias widths = (1, 2, 4, 8, 16, 32, 64, 128, 256)
 
     @parameter
-    for i in range(len(dst)):
+    for i in range(len(src)):
 
         @parameter
-        for j in range(len(src)):
+        for j in range(len(dst)):
 
             @parameter
             for k in range(len(widths)):
                 alias T = src.get[i, DType]()
-                alias A = dst.get[i, DType]()
+                alias A = dst.get[j, DType]()
                 alias min_val = ~Scalar[T](0)
                 alias max_val = Scalar[T](0) << T.bitwidth() - 1
                 test[T, A, widths.get[k, Int](), int(min_val)]()
