@@ -471,6 +471,13 @@ future and `StringSlice.__len__` now does return the Unicode codepoints length.
 
 - `SIMD.load/store` now supports `UnsafePointer` overloads.
 
+- The `atol` function now correctly supports leading underscores,
+  (e.g.`atol("0x_ff", 0)`), when the appropriate base is specified or inferred
+  (base 0). non-base-10 integer literals as per Python's [Integer Literals](\
+  <https://docs.python.org/3/reference/lexical_analysis.html#integers>).
+  ([PR #3180](https://github.com/modularml/mojo/pull/3180)
+  by [@jjvraw](https://github.com/jjvraw))
+
 ### ❌ Removed
 
 - It is no longer possible to cast (implicitly or explicitly) from `Reference`
