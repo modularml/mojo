@@ -84,7 +84,7 @@ def test_uint_cast():
                 alias T = src.get[i, DType]()
                 alias A = dst.get[j, DType]()
                 alias min_val = ~Scalar[T](0)
-                alias max_val = Scalar[T](0) << T.bitwidth() - 1
+                alias max_val = ~Scalar[T](0) << T.bitwidth() - 1
                 test[T, A, widths.get[k, Int](), int(min_val)]()
                 test[T, A, widths.get[k, Int](), int(max_val)]()
 
