@@ -242,6 +242,9 @@ struct SIMD[type: DType, size: Int](
     fn __init__[A: DType, //](inout self, other: SIMD[A, size]):
         """Cast the other SIMD vector into self.
 
+        Parameters:
+            A: The DType of the other SIMD.
+
         Args:
             other: The value to cast into self.
         """
