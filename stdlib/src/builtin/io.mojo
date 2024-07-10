@@ -28,7 +28,7 @@ from builtin.dtype import _get_dtype_printf_format
 from builtin.file_descriptor import FileDescriptor
 from memory import UnsafePointer
 
-from utils import StringRef, unroll, StaticString, StringSlice
+from utils import StringRef, StaticString, StringSlice
 from utils._format import Formattable, Formatter, write_to
 
 # ===----------------------------------------------------------------------=== #

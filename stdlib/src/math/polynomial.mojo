@@ -21,8 +21,6 @@ from math.polynomial import polynomial_evaluate
 
 from collections import List
 
-from utils.loop import unroll
-
 # ===----------------------------------------------------------------------===#
 # polynomial_evaluate
 # ===----------------------------------------------------------------------===#

@@ -23,8 +23,6 @@ from sys.intrinsics import _type_is_eq
 
 from memory import UnsafePointer
 
-from utils import unroll
-
 # ===----------------------------------------------------------------------===#
 # Utilities
 # ===----------------------------------------------------------------------===#
